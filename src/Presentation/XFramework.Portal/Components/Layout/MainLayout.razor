@@ -5,7 +5,7 @@
 @using XFramework.Domain.Shared.DataContext
 @using XFramework.Inventario.Domain.Shared.Contracts
 
-<div class="portal-shell flex h-screen overflow-hidden bg-background text-foreground">
+<div class="portal-shell @(IsInventarioRoute ? "inventario-shell" : "") flex h-screen overflow-hidden bg-background text-foreground">
     @* Fixed left sidebar - always visible *@
     <aside class="@SidebarClass"
            aria-label="Portal navigation"
@@ -67,9 +67,28 @@
         </div>
     </aside>
 
+    @if (IsInventarioRoute)
+    {
+        <BbSheet @bind-Open="_inventarioNavigationOpen">
+            <BbSheetContent Class="inventario-navigation-sheet">
+                <BbSheetHeader><BbSheetTitle>Inventario navigation</BbSheetTitle><BbSheetDescription>Choose a workspace or return to the product list.</BbSheetDescription></BbSheetHeader>
+                <nav class="app-sidebar-nav" aria-label="Inventario mobile navigation">
+                    <CascadingValue Value="_inventarioMobileSidebar">
+                        @if (TryGetInventarioProductDetailRoute(out var mobileProductId, out _))
+                        { <ProductDetailSidebar ProductId="@mobileProductId" /> }
+                        else { <NavMenu /> }
+                    </CascadingValue>
+                </nav>
+            </BbSheetContent>
+        </BbSheet>
+    }
     @* Main content *@
     <div class="app-content-shell flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <header class="app-header flex h-14 shrink-0 items-center justify-between border-b px-6">
+            @if (IsInventarioRoute)
+            {
+                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" Class="inventario-mobile-menu" AriaLabel="Open Inventario navigation" OnClick="@(() => _inventarioNavigationOpen = true)"><LucideIcon Name="menu" /></BbButton>
+            }
             <div class="app-header-breadcrumb flex min-w-0 items-center gap-2">
                 <BbBreadcrumb>
                     <BbBreadcrumbList>
@@ -181,6 +200,10 @@
 <BbOverlayPortalHost />
 
 @code {
+    private bool IsInventarioRoute => new Uri(Nav.Uri).AbsolutePath.StartsWith("/inventario/", StringComparison.OrdinalIgnoreCase);
+    private bool _inventarioNavigationOpen;
+    private readonly PortalSidebarState _inventarioMobileSidebar = new(["inventario", "product-detail"]);
+
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager Nav { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
@@ -363,6 +386,7 @@
     protected override void OnInitialized()
     {
         _sidebarState.ToggleGroupAsync = ToggleSidebarGroup;
+        _inventarioMobileSidebar.ToggleGroupAsync = group => { _inventarioMobileSidebar.SetGroupOpen(group, !_inventarioMobileSidebar.IsGroupOpen(group)); StateHasChanged(); return Task.CompletedTask; };
         UpdateActiveSidebarGroup();
 
         Nav.LocationChanged += OnLocationChanged;
@@ -918,6 +942,7 @@
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
     {
+        _inventarioNavigationOpen = false;
         _ = InvokeAsync(async () =>
         {
             await EnsureManageTenantsRouteUsesAllTenants();

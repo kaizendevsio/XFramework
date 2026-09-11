@@ -36,7 +36,7 @@ else if (_movement is null)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="flex items-center gap-4">
                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to stock"
                           OnClick="@(() => Navigation.NavigateTo("/inventario/stock"))">
@@ -59,7 +59,7 @@ else
                 <BbCard>
                     <BbCardContent>
                         <div class="space-y-1 pt-4">
-                            <BbTypographyMuted>Quantity Before</BbTypographyMuted>
+                            <BbTypographyMuted>On hand before</BbTypographyMuted>
                             <BbTypographyH3>@_movement.QuantityBefore.ToString("N2")</BbTypographyH3>
                         </div>
                     </BbCardContent>
@@ -67,7 +67,7 @@ else
                 <BbCard>
                     <BbCardContent>
                         <div class="space-y-1 pt-4">
-                            <BbTypographyMuted>Delta</BbTypographyMuted>
+                            <BbTypographyMuted>Change in @InventoryDisplay.Effect(_movement.MovementType)</BbTypographyMuted>
                             <BbTypographyH3>@FormatDelta(_movement.QuantityDelta)</BbTypographyH3>
                         </div>
                     </BbCardContent>
@@ -75,7 +75,7 @@ else
                 <BbCard>
                     <BbCardContent>
                         <div class="space-y-1 pt-4">
-                            <BbTypographyMuted>Quantity After</BbTypographyMuted>
+                            <BbTypographyMuted>On hand after</BbTypographyMuted>
                             <BbTypographyH3>@_movement.QuantityAfter.ToString("N2")</BbTypographyH3>
                         </div>
                     </BbCardContent>
@@ -85,13 +85,17 @@ else
             <BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Movement Details</BbCardTitle>
-                    <BbCardDescription>Read-only append ledger entry.</BbCardDescription>
+                    <BbCardDescription>Recorded stock change. Reservation and release affect reserved stock; on-hand snapshots remain unchanged.</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
                     <div class="grid gap-4 md:grid-cols-2">
                         <div>
                             <BbTypographyMuted>Product</BbTypographyMuted>
                             <div>@GetProductLabel()</div>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Variant</BbTypographyMuted>
+                            <div>@InventoryDisplay.Variant(_variants, _movement.ProductVariationId)</div>
                         </div>
                         <div>
                             <BbTypographyMuted>Warehouse</BbTypographyMuted>
@@ -147,6 +151,7 @@ else
 
     private InventoryMovement? _movement;
     private Product? _product;
+    private List<ProductVariation> _variants = [];
     private Warehouse? _warehouse;
     private InventoryLocation? _location;
     private StockBalance? _balance;
@@ -182,6 +187,7 @@ else
             _outsideTenantContext = false;
             _movement = null;
             _product = null;
+            _variants = [];
             _warehouse = null;
             _location = null;
             _balance = null;
@@ -198,6 +204,9 @@ else
             if (_movement is null || _outsideTenantContext) return;
 
             var tenantId = _movement.TenantId;
+            if (_movement.ProductVariationId is { } variantId)
+                _variants = await DataContext.Query<ProductVariation>().NoCache()
+                    .Where(x => x.TenantId == tenantId && x.Id == variantId && !x.IsDeleted).ToListAsync();
             _product = await DataContext.Query<Product>()
                 .IgnoreQueryFilters()
                 .NoCache()
@@ -259,7 +268,7 @@ else
     private string FormatReference() =>
         string.IsNullOrWhiteSpace(_movement?.ReferenceType)
             ? "N/A"
-            : _movement.ReferenceId is { } referenceId ? $"{_movement.ReferenceType} / {referenceId}" : _movement.ReferenceType;
+            : _movement.ReferenceId is { } referenceId ? $"{InventoryDisplay.Reference(_movement.ReferenceType)} / {referenceId}" : InventoryDisplay.Reference(_movement.ReferenceType);
 
     private static string FormatDelta(decimal value) =>
         value >= 0 ? $"+{value:N2}" : value.ToString("N2");

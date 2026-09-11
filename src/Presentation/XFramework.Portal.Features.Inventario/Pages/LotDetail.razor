@@ -37,7 +37,7 @@ else if (_lot is null)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="flex items-center gap-4">
                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to lots"
                           OnClick="@(() => Navigation.NavigateTo("/inventario/lots"))">
@@ -46,9 +46,9 @@ else
                 <div class="flex-1">
                     <div class="flex items-center gap-2">
                         <BbTypographyH3>@_lot.LotNumber</BbTypographyH3>
-                        <StatusBadge Text="@_lot.Status.ToString()" Status="@GetStatusBadge(_lot.Status)" />
+                        <StatusBadge Text="@(_lot.Status == InventoryLotStatus.Available ? "Eligible" : _lot.Status.ToString())" Status="@GetStatusBadge(_lot.Status)" />
                     </div>
-                    <BbTypographyMuted>@GetProductLabel() - ID: @_lot.Id</BbTypographyMuted>
+                    <BbTypographyMuted>@GetProductLabel() / @InventoryDisplay.Variant(_variants, _lot.ProductVariationId). @(_balances.Sum(x => x.OnHandQuantity) == 0 ? "Depleted" : "Stock on hand")</BbTypographyMuted>
                 </div>
                 <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
                     <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
@@ -88,7 +88,21 @@ else
                     <BbCardTitle>Lot Summary</BbCardTitle>
                     <BbCardDescription>Traceability metadata and source details.</BbCardDescription>
                 </BbCardHeader>
-                <BbCardContent>
+                <BbCardContent>@if (_maintenanceEditing)
+                    {
+                        @if (_maintenanceError is not null) { <BbAlert><BbAlertDescription>@_maintenanceError</BbAlertDescription></BbAlert> }
+                        <div class="xf-detail-field-grid"><BbFormFieldInput TValue="string" @bind-Value="_editSupplierReference" Label="Supplier Reference" />
+<BbFormFieldDatePicker @bind-Value="_editManufacturedAt" Label="Manufactured At" />
+<BbFormFieldDatePicker @bind-Value="_editExpiresAt" Label="Expires At" />
+<BbFormFieldSelect TValue="InventoryLotStatus" @bind-Value="_editStatus" Label="Status">@foreach (var value in Enum.GetValues<InventoryLotStatus>()) { <BbSelectItem Value="@value">@value</BbSelectItem> }</BbFormFieldSelect>
+</div>
+                        <p class="text-sm text-muted-foreground">Identity and existing stock quantities remain unchanged. Eligibility and pickability changes require active reservations to be released first.</p>
+                        <div class="xf-page-actions"><BbButton OnClick="@SaveMaintenance" Disabled="@_maintenanceSaving">Save changes</BbButton><BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _maintenanceEditing = false)" Disabled="@_maintenanceSaving">Discard</BbButton></div>
+                    }
+                    else
+                    {
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@BeginMaintenance">Edit details</BbButton>
+
                     <div class="grid gap-4 md:grid-cols-2">
                         <div>
                             <BbTypographyMuted>Product</BbTypographyMuted>
@@ -108,7 +122,7 @@ else
                         </div>
                         <div>
                             <BbTypographyMuted>Expiration</BbTypographyMuted>
-                            <div>@FormatDate(_lot.ExpiresAt)</div>
+                            <div>@(_lot.ExpiresAt?.ToString("dd MMM yyyy") ?? "No expiry")</div>
                         </div>
                         <div>
                             <BbTypographyMuted>Unit Cost</BbTypographyMuted>
@@ -116,17 +130,21 @@ else
                         </div>
                         <div>
                             <BbTypographyMuted>Source</BbTypographyMuted>
-                            <div>@FormatSource()</div>
+                            <div>@if (_lot.SourceReferenceType == "receiving" && _lot.SourceReferenceId is { } receiptId)
+                            { <a href="@($"/inventario/receiving/{receiptId}")">Stock receipt</a> }
+                            else { @FormatSource() }</div>
                         </div>
                         <div>
                             <BbTypographyMuted>Created</BbTypographyMuted>
                             <div>@_lot.CreatedAt.ToLocalTime().ToString("g")</div>
                         </div>
                     </div>
-                </BbCardContent>
+
+                    }
+</BbCardContent>
             </BbCard>
 
-            <BbCard>
+            <BbTabs DefaultValue="view0" Class="inv-workspace-tabs"><BbTabsList><BbTabsTrigger Value="view0">Balances</BbTabsTrigger><BbTabsTrigger Value="view1">Movements</BbTabsTrigger></BbTabsList><BbTabsContent Value="view0" ForceMount="true"><BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Stock Balances</BbCardTitle>
                     <BbCardDescription>Warehouse and location balances for this lot.</BbCardDescription>
@@ -135,22 +153,22 @@ else
                     <BbDataGrid Items="@_balances" ShowPagination="true" InitialPageSize="10"
                                 OnRowClick="@((StockBalance item) => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}"))"
                                 Class="cursor-pointer">
-                        <Columns>
+                        <Columns><BbDataGridTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Warehouse" Filterable="true" FilterBy="@(item => GetWarehouseName(item.WarehouseId))">
                                 <ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Location" Filterable="true" FilterBy="@(item => GetLocationName(item.LocationId))">
                                 <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Format="0.####" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Format="0.####" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Format="0.####" Sortable="true" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
-            </BbCard>
+            </BbCard></BbTabsContent>
 
-            <BbCard>
+            <BbTabsContent Value="view1" ForceMount="true"><BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Movement Ledger</BbCardTitle>
                     <BbCardDescription>Append-only movement rows associated with this lot.</BbCardDescription>
@@ -159,21 +177,24 @@ else
                     <BbDataGrid Items="@_movements" ShowPagination="true" InitialPageSize="10"
                                 OnRowClick="@((InventoryMovement item) => Navigation.NavigateTo($"/inventario/stock/movements/{item.Id}"))"
                                 Class="cursor-pointer">
-                        <Columns>
+                        <Columns><BbDataGridTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="After" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ReferenceType)" Title="Reference" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Affects" Filterable="true" FilterBy="@(item => InventoryDisplay.Effect(item.MovementType))"><ChildContent Context="item">@InventoryDisplay.Effect(item.MovementType)</ChildContent></BbDataGridTemplateColumn>
+<BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Format="0.####" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="On hand after" Format="0.####" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Reference" Filterable="true" FilterBy="@(item => InventoryDisplay.Reference(item.ReferenceType))"><ChildContent Context="item">@InventoryDisplay.Reference(item.ReferenceType)</ChildContent></BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
-            </BbCard>
+            </BbCard></BbTabsContent></BbTabs>
         </div>
     </FadeInContent>
 }
 
 @code {
+    private List<ProductVariation> _variants = [];
+    private List<InventoryLot> _identityLots = [];
     [Parameter] public Guid Id { get; set; }
 
     [Inject] private IDataContext DataContext { get; set; } = default!;
@@ -241,6 +262,8 @@ else
             if (_lot is null || _outsideTenantContext) return;
 
             var tenantId = _lot.TenantId;
+            _variants = await DataContext.Query<ProductVariation>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
+            _identityLots = await DataContext.Query<InventoryLot>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
             _product = await DataContext.Query<Product>()
                 .IgnoreQueryFilters()
                 .NoCache()
@@ -303,7 +326,7 @@ else
     {
         if (_lot is null) return "N/A";
         if (string.IsNullOrWhiteSpace(_lot.SourceReferenceType) && _lot.SourceReferenceId is null) return "N/A";
-        return $"{_lot.SourceReferenceType ?? "Source"} {_lot.SourceReferenceId?.ToString()[..8] ?? ""}".Trim();
+        return InventoryDisplay.Reference(_lot.SourceReferenceType);
     }
 
     private static string FormatDate(DateTime? value) =>
@@ -317,4 +340,55 @@ else
         TenantFilter.OnChanged -= OnTenantChanged;
         ModuleNavigation.OnChanged -= OnTenantChanged;
     }
+
+    private string? _maintenanceError;
+    private bool _maintenanceEditing;
+    private bool _maintenanceSaving;
+    private Guid _editStamp;
+    private string _editSupplierReference = "";
+    private DateTime? _editManufacturedAt;
+    private DateTime? _editExpiresAt;
+    private InventoryLotStatus _editStatus;
+
+    private void BeginMaintenance()
+    {
+        if (_lot is null) return;
+        _editStamp = _lot.ConcurrencyStamp;
+        _editSupplierReference = _lot.SupplierReference ?? "";
+        _editManufacturedAt = _lot.ManufacturedAt;
+        _editExpiresAt = _lot.ExpiresAt;
+        _editStatus = _lot.Status;
+        _maintenanceError = null;
+        _maintenanceEditing = true;
+    }
+    private async Task SaveMaintenance()
+    {
+        if (_lot is null || _maintenanceSaving) return;
+        _maintenanceError = null;
+        if (_editSupplierReference.Length > 200) { _maintenanceError = "Supplier reference must be at most 200 characters."; return; }
+        _maintenanceSaving = true;
+        try
+        {
+            var result = await Inventario.UpdateInventoryLot(new UpdateInventoryLotRequest
+            {
+                Metadata = new() { RequestedTenantId = TenantFilter.SelectedTenantId },
+                Id = _lot.Id,
+                ConcurrencyStamp = _editStamp,
+                SupplierReference = _editSupplierReference,
+                ManufacturedAt = _editManufacturedAt,
+                ExpiresAt = _editExpiresAt,
+                Status = _editStatus,
+            });
+            if (result.IsSuccess)
+            {
+                _maintenanceEditing = false;
+                ToastService.Success("Changes saved.");
+                await Reload();
+            }
+            else ToastService.Error("Could not save. Check fields, release active reservations if changing eligibility, or refresh if another user edited this record.");
+        }
+        catch { ToastService.Error("Could not save changes. Refresh and try again."); }
+        finally { _maintenanceSaving = false; }
+    }
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
 }

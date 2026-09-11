@@ -21,7 +21,7 @@ else if (!_purchasingEnabled)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="xf-page-header">
                 <div>
                     <BbTypographyH3>Receiving</BbTypographyH3>
@@ -81,16 +81,20 @@ else
 }
 
 <BbDialog Open="@_receiveDialogOpen" OpenChanged="@(v => _receiveDialogOpen = v)">
-    <BbDialogContent TrapFocus="false" Class="xf-dialog-extra-wide">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-extra-wide inv-dialog">
         <BbDialogHeader>
             <BbDialogTitle>Receive Stock</BbDialogTitle>
-            <BbDialogDescription>Receiving posts receipt movements and updates balances in one save.</BbDialogDescription>
+            <BbDialogDescription>Receive against an order, or leave Purchase Order empty for an ad-hoc receipt. Posting increases on-hand stock; reserved stock stays unchanged.</BbDialogDescription>
         </BbDialogHeader>
-        <div class="grid gap-4 py-4">
+        <div class="grid gap-4 py-4 inv-dialog-body">
+            @if (_receiveError is not null)
+            {
+                <BbAlert><BbAlertTitle>Receipt not posted</BbAlertTitle><BbAlertDescription>@_receiveError</BbAlertDescription></BbAlert>
+            }
             <div class="grid gap-3 md:grid-cols-3">
                 <BbFormFieldInput TValue="string" @bind-Value="_form.ReceiptNumber" Label="Receipt Number" />
                 <XfEntityPicker TItem="PurchaseOrder"
-                                @bind-Value="_form.PurchaseOrderId"
+                                Value="@_form.PurchaseOrderId" ValueChanged="@OnPurchaseOrderChanged"
                                 Items="@OpenPurchaseOrders"
                                 Label="Purchase Order"
                                 Placeholder="No purchase order"
@@ -160,10 +164,10 @@ else
                     {
                         var index = i;
                         var line = _form.Lines[index];
-                        <div class="grid gap-3 rounded-md border p-3">
+                        <div @key="line" class="grid gap-3 rounded-md border p-3">
                             <div class="grid gap-3 md:grid-cols-[1.2fr_1.4fr_0.8fr_0.8fr_auto]">
                                 <XfEntityPicker TItem="PurchaseOrderLine"
-                                                @bind-Value="line.PurchaseOrderLineId"
+                                                Value="@line.PurchaseOrderLineId" ValueChanged="@((string? value) => OnOrderLineChanged(line, value))" Disabled="@string.IsNullOrEmpty(_form.PurchaseOrderId)"
                                                 Items="@OpenPurchaseOrderLines"
                                                 Label="PO Line"
                                                 Placeholder="No PO line"
@@ -177,7 +181,7 @@ else
                                                 AdvancedSearchTitle="Find Purchase Order Line"
                                                 AdvancedSearchDescription="Search open purchase order lines." />
                                 <XfEntityPicker TItem="Product"
-                                                @bind-Value="line.ProductId"
+                                                Value="@line.ProductId" ValueChanged="@((string? value) => OnProductChanged(line, value))" Disabled="@(!string.IsNullOrEmpty(_form.PurchaseOrderId))"
                                                 Items="@_products"
                                                 Label="Product"
                                                 Placeholder="Select product"
@@ -188,14 +192,19 @@ else
                                                 SearchTextSelector="@GetProductSearchText"
                                                 AdvancedSearchTitle="Find Product"
                                                 AdvancedSearchDescription="Search products in the active tenant." />
+                                <BbFormFieldSelect TValue="string" Value="@line.ProductVariationId" ValueChanged="@((string value) => { line.ProductVariationId = value; line.LotId = ""; line.LotNumber = ""; line.ManufacturedAt = null; line.ExpiresAt = null; })" Label="Variant" Disabled="@(!string.IsNullOrEmpty(_form.PurchaseOrderId))">
+                                    <BbSelectItem Value="@("base")">Base product</BbSelectItem>
+                                    @foreach (var variant in _variants.Where(x => x.ProductId.ToString() == line.ProductId))
+                                    { <BbSelectItem Value="@variant.Id.ToString()">@InventoryDisplay.Variant(_variants, variant.Id)</BbSelectItem> }
+                                </BbFormFieldSelect>
                                 <BbFormFieldNumericInput TValue="decimal"
                                                          @bind-Value="line.Quantity"
                                                          Label="Quantity"
                                                          Min="0"
-                                                         DecimalPlaces="2"
+                                                         DecimalPlaces="4"
                                                          Step="1" />
-                                <BbFormFieldCurrencyInput @bind-Value="line.UnitCost"
-                                                          Label="Unit Cost"
+                                <BbFormFieldCurrencyInput CurrencyCode="@_currency" @bind-Value="line.UnitCost"
+                                                          Label="Unit Cost" Disabled="@(!string.IsNullOrEmpty(line.PurchaseOrderLineId))"
                                                           Min="0"
                                                           ShowSymbol="false" />
                                 <div class="flex items-end">
@@ -206,22 +215,24 @@ else
                                     </BbButton>
                                 </div>
                             </div>
+                            <p class="text-sm text-muted-foreground">@LinePreview(line)</p>
+                            <BbFormFieldInput TValue="string" @bind-Value="line.UnitOfMeasure" Label="Unit" Disabled="@(!string.IsNullOrEmpty(line.PurchaseOrderLineId))" />
                             <div class="grid gap-3 md:grid-cols-4">
                                 <XfEntityPicker TItem="InventoryLot"
-                                                @bind-Value="line.LotId"
-                                                Items="@_lots"
+                                                Value="@line.LotId" ValueChanged="@((string? value) => { line.LotId = value ?? ""; line.LotNumber = ""; line.ManufacturedAt = null; line.ExpiresAt = null; })"
+                                                Items="@_lots.Where(x => x.ProductId.ToString() == line.ProductId && x.ProductVariationId == ParseVariant(line.ProductVariationId)).ToList()"
                                                 Label="Existing Lot"
-                                                Placeholder="Create/no lot"
+                                                Placeholder="Untracked unless new lot entered"
                                                 SearchPlaceholder="Search lots..."
                                                 EmptyMessage="No lots found."
                                                 ValueSelector="@GetLotPickerValue"
                                                 TextSelector="@GetLotLabel"
                                                 SearchTextSelector="@GetLotSearchText"
                                                 AllowClear="true"
-                                                ClearText="Create/no lot"
+                                                ClearText="No existing lot"
                                                 AdvancedSearchTitle="Find Lot / Batch"
                                                 AdvancedSearchDescription="Search lots in the active tenant." />
-                                <BbFormFieldInput TValue="string" @bind-Value="line.LotNumber" Label="New Lot Number" />
+                                <BbFormFieldInput TValue="string" @bind-Value="line.LotNumber" Label="New Lot Number" Disabled="@(!string.IsNullOrEmpty(line.LotId))" />
                                 <BbFormFieldDatePicker @bind-Value="line.ManufacturedAt" Label="Manufacture Date" />
                                 <BbFormFieldDatePicker @bind-Value="line.ExpiresAt" Label="Expiration Date" />
                             </div>
@@ -238,6 +249,7 @@ else
 </BbDialog>
 
 @code {
+    private string _currency = "PHP";
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
@@ -252,6 +264,9 @@ else
     private List<PurchaseOrderLine> _orderLines = [];
     private List<Supplier> _suppliers = [];
     private List<Product> _products = [];
+    private List<ProductVariation> _variants = [];
+    [SupplyParameterFromQuery] public Guid? PurchaseOrderId { get; set; }
+    private Guid? _openedPurchaseOrderId;
     private List<Warehouse> _warehouses = [];
     private List<InventoryLocation> _locations = [];
     private List<InventoryLot> _lots = [];
@@ -260,17 +275,18 @@ else
     private bool _purchasingEnabled;
     private bool _saving;
     private bool _receiveDialogOpen;
+    private string? _receiveError;
     private bool IsReceiveDisabled =>
         _saving ||
         string.IsNullOrWhiteSpace(_form.WarehouseId) ||
         string.IsNullOrWhiteSpace(_form.LocationId) ||
-        _form.Lines.Any(x => string.IsNullOrWhiteSpace(x.ProductId) || x.Quantity <= 0);
+        _form.Lines.Any(x => string.IsNullOrWhiteSpace(x.ProductId) || x.Quantity <= 0 || (!string.IsNullOrEmpty(_form.PurchaseOrderId) && !OpenPurchaseOrderLines.Any(po => po.Id.ToString() == x.PurchaseOrderLineId && po.ProductId.ToString() == x.ProductId && po.ProductVariationId == ParseVariant(x.ProductVariationId) && x.Quantity <= po.OrderedQuantity - po.ReceivedQuantity)));
 
     private IReadOnlyList<PurchaseOrder> OpenPurchaseOrders =>
         _orders.Where(x => x.Status is PurchaseOrderStatus.Open or PurchaseOrderStatus.PartiallyReceived).ToList();
 
     private IReadOnlyList<PurchaseOrderLine> OpenPurchaseOrderLines =>
-        _orderLines.Where(x => x.ReceivedQuantity < x.OrderedQuantity).ToList();
+        _orderLines.Where(x => x.PurchaseOrderId.ToString() == _form.PurchaseOrderId && x.ReceivedQuantity < x.OrderedQuantity).ToList();
 
     private IReadOnlyList<InventoryLocation> FilteredLocations =>
         _locations.Where(x => x.WarehouseId.ToString() == _form.WarehouseId).ToList();
@@ -306,6 +322,7 @@ else
             if (!_hasTenant || !_purchasingEnabled) return;
 
             var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _currency = await InventoryDisplay.CurrencyAsync(DataContext, tenantId);
             _documents = await DataContext.Query<ReceivingDocument>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderByDescending(x => x.ReceivedAt).Take(500).ToListAsync();
             _lines = await DataContext.Query<ReceivingLine>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
             _orders = await DataContext.Query<PurchaseOrder>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(500).ToListAsync();
@@ -314,6 +331,7 @@ else
             _products = await DataContext.Query<Product>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.Name).Take(500).ToListAsync();
             _warehouses = await DataContext.Query<Warehouse>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.Code).Take(200).ToListAsync();
             _locations = await DataContext.Query<InventoryLocation>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.Code).Take(500).ToListAsync();
+            _variants = await DataContext.Query<ProductVariation>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
             _lots = await DataContext.Query<InventoryLot>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.LotNumber).Take(500).ToListAsync();
         }
         catch
@@ -327,9 +345,59 @@ else
         }
     }
 
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!_loading && _hasTenant && _purchasingEnabled && PurchaseOrderId is { } id && _openedPurchaseOrderId != id)
+        {
+            _openedPurchaseOrderId = id;
+            OpenReceiveDialog();
+            OnPurchaseOrderChanged(id.ToString());
+            StateHasChanged();
+        }
+    }
+
+    private static Guid? ParseVariant(string value) => Guid.TryParse(value, out var id) ? id : null;
+    private void OnProductChanged(ReceivingLineForm line, string? value)
+    {
+        line.ProductId = value ?? "";
+        line.ProductVariationId = "base";
+        line.LotId = "";
+        line.LotNumber = "";
+        line.ManufacturedAt = null;
+        line.ExpiresAt = null;
+        line.UnitOfMeasure = "each";
+    }
+    private void OnOrderLineChanged(ReceivingLineForm line, string? value)
+    {
+        line.PurchaseOrderLineId = value ?? "";
+        var orderLine = OpenPurchaseOrderLines.FirstOrDefault(x => x.Id.ToString() == value);
+        OnProductChanged(line, orderLine?.ProductId.ToString());
+        line.ProductVariationId = orderLine?.ProductVariationId?.ToString() ?? "base";
+        line.Quantity = orderLine is null ? 1 : orderLine.OrderedQuantity - orderLine.ReceivedQuantity;
+        line.UnitCost = orderLine?.UnitCost ?? 0;
+        line.UnitOfMeasure = orderLine?.UnitOfMeasure ?? "each";
+    }
+    private void OnPurchaseOrderChanged(string? value)
+    {
+        _form.PurchaseOrderId = value ?? "";
+        _form.SupplierId = _orders.FirstOrDefault(x => x.Id.ToString() == value)?.SupplierId?.ToString() ?? "";
+        _form.Lines.Clear();
+        AddLine();
+        if (OpenPurchaseOrderLines.Count == 1)
+            OnOrderLineChanged(_form.Lines[0], OpenPurchaseOrderLines[0].Id.ToString());
+    }
+    private string LinePreview(ReceivingLineForm line)
+    {
+        var po = OpenPurchaseOrderLines.FirstOrDefault(x => x.Id.ToString() == line.PurchaseOrderLineId);
+        var remaining = po is null ? "Ad-hoc receipt." : $"Order remaining: {po.OrderedQuantity - po.ReceivedQuantity:0.####} {po.UnitOfMeasure}.";
+        return $"{remaining} Adds {line.Quantity:0.####} {line.UnitOfMeasure} on hand. Line total: {_currency} {line.Quantity * line.UnitCost:N2}. Select an existing lot, enter a new lot number, or leave both empty for untracked stock.";
+    }
+
     private void OpenReceiveDialog()
     {
-        _form.Reset(_warehouses.FirstOrDefault()?.Id.ToString() ?? "", _locations.FirstOrDefault()?.Id.ToString() ?? "", _products.FirstOrDefault()?.Id.ToString() ?? "");
+        _receiveError = null;
+        var warehouseId = _warehouses.FirstOrDefault()?.Id;
+        _form.Reset(warehouseId?.ToString() ?? "", _locations.FirstOrDefault(x => x.WarehouseId == warehouseId)?.Id.ToString() ?? "", "");
         _receiveDialogOpen = true;
     }
 
@@ -339,7 +407,7 @@ else
         _form.LocationId = _locations.FirstOrDefault(x => x.WarehouseId.ToString() == _form.WarehouseId)?.Id.ToString() ?? "";
     }
 
-    private void AddLine() => _form.Lines.Add(new ReceivingLineForm { ProductId = _products.FirstOrDefault()?.Id.ToString() ?? "", Quantity = 1m });
+    private void AddLine() => _form.Lines.Add(new ReceivingLineForm { ProductId = "", Quantity = 1m });
 
     private void RemoveLine(int index)
     {
@@ -349,6 +417,18 @@ else
 
     private async Task ReceiveStock()
     {
+        if (IsReceiveDisabled) return;
+        _receiveError = null;
+        if (_form.Lines.Any(x => x.ManufacturedAt > x.ExpiresAt))
+        {
+            _receiveError = "Expiry must be on or after manufacture date.";
+            return;
+        }
+        if (_form.Lines.Any(x => x.LotNumber.Length > 100 || x.UnitOfMeasure.Length > 25))
+        {
+            _receiveError = "Lot numbers allow up to 100 characters; units allow up to 25.";
+            return;
+        }
         _saving = true;
         try
         {
@@ -368,6 +448,8 @@ else
                     {
                         PurchaseOrderLineId = Guid.TryParse(x.PurchaseOrderLineId, out var poLineId) ? poLineId : null,
                         ProductId = Guid.Parse(x.ProductId),
+                        ProductVariationId = ParseVariant(x.ProductVariationId),
+                        UnitOfMeasure = x.UnitOfMeasure,
                         Quantity = x.Quantity,
                         UnitCost = x.UnitCost > 0 ? x.UnitCost : null,
                         LotId = Guid.TryParse(x.LotId, out var lotId) ? lotId : null,
@@ -378,13 +460,29 @@ else
                     .ToList()
             });
 
-            ToastService.Show(result.IsSuccess ? "Receiving posted." : "Could not post receiving.");
             if (result.IsSuccess)
             {
+                ToastService.Success("Receiving posted.");
                 _receiveDialogOpen = false;
                 await Reload();
             }
+            else
+            {
+                _receiveError = result.Message switch
+                {
+                    "Receiving quantity exceeds the remaining purchase order quantity." => "This order has less outstanding stock now. Refresh the order and reduce the receipt quantity.",
+                    "Receiving line product does not match the purchase order line." or
+                    "Receiving line variant does not match the purchase order line." => "Re-select the order line to restore its product and variant.",
+                    "Lot does not belong to the receiving product." or
+                    "Lot does not belong to the receiving variant." => "Choose a lot for this product and variant, or clear the lot selection.",
+                    _ when result.HttpStatusCode == System.Net.HttpStatusCode.Conflict => "The order or stock changed, or this receipt was already submitted with different details. Refresh and check receiving history before trying again.",
+                    _ when result.HttpStatusCode == System.Net.HttpStatusCode.BadRequest => "Check the order line, product, variant, quantity, lot dates and unit. Each order receipt line must match an outstanding order line.",
+                    _ when result.HttpStatusCode == System.Net.HttpStatusCode.Forbidden => "Your tenant or role cannot receive into this stock position.",
+                    _ => "Could not confirm the receipt. Check receiving history, then retry the same form to preserve duplicate protection."
+                };
+            }
         }
+        catch { _receiveError = "Connection interrupted. Check receiving history, then retry the same form to preserve duplicate protection."; }
         finally
         {
             _saving = false;
@@ -399,7 +497,7 @@ else
     private string GetPurchaseOrderLabel(PurchaseOrder order) => $"{order.OrderNumber} ({order.Status})";
     private string GetPurchaseOrderSearchText(PurchaseOrder order) => $"{order.OrderNumber} {order.Status} {GetSupplierName(order.SupplierId)} {order.Notes}";
     private static string GetPurchaseOrderLinePickerValue(PurchaseOrderLine line) => line.Id.ToString();
-    private string GetPurchaseOrderLineLabel(PurchaseOrderLine line) => $"{GetPurchaseOrderNumber(line.PurchaseOrderId)} - {GetProductName(line.ProductId)} ({line.OrderedQuantity - line.ReceivedQuantity:N2} remaining)";
+    private string GetPurchaseOrderLineLabel(PurchaseOrderLine line) => $"{GetPurchaseOrderNumber(line.PurchaseOrderId)} - {GetProductName(line.ProductId)} / {InventoryDisplay.Variant(_variants, line.ProductVariationId)} ({line.OrderedQuantity - line.ReceivedQuantity:0.####} {line.UnitOfMeasure} remaining)";
     private string GetPurchaseOrderLineSearchText(PurchaseOrderLine line) => $"{GetPurchaseOrderLineLabel(line)} {line.UnitOfMeasure}";
     private static string GetSupplierPickerValue(Supplier supplier) => supplier.Id.ToString();
     private static string GetSupplierLabel(Supplier supplier) => string.IsNullOrWhiteSpace(supplier.Code) ? supplier.Name ?? supplier.Id.ToString()[..8] : $"{supplier.Code} - {supplier.Name}";
@@ -445,7 +543,7 @@ else
             WarehouseId = warehouseId;
             LocationId = locationId;
             ReferenceNumber = "";
-            IdempotencyKey = "";
+            IdempotencyKey = Guid.NewGuid().ToString("N");
             Lines.Clear();
             Lines.Add(new ReceivingLineForm { ProductId = productId, Quantity = 1m });
         }
@@ -455,6 +553,8 @@ else
     {
         public string PurchaseOrderLineId { get; set; } = "";
         public string ProductId { get; set; } = "";
+        public string ProductVariationId { get; set; } = "base";
+        public string UnitOfMeasure { get; set; } = "each";
         public decimal Quantity { get; set; } = 1m;
         public decimal UnitCost { get; set; }
         public string LotId { get; set; } = "";

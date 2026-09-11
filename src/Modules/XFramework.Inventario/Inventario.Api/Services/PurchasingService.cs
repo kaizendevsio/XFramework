@@ -693,4 +693,36 @@ public sealed class PurchasingService(
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(json));
         return Convert.ToHexString(bytes);
     }
+
+    public async Task<Result<Supplier>> UpdateSupplierAsync(UpdateSupplierRequest request, CancellationToken ct = default)
+    {
+        var tenantResult = GetCurrentTenantId(request);
+        if (!tenantResult.IsSuccess)
+            return Result<Supplier>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+        var tenantId = tenantResult.Data;
+        var featureResult = await EnsurePurchasingEnabledAsync(tenantId, ct);
+        if (!featureResult.IsSuccess)
+            return Result<Supplier>.Failure(featureResult.Message!, featureResult.StatusCode);
+        if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 200)
+            return Result<Supplier>.Failure("Name is required and must be at most 200 characters.", 400);
+
+        if (request.ContactName?.Length > 200) return Result<Supplier>.Failure("ContactName must be at most 200 characters.", 400);
+        if (request.Email?.Length > 320) return Result<Supplier>.Failure("Email must be at most 320 characters.", 400);
+        if (request.Phone?.Length > 50) return Result<Supplier>.Failure("Phone must be at most 50 characters.", 400);
+        var entity = await dataContext.Query<Supplier>()
+            .Where(x => x.TenantId == tenantId && x.Id == request.Id && !x.IsDeleted).FirstOrDefaultAsync(ct);
+        if (entity is null) return Result<Supplier>.NotFound("Record not found.");
+        if (entity.ConcurrencyStamp != request.ConcurrencyStamp)
+            return Result<Supplier>.Conflict("This record changed. Refresh before saving.");
+        dataContext.Update(entity);
+        entity.Name = NormalizeOptional(request.Name);
+        entity.ContactName = NormalizeOptional(request.ContactName);
+        entity.Email = NormalizeOptional(request.Email);
+        entity.Phone = NormalizeOptional(request.Phone);
+        entity.IsActive = request.IsActive;
+        entity.ModifiedAt = DateTime.UtcNow;
+        entity.ConcurrencyStamp = Guid.NewGuid();
+        var saved = await dataContext.SaveChangesAsync(ct);
+        return saved.IsSuccess ? Result<Supplier>.Success(entity) : Result<Supplier>.Failure("Could not save changes.", saved.StatusCode);
+    }
 }

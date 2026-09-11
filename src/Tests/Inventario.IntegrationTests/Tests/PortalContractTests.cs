@@ -174,9 +174,8 @@ public sealed class PortalContractTests
             repositoryRoot.FullName,
             "src",
             "Presentation",
-            "XFramework.Portal",
+            "XFramework.Portal.Shared",
             "Components",
-            "Shared",
             "XfEntityPicker.razor");
 
         var productDetailText = File.ReadAllText(productDetailPath);
@@ -248,8 +247,8 @@ public sealed class PortalContractTests
         var productDetailPath = Path.Combine(GetInventarioPagesRoot(repositoryRoot), "ProductDetail.razor");
         var text = File.ReadAllText(productDetailPath);
 
-        text.Should().Contain("Class=\"xf-dialog-wide\"");
-        text.Should().Contain("Class=\"xf-dialog-extra-wide\"");
+        text.Should().MatchRegex("Class=\"[^\"]*\\bxf-dialog-wide\\b[^\"]*\"");
+        text.Should().MatchRegex("Class=\"[^\"]*\\bxf-dialog-extra-wide\\b[^\"]*\"");
         text.Should().Contain("@page \"/inventario/products/{Id:guid}/{Section}\"");
         text.Should().NotContain("xf-detail-layout");
         text.Should().NotContain("xf-detail-sidebar");
@@ -319,7 +318,7 @@ public sealed class PortalContractTests
 
         var getBreadcrumbsBody = Regex.Match(
             mainLayoutText,
-            @"private\s+List<string>\s+GetBreadcrumbs\(\)\s*\{(?<body>.*?)\n\s*\}",
+            @"private\s+List<\(string Label, string\? Href\)>\s+GetBreadcrumbs\(\)\s*\{(?<body>.*?)\n    \}",
             RegexOptions.Singleline).Groups["body"].Value;
 
         getBreadcrumbsBody.Should().Contain("TryGetInventarioProductDetailRoute");

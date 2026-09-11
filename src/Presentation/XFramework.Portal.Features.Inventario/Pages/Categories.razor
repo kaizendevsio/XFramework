@@ -19,7 +19,7 @@ else if (!_moduleEnabled)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="xf-page-header">
                 <div>
                     <BbTypographyH3>Product Categories</BbTypographyH3>
@@ -39,7 +39,7 @@ else
                     <BbCardDescription>@_categories.Count category(s) loaded</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <BbDataGrid Items="@_categories" ShowPagination="true" InitialPageSize="20"
+                    <BbFormFieldInput TValue="string" @bind-Value="_search" Label="Search categories" /><BbDataGrid Items="@_categories.Where(x => (x.Name ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase)).ToList()" ShowPagination="true" InitialPageSize="20"
                                 OnRowClick="@((ProductCategory item) => Navigation.NavigateTo($"/inventario/categories/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
@@ -77,7 +77,7 @@ else
             <BbDialogTitle>Create Category</BbDialogTitle>
             <BbDialogDescription>Categories organize products in this tenant.</BbDialogDescription>
         </BbDialogHeader>
-        <div class="grid gap-4 py-4">
+        <div class="grid gap-4 py-4 inv-dialog-body">
             <BbFormFieldInput TValue="string" @bind-Value="_name" Label="Name" Required="true" />
             <BbFormFieldInput TValue="string" @bind-Value="_description" Label="Description" />
         </div>
@@ -94,6 +94,7 @@ else
                      OnConfirm="@DeleteCategory" />
 
 @code {
+    private string _search = "";
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;

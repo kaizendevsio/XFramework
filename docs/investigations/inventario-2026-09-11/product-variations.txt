@@ -1,0 +1,134 @@
+- complementary "Portal navigation":
+  - generic: X
+  - text: Portal
+  - paragraph: Modules & operations
+  - navigation:
+    - link "Product List":
+      - /url: /inventario/products
+      - generic: Product List
+    - button "Product Detail" [expanded]:
+      - generic: Product Detail
+    - link "Summary":
+      - /url: /inventario/products/f4ac9d44-bde5-4cb9-aff2-bd3fe4cd56ea
+      - generic: Summary
+    - link "Stock":
+      - /url: /inventario/products/f4ac9d44-bde5-4cb9-aff2-bd3fe4cd56ea/stock
+      - generic: Stock
+    - link "Lots / Batches":
+      - /url: /inventario/products/f4ac9d44-bde5-4cb9-aff2-bd3fe4cd56ea/lots
+      - generic: Lots / Batches
+    - link "Replenishment":
+      - /url: /inventario/products/f4ac9d44-bde5-4cb9-aff2-bd3fe4cd56ea/replenishment
+      - generic: Replenishment
+    - link "Variations" [active]:
+      - /url: /inventario/products/f4ac9d44-bde5-4cb9-aff2-bd3fe4cd56ea/variations
+      - generic: Variations
+    - link "Sales Transactions":
+      - /url: /inventario/products/f4ac9d44-bde5-4cb9-aff2-bd3fe4cd56ea/transactions
+      - generic: Sales Transactions
+  - generic: v1.0 - XFramework
+  - button "Collapse sidebar":
+- banner:
+  - navigation "breadcrumb":
+    - list:
+      - link "Dashboard":
+        - /url: /
+      - link "Inventario" [disabled]
+      - link "Products" [disabled]
+      - link "E2E Shirt" [disabled]
+      - link "Variations" [disabled]
+  - button "Switch to light mode":
+  - button "Customize theme":
+  - button "SA Super Admin E2E Inventory POS 20260906":
+    - generic: SA
+    - generic: Super Admin
+    - generic: E2E Inventory POS 20260906
+- main:
+  - heading "E2E Shirt" [level=3]
+  - generic: Available
+  - paragraph: "SKU: E2E-SHIRT-001 - Category: Apparel E2E"
+  - button "Refresh":
+    - text: Refresh
+  - heading "Variants" [level=3]
+  - paragraph: Product options with reusable variation types and absolute prices.
+  - button "Add Variation Type":
+    - text: Add Variation Type
+  - button "Add Variant":
+    - text: Add Variant
+  - heading "Variation Types" [level=3]
+  - paragraph: 1 type(s) available for this product
+  - grid:
+    - rowgroup:
+      - row "Name Filter Name Code Filter Code Scope Filter Scope Created Filter Created":
+        - columnheader "Name Filter Name":
+          - generic: Name
+          - button "Filter Name":
+        - columnheader "Code Filter Code":
+          - generic: Code
+          - button "Filter Code":
+        - columnheader "Scope Filter Scope":
+          - generic: Scope
+          - button "Filter Scope":
+        - columnheader "Created Filter Created":
+          - generic: Created
+          - button "Filter Created":
+    - rowgroup:
+      - row "Size SIZE Tenant-wide 09/06/2026 10:42:06":
+        - gridcell "Size"
+        - gridcell "SIZE"
+        - gridcell "Tenant-wide"
+        - gridcell "09/06/2026 10:42:06"
+  - navigation "Pagination":
+    - generic: Showing 1-1 of 1
+    - list:
+      - button "Previous" [disabled]:
+        - generic: Previous
+      - button "Next" [disabled]:
+        - generic: Next
+  - heading "Variant List" [level=3]
+  - paragraph: 2 variant(s) configured
+  - grid:
+    - rowgroup:
+      - row "Variation Type Filter Variation Type Variant Filter Variant Price Filter Price Delta Filter Delta Created Filter Created Actions":
+        - columnheader "Variation Type Filter Variation Type":
+          - generic: Variation Type
+          - button "Filter Variation Type":
+        - columnheader "Variant Filter Variant":
+          - generic: Variant
+          - button "Filter Variant":
+        - columnheader "Price Filter Price":
+          - generic: Price
+          - button "Filter Price":
+        - columnheader "Delta Filter Delta":
+          - generic: Delta
+          - button "Filter Delta":
+        - columnheader "Created Filter Created":
+          - generic: Created
+          - button "Filter Created":
+        - columnheader "Actions":
+          - generic: Actions
+    - rowgroup:
+      - row "Size Medium 27.50 +2.5 09/06/2026 10:42:48 Edit":
+        - gridcell "Size"
+        - gridcell "Medium"
+        - gridcell "27.50"
+        - gridcell "+2.5"
+        - gridcell "09/06/2026 10:42:48"
+        - gridcell "Edit":
+          - button "Edit"
+      - row "Size Small 25.00 0 09/06/2026 10:42:29 Edit":
+        - gridcell "Size"
+        - gridcell "Small"
+        - gridcell "25.00"
+        - gridcell "0"
+        - gridcell "09/06/2026 10:42:29"
+        - gridcell "Edit":
+          - button "Edit"
+  - navigation "Pagination":
+    - generic: Showing 1-2 of 2
+    - list:
+      - button "Previous" [disabled]:
+        - generic: Previous
+      - button "Next" [disabled]:
+        - generic: Next
+- document
