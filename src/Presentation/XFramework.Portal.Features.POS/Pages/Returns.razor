@@ -95,10 +95,11 @@ else
                             AdvancedSearchTitle="Find Original Sale"
                             AdvancedSearchDescription="Select the completed sale for this return." />
 
-            <BbFormFieldSelect TValue="string" @bind-Value="RefundMethodValue" Label="Refund Method">
-                <BbSelectItem Value="@PosPaymentMethod.CashDrawer.ToString()">Cash Drawer</BbSelectItem>
-                <BbSelectItem Value="@PosPaymentMethod.WalletTransfer.ToString()">Wallet Transfer</BbSelectItem>
-            </BbFormFieldSelect>
+            <div class="space-y-1">
+                <BbTypographyMuted>Refund Method</BbTypographyMuted>
+                <div class="font-medium" data-testid="pos-original-refund-method">@GetRefundMethodLabel(_refundMethod)</div>
+                <BbTypographyMuted>Refunds are always sent through the original captured payment method and account.</BbTypographyMuted>
+            </div>
 
             <BbDataGrid Items="@_returnLines" ShowPagination="false">
                 <Columns>
@@ -159,16 +160,6 @@ else
     private string _reason = "";
     private string _returnIdempotencyKey = NewReturnIdempotencyKey();
     private PosPaymentMethod _refundMethod = PosPaymentMethod.CashDrawer;
-
-    private string RefundMethodValue
-    {
-        get => _refundMethod.ToString();
-        set
-        {
-            if (Enum.TryParse<PosPaymentMethod>(value, out var method))
-                _refundMethod = method;
-        }
-    }
 
     protected override void OnInitialized()
     {
@@ -245,7 +236,6 @@ else
         _selectedSaleId = _completedSales.FirstOrDefault()?.Id.ToString();
         _reason = "";
         _returnIdempotencyKey = NewReturnIdempotencyKey();
-        _refundMethod = PosPaymentMethod.CashDrawer;
         _returnLines = [];
         if (Guid.TryParse(_selectedSaleId, out var saleId))
             await LoadSaleLines(saleId);
@@ -277,6 +267,8 @@ else
             ToastService.Show(response.Message ?? "Could not load sale lines.");
             return;
         }
+
+        _refundMethod = response.Response.PaymentMethod;
 
         var previousLines = new List<PosReturnLineResponse>();
         foreach (var existingReturn in _returns.Where(item => item.SaleId == saleId))
@@ -393,6 +385,12 @@ else
     private static string GetSaleLabel(PosSaleSummaryResponse item) => $"{item.SaleNumber} - {item.TotalAmount:N2}";
     private string GetSaleSearchText(PosSaleSummaryResponse item) => $"{item.SaleNumber} {GetRegisterName(item.RegisterId)} {item.TotalAmount:N2} {item.CreatedAt:yyyy-MM-dd}";
     private static string NewReturnIdempotencyKey() => $"Portal.POS.Return.{Guid.NewGuid():N}";
+    private static string GetRefundMethodLabel(PosPaymentMethod method) => method switch
+    {
+        PosPaymentMethod.CashDrawer => "Cash Drawer",
+        PosPaymentMethod.WalletTransfer => "Wallet Transfer",
+        _ => method.ToString()
+    };
     private static IReadOnlyDictionary<Guid, RefundAllocation> BuildSaleRefundAllocations(PosSaleReceiptResponse sale)
     {
         var orderedLines = sale.Lines.OrderBy(line => line.LineNumber).ToList();

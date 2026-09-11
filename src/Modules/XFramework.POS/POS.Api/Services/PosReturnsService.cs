@@ -42,7 +42,12 @@ public sealed class PosReturnsService(
             if (!string.Equals(replay.RequestHash, requestHash, StringComparison.Ordinal))
                 return Result<PosReturnResponse>.Conflict("Return idempotency key was reused with a different payload");
 
-            return await ExecuteReturnWorkflowAsync(replay, context.Metadata, ct, replayed: true);
+            return await ExecuteReturnWorkflowAsync(
+                replay,
+                context.Metadata,
+                ct,
+                replayed: true,
+                requestedRefundMethod: request.RefundMethod);
         }
 
         if (request.Lines.Count == 0)
@@ -72,6 +77,14 @@ public sealed class PosReturnsService(
         if (sale.Status != PosSaleStatus.Completed)
             return Result<PosReturnResponse>.Conflict("Only completed POS sales can be returned");
 
+        var paymentResult = ResolveCapturedPayment(sale);
+        if (!paymentResult.IsSuccess)
+            return Result<PosReturnResponse>.Failure(paymentResult.Message!, paymentResult.StatusCode);
+
+        var capturedPayment = paymentResult.Data!;
+        if (request.RefundMethod != capturedPayment.Method)
+            return Result<PosReturnResponse>.Conflict("Refund method must match the original captured payment method");
+
         var now = DateTime.UtcNow;
         var posReturn = new PosReturn
         {
@@ -82,7 +95,7 @@ public sealed class PosReturnsService(
             RegisterId = sale.RegisterId,
             CashierCredentialId = request.CashierCredentialId,
             CustomerCredentialId = sale.CustomerCredentialId,
-            RefundMethod = request.RefundMethod,
+            RefundMethod = capturedPayment.Method,
             Status = PosReturnStatus.Pending,
             CurrencyId = sale.CurrencyId,
             WalletTypeId = sale.WalletTypeId,
@@ -141,10 +154,20 @@ public sealed class PosReturnsService(
             if (!string.Equals(concurrentReplay.RequestHash, requestHash, StringComparison.Ordinal))
                 return Result<PosReturnResponse>.Conflict("Return idempotency key was reused with a different payload");
 
-            return await ExecuteReturnWorkflowAsync(concurrentReplay, context.Metadata, ct, replayed: true);
+            return await ExecuteReturnWorkflowAsync(
+                concurrentReplay,
+                context.Metadata,
+                ct,
+                replayed: true,
+                requestedRefundMethod: request.RefundMethod);
         }
 
-        return await ExecuteReturnWorkflowAsync(posReturn, context.Metadata, ct, replayed: false);
+        return await ExecuteReturnWorkflowAsync(
+            posReturn,
+            context.Metadata,
+            ct,
+            replayed: false,
+            requestedRefundMethod: request.RefundMethod);
     }
 
     public async Task<Result<PosReturnResponse>> RetryAsync(
@@ -239,8 +262,21 @@ public sealed class PosReturnsService(
         PosReturn posReturn,
         RequestMetadata metadata,
         CancellationToken ct,
-        bool replayed)
+        bool replayed,
+        PosPaymentMethod? requestedRefundMethod = null)
     {
+        var paymentResult = ResolveCapturedPayment(posReturn.Sale);
+        if (!paymentResult.IsSuccess)
+            return Result<PosReturnResponse>.Failure(paymentResult.Message!, paymentResult.StatusCode);
+
+        var capturedPayment = paymentResult.Data!;
+        if (requestedRefundMethod.HasValue && requestedRefundMethod.Value != capturedPayment.Method)
+            return Result<PosReturnResponse>.Conflict("Refund method must match the original captured payment method");
+
+        // Existing recoverable returns may predate original-payment enforcement. Keep their
+        // audit record accurate and retry against the immutable captured payment snapshot.
+        posReturn.RefundMethod = capturedPayment.Method;
+
         if (posReturn.Status is PosReturnStatus.Pending or PosReturnStatus.InventoryPostFailed or PosReturnStatus.Failed)
         {
             var inventoryResult = await PostReturnInventoryAsync(posReturn, metadata, ct);
@@ -259,7 +295,7 @@ public sealed class PosReturnsService(
 
         if (posReturn.Status is PosReturnStatus.InventoryPosted or PosReturnStatus.RefundFailed)
         {
-            var refundResult = await RefundAsync(posReturn, posReturn.Register, metadata);
+            var refundResult = await RefundAsync(posReturn, capturedPayment, metadata);
             if (!refundResult.IsSuccess)
             {
                 posReturn.Status = PosReturnStatus.RefundFailed;
@@ -407,21 +443,24 @@ public sealed class PosReturnsService(
 
     private async Task<Result> RefundAsync(
         PosReturn posReturn,
-        PosRegister register,
+        PosPayment capturedPayment,
         RequestMetadata metadata)
     {
         var reference = PosServiceHelpers.NormalizeOptional(posReturn.RefundReferenceNumber)
             ?? PosServiceHelpers.ReturnRefundReference(posReturn);
         posReturn.RefundReferenceNumber = reference;
 
-        if (posReturn.RefundMethod == PosPaymentMethod.CashDrawer)
+        if (capturedPayment.Method == PosPaymentMethod.CashDrawer)
         {
+            if (capturedPayment.WalletId is not { } originalWalletId || originalWalletId == Guid.Empty)
+                return Result.Failure("Original cash drawer wallet is missing from the captured payment", 409);
+
             var response = await wallets.DecrementWallet(new DecrementWalletRequest
             {
-                CredentialId = register.MerchantCredentialId,
-                WalletId = register.CashDrawerWalletId,
-                WalletTypeId = posReturn.WalletTypeId,
-                CurrencyId = posReturn.CurrencyId,
+                CredentialId = capturedPayment.MerchantCredentialId,
+                WalletId = originalWalletId,
+                WalletTypeId = capturedPayment.WalletTypeId,
+                CurrencyId = capturedPayment.CurrencyId,
                 Amount = posReturn.TotalRefundAmount,
                 Remarks = $"POS refund {posReturn.ReturnNumber}",
                 ReferenceNumber = reference,
@@ -434,15 +473,15 @@ public sealed class PosReturnsService(
                 : Result.Failure(response.Message ?? "Cash drawer refund failed", (int)response.HttpStatusCode);
         }
 
-        if (posReturn.CustomerCredentialId is not { } customerCredentialId || customerCredentialId == Guid.Empty)
+        if (capturedPayment.CustomerCredentialId is not { } customerCredentialId || customerCredentialId == Guid.Empty)
             return Result.Failure("Customer credential is required for wallet refund", 400);
 
         var transfer = await wallets.TransferWallet(new TransferWalletRequest
         {
-            CredentialId = register.MerchantCredentialId,
+            CredentialId = capturedPayment.MerchantCredentialId,
             RecipientCredentialId = customerCredentialId,
-            WalletTypeId = posReturn.WalletTypeId,
-            CurrencyId = posReturn.CurrencyId,
+            WalletTypeId = capturedPayment.WalletTypeId,
+            CurrencyId = capturedPayment.CurrencyId,
             Amount = posReturn.TotalRefundAmount,
             Remarks = $"POS refund {posReturn.ReturnNumber}",
             ReferenceNumber = reference,
@@ -464,6 +503,7 @@ public sealed class PosReturnsService(
     {
         var query = db.Set<PosReturn>()
             .Include(item => item.Sale)
+            .ThenInclude(sale => sale.Payments)
             .Include(item => item.Register)
             .Include(item => item.Lines)
             .Where(item => item.TenantId == tenantId && item.Id == returnId && !item.IsDeleted);
@@ -483,6 +523,7 @@ public sealed class PosReturnsService(
                 ? db.Set<PosReturn>().AsTracking()
                 : db.Set<PosReturn>().AsNoTracking())
             .Include(item => item.Sale)
+            .ThenInclude(sale => sale.Payments)
             .Include(item => item.Register)
             .Include(item => item.Lines)
             .FirstOrDefaultAsync(item =>
@@ -490,4 +531,18 @@ public sealed class PosReturnsService(
                     item.IdempotencyKey == idempotencyKey &&
                     !item.IsDeleted,
                 ct);
+
+    private static Result<PosPayment> ResolveCapturedPayment(PosSale sale)
+    {
+        var capturedPayments = sale.Payments
+            .Where(payment => payment.Status == PosPaymentStatus.Captured && !payment.IsDeleted)
+            .ToList();
+
+        return capturedPayments.Count switch
+        {
+            1 => Result<PosPayment>.Success(capturedPayments[0]),
+            0 => Result<PosPayment>.Conflict("Original captured payment was not found"),
+            _ => Result<PosPayment>.Conflict("Sale has multiple captured payments and cannot be refunded safely")
+        };
+    }
 }

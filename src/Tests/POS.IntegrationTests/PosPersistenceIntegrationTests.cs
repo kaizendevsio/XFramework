@@ -1,10 +1,21 @@
+using System.Net;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Moq;
+using POS.Api.Services;
 using POS.Domain.Shared.Contracts;
+using POS.Domain.Shared.Contracts.Requests;
 using POS.Domain.Shared.Enums;
 using Testcontainers.PostgreSql;
+using Wallets.Domain.Shared.Contracts.Requests;
+using Wallets.Integration.Drivers;
+using Inventario.Integration.Drivers;
+using XFramework.Core.Patterns;
 using XFramework.Domain.Contexts;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Domain.Shared.Contracts.Requests;
+using XFramework.Inventario.Domain.Shared.Contracts.Requests.Stock;
 using XFramework.TestInfrastructure;
 
 namespace POS.IntegrationTests;
@@ -84,11 +95,149 @@ public sealed class PosPersistenceIntegrationTests
         }
     }
 
+    [Test]
+    public async Task CreateReturn_CrossMethodRequest_IsRejectedBeforeInventoryOrWalletMutation()
+    {
+        var tenantId = Guid.NewGuid();
+        var seed = CreateCompletedSale(tenantId, PosPaymentMethod.CashDrawer);
+        await using var db = CreateContext(tenantId);
+        db.AddRange(seed.Register, seed.Sale, seed.Line, seed.Payment);
+        await db.SaveChangesAsync();
+
+        var inventario = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
+        var wallets = new Mock<IWalletsServiceWrapper>(MockBehavior.Strict);
+        var service = CreateReturnsService(db, tenantId, inventario, wallets);
+
+        var result = await service.CreateAsync(CreateReturnRequest(
+            seed,
+            PosPaymentMethod.WalletTransfer), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(409);
+        result.Message.Should().Be("Refund method must match the original captured payment method");
+        (await db.Set<PosReturn>().CountAsync()).Should().Be(0);
+        inventario.VerifyNoOtherCalls();
+        wallets.VerifyNoOtherCalls();
+    }
+
+    [Test]
+    public async Task CreateReturn_AfterRegisterWalletEdit_RefundsOriginalCapturedWallet()
+    {
+        var tenantId = Guid.NewGuid();
+        var seed = CreateCompletedSale(tenantId, PosPaymentMethod.CashDrawer);
+        var originalMerchantCredentialId = seed.Payment.MerchantCredentialId;
+        var originalWalletId = seed.Payment.WalletId!.Value;
+        var replacementMerchantCredentialId = Guid.NewGuid();
+        var replacementWalletId = Guid.NewGuid();
+
+        await using var db = CreateContext(tenantId);
+        db.AddRange(seed.Register, seed.Sale, seed.Line, seed.Payment);
+        await db.SaveChangesAsync();
+        seed.Register.MerchantCredentialId = replacementMerchantCredentialId;
+        seed.Register.CashDrawerWalletId = replacementWalletId;
+        await db.SaveChangesAsync();
+
+        var inventario = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
+        inventario.Setup(item => item.PostStockMovement(
+                It.IsAny<PostStockMovementRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CmdResponse { HttpStatusCode = HttpStatusCode.OK });
+        var wallets = new Mock<IWalletsServiceWrapper>(MockBehavior.Strict);
+        wallets.Setup(item => item.DecrementWallet(It.IsAny<DecrementWalletRequest>()))
+            .ReturnsAsync(new CmdResponse { HttpStatusCode = HttpStatusCode.OK });
+        var service = CreateReturnsService(db, tenantId, inventario, wallets);
+
+        var result = await service.CreateAsync(CreateReturnRequest(
+            seed,
+            PosPaymentMethod.CashDrawer), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue(result.Message);
+        result.Data!.Status.Should().Be(PosReturnStatus.Completed);
+        wallets.Verify(item => item.DecrementWallet(It.Is<DecrementWalletRequest>(request =>
+            request.CredentialId == originalMerchantCredentialId &&
+            request.WalletId == originalWalletId &&
+            request.CredentialId != replacementMerchantCredentialId &&
+            request.WalletId != replacementWalletId &&
+            request.WalletTypeId == seed.Payment.WalletTypeId &&
+            request.CurrencyId == seed.Payment.CurrencyId &&
+            request.Amount == seed.Sale.TotalAmount)), Times.Once);
+        wallets.VerifyNoOtherCalls();
+        inventario.VerifyAll();
+    }
+
     private AppDbContext CreateContext(Guid tenantId) => new(
         options,
         new HttpContextAccessor(),
         new ConfigurationBuilder().Build(),
         new TestEffectiveTenantContextAccessor(tenantId));
+
+    private static PosReturnsService CreateReturnsService(
+        AppDbContext db,
+        Guid tenantId,
+        Mock<IInventarioServiceWrapper> inventario,
+        Mock<IWalletsServiceWrapper> wallets)
+    {
+        var resolver = new Mock<IPosRequestContextResolver>(MockBehavior.Strict);
+        resolver.Setup(item => item.Resolve(It.IsAny<RequestBase>(), It.IsAny<Guid?>()))
+            .Returns((RequestBase request, Guid? _) => Result<PosRequestContext>.Success(
+                new PosRequestContext(tenantId, Guid.NewGuid(), request.Metadata, true, false)));
+        return new PosReturnsService(db, inventario.Object, wallets.Object, resolver.Object);
+    }
+
+    private static CreatePosReturnRequest CreateReturnRequest(
+        CompletedSaleSeed seed,
+        PosPaymentMethod refundMethod) => new()
+    {
+        SaleId = seed.Sale.Id,
+        CashierCredentialId = Guid.NewGuid(),
+        RefundMethod = refundMethod,
+        IdempotencyKey = $"return-{Guid.NewGuid():N}",
+        Lines = [new CreatePosReturnLineRequest { SaleLineId = seed.Line.Id, Quantity = seed.Line.Quantity }],
+        Metadata = new RequestMetadata { RequestedTenantId = seed.Sale.TenantId }
+    };
+
+    private static CompletedSaleSeed CreateCompletedSale(Guid tenantId, PosPaymentMethod paymentMethod)
+    {
+        var register = CreateRegister(tenantId);
+        var sale = CreateSale(tenantId, register.Id);
+        sale.Status = PosSaleStatus.Completed;
+        sale.PaymentMethod = paymentMethod;
+        sale.SubtotalAmount = 25;
+        sale.TotalAmount = 25;
+        sale.CompletedAt = DateTime.UtcNow;
+        sale.Register = register;
+        var line = new PosSaleLine
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            SaleId = sale.Id,
+            LineNumber = 1,
+            ProductId = Guid.NewGuid(),
+            ProductName = "Refund regression item",
+            Quantity = 1,
+            UnitPrice = 25,
+            ExpectedUnitPrice = 25,
+            LineTotal = 25,
+            WarehouseId = sale.WarehouseId,
+            LocationId = sale.LocationId,
+            CreatedAt = DateTime.UtcNow,
+            ConcurrencyStamp = Guid.NewGuid(),
+            IsEnabled = true,
+            Sale = sale
+        };
+        var payment = CreatePayment(tenantId, sale.Id, Guid.NewGuid());
+        payment.Method = paymentMethod;
+        payment.Status = PosPaymentStatus.Captured;
+        payment.Amount = sale.TotalAmount;
+        payment.CurrencyId = sale.CurrencyId;
+        payment.WalletTypeId = sale.WalletTypeId;
+        payment.WalletId = paymentMethod == PosPaymentMethod.CashDrawer ? Guid.NewGuid() : null;
+        payment.CustomerCredentialId = paymentMethod == PosPaymentMethod.WalletTransfer ? Guid.NewGuid() : null;
+        payment.CapturedAt = DateTime.UtcNow;
+        payment.Sale = sale;
+        sale.Lines = [line];
+        sale.Payments = [payment];
+        return new CompletedSaleSeed(register, sale, line, payment);
+    }
 
     private static PosRegister CreateRegister(Guid tenantId) => new()
     {
@@ -159,4 +308,10 @@ public sealed class PosPersistenceIntegrationTests
         ConcurrencyStamp = Guid.NewGuid(),
         IsEnabled = true
     };
+
+    private sealed record CompletedSaleSeed(
+        PosRegister Register,
+        PosSale Sale,
+        PosSaleLine Line,
+        PosPayment Payment);
 }
