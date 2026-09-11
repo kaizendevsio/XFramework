@@ -183,7 +183,16 @@ public sealed class PosReturnsService(
             return Result<PosReturnResponse>.NotFound("POS return was not found");
 
         if (posReturn.Status == PosReturnStatus.Completed)
+        {
+            var paymentResult = ResolveCapturedPayment(posReturn.Sale);
+            if (!paymentResult.IsSuccess)
+                return Result<PosReturnResponse>.Failure(paymentResult.Message!, paymentResult.StatusCode);
+
+            if (await ReconcileRefundedAmountAsync(posReturn, paymentResult.Data!, 0, ct))
+                await db.SaveChangesAsync(ct);
+
             return Result<PosReturnResponse>.Success(PosServiceHelpers.ToReturnResponse(posReturn), "POS return already completed");
+        }
 
         if (posReturn.Status is not PosReturnStatus.Pending
             and not PosReturnStatus.InventoryPostFailed
@@ -307,6 +316,13 @@ public sealed class PosReturnsService(
             posReturn.Status = PosReturnStatus.Completed;
             posReturn.CompletedAt = DateTime.UtcNow;
             posReturn.FailureReason = null;
+            await ReconcileRefundedAmountAsync(posReturn, capturedPayment, posReturn.TotalRefundAmount, ct);
+            await db.SaveChangesAsync(ct);
+        }
+
+        else if (posReturn.Status == PosReturnStatus.Completed &&
+            await ReconcileRefundedAmountAsync(posReturn, capturedPayment, 0, ct))
+        {
             await db.SaveChangesAsync(ct);
         }
 
@@ -487,6 +503,7 @@ public sealed class PosReturnsService(
             ReferenceNumber = reference,
             IdempotencyKey = reference,
             TransactionPurpose = TransactionPurpose.Refund,
+            TransferDeductionType = TransferDeductionType.DeductFromSender,
             Metadata = metadata
         });
 
@@ -532,10 +549,39 @@ public sealed class PosReturnsService(
                     !item.IsDeleted,
                 ct);
 
+    private async Task<bool> ReconcileRefundedAmountAsync(
+        PosReturn posReturn,
+        PosPayment payment,
+        decimal completingRefundAmount,
+        CancellationToken ct)
+    {
+        var persistedCompletedAmount = await db.Set<PosReturn>()
+            .AsNoTracking()
+            .Where(item =>
+                item.TenantId == posReturn.TenantId &&
+                item.SaleId == posReturn.SaleId &&
+                item.Status == PosReturnStatus.Completed &&
+                !item.IsDeleted)
+            .SumAsync(item => item.TotalRefundAmount, ct);
+        var refundedAmount = Math.Min(payment.Amount, persistedCompletedAmount + completingRefundAmount);
+        var status = refundedAmount >= payment.Amount
+            ? PosPaymentStatus.Refunded
+            : PosPaymentStatus.Captured;
+
+        if (payment.RefundedAmount == refundedAmount && payment.Status == status)
+            return false;
+
+        payment.RefundedAmount = refundedAmount;
+        payment.Status = status;
+        return true;
+    }
+
     private static Result<PosPayment> ResolveCapturedPayment(PosSale sale)
     {
         var capturedPayments = sale.Payments
-            .Where(payment => payment.Status == PosPaymentStatus.Captured && !payment.IsDeleted)
+            .Where(payment =>
+                (payment.Status is PosPaymentStatus.Captured or PosPaymentStatus.Refunded) &&
+                !payment.IsDeleted)
             .ToList();
 
         return capturedPayments.Count switch

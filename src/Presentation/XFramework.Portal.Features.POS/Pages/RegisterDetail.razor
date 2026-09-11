@@ -77,6 +77,13 @@ else
                     @if (_editMode)
                     {
                         <div class="grid gap-5">
+                            @if (!string.IsNullOrWhiteSpace(_validationMessage))
+                            {
+                                <BbAlert Variant="AlertVariant.Warning">
+                                    <BbAlertTitle>Register setup incomplete</BbAlertTitle>
+                                    <BbAlertDescription>@_validationMessage</BbAlertDescription>
+                                </BbAlert>
+                            }
                             <div class="grid gap-3 md:grid-cols-2">
                                 <BbFormFieldInput TValue="string" @bind-Value="_form.Name" Label="Name" Required="true" />
                                 <BbFormFieldInput TValue="string" @bind-Value="_form.Code" Label="Code" />
@@ -261,6 +268,7 @@ else
     private bool _reloading;
     private Guid? _loadedId;
     private string? _loadError;
+    private string? _validationMessage;
     private const int ReferenceSearchSize = 50;
 
     protected override void OnInitialized()
@@ -366,7 +374,8 @@ else
     {
         if (_register is null) return;
 
-        _form.Name = _register.Name;
+        _validationMessage = null;
+        _form.Name = _register.Name ?? "";
         _form.Code = _register.Code ?? "";
         _form.MerchantCredentialId = _register.MerchantCredentialId.ToString();
         _form.CashDrawerWalletId = _register.CashDrawerWalletId.ToString();
@@ -382,10 +391,12 @@ else
     {
         if (!TryBuildUpdateRequest(out var request, out var validationMessage))
         {
+            _validationMessage = validationMessage;
             ToastService.Show(validationMessage);
             return;
         }
 
+        _validationMessage = null;
         _saving = true;
         try
         {
@@ -416,7 +427,7 @@ else
         request = new UpdatePosRegisterRequest();
         validationMessage = "Complete the register setup.";
 
-        var name = _form.Name.Trim();
+        var name = _form.Name?.Trim() ?? "";
         var code = NullIfEmpty(_form.Code);
         var description = NullIfEmpty(_form.Description);
         if (string.IsNullOrWhiteSpace(name))
@@ -511,7 +522,7 @@ else
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
-            query = query.Where(item => item.UserName.Contains(term) || (item.UserAlias != null && item.UserAlias.Contains(term)));
+            query = query.Where(item => (item.UserName != null && item.UserName.Contains(term)) || (item.UserAlias != null && item.UserAlias.Contains(term)));
         }
         _credentials = await query.OrderBy(item => item.UserName).Take(ReferenceSearchSize).ToListAsync();
         if (Guid.TryParse(_form.MerchantCredentialId, out var selectedId) && _credentials.All(item => item.Id != selectedId))
@@ -530,7 +541,7 @@ else
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
-            query = query.Where(item => item.AccountNumber.Contains(term));
+            query = query.Where(item => item.AccountNumber != null && item.AccountNumber.Contains(term));
         }
         _wallets = await query.OrderBy(item => item.AccountNumber).Take(ReferenceSearchSize).ToListAsync();
         if (Guid.TryParse(_form.CashDrawerWalletId, out var selectedId) && _wallets.All(item => item.Id != selectedId))
@@ -568,7 +579,9 @@ else
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
-            query = query.Where(item => item.CurrencyIsoCode3.Contains(term) || item.Name.Contains(term));
+            query = query.Where(item =>
+                (item.CurrencyIsoCode3 != null && item.CurrencyIsoCode3.Contains(term)) ||
+                (item.Name != null && item.Name.Contains(term)));
         }
         _currencies = await query.OrderBy(item => item.CurrencyIsoCode3).Take(ReferenceSearchSize).ToListAsync();
         if (Guid.TryParse(_form.CurrencyId, out var selectedId) && _currencies.All(item => item.Id != selectedId))

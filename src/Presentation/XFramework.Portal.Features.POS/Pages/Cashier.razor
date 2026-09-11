@@ -542,7 +542,11 @@ else
         customerCredentialId == SelectedRegister?.MerchantCredentialId;
     private bool IsBusy => _checkingOut || _savingCart || _actingOnCart;
     private bool HasPendingPayment => _lastReceipt?.Status == PosSaleStatus.PaymentPending;
-    private bool IsInteractionLocked => IsBusy || HasPendingPayment;
+    private bool HasTerminalCheckoutFailure => _lastReceipt?.Status is
+        PosSaleStatus.PaymentFailed or
+        PosSaleStatus.InventoryReservationFailed or
+        PosSaleStatus.Cancelled;
+    private bool IsInteractionLocked => IsBusy || HasPendingPayment || HasTerminalCheckoutFailure;
     private PosRegisterResponse? SelectedRegister => _registers.FirstOrDefault(item => item.Id.ToString() == _selectedRegisterId);
     private string? RegisterCurrency
     {
@@ -571,8 +575,10 @@ else
         ? "Please wait for the current sale action."
         : HasPendingPayment
             ? "Payment result is unknown. Retry to reuse the original payment reference."
+            : HasTerminalCheckoutFailure
+                ? "This sale cannot be retried. Start a new sale to use a new payment reference."
             : CheckoutRequirement ?? "Ready for payment";
-    private bool CanCheckout => !IsBusy && (HasPendingPayment || CheckoutRequirement is null);
+    private bool CanCheckout => !IsBusy && !HasTerminalCheckoutFailure && (HasPendingPayment || CheckoutRequirement is null);
 
     protected override void OnInitialized()
     {
@@ -730,7 +736,7 @@ else
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
-            query = query.Where(item => item.UserName.Contains(term) ||
+            query = query.Where(item => (item.UserName != null && item.UserName.Contains(term)) ||
                 (item.UserAlias != null && item.UserAlias.Contains(term)));
         }
 
@@ -1188,6 +1194,7 @@ else
             customerCredentialId = parsedCustomer;
         }
 
+        var refreshCatalogAfterCheckout = false;
         _checkingOut = true;
         try
         {
@@ -1220,6 +1227,7 @@ else
                     {
                         ClearCurrentCart();
                         await LoadSuspendedCarts();
+                        refreshCatalogAfterCheckout = true;
                     }
                 }
                 else
@@ -1260,7 +1268,10 @@ else
             {
                 ToastService.Show(_lastReceipt?.Status == PosSaleStatus.Completed ? "Sale completed." : "Sale recorded with recovery status.");
                 if (_lastReceipt?.Status == PosSaleStatus.Completed)
+                {
                     ClearCurrentCart();
+                    refreshCatalogAfterCheckout = true;
+                }
             }
             else
                 ToastService.Show(response.Message ?? "Checkout failed.");
@@ -1268,6 +1279,8 @@ else
         finally
         {
             _checkingOut = false;
+            if (refreshCatalogAfterCheckout)
+                await SearchCatalog(false, false);
         }
     }
 
@@ -1276,6 +1289,7 @@ else
         if (_lastReceipt is not { Status: PosSaleStatus.PaymentPending } pendingSale)
             return;
 
+        var refreshCatalogAfterCheckout = false;
         _checkingOut = true;
         try
         {
@@ -1303,11 +1317,14 @@ else
                 ClearCurrentCart();
                 if (_cartsEnabled)
                     await LoadSuspendedCarts();
+                refreshCatalogAfterCheckout = true;
             }
         }
         finally
         {
             _checkingOut = false;
+            if (refreshCatalogAfterCheckout)
+                await SearchCatalog(false, false);
         }
     }
 

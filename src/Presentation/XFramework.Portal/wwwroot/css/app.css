@@ -2129,3 +2129,99 @@
         width: 10rem;
     }
 }
+
+@media print {
+    @page {
+        margin: 12mm;
+    }
+
+    .app-sidebar,
+    .app-header,
+    .no-print {
+        display: none !important;
+    }
+
+    html,
+    body,
+    .portal-shell,
+    .app-content-shell,
+    .app-main,
+    .app-main > .xf-fade-in,
+    .app-main > .xf-fade-in > .xf-fade-in {
+        height: auto !important;
+        max-height: none !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+    }
+
+    .portal-shell,
+    .app-content-shell {
+        display: block !important;
+    }
+
+    .app-main {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    html,
+    body,
+    .portal-shell,
+    .app-content-shell,
+    .app-main,
+    .pos-sale-receipt,
+    .pos-sale-receipt * {
+        color: #000 !important;
+        background: #fff !important;
+    }
+
+    .pos-sale-receipt {
+        width: 100% !important;
+        max-width: none !important;
+        print-color-adjust: economy;
+    }
+
+    .pos-sale-receipt .overflow-auto {
+        overflow: visible !important;
+    }
+
+    .pos-sale-receipt table {
+        width: 100% !important;
+        table-layout: fixed !important;
+    }
+
+    .pos-sale-receipt th,
+    .pos-sale-receipt td {
+        padding: 4px !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        font-size: 9pt !important;
+    }
+
+    .pos-sale-receipt thead button,
+    .pos-sale-receipt thead svg {
+        display: none !important;
+    }
+
+    .pos-sale-receipt .rounded-lg {
+        border: 1px solid #777 !important;
+        box-shadow: none !important;
+        break-inside: avoid;
+    }
+
+    .pos-sale-receipt .p-6 {
+        padding: 12px !important;
+    }
+
+    .pos-sale-receipt .pt-0 {
+        padding-top: 0 !important;
+    }
+
+    .pos-sale-receipt > :not(:last-child) {
+        margin-bottom: 12px !important;
+    }
+
+    .pos-sale-receipt tr {
+        break-inside: avoid;
+    }
+}

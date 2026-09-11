@@ -17,6 +17,7 @@ using XFramework.Core.Patterns;
 using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts.Requests;
+using XFramework.Domain.Shared.Enums;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Stock;
 using XFramework.TestInfrastructure;
 
@@ -216,9 +217,27 @@ public sealed class PosPersistenceIntegrationTests
             item.CredentialId == seed.Payment.MerchantCredentialId &&
             item.RecipientCredentialId == seed.Payment.CustomerCredentialId &&
             item.WalletTypeId == seed.Payment.WalletTypeId &&
-            item.CurrencyId == seed.Payment.CurrencyId && item.Amount == 25);
+            item.CurrencyId == seed.Payment.CurrencyId &&
+            item.Amount == 25 &&
+            item.TransferDeductionType == TransferDeductionType.DeductFromSender);
         inventory.Verify(item => item.PostStockMovement(It.IsAny<PostStockMovementRequest>(), It.IsAny<CancellationToken>()), Times.Once);
         (await db.Set<PosReturn>().CountAsync()).Should().Be(1);
+        var payment = await db.Set<PosPayment>().SingleAsync(item => item.Id == seed.Payment.Id);
+        payment.RefundedAmount.Should().Be(25);
+        payment.Status.Should().Be(PosPaymentStatus.Refunded);
+
+        payment.RefundedAmount = 0;
+        payment.Status = PosPaymentStatus.Captured;
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        var completedRetry = await service.RetryAsync(
+            new RetryPosReturnRequest { ReturnId = returnId }, CancellationToken.None);
+        completedRetry.IsSuccess.Should().BeTrue(completedRetry.Message);
+        var reconciledPayment = await db.Set<PosPayment>().SingleAsync(item => item.Id == seed.Payment.Id);
+        reconciledPayment.RefundedAmount.Should().Be(25);
+        reconciledPayment.Status.Should().Be(PosPaymentStatus.Refunded);
+        refundRequests.Should().HaveCount(2, "reconciling a completed return must not post another wallet transfer");
     }
 
     [Test]
@@ -293,6 +312,11 @@ public sealed class PosPersistenceIntegrationTests
             {
                 result.IsSuccess.Should().BeTrue(result.Message);
                 result.Data!.Status.Should().Be(PosReturnStatus.Completed);
+                var payment = await db.Set<PosPayment>().SingleAsync(item => item.Id == seed.Payment.Id);
+                payment.RefundedAmount.Should().Be(refundAmounts.Sum());
+                payment.Status.Should().Be(attempt == 2
+                    ? PosPaymentStatus.Refunded
+                    : PosPaymentStatus.Captured);
             }
             else
             {

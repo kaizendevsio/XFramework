@@ -238,6 +238,9 @@ public sealed class PortalContractTests
         detail.Should().Contain("wallet.CredentialId != merchantCredentialId");
         detail.Should().Contain("walletType.CurrencyTypeId is Guid walletTypeCurrencyId");
         detail.Should().Contain("item.Id == locationId && item.WarehouseId == warehouseId");
+        detail.Should().Contain("<BbAlertTitle>Register setup incomplete</BbAlertTitle>");
+        detail.Should().Contain("<BbAlertDescription>@_validationMessage</BbAlertDescription>");
+        detail.Should().Contain("_validationMessage = validationMessage;");
         detail.Should().Contain("Label=\"Enabled\"");
         detail.Should().NotContain("DataContext.Update");
     }
@@ -385,15 +388,30 @@ public sealed class PortalContractTests
         var cashier = File.ReadAllText(Path.Combine(GetPosPagesRoot(), "Cashier.razor"));
 
         cashier.Should().Contain("private bool HasPendingPayment => _lastReceipt?.Status == PosSaleStatus.PaymentPending;");
-        cashier.Should().Contain("private bool IsInteractionLocked => IsBusy || HasPendingPayment;");
+        cashier.Should().Contain("private bool HasTerminalCheckoutFailure => _lastReceipt?.Status is");
+        cashier.Should().Contain("private bool IsInteractionLocked => IsBusy || HasPendingPayment || HasTerminalCheckoutFailure;");
         cashier.Should().Contain("if (HasPendingPayment)");
         cashier.Should().Contain("await RetryPendingPayment();");
         cashier.Should().Contain("POS.RetryPosSalePayment(new RetryPosSalePaymentRequest");
         cashier.Should().Contain("SaleId = pendingSale.Id");
         cashier.Should().Contain("Payment result is unknown. Retry to reuse the original payment reference.");
+        cashier.Should().Contain("This sale cannot be retried. Start a new sale to use a new payment reference.");
+        cashier.Should().Contain("!HasTerminalCheckoutFailure");
         cashier.Should().Contain("Disabled=\"@IsInteractionLocked\"");
         Regex.Matches(cashier, @"if \(_lastReceipt\?\.Status == PosSaleStatus\.Completed\)\s*\{\s*ClearCurrentCart\(\);")
             .Count.Should().BeGreaterThanOrEqualTo(2, "both direct and held-cart checkout must retain ambiguous payments");
+    }
+
+    [Test]
+    public void PosCashier_CompletedCheckout_RefreshesCatalogAfterInteractionUnlocks()
+    {
+        var cashier = File.ReadAllText(Path.Combine(GetPosPagesRoot(), "Cashier.razor"));
+
+        cashier.Should().Contain("var refreshCatalogAfterCheckout = false;");
+        cashier.Should().Contain("refreshCatalogAfterCheckout = true;");
+        Regex.Matches(cashier,
+                @"finally\s*\{\s*_checkingOut = false;\s*if \(refreshCatalogAfterCheckout\)\s*await SearchCatalog\(false, false\);")
+            .Count.Should().Be(2, "both checkout and pending-payment recovery must refresh displayed availability");
     }
 
     [Test]
@@ -420,6 +438,35 @@ public sealed class PortalContractTests
         returns.Should().Contain("Navigation.NavigateTo($\"/pos/returns/{returnId}\")");
         returnDetail.Should().Contain("@page \"/pos/returns/{Id:guid}\"");
         returnDetail.Should().Contain("data-testid=\"pos-return-detail\"");
+    }
+
+    [Test]
+    public void PosSaleAndReturnDetails_ShowAuditableLabelsCurrencyAndReceiptPrinting()
+    {
+        var pagesRoot = GetPosPagesRoot();
+        var saleDetail = File.ReadAllText(Path.Combine(pagesRoot, "SaleDetail.razor"));
+        var returnDetail = File.ReadAllText(Path.Combine(pagesRoot, "ReturnDetail.razor"));
+        var printStyles = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot().FullName,
+            "src", "Presentation", "XFramework.Portal", "wwwroot", "css", "app.css"));
+
+        saleDetail.Should().Contain("Print receipt");
+        saleDetail.Should().Contain("JSRuntime.InvokeVoidAsync(\"print\")");
+        saleDetail.Should().Contain("Refunded Amount");
+        saleDetail.Should().Contain("item.RefundedAmount");
+        saleDetail.Should().Contain("_registerLabel");
+        saleDetail.Should().Contain("_cashierLabel");
+        saleDetail.Should().Contain("_customerLabel");
+        saleDetail.Should().Contain("FormatMoney(_sale.TotalAmount)");
+        printStyles.Should().Contain(".pos-sale-receipt .overflow-auto");
+        printStyles.Should().Contain("overflow: visible !important;");
+        printStyles.Should().Contain("table-layout: fixed !important;");
+        printStyles.Should().Contain("background: #fff !important;");
+        printStyles.Should().Contain("break-inside: avoid;");
+        returnDetail.Should().Contain("_registerLabel");
+        returnDetail.Should().Contain("_cashierLabel");
+        returnDetail.Should().Contain("_customerLabel");
+        returnDetail.Should().Contain("FormatMoney(_return.TotalRefundAmount)");
     }
 
     [Test]

@@ -62,7 +62,7 @@ else
                                 <ChildContent Context="item">@GetRegisterName(item.RegisterId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Total" Sortable="true" Filterable="true" FilterBy="@(item => item.TotalAmount)">
-                                <ChildContent Context="item">@item.TotalAmount.ToString("N2")</ChildContent>
+                                <ChildContent Context="item">@FormatMoney(item.TotalAmount, item.CurrencyId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.Status)">
                                 <ChildContent Context="item">
@@ -127,6 +127,7 @@ else
 
     private List<PosSaleSummaryResponse> _sales = [];
     private List<PosRegister> _registers = [];
+    private List<Wallets.Domain.Shared.Contracts.CurrencyType> _currencies = [];
     private bool _loading = true;
     private bool _acting;
     private bool _hasTenant;
@@ -163,6 +164,7 @@ else
             _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "sales");
             _sales = [];
             _registers = [];
+            _currencies = [];
 
             if (!_hasTenant || !_moduleEnabled || TenantFilter.SelectedTenantId is not Guid)
                 return;
@@ -194,7 +196,7 @@ else
                 PageSize = PageSize
             });
             _sales = salesResponse.Response ?? [];
-            await LoadRegisterLabels();
+            await LoadReferenceLabels();
             _hasNextPage = salesResponse.IsSuccess && _sales.Count == PageSize;
             if (!salesResponse.IsSuccess)
                 ToastService.Show(salesResponse.Message ?? "Could not load POS sales.");
@@ -205,7 +207,7 @@ else
         }
     }
 
-    private async Task LoadRegisterLabels()
+    private async Task LoadReferenceLabels()
     {
         if (TenantFilter.SelectedTenantId is not Guid tenantId)
             return;
@@ -214,6 +216,9 @@ else
         _registers = await DataContext.Query<PosRegister>().IgnoreQueryFilters().NoCache()
             .Where(item => item.TenantId == tenantId && !item.IsDeleted && registerIds.Contains(item.Id))
             .ToListAsync();
+        var currencyIds = _sales.Select(item => item.CurrencyId).Distinct().ToList();
+        _currencies = await DataContext.Query<Wallets.Domain.Shared.Contracts.CurrencyType>()
+            .IgnoreQueryFilters().NoCache().Where(item => currencyIds.Contains(item.Id)).ToListAsync();
     }
 
     private async Task ApplyFilters()
@@ -244,6 +249,11 @@ else
     }
 
     private void OpenSale(Guid saleId) => Navigation.NavigateTo($"/pos/sales/{saleId}");
+    private string FormatMoney(decimal amount, Guid currencyId)
+    {
+        var code = _currencies.FirstOrDefault(item => item.Id == currencyId)?.CurrencyIsoCode3?.Trim().ToUpperInvariant();
+        return code is { Length: 3 } && code.All(char.IsAsciiLetter) ? $"{code} {amount:N2}" : amount.ToString("N2");
+    }
 
     private async Task CancelSale(Guid saleId)
     {

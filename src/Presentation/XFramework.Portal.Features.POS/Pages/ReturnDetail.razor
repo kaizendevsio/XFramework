@@ -21,17 +21,17 @@ else
             </div>
             @if (!string.IsNullOrWhiteSpace(_return.FailureReason)) { <BbAlert Variant="AlertVariant.Warning"><BbAlertTitle>Recovery needed</BbAlertTitle><BbAlertDescription>@_return.FailureReason</BbAlertDescription></BbAlert> }
             <div class="grid gap-4 md:grid-cols-2">
-                <BbCard><BbCardHeader><BbCardTitle>Refund</BbCardTitle></BbCardHeader><BbCardContent><div class="grid gap-2"><strong>@_return.TotalRefundAmount.ToString("N2")</strong><div>Original method: @_return.RefundMethod</div><div>Reference: @(_return.RefundReferenceNumber ?? "-")</div><div>Completed: @(_return.CompletedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</div></div></BbCardContent></BbCard>
-                <BbCard><BbCardHeader><BbCardTitle>Context</BbCardTitle></BbCardHeader><BbCardContent><div class="grid gap-2"><div>Register: @_return.RegisterId</div><div>Cashier: @_return.CashierCredentialId</div><div>Customer: @(_return.CustomerCredentialId?.ToString() ?? "-")</div><div>Reason: @(_return.Reason ?? "-")</div><div>Idempotency: @_return.IdempotencyKey</div></div></BbCardContent></BbCard>
+                <BbCard><BbCardHeader><BbCardTitle>Refund</BbCardTitle></BbCardHeader><BbCardContent><div class="grid gap-2"><strong>@FormatMoney(_return.TotalRefundAmount)</strong><div>Original method: @_return.RefundMethod</div><div>Reference: @(_return.RefundReferenceNumber ?? "-")</div><div>Completed: @(_return.CompletedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</div></div></BbCardContent></BbCard>
+                <BbCard><BbCardHeader><BbCardTitle>Context</BbCardTitle></BbCardHeader><BbCardContent><div class="grid gap-2"><div>Register: @_registerLabel</div><div>Cashier: @_cashierLabel</div><div>Customer: @_customerLabel</div><div>Reason: @(_return.Reason ?? "-")</div><div>Idempotency: @_return.IdempotencyKey</div></div></BbCardContent></BbCard>
             </div>
             <BbCard><BbCardHeader><BbCardTitle>Returned Items</BbCardTitle></BbCardHeader><BbCardContent>
                 <BbDataGrid Items="@_return.Lines" ShowPagination="false"><Columns>
                     <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Item" Filterable="true" />
                     <BbDataGridPropertyColumn Property="@(x => x.VariantName)" Title="Variant" Filterable="true" />
                     <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Quantity" Sortable="true" />
-                    <BbDataGridPropertyColumn Property="@(x => x.UnitPrice)" Title="Unit Price" Sortable="true" />
-                    <BbDataGridPropertyColumn Property="@(x => x.TaxAmount)" Title="Tax" Sortable="true" />
-                    <BbDataGridPropertyColumn Property="@(x => x.RefundAmount)" Title="Refund" Sortable="true" />
+                    <BbDataGridTemplateColumn Title="Unit Price" Sortable="true" Filterable="true" FilterBy="@(x => x.UnitPrice)"><ChildContent Context="item">@FormatMoney(item.UnitPrice)</ChildContent></BbDataGridTemplateColumn>
+                    <BbDataGridTemplateColumn Title="Tax" Sortable="true" Filterable="true" FilterBy="@(x => x.TaxAmount)"><ChildContent Context="item">@FormatMoney(item.TaxAmount)</ChildContent></BbDataGridTemplateColumn>
+                    <BbDataGridTemplateColumn Title="Refund" Sortable="true" Filterable="true" FilterBy="@(x => x.RefundAmount)"><ChildContent Context="item">@FormatMoney(item.RefundAmount)</ChildContent></BbDataGridTemplateColumn>
                     <BbDataGridPropertyColumn Property="@(x => x.InventoryMovementReferenceNumber)" Title="Inventory Reference" Filterable="true" />
                     <BbDataGridPropertyColumn Property="@(x => x.FailureReason)" Title="Failure" Filterable="true" />
                 </Columns></BbDataGrid>
@@ -43,6 +43,7 @@ else
 @code {
     [Parameter] public Guid Id { get; set; }
     [Inject] private IPOSServiceWrapper POS { get; set; } = default!;
+    [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
     [Inject] private IPortalModuleAvailability ModuleNavigation { get; set; } = default!;
@@ -54,13 +55,17 @@ else
     private bool _hasTenant;
     private bool _moduleEnabled;
     private string? _loadError;
+    private string _registerLabel = "-";
+    private string _cashierLabel = "-";
+    private string _customerLabel = "-";
+    private string? _currencyCode;
     protected override void OnInitialized() { TenantFilter.OnChanged += OnContextChanged; ModuleNavigation.OnChanged += OnContextChanged; }
     protected override async Task OnInitializedAsync() => await Reload();
     private void OnContextChanged() => _ = InvokeAsync(Reload);
     private async Task Reload()
     {
         _loading = true; _return = null; _loadError = null;
-        try { await ModuleNavigation.EnsureLoadedAsync(); _hasTenant = TenantFilter.SelectedTenantId is Guid; _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "returns"); if (!_hasTenant || !_moduleEnabled) return; var response = await POS.GetPosReturn(new GetPosReturnRequest { Id = Id, Metadata = BuildMetadata() }); _return = response.Response; if (!response.IsSuccess) _loadError = response.Message; }
+        try { await ModuleNavigation.EnsureLoadedAsync(); _hasTenant = TenantFilter.SelectedTenantId is Guid; _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "returns"); if (!_hasTenant || !_moduleEnabled) return; var response = await POS.GetPosReturn(new GetPosReturnRequest { Id = Id, Metadata = BuildMetadata() }); _return = response.Response; if (!response.IsSuccess) _loadError = response.Message; if (_return is not null) { SetReferenceFallbacks(_return.RegisterId, _return.CashierCredentialId, _return.CustomerCredentialId); try { await LoadReferenceLabels(); } catch { ToastService.Show("The return loaded, but some reference labels are unavailable."); } } }
         catch { _loadError = "Could not load the return."; }
         finally { _loading = false; }
     }
@@ -73,6 +78,39 @@ else
     }
     private static bool IsRetryable(PosReturnStatus status) => status is PosReturnStatus.Pending or PosReturnStatus.InventoryPostFailed or PosReturnStatus.InventoryPosted or PosReturnStatus.RefundFailed or PosReturnStatus.Failed;
     private static string StatusBadgeValue(PosReturnStatus status) => status switch { PosReturnStatus.Completed => "active", PosReturnStatus.InventoryPostFailed or PosReturnStatus.RefundFailed or PosReturnStatus.Failed => "warning", _ => "pending" };
+    private void SetReferenceFallbacks(Guid registerId, Guid cashierId, Guid? customerId)
+    {
+        _registerLabel = registerId.ToString()[..8];
+        _cashierLabel = cashierId.ToString()[..8];
+        _customerLabel = customerId is { } id ? id.ToString()[..8] : "Walk-in customer";
+    }
+    private async Task LoadReferenceLabels()
+    {
+        var posReturn = _return!;
+        var registerResponse = await POS.GetPosRegister(new GetPosRegisterRequest { Id = posReturn.RegisterId, Metadata = BuildMetadata() });
+        if (registerResponse.Response is { } register)
+            _registerLabel = string.IsNullOrWhiteSpace(register.Code) ? register.Name : $"{register.Name} ({register.Code})";
+
+        var currency = await DataContext.Query<Wallets.Domain.Shared.Contracts.CurrencyType>()
+            .IgnoreQueryFilters().NoCache().Where(item => item.Id == posReturn.CurrencyId).FirstOrDefaultAsync();
+        var code = currency?.CurrencyIsoCode3?.Trim().ToUpperInvariant();
+        _currencyCode = code is { Length: 3 } && code.All(char.IsAsciiLetter) ? code : null;
+
+        var credentials = await DataContext.Query<IdentityCredential>()
+            .IgnoreQueryFilters().NoCache()
+            .Where(item => item.Id == posReturn.CashierCredentialId || item.Id == posReturn.CustomerCredentialId)
+            .ToListAsync();
+        _cashierLabel = CredentialLabel(credentials.FirstOrDefault(item => item.Id == posReturn.CashierCredentialId), posReturn.CashierCredentialId);
+        _customerLabel = posReturn.CustomerCredentialId is { } customerId
+            ? CredentialLabel(credentials.FirstOrDefault(item => item.Id == customerId), customerId)
+            : "Walk-in customer";
+    }
+    private string FormatMoney(decimal value) => _currencyCode is { } code ? $"{code} {value:N2}" : value.ToString("N2");
+    private static string CredentialLabel(IdentityCredential? credential, Guid id) => credential is null
+        ? id.ToString()[..8]
+        : !string.IsNullOrWhiteSpace(credential.UserAlias)
+            ? $"{credential.UserName ?? id.ToString()[..8]} ({credential.UserAlias})"
+            : credential.UserName ?? id.ToString()[..8];
     private RequestMetadata BuildMetadata() => new() { RequestedTenantId = TenantFilter.SelectedTenantId, RequestId = Guid.NewGuid(), OperationName = "Portal" };
     private void Back() => Navigation.NavigateTo("/pos/returns");
     public void Dispose() { TenantFilter.OnChanged -= OnContextChanged; ModuleNavigation.OnChanged -= OnContextChanged; }

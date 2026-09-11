@@ -18,6 +18,7 @@ public sealed class PosOrchestrationContractTests
         source.Should().Contain("GetReservations", "reservation IDs must be persisted for recovery");
         source.Should().Contain("IncrementWallet", "cash drawer payment must post through Wallets");
         source.Should().Contain("TransferWallet", "wallet tender must post through Wallets");
+        source.Should().Contain("TransferDeductionType = TransferDeductionType.DeductFromSender", "POS wallet tender must not depend on an optional tenant default");
         source.Should().Contain("ReleaseReservationsAsync", "payment failure must release inventory reservations");
         source.Should().Contain("FulfillReservation", "paid sales must fulfill Inventario reservations");
         source.Should().Contain("InventoryFulfillmentFailed", "paid-but-unfulfilled sales need a recoverable status");
@@ -39,6 +40,7 @@ public sealed class PosOrchestrationContractTests
         source.Should().Contain("DecrementWallet", "cash refunds must debit the cash drawer wallet");
         source.Should().Contain("TransferWallet", "wallet refunds must reverse transfer through Wallets");
         source.Should().Contain("TransactionPurpose.Refund");
+        source.Should().Contain("ReconcileRefundedAmountAsync", "completed refunds must update the original payment audit aggregate");
         source.Should().Contain("RetryAsync", "recoverable return failures need an explicit retry command");
         source.Should().Contain("InventoryPostFailed", "inventory-post failures need a retryable state");
         source.Should().Contain("RefundFailed", "refund failures need a retryable state");

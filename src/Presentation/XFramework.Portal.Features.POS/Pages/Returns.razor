@@ -69,7 +69,7 @@ else
                                 <ChildContent Context="item">@GetRegisterName(item.RegisterId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Refund" Sortable="true" Filterable="true" FilterBy="@(item => item.TotalRefundAmount)">
-                                <ChildContent Context="item">@item.TotalRefundAmount.ToString("N2")</ChildContent>
+                                <ChildContent Context="item">@FormatMoney(item.TotalRefundAmount, item.CurrencyId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.Status)">
                                 <ChildContent Context="item">
@@ -152,10 +152,10 @@ else
                         </ChildContent>
                     </BbDataGridTemplateColumn>
                     <BbDataGridTemplateColumn Title="Unit" Filterable="true" FilterBy="@(item => item.UnitPrice)">
-                        <ChildContent Context="item">@item.UnitPrice.ToString("N2")</ChildContent>
+                        <ChildContent Context="item">@FormatSelectedMoney(item.UnitPrice)</ChildContent>
                     </BbDataGridTemplateColumn>
                     <BbDataGridTemplateColumn Title="Refund" Filterable="true" FilterBy="@(item => item.RefundAmount)">
-                        <ChildContent Context="item">@item.RefundAmount.ToString("N2")</ChildContent>
+                        <ChildContent Context="item">@FormatSelectedMoney(item.RefundAmount)</ChildContent>
                     </BbDataGridTemplateColumn>
                 </Columns>
                 <EmptyTemplate>
@@ -183,6 +183,7 @@ else
     [Inject] private IPortalActorContext ActorContext { get; set; } = default!;
 
     private List<PosReturnSummaryResponse> _returns = [];
+    private List<Wallets.Domain.Shared.Contracts.CurrencyType> _currencies = [];
     private List<PosSaleSummaryResponse> _completedSales = [];
     private List<PosRegister> _registers = [];
     private List<ReturnLineForm> _returnLines = [];
@@ -204,6 +205,7 @@ else
     private string _reason = "";
     private string _returnIdempotencyKey = NewReturnIdempotencyKey();
     private PosPaymentMethod _refundMethod = PosPaymentMethod.CashDrawer;
+    private Guid? _selectedSaleCurrencyId;
 
     protected override void OnInitialized()
     {
@@ -239,6 +241,7 @@ else
             _returns = [];
             _completedSales = [];
             _registers = [];
+            _currencies = [];
 
             if (!_hasTenant || !_moduleEnabled || TenantFilter.SelectedTenantId is not Guid)
                 return;
@@ -271,7 +274,7 @@ else
                 PageSize = PageSize
             });
             _returns = response.Response ?? [];
-            await LoadRegisterLabels();
+            await LoadReferenceLabels();
             _hasNextReturnPage = response.IsSuccess && _returns.Count == PageSize;
             if (!response.IsSuccess)
                 ToastService.Show(response.Message ?? "Could not load POS returns.");
@@ -299,7 +302,7 @@ else
             _completedSales = response.Response ?? [];
             if (selected is not null && _completedSales.All(item => item.Id != selected.Id))
                 _completedSales.Insert(0, selected);
-            await LoadRegisterLabels();
+            await LoadReferenceLabels();
             if (!response.IsSuccess)
                 ToastService.Show(response.Message ?? "Could not load completed POS sales.");
         }
@@ -315,7 +318,7 @@ else
         await SearchCompletedSales();
     }
 
-    private async Task LoadRegisterLabels()
+    private async Task LoadReferenceLabels()
     {
         if (TenantFilter.SelectedTenantId is not Guid tenantId)
             return;
@@ -327,6 +330,12 @@ else
         _registers = await DataContext.Query<PosRegister>().IgnoreQueryFilters().NoCache()
             .Where(item => item.TenantId == tenantId && !item.IsDeleted && registerIds.Contains(item.Id))
             .ToListAsync();
+        var currencyIds = _returns.Select(item => item.CurrencyId)
+            .Concat(_completedSales.Select(item => item.CurrencyId))
+            .Distinct()
+            .ToList();
+        _currencies = await DataContext.Query<Wallets.Domain.Shared.Contracts.CurrencyType>()
+            .IgnoreQueryFilters().NoCache().Where(item => currencyIds.Contains(item.Id)).ToListAsync();
     }
 
     private async Task ApplyReturnFilters()
@@ -364,6 +373,7 @@ else
         _reason = "";
         _returnIdempotencyKey = NewReturnIdempotencyKey();
         _returnLines = [];
+        _selectedSaleCurrencyId = null;
         if (Guid.TryParse(_selectedSaleId, out var saleId))
             await LoadSaleLines(saleId);
         _dialogOpen = true;
@@ -374,6 +384,7 @@ else
         _selectedSaleId = value;
         _returnIdempotencyKey = NewReturnIdempotencyKey();
         _returnLines = [];
+        _selectedSaleCurrencyId = null;
         if (Guid.TryParse(value, out var saleId))
             await LoadSaleLines(saleId);
     }
@@ -396,6 +407,7 @@ else
         }
 
         _refundMethod = response.Response.PaymentMethod;
+        _selectedSaleCurrencyId = response.Response.CurrencyId;
 
         var saleReturns = new List<PosReturnSummaryResponse>();
         for (var page = 1; ; page++)
@@ -531,8 +543,16 @@ else
     private string GetSaleNumber(Guid saleId) => _completedSales.FirstOrDefault(item => item.Id == saleId)?.SaleNumber ?? saleId.ToString()[..8];
     private string GetRegisterName(Guid registerId) => _registers.FirstOrDefault(item => item.Id == registerId)?.Name ?? registerId.ToString()[..8];
     private static string GetSaleValue(PosSaleSummaryResponse item) => item.Id.ToString();
-    private static string GetSaleLabel(PosSaleSummaryResponse item) => $"{item.SaleNumber} - {item.TotalAmount:N2}";
+    private string GetSaleLabel(PosSaleSummaryResponse item) => $"{item.SaleNumber} - {FormatMoney(item.TotalAmount, item.CurrencyId)}";
     private string GetSaleSearchText(PosSaleSummaryResponse item) => $"{item.SaleNumber} {GetRegisterName(item.RegisterId)} {item.TotalAmount:N2} {item.CreatedAt:yyyy-MM-dd}";
+    private string FormatMoney(decimal amount, Guid currencyId)
+    {
+        var code = _currencies.FirstOrDefault(item => item.Id == currencyId)?.CurrencyIsoCode3?.Trim().ToUpperInvariant();
+        return code is { Length: 3 } && code.All(char.IsAsciiLetter) ? $"{code} {amount:N2}" : amount.ToString("N2");
+    }
+    private string FormatSelectedMoney(decimal amount) => _selectedSaleCurrencyId is { } currencyId
+        ? FormatMoney(amount, currencyId)
+        : amount.ToString("N2");
     private static string NewReturnIdempotencyKey() => $"Portal.POS.Return.{Guid.NewGuid():N}";
     private static string GetRefundMethodLabel(PosPaymentMethod method) => method switch
     {

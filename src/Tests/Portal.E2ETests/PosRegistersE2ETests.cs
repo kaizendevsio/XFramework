@@ -70,6 +70,8 @@ public sealed class PosRegistersE2ETests : PageTest
         await name.FillAsync("");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
         await Expect(Page.GetByText("Register name is required.", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.Locator("#blazor-error-ui")).ToBeHiddenAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true })).ToBeVisibleAsync();
 
         await Page.GetByRole(AriaRole.Button, new() { Name = "Discard", Exact = true }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Edit", Exact = true })).ToBeVisibleAsync();

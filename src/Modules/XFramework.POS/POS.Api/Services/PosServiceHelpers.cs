@@ -389,6 +389,7 @@ internal static class PosServiceHelpers
         Method = payment.Method,
         Status = payment.Status,
         Amount = payment.Amount,
+        RefundedAmount = payment.RefundedAmount,
         ReferenceNumber = payment.ReferenceNumber,
         IdempotencyKey = payment.IdempotencyKey,
         FailureReason = payment.FailureReason,

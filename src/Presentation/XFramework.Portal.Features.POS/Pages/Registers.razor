@@ -398,7 +398,7 @@ else
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
-            query = query.Where(item => item.UserName.Contains(term) || (item.UserAlias != null && item.UserAlias.Contains(term)));
+            query = query.Where(item => (item.UserName != null && item.UserName.Contains(term)) || (item.UserAlias != null && item.UserAlias.Contains(term)));
         }
         _credentials = await query.OrderBy(item => item.UserName).Take(ReferenceSearchSize).ToListAsync();
         if (selected is not null && _credentials.All(item => item.Id != selected.Id)) _credentials.Insert(0, selected);
@@ -413,7 +413,7 @@ else
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
-            query = query.Where(item => item.AccountNumber.Contains(term));
+            query = query.Where(item => item.AccountNumber != null && item.AccountNumber.Contains(term));
         }
         _wallets = await query.OrderBy(item => item.AccountNumber).Take(ReferenceSearchSize).ToListAsync();
         if (selected is not null && _wallets.All(item => item.Id != selected.Id)) _wallets.Insert(0, selected);
@@ -443,7 +443,9 @@ else
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
-            query = query.Where(item => item.CurrencyIsoCode3.Contains(term) || item.Name.Contains(term));
+            query = query.Where(item =>
+                (item.CurrencyIsoCode3 != null && item.CurrencyIsoCode3.Contains(term)) ||
+                (item.Name != null && item.Name.Contains(term)));
         }
         _currencies = await query.OrderBy(item => item.CurrencyIsoCode3).Take(ReferenceSearchSize).ToListAsync();
         if (selected is not null && _currencies.All(item => item.Id != selected.Id)) _currencies.Insert(0, selected);
@@ -515,7 +517,8 @@ else
     private bool TryParseForm(out CreatePosRegisterRequest request)
     {
         request = new CreatePosRegisterRequest();
-        if (string.IsNullOrWhiteSpace(_form.Name) ||
+        var name = _form.Name?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(name) ||
             !Guid.TryParse(_form.MerchantCredentialId, out var merchantCredentialId) ||
             !Guid.TryParse(_form.CashDrawerWalletId, out var cashDrawerWalletId) ||
             !Guid.TryParse(_form.WalletTypeId, out var walletTypeId) ||
@@ -529,7 +532,7 @@ else
         request = new CreatePosRegisterRequest
         {
             Metadata = BuildMetadata(),
-            Name = _form.Name.Trim(),
+            Name = name,
             Code = NullIfEmpty(_form.Code),
             MerchantCredentialId = merchantCredentialId,
             CashDrawerWalletId = cashDrawerWalletId,

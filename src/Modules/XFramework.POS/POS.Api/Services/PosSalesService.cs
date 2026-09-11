@@ -656,6 +656,7 @@ public sealed class PosSalesService(
             ReferenceNumber = payment.ReferenceNumber,
             IdempotencyKey = payment.IdempotencyKey,
             TransactionPurpose = TransactionPurpose.Payment,
+            TransferDeductionType = TransferDeductionType.DeductFromSender,
             Metadata = metadata
         });
 
