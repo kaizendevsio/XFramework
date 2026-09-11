@@ -99,7 +99,7 @@
             @if (Chat.Replies.Count == 0) { <p class="empty">Be the first to reply.</p> }
         </div>
         <form class="thread-composer" @onsubmit="SendThreadReply" @onsubmit:preventDefault>
-            <label class="field"><span class="lab">Reply to thread</span><BbTextarea UpdateTiming="UpdateTiming.Immediate" @bind-Value="threadDraft" maxlength="4000" Disabled="threadSending" /></label>
+            <label class="field"><span class="lab">Reply to thread</span><BbTextarea UpdateTiming="UpdateTiming.Immediate" @bind-Value="threadDraft" @bind-Value:after="ThreadDraftChanged" maxlength="4000" Disabled="threadSending" /></label>
             @if (threadError is not null) { <p class="form-error" role="alert">@threadError</p> }
             <BbButton Type="ButtonType.Submit" Disabled="threadSending || string.IsNullOrWhiteSpace(threadDraft)">@(threadSending ? "Sending…" : "Send reply")</BbButton>
         </form>
@@ -286,6 +286,7 @@
         {
             await Chat.SendAsync(Chat.Selected.Id, threadDraft, Chat.ReplyParent.Id);
             committed = true; threadDraft = "";
+            await Chat.PublishTypingAsync(false);
             await Chat.RefreshAsync();
         }
         catch (Exception ex)
@@ -314,6 +315,7 @@
     private Task ShowAttachments() => Run(async () => { if (Chat.Selected is not null && actionMessage is not null) attachmentLinks = await Files.GetLinksAsync(Chat.Selected.Id, actionMessage.Id, Chat.Cancellation); }, true);
     private Task ToggleMute() => Run(async () => { if (Chat.Selected is not null) await Chat.MuteAsync(Chat.Selected.Id, !IsMuted); await Chat.RefreshAsync(); detailsOpen = false; });
     private async Task DraftChanged(ChangeEventArgs args) { draft = args.Value?.ToString() ?? ""; await Chat.PublishTypingAsync(!string.IsNullOrWhiteSpace(draft)); }
+    private Task ThreadDraftChanged() => Chat.PublishTypingAsync(!string.IsNullOrWhiteSpace(threadDraft));
     private async Task ComposerKeyDown(KeyboardEventArgs args) { if (args.Key == "Enter" && (args.CtrlKey || args.MetaKey)) await Send(); }
     private void ChooseFile(InputFileChangeEventArgs args)
     { if (args.File.Size is <= 0 or > ChatFiles.MaxFileBytes) { error = "Choose a file between 1 byte and 20 MB."; return; } file = args.File; uploadedFileId = pendingMessageId = null; }

@@ -13,6 +13,33 @@ namespace Yap.Tests;
 [TestFixture]
 public sealed class ChatWorkspaceTests
 {
+    [TestCase("Bob", "Carol")]
+    [TestCase("Carol", "Bob")]
+    public async Task DirectConversation_ShowsOtherPersonInListAndHeader(string callerName, string peerName)
+    {
+        var fixture = new ChatFixture();
+        var peer = Guid.NewGuid();
+        var directory = new Mock<IChatDirectory>();
+        directory.Setup(d => d.ResolveAsync(It.IsAny<Guid[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { new ChatPerson(peer, peerName, peerName.ToLowerInvariant()) });
+        fixture.Session.Setup(s => s.GetThreadsAsync(0, 30, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ChatFixture.Ok(new GetThreadListResponse { TotalCount = 2, Items =
+            [new() { Id = fixture.Thread, Name = "Shared stored title", IsDirect = true, OtherCredentialId = peer },
+             new() { Id = Guid.NewGuid(), Name = "Project group", IsDirect = false }] }));
+        fixture.Session.Setup(s => s.GetThreadAsync(fixture.Thread, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ChatFixture.Ok(new GetThreadResponse { Id = fixture.Thread, Name = "Shared stored title", IsDirect = true,
+                Members = [new() { CredentialId = fixture.Credential, Alias = callerName }, new() { CredentialId = peer }] }));
+        await using var workspace = new ChatWorkspace(fixture.Client.Object, directory.Object, NullLogger<ChatWorkspace>.Instance);
+
+        await workspace.StartAsync("device");
+        await workspace.SelectAsync(fixture.Thread);
+
+        Assert.That(workspace.Conversations[0].Name, Is.EqualTo(peerName));
+        Assert.That(workspace.Selected!.Name, Is.EqualTo(peerName));
+        Assert.That(workspace.Conversations[1].Name, Is.EqualTo("Project group"));
+        directory.Verify(d => d.ResolveAsync(It.Is<Guid[]>(ids => ids.Length == 1 && ids[0] == peer), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     [Test]
     public async Task StartAsync_FailedInitialLoad_CanRetryAndSubscribe()
     {

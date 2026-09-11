@@ -78,17 +78,11 @@ public sealed class ChatWorkspace(ICommunicationsChatClient client, IChatDirecto
             lastTypingPublished = DateTime.MinValue;
             messagePages = 1;
             Selected = Require(await Session.GetThreadAsync(id, lifetime.Token));
-            try
-            {
-                var missingNames = Selected.Members.Where(m => string.IsNullOrWhiteSpace(m.Alias) && !memberNames.ContainsKey(m.CredentialId))
-                    .Select(m => m.CredentialId).Distinct().ToArray();
-                foreach (var person in await directory.ResolveAsync(missingNames, lifetime.Token))
-                    memberNames[person.Id] = person.Name;
-                foreach (var member in Selected.Members.Where(m => string.IsNullOrWhiteSpace(m.Alias)))
-                    member.Alias = memberNames.GetValueOrDefault(member.CredentialId, "Workspace member");
-            }
-            catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { throw; }
-            catch (Exception ex) { logger.LogDebug(ex, "Member names are unavailable; chat remains accessible."); }
+            await ResolveMemberNamesAsync(Selected.Members.Where(m => string.IsNullOrWhiteSpace(m.Alias)).Select(m => m.CredentialId));
+            foreach (var member in Selected.Members.Where(m => string.IsNullOrWhiteSpace(m.Alias)))
+                member.Alias = memberNames.GetValueOrDefault(member.CredentialId, "Workspace member");
+            if (Selected.IsDirect)
+                Selected.Name = Selected.Members.FirstOrDefault(m => m.CredentialId != CredentialId)?.Alias ?? "Direct message";
             await LoadMessagesAsync();
             await Session.SubscribeTypingAsync(id, state =>
             {
@@ -278,6 +272,22 @@ public sealed class ChatWorkspace(ICommunicationsChatClient client, IChatDirecto
             if (items.Count >= result.TotalCount) break;
         }
         Conversations = items.DistinctBy(x => x.Id).ToArray();
+        await ResolveMemberNamesAsync(Conversations.Where(c => c.IsDirect && c.OtherCredentialId.HasValue).Select(c => c.OtherCredentialId!.Value));
+        foreach (var conversation in Conversations.Where(c => c.IsDirect && c.OtherCredentialId.HasValue))
+            conversation.Name = memberNames.GetValueOrDefault(conversation.OtherCredentialId!.Value, "Direct message");
+    }
+
+    private async Task ResolveMemberNamesAsync(IEnumerable<Guid> credentialIds)
+    {
+        var missing = credentialIds.Distinct().Where(id => !memberNames.ContainsKey(id)).ToArray();
+        if (missing.Length == 0) return;
+        try
+        {
+            foreach (var person in await directory.ResolveAsync(missing, lifetime.Token))
+                memberNames[person.Id] = person.Name;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { throw; }
+        catch (Exception ex) { logger.LogDebug(ex, "Member names are unavailable; chat remains accessible."); }
     }
 
     private async Task LoadMessagesAsync()
