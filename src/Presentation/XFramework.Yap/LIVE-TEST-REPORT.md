@@ -20,6 +20,10 @@ At approximately `10:54–10:59Z`, three ordinary test accounts signed into sepa
 
 **Outstanding backend verification:** Yap logged `GetThreadMessagesRequest` 503 responses at `10:54:39Z` and `10:56:39Z` during durable-event processing; the handler correctly withheld acknowledgements. The fix task reported missing trusted tenant context in Communications background fanout/outbox work and is implementing an owner-module repair with tests. Successful foreground interactions above do not establish that this background path is healthy. Recheck delivery, recovery, reactions, and search after its normal deployment before closing acceptance.
 
+A read-only database transaction at approximately `11:10Z` established the backlog baseline: this tenant had 79 enabled, non-deleted outbox events, all pending, zero processed/dead-lettered, and neither realtime nor notification completion timestamps persisted. The oldest pending event was created at `09:05:38.951259Z`. Post-deployment acceptance must verify automatic processing of this backlog and newly generated events, alongside browser delivery; no direct database repair or manual replay was performed.
+
+The repair is tracked in [PR #447](https://github.com/kaizendevsio/XFramework/pull/447), initially `49088677`. Phase 0 CI `34592760607` and all other PR checks passed on that revision. Its scope includes tenant-authorized background processing and one bounded retry of read-only actor-session validation after a transient Bolt failure. Yap was stopped while the normal deployment workflow proceeds. Final acceptance remains pending deployment and a clean restart/reconnect test.
+
 ## Typing retest after PR #442 deployment
 
 Deployment `34584776953` completed successfully for develop `7836437a`. The new client commit `8d5b6dd4` was imported as `14a4a985`, and 26 Yap tests passed before restarting against the matching Hub at `09:48:08Z`.
