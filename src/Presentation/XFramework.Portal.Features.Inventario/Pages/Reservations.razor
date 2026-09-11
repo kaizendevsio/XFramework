@@ -21,6 +21,11 @@ else if (!_reservationsEnabled)
 {
     <ModuleUnavailable ModuleName="Inventario Reservations" />
 }
+else if (_loadError is not null)
+{
+    <BbAlert><BbAlertTitle>Reservations could not be loaded</BbAlertTitle><BbAlertDescription>@_loadError</BbAlertDescription></BbAlert>
+    <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">Retry loading reservations</BbButton>
+}
 else
 {
     <FadeInContent>
@@ -31,7 +36,7 @@ else
                     <BbTypographyMuted>Reserve, release, fulfill, and expire allocated inventory.</BbTypographyMuted>
                 </div>
                 <div class="xf-page-actions">
-                    <BbButton OnClick="@OpenReservationDialog">
+                    <BbButton OnClick="@OpenReservationDialog" Disabled="@(_products.Count == 0 || _warehouses.Count == 0 || _locations.Count == 0)">
                         <LucideIcon Name="clipboard-plus" class="mr-2 h-4 w-4" />
                         Reserve Inventory
                     </BbButton>
@@ -62,22 +67,22 @@ else
                                 OnRowClick="@((Reservation item) => Navigation.NavigateTo($"/inventario/reservations/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Warehouse" Filterable="true" SortBy="@(item => GetWarehouseName(item.WarehouseId))" FilterBy="@(item => GetWarehouseName(item.WarehouseId))"><ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent></BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Allocated lots" Filterable="true" SortBy="@(item => AllocationLabel(item))" FilterBy="@(item => AllocationLabel(item))"><ChildContent Context="item">@AllocationLabel(item)</ChildContent></BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
+                            <InventoryTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></InventoryTemplateColumn>
+                            <InventoryTemplateColumn Title="Warehouse" Filterable="true" SortBy="@(item => GetWarehouseName(item.WarehouseId))" FilterBy="@(item => GetWarehouseName(item.WarehouseId))"><ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent></InventoryTemplateColumn>
+                            <InventoryTemplateColumn Title="Allocated lots" Filterable="true" SortBy="@(item => AllocationLabel(item))" FilterBy="@(item => AllocationLabel(item))"><ChildContent Context="item">@AllocationLabel(item)</ChildContent></InventoryTemplateColumn>
+                            <InventoryTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
-                            </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Location" Filterable="true" SortBy="@(item => GetLocationName(item.LocationId))" FilterBy="@(item => GetLocationName(item.LocationId))">
+                            </InventoryTemplateColumn>
+                            <InventoryTemplateColumn Title="Location" Filterable="true" SortBy="@(item => GetLocationName(item.LocationId))" FilterBy="@(item => GetLocationName(item.LocationId))">
                                 <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
-                            </BbDataGridTemplateColumn>
+                            </InventoryTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Qty" Format="0.####" Sortable="true" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Status" Filterable="true" SortBy="@(item => item.Status)" FilterBy="@(item => item.Status)">
+                            <InventoryTemplateColumn Title="Status" Filterable="true" SortBy="@(item => item.Status)" FilterBy="@(item => item.Status)">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@item.Status.ToString()" Status="@GetStatusBadge(item.Status)" />
                                 </ChildContent>
-                            </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Reference" Filterable="true" SortBy="@(item => InventoryDisplay.Reference(item.ReferenceType))" FilterBy="@(item => InventoryDisplay.Reference(item.ReferenceType))"><ChildContent Context="item">@InventoryDisplay.Reference(item.ReferenceType)</ChildContent></BbDataGridTemplateColumn>
+                            </InventoryTemplateColumn>
+                            <InventoryTemplateColumn Title="Reference" Filterable="true" SortBy="@(item => InventoryDisplay.Reference(item.ReferenceType))" FilterBy="@(item => InventoryDisplay.Reference(item.ReferenceType))"><ChildContent Context="item">@InventoryDisplay.Reference(item.ReferenceType)</ChildContent></InventoryTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.ReservedAt)" Title="Reserved" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" Filterable="true" />
                             <BbDataGridTemplateColumn Title="Actions">
@@ -219,6 +224,8 @@ else
     [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
     [Inject] private IPortalModuleAvailability ModuleNavigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private ILogger<Reservations> Logger { get; set; } = default!;
+    private string? _loadError;
 
     private ReservationForm _form = new();
     private List<Product> _products = [];
@@ -260,6 +267,7 @@ else
     private async Task Reload()
     {
         _loading = true;
+        _loadError = null;
         try
         {
             await ModuleNavigation.EnsureLoadedAsync();
@@ -271,13 +279,18 @@ else
             _locations = [];
             _lots = [];
             _reservations = [];
+            _variants = [];
+            _balances = [];
+            _allocations = [];
 
             if (!_hasTenant || !_reservationsEnabled) return;
 
             var tenantId = TenantFilter.SelectedTenantId!.Value;
             _variants = await DataContext.Query<ProductVariation>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
             _balances = await DataContext.Query<StockBalance>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
-            _allocations = await DataContext.Query<ReservationAllocation>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(2000).ToListAsync();
+            var allocations = await Inventario.GetReservationAllocations(new GetReservationAllocationsRequest { Metadata = BuildMetadata() });
+            if (!allocations.IsSuccess) throw new InvalidOperationException("Reservation allocations could not be loaded through Inventario.");
+            _allocations = allocations.Response ?? [];
             _products = await DataContext.Query<Product>()
                 .IgnoreQueryFilters()
                 .NoCache()
@@ -324,9 +337,20 @@ else
 
             ApplyDefaultSelections();
         }
-        catch
+        catch (Exception exception)
         {
-            ToastService.Show("Could not load reservations.");
+            Logger.LogWarning(exception, "Could not load Inventario reservations for the selected tenant.");
+            _loadError = "Reservation and stock data are unavailable. Retry loading before creating a reservation.";
+            _reservationDialogOpen = false;
+            _form = new();
+            _products = [];
+            _variants = [];
+            _warehouses = [];
+            _locations = [];
+            _lots = [];
+            _balances = [];
+            _allocations = [];
+            _reservations = [];
         }
         finally
         {

@@ -117,7 +117,7 @@ else
                         <BbDataGrid Items="@_nearExpiry" ShowPagination="true" InitialPageSize="10">
                             <Columns>
                                 <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
-                                <BbDataGridTemplateColumn Title="Lot" Filterable="true" SortBy="@(item => item.LotNumber)" FilterBy="@(item => item.LotNumber)"><ChildContent Context="item"><a href="@($"/inventario/lots/{item.LotId}")">@item.LotNumber</a></ChildContent></BbDataGridTemplateColumn>
+                                <InventoryTemplateColumn Title="Lot" Filterable="true" SortBy="@(item => item.LotNumber)" FilterBy="@(item => item.LotNumber)"><ChildContent Context="item"><a href="@($"/inventario/lots/{item.LotId}")">@item.LotNumber</a></ChildContent></InventoryTemplateColumn>
                                 <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Location" Filterable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Format="0.####" Sortable="true" Filterable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" Filterable="true" />
@@ -142,7 +142,7 @@ else
                         <BbDataGrid Items="@_expired" ShowPagination="true" InitialPageSize="10">
                             <Columns>
                                 <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
-                                <BbDataGridTemplateColumn Title="Lot" Filterable="true" SortBy="@(item => item.LotNumber)" FilterBy="@(item => item.LotNumber)"><ChildContent Context="item"><a href="@($"/inventario/lots/{item.LotId}")">@item.LotNumber</a></ChildContent></BbDataGridTemplateColumn>
+                                <InventoryTemplateColumn Title="Lot" Filterable="true" SortBy="@(item => item.LotNumber)" FilterBy="@(item => item.LotNumber)"><ChildContent Context="item"><a href="@($"/inventario/lots/{item.LotId}")">@item.LotNumber</a></ChildContent></InventoryTemplateColumn>
                                 <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Location" Filterable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Format="0.####" Sortable="true" Filterable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expired" Sortable="true" Filterable="true" />

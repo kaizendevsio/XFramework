@@ -2338,5 +2338,6 @@
 
 /* Keep grid children within narrow Inventario dialogs. */
 .inv-dialog-body, .inv-dialog-body .grid, .inv-dialog-body .grid > * { min-width: 0; }
+.inv-dialog-body button { max-width: 100%; }
 .inventario-shell [role="grid"] [role="gridcell"] { padding-block: .5rem; }
 .inventario-shell [role="grid"] [role="gridcell"]:last-child { white-space: nowrap; }

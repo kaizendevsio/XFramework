@@ -91,15 +91,21 @@ else
                 <BbCardContent>
                     <BbDataGrid Items="@_lines" ShowPagination="true" InitialPageSize="20">
                         <Columns>
-                            <BbDataGridTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
+                            <InventoryTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item"><a href="@($"/inventario/products/{item.ProductId}")">@GetProductName(item.ProductId)</a></ChildContent>
-                            </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Lot" Filterable="true" SortBy="@(item => GetLotLabel(item.LotId, item.LotNumber))" FilterBy="@(item => GetLotLabel(item.LotId, item.LotNumber))">
+                            </InventoryTemplateColumn>
+                            <InventoryTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))">
+                                <ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent>
+                            </InventoryTemplateColumn>
+                            <InventoryTemplateColumn Title="Lot" Filterable="true" SortBy="@(item => GetLotLabel(item.LotId, item.LotNumber))" FilterBy="@(item => GetLotLabel(item.LotId, item.LotNumber))">
                                 <ChildContent Context="item">@if (item.LotId is { } lotId) { <a href="@($"/inventario/lots/{lotId}")">@GetLotLabel(item.LotId, item.LotNumber)</a> } else { <span>Untracked</span> }</ChildContent>
-                            </BbDataGridTemplateColumn>
+                            </InventoryTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Quantity" Format="0.####" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.UnitCost)" Title="Unit Cost" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Stock Balance" Filterable="true" SortBy="@(item => GetStockBalanceFilterText(item))" FilterBy="@(item => GetStockBalanceFilterText(item))">
+                            <InventoryTemplateColumn Title="Unit" Filterable="true" SortBy="@(item => string.IsNullOrWhiteSpace(item.UnitOfMeasure) ? "Not recorded" : item.UnitOfMeasure)" FilterBy="@(item => string.IsNullOrWhiteSpace(item.UnitOfMeasure) ? "Not recorded" : item.UnitOfMeasure)">
+                                <ChildContent Context="item">@(string.IsNullOrWhiteSpace(item.UnitOfMeasure) ? "Not recorded" : item.UnitOfMeasure)</ChildContent>
+                            </InventoryTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.UnitCost)" Title="@($"Unit cost ({_currency})")" Format="N2" Sortable="true" Filterable="true" />
+                            <InventoryTemplateColumn Title="Stock Balance" Filterable="true" SortBy="@(item => GetStockBalanceFilterText(item))" FilterBy="@(item => GetStockBalanceFilterText(item))">
                                 <ChildContent Context="item">
                                     @if (item.StockBalanceId is { } balanceId)
                                     {
@@ -112,7 +118,7 @@ else
                                         <span>N/A</span>
                                     }
                                 </ChildContent>
-                            </BbDataGridTemplateColumn>
+                            </InventoryTemplateColumn>
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
@@ -134,6 +140,8 @@ else
     private List<PurchaseOrder> _orders = [];
     private List<Supplier> _suppliers = [];
     private List<Product> _products = [];
+    private List<ProductVariation> _variants = [];
+    private string _currency = "PHP";
     private List<Warehouse> _warehouses = [];
     private List<InventoryLocation> _locations = [];
     private List<InventoryLot> _lots = [];
@@ -164,6 +172,7 @@ else
             _orders = [];
             _suppliers = [];
             _products = [];
+            _variants = [];
             _warehouses = [];
             _locations = [];
             _lots = [];
@@ -175,6 +184,8 @@ else
             if (_document is null) return;
 
             _lines = await DataContext.Query<ReceivingLine>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && x.ReceivingDocumentId == Id && !x.IsDeleted).ToListAsync();
+            _currency = await InventoryDisplay.CurrencyAsync(DataContext, tenantId);
+            _variants = await DataContext.Query<ProductVariation>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
             _orders = await DataContext.Query<PurchaseOrder>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(500).ToListAsync();
             _suppliers = await DataContext.Query<Supplier>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(500).ToListAsync();
             _products = await DataContext.Query<Product>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(500).ToListAsync();

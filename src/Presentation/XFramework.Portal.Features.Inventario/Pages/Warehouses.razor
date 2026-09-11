@@ -51,14 +51,14 @@ else
                             <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.City)" Title="City" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Default" Filterable="true" SortBy="@(item => item.IsDefault)" FilterBy="@(item => item.IsDefault)">
+                            <InventoryTemplateColumn Title="Default" Filterable="true" SortBy="@(item => item.IsDefault)" FilterBy="@(item => item.IsDefault)">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@(item.IsDefault ? "Default" : "Standard")" Status="@(item.IsDefault ? "active" : "inactive")" />
                                 </ChildContent>
-                            </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Locations" Filterable="true" SortBy="@(item => _locations.Count(x => x.WarehouseId == item.Id))" FilterBy="@(item => _locations.Count(x => x.WarehouseId == item.Id))">
+                            </InventoryTemplateColumn>
+                            <InventoryTemplateColumn Title="Locations" Filterable="true" SortBy="@(item => _locations.Count(x => x.WarehouseId == item.Id))" FilterBy="@(item => _locations.Count(x => x.WarehouseId == item.Id))">
                                 <ChildContent Context="item">@_locations.Count(x => x.WarehouseId == item.Id)</ChildContent>
-                            </BbDataGridTemplateColumn>
+                            </InventoryTemplateColumn>
                             <BbDataGridTemplateColumn Title="Actions">
                                 <ChildContent Context="item">
                                     <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View warehouse"

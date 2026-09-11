@@ -1246,21 +1246,21 @@ else
                     <Columns>
                         @if (CanPickVariant)
                         {
-                            <BbDataGridTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => GetVariantName(item.ProductVariationId))" FilterBy="@(item => GetVariantName(item.ProductVariationId))">
+                            <InventoryTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => GetVariantName(item.ProductVariationId))" FilterBy="@(item => GetVariantName(item.ProductVariationId))">
                                 <ChildContent Context="item">@GetVariantName(item.ProductVariationId)</ChildContent>
-                            </BbDataGridTemplateColumn>
+                            </InventoryTemplateColumn>
                         }
-                        <BbDataGridTemplateColumn Title="Warehouse" Filterable="true" SortBy="@(item => GetWarehouseName(item.WarehouseId))" FilterBy="@(item => GetWarehouseName(item.WarehouseId))">
+                        <InventoryTemplateColumn Title="Warehouse" Filterable="true" SortBy="@(item => GetWarehouseName(item.WarehouseId))" FilterBy="@(item => GetWarehouseName(item.WarehouseId))">
                             <ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent>
-                        </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Location" Filterable="true" SortBy="@(item => GetLocationName(item.LocationId))" FilterBy="@(item => GetLocationName(item.LocationId))">
+                        </InventoryTemplateColumn>
+                        <InventoryTemplateColumn Title="Location" Filterable="true" SortBy="@(item => GetLocationName(item.LocationId))" FilterBy="@(item => GetLocationName(item.LocationId))">
                             <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
-                        </BbDataGridTemplateColumn>
+                        </InventoryTemplateColumn>
                         @if (_traceabilityEnabled)
                         {
-                            <BbDataGridTemplateColumn Title="Lot" Filterable="true" SortBy="@(item => GetLotNumber(item.LotId))" FilterBy="@(item => GetLotNumber(item.LotId))">
+                            <InventoryTemplateColumn Title="Lot" Filterable="true" SortBy="@(item => GetLotNumber(item.LotId))" FilterBy="@(item => GetLotNumber(item.LotId))">
                                 <ChildContent Context="item">@GetLotNumber(item.LotId)</ChildContent>
-                            </BbDataGridTemplateColumn>
+                            </InventoryTemplateColumn>
                         }
                         <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Format="0.####" Sortable="true" Filterable="true" />
                         <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Format="0.####" Sortable="true" Filterable="true" />
@@ -1281,23 +1281,23 @@ else
                         <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" Filterable="true" />
                         @if (CanPickVariant)
                         {
-                            <BbDataGridTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => GetVariantName(item.ProductVariationId))" FilterBy="@(item => GetVariantName(item.ProductVariationId))">
+                            <InventoryTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => GetVariantName(item.ProductVariationId))" FilterBy="@(item => GetVariantName(item.ProductVariationId))">
                                 <ChildContent Context="item">@GetVariantName(item.ProductVariationId)</ChildContent>
-                            </BbDataGridTemplateColumn>
+                            </InventoryTemplateColumn>
                         }
-                        <BbDataGridTemplateColumn Title="Warehouse" Filterable="true" SortBy="@(item => GetWarehouseName(item.WarehouseId))" FilterBy="@(item => GetWarehouseName(item.WarehouseId))">
+                        <InventoryTemplateColumn Title="Warehouse" Filterable="true" SortBy="@(item => GetWarehouseName(item.WarehouseId))" FilterBy="@(item => GetWarehouseName(item.WarehouseId))">
                             <ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent>
-                        </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Location" Filterable="true" SortBy="@(item => GetLocationName(item.LocationId))" FilterBy="@(item => GetLocationName(item.LocationId))">
+                        </InventoryTemplateColumn>
+                        <InventoryTemplateColumn Title="Location" Filterable="true" SortBy="@(item => GetLocationName(item.LocationId))" FilterBy="@(item => GetLocationName(item.LocationId))">
                             <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
-                        </BbDataGridTemplateColumn>
+                        </InventoryTemplateColumn>
                         @if (_traceabilityEnabled)
                         {
-                            <BbDataGridTemplateColumn Title="Lot" Filterable="true" SortBy="@(item => GetLotNumber(item.LotId))" FilterBy="@(item => GetLotNumber(item.LotId))">
+                            <InventoryTemplateColumn Title="Lot" Filterable="true" SortBy="@(item => GetLotNumber(item.LotId))" FilterBy="@(item => GetLotNumber(item.LotId))">
                                 <ChildContent Context="item">@GetLotNumber(item.LotId)</ChildContent>
-                            </BbDataGridTemplateColumn>
+                            </InventoryTemplateColumn>
                         }
-                        <BbDataGridTemplateColumn Title="Affects" Filterable="true" SortBy="@(item => InventoryDisplay.Effect(item.MovementType))" FilterBy="@(item => InventoryDisplay.Effect(item.MovementType))"><ChildContent Context="item">@InventoryDisplay.Effect(item.MovementType)</ChildContent></BbDataGridTemplateColumn>
+                        <InventoryTemplateColumn Title="Affects" Filterable="true" SortBy="@(item => InventoryDisplay.Effect(item.MovementType))" FilterBy="@(item => InventoryDisplay.Effect(item.MovementType))"><ChildContent Context="item">@InventoryDisplay.Effect(item.MovementType)</ChildContent></InventoryTemplateColumn>
 <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Format="0.####" Sortable="true" Filterable="true" />
                         <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="On hand after" Format="0.####" Sortable="true" Filterable="true" />
                         <BbDataGridPropertyColumn Property="@(x => x.Reason)" Title="Reason" Filterable="true" />
@@ -1335,17 +1335,17 @@ else
                         <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot / Batch" Sortable="true" Filterable="true" />
                         @if (CanPickVariant)
                         {
-                            <BbDataGridTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => GetVariantName(item.ProductVariationId))" FilterBy="@(item => GetVariantName(item.ProductVariationId))">
+                            <InventoryTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => GetVariantName(item.ProductVariationId))" FilterBy="@(item => GetVariantName(item.ProductVariationId))">
                                 <ChildContent Context="item">@GetVariantName(item.ProductVariationId)</ChildContent>
-                            </BbDataGridTemplateColumn>
+                            </InventoryTemplateColumn>
                         }
                         <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" Filterable="true" />
                         <BbDataGridPropertyColumn Property="@(x => x.SupplierReference)" Title="Supplier Ref" Filterable="true" />
                         <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" Filterable="true" />
                         <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" Filterable="true" />
-                        <BbDataGridTemplateColumn Title="On Hand" Filterable="true" SortBy="@(item => GetLotOnHand(item.Id))" FilterBy="@(item => GetLotOnHand(item.Id))">
+                        <InventoryTemplateColumn Title="On Hand" Filterable="true" SortBy="@(item => GetLotOnHand(item.Id))" FilterBy="@(item => GetLotOnHand(item.Id))">
                             <ChildContent Context="item">@GetLotOnHand(item.Id).ToString("N2")</ChildContent>
-                        </BbDataGridTemplateColumn>
+                        </InventoryTemplateColumn>
                     </Columns>
                 </BbDataGrid>
             </BbCardContent>
@@ -1376,23 +1376,23 @@ else
                     <Columns>
                         @if (CanPickVariant)
                         {
-                            <BbDataGridTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => GetVariantName(item.ProductVariationId))" FilterBy="@(item => GetVariantName(item.ProductVariationId))">
+                            <InventoryTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => GetVariantName(item.ProductVariationId))" FilterBy="@(item => GetVariantName(item.ProductVariationId))">
                                 <ChildContent Context="item">@GetVariantName(item.ProductVariationId)</ChildContent>
-                            </BbDataGridTemplateColumn>
+                            </InventoryTemplateColumn>
                         }
-                        <BbDataGridTemplateColumn Title="Scope" Filterable="true" SortBy="@(item => GetRuleScope(item))" FilterBy="@(item => GetRuleScope(item))">
+                        <InventoryTemplateColumn Title="Scope" Filterable="true" SortBy="@(item => GetRuleScope(item))" FilterBy="@(item => GetRuleScope(item))">
                             <ChildContent Context="item">@GetRuleScope(item)</ChildContent>
-                        </BbDataGridTemplateColumn>
+                        </InventoryTemplateColumn>
                         <BbDataGridPropertyColumn Property="@(x => x.MinimumQuantity)" Title="Min" Sortable="true" Filterable="true" />
                         <BbDataGridPropertyColumn Property="@(x => x.MaximumQuantity)" Title="Max" Sortable="true" Filterable="true" />
                         <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Reorder Point" Sortable="true" Filterable="true" />
                         <BbDataGridPropertyColumn Property="@(x => x.ReorderQuantity)" Title="Reorder Qty" Sortable="true" Filterable="true" />
                         <BbDataGridPropertyColumn Property="@(x => x.PreferredSupplier)" Title="Preferred Supplier" Filterable="true" />
-                        <BbDataGridTemplateColumn Title="Status" Filterable="true" SortBy="@(item => item.IsActive)" FilterBy="@(item => item.IsActive)">
+                        <InventoryTemplateColumn Title="Status" Filterable="true" SortBy="@(item => item.IsActive)" FilterBy="@(item => item.IsActive)">
                             <ChildContent Context="item">
                                 <StatusBadge Text="@(item.IsActive ? "Active" : "Inactive")" Status="@(item.IsActive ? "active" : "inactive")" />
                             </ChildContent>
-                        </BbDataGridTemplateColumn>
+                        </InventoryTemplateColumn>
                     <BbDataGridTemplateColumn Title="Actions"><ChildContent Context="item"><BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo($"/inventario/planning/rules/{item.Id}"))">View / edit</BbButton></ChildContent></BbDataGridTemplateColumn></Columns>
                 </BbDataGrid>
             </BbCardContent>
@@ -1427,9 +1427,9 @@ else
                     <Columns>
                         <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
                         <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" Filterable="true" />
-                        <BbDataGridTemplateColumn Title="Scope" Filterable="true" SortBy="@(item => GetVariationTypeScope(item))" FilterBy="@(item => GetVariationTypeScope(item))">
+                        <InventoryTemplateColumn Title="Scope" Filterable="true" SortBy="@(item => GetVariationTypeScope(item))" FilterBy="@(item => GetVariationTypeScope(item))">
                             <ChildContent Context="item">@GetVariationTypeScope(item)</ChildContent>
-                        </BbDataGridTemplateColumn>
+                        </InventoryTemplateColumn>
                         <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                     </Columns>
                 </BbDataGrid>
@@ -1444,16 +1444,16 @@ else
             <BbCardContent>
                 <BbDataGrid Items="@_variations" ShowPagination="true" InitialPageSize="20">
                     <Columns>
-                        <BbDataGridTemplateColumn Title="Variation Type" Filterable="true" SortBy="@(item => GetVariationTypeName(item))" FilterBy="@(item => GetVariationTypeName(item))">
+                        <InventoryTemplateColumn Title="Variation Type" Filterable="true" SortBy="@(item => GetVariationTypeName(item))" FilterBy="@(item => GetVariationTypeName(item))">
                             <ChildContent Context="item">@GetVariationTypeName(item)</ChildContent>
-                        </BbDataGridTemplateColumn>
+                        </InventoryTemplateColumn>
                         <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Variant" Sortable="true" Filterable="true" />
-                        <BbDataGridTemplateColumn Title="Price" Filterable="true" SortBy="@(item => GetVariantPrice(item))" FilterBy="@(item => GetVariantPrice(item))">
+                        <InventoryTemplateColumn Title="Price" Filterable="true" SortBy="@(item => GetVariantPrice(item))" FilterBy="@(item => GetVariantPrice(item))">
                             <ChildContent Context="item">@GetVariantPrice(item).ToString("N2")</ChildContent>
-                        </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Delta" Filterable="true" SortBy="@(item => GetVariantDelta(item))" FilterBy="@(item => GetVariantDelta(item))">
+                        </InventoryTemplateColumn>
+                        <InventoryTemplateColumn Title="Delta" Filterable="true" SortBy="@(item => GetVariantDelta(item))" FilterBy="@(item => GetVariantDelta(item))">
                             <ChildContent Context="item">@GetVariantDelta(item).ToString("+0.##;-0.##;0")</ChildContent>
-                        </BbDataGridTemplateColumn>
+                        </InventoryTemplateColumn>
                         <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                         <BbDataGridTemplateColumn Title="Actions">
                             <ChildContent Context="item">
@@ -1479,16 +1479,16 @@ else
                     <Columns>
                         @if (CanPickVariant)
                         {
-                            <BbDataGridTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => GetVariantName(item.ProductVariationId))" FilterBy="@(item => GetVariantName(item.ProductVariationId))">
+                            <InventoryTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => GetVariantName(item.ProductVariationId))" FilterBy="@(item => GetVariantName(item.ProductVariationId))">
                                 <ChildContent Context="item">@GetVariantName(item.ProductVariationId)</ChildContent>
-                            </BbDataGridTemplateColumn>
+                            </InventoryTemplateColumn>
                         }
-                        <BbDataGridTemplateColumn Title="Quantity" Filterable="true" SortBy="@(item => item.Quantity)" FilterBy="@(item => item.Quantity)">
+                        <InventoryTemplateColumn Title="Quantity" Filterable="true" SortBy="@(item => item.Quantity)" FilterBy="@(item => item.Quantity)">
                             <ChildContent Context="item">@item.Quantity</ChildContent>
-                        </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Total" Filterable="true" SortBy="@(item => item.TotalPrice)" FilterBy="@(item => item.TotalPrice)">
+                        </InventoryTemplateColumn>
+                        <InventoryTemplateColumn Title="Total" Filterable="true" SortBy="@(item => item.TotalPrice)" FilterBy="@(item => item.TotalPrice)">
                             <ChildContent Context="item">@item.TotalPrice.ToString("N2")</ChildContent>
-                        </BbDataGridTemplateColumn>
+                        </InventoryTemplateColumn>
                         <BbDataGridPropertyColumn Property="@(x => x.TransactionDate)" Title="Transaction Date" Sortable="true" Filterable="true" />
                         <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                     </Columns>

@@ -13,7 +13,7 @@
     <!-- BlazorBlueprint component styles -->
     <link href="_content/BlazorBlueprint.Components/blazorblueprint.css" rel="stylesheet" />
     <!-- App styles (Tailwind utilities) -->
-    <link href="css/app.css" rel="stylesheet" />
+    <link href="@Assets["css/app.css"]" rel="stylesheet" />
     <script>
         (() => {
             const storageKey = "bb-theme";
@@ -103,7 +103,7 @@
         window.FloatingUIDOM = FloatingUI;
     </script>
 
-    <script src="js/inventario-focus.js"></script>
+    <script src="@Assets["js/inventario-focus.js"]"></script>
     <script src="_framework/blazor.web.js"></script>
 </body>
 </html>

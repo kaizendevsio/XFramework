@@ -74,7 +74,7 @@ else
                     <BbDataGrid Items="@_suggestions" ShowPagination="true" InitialPageSize="20">
                         <Columns>
                             <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Sortable="true" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
+                            <InventoryTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></InventoryTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.WarehouseName)" Title="Warehouse" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.LocationName)" Title="Location" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Format="0.####" Sortable="true" Filterable="true" />
@@ -94,22 +94,22 @@ else
                 <BbCardContent>
                     <BbDataGrid Items="@_rules" OnRowClick="@((InventoryReorderRule item) => Navigation.NavigateTo($"/inventario/planning/rules/{item.Id}"))" ShowPagination="true" InitialPageSize="20">
                         <Columns>
-                            <BbDataGridTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
+                            <InventoryTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
-                            </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Scope" Filterable="true" SortBy="@(item => GetScopeLabel(item))" FilterBy="@(item => GetScopeLabel(item))">
+                            </InventoryTemplateColumn>
+                            <InventoryTemplateColumn Title="Scope" Filterable="true" SortBy="@(item => GetScopeLabel(item))" FilterBy="@(item => GetScopeLabel(item))">
                                 <ChildContent Context="item">@GetScopeLabel(item)</ChildContent>
-                            </BbDataGridTemplateColumn>
+                            </InventoryTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.MinimumQuantity)" Title="Min" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.MaximumQuantity)" Title="Max" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Point" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.ReorderQuantity)" Title="Qty" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.PreferredSupplier)" Title="Supplier" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Status" Filterable="true" SortBy="@(item => item.IsActive)" FilterBy="@(item => item.IsActive)">
+                            <InventoryTemplateColumn Title="Status" Filterable="true" SortBy="@(item => item.IsActive)" FilterBy="@(item => item.IsActive)">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@(item.IsActive ? "Active" : "Inactive")" Status="@(item.IsActive ? "active" : "inactive")" />
                                 </ChildContent>
-                            </BbDataGridTemplateColumn>
+                            </InventoryTemplateColumn>
                         <BbDataGridTemplateColumn Title="Actions"><ChildContent Context="item"><BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo($"/inventario/planning/rules/{item.Id}"))">View / edit</BbButton></ChildContent></BbDataGridTemplateColumn></Columns>
                     </BbDataGrid>
                 </BbCardContent>

@@ -1,0 +1,20 @@
+Actual compiled Receiving component, local isolated host http://localhost:5199.
+Final script: scoped .inv-dialog button[aria-haspopup][aria-expanded="true"], pointer outside-dismiss, trigger focus.
+Draft: LOCAL-NESTED-DRAFT. No business calls/live writes.
+
+Calendar (selected 9/11/2026):
+Before: dialogs=1, expanded=9/11/2026, focus=11.
+First Escape: dialogs=1, draft retained, expanded=[], focus=9/11/2026.
+Second Escape: dialogs=0, focus=Receive Stock.
+
+Variant (opened with ArrowDown):
+Before: dialogs=1, expanded=Variant, focus=Base product.
+First Escape: dialogs=1, draft retained, expanded=[], focus=Variant.
+Second Escape: dialogs=0, focus=Receive Stock.
+
+Warehouse entity picker:
+Before: dialogs=1, expanded=Warehouse (and internal combobox), focus=Warehouse.
+First Escape: dialogs=1, draft retained, expanded=[], focus=Warehouse.
+Second Escape: dialogs=0, focus=Receive Stock.
+
+Pre-fix check on head 1377843: first Escape from calendar or Variant closed parent (dialogs=0).

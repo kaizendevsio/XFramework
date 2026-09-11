@@ -127,22 +127,22 @@ else
                                 OnRowClick="@((Product item) => Navigation.NavigateTo($"/inventario/products/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridTemplateColumn Title="Product" Filterable="true" SortBy="@(item => item.Name)" FilterBy="@(item => item.Name)"><ChildContent Context="item"><a href="@($"/inventario/products/{item.Id}")">@item.Name</a></ChildContent></BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="SKU" Filterable="true" SortBy="@(item => item.SKU ?? string.Empty)" FilterBy="@(item => item.SKU ?? string.Empty)">
+                            <InventoryTemplateColumn Title="Product" Filterable="true" SortBy="@(item => item.Name)" FilterBy="@(item => item.Name)"><ChildContent Context="item"><a href="@($"/inventario/products/{item.Id}")">@item.Name</a></ChildContent></InventoryTemplateColumn>
+                            <InventoryTemplateColumn Title="SKU" Filterable="true" SortBy="@(item => item.SKU ?? string.Empty)" FilterBy="@(item => item.SKU ?? string.Empty)">
                                 <ChildContent Context="item">
                                     <span class="font-mono text-xs">@(item.SKU ?? "N/A")</span>
                                 </ChildContent>
-                            </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Price" Sortable="true" SortBy="@(item => item.Price)" Filterable="true" FilterBy="@(item => item.Price)">
+                            </InventoryTemplateColumn>
+                            <InventoryTemplateColumn Title="Price" Sortable="true" SortBy="@(item => item.Price)" Filterable="true" FilterBy="@(item => item.Price)">
                                 <ChildContent Context="item">@_currency @item.Price.ToString("N2")</ChildContent>
-                            </BbDataGridTemplateColumn>
+                            </InventoryTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(item => item.StockQuantity)" Title="Stock" Format="0.####" Sortable="true" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Catalog status" Filterable="true" SortBy="@(item => item.IsAvailable)" FilterBy="@(item => item.IsAvailable)">
+                            <InventoryTemplateColumn Title="Catalog status" Filterable="true" SortBy="@(item => item.IsAvailable)" FilterBy="@(item => item.IsAvailable)">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@(item.IsAvailable ? "Catalog enabled" : "Catalog disabled")"
                                                  Status="@(item.IsAvailable ? "active" : "inactive")" />
                                 </ChildContent>
-                            </BbDataGridTemplateColumn>
+                            </InventoryTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
