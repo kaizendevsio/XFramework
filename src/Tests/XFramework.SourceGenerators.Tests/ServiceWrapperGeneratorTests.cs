@@ -149,8 +149,8 @@ public sealed class ServiceWrapperGeneratorTests
         generatedSource.Should().Contain("_actorAccessTokenProvider = actorAccessTokenProvider;");
         generatedSource.Should().Contain(
             "BoltInvocationEnvelopeFactory.CreateAsync(",
-            Exactly.Times(6));
-        generatedSource.Should().Contain("XFrameworkServiceScopes.DataContextQuery");
+            Exactly.Times(4));
+        generatedSource.Should().Contain("BoltInvocationEnvelopeFactory.CreateDataContextQueryAsync(", Exactly.Times(2));
         generatedSource.Should().Contain("XFrameworkServiceScopes.DataContextMutate");
         generatedSource.Should().Contain("XFrameworkServiceScopes.TenantTarget");
         generatedSource.Should().Contain("MemoryPack.MemoryPackSerializer.Deserialize<DataContextResult>(data.Span)");
