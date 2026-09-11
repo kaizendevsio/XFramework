@@ -1,6 +1,15 @@
 # Yap live setup and test report — 2026-09-11
 
-**Status: role provisioning, dedicated Yap service authentication, Bolt connectivity, and live user login pass. Chat initialization is blocked by a confirmed backend capability mismatch. No live direct-chat, group-chat, reaction, attachment, or realtime test has passed yet.** The earlier local browser tests used the isolated test fixture and are not evidence about the deployed APIs.
+**Status: role provisioning, dedicated service authentication, live login/logout, chat defaults, conversation loading, and empty message search pass. Member search is blocked by a generated SDK token-scope mismatch. No live direct-chat, group-chat, reaction, attachment, or realtime message test has passed yet.** Fixture browser tests are not evidence about deployed APIs.
+
+## Retest after PR #440 deployment
+
+- Normal deployment `34580364797` completed successfully for develop `94cc21b02f697ef070384f11267e5e29ce6209e0`. Yap's local suite passes 26 tests against that merged code.
+- `EnsureChatDefaults` now succeeds with regular Chat Create permission. A read-only database query verified tenant-owned Chat thread type `917b06a0-8a75-4155-8fa9-797ae54d109e`, Chat message type `d538734b-59ce-4e3a-8530-515d6bb60715`, and six reaction types: Love, Like, Laugh, Celebrate, Sad, Surprised.
+- Bob's live logout now revokes the current upstream session. Session `166e08d5-b15e-4e44-8033-e1da35d51bfc` changed to `Inactive` at `08:53:27Z`; its previous session remained active. After logout, opening protected Settings redirects to login.
+- Conversation-list loading initially returned 501 during the deployment smoke test, then succeeded after full rollout. The fix task found that the synthetic smoke runner registers the real Communications recipient name, temporarily sharing its route without business handlers. No app handler was patched for this transient failure; the deployment interference needs a separate pipeline correction.
+- Bob and Carol now initialize the real chat workspace and load the empty conversation list. Carol's message search for `Yap E2E` returns zero results without error. Search with actual messages and scope restrictions is still pending.
+- **Current blocker:** Bob's member search for `cArOl` fails before the query RPC. At `08:57:00Z`, service-token acquisition returned HTTP 403. `ServiceWrapperGenerator.cs` requests both `datacontext.query` and `tenant.target` for every normal query. Yap intentionally has only the former; its actor and requested tenant already match. Reported the exact source to the fix task for an actor-bound query scope correction, preserving cross-tenant restrictions. No broader grant was added.
 
 ## Live checks after PR #439
 
