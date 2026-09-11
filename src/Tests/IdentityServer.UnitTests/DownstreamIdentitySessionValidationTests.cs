@@ -112,6 +112,55 @@ public sealed class DownstreamIdentitySessionValidationTests
         await options.Events.OnTokenValidated(context);
 
         context.Result!.Failure!.Message.Should().Be("Actor identity validation is unavailable.");
+        identityServer.Verify(wrapper => wrapper.ValidateIdentitySession(
+            It.IsAny<ValidateIdentitySessionRequest>(),
+            It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    [Test]
+    public async Task TransientBoltRotationFailure_RetriesSessionValidationOnce()
+    {
+        var tenantId = Guid.NewGuid();
+        var credentialId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        var identityServer = new Mock<IIdentityServerServiceWrapper>(MockBehavior.Strict);
+        identityServer
+            .SetupSequence(wrapper => wrapper.ValidateIdentitySession(
+                It.IsAny<ValidateIdentitySessionRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new QueryResponse<ValidateIdentitySessionResponse>
+            {
+                HttpStatusCode = HttpStatusCode.ServiceUnavailable,
+                Message = "Service unavailable"
+            })
+            .ReturnsAsync(new QueryResponse<ValidateIdentitySessionResponse>
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Response = new ValidateIdentitySessionResponse
+                {
+                    TenantId = tenantId,
+                    CredentialId = credentialId,
+                    IdentityId = Guid.NewGuid(),
+                    SessionId = sessionId,
+                    GenerationId = "g1",
+                    ExpiresAtUtc = DateTime.UtcNow.AddMinutes(5),
+                    IsValid = true
+                }
+            });
+
+        var (options, context) = CreateValidationContext(
+            identityServer.Object,
+            new Claim("tenant_id", tenantId.ToString("D")),
+            new Claim("credential_id", credentialId.ToString("D")),
+            new Claim("session_id", sessionId.ToString("D")),
+            new Claim(JwtCredentialSet.GenerationClaim, "g1"));
+
+        await options.Events.OnTokenValidated(context);
+
+        context.Result?.Failure.Should().BeNull();
+        identityServer.Verify(wrapper => wrapper.ValidateIdentitySession(
+            It.IsAny<ValidateIdentitySessionRequest>(),
+            It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
 
     [Test]

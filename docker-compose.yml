@@ -242,7 +242,7 @@ services:
       ServiceIdentity__Clients__3__ValidationFallback__ClientSecret: ${COMMUNICATIONS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__Clients__3__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__3__AllowedAudiences: *service-identity-audiences
-      ServiceIdentity__Clients__3__AllowedScopes: bolt.service,identity.session.validate,notifications.send,storage.read,storage.write,tenant.target
+      ServiceIdentity__Clients__3__AllowedScopes: bolt.service,communications.admin,datacontext.query.all-tenants,identity.session.validate,notifications.send,storage.read,storage.write,tenant.target
       ServiceIdentity__Clients__4__ClientId: XFramework.Notifications
       ServiceIdentity__Clients__4__ClientSecret: ${NOTIFICATIONS_SERVICE_IDENTITY_SECRET:?Set NOTIFICATIONS_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__Clients__4__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
