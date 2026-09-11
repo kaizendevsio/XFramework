@@ -19,7 +19,7 @@ else if (!_stockEnabled)
 else if (_outsideTenantContext)
 {
     <div class="space-y-4">
-        <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo("/inventario/stock"))">
+        <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo($"/inventario/stock{ProductQuery}"))">
             <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
             Back to Stock
         </BbButton>
@@ -39,7 +39,7 @@ else
         <div class="space-y-6 inv-page">
             <div class="flex items-center gap-4">
                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to stock"
-                          OnClick="@(() => Navigation.NavigateTo("/inventario/stock"))">
+                          OnClick="@(() => Navigation.NavigateTo($"/inventario/stock{ProductQuery}"))">
                     <LucideIcon Name="arrow-left" class="h-4 w-4" />
                 </BbButton>
                 <div class="flex-1">
@@ -122,10 +122,12 @@ else
                 </BbCardHeader>
                 <BbCardContent>
                     <BbDataGrid Items="@_movements" ShowPagination="true" InitialPageSize="10"
-                                OnRowClick="@((InventoryMovement item) => Navigation.NavigateTo($"/inventario/stock/movements/{item.Id}"))"
+                                OnRowClick="@((InventoryMovement item) => Navigation.NavigateTo($"/inventario/stock/movements/{item.Id}{ProductQuery}"))"
                                 Class="cursor-pointer">
                         <Columns><InventoryTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></InventoryTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" Filterable="true" />
+                            <InventoryTemplateColumn Title="Type" Sortable="true" SortBy="@(item => item.MovementType)" Filterable="true" FilterBy="@(item => item.MovementType)">
+                                <ChildContent Context="item"><a href="@($"/inventario/stock/movements/{item.Id}{ProductQuery}")" aria-label="@($"View stock movement: {item.MovementType}")">@item.MovementType</a></ChildContent>
+                            </InventoryTemplateColumn>
                             <InventoryTemplateColumn Title="Affects" Filterable="true" SortBy="@(item => InventoryDisplay.Effect(item.MovementType))" FilterBy="@(item => InventoryDisplay.Effect(item.MovementType))"><ChildContent Context="item">@InventoryDisplay.Effect(item.MovementType)</ChildContent></InventoryTemplateColumn>
 <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Format="0.####" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.QuantityBefore)" Title="On hand before" Format="0.####" Sortable="true" Filterable="true" />
@@ -143,6 +145,8 @@ else
     private List<ProductVariation> _variants = [];
     private List<InventoryLot> _identityLots = [];
     [Parameter] public Guid Id { get; set; }
+    [SupplyParameterFromQuery] public Guid? ProductId { get; set; }
+    private string ProductQuery => ProductId is { } productId ? $"?productId={productId}" : "";
 
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;

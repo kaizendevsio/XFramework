@@ -53,7 +53,7 @@ else
                 </BbCardHeader>
                 <BbCardContent>
                     <BbDataGrid Items="@_orders.Where(MatchesOrder).ToList()" ShowPagination="true" InitialPageSize="20"
-                                OnRowClick="@((PurchaseOrder item) => Navigation.NavigateTo($"/inventario/purchase-orders/{item.Id}"))"
+                                OnRowClick="@((PurchaseOrder item) => Navigation.NavigateTo($"/inventario/purchase-orders/{item.Id}{SupplierQuery}"))"
                                 Class="cursor-pointer">
                         <Columns>
                             <BbDataGridPropertyColumn Property="@(x => x.OrderNumber)" Title="Order" Sortable="true" Filterable="true" />
@@ -73,7 +73,7 @@ else
                             <BbDataGridTemplateColumn Title="Actions">
                                 <ChildContent Context="item">
                                     <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View purchase order"
-                                              OnClick="@(() => Navigation.NavigateTo($"/inventario/purchase-orders/{item.Id}"))">
+                                              OnClick="@(() => Navigation.NavigateTo($"/inventario/purchase-orders/{item.Id}{SupplierQuery}"))">
                                         <LucideIcon Name="eye" class="h-4 w-4" />
                                     </BbButton>
                                 </ChildContent>
@@ -197,6 +197,7 @@ else
     [SupplyParameterFromQuery] public Guid? ProductId { get; set; }
     [SupplyParameterFromQuery] public Guid? VariantId { get; set; }
     [SupplyParameterFromQuery] public Guid? SupplierId { get; set; }
+    private string SupplierQuery => SupplierId is { } supplierId ? $"?supplierId={supplierId}" : "";
     [SupplyParameterFromQuery] public string? PreferredSupplier { get; set; }
     [SupplyParameterFromQuery] public decimal? Quantity { get; set; }
     [SupplyParameterFromQuery] public string? Scope { get; set; }

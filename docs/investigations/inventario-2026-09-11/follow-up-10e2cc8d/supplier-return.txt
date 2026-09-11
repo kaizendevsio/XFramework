@@ -1,0 +1,75 @@
+- StaticText "Supplier: "
+- StaticText "Fixture supplier"
+- link "Clear supplier filter" [ref=e1]
+- heading "Purchase Orders" [level=3, ref=e2]
+- paragraph
+  - StaticText "Track supplier orders, partial receiving, and completion state."
+- button "Create PO" [disabled, ref=e3]
+  - image
+  - StaticText "Create PO"
+- button "Refresh" [ref=e4]
+  - image
+  - StaticText "Refresh"
+- LabelText
+  - StaticText "Order view"
+- combobox "Order view" [expanded=false, ref=e7]: All orders
+  - StaticText "All orders"
+  - image
+- heading "Purchase Order List" [level=3, ref=e5]
+- paragraph
+  - StaticText "2 purchase order(s) loaded"
+- generic
+  - grid
+    - rowgroup
+      - row "Order Filter Order Supplier Filter Supplier Status Filter Status Order Date Filter Order Date Expected Filter Expected Lines Filter Lines Actions"
+        - columnheader "Order Filter Order" [ref=e17] clickable [cursor:pointer, tabindex]
+          - StaticText "Order"
+          - image
+          - button "Filter Order" [expanded=false, ref=e25]
+            - image
+        - columnheader "Supplier Filter Supplier" [ref=e18]
+          - StaticText "Supplier"
+          - button "Filter Supplier" [expanded=false, ref=e26]
+            - image
+        - columnheader "Status Filter Status" [ref=e19]
+          - StaticText "Status"
+          - button "Filter Status" [expanded=false, ref=e27]
+            - image
+        - columnheader "Order Date Filter Order Date" [ref=e20] clickable [cursor:pointer, tabindex]
+          - StaticText "Order Date"
+          - image
+          - button "Filter Order Date" [expanded=false, ref=e28]
+            - image
+        - columnheader "Expected Filter Expected" [ref=e21] clickable [cursor:pointer, tabindex]
+          - StaticText "Expected"
+          - image
+          - button "Filter Expected" [expanded=false, ref=e29]
+            - image
+        - columnheader "Lines Filter Lines" [ref=e22]
+          - StaticText "Lines"
+          - button "Filter Lines" [expanded=false, ref=e30]
+            - image
+        - columnheader "Actions" [ref=e23]
+          - StaticText "Actions"
+    - row "LOCAL-PO Fixture supplier Received 1/1/0001 12:00:00 AM 0 View purchase order" [ref=e8] clickable [cursor:pointer, tabindex]
+      - gridcell "LOCAL-PO" [ref=e9]
+      - gridcell "Fixture supplier" [ref=e10]
+      - gridcell "Received" [ref=e11]
+      - gridcell "1/1/0001 12:00:00 AM" [ref=e12]
+      - gridcell
+      - gridcell "0" [ref=e13]
+      - gridcell "View purchase order" [ref=e14]
+        - button "View purchase order" [ref=e24]
+          - image
+  - StaticText "Scroll table horizontally for more columns"
+- navigation "Pagination" [ref=e6]
+  - StaticText "Showing 1-1 of 1"
+  - list
+    - listitem [level=1]
+      - button "Previous" [disabled, ref=e15]
+        - image
+        - StaticText "Previous"
+    - listitem [level=1]
+      - button "Next" [disabled, ref=e16]
+        - StaticText "Next"
+        - image

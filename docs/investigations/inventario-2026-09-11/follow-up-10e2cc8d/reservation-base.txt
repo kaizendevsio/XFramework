@@ -1,0 +1,113 @@
+- button "Back to reservations" [ref=e1]
+  - image
+- heading "Reservation" [level=3, ref=e2]
+- StaticText "Active"
+- paragraph
+  - StaticText "Fixture Shirt (SHIRT) - Qty 2.00"
+- button "Release" [ref=e3]
+- button "Fulfill" [ref=e4]
+- button "Cancel" [ref=e5]
+- button "Refresh" [ref=e6]
+  - image
+  - StaticText "Refresh"
+- paragraph
+  - StaticText "Quantity"
+- heading "2.00" [level=3, ref=e7]
+- paragraph
+  - StaticText "Reserved"
+- heading "9/12/2026 8:00 AM" [level=3, ref=e8]
+- paragraph
+  - StaticText "Expires"
+- heading "N/A" [level=3, ref=e9]
+- heading "Reservation Details" [level=3, ref=e10]
+- paragraph
+  - StaticText "Allocation context and lifecycle timestamps."
+- paragraph
+  - StaticText "Product"
+- StaticText "Fixture Shirt (SHIRT)"
+- paragraph
+  - StaticText "Variant"
+- StaticText "Base product"
+- paragraph
+  - StaticText "Warehouse"
+- StaticText "WH - Fixture warehouse"
+- paragraph
+  - StaticText "Location"
+- StaticText "BIN - Fixture bin"
+- paragraph
+  - StaticText "Current stock position"
+- StaticText "10.00 on hand / 2.00 reserved / 8.00 available"
+- link "View stock position" [ref=e11]
+- paragraph
+  - StaticText "Reference"
+- StaticText "Fixture base"
+- paragraph
+  - StaticText "Created"
+- StaticText "1/1/0001 8:00 AM"
+- paragraph
+  - StaticText "Released"
+- StaticText "N/A"
+- paragraph
+  - StaticText "Fulfilled"
+- StaticText "N/A"
+- paragraph
+  - StaticText "ID"
+- StaticText "00000000-0000-0000-0000-000000000001"
+- heading "Allocation Output" [level=3, ref=e12]
+- paragraph
+  - StaticText "Lots and balances selected for this reservation."
+- generic
+  - grid
+    - rowgroup
+      - row "Lot Filter Lot Qty Filter Qty Status Filter Status Reserved Filter Reserved Released Filter Released Fulfilled Filter Fulfilled Stock position"
+        - columnheader "Lot Filter Lot" [ref=e22]
+          - StaticText "Lot"
+          - button "Filter Lot" [expanded=false, ref=e30]
+            - image
+        - columnheader "Qty Filter Qty" [ref=e23] clickable [cursor:pointer, tabindex]
+          - StaticText "Qty"
+          - image
+          - button "Filter Qty" [expanded=false, ref=e31]
+            - image
+        - columnheader "Status Filter Status" [ref=e24]
+          - StaticText "Status"
+          - button "Filter Status" [expanded=false, ref=e32]
+            - image
+        - columnheader "Reserved Filter Reserved" [ref=e25] clickable [cursor:pointer, tabindex]
+          - StaticText "Reserved"
+          - image
+          - button "Filter Reserved" [expanded=false, ref=e33]
+            - image
+        - columnheader "Released Filter Released" [ref=e26] clickable [cursor:pointer, tabindex]
+          - StaticText "Released"
+          - image
+          - button "Filter Released" [expanded=false, ref=e34]
+            - image
+        - columnheader "Fulfilled Filter Fulfilled" [ref=e27] clickable [cursor:pointer, tabindex]
+          - StaticText "Fulfilled"
+          - image
+          - button "Filter Fulfilled" [expanded=false, ref=e35]
+            - image
+        - columnheader "Stock position" [ref=e28]
+          - StaticText "Stock position"
+    - row "Untracked 2 Reserved 1/1/0001 12:00:00 AM View stock position" [ref=e14] focusable [tabindex]
+      - gridcell "Untracked" [ref=e15]
+      - gridcell "2" [ref=e16]
+      - gridcell "Reserved" [ref=e17]
+      - gridcell "1/1/0001 12:00:00 AM" [ref=e18]
+      - gridcell
+      - gridcell
+      - gridcell "View stock position" [ref=e19]
+        - link "View stock position" [ref=e29]
+  - StaticText "Scroll table horizontally for more columns"
+- navigation "Pagination" [ref=e13]
+  - StaticText "Showing 1-1 of 1"
+  - list
+    - listitem [level=1]
+      - button "Previous" [disabled, ref=e20]
+        - image
+        - StaticText "Previous"
+    - listitem [level=1]
+      - button "Next" [disabled, ref=e21]
+        - StaticText "Next"
+        - image

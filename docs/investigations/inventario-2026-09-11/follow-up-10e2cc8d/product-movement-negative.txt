@@ -1,0 +1,152 @@
+- heading "Fixture Shirt" [level=3, ref=e1]
+- StaticText "Catalog disabled"
+- paragraph
+  - StaticText "SKU: SHIRT - Category: Uncategorized"
+- button "Refresh" [ref=e2]
+  - image
+  - StaticText "Refresh"
+- heading "Stock" [level=3, ref=e3]
+- paragraph
+  - StaticText "Post stock, receive batches, and inspect balances for this product."
+- button "Post Stock Movement" [ref=e4]
+  - image
+  - StaticText "Post Stock Movement"
+- paragraph
+  - StaticText "On Hand"
+- heading "18.00" [level=3, ref=e5]
+- paragraph
+  - StaticText "Reserved"
+- heading "3.00" [level=3, ref=e6]
+- paragraph
+  - StaticText "Available"
+- heading "15.00" [level=3, ref=e7]
+- tablist
+  - tab "Balances" [ref=e9]
+  - tab "Movements" [ref=e10]
+- tabpanel "Balances" [ref=e8] focusable [tabindex]
+  - heading "Stock Balances" [level=3, ref=e11]
+  - paragraph
+    - StaticText "2 balance row(s) for this product"
+  - generic
+    - grid
+      - rowgroup
+        - row "Variant Filter Variant Warehouse Filter Warehouse Location Filter Location Lot Filter Lot On Hand Filter On Hand Reserved Filter Reserved Available Filter Available"
+          - columnheader "Variant Filter Variant" [ref=e44]
+            - StaticText "Variant"
+            - button "Filter Variant" [expanded=false, ref=e53]
+              - image
+          - columnheader "Warehouse Filter Warehouse" [ref=e45]
+            - StaticText "Warehouse"
+            - button "Filter Warehouse" [expanded=false, ref=e54]
+              - image
+          - columnheader "Location Filter Location" [ref=e46]
+            - StaticText "Location"
+            - button "Filter Location" [expanded=false, ref=e55]
+              - image
+          - columnheader "Lot Filter Lot" [ref=e47]
+            - StaticText "Lot"
+            - button "Filter Lot" [expanded=false, ref=e56]
+              - image
+          - columnheader "On Hand Filter On Hand" [ref=e48] clickable [cursor:pointer, tabindex]
+            - StaticText "On Hand"
+            - image
+            - button "Filter On Hand" [expanded=false, ref=e57]
+              - image
+          - columnheader "Reserved Filter Reserved" [ref=e49] clickable [cursor:pointer, tabindex]
+            - StaticText "Reserved"
+            - image
+            - button "Filter Reserved" [expanded=false, ref=e58]
+              - image
+          - columnheader "Available Filter Available" [ref=e50] clickable [cursor:pointer, tabindex]
+            - StaticText "Available"
+            - image
+            - button "Filter Available" [expanded=false, ref=e59]
+              - image
+      - row "Base product View stock position: WH - Fixture warehouse BIN - Fixture bin Untracked 10 2 8" [ref=e21] clickable [cursor:pointer, tabindex]
+        - gridcell "Base product" [ref=e28]
+        - gridcell "View stock position: WH - Fixture warehouse" [ref=e29]
+          - link "View stock position: WH - Fixture warehouse" [ref=e51]
+            - StaticText "WH - Fixture warehouse"
+        - gridcell "BIN - Fixture bin" [ref=e30]
+        - gridcell "Untracked" [ref=e31]
+        - gridcell "10" [ref=e32]
+        - gridcell "2" [ref=e33]
+        - gridcell "8" [ref=e34]
+      - row "Size: QA Medium View stock position: WH - Fixture warehouse BIN - Fixture bin Untracked 8 1 7" [ref=e22] clickable [cursor:pointer, tabindex]
+        - gridcell "Size: QA Medium" [ref=e35]
+        - gridcell "View stock position: WH - Fixture warehouse" [ref=e36]
+          - link "View stock position: WH - Fixture warehouse" [ref=e52]
+            - StaticText "WH - Fixture warehouse"
+        - gridcell "BIN - Fixture bin" [ref=e37]
+        - gridcell "Untracked" [ref=e38]
+        - gridcell "8" [ref=e39]
+        - gridcell "1" [ref=e40]
+        - gridcell "7" [ref=e41]
+    - StaticText "Scroll table horizontally for more columns"
+  - navigation "Pagination" [ref=e12]
+    - StaticText "Showing 1-2 of 2"
+    - list
+      - listitem [level=1]
+        - button "Previous" [disabled, ref=e42]
+          - image
+          - StaticText "Previous"
+      - listitem [level=1]
+        - button "Next" [disabled, ref=e43]
+          - StaticText "Next"
+          - image
+- dialog "Post Stock Movement"
+  - heading "Post Stock Movement" [level=2, ref=e13]
+  - generic
+    - paragraph
+      - StaticText "Product"
+    - StaticText "Fixture Shirt (SHIRT)"
+    - LabelText
+      - StaticText "Variant"
+    - button "Variant" [expanded=false, ref=e17]
+      - StaticText "Base product"
+      - image
+    - LabelText
+      - StaticText "Warehouse"
+    - button "Warehouse" [expanded=false, ref=e18]
+      - StaticText "WH - Fixture warehouse"
+      - image
+    - LabelText
+      - StaticText "Location"
+    - button "Location" [expanded=false, ref=e19]
+      - StaticText "BIN - Fixture bin"
+      - image
+    - LabelText
+      - StaticText "Lot / Batch"
+    - button "Lot / Batch" [expanded=false, ref=e20]
+      - StaticText "No lot / untracked"
+      - image
+    - LabelText
+      - StaticText "Movement Type"
+    - combobox "Movement Type" [expanded=false, ref=e23]: Adjustment
+      - StaticText "Adjustment"
+      - image
+    - group
+      - LabelText
+        - StaticText "Quantity"
+      - textbox "Quantity" [ref=e24]: -1.0000
+        - StaticText "-1.0000"
+    - group
+      - LabelText
+        - StaticText "Unit"
+      - textbox "Unit" [ref=e25]: each
+        - StaticText "each"
+    - group
+      - LabelText
+        - StaticText "Reference Type"
+      - textbox "Reference Type" [ref=e26]
+    - paragraph
+      - StaticText "Available in selected position: 8. For adjustments, use a positive quantity to add stock or a negative quantity to remove it. Reservation/release changes reserved stock; other types change on-hand."
+    - group
+      - LabelText
+        - StaticText "Reason"
+      - textbox "Reason" [ref=e27]
+  - button "Cancel" [ref=e14]
+  - button "Post Movement" [ref=e15]
+  - button "Close" [ref=e16]
+    - image
+    - StaticText "Close"

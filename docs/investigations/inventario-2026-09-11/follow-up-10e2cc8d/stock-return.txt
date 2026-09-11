@@ -1,0 +1,112 @@
+- heading "Stock Control" [level=3, ref=e1]
+- paragraph
+  - StaticText "Post stock movements and inspect balances for the selected tenant."
+- button "Post Movement" [ref=e2]
+  - image
+  - StaticText "Post Movement"
+- button "Refresh" [ref=e3]
+  - image
+  - StaticText "Refresh"
+- StaticText "Product: "
+- StaticText "Fixture Shirt"
+- link "Back to product stock" [ref=e4]
+- link "Clear product scope" [ref=e5]
+- group
+  - LabelText
+    - StaticText "Search stock"
+  - textbox "Search stock" [ref=e8]
+- LabelText
+  - StaticText "Warehouse"
+- combobox "Warehouse" [expanded=false, ref=e9]: All warehouses
+  - StaticText "All warehouses"
+  - image
+- button "Clear filters" [ref=e6]
+- tablist
+  - tab "Balances (2)" [ref=e10]
+    - StaticText "Balances (2)"
+  - tab "Movements (0)" [ref=e11]
+    - StaticText "Movements (0)"
+- tabpanel "Balances (2)" [ref=e7] focusable [tabindex]
+  - heading "Stock Balances" [level=3, ref=e12]
+  - paragraph
+    - StaticText "2 balance row(s) in scope before column filters"
+  - generic
+    - grid
+      - rowgroup
+        - row "Variant Filter Variant Product Filter Product Warehouse Filter Warehouse Location Filter Location On Hand Filter On Hand Reserved Filter Reserved Available Filter Available Last movement Filter Last movement Actions"
+          - columnheader "Variant Filter Variant" [ref=e34]
+            - StaticText "Variant"
+            - button "Filter Variant" [expanded=false, ref=e45]
+              - image
+          - columnheader "Product Filter Product" [ref=e35]
+            - StaticText "Product"
+            - button "Filter Product" [expanded=false, ref=e46]
+              - image
+          - columnheader "Warehouse Filter Warehouse" [ref=e36]
+            - StaticText "Warehouse"
+            - button "Filter Warehouse" [expanded=false, ref=e47]
+              - image
+          - columnheader "Location Filter Location" [ref=e37]
+            - StaticText "Location"
+            - button "Filter Location" [expanded=false, ref=e48]
+              - image
+          - columnheader "On Hand Filter On Hand" [ref=e38] clickable [cursor:pointer, tabindex]
+            - StaticText "On Hand"
+            - image
+            - button "Filter On Hand" [expanded=false, ref=e49]
+              - image
+          - columnheader "Reserved Filter Reserved" [ref=e39] clickable [cursor:pointer, tabindex]
+            - StaticText "Reserved"
+            - image
+            - button "Filter Reserved" [expanded=false, ref=e50]
+              - image
+          - columnheader "Available Filter Available" [ref=e40] clickable [cursor:pointer, tabindex]
+            - StaticText "Available"
+            - image
+            - button "Filter Available" [expanded=false, ref=e51]
+              - image
+          - columnheader "Last movement Filter Last movement" [ref=e41] clickable [cursor:pointer, tabindex]
+            - StaticText "Last movement"
+            - image
+            - button "Filter Last movement" [expanded=false, ref=e52]
+              - image
+          - columnheader "Actions" [ref=e42]
+            - StaticText "Actions"
+      - row "Base product Fixture Shirt Fixture warehouse Fixture bin 10 2 8 View stock balance Adjust" [ref=e14] clickable [cursor:pointer, tabindex]
+        - gridcell "Base product" [ref=e16]
+        - gridcell "Fixture Shirt" [ref=e17]
+        - gridcell "Fixture warehouse" [ref=e18]
+        - gridcell "Fixture bin" [ref=e19]
+        - gridcell "10" [ref=e20]
+        - gridcell "2" [ref=e21]
+        - gridcell "8" [ref=e22]
+        - gridcell
+        - gridcell "View stock balance Adjust" [ref=e23]
+          - button "View stock balance" [ref=e43]
+            - image
+          - button "Adjust" [ref=e53]
+      - row "Size: QA Medium Fixture Shirt Fixture warehouse Fixture bin 8 1 7 View stock balance Adjust" [ref=e15] clickable [cursor:pointer, tabindex]
+        - gridcell "Size: QA Medium" [ref=e24]
+        - gridcell "Fixture Shirt" [ref=e25]
+        - gridcell "Fixture warehouse" [ref=e26]
+        - gridcell "Fixture bin" [ref=e27]
+        - gridcell "8" [ref=e28]
+        - gridcell "1" [ref=e29]
+        - gridcell "7" [ref=e30]
+        - gridcell
+        - gridcell "View stock balance Adjust" [ref=e31]
+          - button "View stock balance" [ref=e44]
+            - image
+          - button "Adjust" [ref=e54]
+    - StaticText "Scroll table horizontally for more columns"
+  - navigation "Pagination" [ref=e13]
+    - StaticText "Showing 1-2 of 2"
+    - list
+      - listitem [level=1]
+        - button "Previous" [disabled, ref=e32]
+          - image
+          - StaticText "Previous"
+      - listitem [level=1]
+        - button "Next" [disabled, ref=e33]
+          - StaticText "Next"
+          - image

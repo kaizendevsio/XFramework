@@ -2,7 +2,7 @@
 @inject TenantModuleNavigationService ModuleNavigation
 @implements IDisposable
 
-<SidebarNavItem Href="/inventario/products"
+<SidebarNavItem Href="@($"/inventario/products{CategoryQuery}")"
                 Label="Product List"
                 Icon="arrow-left"
                 Match="NavLinkMatch.All"
@@ -39,6 +39,10 @@
 
     private string CurrentPath => new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/');
     private string BaseHref => $"/inventario/products/{ProductId}";
+    private string CategoryQuery =>
+        Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query)
+            .TryGetValue("categoryId", out var value) && Guid.TryParse(value, out var categoryId)
+                ? $"?categoryId={categoryId}" : "";
     private bool ShowStock =>
         ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "stock_balances")
         || ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "movements")
@@ -73,7 +77,7 @@
     private void OnModuleNavigationChanged() => _ = InvokeAsync(StateHasChanged);
 
     private string SectionHref(string section) =>
-        section == "summary" ? BaseHref : $"{BaseHref}/{section}";
+        (section == "summary" ? BaseHref : $"{BaseHref}/{section}") + CategoryQuery;
 
     private static string NormalizeSection(string section) =>
         section.ToLowerInvariant() switch

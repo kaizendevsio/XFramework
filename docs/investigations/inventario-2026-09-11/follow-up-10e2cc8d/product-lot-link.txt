@@ -1,0 +1,3 @@
+Actual ProductDetail Lots section showed a native link named 'View lot: LOCAL-LOT'.
+Focus + Enter navigated to http://localhost:5199/inventario/lots/20000000-0000-0000-0000-000000000001 .
+The isolated host does not render the destination lot detail; no live navigation or writes occurred.

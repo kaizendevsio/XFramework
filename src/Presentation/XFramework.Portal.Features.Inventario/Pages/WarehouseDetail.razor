@@ -151,7 +151,9 @@ else
                                 OnRowClick="@((InventoryLocation item) => Navigation.NavigateTo($"/inventario/locations/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" Filterable="true" />
+                            <InventoryTemplateColumn Title="Code" Sortable="true" SortBy="@(item => item.Code)" Filterable="true" FilterBy="@(item => item.Code)">
+                                <ChildContent Context="item"><a href="@($"/inventario/locations/{item.Id}")" aria-label="@($"View location: {item.Code}")">@item.Code</a></ChildContent>
+                            </InventoryTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.LocationType)" Title="Type" Sortable="true" Filterable="true" />
                             <InventoryTemplateColumn Title="Pickable" Filterable="true" SortBy="@(item => item.IsPickable ? "Pickable" : "Storage")" FilterBy="@(item => item.IsPickable ? "Pickable" : "Storage")">
@@ -175,7 +177,7 @@ else
                                 Class="cursor-pointer">
                         <Columns><InventoryTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></InventoryTemplateColumn><InventoryTemplateColumn Title="Lot" Filterable="true" SortBy="@(item => IdentityLotLabel(item.LotId))" FilterBy="@(item => IdentityLotLabel(item.LotId))"><ChildContent Context="item">@(_identityLots.FirstOrDefault(x => x.Id == item.LotId)?.LotNumber ?? "Untracked")</ChildContent></InventoryTemplateColumn>
                             <InventoryTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
-                                <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
+                                <ChildContent Context="item"><a href="@($"/inventario/stock/balances/{item.Id}")" aria-label="@($"View stock position: {GetProductName(item.ProductId)}")">@GetProductName(item.ProductId)</a></ChildContent>
                             </InventoryTemplateColumn>
                             <InventoryTemplateColumn Title="Location" Filterable="true" SortBy="@(item => GetLocationName(item.LocationId))" FilterBy="@(item => GetLocationName(item.LocationId))">
                                 <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
@@ -201,7 +203,9 @@ else
                             <InventoryTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </InventoryTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" Filterable="true" />
+                            <InventoryTemplateColumn Title="Type" Sortable="true" SortBy="@(item => item.MovementType)" Filterable="true" FilterBy="@(item => item.MovementType)">
+                                <ChildContent Context="item"><a href="@($"/inventario/stock/movements/{item.Id}")" aria-label="@($"View stock movement: {item.MovementType}")">@item.MovementType</a></ChildContent>
+                            </InventoryTemplateColumn>
                             <InventoryTemplateColumn Title="Affects" Filterable="true" SortBy="@(item => InventoryDisplay.Effect(item.MovementType))" FilterBy="@(item => InventoryDisplay.Effect(item.MovementType))"><ChildContent Context="item">@InventoryDisplay.Effect(item.MovementType)</ChildContent></InventoryTemplateColumn>
 <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Format="0.####" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="On hand after" Format="0.####" Sortable="true" Filterable="true" />

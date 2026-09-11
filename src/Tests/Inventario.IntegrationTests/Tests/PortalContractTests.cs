@@ -116,6 +116,31 @@ public sealed class PortalContractTests
     }
 
     [Test]
+    public void DetailNavigationGrids_ProvideNativeLinksOrButtonActions()
+    {
+        var pagesRoot = GetInventarioPagesRoot(FindRepositoryRoot());
+        var missingActions = new List<string>();
+        foreach (var path in Directory.EnumerateFiles(pagesRoot, "*.razor", SearchOption.AllDirectories))
+        {
+            foreach (Match grid in Regex.Matches(File.ReadAllText(path), @"<BbDataGrid\b.*?</BbDataGrid>", RegexOptions.Singleline))
+            {
+                var rowAction = Regex.Match(grid.Value,
+                    """
+                    OnRowClick="@\(\(\w+ item\) => Navigation.NavigateTo\(\$"([^"]+)"\)\)"
+                    """);
+                if (!rowAction.Success) continue;
+
+                var route = Regex.Escape(rowAction.Groups[1].Value);
+                var nativeAction = $"""(?:href="@\(\$"{route}"\)"|OnClick="@\(\(\) => Navigation.NavigateTo\(\$"{route}"\)\)")""";
+                if (!Regex.IsMatch(grid.Value, nativeAction))
+                    missingActions.Add($"{Path.GetFileName(path)}: {rowAction.Groups[1].Value}");
+            }
+        }
+
+        missingActions.Should().BeEmpty("keyboard users need a native link or button for every row-click detail route");
+    }
+
+    [Test]
     public void DetailLookups_DoNotSendInMemoryIdCollectionsThroughRemoteDataContext()
     {
         var repositoryRoot = FindRepositoryRoot();
@@ -300,7 +325,7 @@ public sealed class PortalContractTests
         productDetailText.Should().NotContain("AriaLabel=\"Back to products\"");
 
         productSidebarText.Should().Contain("Label=\"Product List\"");
-        productSidebarText.Should().Contain("Href=\"/inventario/products\"");
+        productSidebarText.Should().Contain("Href=\"@($\"/inventario/products{CategoryQuery}\")\"");
         productSidebarText.Should().Contain("Product Detail");
         productSidebarText.Should().Contain("Label=\"Summary\"");
         productSidebarText.Should().Contain("Label=\"Stock\"");

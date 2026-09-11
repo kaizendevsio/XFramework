@@ -53,6 +53,15 @@ else
                 </BbCard>
             </div>
 
+            @if (CategoryId is { } categoryId)
+            {
+                <div class="flex flex-wrap items-center gap-3 rounded-md border p-3">
+                    <span>Category: @GetCategoryName(categoryId)</span>
+                    <a href="@($"/inventario/categories/{categoryId}")">View category</a>
+                    <a href="/inventario/products">Clear category filter</a>
+                </div>
+            }
+
             <BbCard>
                 <BbCardHeader>
                     <div class="xf-page-header">
@@ -71,7 +80,7 @@ else
                 </BbCardHeader>
                 <BbCardContent>
                     <BbDataGrid Items="@_filteredProducts" ShowPagination="true" InitialPageSize="20"
-                                OnRowClick="@((Product item) => Navigation.NavigateTo($"/inventario/products/{item.Id}"))"
+                                OnRowClick="@((Product item) => Navigation.NavigateTo($"/inventario/products/{item.Id}{CategoryQuery}"))"
                                 Class="cursor-pointer">
                         <Columns>
                             <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
@@ -104,7 +113,7 @@ else
                                 <ChildContent Context="item">
                                     <div class="flex items-center gap-1">
                                         <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View product"
-                                                  OnClick="@(() => Navigation.NavigateTo($"/inventario/products/{item.Id}"))">
+                                                  OnClick="@(() => Navigation.NavigateTo($"/inventario/products/{item.Id}{CategoryQuery}"))">
                                             <LucideIcon Name="eye" class="h-4 w-4" />
                                         </BbButton>
                                     </div>
@@ -200,6 +209,10 @@ else
     {
         await Reload();
     }
+
+    protected override void OnParametersSet() => ApplySearch();
+
+    private string CategoryQuery => CategoryId is { } categoryId ? $"?categoryId={categoryId}" : "";
 
     private void OnTenantChanged()
     {

@@ -124,10 +124,10 @@ else
                 </BbCardHeader>
                 <BbCardContent>
                     <BbDataGrid Items="@_products" ShowPagination="true" InitialPageSize="20"
-                                OnRowClick="@((Product item) => Navigation.NavigateTo($"/inventario/products/{item.Id}"))"
+                                OnRowClick="@((Product item) => Navigation.NavigateTo($"/inventario/products/{item.Id}?categoryId={Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <InventoryTemplateColumn Title="Product" Filterable="true" SortBy="@(item => item.Name)" FilterBy="@(item => item.Name)"><ChildContent Context="item"><a href="@($"/inventario/products/{item.Id}")">@item.Name</a></ChildContent></InventoryTemplateColumn>
+                            <InventoryTemplateColumn Title="Product" Filterable="true" SortBy="@(item => item.Name)" FilterBy="@(item => item.Name)"><ChildContent Context="item"><a href="@($"/inventario/products/{item.Id}?categoryId={Id}")">@item.Name</a></ChildContent></InventoryTemplateColumn>
                             <InventoryTemplateColumn Title="SKU" Filterable="true" SortBy="@(item => item.SKU ?? string.Empty)" FilterBy="@(item => item.SKU ?? string.Empty)">
                                 <ChildContent Context="item">
                                     <span class="font-mono text-xs">@(item.SKU ?? "N/A")</span>
