@@ -142,6 +142,27 @@ public sealed class ChatWorkspaceTests
     }
 
     [Test]
+    public async Task PublishTypingAsync_StopThenRestart_PublishesBothTransitionsAndThrottlesRepeatedTyping()
+    {
+        var fixture = new ChatFixture();
+        var published = new List<bool>();
+        fixture.Session.Setup(s => s.PublishTypingAsync(fixture.Thread, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, bool, CancellationToken>((_, typing, _) => published.Add(typing))
+            .Returns(Task.CompletedTask);
+        await using var workspace = fixture.Workspace();
+        await workspace.StartAsync("device");
+        await workspace.SelectAsync(fixture.Thread);
+
+        await workspace.PublishTypingAsync(true);
+        await workspace.PublishTypingAsync(true);
+        await workspace.PublishTypingAsync(false);
+        await workspace.PublishTypingAsync(true);
+        await workspace.PublishTypingAsync(true);
+
+        Assert.That(published, Is.EqualTo(new[] { true, false, true }));
+    }
+
+    [Test]
     public async Task Typing_GroupMemberStops_DoesNotClearOtherMember()
     {
         var fixture = new ChatFixture();

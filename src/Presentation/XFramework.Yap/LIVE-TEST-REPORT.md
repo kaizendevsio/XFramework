@@ -1,6 +1,17 @@
 # Yap live setup and test report — 2026-09-11
 
-**Status: direct and three-person group messaging, replies/threads, reactions, search, editing, pinning, saved messages, deletion, mute, unread/read transitions, persistence, and non-member rejection have live passing evidence. Shared typing subscriptions and regular-user attachment upload remain blocked pending their fixes and deployment.** Fixture tests remain separate from the live evidence below.
+**Status: direct and three-person group messaging, replies/threads, reactions, search, editing, pinning, saved messages, deletion, mute, unread/read transitions, persistence, and non-member rejection have live passing evidence. Multi-user typing initially passed after PR #442, but subscription authorization subsequently failed; typing recovery and regular-user attachment upload remain blocked pending fixes and deployment.** Fixture tests remain separate from the live evidence below.
+
+## Typing retest after PR #442 deployment
+
+Deployment `34584776953` completed successfully for develop `7836437a`. The new client commit `8d5b6dd4` was imported as `14a4a985`, and 26 Yap tests passed before restarting against the matching Hub at `09:48:08Z`.
+
+- **Initial six-way group typing passed:** Bob typing appeared for Carol and Dave in 81 ms each; Carol typing appeared for Bob/Dave in 57/52 ms; Dave typing appeared for Bob/Carol in 75/72 ms. These were real UI inputs and DOM observations with all three accounts subscribed to the same group. The prior duplicate-subscription exception was absent.
+- **Recovery remains blocked:** after the normal service-transport reconnect at `09:50:07Z`, fresh Bob and Carol typing failed to reach the other accounts even outside the four-second local throttle. Reloading Dave restored reception temporarily. A later complete app restart also failed to establish working typing subscriptions, so the failure is not specific to reconnect.
+- **Backend finding reported by the fix task:** Hub logs showed all three transient and durable subscriptions rejected as unauthorized at `09:52:11Z`, with new transient subscriptions rejected again at `09:53:43Z`. Concurrent IdentityServer HTTP 429 responses prevented service credential generation-policy resolution. This supersedes the initial suspicion of lost client rebinds. The fix task owns the shared authorization/availability repair; Yap was stopped to avoid adding retries while it investigates.
+- **Separate local throttle correction:** a deterministic regression test showed that `true, true, false, true, true` only published `true, false`, suppressing the immediate restart. Resetting the local throttle when publishing false now emits `true, false, true` while still throttling repeated true updates. All 27 Yap tests pass. Live rapid-restart, simultaneous-stop, thread/direct typing, and expiry/reconnect acceptance remain pending healthy subscription authorization.
+
+Attachment contracts are concrete in the fix task but have not been imported into Yap yet: creation and download are Communications membership-checked SDK operations; upload part/complete/abort use dedicated Storage chat operations. The fix task reported ordinary-user multipart and ownership tests passing; no live attachment success is claimed here.
 
 ## Live checks after PR #441 deployment
 

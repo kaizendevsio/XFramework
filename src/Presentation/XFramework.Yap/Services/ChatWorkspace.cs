@@ -240,7 +240,7 @@ public sealed class ChatWorkspace(ICommunicationsChatClient client, IChatDirecto
     public async Task PublishTypingAsync(bool typing)
     {
         if (Selected is null || (typing && DateTime.UtcNow - lastTypingPublished < TimeSpan.FromSeconds(4))) return;
-        lastTypingPublished = DateTime.UtcNow;
+        lastTypingPublished = typing ? DateTime.UtcNow : DateTime.MinValue;
         try { await Session.PublishTypingAsync(Selected.Id, typing, lifetime.Token); }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex) { logger.LogDebug(ex, "Typing update could not be published."); }
