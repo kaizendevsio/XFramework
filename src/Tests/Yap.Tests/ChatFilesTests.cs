@@ -76,10 +76,16 @@ public sealed class ChatFilesTests
             Assert.That(creation.FileName, Is.EqualTo("test.txt"));
             Assert.That(creation.ContentType, Is.EqualTo("text/plain"));
             Assert.That(creation.TotalSizeBytes, Is.EqualTo(7));
+            Assert.That(creation.ChunkSizeBytes, Is.Null, "Storage must choose a provider-compatible default part size.");
             Assert.That(parts.Select(p => p.ChunkBytes.Length), Is.EqualTo(new[] { 5, 2 }));
             Assert.That(parts.Select(p => p.OffsetBytes), Is.EqualTo(new long[] { 0, 5 }));
             Assert.That(parts.Select(p => p.PartNumber), Is.EqualTo(new[] { 1, 2 }));
             Assert.That(parts.SelectMany(p => p.ChunkBytes), Is.EqualTo(new byte[] { 1, 2, 3, 4, 5, 6, 7 }));
+            Assert.That(parts.Select(p => p.PartSha256Hash), Is.EqualTo(new[]
+            {
+                "74F81FE167D99B4CB41D6D0CCDA82278CAEE9F3E2F25D5E5A3936FF3DCEC60D0",
+                "4E399D0536E9EB556EA05E7C19F52034FC44DC7EEA2F3B5AF2DA5336CA9C9CF1"
+            }));
             Assert.That(parts.All(p => p.UploadSessionId == upload), Is.True);
             Assert.That(parts.All(p => p.Metadata!.RequestedTenantId == tenant), Is.True);
         });

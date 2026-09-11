@@ -19,7 +19,11 @@ Imported the fix task's `4aeb2980` as `2b35cb21` and adapted Yap to the actual c
 
 The adapter honors negotiated part sizes and retains the actual filename, MIME type, and bytes. After multipart completion it polls tenant-scoped Storage metadata for up to 60 seconds if the file is still Verifying/VerificationInProgress, and only returns an Available file for message linking. It aborts an incomplete session on upload failure, but does not abort an already completed upload when later verification fails or is cancelled.
 
+Preflight review corrected two outgoing-request gaps before live use: Yap now omits the old 256 KB requested chunk size so Storage chooses its provider-compatible default (S3 multipart requires at least 5 MB), and includes the required SHA-256 hash for each exact part's bytes. Both negotiated parts have explicit expected-hash assertions. All 30 tests still pass.
+
 All **30 Yap tests pass**, including exact multipart bytes/offsets/numbers, Available and Verifying completion, abort after a rejected part, and link-scoped downloads. PR #443 owns the normal server deployment. These are adapter tests, not live upload/download evidence; the app remains stopped pending server deployment and authorization recovery.
+
+The fix task also corrected Communications' default requested service scopes to include its already-allowed `storage.write` grant, and is addressing private signed URLs generated with the Docker-only `minio` host. PR #444 owns the separate bounded IdentityServer rate-budget correction. These deployment prerequisites are not yet proven live.
 
 ## Live checks after PR #441 deployment
 

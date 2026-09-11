@@ -1,5 +1,6 @@
 using Communications.Integration.Clients;
 using Communications.Domain.Shared.Contracts.Requests.Attachments;
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Components.Forms;
 using Storage.Domain.Shared.Contracts.Requests;
 using Storage.Integration.Drivers;
@@ -25,7 +26,7 @@ public sealed class ChatFiles(IStorageServiceWrapper storage, ICommunicationsCha
         {
             ThreadId = threadId, FileName = Path.GetFileName(file.Name),
             ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
-            TotalSizeBytes = file.Size, ChunkSizeBytes = 256 * 1024
+            TotalSizeBytes = file.Size
         }, ct));
         var completedUpload = false;
         try
@@ -41,10 +42,11 @@ public sealed class ChatFiles(IStorageServiceWrapper storage, ICommunicationsCha
             {
                 var length = (int)Math.Min(buffer.Length, file.Size - offset);
                 await stream.ReadExactlyAsync(buffer.AsMemory(0, length), ct);
+                var partBytes = buffer.AsSpan(0, length).ToArray();
                 ChatWorkspace.Require(await storage.UploadChatStorageFilePart(new UploadChatStorageFilePartRequest
                 {
                     UploadSessionId = upload.Id, PartNumber = part++, OffsetBytes = offset,
-                    ChunkBytes = buffer.AsSpan(0, length).ToArray(), Metadata = metadata
+                    ChunkBytes = partBytes, PartSha256Hash = Convert.ToHexString(SHA256.HashData(partBytes)), Metadata = metadata
                 }, ct));
                 offset += length;
                 progress?.Report((int)(offset * 100 / file.Size));
