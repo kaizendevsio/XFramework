@@ -9,6 +9,36 @@ namespace Yap.Tests;
 public sealed class BrowserApiTests
 {
     [Test]
+    public async Task Events_ForSelectedConversation_StreamsTypingWithoutPolling()
+    {
+        await using var app = UiFixture.Create(0); await app.StartAsync();
+        using var handler = new HttpClientHandler { CookieContainer = new() };
+        using var client = new HttpClient(handler) { BaseAddress = new Uri(app.Urls.Single()) };
+        var session = (await client.GetFromJsonAsync<SessionResponse>("api/session"))!;
+        client.DefaultRequestHeaders.Add("RequestVerificationToken", session.AntiforgeryToken);
+        await client.PostAsync("api/auth/login", new FormUrlEncodedContent(new Dictionary<string, string> { ["username"] = "fixture", ["password"] = "fixture" }));
+        session = (await client.GetFromJsonAsync<SessionResponse>("api/session"))!;
+        var account = $"{session.User!.TenantId:N}:{session.User.CredentialId:N}";
+        client.DefaultRequestHeaders.Add("X-Yap-Account", account);
+        var chat = (await client.GetFromJsonAsync<ChatPage<Conversation>>("api/chat/conversations"))!.Items[0];
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var response = await client.GetAsync($"api/chat/events?account={account}&thread={chat.Id}", HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+        Assert.That(response.Content.Headers.ContentType!.MediaType, Is.EqualTo("text/event-stream"));
+        using var reader = new StreamReader(await response.Content.ReadAsStreamAsync(timeout.Token));
+        Assert.That(await reader.ReadLineAsync(timeout.Token), Is.EqualTo(": connected"));
+        await reader.ReadLineAsync(timeout.Token);
+        await client.PostAsync("test/typing/true", null, timeout.Token);
+        Assert.That(await reader.ReadLineAsync(timeout.Token), Is.EqualTo("event: typing"));
+        var frame = (await reader.ReadLineAsync(timeout.Token))!;
+        var update = System.Text.Json.JsonSerializer.Deserialize<TypingUpdate>(frame[6..])!;
+        Assert.That(update.ThreadId, Is.EqualTo(chat.Id));
+        Assert.That(update.IsTyping, Is.True);
+        Assert.That(update.CredentialId, Is.Not.EqualTo(session.User.CredentialId));
+        response.Dispose();
+        await app.StopAsync();
+    }
+
+    [Test]
     public async Task ChatApi_RequiresAuthenticationAccountBindingAndAntiforgery()
     {
         await using var app = UiFixture.Create(0); await app.StartAsync();

@@ -10,7 +10,7 @@
     const complete = () => { if (pending) { clearTimeout(pending.timer); pending.resolve(); pending = null; } };
     window.yap.motion = {
         begin(from, to) {
-            if (new URL(from).pathname === new URL(to).pathname) return;
+            if (new URL(from, location.href).pathname === new URL(to, location.href).pathname) return;
             const previous = pending;
             complete();
             previous?.transition?.skipTransition();

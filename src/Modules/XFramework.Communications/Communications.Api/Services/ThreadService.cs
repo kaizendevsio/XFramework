@@ -29,10 +29,20 @@ public sealed partial class ThreadService(
     ICommunicationsTransientRealtimePublisher transientRealtimePublisher,
     IMessageReactionSummaryReader reactionSummaryReader,
     IMessageReplySummaryReader replySummaryReader,
-    ILogger<ThreadService> logger
+    ILogger<ThreadService> logger,
+    CommunicationsOutboxSignal outboxSignal
 ) : IThreadService
 {
     private static readonly JsonSerializerOptions OutboxJsonOptions = new(JsonSerializerDefaults.Web);
+    private bool outboxPending;
+
+    private async Task SaveAndSignalAsync(CancellationToken ct)
+    {
+        await dataContext.SaveChangesOrThrowAsync(ct);
+        if (!outboxPending) return;
+        outboxPending = false;
+        outboxSignal.Notify();
+    }
 
     public async Task<Result<CreateThreadResponse>> CreateThreadAsync(CreateThreadRequest request, CancellationToken ct = default)
     {
@@ -140,7 +150,7 @@ public sealed partial class ThreadService(
                     MemberCredentialIds = allMemberIds
                 });
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
 
             return Result<CreateThreadResponse>.Success(new CreateThreadResponse
             {
@@ -586,7 +596,7 @@ public sealed partial class ThreadService(
                 });
 
             dataContext.Update(thread);
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -653,7 +663,7 @@ public sealed partial class ThreadService(
                     member.CredentialId
                 });
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.OK,
@@ -699,7 +709,7 @@ public sealed partial class ThreadService(
                     request.IsMuted
                 });
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.OK,
@@ -745,7 +755,7 @@ public sealed partial class ThreadService(
                     request.IsArchived
                 });
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.OK,
@@ -884,7 +894,7 @@ public sealed partial class ThreadService(
                     member.CredentialId
                 });
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -959,7 +969,7 @@ public sealed partial class ThreadService(
                     member.CredentialId
                 });
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -1072,7 +1082,7 @@ public sealed partial class ThreadService(
                     invite.InvitedByCredentialId
                 });
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.Created,
@@ -1188,7 +1198,7 @@ public sealed partial class ThreadService(
                     MemberId = member?.Id
                 });
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.OK,
@@ -1272,7 +1282,7 @@ public sealed partial class ThreadService(
                     Role = normalizedRole
                 });
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.OK,
@@ -1507,7 +1517,7 @@ public sealed partial class ThreadService(
                     });
             }
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
 
             return Result<CreateThreadMessageResponse>.Success(new CreateThreadMessageResponse
             {
@@ -1614,7 +1624,7 @@ public sealed partial class ThreadService(
                         ConcurrencyStamp = Guid.NewGuid()
                     });
                 }
-                await dataContext.SaveChangesOrThrowAsync(ct);
+                await SaveAndSignalAsync(ct);
             }
 
             // Get the member info for senders
@@ -1830,7 +1840,7 @@ public sealed partial class ThreadService(
                         ConcurrencyStamp = Guid.NewGuid()
                     });
 
-                    await dataContext.SaveChangesOrThrowAsync(ct);
+                    await SaveAndSignalAsync(ct);
                 }
 
                 return Result<CmdResponse>.Success(new CmdResponse
@@ -1862,7 +1872,7 @@ public sealed partial class ThreadService(
                     request.MessageId
                 });
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -1938,7 +1948,7 @@ public sealed partial class ThreadService(
                     request.MessageId
                 });
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -2032,7 +2042,7 @@ public sealed partial class ThreadService(
                     MemberId = member.Id
                 });
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.OK,
@@ -2121,7 +2131,7 @@ public sealed partial class ThreadService(
                     MemberId = member.Id
                 });
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.OK,
@@ -2197,7 +2207,7 @@ public sealed partial class ThreadService(
                     report.Reason
                 });
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.Created,
@@ -2273,7 +2283,7 @@ public sealed partial class ThreadService(
                     existingBlock.BlockedCredentialId
                 });
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.Created,
@@ -2325,7 +2335,7 @@ public sealed partial class ThreadService(
                     block.BlockedCredentialId
                 });
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.OK,
@@ -2440,7 +2450,7 @@ public sealed partial class ThreadService(
                     StorageFileId = file.StorageId
                 });
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -2613,7 +2623,7 @@ public sealed partial class ThreadService(
                     StorageFileId = file.StorageId
                 });
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -2714,7 +2724,7 @@ public sealed partial class ThreadService(
                     MemberId = member.Id
                 });
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -2802,7 +2812,7 @@ public sealed partial class ThreadService(
                     reaction.TypeId
                 });
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -2923,7 +2933,7 @@ public sealed partial class ThreadService(
                     });
             }
 
-            await dataContext.SaveChangesOrThrowAsync(ct);
+            await SaveAndSignalAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -3381,6 +3391,7 @@ public sealed partial class ThreadService(
         Guid actorCredentialId,
         object payload)
     {
+        outboxPending = true;
         var now = DateTime.UtcNow;
         dataContext.Add(new MessageOutboxEvent
         {

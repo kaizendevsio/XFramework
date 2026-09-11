@@ -64,3 +64,4 @@ public sealed record ReadMessages(Guid ThreadId, List<Guid> MessageIds);
 public sealed record ThreadAction(Guid ThreadId, string Action, bool Value);
 public sealed record AttachMessageFile(Guid ThreadId, Guid MessageId, Guid StorageId);
 public sealed record SearchHit(Guid ThreadId, Guid MessageId, string Text, DateTime CreatedAt);
+public sealed record TypingUpdate(Guid ThreadId, Guid CredentialId, bool IsTyping);
