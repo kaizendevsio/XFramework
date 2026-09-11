@@ -172,4 +172,36 @@ public sealed class InventoryLotService(
             TenantModuleFeatureKeys.Inventario,
             TenantModuleFeatureKeys.TraceabilitySubFeature,
             ct);
+
+    public async Task<Result<InventoryLot>> UpdateInventoryLotAsync(UpdateInventoryLotRequest request, CancellationToken ct = default)
+    {
+        var tenantResult = GetCurrentTenantId(request);
+        if (!tenantResult.IsSuccess)
+            return Result<InventoryLot>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+        var tenantId = tenantResult.Data;
+        var featureResult = await EnsureTraceabilityEnabledAsync(tenantId, ct);
+        if (!featureResult.IsSuccess)
+            return Result<InventoryLot>.Failure(featureResult.Message!, featureResult.StatusCode);
+        if (!Enum.IsDefined(request.Status) || request.ManufacturedAt > request.ExpiresAt)
+            return Result<InventoryLot>.Failure("Check lot status and manufacture/expiry dates.", 400);
+        if (request.Status != XFramework.Inventario.Domain.Shared.Enums.InventoryLotStatus.Available &&
+            await dataContext.Query<StockBalance>().AnyAsync(x => x.TenantId == tenantId && x.LotId == request.Id && x.ReservedQuantity > 0 && !x.IsDeleted, ct))
+            return Result<InventoryLot>.Conflict("Release active reservations before changing lot eligibility.");
+
+        if (request.SupplierReference?.Length > 200) return Result<InventoryLot>.Failure("SupplierReference must be at most 200 characters.", 400);
+        var entity = await dataContext.Query<InventoryLot>()
+            .Where(x => x.TenantId == tenantId && x.Id == request.Id && !x.IsDeleted).FirstOrDefaultAsync(ct);
+        if (entity is null) return Result<InventoryLot>.NotFound("Record not found.");
+        if (entity.ConcurrencyStamp != request.ConcurrencyStamp)
+            return Result<InventoryLot>.Conflict("This record changed. Refresh before saving.");
+        dataContext.Update(entity);
+        entity.SupplierReference = NormalizeOptional(request.SupplierReference);
+        entity.ManufacturedAt = request.ManufacturedAt;
+        entity.ExpiresAt = request.ExpiresAt;
+        entity.Status = request.Status;
+        entity.ModifiedAt = DateTime.UtcNow;
+        entity.ConcurrencyStamp = Guid.NewGuid();
+        var saved = await dataContext.SaveChangesAsync(ct);
+        return saved.IsSuccess ? Result<InventoryLot>.Success(entity) : Result<InventoryLot>.Failure("Could not save changes.", saved.StatusCode);
+    }
 }

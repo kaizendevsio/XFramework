@@ -1,0 +1,118 @@
+@page "/inventario/suppliers/{Id:guid}"
+@implements IDisposable
+<PageTitle>Supplier - Inventario</PageTitle>
+@if (_loading) { <CenteredSpinner /> }
+else if (!_enabled) { <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" /> }
+else if (_supplier is null) { <BbEmpty Title="Record not found" Description="Choose a record in the active tenant." /> }
+else
+{
+    <div class="space-y-6 inv-page">
+        <div class="xf-page-header"><BbTypographyH3>@_supplier.Name</BbTypographyH3><BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">Refresh</BbButton></div>
+        <a href="@($"/inventario/purchase-orders?supplierId={Id}")">View supplier purchase orders</a>
+        <BbCard><BbCardHeader><BbCardTitle>Supplier Summary</BbCardTitle></BbCardHeader><BbCardContent>@if (_maintenanceEditing)
+                    {
+                        @if (_maintenanceError is not null) { <BbAlert><BbAlertDescription>@_maintenanceError</BbAlertDescription></BbAlert> }
+                        <div class="xf-detail-field-grid"><BbFormFieldInput TValue="string" @bind-Value="_editName" Label="Name" />
+<BbFormFieldInput TValue="string" @bind-Value="_editContactName" Label="Contact Name" />
+<BbFormFieldInput TValue="string" @bind-Value="_editEmail" Label="Email" />
+<BbFormFieldInput TValue="string" @bind-Value="_editPhone" Label="Phone" />
+<BbFormFieldSwitch @bind-Checked="_editIsActive" Label="Is Active" />
+</div>
+                        <p class="text-sm text-muted-foreground">Inactive suppliers remain in order history.</p>
+                        <div class="xf-page-actions"><BbButton OnClick="@SaveMaintenance" Disabled="@_maintenanceSaving">Save changes</BbButton><BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _maintenanceEditing = false)" Disabled="@_maintenanceSaving">Discard</BbButton></div>
+                    }
+                    else
+                    {
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@BeginMaintenance">Edit details</BbButton>
+<div class="xf-detail-field-grid"><div><BbTypographyMuted>Name</BbTypographyMuted><p>@_supplier.Name</p></div><div><BbTypographyMuted>Contact name</BbTypographyMuted><p>@_supplier.ContactName</p></div><div><BbTypographyMuted>Email</BbTypographyMuted><p>@_supplier.Email</p></div><div><BbTypographyMuted>Phone</BbTypographyMuted><p>@_supplier.Phone</p></div><div><BbTypographyMuted>Status</BbTypographyMuted><p>@(_supplier.IsActive ? "Active" : "Inactive")</p></div></div>
+                    }
+</BbCardContent></BbCard>
+    </div>
+}
+@code {
+    [Parameter] public Guid Id { get; set; }
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
+    [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
+    [Inject] private IPortalModuleAvailability ModuleNavigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    private Supplier? _supplier;
+    private bool _loading = true;
+    private bool _enabled;
+    protected override void OnInitialized() => TenantFilter.OnChanged += TenantChanged;
+    protected override Task OnParametersSetAsync() => Reload();
+    private void TenantChanged() => _ = InvokeAsync(Reload);
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _enabled = TenantFilter.SelectedTenantId is Guid && ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "purchasing");
+            _supplier = null;
+            if (!_enabled) return;
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _supplier = await DataContext.Query<Supplier>().NoCache().Where(x => x.TenantId == tenantId && x.Id == Id && !x.IsDeleted).FirstOrDefaultAsync();
+        }
+        catch { ToastService.Error("Could not load record."); }
+        finally { _loading = false; }
+    }
+    public void Dispose() => TenantFilter.OnChanged -= TenantChanged;
+
+    private string? _maintenanceError;
+    private bool _maintenanceEditing;
+    private bool _maintenanceSaving;
+    private Guid _editStamp;
+    private string _editName = "";
+    private string _editContactName = "";
+    private string _editEmail = "";
+    private string _editPhone = "";
+    private bool _editIsActive;
+
+    private void BeginMaintenance()
+    {
+        if (_supplier is null) return;
+        _editStamp = _supplier.ConcurrencyStamp;
+        _editName = _supplier.Name ?? "";
+        _editContactName = _supplier.ContactName ?? "";
+        _editEmail = _supplier.Email ?? "";
+        _editPhone = _supplier.Phone ?? "";
+        _editIsActive = _supplier.IsActive;
+        _maintenanceError = null;
+        _maintenanceEditing = true;
+    }
+    private async Task SaveMaintenance()
+    {
+        if (_supplier is null || _maintenanceSaving) return;
+        _maintenanceError = null;
+        if (_editName.Length > 200) { _maintenanceError = "Name must be at most 200 characters."; return; }
+        if (_editContactName.Length > 200) { _maintenanceError = "Contact name must be at most 200 characters."; return; }
+        if (_editEmail.Length > 320) { _maintenanceError = "Email must be at most 320 characters."; return; }
+        if (_editPhone.Length > 50) { _maintenanceError = "Phone must be at most 50 characters."; return; }
+        if (string.IsNullOrWhiteSpace(_editName)) { _maintenanceError = "Name is required."; return; }
+        _maintenanceSaving = true;
+        try
+        {
+            var result = await Inventario.UpdateSupplier(new UpdateSupplierRequest
+            {
+                Metadata = new() { RequestedTenantId = TenantFilter.SelectedTenantId },
+                Id = _supplier.Id,
+                ConcurrencyStamp = _editStamp,
+                Name = _editName,
+                ContactName = _editContactName,
+                Email = _editEmail,
+                Phone = _editPhone,
+                IsActive = _editIsActive,
+            });
+            if (result.IsSuccess)
+            {
+                _maintenanceEditing = false;
+                ToastService.Success("Changes saved.");
+                await Reload();
+            }
+            else ToastService.Error("Could not save. Check fields, or refresh if another user edited this supplier.");
+        }
+        catch { ToastService.Error("Could not save changes. Refresh and try again."); }
+        finally { _maintenanceSaving = false; }
+    }
+}

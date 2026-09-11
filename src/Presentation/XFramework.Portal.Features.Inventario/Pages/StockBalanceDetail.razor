@@ -36,7 +36,7 @@ else if (_balance is null)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="flex items-center gap-4">
                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to stock"
                           OnClick="@(() => Navigation.NavigateTo("/inventario/stock"))">
@@ -87,6 +87,7 @@ else
                 <BbCardContent>
                     <div class="grid gap-4 md:grid-cols-2">
                         <div>
+                            <BbTypographyMuted>Variant / Lot</BbTypographyMuted><div>@InventoryDisplay.Variant(_variants, _balance.ProductVariationId) / @(_identityLots.FirstOrDefault(x => x.Id == _balance.LotId)?.LotNumber ?? "Untracked")</div>
                             <BbTypographyMuted>Product</BbTypographyMuted>
                             <div>@GetProductLabel()</div>
                         </div>
@@ -123,11 +124,12 @@ else
                     <BbDataGrid Items="@_movements" ShowPagination="true" InitialPageSize="10"
                                 OnRowClick="@((InventoryMovement item) => Navigation.NavigateTo($"/inventario/stock/movements/{item.Id}"))"
                                 Class="cursor-pointer">
-                        <Columns>
+                        <Columns><BbDataGridTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.QuantityBefore)" Title="Before" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="After" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Affects" Filterable="true" FilterBy="@(item => InventoryDisplay.Effect(item.MovementType))"><ChildContent Context="item">@InventoryDisplay.Effect(item.MovementType)</ChildContent></BbDataGridTemplateColumn>
+<BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Format="0.####" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.QuantityBefore)" Title="On hand before" Format="0.####" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="On hand after" Format="0.####" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
@@ -138,6 +140,8 @@ else
 }
 
 @code {
+    private List<ProductVariation> _variants = [];
+    private List<InventoryLot> _identityLots = [];
     [Parameter] public Guid Id { get; set; }
 
     [Inject] private IDataContext DataContext { get; set; } = default!;
@@ -199,6 +203,8 @@ else
             if (_balance is null || _outsideTenantContext) return;
 
             var tenantId = _balance.TenantId;
+            _variants = await DataContext.Query<ProductVariation>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
+            _identityLots = await DataContext.Query<InventoryLot>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
             _product = await DataContext.Query<Product>()
                 .IgnoreQueryFilters()
                 .NoCache()

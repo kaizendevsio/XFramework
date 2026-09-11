@@ -1,0 +1,390 @@
+- complementary "Portal navigation":
+  - generic: X
+  - text: Portal
+  - paragraph: Modules & operations
+  - navigation:
+    - link "Dashboard":
+      - /url: /
+      - generic: Dashboard
+    - button "Audit" [expanded]:
+      - generic: Audit
+    - link "Database changes":
+      - /url: /audit/logs
+      - generic: Database changes
+    - button "Identity" [expanded]:
+      - generic: Identity
+    - link "Users":
+      - /url: /identity/users
+      - generic: Users
+    - link "Sessions":
+      - /url: /identity/sessions
+      - generic: Sessions
+    - link "Auth Logs":
+      - /url: /identity/auth-logs
+      - generic: Auth Logs
+    - button "Inventario" [expanded]:
+      - generic: Inventario
+    - link "Products":
+      - /url: /inventario/products
+      - generic: Products
+    - link "Categories":
+      - /url: /inventario/categories
+      - generic: Categories
+    - link "Warehouses":
+      - /url: /inventario/warehouses
+      - generic: Warehouses
+    - link "Lots":
+      - /url: /inventario/lots
+      - generic: Lots
+    - link "Stock":
+      - /url: /inventario/stock
+      - generic: Stock
+    - link "Reservations":
+      - /url: /inventario/reservations
+      - generic: Reservations
+    - link "Planning":
+      - /url: /inventario/planning
+      - generic: Planning
+    - link "Suppliers":
+      - /url: /inventario/suppliers
+      - generic: Suppliers
+    - link "Purchase Orders":
+      - /url: /inventario/purchase-orders
+      - generic: Purchase Orders
+    - link "Receiving":
+      - /url: /inventario/receiving
+      - generic: Receiving
+    - link "Reports":
+      - /url: /inventario/reports
+      - generic: Reports
+    - link "Sales Transactions":
+      - /url: /inventario/transactions
+      - generic: Sales Transactions
+    - link "Settings":
+      - /url: /inventario/settings
+      - generic: Settings
+    - button "POS" [expanded]:
+      - generic: POS
+    - link "Cashier":
+      - /url: /pos/cashier
+      - generic: Cashier
+    - link "Registers":
+      - /url: /pos/registers
+      - generic: Registers
+    - link "Sales":
+      - /url: /pos/sales
+      - generic: Sales
+    - link "Returns":
+      - /url: /pos/returns
+      - generic: Returns
+    - button "Communications":
+      - generic: Communications
+    - link:
+      - /url: /communications/users
+      - generic: Users
+    - link:
+      - /url: /communications/threads
+      - generic: Threads
+    - link:
+      - /url: /communications/operations
+      - generic: Operations
+    - link:
+      - /url: /communications/moderation
+      - generic: Moderation
+    - link:
+      - /url: /communications/settings
+      - generic: Settings
+    - button "Community":
+      - generic: Community
+    - link:
+      - /url: /community/identities
+      - generic: Identities
+    - link:
+      - /url: /community/content
+      - generic: Content
+    - link:
+      - /url: /community/connections
+      - generic: Connections
+    - link:
+      - /url: /community/notifications
+      - generic: Notifications
+    - link:
+      - /url: /community/settings
+      - generic: Settings
+    - button "Attendance":
+      - generic: Attendance
+    - link:
+      - /url: /attendance/contexts
+      - generic: Contexts
+    - link:
+      - /url: /attendance/sessions
+      - generic: Sessions
+    - link:
+      - /url: /attendance/reports
+      - generic: Reports
+    - button "Storage":
+      - generic: Storage
+    - link:
+      - /url: /storage/files
+      - generic: Files
+    - button "Finance" [expanded]:
+      - generic: Finance
+    - link "Wallets":
+      - /url: /finance/wallets
+      - generic: Wallets
+    - link "Deposits":
+      - /url: /finance/deposit-requests
+      - generic: Deposits
+    - link "Withdrawals":
+      - /url: /finance/withdrawal-requests
+      - generic: Withdrawals
+    - link "Transfers":
+      - /url: /finance/transfers
+      - generic: Transfers
+    - link "Batch":
+      - /url: /finance/batch
+      - generic: Batch
+    - link "Operations":
+      - /url: /finance/wallet-operations
+      - generic: Operations
+    - link "Statements":
+      - /url: /finance/statements
+      - generic: Statements
+    - link "Audit":
+      - /url: /finance/wallet-audit
+      - generic: Audit
+    - link "Reconciliation":
+      - /url: /finance/reconciliation
+      - generic: Reconciliation
+    - link "Outbox":
+      - /url: /finance/outbox-webhooks
+      - generic: Outbox
+    - link "Approvals":
+      - /url: /finance/wallet-approvals
+      - generic: Approvals
+    - link "Policy":
+      - /url: /finance/policy-decisions
+      - generic: Policy
+    - link "Refunds":
+      - /url: /finance/refunds-disputes
+      - generic: Refunds
+    - button "System" [expanded]:
+      - generic: System
+    - link "Reference Data":
+      - /url: /admin/reference-data
+      - generic: Reference Data
+  - generic: v1.0 - XFramework
+  - button "Collapse sidebar":
+- banner:
+  - navigation "breadcrumb":
+    - list:
+      - link "Dashboard":
+        - /url: /
+      - link "Inventario" [disabled]
+      - link "Warehouses" [disabled]
+      - link "1927cd42" [disabled]
+  - button "Switch to light mode":
+  - button "Customize theme":
+  - button "SA Super Admin E2E Inventory POS 20260906":
+    - generic: SA
+    - generic: Super Admin
+    - generic: E2E Inventory POS 20260906
+- main:
+  - button "Back to warehouses":
+  - heading "Main E2E Warehouse" [level=3]
+  - generic: Default
+  - paragraph: "WH-E2E-MAIN - ID: 1927cd42-bdb0-4873-9ab4-fc1d83db1e0f"
+  - button "Create Location":
+    - text: Create Location
+  - button "Refresh":
+    - text: Refresh
+  - heading "Warehouse Summary" [level=3]
+  - paragraph: Storage facility details for the selected tenant.
+  - paragraph: Code
+  - generic: WH-E2E-MAIN
+  - paragraph: Name
+  - generic: Main E2E Warehouse
+  - paragraph: Address
+  - generic: 1 E2E Test Avenue, Singapore, Central, SG
+  - paragraph: Created
+  - generic: 09/06/2026 10:11
+  - paragraph: Description
+  - generic: Primary warehouse for inventory and POS E2E
+  - paragraph: Locations
+  - heading "1" [level=3]
+  - paragraph: Stock Balances
+  - heading "4" [level=3]
+  - paragraph: Recent Movements
+  - heading "32" [level=3]
+  - heading "Locations" [level=3]
+  - paragraph: Internal positions inside this warehouse.
+  - grid:
+    - rowgroup:
+      - row "Code Filter Code Name Filter Name Type Filter Type Pickable Filter Pickable":
+        - columnheader "Code Filter Code":
+          - generic: Code
+          - button "Filter Code":
+        - columnheader "Name Filter Name":
+          - generic: Name
+          - button "Filter Name":
+        - columnheader "Type Filter Type":
+          - generic: Type
+          - button "Filter Type":
+        - columnheader "Pickable Filter Pickable":
+          - generic: Pickable
+          - button "Filter Pickable":
+    - rowgroup:
+      - row "A1-FRONT Front Shelf A1 Bin Pickable":
+        - gridcell "A1-FRONT"
+        - gridcell "Front Shelf A1"
+        - gridcell "Bin"
+        - gridcell "Pickable":
+          - generic: Pickable
+  - navigation "Pagination":
+    - generic: Showing 1-1 of 1
+    - list:
+      - button "Previous" [disabled]:
+        - generic: Previous
+      - button "Next" [disabled]:
+        - generic: Next
+  - heading "Stock Balances" [level=3]
+  - paragraph: Current balances held in this warehouse.
+  - grid:
+    - rowgroup:
+      - row "Product Filter Product Location Filter Location On Hand Filter On Hand Reserved Filter Reserved Available Filter Available":
+        - columnheader "Product Filter Product":
+          - generic: Product
+          - button "Filter Product":
+        - columnheader "Location Filter Location":
+          - generic: Location
+          - button "Filter Location":
+        - columnheader "On Hand Filter On Hand":
+          - generic: On Hand
+          - button "Filter On Hand":
+        - columnheader "Reserved Filter Reserved":
+          - generic: Reserved
+          - button "Filter Reserved":
+        - columnheader "Available Filter Available":
+          - generic: Available
+          - button "Filter Available":
+    - rowgroup:
+      - row "E2E Bottled Water Front Shelf A1 20.0000 0.0000 20.0000":
+        - gridcell "E2E Bottled Water"
+        - gridcell "Front Shelf A1"
+        - gridcell "20.0000"
+        - gridcell "0.0000"
+        - gridcell "20.0000"
+      - row "E2E Bottled Water Front Shelf A1 0.0000 0.0000 0.0000":
+        - gridcell "E2E Bottled Water"
+        - gridcell "Front Shelf A1"
+        - gridcell "0.0000"
+        - gridcell "0.0000"
+        - gridcell "0.0000"
+      - row "E2E Shirt Front Shelf A1 7.0000 0.0000 7.0000":
+        - gridcell "E2E Shirt"
+        - gridcell "Front Shelf A1"
+        - gridcell "7.0000"
+        - gridcell "0.0000"
+        - gridcell "7.0000"
+      - row "E2E Shirt Front Shelf A1 5.0000 0.0000 5.0000":
+        - gridcell "E2E Shirt"
+        - gridcell "Front Shelf A1"
+        - gridcell "5.0000"
+        - gridcell "0.0000"
+        - gridcell "5.0000"
+  - navigation "Pagination":
+    - generic: Showing 1-4 of 4
+    - list:
+      - button "Previous" [disabled]:
+        - generic: Previous
+      - button "Next" [disabled]:
+        - generic: Next
+  - heading "Recent Movements" [level=3]
+  - paragraph: Latest movement ledger entries for this warehouse.
+  - grid:
+    - rowgroup:
+      - row "Product Filter Product Type Filter Type Delta Filter Delta After Filter After Movement Date Filter Movement Date":
+        - columnheader "Product Filter Product":
+          - generic: Product
+          - button "Filter Product":
+        - columnheader "Type Filter Type":
+          - generic: Type
+          - button "Filter Type":
+        - columnheader "Delta Filter Delta":
+          - generic: Delta
+          - button "Filter Delta":
+        - columnheader "After Filter After":
+          - generic: After
+          - button "Filter After":
+        - columnheader "Movement Date Filter Movement Date":
+          - generic: Movement Date
+          - button "Filter Movement Date":
+    - rowgroup:
+      - row "E2E Shirt Release -3.0000 5.0000 09/10/2026 16:53:00":
+        - gridcell "E2E Shirt"
+        - gridcell "Release"
+        - gridcell "-3.0000"
+        - gridcell "5.0000"
+        - gridcell "09/10/2026 16:53:00"
+      - row "E2E Shirt Release -1.0000 7.0000 09/10/2026 16:53:00":
+        - gridcell "E2E Shirt"
+        - gridcell "Release"
+        - gridcell "-1.0000"
+        - gridcell "7.0000"
+        - gridcell "09/10/2026 16:53:00"
+      - row "E2E Bottled Water Release -2.0000 20.0000 09/10/2026 16:53:00":
+        - gridcell "E2E Bottled Water"
+        - gridcell "Release"
+        - gridcell "-2.0000"
+        - gridcell "20.0000"
+        - gridcell "09/10/2026 16:53:00"
+      - row "E2E Shirt Reservation 3.0000 5.0000 09/10/2026 16:53:00":
+        - gridcell "E2E Shirt"
+        - gridcell "Reservation"
+        - gridcell "3.0000"
+        - gridcell "5.0000"
+        - gridcell "09/10/2026 16:53:00"
+      - row "E2E Shirt Reservation 1.0000 7.0000 09/10/2026 16:52:59":
+        - gridcell "E2E Shirt"
+        - gridcell "Reservation"
+        - gridcell "1.0000"
+        - gridcell "7.0000"
+        - gridcell "09/10/2026 16:52:59"
+      - row "E2E Bottled Water Reservation 2.0000 20.0000 09/10/2026 16:52:59":
+        - gridcell "E2E Bottled Water"
+        - gridcell "Reservation"
+        - gridcell "2.0000"
+        - gridcell "20.0000"
+        - gridcell "09/10/2026 16:52:59"
+      - row "E2E Shirt Return 1.0000 5.0000 09/06/2026 13:32:03":
+        - gridcell "E2E Shirt"
+        - gridcell "Return"
+        - gridcell "1.0000"
+        - gridcell "5.0000"
+        - gridcell "09/06/2026 13:32:03"
+      - row "E2E Shirt Shipment -1.0000 4.0000 09/06/2026 13:27:13":
+        - gridcell "E2E Shirt"
+        - gridcell "Shipment"
+        - gridcell "-1.0000"
+        - gridcell "4.0000"
+        - gridcell "09/06/2026 13:27:13"
+      - row "E2E Shirt Release -1.0000 5.0000 09/06/2026 13:27:13":
+        - gridcell "E2E Shirt"
+        - gridcell "Release"
+        - gridcell "-1.0000"
+        - gridcell "5.0000"
+        - gridcell "09/06/2026 13:27:13"
+      - row "E2E Bottled Water Shipment -1.0000 0.0000 09/06/2026 13:27:13":
+        - gridcell "E2E Bottled Water"
+        - gridcell "Shipment"
+        - gridcell "-1.0000"
+        - gridcell "0.0000"
+        - gridcell "09/06/2026 13:27:13"
+  - navigation "Pagination":
+    - generic: Showing 1-10 of 32
+    - list:
+      - button "Previous" [disabled]:
+        - generic: Previous
+      - button "Next":
+        - generic: Next
+- document

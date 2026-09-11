@@ -19,16 +19,16 @@ else if (!_moduleEnabled)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div>
                 <BbTypographyH3>Inventario Settings</BbTypographyH3>
-                <BbTypographyMuted>Tenant-level inventory settings stored as registry configuration.</BbTypographyMuted>
+                <BbTypographyMuted>Display preferences for the active tenant.</BbTypographyMuted>
             </div>
 
             <BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Catalog Behavior</BbCardTitle>
-                    <BbCardDescription>These settings are reserved for inventory workflows and future UI defaults.</BbCardDescription>
+                    <BbCardDescription>Low-stock threshold drives the product catalog warning. Default currency labels catalog prices and purchasing amounts; it does not convert values or change existing amounts.</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
                     <div class="grid gap-4 md:grid-cols-2">
@@ -36,13 +36,14 @@ else
                         <BbFormFieldInput TValue="string" @bind-Value="_defaultCurrency" Label="Default Currency" />
                         <BbFormFieldSwitch Checked="@_skuRequired"
                                            CheckedChanged="@((bool value) => _skuRequired = value)"
-                                           Label="Require SKU" />
+                                           Disabled="true" Label="Require SKU (saved preference; not enforced)" />
                         <BbFormFieldSwitch Checked="@_allowNegativeStock"
                                            CheckedChanged="@((bool value) => _allowNegativeStock = value)"
-                                           Label="Allow Negative Stock" />
+                                           Disabled="true" Label="Allow Negative Stock (saved preference; not enforced)" />
                     </div>
+                    <p>SKU validation follows the product API. Negative-stock permission is controlled by the tenant feature and an explicit per-post override. The two disabled legacy preferences do not change either policy.</p>
                     <div class="mt-6 flex justify-end">
-                        <BbButton OnClick="@SaveSettings" Disabled="@_saving">
+                        <BbButton OnClick="@SaveSettings" Disabled="@(_saving || !IsDirty)">
                             @if (_saving)
                             {
                                 <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
@@ -67,6 +68,8 @@ else
     private const string SkuRequiredKey = "Settings:Inventario:SkuRequired";
     private const string AllowNegativeStockKey = "Settings:Inventario:AllowNegativeStock";
 
+    private string _savedValues = "";
+    private bool IsDirty => _savedValues != $"{_lowStockThreshold}|{_defaultCurrency}";
     private bool _loading = true;
     private bool _saving;
     private bool _hasTenant;
@@ -110,6 +113,7 @@ else
             _defaultCurrency = GetValue(configs, DefaultCurrencyKey, "PHP");
             _skuRequired = bool.TryParse(GetValue(configs, SkuRequiredKey, "true"), out var skuRequired) && skuRequired;
             _allowNegativeStock = bool.TryParse(GetValue(configs, AllowNegativeStockKey, "false"), out var allowNegative) && allowNegative;
+            _savedValues = $"{_lowStockThreshold}|{_defaultCurrency}";
         }
         catch
         {
@@ -131,17 +135,24 @@ else
             return;
         }
 
+        _defaultCurrency = _defaultCurrency.Trim().ToUpperInvariant();
+        if (!CurrencyCatalog.GetAllCurrencyCodes().Contains(_defaultCurrency))
+        {
+            ToastService.Error("Enter a supported three-letter currency code, such as SGD or PHP.");
+            return;
+        }
         _saving = true;
         try
         {
             _settingsGroupId = _settingsGroupId == Guid.Empty ? await EnsureSettingsGroup() : _settingsGroupId;
             await UpsertSetting(tenantId, LowStockThresholdKey, threshold.ToString(), "quantity");
             await UpsertSetting(tenantId, DefaultCurrencyKey, _defaultCurrency.Trim(), "code");
-            await UpsertSetting(tenantId, SkuRequiredKey, _skuRequired.ToString(), "boolean");
-            await UpsertSetting(tenantId, AllowNegativeStockKey, _allowNegativeStock.ToString(), "boolean");
+
+
 
             var result = await DataContext.SaveChangesAsync();
             ToastService.Show(result.IsSuccess ? "Inventario settings saved." : "Could not save Inventario settings.");
+            if (result.IsSuccess) _savedValues = $"{_lowStockThreshold}|{_defaultCurrency}";
         }
         catch
         {

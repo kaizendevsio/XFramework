@@ -19,7 +19,7 @@ else if (!_reportingEnabled)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="xf-page-header">
                 <div>
                     <BbTypographyH3>Inventory Risk Reports</BbTypographyH3>
@@ -31,18 +31,14 @@ else
                 </BbButton>
             </div>
 
-            <div class="xf-summary-grid xf-summary-grid-2">
-                <ReportMetric Title="Near Expiry" Value="@_nearExpiry.Count.ToString()" />
-                <ReportMetric Title="Expired Lots" Value="@_expired.Count.ToString()" />
-            </div>
 
             <BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Report Filters</BbCardTitle>
-                    <BbCardDescription>Scope the report cards before using column filters inside each grid.</BbCardDescription>
+                    <BbCardDescription>Choose product and storage scope, then apply. Column filters refine the loaded results.</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div class="xf-detail-field-grid-wide">
                         <XfEntityPicker TItem="Product"
                                         @bind-Value="_filterProductId"
                                         Items="@_products"
@@ -88,7 +84,7 @@ else
                                         AdvancedSearchDescription="Search locations in the selected warehouse." />
                         <BbFormFieldNumericInput TValue="int"
                                                  @bind-Value="_nearExpiryWindowDays"
-                                                 Label="Near Expiry Window"
+                                                 Label="Expiry window (days)"
                                                  Min="1"
                                                  Max="365"
                                                  Step="1" />
@@ -105,10 +101,11 @@ else
                 </BbCardContent>
             </BbCard>
 
-            <BbCard>
+            <p class="text-sm text-muted-foreground">Applied scope: @_appliedScope</p>
+            <BbTabs DefaultValue="view0" Class="inv-workspace-tabs"><BbTabsList><BbTabsTrigger Value="view0">Near expiry (@_nearExpiry.Count)</BbTabsTrigger><BbTabsTrigger Value="view1">Expired (@_expired.Count)</BbTabsTrigger></BbTabsList><BbTabsContent Value="view0" ForceMount="true"><BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Near Expiry</BbCardTitle>
-                    <BbCardDescription>Lots expiring in the next @_nearExpiryWindowDays day(s) with on-hand stock</BbCardDescription>
+                    <BbCardDescription>Lots expiring in the next @_appliedWindowDays day(s) with on-hand stock</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
                     @if (_nearExpiry.Count == 0)
@@ -120,17 +117,17 @@ else
                         <BbDataGrid Items="@_nearExpiry" ShowPagination="true" InitialPageSize="10">
                             <Columns>
                                 <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Lot" Filterable="true" FilterBy="@(item => item.LotNumber)"><ChildContent Context="item"><a href="@($"/inventario/lots/{item.LotId}")">@item.LotNumber</a></ChildContent></BbDataGridTemplateColumn>
                                 <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Location" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Format="0.####" Sortable="true" Filterable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" Filterable="true" />
                             </Columns>
                         </BbDataGrid>
                     }
                 </BbCardContent>
-            </BbCard>
+            </BbCard></BbTabsContent>
 
-            <BbCard>
+            <BbTabsContent Value="view1" ForceMount="true"><BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Expired Stock</BbCardTitle>
                     <BbCardDescription>Expired or expired-status lots that still have on-hand stock</BbCardDescription>
@@ -145,15 +142,15 @@ else
                         <BbDataGrid Items="@_expired" ShowPagination="true" InitialPageSize="10">
                             <Columns>
                                 <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Lot" Filterable="true" FilterBy="@(item => item.LotNumber)"><ChildContent Context="item"><a href="@($"/inventario/lots/{item.LotId}")">@item.LotNumber</a></ChildContent></BbDataGridTemplateColumn>
                                 <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Location" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Format="0.####" Sortable="true" Filterable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expired" Sortable="true" Filterable="true" />
                             </Columns>
                         </BbDataGrid>
                     }
                 </BbCardContent>
-            </BbCard>
+            </BbCard></BbTabsContent></BbTabs>
 
         </div>
     </FadeInContent>
@@ -175,6 +172,8 @@ else
     private string? _filterWarehouseId;
     private string? _filterLocationId;
     private int _nearExpiryWindowDays = 30;
+    private int _appliedWindowDays = 30;
+    private string _appliedScope = "All products / all warehouses / all locations";
     private bool _loading = true;
     private bool _hasTenant;
     private bool _reportingEnabled;
@@ -249,13 +248,13 @@ else
             .Where(row => MatchesLocation(locationId, row.LocationId))
             .ToList();
         _nearExpiry = nearExpiryRows.Select(row => new ExpiryRow(
-            row.ProductName,
+            row.LotId, row.ProductName,
             row.LotNumber,
             GetReportScope(row.WarehouseName, row.LocationName),
             row.AvailableQuantity,
             row.ExpiresAt)).ToList();
         _expired = expiredRows.Select(row => new ExpiryRow(
-            row.ProductName,
+            row.LotId, row.ProductName,
             row.LotNumber,
             GetReportScope(row.WarehouseName, row.LocationName),
             row.AvailableQuantity,
@@ -263,6 +262,8 @@ else
         if (refreshFilterOptions)
             BuildFilterOptions(nearExpiryRows, expiredRows);
 
+        _appliedWindowDays = Math.Clamp(_nearExpiryWindowDays, 1, 365);
+        _appliedScope = $"{_products.FirstOrDefault(x => x.Id == productId)?.Name ?? "All products"} / {_warehouses.FirstOrDefault(x => x.Id == warehouseId)?.Name ?? "All warehouses"} / {_locations.FirstOrDefault(x => x.Id == locationId)?.Name ?? "All locations"}";
         var failures = new[]
         {
             (nearExpiryResponse.IsSuccess, nearExpiryResponse.Message),
@@ -400,5 +401,5 @@ else
         ModuleNavigation.OnChanged -= OnTenantChanged;
     }
 
-    private sealed record ExpiryRow(string ProductName, string LotNumber, string Scope, decimal AvailableQuantity, DateTime? ExpiresAt);
+    private sealed record ExpiryRow(Guid LotId, string ProductName, string LotNumber, string Scope, decimal AvailableQuantity, DateTime? ExpiresAt);
 }

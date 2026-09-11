@@ -28,7 +28,7 @@ else if (_document is null)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="xf-page-header">
                 <div class="flex items-center gap-3">
                     <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Icon" AriaLabel="Back to receiving" OnClick="@GoBack">
@@ -71,12 +71,13 @@ else
                             <p>@_document.ReceivedAt.ToString("g")</p>
                         </div>
                         <div>
-                            <BbTypographyMuted>Reference</BbTypographyMuted>
+                            <BbTypographyMuted>Purchase order / reference</BbTypographyMuted>
+                            @if (_document.PurchaseOrderId is { } orderId) { <a href="@($"/inventario/purchase-orders/{orderId}")">View purchase order</a> }
                             <p>@(_document.ReferenceNumber ?? "N/A")</p>
                         </div>
                         <div>
-                            <BbTypographyMuted>Idempotency</BbTypographyMuted>
-                            <p>@(_document.IdempotencyKey ?? "N/A")</p>
+                            <BbTypographyMuted>Duplicate receipt protection</BbTypographyMuted>
+                            <p>@(string.IsNullOrEmpty(_document.IdempotencyKey) ? "Legacy receipt" : "Protected against duplicate submission")</p>
                         </div>
                     </div>
                 </BbCardContent>
@@ -91,19 +92,19 @@ else
                     <BbDataGrid Items="@_lines" ShowPagination="true" InitialPageSize="20">
                         <Columns>
                             <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
-                                <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
+                                <ChildContent Context="item"><a href="@($"/inventario/products/{item.ProductId}")">@GetProductName(item.ProductId)</a></ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Lot" Filterable="true" FilterBy="@(item => GetLotLabel(item.LotId, item.LotNumber))">
-                                <ChildContent Context="item">@GetLotLabel(item.LotId, item.LotNumber)</ChildContent>
+                                <ChildContent Context="item">@if (item.LotId is { } lotId) { <a href="@($"/inventario/lots/{lotId}")">@GetLotLabel(item.LotId, item.LotNumber)</a> } else { <span>Untracked</span> }</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Quantity" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Quantity" Format="0.####" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.UnitCost)" Title="Unit Cost" Filterable="true" />
                             <BbDataGridTemplateColumn Title="Stock Balance" Filterable="true" FilterBy="@(item => GetStockBalanceFilterText(item))">
                                 <ChildContent Context="item">
                                     @if (item.StockBalanceId is { } balanceId)
                                     {
                                         <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo($"/inventario/stock/balances/{balanceId}"))">
-                                            @balanceId.ToString()[..8]
+                                            View stock position
                                         </BbButton>
                                     }
                                     else

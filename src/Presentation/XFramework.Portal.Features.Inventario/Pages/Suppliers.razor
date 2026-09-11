@@ -20,7 +20,7 @@ else if (!_purchasingEnabled)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="xf-page-header">
                 <div>
                     <BbTypographyH3>Suppliers</BbTypographyH3>
@@ -44,7 +44,7 @@ else
                     <BbCardDescription>@_suppliers.Count supplier(s) loaded</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <BbDataGrid Items="@_suppliers" ShowPagination="true" InitialPageSize="20">
+                    <BbFormFieldInput TValue="string" @bind-Value="_search" Label="Search suppliers" /><BbDataGrid Items="@_suppliers.Where(x => ($"{x.Name} {x.Code} {x.ContactName}" ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase)).ToList()" OnRowClick="@((Supplier item) => Navigation.NavigateTo($"/inventario/suppliers/{item.Id}"))" ShowPagination="true" InitialPageSize="20">
                         <Columns>
                             <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
@@ -55,7 +55,7 @@ else
                                     <StatusBadge Text="@(item.IsActive ? "Active" : "Inactive")" Status="@(item.IsActive ? "active" : "inactive")" />
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
-                        </Columns>
+                        <BbDataGridTemplateColumn Title="Actions"><ChildContent Context="item"><BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo($"/inventario/suppliers/{item.Id}"))">View / edit</BbButton></ChildContent></BbDataGridTemplateColumn></Columns>
                     </BbDataGrid>
                 </BbCardContent>
             </BbCard>
@@ -64,12 +64,12 @@ else
 }
 
 <BbDialog Open="@_createDialogOpen" OpenChanged="@(v => _createDialogOpen = v)">
-    <BbDialogContent Class="xf-dialog-wide">
+    <BbDialogContent Class="xf-dialog-wide inv-dialog">
         <BbDialogHeader>
             <BbDialogTitle>Create Supplier</BbDialogTitle>
             <BbDialogDescription>Supplier codes are unique inside the selected tenant.</BbDialogDescription>
         </BbDialogHeader>
-        <div class="grid gap-4 py-4">
+        <div class="grid gap-4 py-4 inv-dialog-body">
             <div class="grid gap-3 md:grid-cols-2">
                 <BbFormFieldInput TValue="string" @bind-Value="_form.Code" Label="Code" Required="true" />
                 <BbFormFieldInput TValue="string" @bind-Value="_form.Name" Label="Name" Required="true" />
@@ -91,6 +91,8 @@ else
 </BbDialog>
 
 @code {
+    private string _search = "";
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
     [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;

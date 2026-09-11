@@ -20,7 +20,7 @@ else if (!_warehousingEnabled)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="xf-page-header">
                 <div>
                     <BbTypographyH3>Warehouses</BbTypographyH3>
@@ -77,12 +77,12 @@ else
 }
 
 <BbDialog Open="@_warehouseDialogOpen" OpenChanged="@(v => _warehouseDialogOpen = v)">
-    <BbDialogContent Class="xf-dialog-wide">
+    <BbDialogContent Class="xf-dialog-wide inv-dialog">
         <BbDialogHeader>
             <BbDialogTitle>Create Warehouse</BbDialogTitle>
             <BbDialogDescription>Warehouse codes are unique inside the selected tenant.</BbDialogDescription>
         </BbDialogHeader>
-        <div class="grid gap-4 py-4">
+        <div class="grid gap-4 py-4 inv-dialog-body">
             <div class="grid gap-3 md:grid-cols-2">
                 <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.Code" Label="Code" Required="true" />
                 <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.Name" Label="Name" Required="true" />

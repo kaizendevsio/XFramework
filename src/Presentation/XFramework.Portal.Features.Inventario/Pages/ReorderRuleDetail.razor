@@ -1,0 +1,133 @@
+@page "/inventario/planning/rules/{Id:guid}"
+@implements IDisposable
+<PageTitle>Reorder Rule - Inventario</PageTitle>
+@if (_loading) { <CenteredSpinner /> }
+else if (!_enabled) { <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" /> }
+else if (_rule is null) { <BbEmpty Title="Record not found" Description="Choose a record in the active tenant." /> }
+else
+{
+    <div class="space-y-6 inv-page">
+        <div class="xf-page-header"><BbTypographyH3>Reorder Rule</BbTypographyH3><BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">Refresh</BbButton></div>
+        <p><a href="@($"/inventario/products/{_rule.ProductId}/replenishment")">@_productName</a> ? @_variantName ? @_warehouseName ? @_locationName</p>
+        <p>Stock scope stays unchanged. Deactivate this rule to stop suggestions without deleting its history.</p>
+        <BbCard><BbCardHeader><BbCardTitle>Reorder Rule Summary</BbCardTitle></BbCardHeader><BbCardContent>@if (_maintenanceEditing)
+                    {
+                        @if (_maintenanceError is not null) { <BbAlert><BbAlertDescription>@_maintenanceError</BbAlertDescription></BbAlert> }
+                        <div class="xf-detail-field-grid"><BbFormFieldNumericInput TValue="decimal" @bind-Value="_editMinimumQuantity" Label="Minimum Quantity" Min="0" DecimalPlaces="4" />
+<BbFormFieldSwitch @bind-Checked="_editHasMaximum" Label="Set maximum quantity" /><BbFormFieldNumericInput TValue="decimal" Disabled="@(!_editHasMaximum)" @bind-Value="_editMaximumQuantity" Label="Maximum Quantity" Min="0" DecimalPlaces="4" />
+<BbFormFieldNumericInput TValue="decimal" @bind-Value="_editReorderPoint" Label="Reorder Point" Min="0" DecimalPlaces="4" />
+<BbFormFieldNumericInput TValue="decimal" @bind-Value="_editReorderQuantity" Label="Reorder Quantity" Min="0" DecimalPlaces="4" />
+<BbFormFieldInput TValue="string" @bind-Value="_editPreferredSupplier" Label="Preferred Supplier" />
+<BbFormFieldSwitch @bind-Checked="_editIsActive" Label="Is Active" />
+</div>
+                        <p class="text-sm text-muted-foreground">Identity and existing stock quantities remain unchanged. </p>
+                        <div class="xf-page-actions"><BbButton OnClick="@SaveMaintenance" Disabled="@_maintenanceSaving">Save changes</BbButton><BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _maintenanceEditing = false)" Disabled="@_maintenanceSaving">Discard</BbButton></div>
+                    }
+                    else
+                    {
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@BeginMaintenance">Edit details</BbButton>
+<div class="xf-detail-field-grid"><div><BbTypographyMuted>Minimum quantity</BbTypographyMuted><p>@_rule.MinimumQuantity</p></div><div><BbTypographyMuted>Maximum quantity</BbTypographyMuted><p>@(_rule.MaximumQuantity?.ToString("0.####") ?? "No maximum")</p></div><div><BbTypographyMuted>Reorder point</BbTypographyMuted><p>@_rule.ReorderPoint</p></div><div><BbTypographyMuted>Reorder quantity</BbTypographyMuted><p>@_rule.ReorderQuantity</p></div><div><BbTypographyMuted>Preferred supplier</BbTypographyMuted><p>@_rule.PreferredSupplier</p></div><div><BbTypographyMuted>Status</BbTypographyMuted><p>@(_rule.IsActive ? "Active" : "Inactive")</p></div></div>
+                    }
+</BbCardContent></BbCard>
+    </div>
+}
+@code {
+    [Parameter] public Guid Id { get; set; }
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
+    [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
+    [Inject] private IPortalModuleAvailability ModuleNavigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    private InventoryReorderRule? _rule;
+    private string _productName = "Product";
+    private string _variantName = "Base product";
+    private string _warehouseName = "Any warehouse";
+    private string _locationName = "Any location";
+    private bool _loading = true;
+    private bool _enabled;
+    protected override void OnInitialized() => TenantFilter.OnChanged += TenantChanged;
+    protected override Task OnParametersSetAsync() => Reload();
+    private void TenantChanged() => _ = InvokeAsync(Reload);
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _enabled = TenantFilter.SelectedTenantId is Guid && ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "planning");
+            _rule = null;
+            if (!_enabled) return;
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _rule = await DataContext.Query<InventoryReorderRule>().NoCache().Where(x => x.TenantId == tenantId && x.Id == Id && !x.IsDeleted).FirstOrDefaultAsync();
+            if (_rule is null) return;
+            _productName = (await DataContext.Query<Product>().NoCache().Where(x => x.TenantId == tenantId && x.Id == _rule.ProductId && !x.IsDeleted).FirstOrDefaultAsync())?.Name ?? "Product";
+            var variants = await DataContext.Query<ProductVariation>().NoCache().Where(x => x.TenantId == tenantId && x.Id == _rule.ProductVariationId && !x.IsDeleted).ToListAsync();
+            _variantName = InventoryDisplay.Variant(variants, _rule.ProductVariationId);
+            _warehouseName = (await DataContext.Query<Warehouse>().NoCache().Where(x => x.TenantId == tenantId && x.Id == _rule.WarehouseId && !x.IsDeleted).FirstOrDefaultAsync())?.Name ?? "Any warehouse";
+            _locationName = (await DataContext.Query<InventoryLocation>().NoCache().Where(x => x.TenantId == tenantId && x.Id == _rule.LocationId && !x.IsDeleted).FirstOrDefaultAsync())?.Name ?? "Any location";
+        }
+        catch { ToastService.Error("Could not load record."); }
+        finally { _loading = false; }
+    }
+    public void Dispose() => TenantFilter.OnChanged -= TenantChanged;
+
+    private string? _maintenanceError;
+    private bool _maintenanceEditing;
+    private bool _maintenanceSaving;
+    private Guid _editStamp;
+    private decimal _editMinimumQuantity;
+    private decimal _editMaximumQuantity;
+    private bool _editHasMaximum;
+    private decimal _editReorderPoint;
+    private decimal _editReorderQuantity;
+    private string _editPreferredSupplier = "";
+    private bool _editIsActive;
+
+    private void BeginMaintenance()
+    {
+        if (_rule is null) return;
+        _editStamp = _rule.ConcurrencyStamp;
+        _editMinimumQuantity = _rule.MinimumQuantity;
+        _editHasMaximum = _rule.MaximumQuantity.HasValue;
+        _editMaximumQuantity = _rule.MaximumQuantity ?? 0;
+        _editReorderPoint = _rule.ReorderPoint;
+        _editReorderQuantity = _rule.ReorderQuantity;
+        _editPreferredSupplier = _rule.PreferredSupplier ?? "";
+        _editIsActive = _rule.IsActive;
+        _maintenanceError = null;
+        _maintenanceEditing = true;
+    }
+    private async Task SaveMaintenance()
+    {
+        if (_rule is null || _maintenanceSaving) return;
+        _maintenanceError = null;
+        if (_editPreferredSupplier.Length > 200) { _maintenanceError = "Preferred supplier must be at most 200 characters."; return; }
+        if (_editMinimumQuantity < 0 || _editReorderPoint < 0 || _editReorderQuantity < 0 || (_editHasMaximum && _editMaximumQuantity < _editMinimumQuantity))
+        { _maintenanceError = "Quantities must be nonnegative, and maximum must be at least minimum."; return; }
+        _maintenanceSaving = true;
+        try
+        {
+            var result = await Inventario.UpdateInventoryReorderRule(new UpdateInventoryReorderRuleRequest
+            {
+                Metadata = new() { RequestedTenantId = TenantFilter.SelectedTenantId },
+                Id = _rule.Id,
+                ConcurrencyStamp = _editStamp,
+                MinimumQuantity = _editMinimumQuantity,
+                MaximumQuantity = _editHasMaximum ? _editMaximumQuantity : null,
+                ReorderPoint = _editReorderPoint,
+                ReorderQuantity = _editReorderQuantity,
+                PreferredSupplier = _editPreferredSupplier,
+                IsActive = _editIsActive,
+            });
+            if (result.IsSuccess)
+            {
+                _maintenanceEditing = false;
+                ToastService.Success("Changes saved.");
+                await Reload();
+            }
+            else ToastService.Error("Could not save. Check quantities, or refresh if another user edited this rule.");
+        }
+        catch { ToastService.Error("Could not save changes. Refresh and try again."); }
+        finally { _maintenanceSaving = false; }
+    }
+}

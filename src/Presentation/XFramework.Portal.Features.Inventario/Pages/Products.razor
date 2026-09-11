@@ -20,7 +20,7 @@ else if (!_moduleEnabled)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="xf-page-header">
                 <div>
                     <BbTypographyH3>Products</BbTypographyH3>
@@ -40,7 +40,7 @@ else
                     <BbCardContent><BbTypographyH2>@_products.Count</BbTypographyH2></BbCardContent>
                 </BbCard>
                 <BbCard>
-                    <BbCardHeader><BbCardTitle>Available</BbCardTitle></BbCardHeader>
+                    <BbCardHeader><BbCardTitle>Catalog enabled</BbCardTitle></BbCardHeader>
                     <BbCardContent><BbTypographyH2>@_products.Count(x => x.IsAvailable)</BbTypographyH2></BbCardContent>
                 </BbCard>
                 <BbCard>
@@ -61,8 +61,8 @@ else
                             <BbCardDescription>@_filteredProducts.Count product(s) shown</BbCardDescription>
                         </div>
                         <div class="xf-filter-actions">
-                            <BbInput @bind-Value="_search" Placeholder="Search products..." @oninput="OnSearchChanged" />
-                            <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                            <BbInput @bind-Value="_search" AriaLabel="Search products" Placeholder="Search products..." @oninput="OnSearchChanged" />
+                            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => { _search = ""; ApplySearch(); })">Clear search</BbButton><BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
                                 <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
                                 Refresh
                             </BbButton>
@@ -84,7 +84,7 @@ else
                                 <ChildContent Context="item">@GetCategoryName(item.CategoryId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Price" Sortable="true" Filterable="true" FilterBy="@(item => item.Price)">
-                                <ChildContent Context="item">@item.Price.ToString("N2")</ChildContent>
+                                <ChildContent Context="item">@_currency @item.Price.ToString("N2")</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Stock" Sortable="true" Filterable="true" FilterBy="@(item => item.StockQuantity)">
                                 <ChildContent Context="item">
@@ -93,9 +93,9 @@ else
                                     </span>
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.IsAvailable)">
+                            <BbDataGridTemplateColumn Title="Catalog status" Filterable="true" FilterBy="@(item => item.IsAvailable)">
                                 <ChildContent Context="item">
-                                    <StatusBadge Text="@(item.IsAvailable ? "Available" : "Unavailable")"
+                                    <StatusBadge Text="@(item.IsAvailable ? "Catalog enabled" : "Catalog disabled")"
                                                  Status="@(item.IsAvailable ? "active" : "inactive")" />
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
@@ -119,12 +119,12 @@ else
 }
 
 <BbDialog Open="@_productDialogOpen" OpenChanged="@(v => _productDialogOpen = v)">
-    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide inv-dialog">
         <BbDialogHeader>
             <BbDialogTitle>Create Product</BbDialogTitle>
             <BbDialogDescription>Catalog data belongs to the selected tenant.</BbDialogDescription>
         </BbDialogHeader>
-        <div class="grid gap-4 py-4">
+        <div class="grid gap-4 py-4 inv-dialog-body">
             <div class="grid gap-4 md:grid-cols-2">
                 <BbFormFieldInput TValue="string" @bind-Value="_form.Name" Label="Name" Required="true" />
                 <BbFormFieldInput TValue="string" @bind-Value="_form.Sku" Label="SKU" />
@@ -147,7 +147,7 @@ else
                             AdvancedSearchTitle="Find Category"
                             AdvancedSearchDescription="Select the category for this product." />
             <div class="grid gap-4 md:grid-cols-2">
-                <BbFormFieldCurrencyInput @bind-Value="_form.Price"
+                <BbFormFieldCurrencyInput CurrencyCode="@_currency" @bind-Value="_form.Price"
                                            Label="Price"
                                            Min="0"
                                           Required="true"
@@ -169,6 +169,8 @@ else
 </BbDialog>
 
 @code {
+    [SupplyParameterFromQuery] public Guid? CategoryId { get; set; }
+    private string _currency = "PHP";
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
@@ -222,6 +224,7 @@ else
             }
 
             var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _currency = await InventoryDisplay.CurrencyAsync(DataContext, tenantId);
             _categories = await DataContext.Query<ProductCategory>()
                 .IgnoreQueryFilters()
                 .NoCache()
@@ -284,6 +287,7 @@ else
                     || (x.Brand?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
                     || GetCategoryName(x.CategoryId).Contains(search, StringComparison.OrdinalIgnoreCase))
                 .ToList();
+        if (CategoryId is { } categoryId) _filteredProducts = _filteredProducts.Where(x => x.CategoryId == categoryId).ToList();
     }
 
     private string GetCategoryName(Guid categoryId) =>

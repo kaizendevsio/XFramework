@@ -39,7 +39,7 @@ else if (_reservation is null)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="xf-detail-header">
                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to reservations"
                           OnClick="@(() => Navigation.NavigateTo("/inventario/reservations"))">
@@ -163,7 +163,7 @@ else
                                 <BbDataGridTemplateColumn Title="Lot" Filterable="true" FilterBy="@(item => GetLotLabel(item.LotId))">
                                     <ChildContent Context="item">@GetLotLabel(item.LotId)</ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Qty" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Qty" Format="0.####" Sortable="true" Filterable="true" />
                                 <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.Status.ToString())">
                                     <ChildContent Context="item">
                                         <StatusBadge Text="@item.Status.ToString()" Status="@GetAllocationStatusBadge(item.Status)" />
