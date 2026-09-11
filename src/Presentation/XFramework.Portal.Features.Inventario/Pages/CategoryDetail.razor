@@ -36,7 +36,7 @@ else if (_category is null)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="xf-detail-header">
                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to categories"
                           OnClick="@(() => Navigation.NavigateTo("/inventario/categories"))">
@@ -98,7 +98,7 @@ else
                             </div>
                             <div>
                                 <BbTypographyMuted>Products</BbTypographyMuted>
-                                <div>@_products.Count</div>
+                                <a href="@($"/inventario/products?categoryId={Id}")">@_products.Count products</a>
                             </div>
                             <div>
                                 <BbTypographyMuted>Created</BbTypographyMuted>
@@ -127,7 +127,7 @@ else
                                 OnRowClick="@((Product item) => Navigation.NavigateTo($"/inventario/products/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => item.Name)"><ChildContent Context="item"><a href="@($"/inventario/products/{item.Id}")">@item.Name</a></ChildContent></BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="SKU" Filterable="true" FilterBy="@(item => item.SKU ?? string.Empty)">
                                 <ChildContent Context="item">
                                     <span class="font-mono text-xs">@(item.SKU ?? "N/A")</span>

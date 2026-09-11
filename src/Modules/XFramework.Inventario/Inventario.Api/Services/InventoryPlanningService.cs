@@ -386,4 +386,35 @@ public sealed class InventoryPlanningService(
     private sealed record VariationLookups(
         Dictionary<Guid, string> Names,
         Dictionary<Guid, string?> TypeNames);
+
+    public async Task<Result<InventoryReorderRule>> UpdateInventoryReorderRuleAsync(UpdateInventoryReorderRuleRequest request, CancellationToken ct = default)
+    {
+        var tenantResult = GetCurrentTenantId(request);
+        if (!tenantResult.IsSuccess)
+            return Result<InventoryReorderRule>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+        var tenantId = tenantResult.Data;
+        var featureResult = await EnsurePlanningEnabledAsync(tenantId, ct);
+        if (!featureResult.IsSuccess)
+            return Result<InventoryReorderRule>.Failure(featureResult.Message!, featureResult.StatusCode);
+        if (request.MinimumQuantity < 0 || request.ReorderPoint < 0 || request.ReorderQuantity <= 0 || request.MaximumQuantity < request.MinimumQuantity)
+            return Result<InventoryReorderRule>.Failure("Check minimum, maximum, reorder point and reorder quantity.", 400);
+
+        if (request.PreferredSupplier?.Length > 200) return Result<InventoryReorderRule>.Failure("PreferredSupplier must be at most 200 characters.", 400);
+        var entity = await dataContext.Query<InventoryReorderRule>()
+            .Where(x => x.TenantId == tenantId && x.Id == request.Id && !x.IsDeleted).FirstOrDefaultAsync(ct);
+        if (entity is null) return Result<InventoryReorderRule>.NotFound("Record not found.");
+        if (entity.ConcurrencyStamp != request.ConcurrencyStamp)
+            return Result<InventoryReorderRule>.Conflict("This record changed. Refresh before saving.");
+        dataContext.Update(entity);
+        entity.MinimumQuantity = request.MinimumQuantity;
+        entity.MaximumQuantity = request.MaximumQuantity;
+        entity.ReorderPoint = request.ReorderPoint;
+        entity.ReorderQuantity = request.ReorderQuantity;
+        entity.PreferredSupplier = NormalizeOptional(request.PreferredSupplier);
+        entity.IsActive = request.IsActive;
+        entity.ModifiedAt = DateTime.UtcNow;
+        entity.ConcurrencyStamp = Guid.NewGuid();
+        var saved = await dataContext.SaveChangesAsync(ct);
+        return saved.IsSuccess ? Result<InventoryReorderRule>.Success(entity) : Result<InventoryReorderRule>.Failure("Could not save changes.", saved.StatusCode);
+    }
 }

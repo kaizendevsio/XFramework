@@ -21,7 +21,7 @@ else if (!_traceabilityEnabled)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="xf-page-header">
                 <div>
                     <BbTypographyH3>Lots and Batches</BbTypographyH3>
@@ -45,7 +45,9 @@ else
                     <BbCardDescription>@_lots.Count lot(s) loaded</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <BbDataGrid Items="@_lots" ShowPagination="true" InitialPageSize="20"
+                    <div class="xf-filter-actions"><BbFormFieldInput TValue="string" @bind-Value="_search" Label="Search lots" />
+<BbFormFieldSelect TValue="string" @bind-Value="_expiry" Label="Expiry"><BbSelectItem Value="@("all")">All dates</BbSelectItem><BbSelectItem Value="@("soon")">Next 30 days</BbSelectItem><BbSelectItem Value="@("expired")">Expired</BbSelectItem><BbSelectItem Value="@("none")">No expiry</BbSelectItem></BbFormFieldSelect>
+<BbFormFieldSelect TValue="string" @bind-Value="_eligibility" Label="Eligibility"><BbSelectItem Value="@("all")">All statuses</BbSelectItem>@foreach (var status in Enum.GetValues<InventoryLotStatus>()) { <BbSelectItem Value="@status.ToString()">@status</BbSelectItem> }</BbFormFieldSelect></div><BbDataGrid Items="@_lots.Where(MatchesLot).Where(x => ($"{x.LotNumber} {GetProductName(x.ProductId)}" ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase)).ToList()" ShowPagination="true" InitialPageSize="20"
                                 OnRowClick="@((InventoryLot item) => Navigation.NavigateTo($"/inventario/lots/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
@@ -53,16 +55,16 @@ else
                             <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.Status)">
+                            <BbDataGridTemplateColumn Title="Eligibility" Filterable="true" FilterBy="@(item => item.Status)">
                                 <ChildContent Context="item">
-                                    <StatusBadge Text="@item.Status.ToString()" Status="@GetStatusBadge(item.Status)" />
+                                    <StatusBadge Text="@(item.Status == InventoryLotStatus.Available ? "Eligible" : item.Status.ToString())" Status="@GetStatusBadge(item.Status)" />
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="On Hand" Filterable="true" FilterBy="@(item => GetLotOnHand(item.Id))">
-                                <ChildContent Context="item">@GetLotOnHand(item.Id).ToString("N2")</ChildContent>
+                                <ChildContent Context="item">@GetLotOnHand(item.Id).ToString("0.####") @(GetLotOnHand(item.Id) == 0 ? "(Depleted)" : "")</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Expires" Filterable="true" FilterBy="@(item => item.ExpiresAt)"><ChildContent Context="item">@(item.ExpiresAt?.ToString("dd MMM yyyy") ?? "No expiry")</ChildContent></BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Actions">
                                 <ChildContent Context="item">
                                     <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View lot"
@@ -80,12 +82,12 @@ else
 }
 
 <BbDialog Open="@_createDialogOpen" OpenChanged="@(v => _createDialogOpen = v)">
-    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide inv-dialog">
         <BbDialogHeader>
             <BbDialogTitle>Create Lot</BbDialogTitle>
             <BbDialogDescription>Lot numbers are unique per product inside the selected tenant.</BbDialogDescription>
         </BbDialogHeader>
-        <div class="grid gap-4 py-4">
+        <div class="grid gap-4 py-4 inv-dialog-body">
             <XfEntityPicker TItem="Product"
                             @bind-Value="_form.ProductId"
                             Items="@_products"
@@ -109,7 +111,7 @@ else
             </div>
             <div class="grid gap-3 md:grid-cols-2">
                 <BbFormFieldInput TValue="string" @bind-Value="_form.SupplierReference" Label="Supplier / Source Ref" />
-                <BbFormFieldCurrencyInput @bind-Value="_form.UnitCost"
+                <BbFormFieldCurrencyInput CurrencyCode="@_currency" @bind-Value="_form.UnitCost"
                                           Label="Unit Cost"
                                           Min="0"
                                           ShowSymbol="false" />
@@ -132,6 +134,11 @@ else
 </BbDialog>
 
 @code {
+    private string _search = "";
+    private string _expiry = "all";
+    private string _eligibility = "all";
+    private bool MatchesLot(InventoryLot lot) => (_eligibility == "all" || lot.Status.ToString() == _eligibility) && (_expiry == "all" || (_expiry == "expired" && lot.ExpiresAt < DateTime.UtcNow) || (_expiry == "soon" && lot.ExpiresAt >= DateTime.UtcNow && lot.ExpiresAt <= DateTime.UtcNow.AddDays(30)) || (_expiry == "none" && lot.ExpiresAt == null));
+    private string _currency = "PHP";
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
@@ -175,6 +182,7 @@ else
             if (!_hasTenant || !_traceabilityEnabled) return;
 
             var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _currency = await InventoryDisplay.CurrencyAsync(DataContext, tenantId);
             _products = await DataContext.Query<Product>()
                 .IgnoreQueryFilters()
                 .NoCache()

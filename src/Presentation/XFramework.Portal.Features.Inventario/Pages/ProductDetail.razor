@@ -46,7 +46,7 @@ else if (!IsSectionAvailable(CurrentSection))
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             @ProductHeader
 
             @if (CurrentSection == "summary")
@@ -80,12 +80,12 @@ else
 @if (_product is not null)
 {
     <BbDialog Open="@_variationDialogOpen" OpenChanged="@(value => _variationDialogOpen = value)">
-        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide inv-dialog">
             <BbDialogHeader>
                 <BbDialogTitle>@(_variationForm.IsEditing ? "Edit Variant" : "Add Variant")</BbDialogTitle>
                 <BbDialogDescription>Configure a sellable variant for @_product.Name.</BbDialogDescription>
             </BbDialogHeader>
-            <div class="grid gap-4 py-4">
+            <div class="grid gap-4 py-4 inv-dialog-body">
                 <XfEntityPicker TItem="ProductVariationType"
                                 Label="Variation Type"
                                 Value="@_variationForm.ProductVariationTypeId"
@@ -112,7 +112,7 @@ else
                 }
                 <div class="grid gap-3 md:grid-cols-2">
                     <BbFormFieldInput TValue="string" @bind-Value="_variationForm.Name" Label="Variant" Required="true" />
-                    <BbFormFieldCurrencyInput @bind-Value="_variationForm.Price"
+                    <BbFormFieldCurrencyInput CurrencyCode="@_currency" @bind-Value="_variationForm.Price"
                                               Label="Variant Price"
                                               Min="0"
                                               Required="true"
@@ -127,12 +127,12 @@ else
     </BbDialog>
 
     <BbDialog Open="@_variationTypeDialogOpen" OpenChanged="@(value => _variationTypeDialogOpen = value)">
-        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide inv-dialog">
             <BbDialogHeader>
                 <BbDialogTitle>Create Variation Type</BbDialogTitle>
                 <BbDialogDescription>Add a reusable tenant-wide type or limit it to @_product.Name.</BbDialogDescription>
             </BbDialogHeader>
-            <div class="grid gap-4 py-4">
+            <div class="grid gap-4 py-4 inv-dialog-body">
                 <BbFormFieldInput TValue="string" @bind-Value="_variationTypeForm.Name" Label="Name" Placeholder="Color, Size, Packaging" Required="true" />
                 <BbFormFieldInput TValue="string" @bind-Value="_variationTypeForm.Code" Label="Code" Placeholder="Optional" />
                 <BbFormFieldSwitch Checked="@_variationTypeForm.ProductLocal"
@@ -147,11 +147,11 @@ else
     </BbDialog>
 
     <BbDialog Open="@_movementDialogOpen" OpenChanged="@(value => _movementDialogOpen = value)">
-        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide inv-dialog">
             <BbDialogHeader>
                 <BbDialogTitle>Post Stock Movement</BbDialogTitle>
             </BbDialogHeader>
-            <div class="grid gap-4 py-4">
+            <div class="grid gap-4 py-4 inv-dialog-body">
                 @FixedProductField
                 @if (CanPickVariant)
                 {
@@ -253,7 +253,7 @@ else
                     <BbFormFieldNumericInput TValue="decimal"
                                              @bind-Value="_movementForm.Quantity"
                                              Label="Quantity"
-                                             DecimalPlaces="2"
+                                             DecimalPlaces="4"
                                              Step="1"
                                              AllowNegative="true" />
                     <BbFormFieldInput TValue="string" @bind-Value="_movementForm.UnitOfMeasure" Label="Unit" />
@@ -275,12 +275,12 @@ else
     </BbDialog>
 
     <BbDialog Open="@_lotDialogOpen" OpenChanged="@(value => _lotDialogOpen = value)">
-        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide inv-dialog">
             <BbDialogHeader>
                 <BbDialogTitle>Create Lot / Batch</BbDialogTitle>
                 <BbDialogDescription>Create a traceability lot for @_product.Name.</BbDialogDescription>
             </BbDialogHeader>
-            <div class="grid gap-4 py-4">
+            <div class="grid gap-4 py-4 inv-dialog-body">
                 @FixedProductField
                 @if (CanPickVariant)
                 {
@@ -313,7 +313,7 @@ else
                         }
                     </BbFormFieldSelect>
                     <BbFormFieldInput TValue="string" @bind-Value="_lotForm.SupplierReference" Label="Supplier / Source Reference" />
-                    <BbFormFieldCurrencyInput @bind-Value="_lotForm.UnitCost"
+                    <BbFormFieldCurrencyInput CurrencyCode="@_currency" @bind-Value="_lotForm.UnitCost"
                                               Label="Unit Cost"
                                               Min="0"
                                               ShowSymbol="false" />
@@ -331,12 +331,12 @@ else
     </BbDialog>
 
     <BbDialog Open="@_receiveDialogOpen" OpenChanged="@(value => _receiveDialogOpen = value)">
-        <BbDialogContent TrapFocus="false" Class="xf-dialog-extra-wide">
+        <BbDialogContent TrapFocus="false" Class="xf-dialog-extra-wide inv-dialog">
             <BbDialogHeader>
                 <BbDialogTitle>Receive Batch / Stock</BbDialogTitle>
                 <BbDialogDescription>Receive stock for @_product.Name into a warehouse location.</BbDialogDescription>
             </BbDialogHeader>
-            <div class="grid gap-4 py-4">
+            <div class="grid gap-4 py-4 inv-dialog-body">
                 @FixedProductField
                 @if (CanPickVariant)
                 {
@@ -454,9 +454,9 @@ else
                                              @bind-Value="_receiveForm.Quantity"
                                              Label="Quantity"
                                              Min="0"
-                                             DecimalPlaces="2"
+                                             DecimalPlaces="4"
                                              Step="1" />
-                    <BbFormFieldCurrencyInput @bind-Value="_receiveForm.UnitCost"
+                    <BbFormFieldCurrencyInput CurrencyCode="@_currency" @bind-Value="_receiveForm.UnitCost"
                                               Label="Unit Cost"
                                               Min="0"
                                               ShowSymbol="false" />
@@ -496,12 +496,12 @@ else
     </BbDialog>
 
     <BbDialog Open="@_ruleDialogOpen" OpenChanged="@(value => _ruleDialogOpen = value)">
-        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide inv-dialog">
             <BbDialogHeader>
                 <BbDialogTitle>Add Reorder Rule</BbDialogTitle>
                 <BbDialogDescription>Add min/max/reorder rules for @_product.Name.</BbDialogDescription>
             </BbDialogHeader>
-            <div class="grid gap-4 py-4">
+            <div class="grid gap-4 py-4 inv-dialog-body">
                 @FixedProductField
                 @if (CanPickVariant)
                 {
@@ -605,25 +605,25 @@ else
                                              @bind-Value="_ruleForm.MinimumQuantity"
                                              Label="Minimum"
                                              Min="0"
-                                             DecimalPlaces="2"
+                                             DecimalPlaces="4"
                                              Step="1" />
                     <BbFormFieldNumericInput TValue="decimal"
                                              @bind-Value="_ruleForm.MaximumQuantity"
                                              Label="Maximum"
                                              Min="0"
-                                             DecimalPlaces="2"
+                                             DecimalPlaces="4"
                                              Step="1" />
                     <BbFormFieldNumericInput TValue="decimal"
                                              @bind-Value="_ruleForm.ReorderPoint"
                                              Label="Reorder Point"
                                              Min="0"
-                                             DecimalPlaces="2"
+                                             DecimalPlaces="4"
                                              Step="1" />
                     <BbFormFieldNumericInput TValue="decimal"
                                              @bind-Value="_ruleForm.ReorderQuantity"
                                              Label="Reorder Qty"
                                              Min="0"
-                                             DecimalPlaces="2"
+                                             DecimalPlaces="4"
                                              Step="1" />
                 </div>
                 <BbFormFieldSwitch Checked="@_ruleForm.IsActive"
@@ -638,12 +638,12 @@ else
     </BbDialog>
 
     <BbDialog Open="@_warehouseCreateDialogOpen" OpenChanged="@(value => _warehouseCreateDialogOpen = value)">
-        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide inv-dialog">
             <BbDialogHeader>
                 <BbDialogTitle>Create Warehouse</BbDialogTitle>
                 <BbDialogDescription>Create a warehouse, then return to the product workflow with it selected.</BbDialogDescription>
             </BbDialogHeader>
-            <div class="grid gap-4 py-4">
+            <div class="grid gap-4 py-4 inv-dialog-body">
                 <div class="grid gap-3 md:grid-cols-2">
                     <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.Code" Label="Code" Required="true" />
                     <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.Name" Label="Name" Required="true" />
@@ -667,12 +667,12 @@ else
     </BbDialog>
 
     <BbDialog Open="@_locationCreateDialogOpen" OpenChanged="@(value => _locationCreateDialogOpen = value)">
-        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide inv-dialog">
             <BbDialogHeader>
                 <BbDialogTitle>Create Location</BbDialogTitle>
                 <BbDialogDescription>Create a location for the selected warehouse, then return to the product workflow.</BbDialogDescription>
             </BbDialogHeader>
-            <div class="grid gap-4 py-4">
+            <div class="grid gap-4 py-4 inv-dialog-body">
                 <XfEntityPicker TItem="Warehouse"
                                 Label="Warehouse"
                                 Value="@_locationForm.WarehouseId"
@@ -713,12 +713,12 @@ else
     </BbDialog>
 
     <BbDialog Open="@_supplierCreateDialogOpen" OpenChanged="@(value => _supplierCreateDialogOpen = value)">
-        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide inv-dialog">
             <BbDialogHeader>
                 <BbDialogTitle>Create Supplier</BbDialogTitle>
                 <BbDialogDescription>Create a supplier, then return to the product workflow with it selected.</BbDialogDescription>
             </BbDialogHeader>
-            <div class="grid gap-4 py-4">
+            <div class="grid gap-4 py-4 inv-dialog-body">
                 <div class="grid gap-3 md:grid-cols-2">
                     <BbFormFieldInput TValue="string" @bind-Value="_supplierForm.Code" Label="Code" Required="true" />
                     <BbFormFieldInput TValue="string" @bind-Value="_supplierForm.Name" Label="Name" Required="true" />
@@ -741,6 +741,7 @@ else
 }
 
 @code {
+    private string _currency = "PHP";
     [Parameter] public Guid Id { get; set; }
     [Parameter] public string? Section { get; set; }
 
@@ -893,6 +894,7 @@ else
             _outsideTenantContext = _product is not null && _product.TenantId != TenantFilter.SelectedTenantId;
             if (_product is null || _outsideTenantContext) return;
 
+            _currency = await InventoryDisplay.CurrencyAsync(DataContext, _product.TenantId);
             await LoadProductData(_product.TenantId);
             if (!_editMode)
                 LoadProductForm();
@@ -1123,10 +1125,10 @@ else
 
     private RenderFragment SummarySection => @<div class="space-y-6">
         <div class="xf-summary-grid xf-summary-grid-4">
-            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Price</BbTypographyMuted><BbTypographyH3>@(_product?.Price.ToString("N2") ?? "0.00")</BbTypographyH3></div></BbCardContent></BbCard>
-            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Available Stock</BbTypographyMuted><BbTypographyH3>@TotalAvailable.ToString("N2")</BbTypographyH3></div></BbCardContent></BbCard>
-            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Locations</BbTypographyMuted><BbTypographyH3>@ActiveLocationCount</BbTypographyH3></div></BbCardContent></BbCard>
-            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Reorder Rules</BbTypographyMuted><BbTypographyH3>@_reorderRules.Count</BbTypographyH3></div></BbCardContent></BbCard>
+            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Price</BbTypographyMuted><BbTypographyH3>@_currency @(_product?.Price.ToString("N2") ?? "0.00")</BbTypographyH3></div></BbCardContent></BbCard>
+            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Available Stock</BbTypographyMuted><BbTypographyH3><a href="@($"/inventario/products/{Id}/stock")">@TotalAvailable.ToString("0.####")</a></BbTypographyH3></div></BbCardContent></BbCard>
+            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Locations</BbTypographyMuted><BbTypographyH3><a href="@($"/inventario/products/{Id}/stock")">@ActiveLocationCount</a></BbTypographyH3></div></BbCardContent></BbCard>
+            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Reorder Rules</BbTypographyMuted><BbTypographyH3><a href="@($"/inventario/products/{Id}/replenishment")">@_reorderRules.Count</a></BbTypographyH3></div></BbCardContent></BbCard>
         </div>
 
         <BbCard>
@@ -1160,7 +1162,7 @@ else
                                         AdvancedSearchTitle="Find Category"
                                         AdvancedSearchDescription="Select the category for this product." />
                         <div class="xf-detail-field-grid">
-                            <BbFormFieldCurrencyInput @bind-Value="_productForm.Price"
+                            <BbFormFieldCurrencyInput CurrencyCode="@_currency" @bind-Value="_productForm.Price"
                                                       Label="Price"
                                                       Min="0"
                                                       Required="true"
@@ -1232,7 +1234,7 @@ else
             <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Available</BbTypographyMuted><BbTypographyH3>@TotalAvailable.ToString("N2")</BbTypographyH3></div></BbCardContent></BbCard>
         </div>
 
-        <BbCard>
+        <BbTabs DefaultValue="view0" Class="inv-workspace-tabs"><BbTabsList><BbTabsTrigger Value="view0">Balances</BbTabsTrigger><BbTabsTrigger Value="view1">Movements</BbTabsTrigger></BbTabsList><BbTabsContent Value="view0" ForceMount="true"><BbCard>
             <BbCardHeader>
                 <BbCardTitle>Stock Balances</BbCardTitle>
                 <BbCardDescription>@_balances.Count balance row(s) for this product</BbCardDescription>
@@ -1260,15 +1262,15 @@ else
                                 <ChildContent Context="item">@GetLotNumber(item.LotId)</ChildContent>
                             </BbDataGridTemplateColumn>
                         }
-                        <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Sortable="true" Filterable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Sortable="true" Filterable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Format="0.####" Sortable="true" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Format="0.####" Sortable="true" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Format="0.####" Sortable="true" Filterable="true" />
                     </Columns>
                 </BbDataGrid>
             </BbCardContent>
-        </BbCard>
+        </BbCard></BbTabsContent>
 
-        <BbCard>
+        <BbTabsContent Value="view1" ForceMount="true"><BbCard>
             <BbCardHeader>
                 <BbCardTitle>Movement Ledger</BbCardTitle>
                 <BbCardDescription>@_movements.Count movement(s) for this product</BbCardDescription>
@@ -1295,14 +1297,15 @@ else
                                 <ChildContent Context="item">@GetLotNumber(item.LotId)</ChildContent>
                             </BbDataGridTemplateColumn>
                         }
-                        <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Sortable="true" Filterable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="After" Sortable="true" Filterable="true" />
+                        <BbDataGridTemplateColumn Title="Affects" Filterable="true" FilterBy="@(item => InventoryDisplay.Effect(item.MovementType))"><ChildContent Context="item">@InventoryDisplay.Effect(item.MovementType)</ChildContent></BbDataGridTemplateColumn>
+<BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Format="0.####" Sortable="true" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="On hand after" Format="0.####" Sortable="true" Filterable="true" />
                         <BbDataGridPropertyColumn Property="@(x => x.Reason)" Title="Reason" Filterable="true" />
                         <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" Filterable="true" />
                     </Columns>
                 </BbDataGrid>
             </BbCardContent>
-        </BbCard>
+        </BbCard></BbTabsContent></BbTabs>
     </div>;
 
     private RenderFragment LotsSection => @<div class="space-y-6">
@@ -1369,7 +1372,7 @@ else
                 <BbCardDescription>@_reorderRules.Count rule(s) configured for this product</BbCardDescription>
             </BbCardHeader>
             <BbCardContent>
-                <BbDataGrid Items="@_reorderRules" ShowPagination="true" InitialPageSize="20">
+                <BbDataGrid Items="@_reorderRules" OnRowClick="@((InventoryReorderRule item) => Navigation.NavigateTo($"/inventario/planning/rules/{item.Id}"))" ShowPagination="true" InitialPageSize="20">
                     <Columns>
                         @if (CanPickVariant)
                         {
@@ -1390,7 +1393,7 @@ else
                                 <StatusBadge Text="@(item.IsActive ? "Active" : "Inactive")" Status="@(item.IsActive ? "active" : "inactive")" />
                             </ChildContent>
                         </BbDataGridTemplateColumn>
-                    </Columns>
+                    <BbDataGridTemplateColumn Title="Actions"><ChildContent Context="item"><BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo($"/inventario/planning/rules/{item.Id}"))">View / edit</BbButton></ChildContent></BbDataGridTemplateColumn></Columns>
                 </BbDataGrid>
             </BbCardContent>
         </BbCard>
@@ -1465,7 +1468,7 @@ else
         </BbCard>
     </div>;
 
-    private RenderFragment TransactionsSection => @<div class="space-y-6">
+    private RenderFragment TransactionsSection => @<div class="space-y-6"><p>This view contains Inventario product sales records. POS shipment and return references are recorded separately in the stock movement ledger.</p><a href="@($"/inventario/stock?productId={Id}")">View product stock movements</a>
         <BbCard>
             <BbCardHeader>
                 <BbCardTitle>Sales Transaction History</BbCardTitle>

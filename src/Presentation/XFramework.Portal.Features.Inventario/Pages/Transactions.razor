@@ -19,11 +19,11 @@ else if (!_moduleEnabled)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="flex items-center justify-between">
                 <div>
                     <BbTypographyH3>Sales Transactions</BbTypographyH3>
-                    <BbTypographyMuted>Read-only product sales history. Inventory quantity changes are recorded in Stock.</BbTypographyMuted>
+                    <BbTypographyMuted>This view contains Inventario product sales records. POS shipment and return references are recorded separately in the stock movement ledger.</BbTypographyMuted>
                 </div>
                 <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
                     <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
@@ -37,14 +37,14 @@ else
                     <BbCardDescription>@_transactions.Count sales transaction(s) loaded</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <BbDataGrid Items="@_transactions" ShowPagination="true" InitialPageSize="20"
+                    <a href="/inventario/stock">View stock movements</a><div class="xf-filter-actions"><BbFormFieldInput TValue="string" @bind-Value="_productSearch" Label="Product search" /><BbFormFieldDatePicker @bind-Value="_fromDate" Label="From date" /><BbFormFieldDatePicker @bind-Value="_toDate" Label="Through date" /></div><BbDataGrid Items="@_transactions.Where(x => (_fromDate == null || x.TransactionDate >= _fromDate) && (_toDate == null || x.TransactionDate < _toDate.Value.AddDays(1)) && GetProductName(x.ProductId).Contains(_productSearch, StringComparison.OrdinalIgnoreCase)).ToList()" ShowPagination="true" InitialPageSize="20"
                                 OnRowClick="@((ProductTransaction item) => Navigation.NavigateTo($"/inventario/transactions/{item.Id}"))"
                                 Class="cursor-pointer">
-                        <Columns>
+                        <EmptyTemplate>No Inventario sales records match this scope. Open Stock movements for inventory changes, including POS shipments and returns.</EmptyTemplate><Columns>
                             <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Quantity" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Quantity" Format="0.####" Sortable="true" Filterable="true" />
                             <BbDataGridTemplateColumn Title="Total" Filterable="true" FilterBy="@(item => item.TotalPrice)">
                                 <ChildContent Context="item">@item.TotalPrice.ToString("N2")</ChildContent>
                             </BbDataGridTemplateColumn>
@@ -67,6 +67,9 @@ else
 }
 
 @code {
+    private DateTime? _fromDate;
+    private DateTime? _toDate;
+    private string _productSearch = "";
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;

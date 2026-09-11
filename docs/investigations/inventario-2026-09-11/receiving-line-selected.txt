@@ -1,0 +1,310 @@
+- complementary "Portal navigation":
+  - generic: X
+  - text: Portal
+  - paragraph: Modules & operations
+  - navigation:
+    - link "Dashboard":
+      - /url: /
+      - generic: Dashboard
+    - button "Audit" [expanded]:
+      - generic: Audit
+    - link "Database changes":
+      - /url: /audit/logs
+      - generic: Database changes
+    - button "Identity" [expanded]:
+      - generic: Identity
+    - link "Users":
+      - /url: /identity/users
+      - generic: Users
+    - link "Sessions":
+      - /url: /identity/sessions
+      - generic: Sessions
+    - link "Auth Logs":
+      - /url: /identity/auth-logs
+      - generic: Auth Logs
+    - button "Inventario" [expanded]:
+      - generic: Inventario
+    - link "Products":
+      - /url: /inventario/products
+      - generic: Products
+    - link "Categories":
+      - /url: /inventario/categories
+      - generic: Categories
+    - link "Warehouses":
+      - /url: /inventario/warehouses
+      - generic: Warehouses
+    - link "Lots":
+      - /url: /inventario/lots
+      - generic: Lots
+    - link "Stock":
+      - /url: /inventario/stock
+      - generic: Stock
+    - link "Reservations":
+      - /url: /inventario/reservations
+      - generic: Reservations
+    - link "Planning":
+      - /url: /inventario/planning
+      - generic: Planning
+    - link "Suppliers":
+      - /url: /inventario/suppliers
+      - generic: Suppliers
+    - link "Purchase Orders":
+      - /url: /inventario/purchase-orders
+      - generic: Purchase Orders
+    - link "Receiving":
+      - /url: /inventario/receiving
+      - generic: Receiving
+    - link "Reports":
+      - /url: /inventario/reports
+      - generic: Reports
+    - link "Sales Transactions":
+      - /url: /inventario/transactions
+      - generic: Sales Transactions
+    - link "Settings":
+      - /url: /inventario/settings
+      - generic: Settings
+    - button "POS" [expanded]:
+      - generic: POS
+    - link "Cashier":
+      - /url: /pos/cashier
+      - generic: Cashier
+    - link "Registers":
+      - /url: /pos/registers
+      - generic: Registers
+    - link "Sales":
+      - /url: /pos/sales
+      - generic: Sales
+    - link "Returns":
+      - /url: /pos/returns
+      - generic: Returns
+    - button "Communications":
+      - generic: Communications
+    - link:
+      - /url: /communications/users
+      - generic: Users
+    - link:
+      - /url: /communications/threads
+      - generic: Threads
+    - link:
+      - /url: /communications/operations
+      - generic: Operations
+    - link:
+      - /url: /communications/moderation
+      - generic: Moderation
+    - link:
+      - /url: /communications/settings
+      - generic: Settings
+    - button "Community":
+      - generic: Community
+    - link:
+      - /url: /community/identities
+      - generic: Identities
+    - link:
+      - /url: /community/content
+      - generic: Content
+    - link:
+      - /url: /community/connections
+      - generic: Connections
+    - link:
+      - /url: /community/notifications
+      - generic: Notifications
+    - link:
+      - /url: /community/settings
+      - generic: Settings
+    - button "Attendance":
+      - generic: Attendance
+    - link:
+      - /url: /attendance/contexts
+      - generic: Contexts
+    - link:
+      - /url: /attendance/sessions
+      - generic: Sessions
+    - link:
+      - /url: /attendance/reports
+      - generic: Reports
+    - button "Storage":
+      - generic: Storage
+    - link:
+      - /url: /storage/files
+      - generic: Files
+    - button "Finance" [expanded]:
+      - generic: Finance
+    - link "Wallets":
+      - /url: /finance/wallets
+      - generic: Wallets
+    - link "Deposits":
+      - /url: /finance/deposit-requests
+      - generic: Deposits
+    - link "Withdrawals":
+      - /url: /finance/withdrawal-requests
+      - generic: Withdrawals
+    - link "Transfers":
+      - /url: /finance/transfers
+      - generic: Transfers
+    - link "Batch":
+      - /url: /finance/batch
+      - generic: Batch
+    - link "Operations":
+      - /url: /finance/wallet-operations
+      - generic: Operations
+    - link "Statements":
+      - /url: /finance/statements
+      - generic: Statements
+    - link "Audit":
+      - /url: /finance/wallet-audit
+      - generic: Audit
+    - link "Reconciliation":
+      - /url: /finance/reconciliation
+      - generic: Reconciliation
+    - link "Outbox":
+      - /url: /finance/outbox-webhooks
+      - generic: Outbox
+    - link "Approvals":
+      - /url: /finance/wallet-approvals
+      - generic: Approvals
+    - link "Policy":
+      - /url: /finance/policy-decisions
+      - generic: Policy
+    - link "Refunds":
+      - /url: /finance/refunds-disputes
+      - generic: Refunds
+    - button "System" [expanded]:
+      - generic: System
+    - link "Reference Data":
+      - /url: /admin/reference-data
+      - generic: Reference Data
+  - generic: v1.0 - XFramework
+  - button "Collapse sidebar":
+- banner:
+  - navigation "breadcrumb":
+    - list:
+      - link "Dashboard":
+        - /url: /
+      - link "Inventario" [disabled]
+      - link "Receiving" [disabled]
+  - button "Switch to light mode":
+  - button "Customize theme":
+  - button "SA Super Admin E2E Inventory POS 20260906":
+    - generic: SA
+    - generic: Super Admin
+    - generic: E2E Inventory POS 20260906
+- main:
+  - heading "Receiving" [level=3]
+  - paragraph: Post received stock into warehouses and locations with optional lot tracking.
+  - button "Receive Stock":
+    - text: Receive Stock
+  - button "Refresh":
+    - text: Refresh
+  - heading "Receiving Documents" [level=3]
+  - paragraph: 1 receipt(s) loaded
+  - grid:
+    - rowgroup:
+      - row "Receipt Filter Receipt Purchase Order Filter Purchase Order Supplier Filter Supplier Warehouse Filter Warehouse Received Filter Received Reference Filter Reference Lines Filter Lines Actions":
+        - columnheader "Receipt Filter Receipt":
+          - generic: Receipt
+          - button "Filter Receipt":
+        - columnheader "Purchase Order Filter Purchase Order":
+          - generic: Purchase Order
+          - button "Filter Purchase Order":
+        - columnheader "Supplier Filter Supplier":
+          - generic: Supplier
+          - button "Filter Supplier":
+        - columnheader "Warehouse Filter Warehouse":
+          - generic: Warehouse
+          - button "Filter Warehouse":
+        - columnheader "Received Filter Received":
+          - generic: Received
+          - button "Filter Received":
+        - columnheader "Reference Filter Reference":
+          - generic: Reference
+          - button "Filter Reference":
+        - columnheader "Lines Filter Lines":
+          - generic: Lines
+          - button "Filter Lines":
+        - columnheader "Actions":
+          - generic: Actions
+    - rowgroup:
+      - row "RCV-E2E-20260906 PO-E2E-20260906 E2E Beverage Supply Main E2E Warehouse 09/06/2026 11:12:14 PO-E2E-20260906 1 View receiving document":
+        - gridcell "RCV-E2E-20260906"
+        - gridcell "PO-E2E-20260906"
+        - gridcell "E2E Beverage Supply"
+        - gridcell "Main E2E Warehouse"
+        - gridcell "09/06/2026 11:12:14"
+        - gridcell "PO-E2E-20260906"
+        - gridcell "1"
+        - gridcell "View receiving document":
+          - button "View receiving document":
+  - navigation "Pagination":
+    - generic: Showing 1-1 of 1
+    - list:
+      - button "Previous" [disabled]:
+        - generic: Previous
+      - button "Next" [disabled]:
+        - generic: Next
+- dialog "Receive Stock":
+  - heading "Receive Stock" [level=2]
+  - paragraph: Receiving posts receipt movements and updates balances in one save.
+  - generic: Receipt Number
+  - textbox "Receipt Number"
+  - generic: Purchase Order
+  - button "Purchase Order":
+    - button "Purchase Order":
+      - generic: PO-20260906104750545 (Open)
+  - generic: Supplier
+  - button "Supplier":
+    - button "Supplier":
+      - generic: No supplier
+  - generic: Warehouse
+  - button "Warehouse":
+    - button "Warehouse":
+      - generic: WH-E2E-MAIN - Main E2E Warehouse
+  - generic: Location
+  - button "Location":
+    - button "Location":
+      - generic: A1-FRONT - Front Shelf A1
+  - generic: Reference
+  - textbox "Reference"
+  - heading "Lines" [level=4]
+  - button "Add Line":
+    - text: Add Line
+  - generic: PO Line
+  - button "PO Line" [active]:
+    - button "PO Line":
+      - generic: PO-20260906104750545 - E2E Bottled Water (1.00 remaining)
+  - generic: Product
+  - button "Product":
+    - button "Product":
+      - generic: Audit Viewer Verification 20260907 (AUDIT-VERIFY-20260907)
+  - generic: Quantity
+  - textbox "Quantity": "1.00"
+  - generic: Unit Cost
+  - textbox "Amount in US Dollar": "0.00"
+  - button "Remove line" [disabled]:
+  - generic: Existing Lot
+  - button "Existing Lot":
+    - button "Existing Lot":
+      - generic: Create/no lot
+  - generic: New Lot Number
+  - textbox "New Lot Number"
+  - generic: Manufacture Date
+  - button "Pick a date":
+    - generic: Pick a date
+  - generic: Expiration Date
+  - button "Pick a date":
+    - generic: Pick a date
+  - button "Cancel"
+  - button "Post Receiving"
+  - button "Close":
+    - generic: Close
+- dialog:
+  - listbox "Command menu":
+    - combobox "Search PO lines..." [expanded]
+    - listbox "Command list":
+      - option "No PO line":
+        - generic: No PO line
+      - option "PO-20260906104750545 - E2E Bottled Water (1.00 remaining)" [selected]:
+        - generic: PO-20260906104750545 - E2E Bottled Water (1.00 remaining)
+      - separator
+      - option "Advanced Search":
+        - generic: Advanced Search
+- document

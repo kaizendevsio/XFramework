@@ -1,0 +1,562 @@
+- complementary "Portal navigation":
+  - generic: X
+  - text: Portal
+  - paragraph: Modules & operations
+  - navigation:
+    - link "Dashboard":
+      - /url: /
+      - generic: Dashboard
+    - button "Audit" [expanded]:
+      - generic: Audit
+    - link "Database changes":
+      - /url: /audit/logs
+      - generic: Database changes
+    - button "Identity" [expanded]:
+      - generic: Identity
+    - link "Users":
+      - /url: /identity/users
+      - generic: Users
+    - link "Sessions":
+      - /url: /identity/sessions
+      - generic: Sessions
+    - link "Auth Logs":
+      - /url: /identity/auth-logs
+      - generic: Auth Logs
+    - button "Inventario" [expanded]:
+      - generic: Inventario
+    - link "Products" [active]:
+      - /url: /inventario/products
+      - generic: Products
+    - link "Categories":
+      - /url: /inventario/categories
+      - generic: Categories
+    - link "Warehouses":
+      - /url: /inventario/warehouses
+      - generic: Warehouses
+    - link "Lots":
+      - /url: /inventario/lots
+      - generic: Lots
+    - link "Stock":
+      - /url: /inventario/stock
+      - generic: Stock
+    - link "Reservations":
+      - /url: /inventario/reservations
+      - generic: Reservations
+    - link "Planning":
+      - /url: /inventario/planning
+      - generic: Planning
+    - link "Suppliers":
+      - /url: /inventario/suppliers
+      - generic: Suppliers
+    - link "Purchase Orders":
+      - /url: /inventario/purchase-orders
+      - generic: Purchase Orders
+    - link "Receiving":
+      - /url: /inventario/receiving
+      - generic: Receiving
+    - link "Reports":
+      - /url: /inventario/reports
+      - generic: Reports
+    - link "Sales Transactions":
+      - /url: /inventario/transactions
+      - generic: Sales Transactions
+    - link "Settings":
+      - /url: /inventario/settings
+      - generic: Settings
+    - button "POS" [expanded]:
+      - generic: POS
+    - link "Cashier":
+      - /url: /pos/cashier
+      - generic: Cashier
+    - link "Registers":
+      - /url: /pos/registers
+      - generic: Registers
+    - link "Sales":
+      - /url: /pos/sales
+      - generic: Sales
+    - link "Returns":
+      - /url: /pos/returns
+      - generic: Returns
+    - button "Communications":
+      - generic: Communications
+    - link:
+      - /url: /communications/users
+      - generic: Users
+    - link:
+      - /url: /communications/threads
+      - generic: Threads
+    - link:
+      - /url: /communications/operations
+      - generic: Operations
+    - link:
+      - /url: /communications/moderation
+      - generic: Moderation
+    - link:
+      - /url: /communications/settings
+      - generic: Settings
+    - button "Community":
+      - generic: Community
+    - link:
+      - /url: /community/identities
+      - generic: Identities
+    - link:
+      - /url: /community/content
+      - generic: Content
+    - link:
+      - /url: /community/connections
+      - generic: Connections
+    - link:
+      - /url: /community/notifications
+      - generic: Notifications
+    - link:
+      - /url: /community/settings
+      - generic: Settings
+    - button "Attendance":
+      - generic: Attendance
+    - link:
+      - /url: /attendance/contexts
+      - generic: Contexts
+    - link:
+      - /url: /attendance/sessions
+      - generic: Sessions
+    - link:
+      - /url: /attendance/reports
+      - generic: Reports
+    - button "Storage":
+      - generic: Storage
+    - link:
+      - /url: /storage/files
+      - generic: Files
+    - button "Finance" [expanded]:
+      - generic: Finance
+    - link "Wallets":
+      - /url: /finance/wallets
+      - generic: Wallets
+    - link "Deposits":
+      - /url: /finance/deposit-requests
+      - generic: Deposits
+    - link "Withdrawals":
+      - /url: /finance/withdrawal-requests
+      - generic: Withdrawals
+    - link "Transfers":
+      - /url: /finance/transfers
+      - generic: Transfers
+    - link "Batch":
+      - /url: /finance/batch
+      - generic: Batch
+    - link "Operations":
+      - /url: /finance/wallet-operations
+      - generic: Operations
+    - link "Statements":
+      - /url: /finance/statements
+      - generic: Statements
+    - link "Audit":
+      - /url: /finance/wallet-audit
+      - generic: Audit
+    - link "Reconciliation":
+      - /url: /finance/reconciliation
+      - generic: Reconciliation
+    - link "Outbox":
+      - /url: /finance/outbox-webhooks
+      - generic: Outbox
+    - link "Approvals":
+      - /url: /finance/wallet-approvals
+      - generic: Approvals
+    - link "Policy":
+      - /url: /finance/policy-decisions
+      - generic: Policy
+    - link "Refunds":
+      - /url: /finance/refunds-disputes
+      - generic: Refunds
+    - button "System" [expanded]:
+      - generic: System
+    - link "Reference Data":
+      - /url: /admin/reference-data
+      - generic: Reference Data
+  - generic: v1.0 - XFramework
+  - button "Collapse sidebar":
+- banner:
+  - navigation "breadcrumb":
+    - list:
+      - link "Dashboard":
+        - /url: /
+      - link "Inventario" [disabled]
+      - link "Stock" [disabled]
+  - button "Switch to light mode":
+  - button "Customize theme":
+  - button "SA Super Admin E2E Inventory POS 20260906":
+    - generic: SA
+    - generic: Super Admin
+    - generic: E2E Inventory POS 20260906
+- main:
+  - heading "Stock Control" [level=3]
+  - paragraph: Post stock movements and inspect balances for the selected tenant.
+  - button "Post Movement":
+    - text: Post Movement
+  - button "Refresh":
+    - text: Refresh
+  - heading "Stock Balances" [level=3]
+  - paragraph: 6 balance row(s) loaded
+  - grid:
+    - rowgroup:
+      - row "Product Filter Product Warehouse Filter Warehouse Location Filter Location Lot Filter Lot On Hand Filter On Hand Reserved Filter Reserved Available Filter Available Last Movement Filter Last Movement Actions":
+        - columnheader "Product Filter Product":
+          - generic: Product
+          - button "Filter Product":
+        - columnheader "Warehouse Filter Warehouse":
+          - generic: Warehouse
+          - button "Filter Warehouse":
+        - columnheader "Location Filter Location":
+          - generic: Location
+          - button "Filter Location":
+        - columnheader "Lot Filter Lot":
+          - generic: Lot
+          - button "Filter Lot":
+        - columnheader "On Hand Filter On Hand":
+          - generic: On Hand
+          - button "Filter On Hand":
+        - columnheader "Reserved Filter Reserved":
+          - generic: Reserved
+          - button "Filter Reserved":
+        - columnheader "Available Filter Available":
+          - generic: Available
+          - button "Filter Available":
+        - columnheader "Last Movement Filter Last Movement":
+          - generic: Last Movement
+          - button "Filter Last Movement":
+        - columnheader "Actions":
+          - generic: Actions
+    - rowgroup:
+      - row "E2E Bottled Water Main E2E Warehouse Front Shelf A1 No lot 20.0000 0.0000 20.0000 09/10/2026 16:53:00 View stock balance":
+        - gridcell "E2E Bottled Water"
+        - gridcell "Main E2E Warehouse"
+        - gridcell "Front Shelf A1"
+        - gridcell "No lot"
+        - gridcell "20.0000"
+        - gridcell "0.0000"
+        - gridcell "20.0000"
+        - gridcell "09/10/2026 16:53:00"
+        - gridcell "View stock balance":
+          - button "View stock balance":
+      - row "E2E Bottled Water Overflow E2E Warehouse Overflow Bin B1 No lot 10.0000 0.0000 10.0000 09/06/2026 10:21:40 View stock balance":
+        - gridcell "E2E Bottled Water"
+        - gridcell "Overflow E2E Warehouse"
+        - gridcell "Overflow Bin B1"
+        - gridcell "No lot"
+        - gridcell "10.0000"
+        - gridcell "0.0000"
+        - gridcell "10.0000"
+        - gridcell "09/06/2026 10:21:40"
+        - gridcell "View stock balance":
+          - button "View stock balance":
+      - row "E2E Bottled Water Main E2E Warehouse Front Shelf A1 LOT-WATER-20260906 0.0000 0.0000 0.0000 09/06/2026 13:27:13 View stock balance":
+        - gridcell "E2E Bottled Water"
+        - gridcell "Main E2E Warehouse"
+        - gridcell "Front Shelf A1"
+        - gridcell "LOT-WATER-20260906"
+        - gridcell "0.0000"
+        - gridcell "0.0000"
+        - gridcell "0.0000"
+        - gridcell "09/06/2026 13:27:13"
+        - gridcell "View stock balance":
+          - button "View stock balance":
+      - row "E2E Shirt Main E2E Warehouse Front Shelf A1 No lot 7.0000 0.0000 7.0000 09/10/2026 16:53:00 View stock balance":
+        - gridcell "E2E Shirt"
+        - gridcell "Main E2E Warehouse"
+        - gridcell "Front Shelf A1"
+        - gridcell "No lot"
+        - gridcell "7.0000"
+        - gridcell "0.0000"
+        - gridcell "7.0000"
+        - gridcell "09/10/2026 16:53:00"
+        - gridcell "View stock balance":
+          - button "View stock balance":
+      - row "E2E Shirt Main E2E Warehouse Front Shelf A1 No lot 5.0000 0.0000 5.0000 09/10/2026 16:53:00 View stock balance":
+        - gridcell "E2E Shirt"
+        - gridcell "Main E2E Warehouse"
+        - gridcell "Front Shelf A1"
+        - gridcell "No lot"
+        - gridcell "5.0000"
+        - gridcell "0.0000"
+        - gridcell "5.0000"
+        - gridcell "09/10/2026 16:53:00"
+        - gridcell "View stock balance":
+          - button "View stock balance":
+      - row "E2E Shirt Overflow E2E Warehouse Overflow Bin B1 No lot 4.0000 0.0000 4.0000 09/06/2026 10:22:40 View stock balance":
+        - gridcell "E2E Shirt"
+        - gridcell "Overflow E2E Warehouse"
+        - gridcell "Overflow Bin B1"
+        - gridcell "No lot"
+        - gridcell "4.0000"
+        - gridcell "0.0000"
+        - gridcell "4.0000"
+        - gridcell "09/06/2026 10:22:40"
+        - gridcell "View stock balance":
+          - button "View stock balance":
+  - navigation "Pagination":
+    - generic: Showing 1-6 of 6
+    - list:
+      - button "Previous" [disabled]:
+        - generic: Previous
+      - button "Next" [disabled]:
+        - generic: Next
+  - heading "Movement Ledger" [level=3]
+  - paragraph: 34 movement(s) loaded
+  - grid:
+    - rowgroup:
+      - row "Product Filter Product Lot Filter Lot Type Filter Type Delta Filter Delta Before Filter Before After Filter After Reason Filter Reason Movement Date Filter Movement Date Actions":
+        - columnheader "Product Filter Product":
+          - generic: Product
+          - button "Filter Product":
+        - columnheader "Lot Filter Lot":
+          - generic: Lot
+          - button "Filter Lot":
+        - columnheader "Type Filter Type":
+          - generic: Type
+          - button "Filter Type":
+        - columnheader "Delta Filter Delta":
+          - generic: Delta
+          - button "Filter Delta":
+        - columnheader "Before Filter Before":
+          - generic: Before
+          - button "Filter Before":
+        - columnheader "After Filter After":
+          - generic: After
+          - button "Filter After":
+        - columnheader "Reason Filter Reason":
+          - generic: Reason
+          - button "Filter Reason":
+        - columnheader "Movement Date Filter Movement Date":
+          - generic: Movement Date
+          - button "Filter Movement Date":
+        - columnheader "Actions":
+          - generic: Actions
+    - rowgroup:
+      - row "E2E Shirt No lot Release -3.0000 5.0000 5.0000 POS sale POS-20260910165258-4b54fa371d2 released 09/10/2026 16:53:00 View movement":
+        - gridcell "E2E Shirt"
+        - gridcell "No lot"
+        - gridcell "Release"
+        - gridcell "-3.0000"
+        - gridcell "5.0000"
+        - gridcell "5.0000"
+        - gridcell "POS sale POS-20260910165258-4b54fa371d2 released"
+        - gridcell "09/10/2026 16:53:00"
+        - gridcell "View movement":
+          - button "View movement":
+      - row "E2E Shirt No lot Release -1.0000 7.0000 7.0000 POS sale POS-20260910165258-4b54fa371d2 released 09/10/2026 16:53:00 View movement":
+        - gridcell "E2E Shirt"
+        - gridcell "No lot"
+        - gridcell "Release"
+        - gridcell "-1.0000"
+        - gridcell "7.0000"
+        - gridcell "7.0000"
+        - gridcell "POS sale POS-20260910165258-4b54fa371d2 released"
+        - gridcell "09/10/2026 16:53:00"
+        - gridcell "View movement":
+          - button "View movement":
+      - row "E2E Bottled Water No lot Release -2.0000 20.0000 20.0000 POS sale POS-20260910165258-4b54fa371d2 released 09/10/2026 16:53:00 View movement":
+        - gridcell "E2E Bottled Water"
+        - gridcell "No lot"
+        - gridcell "Release"
+        - gridcell "-2.0000"
+        - gridcell "20.0000"
+        - gridcell "20.0000"
+        - gridcell "POS sale POS-20260910165258-4b54fa371d2 released"
+        - gridcell "09/10/2026 16:53:00"
+        - gridcell "View movement":
+          - button "View movement":
+      - row "E2E Shirt No lot Reservation 3.0000 5.0000 5.0000 POS sale POS-20260910165258-4b54fa371d2 09/10/2026 16:53:00 View movement":
+        - gridcell "E2E Shirt"
+        - gridcell "No lot"
+        - gridcell "Reservation"
+        - gridcell "3.0000"
+        - gridcell "5.0000"
+        - gridcell "5.0000"
+        - gridcell "POS sale POS-20260910165258-4b54fa371d2"
+        - gridcell "09/10/2026 16:53:00"
+        - gridcell "View movement":
+          - button "View movement":
+      - row "E2E Shirt No lot Reservation 1.0000 7.0000 7.0000 POS sale POS-20260910165258-4b54fa371d2 09/10/2026 16:52:59 View movement":
+        - gridcell "E2E Shirt"
+        - gridcell "No lot"
+        - gridcell "Reservation"
+        - gridcell "1.0000"
+        - gridcell "7.0000"
+        - gridcell "7.0000"
+        - gridcell "POS sale POS-20260910165258-4b54fa371d2"
+        - gridcell "09/10/2026 16:52:59"
+        - gridcell "View movement":
+          - button "View movement":
+      - row "E2E Bottled Water No lot Reservation 2.0000 20.0000 20.0000 POS sale POS-20260910165258-4b54fa371d2 09/10/2026 16:52:59 View movement":
+        - gridcell "E2E Bottled Water"
+        - gridcell "No lot"
+        - gridcell "Reservation"
+        - gridcell "2.0000"
+        - gridcell "20.0000"
+        - gridcell "20.0000"
+        - gridcell "POS sale POS-20260910165258-4b54fa371d2"
+        - gridcell "09/10/2026 16:52:59"
+        - gridcell "View movement":
+          - button "View movement":
+      - row "E2E Shirt No lot Return 1.0000 4.0000 5.0000 POS return RET-20260906133203-a8929a70662 09/06/2026 13:32:03 View movement":
+        - gridcell "E2E Shirt"
+        - gridcell "No lot"
+        - gridcell "Return"
+        - gridcell "1.0000"
+        - gridcell "4.0000"
+        - gridcell "5.0000"
+        - gridcell "POS return RET-20260906133203-a8929a70662"
+        - gridcell "09/06/2026 13:32:03"
+        - gridcell "View movement":
+          - button "View movement":
+      - 'row "E2E Shirt No lot Release -1.0000 5.0000 5.0000 Reservation fulfilled: release reserved quantity 09/06/2026 13:27:13 View movement"':
+        - gridcell "E2E Shirt"
+        - gridcell "No lot"
+        - gridcell "Release"
+        - gridcell "-1.0000"
+        - gridcell "5.0000"
+        - gridcell "5.0000"
+        - 'gridcell "Reservation fulfilled: release reserved quantity"'
+        - gridcell "09/06/2026 13:27:13"
+        - gridcell "View movement":
+          - button "View movement":
+      - row "E2E Shirt No lot Shipment -1.0000 5.0000 4.0000 POS sale POS-20260906132710-a190d30004e 09/06/2026 13:27:13 View movement":
+        - gridcell "E2E Shirt"
+        - gridcell "No lot"
+        - gridcell "Shipment"
+        - gridcell "-1.0000"
+        - gridcell "5.0000"
+        - gridcell "4.0000"
+        - gridcell "POS sale POS-20260906132710-a190d30004e"
+        - gridcell "09/06/2026 13:27:13"
+        - gridcell "View movement":
+          - button "View movement":
+      - 'row "E2E Bottled Water LOT-WATER-20260906 Release -1.0000 1.0000 1.0000 Reservation fulfilled: release reserved quantity 09/06/2026 13:27:13 View movement"':
+        - gridcell "E2E Bottled Water"
+        - gridcell "LOT-WATER-20260906"
+        - gridcell "Release"
+        - gridcell "-1.0000"
+        - gridcell "1.0000"
+        - gridcell "1.0000"
+        - 'gridcell "Reservation fulfilled: release reserved quantity"'
+        - gridcell "09/06/2026 13:27:13"
+        - gridcell "View movement":
+          - button "View movement":
+      - row "E2E Bottled Water LOT-WATER-20260906 Shipment -1.0000 1.0000 0.0000 POS sale POS-20260906132710-a190d30004e 09/06/2026 13:27:13 View movement":
+        - gridcell "E2E Bottled Water"
+        - gridcell "LOT-WATER-20260906"
+        - gridcell "Shipment"
+        - gridcell "-1.0000"
+        - gridcell "1.0000"
+        - gridcell "0.0000"
+        - gridcell "POS sale POS-20260906132710-a190d30004e"
+        - gridcell "09/06/2026 13:27:13"
+        - gridcell "View movement":
+          - button "View movement":
+      - row "E2E Shirt No lot Reservation 1.0000 5.0000 5.0000 POS sale POS-20260906132710-a190d30004e 09/06/2026 13:27:12 View movement":
+        - gridcell "E2E Shirt"
+        - gridcell "No lot"
+        - gridcell "Reservation"
+        - gridcell "1.0000"
+        - gridcell "5.0000"
+        - gridcell "5.0000"
+        - gridcell "POS sale POS-20260906132710-a190d30004e"
+        - gridcell "09/06/2026 13:27:12"
+        - gridcell "View movement":
+          - button "View movement":
+      - row "E2E Bottled Water LOT-WATER-20260906 Reservation 1.0000 1.0000 1.0000 POS sale POS-20260906132710-a190d30004e 09/06/2026 13:27:11 View movement":
+        - gridcell "E2E Bottled Water"
+        - gridcell "LOT-WATER-20260906"
+        - gridcell "Reservation"
+        - gridcell "1.0000"
+        - gridcell "1.0000"
+        - gridcell "1.0000"
+        - gridcell "POS sale POS-20260906132710-a190d30004e"
+        - gridcell "09/06/2026 13:27:11"
+        - gridcell "View movement":
+          - button "View movement":
+      - row "E2E Shirt No lot Release -1.0000 5.0000 5.0000 POS sale POS-20260906125002-a99f3caa461 released 09/06/2026 13:08:41 View movement":
+        - gridcell "E2E Shirt"
+        - gridcell "No lot"
+        - gridcell "Release"
+        - gridcell "-1.0000"
+        - gridcell "5.0000"
+        - gridcell "5.0000"
+        - gridcell "POS sale POS-20260906125002-a99f3caa461 released"
+        - gridcell "09/06/2026 13:08:41"
+        - gridcell "View movement":
+          - button "View movement":
+      - row "E2E Bottled Water LOT-WATER-20260906 Release -1.0000 1.0000 1.0000 POS sale POS-20260906125002-a99f3caa461 released 09/06/2026 13:08:41 View movement":
+        - gridcell "E2E Bottled Water"
+        - gridcell "LOT-WATER-20260906"
+        - gridcell "Release"
+        - gridcell "-1.0000"
+        - gridcell "1.0000"
+        - gridcell "1.0000"
+        - gridcell "POS sale POS-20260906125002-a99f3caa461 released"
+        - gridcell "09/06/2026 13:08:41"
+        - gridcell "View movement":
+          - button "View movement":
+      - row "E2E Shirt No lot Reservation 1.0000 5.0000 5.0000 POS sale POS-20260906125002-a99f3caa461 09/06/2026 13:08:41 View movement":
+        - gridcell "E2E Shirt"
+        - gridcell "No lot"
+        - gridcell "Reservation"
+        - gridcell "1.0000"
+        - gridcell "5.0000"
+        - gridcell "5.0000"
+        - gridcell "POS sale POS-20260906125002-a99f3caa461"
+        - gridcell "09/06/2026 13:08:41"
+        - gridcell "View movement":
+          - button "View movement":
+      - row "E2E Bottled Water LOT-WATER-20260906 Reservation 1.0000 1.0000 1.0000 POS sale POS-20260906125002-a99f3caa461 09/06/2026 13:08:40 View movement":
+        - gridcell "E2E Bottled Water"
+        - gridcell "LOT-WATER-20260906"
+        - gridcell "Reservation"
+        - gridcell "1.0000"
+        - gridcell "1.0000"
+        - gridcell "1.0000"
+        - gridcell "POS sale POS-20260906125002-a99f3caa461"
+        - gridcell "09/06/2026 13:08:40"
+        - gridcell "View movement":
+          - button "View movement":
+      - row "E2E Shirt No lot Adjustment 5.0000 0.0000 5.0000 09/06/2026 11:34:45 View movement":
+        - gridcell "E2E Shirt"
+        - gridcell "No lot"
+        - gridcell "Adjustment"
+        - gridcell "5.0000"
+        - gridcell "0.0000"
+        - gridcell "5.0000"
+        - gridcell
+        - gridcell "09/06/2026 11:34:45"
+        - gridcell "View movement":
+          - button "View movement":
+      - row "E2E Shirt No lot Release -1.0000 7.0000 7.0000 Reservation cancelled 09/06/2026 11:32:51 View movement":
+        - gridcell "E2E Shirt"
+        - gridcell "No lot"
+        - gridcell "Release"
+        - gridcell "-1.0000"
+        - gridcell "7.0000"
+        - gridcell "7.0000"
+        - gridcell "Reservation cancelled"
+        - gridcell "09/06/2026 11:32:51"
+        - gridcell "View movement":
+          - button "View movement":
+      - row "E2E Shirt No lot Reservation 1.0000 7.0000 7.0000 Cancel lifecycle test 09/06/2026 11:32:44 View movement":
+        - gridcell "E2E Shirt"
+        - gridcell "No lot"
+        - gridcell "Reservation"
+        - gridcell "1.0000"
+        - gridcell "7.0000"
+        - gridcell "7.0000"
+        - gridcell "Cancel lifecycle test"
+        - gridcell "09/06/2026 11:32:44"
+        - gridcell "View movement":
+          - button "View movement":
+  - navigation "Pagination":
+    - generic: Showing 1-20 of 34
+    - list:
+      - button "Previous" [disabled]:
+        - generic: Previous
+      - button "Next":
+        - generic: Next
+- document

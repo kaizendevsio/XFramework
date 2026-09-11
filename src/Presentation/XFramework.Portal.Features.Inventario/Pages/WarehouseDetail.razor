@@ -38,7 +38,7 @@ else if (_warehouse is null)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="flex items-center gap-4">
                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to warehouses"
                           OnClick="@(() => Navigation.NavigateTo("/inventario/warehouses"))">
@@ -69,7 +69,24 @@ else
                     <BbCardTitle>Warehouse Summary</BbCardTitle>
                     <BbCardDescription>Storage facility details for the selected tenant.</BbCardDescription>
                 </BbCardHeader>
-                <BbCardContent>
+                <BbCardContent>@if (_maintenanceEditing)
+                    {
+                        @if (_maintenanceError is not null) { <BbAlert><BbAlertDescription>@_maintenanceError</BbAlertDescription></BbAlert> }
+                        <div class="xf-detail-field-grid"><BbFormFieldInput TValue="string" @bind-Value="_editName" Label="Name" />
+<BbFormFieldInput TValue="string" @bind-Value="_editDescription" Label="Description" />
+<BbFormFieldInput TValue="string" @bind-Value="_editAddressLine" Label="Address Line" />
+<BbFormFieldInput TValue="string" @bind-Value="_editCity" Label="City" />
+<BbFormFieldInput TValue="string" @bind-Value="_editRegion" Label="Region" />
+<BbFormFieldInput TValue="string" @bind-Value="_editPostalCode" Label="Postal Code" />
+<BbFormFieldInput TValue="string" @bind-Value="_editCountryCode" Label="Country code (SG, PHL)" />
+</div>
+                        <p class="text-sm text-muted-foreground">Identity and existing stock quantities remain unchanged. </p>
+                        <div class="xf-page-actions"><BbButton OnClick="@SaveMaintenance" Disabled="@_maintenanceSaving">Save changes</BbButton><BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _maintenanceEditing = false)" Disabled="@_maintenanceSaving">Discard</BbButton></div>
+                    }
+                    else
+                    {
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@BeginMaintenance">Edit details</BbButton>
+
                     <div class="grid gap-4 md:grid-cols-2">
                         <div>
                             <BbTypographyMuted>Code</BbTypographyMuted>
@@ -92,7 +109,9 @@ else
                             <div>@(_warehouse.Description ?? "No description")</div>
                         </div>
                     </div>
-                </BbCardContent>
+
+                    }
+</BbCardContent>
             </BbCard>
 
             <div class="xf-summary-grid xf-summary-grid-3">
@@ -122,7 +141,7 @@ else
                 </BbCard>
             </div>
 
-            <BbCard>
+            <BbTabs DefaultValue="view0" Class="inv-workspace-tabs"><BbTabsList><BbTabsTrigger Value="view0">Locations</BbTabsTrigger><BbTabsTrigger Value="view1">Balances</BbTabsTrigger><BbTabsTrigger Value="view2">Movements</BbTabsTrigger></BbTabsList><BbTabsContent Value="view0" ForceMount="true"><BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Locations</BbCardTitle>
                     <BbCardDescription>Internal positions inside this warehouse.</BbCardDescription>
@@ -143,9 +162,9 @@ else
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
-            </BbCard>
+            </BbCard></BbTabsContent>
 
-            <BbCard>
+            <BbTabsContent Value="view1" ForceMount="true"><BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Stock Balances</BbCardTitle>
                     <BbCardDescription>Current balances held in this warehouse.</BbCardDescription>
@@ -154,22 +173,22 @@ else
                     <BbDataGrid Items="@_balances" ShowPagination="true" InitialPageSize="10"
                                 OnRowClick="@((StockBalance item) => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}"))"
                                 Class="cursor-pointer">
-                        <Columns>
+                        <Columns><BbDataGridTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn><BbDataGridTemplateColumn Title="Lot" Filterable="true" FilterBy="@(item => IdentityLotLabel(item.LotId))"><ChildContent Context="item">@(_identityLots.FirstOrDefault(x => x.Id == item.LotId)?.LotNumber ?? "Untracked")</ChildContent></BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Location" Filterable="true" FilterBy="@(item => GetLocationName(item.LocationId))">
                                 <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Format="0.####" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Format="0.####" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Format="0.####" Sortable="true" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
-            </BbCard>
+            </BbCard></BbTabsContent>
 
-            <BbCard>
+            <BbTabsContent Value="view2" ForceMount="true"><BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Recent Movements</BbCardTitle>
                     <BbCardDescription>Latest movement ledger entries for this warehouse.</BbCardDescription>
@@ -178,29 +197,30 @@ else
                     <BbDataGrid Items="@_movements" ShowPagination="true" InitialPageSize="10"
                                 OnRowClick="@((InventoryMovement item) => Navigation.NavigateTo($"/inventario/stock/movements/{item.Id}"))"
                                 Class="cursor-pointer">
-                        <Columns>
+                        <Columns><BbDataGridTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn><BbDataGridTemplateColumn Title="Lot" Filterable="true" FilterBy="@(item => IdentityLotLabel(item.LotId))"><ChildContent Context="item">@(_identityLots.FirstOrDefault(x => x.Id == item.LotId)?.LotNumber ?? "Untracked")</ChildContent></BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="After" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Affects" Filterable="true" FilterBy="@(item => InventoryDisplay.Effect(item.MovementType))"><ChildContent Context="item">@InventoryDisplay.Effect(item.MovementType)</ChildContent></BbDataGridTemplateColumn>
+<BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Format="0.####" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="On hand after" Format="0.####" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
-            </BbCard>
+            </BbCard></BbTabsContent></BbTabs>
         </div>
     </FadeInContent>
 }
 
 <BbDialog Open="@_locationDialogOpen" OpenChanged="@(value => _locationDialogOpen = value)">
-    <BbDialogContent Class="xf-dialog-wide">
+    <BbDialogContent Class="xf-dialog-wide inv-dialog">
         <BbDialogHeader>
             <BbDialogTitle>Create Location</BbDialogTitle>
             <BbDialogDescription>Add a bin, shelf, or zone inside @_warehouse?.Name.</BbDialogDescription>
         </BbDialogHeader>
-        <div class="grid gap-4 py-4">
+        <div class="grid gap-4 py-4 inv-dialog-body">
             <div class="grid gap-3 md:grid-cols-2">
                 <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Code" Label="Code" Required="true" />
                 <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Name" Label="Name" Required="true" />
@@ -224,6 +244,9 @@ else
 </BbDialog>
 
 @code {
+    private string IdentityLotLabel(Guid? id) => _identityLots.FirstOrDefault(x => x.Id == id)?.LotNumber ?? "Untracked";
+    private List<ProductVariation> _variants = [];
+    private List<InventoryLot> _identityLots = [];
     [Parameter] public Guid Id { get; set; }
 
     [Inject] private IDataContext DataContext { get; set; } = default!;
@@ -297,6 +320,8 @@ else
             if (_warehouse is null || _outsideTenantContext) return;
 
             var tenantId = _warehouse.TenantId;
+            _variants = await DataContext.Query<ProductVariation>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
+            _identityLots = await DataContext.Query<InventoryLot>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
             _locations = await DataContext.Query<InventoryLocation>()
                 .IgnoreQueryFilters()
                 .NoCache()
@@ -435,5 +460,71 @@ else
             LocationType = InventoryLocationType.Bin.ToString();
             IsPickable = true;
         }
+    }
+
+    private string? _maintenanceError;
+    private bool _maintenanceEditing;
+    private bool _maintenanceSaving;
+    private Guid _editStamp;
+    private string _editName = "";
+    private string _editDescription = "";
+    private string _editAddressLine = "";
+    private string _editCity = "";
+    private string _editRegion = "";
+    private string _editPostalCode = "";
+    private string _editCountryCode = "";
+
+    private void BeginMaintenance()
+    {
+        if (_warehouse is null) return;
+        _editStamp = _warehouse.ConcurrencyStamp;
+        _editName = _warehouse.Name ?? "";
+        _editDescription = _warehouse.Description ?? "";
+        _editAddressLine = _warehouse.AddressLine ?? "";
+        _editCity = _warehouse.City ?? "";
+        _editRegion = _warehouse.Region ?? "";
+        _editPostalCode = _warehouse.PostalCode ?? "";
+        _editCountryCode = _warehouse.CountryCode ?? "";
+        _maintenanceError = null;
+        _maintenanceEditing = true;
+    }
+    private async Task SaveMaintenance()
+    {
+        if (_warehouse is null || _maintenanceSaving) return;
+        _maintenanceError = null;
+        if (_editName.Length > 200) { _maintenanceError = "Name must be at most 200 characters."; return; }
+        if (_editDescription.Length > 1000) { _maintenanceError = "Description must be at most 1000 characters."; return; }
+        if (_editAddressLine.Length > 500) { _maintenanceError = "AddressLine must be at most 500 characters."; return; }
+        if (_editCity.Length > 100) { _maintenanceError = "City must be at most 100 characters."; return; }
+        if (_editRegion.Length > 100) { _maintenanceError = "Region must be at most 100 characters."; return; }
+        if (_editPostalCode.Length > 25) { _maintenanceError = "PostalCode must be at most 25 characters."; return; }
+        if (_editCountryCode.Length > 3) { _maintenanceError = "CountryCode must be at most 3 characters."; return; }
+        if (string.IsNullOrWhiteSpace(_editName)) { _maintenanceError = "Name is required."; return; }
+        _maintenanceSaving = true;
+        try
+        {
+            var result = await Inventario.UpdateWarehouse(new UpdateWarehouseRequest
+            {
+                Metadata = new() { RequestedTenantId = TenantFilter.SelectedTenantId },
+                Id = _warehouse.Id,
+                ConcurrencyStamp = _editStamp,
+                Name = _editName,
+                Description = _editDescription,
+                AddressLine = _editAddressLine,
+                City = _editCity,
+                Region = _editRegion,
+                PostalCode = _editPostalCode,
+                CountryCode = _editCountryCode,
+            });
+            if (result.IsSuccess)
+            {
+                _maintenanceEditing = false;
+                ToastService.Success("Changes saved.");
+                await Reload();
+            }
+            else ToastService.Error("Could not save. Check fields, release active reservations if changing eligibility, or refresh if another user edited this record.");
+        }
+        catch { ToastService.Error("Could not save changes. Refresh and try again."); }
+        finally { _maintenanceSaving = false; }
     }
 }

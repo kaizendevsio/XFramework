@@ -29,7 +29,7 @@ else if (_order is null)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="xf-page-header">
                 <div class="flex items-center gap-3">
                     <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Icon" AriaLabel="Back to purchase orders" OnClick="@GoBack">
@@ -49,6 +49,15 @@ else
                 </BbButton>
             </div>
 
+            <div class="xf-page-actions">
+                @if (_order.Status is PurchaseOrderStatus.Open or PurchaseOrderStatus.PartiallyReceived)
+                { <BbButton OnClick="@(() => Navigation.NavigateTo($"/inventario/receiving?purchaseOrderId={Id}"))">Receive remaining</BbButton> }
+                @if (_order.Status == PurchaseOrderStatus.Draft)
+                { <BbButton OnClick="@(() => ChangeStatus(PurchaseOrderStatus.Open))" Disabled="@_changingStatus">Open order</BbButton> }
+                @if (_order.Status is PurchaseOrderStatus.Draft or PurchaseOrderStatus.Open or PurchaseOrderStatus.PartiallyReceived)
+                { <BbButton Variant="ButtonVariant.Destructive" OnClick="@(() => ChangeStatus(PurchaseOrderStatus.Cancelled))" Disabled="@_changingStatus">Cancel remaining</BbButton> }
+                <strong>Order total: @_currency @_lines.Sum(x => x.OrderedQuantity * (x.UnitCost ?? 0)).ToString("N2")</strong>
+            </div>
             <BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Order Summary</BbCardTitle>
@@ -78,16 +87,16 @@ else
                 </BbCardHeader>
                 <BbCardContent>
                     <BbDataGrid Items="@_lines" ShowPagination="true" InitialPageSize="20">
-                        <Columns>
+                        <Columns><BbDataGridTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.OrderedQuantity)" Title="Ordered" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ReceivedQuantity)" Title="Received" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.OrderedQuantity)" Title="Ordered" Format="0.####" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReceivedQuantity)" Title="Received" Format="0.####" Sortable="true" Filterable="true" />
                             <BbDataGridTemplateColumn Title="Remaining" Filterable="true" FilterBy="@(item => Math.Max(0, item.OrderedQuantity - item.ReceivedQuantity))">
                                 <ChildContent Context="item">@Math.Max(0, item.OrderedQuantity - item.ReceivedQuantity).ToString("N2")</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.UnitCost)" Title="Unit Cost" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.UnitCost)" Title="@($"Unit cost ({_currency})")" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.UnitOfMeasure)" Title="Unit" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
@@ -103,7 +112,7 @@ else
                     <BbDataGrid Items="@_receipts" ShowPagination="true" InitialPageSize="10"
                                 OnRowClick="@((ReceivingDocument item) => Navigation.NavigateTo($"/inventario/receiving/{item.Id}"))"
                                 Class="cursor-pointer">
-                        <Columns>
+                        <EmptyTemplate>No receipts yet. Use Receive remaining on an open order to record delivery.</EmptyTemplate><Columns>
                             <BbDataGridPropertyColumn Property="@(x => x.ReceiptNumber)" Title="Receipt" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" Filterable="true" />
@@ -117,6 +126,26 @@ else
 }
 
 @code {
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
+    [Inject] private DialogService DialogService { get; set; } = default!;
+    private string _currency = "PHP";
+    private List<ProductVariation> _variants = [];
+    private bool _changingStatus;
+    private async Task ChangeStatus(PurchaseOrderStatus status)
+    {
+        if (_changingStatus || _order is null) return;
+        if (!await DialogService.Confirm("Change purchase order status", status == PurchaseOrderStatus.Cancelled ? "Cancel the remaining order? Existing receipts and received stock stay recorded." : "Open this draft for receiving?", new ConfirmDialogOptions())) return;
+        _changingStatus = true;
+        try
+        {
+            var result = await Inventario.SetPurchaseOrderStatus(new SetPurchaseOrderStatusRequest { Metadata = new() { RequestedTenantId = TenantFilter.SelectedTenantId }, PurchaseOrderId = Id, Status = status });
+            if (result.IsSuccess) { ToastService.Success("Order status updated."); await Reload(); }
+            else ToastService.Error("Could not change this order status. Refresh and check its current status.");
+        }
+        catch { ToastService.Error("Could not update order status."); }
+        finally { _changingStatus = false; }
+    }
+
     [Parameter] public Guid Id { get; set; }
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
@@ -160,6 +189,8 @@ else
             if (!_hasTenant || !_purchasingEnabled) return;
 
             var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _currency = await InventoryDisplay.CurrencyAsync(DataContext, tenantId);
+            _variants = await DataContext.Query<ProductVariation>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
             _order = await DataContext.Query<PurchaseOrder>()
                 .IgnoreQueryFilters()
                 .NoCache()

@@ -1,0 +1,260 @@
+- complementary "Portal navigation":
+  - generic: X
+  - text: Portal
+  - paragraph: Modules & operations
+  - navigation:
+    - link "Dashboard":
+      - /url: /
+      - generic: Dashboard
+    - button "Audit" [expanded]:
+      - generic: Audit
+    - link "Database changes":
+      - /url: /audit/logs
+      - generic: Database changes
+    - button "Identity" [expanded]:
+      - generic: Identity
+    - link "Users":
+      - /url: /identity/users
+      - generic: Users
+    - link "Sessions":
+      - /url: /identity/sessions
+      - generic: Sessions
+    - link "Auth Logs":
+      - /url: /identity/auth-logs
+      - generic: Auth Logs
+    - button "Inventario" [expanded]:
+      - generic: Inventario
+    - link "Products":
+      - /url: /inventario/products
+      - generic: Products
+    - link "Categories":
+      - /url: /inventario/categories
+      - generic: Categories
+    - link "Warehouses":
+      - /url: /inventario/warehouses
+      - generic: Warehouses
+    - link "Lots":
+      - /url: /inventario/lots
+      - generic: Lots
+    - link "Stock":
+      - /url: /inventario/stock
+      - generic: Stock
+    - link "Reservations":
+      - /url: /inventario/reservations
+      - generic: Reservations
+    - link "Planning":
+      - /url: /inventario/planning
+      - generic: Planning
+    - link "Suppliers":
+      - /url: /inventario/suppliers
+      - generic: Suppliers
+    - link "Purchase Orders":
+      - /url: /inventario/purchase-orders
+      - generic: Purchase Orders
+    - link "Receiving":
+      - /url: /inventario/receiving
+      - generic: Receiving
+    - link "Reports":
+      - /url: /inventario/reports
+      - generic: Reports
+    - link "Sales Transactions":
+      - /url: /inventario/transactions
+      - generic: Sales Transactions
+    - link "Settings":
+      - /url: /inventario/settings
+      - generic: Settings
+    - button "POS" [expanded]:
+      - generic: POS
+    - link "Cashier":
+      - /url: /pos/cashier
+      - generic: Cashier
+    - link "Registers":
+      - /url: /pos/registers
+      - generic: Registers
+    - link "Sales":
+      - /url: /pos/sales
+      - generic: Sales
+    - link "Returns":
+      - /url: /pos/returns
+      - generic: Returns
+    - button "Communications":
+      - generic: Communications
+    - link:
+      - /url: /communications/users
+      - generic: Users
+    - link:
+      - /url: /communications/threads
+      - generic: Threads
+    - link:
+      - /url: /communications/operations
+      - generic: Operations
+    - link:
+      - /url: /communications/moderation
+      - generic: Moderation
+    - link:
+      - /url: /communications/settings
+      - generic: Settings
+    - button "Community":
+      - generic: Community
+    - link:
+      - /url: /community/identities
+      - generic: Identities
+    - link:
+      - /url: /community/content
+      - generic: Content
+    - link:
+      - /url: /community/connections
+      - generic: Connections
+    - link:
+      - /url: /community/notifications
+      - generic: Notifications
+    - link:
+      - /url: /community/settings
+      - generic: Settings
+    - button "Attendance":
+      - generic: Attendance
+    - link:
+      - /url: /attendance/contexts
+      - generic: Contexts
+    - link:
+      - /url: /attendance/sessions
+      - generic: Sessions
+    - link:
+      - /url: /attendance/reports
+      - generic: Reports
+    - button "Storage":
+      - generic: Storage
+    - link:
+      - /url: /storage/files
+      - generic: Files
+    - button "Finance" [expanded]:
+      - generic: Finance
+    - link "Wallets":
+      - /url: /finance/wallets
+      - generic: Wallets
+    - link "Deposits":
+      - /url: /finance/deposit-requests
+      - generic: Deposits
+    - link "Withdrawals":
+      - /url: /finance/withdrawal-requests
+      - generic: Withdrawals
+    - link "Transfers":
+      - /url: /finance/transfers
+      - generic: Transfers
+    - link "Batch":
+      - /url: /finance/batch
+      - generic: Batch
+    - link "Operations":
+      - /url: /finance/wallet-operations
+      - generic: Operations
+    - link "Statements":
+      - /url: /finance/statements
+      - generic: Statements
+    - link "Audit":
+      - /url: /finance/wallet-audit
+      - generic: Audit
+    - link "Reconciliation":
+      - /url: /finance/reconciliation
+      - generic: Reconciliation
+    - link "Outbox":
+      - /url: /finance/outbox-webhooks
+      - generic: Outbox
+    - link "Approvals":
+      - /url: /finance/wallet-approvals
+      - generic: Approvals
+    - link "Policy":
+      - /url: /finance/policy-decisions
+      - generic: Policy
+    - link "Refunds":
+      - /url: /finance/refunds-disputes
+      - generic: Refunds
+    - button "System" [expanded]:
+      - generic: System
+    - link "Reference Data":
+      - /url: /admin/reference-data
+      - generic: Reference Data
+  - generic: v1.0 - XFramework
+  - button "Collapse sidebar":
+- banner:
+  - navigation "breadcrumb":
+    - list:
+      - link "Dashboard":
+        - /url: /
+      - link "Inventario" [disabled]
+      - link "Categories" [disabled]
+      - link "381c6019" [disabled]
+  - button "Switch to light mode":
+  - button "Customize theme":
+  - button "SA Super Admin E2E Inventory POS 20260906":
+    - generic: SA
+    - generic: Super Admin
+    - generic: E2E Inventory POS 20260906
+- main:
+  - button "Back to categories":
+  - heading "Apparel E2E" [level=3]
+  - generic: Enabled
+  - paragraph: "ID: 381c6019-2e5d-4f4b-a332-f2ac15d5b25e"
+  - button "Refresh":
+    - text: Refresh
+  - button "Edit":
+    - text: Edit
+  - heading "Category Summary" [level=3]
+  - paragraph: Catalog category details for the selected tenant.
+  - paragraph: Name
+  - generic: Apparel E2E
+  - paragraph: Products
+  - generic: "2"
+  - paragraph: Created
+  - generic: 09/06/2026 09:42
+  - paragraph: Last Modified
+  - generic: 09/06/2026 10:10
+  - paragraph: Description
+  - generic: Apparel products with size variations for the 20260906 E2E run
+  - heading "Products" [level=3]
+  - paragraph: Products assigned to this category.
+  - grid:
+    - rowgroup:
+      - row "Name Filter Name SKU Filter SKU Price Filter Price Stock Filter Stock Status Filter Status Created Filter Created":
+        - columnheader "Name Filter Name":
+          - generic: Name
+          - button "Filter Name":
+        - columnheader "SKU Filter SKU":
+          - generic: SKU
+          - button "Filter SKU":
+        - columnheader "Price Filter Price":
+          - generic: Price
+          - button "Filter Price":
+        - columnheader "Stock Filter Stock":
+          - generic: Stock
+          - button "Filter Stock":
+        - columnheader "Status Filter Status":
+          - generic: Status
+          - button "Filter Status":
+        - columnheader "Created Filter Created":
+          - generic: Created
+          - button "Filter Created":
+    - rowgroup:
+      - row "Audit Viewer Verification 20260907 AUDIT-VERIFY-20260907 12.34 0.0000 Available 09/07/2026 06:32:22":
+        - gridcell "Audit Viewer Verification 20260907"
+        - gridcell "AUDIT-VERIFY-20260907"
+        - gridcell "12.34"
+        - gridcell "0.0000"
+        - gridcell "Available":
+          - generic: Available
+        - gridcell "09/07/2026 06:32:22"
+      - row "E2E Shirt E2E-SHIRT-001 25.00 16.0000 Available 09/06/2026 10:18:08":
+        - gridcell "E2E Shirt"
+        - gridcell "E2E-SHIRT-001"
+        - gridcell "25.00"
+        - gridcell "16.0000"
+        - gridcell "Available":
+          - generic: Available
+        - gridcell "09/06/2026 10:18:08"
+  - navigation "Pagination":
+    - generic: Showing 1-2 of 2
+    - list:
+      - button "Previous" [disabled]:
+        - generic: Previous
+      - button "Next" [disabled]:
+        - generic: Next
+- document

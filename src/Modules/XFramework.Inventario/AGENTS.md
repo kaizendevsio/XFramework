@@ -24,7 +24,7 @@ Inventario is not the owner of identities, tenant membership, payments, wallet b
 - `Inventario.Domain.Shared`: EF entities, configurations, enums, request contracts, response contracts, report rows, and shared DTOs.
 - `Inventario.Integration`: generated `IInventarioServiceWrapper` integration surface for Portal and cross-module callers.
 - `src/Tests/Inventario.IntegrationTests`: PostgreSQL-backed integration tests, wrapper completeness tests, remote `IDataContext` tests, and Portal contract tests.
-- `src/Presentation/XFramework.Portal/Components/Pages/Inventario`: Portal Inventario UI. UI guidance lives in root `rules/UiGuidelines.md`; keep module-specific workflow details here.
+- `src/Presentation/XFramework.Portal.Features.Inventario/Pages`: Portal Inventario UI in its feature RCL. Shared pickers live in `XFramework.Portal.Shared/Components`. UI guidance lives in root `rules/UiGuidelines.md`; keep module-specific workflow details here.
 
 ## Ownership Boundaries
 
@@ -103,6 +103,15 @@ Inventario is not the owner of identities, tenant membership, payments, wallet b
 - Use typed BlazorBlueprint controls for numbers, money, dates, booleans, and option lists. Avoid native `<input>`/`<select>` where Blueprint controls fit.
 
 ## EF, Migrations, And Schema
+
+### Operational maintenance and Portal workflows
+
+- Warehouse, location, supplier, lot and reorder-rule maintenance uses the corresponding `Update*` wrapper with the original concurrency stamp. Tenant, identity and stock scope remain immutable. Reject stale edits, invalid lengths and invalid date/quantity ranges; do not allow non-pickable locations or ineligible lots while they hold reserved stock.
+- `IDataContext` query results are detached. Call `Update(entity)` before changing fields so persistence captures the original concurrency stamp, then assign a new stamp. Cover successful persistence, stale edits and foreign-tenant requests through the real wrapper.
+- Stock, warehouse, lot, planning and expiry workspaces use tabs with independent grid state. Preserve variant and lot identity, native filters/sorting, and contextual actions. Reservation/release deltas affect reserved stock; movement before/after snapshots describe on-hand stock.
+- Global stock, reservation, purchase-order and ad-hoc receipt forms require deliberate product selection. PO receiving fills and locks product, variant, unit and cost from the selected outstanding line. Keep one receipt idempotency key across retries and clear incompatible lot data when identity changes.
+- Use the tenant's `Settings:Inventario:DefaultCurrency` for money inputs and price labels. This is display currency, not conversion. Low-stock threshold is consumed by product warnings. SKU-required and negative-stock registry preferences are not enforcement switches; keep them visibly unsupported instead of promising policy changes.
+- The Inventario mobile drawer and responsive table/dialog styles are scoped to Inventario. Preserve the shared shell behavior of other modules and coordinate shared Portal deployments with their active QA tasks.
 
 - EF entities and configurations live in `Inventario.Domain.Shared`.
 - Keep all module-owned tables in the `Inventario` schema.
