@@ -169,6 +169,8 @@ public partial record PosPaymentResponse
     public string IdempotencyKey { get; init; } = string.Empty;
     public string? FailureReason { get; init; }
     public DateTime? CapturedAt { get; init; }
+    public decimal? CashTenderedAmount { get; init; }
+    public decimal? ChangeAmount { get; init; }
 }
 
 [MemoryPackable]

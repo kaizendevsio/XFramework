@@ -566,7 +566,8 @@ public sealed class PosCartService(
             {
                 Method = request.Payment.Method,
                 Amount = cart.TotalAmount,
-                CustomerCredentialId = customerCredentialId
+                CustomerCredentialId = customerCredentialId,
+                CashTenderedAmount = request.Payment.CashTenderedAmount
             }
         };
     }

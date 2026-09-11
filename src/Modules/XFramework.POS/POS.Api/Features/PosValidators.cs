@@ -154,6 +154,9 @@ public sealed class CheckoutPosCartValidator : AbstractValidator<CheckoutPosCart
         RuleFor(x => x.Payment.CustomerCredentialId)
             .NotEmpty()
             .When(x => x.Payment.Method == POS.Domain.Shared.Enums.PosPaymentMethod.WalletTransfer);
+        RuleFor(x => x.Payment.CashTenderedAmount)
+            .GreaterThanOrEqualTo(x => x.Payment.Amount)
+            .When(x => x.Payment.Method == POS.Domain.Shared.Enums.PosPaymentMethod.CashDrawer && x.Payment.CashTenderedAmount.HasValue);
     }
 }
 
@@ -175,6 +178,9 @@ public sealed class CheckoutPosSaleValidator : AbstractValidator<CheckoutPosSale
         RuleFor(x => x.Payment.CustomerCredentialId)
             .NotEmpty()
             .When(x => x.Payment.Method == POS.Domain.Shared.Enums.PosPaymentMethod.WalletTransfer);
+        RuleFor(x => x.Payment.CashTenderedAmount)
+            .GreaterThanOrEqualTo(x => x.Payment.Amount)
+            .When(x => x.Payment.Method == POS.Domain.Shared.Enums.PosPaymentMethod.CashDrawer && x.Payment.CashTenderedAmount.HasValue);
 
         RuleForEach(x => x.Lines).ChildRules(line =>
         {

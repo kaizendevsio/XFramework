@@ -69,6 +69,9 @@ public sealed class PosPersistenceIntegrationTests
         var register = CreateRegister(tenantId);
         var sale = CreateSale(tenantId, register.Id);
         var firstPayment = CreatePayment(tenantId, sale.Id, Guid.NewGuid());
+        firstPayment.Amount = 15;
+        firstPayment.CashTenderedAmount = 20;
+        firstPayment.ChangeAmount = 5;
         const string requestHash = "6E7F31D96835BBAC2E3514F65B6849D1082B92C89A3BCB9E7B27E5C85A67036A";
         var cart = CreateCart(tenantId, register.Id, requestHash);
 
@@ -92,6 +95,9 @@ public sealed class PosPersistenceIntegrationTests
                 .Select(item => item.RequestHash)
                 .SingleAsync();
             persistedHash.Should().Be(requestHash);
+            var persistedPayment = await db.Set<PosPayment>().SingleAsync(item => item.Id == firstPayment.Id);
+            persistedPayment.CashTenderedAmount.Should().Be(20);
+            persistedPayment.ChangeAmount.Should().Be(5);
         }
     }
 

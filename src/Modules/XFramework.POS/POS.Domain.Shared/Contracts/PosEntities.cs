@@ -395,6 +395,12 @@ public partial class PosPayment : BaseModel
     [MemoryPackOrder(13)]
     public decimal RefundedAmount { get; set; }
 
+    [MemoryPackOrder(14)]
+    public decimal? CashTenderedAmount { get; set; }
+
+    [MemoryPackOrder(15)]
+    public decimal? ChangeAmount { get; set; }
+
     [MemoryPackIgnore]
     public virtual PosSale Sale { get; set; } = null!;
 }

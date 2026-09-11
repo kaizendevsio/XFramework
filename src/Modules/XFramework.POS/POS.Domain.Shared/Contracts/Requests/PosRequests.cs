@@ -217,6 +217,7 @@ public partial record CheckoutPosPaymentRequest
     public PosPaymentMethod Method { get; set; } = PosPaymentMethod.CashDrawer;
     public decimal Amount { get; set; }
     public Guid? CustomerCredentialId { get; set; }
+    public decimal? CashTenderedAmount { get; set; }
 }
 
 [MemoryPackable]

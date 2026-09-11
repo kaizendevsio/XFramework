@@ -560,6 +560,12 @@ public sealed class PosSalesService(
             WalletId = request.Payment.Method == PosPaymentMethod.CashDrawer ? register.CashDrawerWalletId : null,
             CustomerCredentialId = request.Payment.CustomerCredentialId ?? request.CustomerCredentialId,
             MerchantCredentialId = register.MerchantCredentialId,
+            CashTenderedAmount = request.Payment.Method == PosPaymentMethod.CashDrawer
+                ? request.Payment.CashTenderedAmount ?? request.Payment.Amount
+                : null,
+            ChangeAmount = request.Payment.Method == PosPaymentMethod.CashDrawer
+                ? (request.Payment.CashTenderedAmount ?? request.Payment.Amount) - request.Payment.Amount
+                : null,
             CreatedAt = DateTime.UtcNow,
             ConcurrencyStamp = Guid.NewGuid(),
             IsEnabled = true

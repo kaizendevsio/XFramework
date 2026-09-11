@@ -24,6 +24,29 @@ public sealed class PosValidatorTests
     }
 
     [Test]
+    public void CheckoutValidators_CashTenderBelowPaymentAmount_ReturnValidationError()
+    {
+        var sale = ValidCheckout();
+        sale.Payment.CashTenderedAmount = sale.Payment.Amount - 1;
+        var cart = new CheckoutPosCartRequest
+        {
+            CartId = Guid.NewGuid(),
+            IdempotencyKey = "cash-cart",
+            Payment = new CheckoutPosPaymentRequest
+            {
+                Method = PosPaymentMethod.CashDrawer,
+                Amount = 10,
+                CashTenderedAmount = 9
+            }
+        };
+
+        new CheckoutPosSaleValidator().Validate(sale).Errors
+            .Should().Contain(error => error.PropertyName == "Payment.CashTenderedAmount");
+        new CheckoutPosCartValidator().Validate(cart).Errors
+            .Should().Contain(error => error.PropertyName == "Payment.CashTenderedAmount");
+    }
+
+    [Test]
     public void CheckoutPosSaleValidator_NegativeDiscountTaxOrLineAmount_ReturnsValidationErrors()
     {
         var request = ValidCheckout();

@@ -183,6 +183,8 @@ public sealed class PosPaymentConfiguration : IEntityTypeConfiguration<PosPaymen
         entity.Property(e => e.Method).HasConversion<int>();
         entity.Property(e => e.Status).HasConversion<int>();
         entity.Property(e => e.Amount).HasPrecision(18, 2);
+        entity.Property(e => e.CashTenderedAmount).HasPrecision(18, 2);
+        entity.Property(e => e.ChangeAmount).HasPrecision(18, 2);
         entity.Property(e => e.ReferenceNumber).IsRequired().HasMaxLength(120);
         entity.Property(e => e.IdempotencyKey).IsRequired().HasMaxLength(160);
         entity.Property(e => e.FailureReason).HasMaxLength(1000);

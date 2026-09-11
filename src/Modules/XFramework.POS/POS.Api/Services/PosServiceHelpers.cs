@@ -56,7 +56,8 @@ internal static class PosServiceHelpers
             {
                 request.Payment.Method,
                 request.Payment.Amount,
-                request.Payment.CustomerCredentialId
+                request.Payment.CustomerCredentialId,
+                request.Payment.CashTenderedAmount
             },
             Lines = request.Lines.Select((line, index) => new
             {
@@ -391,7 +392,9 @@ internal static class PosServiceHelpers
         ReferenceNumber = payment.ReferenceNumber,
         IdempotencyKey = payment.IdempotencyKey,
         FailureReason = payment.FailureReason,
-        CapturedAt = payment.CapturedAt
+        CapturedAt = payment.CapturedAt,
+        CashTenderedAmount = payment.CashTenderedAmount,
+        ChangeAmount = payment.ChangeAmount
     };
 
     private static PosReturnLineResponse ToReturnLineResponse(PosReturnLine line) => new()

@@ -255,6 +255,10 @@ else
                             <div class="pos-receipt-panel" role="status" data-testid="pos-receipt">
                                 <strong>Receipt @_lastReceipt.SaleNumber</strong>
                                 <span>@_lastReceipt.Status | @FormatMoney(_lastReceipt.TotalAmount)</span>
+                                @if (_lastReceipt.Payments.FirstOrDefault() is { CashTenderedAmount: { } tendered, ChangeAmount: { } change })
+                                {
+                                    <span data-testid="pos-receipt-cash">Cash received @FormatMoney(tendered) | Change @FormatMoney(change)</span>
+                                }
                                 @if (!string.IsNullOrWhiteSpace(_lastReceipt.FailureReason))
                                 {
                                     <BbAlert Variant="AlertVariant.Warning">
@@ -1083,7 +1087,8 @@ else
                     {
                         Method = _paymentMethod,
                         Amount = Total,
-                        CustomerCredentialId = customerCredentialId
+                        CustomerCredentialId = customerCredentialId,
+                        CashTenderedAmount = IsCashPayment ? _cashTenderedAmount : null
                     }
                 });
 
@@ -1122,7 +1127,8 @@ else
                 {
                     Method = _paymentMethod,
                     Amount = Total,
-                    CustomerCredentialId = customerCredentialId
+                    CustomerCredentialId = customerCredentialId,
+                    CashTenderedAmount = IsCashPayment ? _cashTenderedAmount : null
                 }
             });
 
