@@ -1,0 +1,36 @@
+@inject DatabaseStartup Startup
+@inject NavigationManager Nav
+@inject ChatState State
+@using Microsoft.EntityFrameworkCore
+@using SqliteWasmBlazor
+@if (failure is not null)
+{
+    <main class="loading"><Brand /><h1>Device storage unavailable</h1><p>@failure</p><button class="btn" @onclick="() => Nav.NavigateTo(Nav.Uri, true)">Try again</button></main>
+}
+else if (!State.Ready)
+{
+    <main class="loading"><Brand /><p>Opening your conversations…</p><progress aria-label="Loading Yap"></progress></main>
+}
+else
+{
+    <Router AppAssembly="typeof(App).Assembly"><Found Context="route"><RouteView RouteData="route" DefaultLayout="typeof(MainLayout)" /></Found>
+    <NotFound><LayoutView Layout="typeof(MainLayout)"><div class="body"><h1>Page not found</h1><a class="btn" href="/">Back to chats</a></div></LayoutView></NotFound></Router>
+}
+@code {
+    private string? failure;
+    protected override Task OnInitializedAsync() => StartAsync();
+    private async Task StartAsync()
+    {
+        failure = null;
+        try
+        {
+            if (Startup.Failed) throw new InvalidOperationException("The database could not be opened.");
+            await State.InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Yap startup failed: {ex}");
+            failure = "Use a current browser with device storage enabled. If Yap is open in another tab, close that tab and try again. Your saved data has not been cleared.";
+        }
+    }
+}

@@ -1,0 +1,13 @@
+<aside class="glass-controls" aria-label="Glass appearance controls" data-glass-controls>
+    <div class="tuning-title"><strong>Glass studio</strong></div>
+    <p>Adjust live. Your settings stay on this browser.</p>
+    <label>Blur <output data-glass-output="blur"></output><input aria-label="Glass blur" data-glass-setting="blur" type="range" min="0" max="12" step="0.25" /></label>
+    <label>Refraction <output data-glass-output="refraction"></output><input aria-label="Glass refraction" data-glass-setting="refraction" type="range" min="0" max="120" step="1" /></label>
+    <label class="tint-switch"><input data-glass-setting="tintEnabled" type="checkbox" />Use custom tint</label>
+    <label class="tint-color">Tint color<input aria-label="Glass tint color" data-glass-setting="color" type="color" /></label>
+    <label>Tint strength <output data-glass-output="strength"></output><input aria-label="Glass tint strength" data-glass-setting="strength" type="range" min="0" max="80" step="1" /></label>
+    <label>Tint lightness <output data-glass-output="lightness"></output><input aria-label="Glass tint lightness" data-glass-setting="lightness" type="range" min="-100" max="100" step="1" /><span class="tint-scale">Darker <span>Lighter</span></span></label>
+    <GlassPresets />
+    <button class="pillbtn" data-glass-reset>Reset defaults</button>
+</aside>
+

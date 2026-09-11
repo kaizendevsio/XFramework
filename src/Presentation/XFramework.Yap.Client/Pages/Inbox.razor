@@ -1,0 +1,58 @@
+@page "/"
+@implements IDisposable
+@inject ChatState State
+@inject NavigationManager Nav
+<PageTitle>Yap · A little closer.</PageTitle>
+@if (State.User is null) { <div class="authbody"><div class="authbrand"><Brand /><p>A little closer.</p></div><h1>Good conversations start here.</h1><p>Your people, one conversation away.</p><a class="btn" href="/login">Sign in</a><a class="btn ghost" href="/register">Create an account</a></div> }
+else
+{
+<ScrollSurface><Header><div class="appbar plain liquid-glass"><GlassLayer /><Brand /><span class="sp"></span><button class="iconbtn" aria-label="Search conversations" @onclick="() => searchVisible = !searchVisible"><Icon Name="search" /></button><a class="iconbtn" href="/settings" aria-label="Settings"><Avatar Initials="@ChatMessage.InitialsFor(State.User.Name)" Size="a34" /></a></div>
+@if (searchVisible) { <label class="searchbar liquid-glass"><GlassLayer /><Icon Name="search" Size="18" /><input aria-label="Search conversations and messages" placeholder="Search conversations and messages" @bind="search" @bind:event="oninput" @bind:after="SearchMessagesAsync" /></label> }
+<div class="tabs liquid-glass" role="tablist" aria-label="Conversation type"><GlassLayer />@foreach (var value in new[] { "Chats", "Groups" }) { <button class="tab" role="tab" aria-selected="@((tab == value).ToString().ToLowerInvariant())" @onclick="() => tab = value">@value <span class="n">@(value == "Chats" ? State.Conversations.Sum(c => c.Unread) : State.Conversations.Count(c => c.Group))</span></button> }</div>
+</Header><ChildContent><div class="body inbox-panel" role="tabpanel" data-swipe-tabs @key="tab">
+@foreach (var chat in Filtered)
+{
+    <a class="row" href="@($"/chat/{chat.Id}")"><Avatar Initials="@chat.Initials" Color="@chat.Color" Size="a48" /><span class="mid"><span class="t1">@chat.Name @if (chat.Group) { <span class="tag">@chat.Members</span> }</span><span class="t2 @(chat.Unread > 0 ? "unread" : "")">@chat.Preview</span></span><span class="end"><span class="time">@chat.LastMessageAt?.ToLocalTime().ToString("HH:mm")</span>@if (chat.Unread > 0) { <span class="badge">@chat.Unread</span> }</span></a>
+}
+@if (!Filtered.Any()) { <p class="empty">No conversations yet. Start one with your people.</p> }
+@if (search.Length >= 2)
+{
+    <div class="sectionhead">@(State.Online ? "Messages" : "Saved messages on this device")</div>
+    @foreach (var hit in hits) { <a class="row" href="@($"/chat/{hit.ThreadId}?message={hit.MessageId}")"><Icon Name="search" /><span class="mid"><span class="t1">@State.Conversations.FirstOrDefault(x => x.Id == hit.ThreadId)?.Name</span><span class="t2">@hit.Text</span></span></a> }
+}
+@if (State.Conversations.Count < State.ConversationTotal) { <button class="btn ghost" disabled="@(!State.Online || State.Busy)" @onclick="State.LoadMoreConversationsAsync">Load more conversations</button> }
+</div></ChildContent><Footer><nav class="bottomnav liquid-glass"><GlassLayer /><button class="@(tab == "Chats" ? "on" : "")" @onclick='() => tab = "Chats"'><Icon Name="chat" />Chats</button><button class="@(tab == "Groups" ? "on" : "")" @onclick='() => tab = "Groups"'><Icon Name="users" />Groups</button><a href="/settings"><Icon Name="user" />Settings</a></nav></Footer></ScrollSurface>
+<button class="fab liquid-glass" aria-label="New conversation" disabled="@(!State.Online || State.NeedsLogin)" @onclick="() => choosing = true"><GlassLayer /><Icon Name="edit" /></button>
+}
+@if (choosing)
+{
+<BottomSheet Title="New conversation" OnClose="() => choosing = false"><div class="picker"><label class="field"><span class="lab">Find people</span><span class="inp"><input aria-label="Find people" placeholder="Name or username" @bind="peopleSearch" @bind:event="oninput" @bind:after="SearchAsync" /></span></label>
+@foreach (var person in people) { <label class="row"><input type="checkbox" checked="@members.Contains(person.Id)" @onchange="() => Toggle(person.Id)" /><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" Size="a34" /><span>@person.Name <small class="muted">@person.UserName</small></span></label> }
+<label class="check"><input type="checkbox" @bind="group" />Create a group</label>
+@if (group || members.Count > 1) { <label class="field"><span class="lab">Group name</span><span class="inp"><input @bind="groupName" maxlength="100" /></span></label> }
+<button class="btn" disabled="@(members.Count == 0 || creating)" @onclick="CreateAsync">Start conversation</button></div></BottomSheet>
+}
+@code {
+    private string tab = "Chats", search = "", peopleSearch = "", groupName = "";
+    private bool searchVisible, choosing, group, creating;
+    private List<Person> people = [];
+    private List<SearchHit> hits = [];
+    private readonly HashSet<Guid> members = [];
+    private readonly Dictionary<Guid, string> names = [];
+    private IEnumerable<Conversation> Filtered => State.Conversations.Where(c => (tab != "Groups" || c.Group) && c.Name.Contains(search, StringComparison.OrdinalIgnoreCase)).OrderByDescending(c => c.LastMessageAt);
+    protected override void OnInitialized() => State.Changed += Changed;
+    private void Changed() => _ = InvokeAsync(StateHasChanged);
+    private async Task SearchAsync()
+    { var query = peopleSearch; try { var result = await State.SearchPeopleAsync(query); if (query == peopleSearch) people = result.Where(x => x.Id != State.User?.CredentialId).ToList(); } catch (Exception ex) { State.Report(ex); } }
+    private async Task SearchMessagesAsync()
+    { var query = search; try { var result = await State.SearchAsync(query); if (query == search) hits = result; } catch (Exception ex) { State.Report(ex); } }
+    private void Toggle(Guid id) { if (!members.Remove(id)) members.Add(id); foreach (var person in people) names[person.Id] = person.Name; }
+    private async Task CreateAsync()
+    {
+        creating = true;
+        try { var id = await State.CreateAsync(group || members.Count > 1 ? groupName : names[members.Single()], members.ToList(), group); Nav.NavigateTo($"/chat/{id}"); }
+        catch (Exception ex) { State.Report(ex); }
+        finally { creating = false; }
+    }
+    public void Dispose() => State.Changed -= Changed;
+}

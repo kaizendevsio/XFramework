@@ -1,0 +1,26 @@
+@page "/settings"
+@inject ChatState State
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+<PageTitle>Settings · Yap</PageTitle>
+<ScrollSurface><Header><div class="appbar liquid-glass"><GlassLayer /><a class="iconbtn" href="/" aria-label="Back to chats"><Icon Name="back" /></a><h1>Settings</h1></div></Header><ChildContent><div class="body settings">
+<Avatar Initials="@ChatMessage.InitialsFor(State.User?.Name)" Size="a92" /><h1>@(State.User?.Name ?? "Yap")</h1>
+<button class="btn ghost" @onclick="ThemeAsync">Switch light / dark appearance</button>
+<GlassControls />
+<h2>A few handy gestures</h2><p class="muted">Swipe a message right to reply. Press and hold to open its actions. Swipe across your inbox to switch tabs. Pull a sheet’s handle down to close it.</p>
+<h2>On this device</h2><p class="muted">Loaded conversations, replies, drafts and opened attachments are available offline. Messages and uploads you send offline are saved here and sync when you reconnect.</p>
+<p>@State.PendingCount messages waiting to sync.</p><button class="btn ghost" @onclick="State.RetryAsync">Sync now</button>
+<button class="btn ghost" @onclick="PersistAsync">Keep offline data on this device</button>
+@if (storageNotice is not null) { <p role="status">@storageNotice</p> }
+<h2>Install Yap</h2><p class="muted">On iPhone, use Safari’s Share menu, then Add to Home Screen. On Android, use your browser’s Install app option.</p><button class="btn ghost" @onclick="InstallAsync">Install app</button>
+@if (State.User is not null) { <button class="btn" @onclick="() => signOut = true">Sign out</button> }
+</div></ChildContent></ScrollSurface>
+@if (signOut) { <BottomSheet Title="Sign out" OnClose="() => signOut = false"><div class="picker"><p>Sign out and remove this account’s offline data from this device? @if (State.PendingCount > 0) { <strong>@State.PendingCount queued messages and uploads will be discarded.</strong> }</p><button class="btn" @onclick="LogoutAsync">Sign out and clear device data</button></div></BottomSheet> }
+@code {
+    private bool signOut;
+    private string? storageNotice;
+    private async Task ThemeAsync() { var theme = await JS.InvokeAsync<string>("yap.getTheme"); await JS.InvokeVoidAsync("yap.setTheme", theme == "dark" ? "light" : "dark"); }
+    private async Task PersistAsync() { storageNotice = await JS.InvokeAsync<bool>("yap.device.persist") ? "The browser has granted persistent storage." : "Your browser manages storage automatically. Keep enough free space for offline data."; }
+    private Task InstallAsync() => JS.InvokeVoidAsync("yap.device.install").AsTask();
+    private async Task LogoutAsync() { await State.LogoutAsync(); Nav.NavigateTo("/login"); }
+}

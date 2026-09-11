@@ -29,7 +29,9 @@ jobs:
           global-json-file: global.json
 
       - name: Restore
-        run: dotnet restore XFramework.slnx
+        run: |
+          dotnet workload install wasm-tools
+          dotnet restore XFramework.slnx
 
       - name: Run Inventario extended integration tests
         run: >

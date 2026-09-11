@@ -9,8 +9,9 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="BlazorBlueprint.Components" />
-    <PackageReference Include="BlazorBlueprint.Icons.Lucide" />
+    <ProjectReference Include="../XFramework.Yap.Contracts/XFramework.Yap.Contracts.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
+    <ProjectReference Include="../XFramework.Yap.Client/XFramework.Yap.Client.csproj" />
     <ProjectReference Include="../../Modules/XFramework.Communications/Communications.Integration/Communications.Integration.csproj" />
     <ProjectReference Include="../../Modules/XFramework.IdentityServer/IdentityServer.Integration/IdentityServer.Integration.csproj" />
     <ProjectReference Include="../../Modules/XFramework.Storage/Storage.Integration/Storage.Integration.csproj" />

@@ -39,10 +39,11 @@ public sealed class PwaEndpointTests
             await AssertIconAsync(client, icon.GetProperty("src").GetString()!, int.Parse(size.Split('x')[0]));
         }
         Assert.That(sizes, Is.EquivalentTo(new[] { "192x192", "512x512" }));
-        await AssertIconAsync(client, "/apple-touch-icon.png", 180);
+        await AssertIconAsync(client, "/yap-app-v2-apple.png", 180);
         var launch = await client.GetAsync(root.GetProperty("start_url").GetString());
-        Assert.That(launch.StatusCode, Is.EqualTo(HttpStatusCode.Redirect));
-        Assert.That(new Uri(client.BaseAddress, launch.Headers.Location!).AbsolutePath, Is.EqualTo("/login"));
+        Assert.That(launch.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(await launch.Content.ReadAsStringAsync(), Does.Contain("blazor.webassembly").And.Not.Contain("blazor.web.js"));
+        Assert.That((await client.GetAsync("/api/chat/conversations")).StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
         await app.StopAsync();
     }
 

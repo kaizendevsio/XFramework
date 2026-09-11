@@ -1,0 +1,32 @@
+<svg class="ic @Class" width="@Size" height="@Size" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="@Path" /></svg>
+@code {
+ [Parameter] public string Name { get; set; } = "chat";
+ [Parameter] public string? Class { get; set; }
+ [Parameter] public int Size { get; set; } = 22;
+ private string Path => Paths.GetValueOrDefault(Name, Paths["chat"]);
+ private static readonly Dictionary<string,string> Paths = new() {
+["chat"] = "M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-2 2V11.5a9.5 9.5 0 0 1 19 0ZM7 11h.01M12 11h.01M17 11h.01",
+["phone"] = "M7 3H4a1 1 0 0 0-1 1c0 9.4 7.6 17 17 17a1 1 0 0 0 1-1v-3l-5-2-2 2a13 13 0 0 1-7-7l2-2-2-5Z",
+["video"] = "M4 5h11v14H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2ZM15 9l7-4v14l-7-4",
+["back"] = "m14 6-6 6 6 6",
+["arrow"] = "M5 12h14m-6-6 6 6-6 6",
+["search"] = "M20 20l-5-5M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z",
+["plus"] = "M12 5v14M5 12h14",
+["edit"] = "m14 4 6 6M4 20l5-1L21 7a2 2 0 0 0-5-5L4 14v6Z",
+["user"] = "M20 21v-2a6 6 0 0 0-6-6h-4a6 6 0 0 0-6 6v2M16 6a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z",
+["users"] = "M16 21v-2a5 5 0 0 0-5-5H8a5 5 0 0 0-5 5v2M13 6a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM17 3a4 4 0 0 1 0 8M21 21v-3a5 5 0 0 0-3-4",
+["thread"] = "M6 3v11a4 4 0 0 0 4 4h10M3 3h6v6H3ZM15 15l4 3-4 3",
+["send"] = "m12 4 8 15-8-4-8 4 8-15Zm0 0v11",
+["reply"] = "m8 5-5 5 5 5M3 10h10a7 7 0 0 1 7 7v3",
+["close"] = "m6 6 12 12M18 6 6 18",
+["mic"] = "M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0V5ZM5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8",
+["volume"] = "m11 4-6 5H2v6h3l6 5V4Zm4 4a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14",
+["lock"] = "M6 10h12v11H6ZM8 10V6a4 4 0 0 1 8 0v4",
+["wifi"] = "M2 8a16 16 0 0 1 20 0M5 12a11 11 0 0 1 14 0M9 16a5 5 0 0 1 6 0M12 20h.01",
+["signal"] = "M4 18v-3m5 3v-6m5 6V9m5 9V5",
+["battery"] = "M2 7h17v10H2ZM22 10v4M5 10h11v4H5Z",
+["more"] = "M5 12h.01M12 12h.01M19 12h.01",
+["file"] = "M14 2H4v20h16V8l-6-6Zm0 0v6h6M8 13h8M8 17h5",
+["pause"] = "M8 5v14M16 5v14",
+};
+}

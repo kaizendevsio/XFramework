@@ -39,7 +39,9 @@ jobs:
           fi
 
       - name: Build
-        run: dotnet build XFramework.slnx -c Release -p:XFrameworkVersion=${{ steps.version.outputs.xframework_version }} -p:BoltVersion=${{ steps.version.outputs.bolt_version }}
+        run: |
+          dotnet workload install wasm-tools
+          dotnet build XFramework.slnx -c Release -p:XFrameworkVersion=${{ steps.version.outputs.xframework_version }} -p:BoltVersion=${{ steps.version.outputs.bolt_version }}
 
       - name: Test (unit tests only)
         run: |

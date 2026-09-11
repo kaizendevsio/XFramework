@@ -28,6 +28,7 @@ public sealed partial class ThreadService(
     ICommunicationsModerationService moderationService,
     ICommunicationsTransientRealtimePublisher transientRealtimePublisher,
     IMessageReactionSummaryReader reactionSummaryReader,
+    IMessageReplySummaryReader replySummaryReader,
     ILogger<ThreadService> logger
 ) : IThreadService
 {
@@ -1287,6 +1288,9 @@ public sealed partial class ThreadService(
 
     public async Task<Result<CreateThreadMessageResponse>> CreateThreadMessageAsync(CreateThreadMessageRequest request, CancellationToken ct = default)
     {
+        if (request.ClientMessageId == Guid.Empty ||
+            (request.ClientMessageId.HasValue && HasTemplate(request.TemplateId, request.TemplateKey)))
+            return Result<CreateThreadMessageResponse>.Failure("Client outbox messages require a nonempty ID and final text", 400);
         try
         {
             var callerResult = await ResolveCallerAsync(request.Metadata, ct);
@@ -1326,6 +1330,25 @@ public sealed partial class ThreadService(
             if (senderMember is null)
             {
                 return Result<CreateThreadMessageResponse>.Failure("Sender is not a member of this thread", 403);
+            }
+
+            if (request.ClientMessageId is { } clientMessageId)
+            {
+                // The primary key makes concurrent delivery attempts atomic without a separate ledger.
+                // Authorize membership first, and never disclose another actor's ID or message content.
+                var previous = await dataContext.Query<Message>()
+                    .NoCache()
+                    .Where(m => m.Id == clientMessageId && m.TenantId == caller.TenantId)
+                    .FirstOrDefaultAsync(ct);
+                if (previous is not null)
+                {
+                    var mentions = JsonSerializer.Deserialize<List<Guid>>(previous.MentionedCredentialIdsJson ?? "[]") ?? [];
+                    if (previous.MessageThreadId != request.ThreadId || previous.MessageThreadMemberId != senderMember.Id ||
+                        previous.Text != request.Text?.Trim() || previous.ParentMessageId != request.ParentMessageId ||
+                        !mentions.ToHashSet().SetEquals(request.MentionedCredentialIds.Where(id => id != Guid.Empty)))
+                        return Result<CreateThreadMessageResponse>.Failure("This client message ID has already been used", 409);
+                    return Result<CreateThreadMessageResponse>.Success(new CreateThreadMessageResponse { MessageId = clientMessageId });
+                }
             }
 
             var activeThreadMembers = await dataContext.Query<MessageThreadMember>()
@@ -1401,7 +1424,7 @@ public sealed partial class ThreadService(
 
             var message = new Message
             {
-                Id = Guid.NewGuid(),
+                Id = request.ClientMessageId ?? Guid.NewGuid(),
                 TenantId = thread.TenantId,
                 MessageThreadId = request.ThreadId,
                 MessageThreadMemberId = senderMember.Id,
@@ -1621,6 +1644,9 @@ public sealed partial class ThreadService(
             var savedSet = saved.Select(s => s.MessageId).ToHashSet();
             var reactionSummaries = await reactionSummaryReader.ReadAsync(caller.TenantId, caller.CredentialId, messageIds, ct);
 
+            var replyCounts = await replySummaryReader.ReadAsync(caller.TenantId, request.ThreadId,
+                messageIds, blockedSenderMemberIds, hiddenMessageIds, ct);
+
             var items = messages.Select(m =>
             {
                 memberMap.TryGetValue(m.MessageThreadMemberId, out var sender);
@@ -1635,7 +1661,8 @@ public sealed partial class ThreadService(
                     MentionedCredentialIds = DeserializeMentionedCredentialIds(m.MentionedCredentialIdsJson),
                     IsPinned = pinnedSet.Contains(m.Id),
                     IsSaved = savedSet.Contains(m.Id),
-                    Reactions = reactionSummaries.GetValueOrDefault(m.Id) ?? []
+                    Reactions = reactionSummaries.GetValueOrDefault(m.Id) ?? [],
+                    ReplyCount = replyCounts.GetValueOrDefault(m.Id)
                 };
             }).ToList();
 

@@ -69,6 +69,8 @@ Communications is not the owner of external delivery infrastructure. Email, SMS,
 - Keep Notifications as the source of truth for external delivery jobs, provider attempts, retries, and status.
 - Keep admin UI privacy-safe by showing metadata and short previews unless moderation context explicitly requires more.
 - Keep routes and wrapper contracts backward-compatible unless a migration/breaking-change plan exists.
+- Chat sends may include `ClientMessageId` for offline retry identity. Validate membership before deduplication; return the existing receipt only for the same actor, thread, text, parent, and mentions. Do not publish another outbox event on a matching retry. Client IDs cannot be combined with rendered templates.
+- Message pages include visible reply counts. `MessageReplySummaryReader` aggregates in PostgreSQL for at most 100 authorized parent IDs, excluding deleted, disabled, hidden, blocked, and foreign-tenant replies.
 - Update this `AGENTS.md` when Communications feature behavior, integration boundaries, realtime contracts, delivery delegation, settings/templates, or testing requirements change.
 
 ## Do Not

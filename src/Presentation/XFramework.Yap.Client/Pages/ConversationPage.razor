@@ -1,0 +1,113 @@
+@page "/chat/{Id:guid}"
+@page "/thread/{Id:guid}/{ParentId:guid}"
+@implements IDisposable
+@inject ChatState State
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+<PageTitle>@(ParentId.HasValue ? "Thread" : State.Selected?.Name ?? "Conversation") · Yap</PageTitle>
+@if (State.User is null) { <div class="body"><p>Sign in to open this conversation.</p><a class="btn" href="/login">Sign in</a></div> }
+else if (State.Selected is not { } chat || chat.Id != Id) { <div class="empty">Opening conversation…</div> }
+else
+{
+    <ScrollSurface><Header><div class="appbar liquid-glass"><GlassLayer /><a class="iconbtn" href="@(ParentId.HasValue ? $"/chat/{Id}" : "/")" aria-label="Go back"><Icon Name="back" /></a>
+        @if (!ParentId.HasValue) { <Avatar Initials="@chat.Initials" Color="@chat.Color" /> }
+        <div class="mid"><h1 style="font-size:16px">@(ParentId.HasValue ? "Thread" : chat.Name)</h1><span class="muted" style="font-size:12px">@(ParentId.HasValue ? $"{chat.Name} · {Parent?.ReplyTotal ?? 0} replies" : chat.Group ? $"{chat.Members} members" : "Direct conversation")</span></div>
+        <button class="iconbtn" aria-label="Search messages" @onclick='() => mode = "search"'><Icon Name="search" /></button>
+        <button class="iconbtn" aria-label="Conversation details" @onclick='() => mode = "details"'><Icon Name="users" /></button>
+    </div></Header>
+    <ChildContent>
+    @if (ParentId.HasValue)
+    {
+        <div class="body" data-messages>
+        @if (Parent is { } parent)
+        {
+            <div class="threadhead"><div class="parentmsg"><Avatar Initials="@parent.Initials" Color="@parent.Color" Size="a34" /><div class="mid"><div class="nm">@parent.Sender <span class="meta">@parent.Time</span></div><div class="tx">@parent.Text</div></div></div><div class="replycount">@parent.ReplyTotal replies</div></div>
+            @foreach (var message in parent.Replies)
+            {
+                <article class="treply" @key="message.Id"><Avatar Initials="@message.Initials" Color="@message.Color" Size="a34" /><div class="mid"><div class="nm"><b>@message.Sender</b><i>@message.Time</i></div><button class="tx liquid-glass @(message.Mine ? "own-bubble" : "")" @onclick="() => Select(message)"><GlassLayer /><span class="bubble-content">@message.Text</span></button>
+                @if (message.Reactions.Count > 0) { <div class="reacts">@foreach (var reaction in message.Reactions) { <button class="react" aria-label="@($"React {reaction.Key}")" @onclick='() => State.ActionAsync(message, "react", emoji: reaction.Key)'>@reaction.Key @reaction.Value</button> }</div> }
+                @if (message.Delivery != "Sent") { <div class="meta">@message.Delivery</div> }</div></article>
+            }
+            @if (parent.Replies.Count < parent.ReplyTotal) { <button class="btn ghost" @onclick="() => State.LoadRepliesAsync(parent)">Load more replies</button> }
+            @if (parent.Replies.Count == 0) { <p class="empty">Start the side conversation.</p> }
+        }
+        else { <p class="empty">This message is not saved on this device.</p> }
+        </div>
+    }
+    else
+    {
+        <div class="body messages" data-messages>
+        @if (chat.Messages.Count < chat.MessageTotal) { <button class="btn ghost" disabled="@(!State.Online || State.Busy)" @onclick="State.LoadEarlierAsync">Load earlier messages</button> }
+        @foreach (var message in chat.Messages) { <MessageBubble @key="message.Id" Message="message" ShowSender="chat.Group" OnSelect="Select" OnReply="ReplyTo" OnThread="OpenThreadAsync" OnReact='emoji => State.ActionAsync(message, "react", emoji: emoji)' /> }
+        @if (chat.Messages.Count == 0) { <p class="empty">Say hello. This is the beginning of your conversation.</p> }
+        </div>
+    }
+    </ChildContent><Footer><Composer @key="@(ParentId ?? Id)" ThreadId="Id" ParentId="ParentId" Reply="reply" Cancel="() => reply = null" Sent="ScrollAsync" /></Footer></ScrollSurface>
+}
+@if (mode is not null)
+{
+<BottomSheet Title="@(mode == "details" ? "Conversation" : mode == "files" ? "Attachments" : mode == "edit" ? "Edit message" : "Message actions")" ShowHeader='@(mode != "message")' OnClose="() => mode = null">
+@if (mode == "message" && selected is not null)
+{
+    <div class="emojirow">@foreach (var reaction in State.Defaults?.Reactions ?? []) { <button aria-label="@($"React {reaction.Emoji}")" disabled="@(!State.Online || State.NeedsLogin)" @onclick="() => ReactAsync(reaction.Emoji)">@reaction.Emoji</button> }</div>
+    <button class="sheetitem" @onclick="() => ReplyTo(selected)"><Icon Name="reply" Size="20" />Reply</button>
+    <button class="sheetitem" @onclick="() => OpenThreadAsync(selected)"><Icon Name="thread" Size="20" />Reply in thread</button>
+    <button class="sheetitem" @onclick='() => mode = "forward"'><Icon Name="arrow" Size="20" />Forward text</button>
+    <button class="sheetitem" @onclick="CopyAsync"><Icon Name="file" Size="20" />Copy text</button>
+    <button class="sheetitem" @onclick="FilesAsync"><Icon Name="file" Size="20" />Attachments</button>
+    <button class="sheetitem" @onclick='() => ActionAsync(selected.Pinned ? "unpin" : "pin")'><Icon Name="plus" Size="20" />@(selected.Pinned ? "Unpin message" : "Pin message")</button>
+    <button class="sheetitem" @onclick='() => ActionAsync(selected.Saved ? "unsave" : "save")'><Icon Name="file" Size="20" />@(selected.Saved ? "Unsave message" : "Save message")</button>
+    @if (selected.Mine) { <div class="sheetsep"></div><button class="sheetitem" @onclick='() => { edit = selected.Text; mode = "edit"; }'><Icon Name="edit" Size="20" />Edit message</button><button class="sheetitem danger" @onclick='() => mode = "delete"'><Icon Name="close" Size="20" />Delete message</button> }
+}
+else if (mode == "files" && selected is not null)
+{ <div class="picker">@foreach (var file in selected.Attachments) { <button class="row" @onclick="() => State.OpenFileAsync(selected, file)"><Icon Name="file" /><span>@file.Name <small>@(file.Size / 1024) KB</small></span></button> }<p class="muted">Opened files are saved on this device for offline use.</p></div> }
+else if (mode == "edit")
+{ <div class="picker"><textarea aria-label="Edit message" @bind="edit" maxlength="4000"></textarea><button class="btn" @onclick='() => ActionAsync("edit", edit)'>Save changes</button></div> }
+else if (mode == "delete")
+{ <div class="picker"><p>Delete this message for everyone?</p><button class="btn" @onclick='() => ActionAsync("delete")'>Delete message</button></div> }
+else if (mode == "details" && State.Selected is { } details)
+{ <div class="picker"><h2>@details.Name</h2>@foreach (var person in details.People) { <div class="row"><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" Size="a34" />@person.Name</div> }<button class="btn ghost" disabled="@(!State.Online || State.NeedsLogin)" @onclick="State.MuteAsync">@(details.Muted ? "Unmute conversation" : "Mute conversation")</button></div> }
+else if (mode == "forward")
+{ <div class="picker">@foreach (var target in State.Conversations) { <button class="row" @onclick="() => ForwardAsync(target.Id)"><Avatar Initials="@target.Initials" Size="a34" />@target.Name</button> }</div> }
+else if (mode == "search")
+{ <div class="picker"><label class="field"><span class="lab">Search messages</span><span class="inp"><input @bind="query" @bind:event="oninput" @bind:after="SearchAsync" /></span></label>@foreach (var hit in hits) { <button class="row" @onclick="() => ShowHitAsync(hit.MessageId)">@hit.Text</button> }</div> }
+</BottomSheet>
+}
+@code {
+    [Parameter] public Guid Id { get; set; }
+    [Parameter] public Guid? ParentId { get; set; }
+    [SupplyParameterFromQuery(Name = "message")] public Guid? FocusMessage { get; set; }
+    private ChatMessage? Parent => State.Selected?.Messages.FirstOrDefault(x => x.Id == ParentId);
+    private ChatMessage? reply, selected;
+    private string? mode;
+    private string edit = "";
+    private Guid loaded;
+    private bool scroll;
+    private Guid? focus;
+    private string query = "";
+    private List<SearchHit> hits = [];
+    protected override void OnInitialized() => State.Changed += Changed;
+    protected override async Task OnParametersSetAsync()
+    {
+        if (State.User is not null && loaded != Id) { loaded = Id; await State.SelectAsync(Id); scroll = true; }
+        if (FocusMessage.HasValue) { await State.LocateAsync(FocusMessage.Value); focus = FocusMessage; scroll = false; }
+    }
+    private void Changed() => _ = InvokeAsync(StateHasChanged);
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (scroll) { scroll = false; await JS.InvokeVoidAsync("yap.scrollMessages"); }
+        if (focus.HasValue) { var id = focus; focus = null; await JS.InvokeVoidAsync("yap.showMessage", id); }
+    }
+    private Task ScrollAsync() { scroll = true; return Task.CompletedTask; }
+    private void Select(ChatMessage message) { selected = message; mode = "message"; }
+    private void ReplyTo(ChatMessage message) { reply = message; mode = null; }
+    private async Task OpenThreadAsync(ChatMessage message) { mode = null; await State.LoadRepliesAsync(message); Nav.NavigateTo($"/thread/{Id}/{message.Id}"); scroll = true; }
+    private async Task CopyAsync() { try { await JS.InvokeVoidAsync("yap.copy", selected!.Text); mode = null; } catch (Exception ex) { State.Report(ex); } }
+    private async Task FilesAsync() { await State.OpenAttachmentsAsync(selected!); mode = "files"; }
+    private async Task ReactAsync(string emoji) { await State.ActionAsync(selected!, "react", emoji: emoji); mode = null; }
+    private async Task ActionAsync(string action, string? text = null) { await State.ActionAsync(selected!, action, text); mode = null; }
+    private async Task ForwardAsync(Guid target) { try { await State.SendAsync(target, selected!.Text, null, $"forward:{Guid.NewGuid()}"); mode = null; Nav.NavigateTo($"/chat/{target}"); } catch (Exception ex) { State.Report(ex); } }
+    private async Task SearchAsync() { var text = query; try { var result = await State.SearchAsync(text, Id); if (text == query) hits = result; } catch (Exception ex) { State.Report(ex); } }
+    private async Task ShowHitAsync(Guid id) { await State.LocateAsync(id); mode = null; focus = id; }
+    public void Dispose() => State.Changed -= Changed;
+}

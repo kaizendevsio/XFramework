@@ -23,6 +23,7 @@ builder.Services.AddScoped<ICommunicationsService, CommunicationsService>();
 builder.Services.AddScoped<IThreadService, ThreadService>();
 builder.Services.AddScoped<ChatReferenceDataService>();
 builder.Services.AddScoped<IMessageReactionSummaryReader, MessageReactionSummaryReader>();
+builder.Services.AddScoped<IMessageReplySummaryReader, MessageReplySummaryReader>();
 builder.Services.AddScoped<ICommunicationsRequestContextResolver, CommunicationsRequestContextResolver>();
 builder.Services.AddScoped<ICommunicationsRealtimePublisher, CommunicationsRealtimePublisher>();
 builder.Services.AddScoped<ICommunicationsTransientRealtimePublisher, CommunicationsTransientRealtimePublisher>();

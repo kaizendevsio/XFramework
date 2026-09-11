@@ -10,6 +10,11 @@ public sealed class CreateThreadMessageValidator : AbstractValidator<CreateThrea
         RuleFor(x => x.ThreadId)
             .NotEmpty().WithMessage("Thread ID is required");
 
+        RuleFor(x => x.ClientMessageId).NotEqual(Guid.Empty).When(x => x.ClientMessageId.HasValue);
+        RuleFor(x => x).Must(x => x.TemplateId is null && string.IsNullOrWhiteSpace(x.TemplateKey))
+            .When(x => x.ClientMessageId.HasValue)
+            .WithMessage("Client outbox messages must provide their final text.");
+
         RuleFor(x => x.Text)
             .MaximumLength(5000).WithMessage("Message text cannot exceed 5000 characters")
             .When(x => !string.IsNullOrWhiteSpace(x.Text));

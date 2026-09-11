@@ -1,6 +1,6 @@
 # Yap
 
-A standalone .NET 10 Blazor Interactive Server chat app using XFramework's existing Communications chat client, IdentityServer wrapper, Storage wrapper, and Bolt transport. The supplied Yap design is adapted to fill the browser window on desktop and mobile; device frames and preview controls are removed.
+A standalone .NET 10 Blazor WebAssembly PWA using XFramework's existing Communications chat client, IdentityServer wrapper, Storage wrapper, and Bolt transport. The supplied Yap design is adapted to fill the browser window on desktop and mobile; device frames and preview controls are removed.
 
 ## Included
 
@@ -10,8 +10,9 @@ A standalone .NET 10 Blazor Interactive Server chat app using XFramework's exist
 - Message search across conversations or within the current conversation, with paged results that open the matching message.
 - Tenant-provisioned reaction choices, grouped reaction badges, and add/remove toggles with current-user ownership.
 - File uploads up to 20 MB, attachment linking, and short-lived download links through the message actions menu. Backend attachment policies may impose stricter limits.
-- Durable user events, typing updates, periodic history reconciliation, and read acknowledgement after the active conversation renders.
-- Responsive inbox/conversation layout and persistent light/dark preference.
+- Durable user event refresh hints, periodic history reconciliation, and read acknowledgement for the active conversation.
+- The original prototype's liquid glass, theme and glass settings, animated navigation, message actions, swipe-to-reply, and full-page reply threads, filling the actual browser viewport without a device frame.
+- Offline conversation history, reply history, drafts, queued messages/uploads, and opened attachments in a browser-local SQLite/OPFS store.
 
 The sign-in page links to account registration. New accounts receive the configured workspace's regular member role and can then sign in. Voice/video calls remain outside this build. There are no simulated conversations or automatic replies in the production app.
 
@@ -19,7 +20,7 @@ The sign-in page links to account registration. New accounts receive the configu
 
 The xeon-dev deployment hosts Yap at `https://xeon-dev.tailed40e.ts.net:5188` for tailnet users. The normal workflow builds its image, checks Bolt readiness, and configures its own Tailscale Serve listener. Backend HTTP binds only to `127.0.0.1:5188`; other Serve routes are preserved. The protected deployment environment supplies the dedicated service credentials plus `YAP_TENANT_ID` and `YAP_ROLE_ID`. The dev provisioning script initializes missing workspace values to the provisioned Yap test workspace and preserves explicit overrides. Data Protection keys persist in the `yap-keydata` volume; login sessions remain in memory, so deployments require signing in again.
 
-Use an existing XFramework environment with IdentityServer, Communications, Storage, and Bolt Hub running. This app needs no database connection or new database. Modules retain their existing single-database, schema-per-module ownership.
+Use an existing XFramework environment with IdentityServer, Communications, Storage, and Bolt Hub running. The host needs no database connection or new module database; the browser owns a private local SQLite cache. Modules retain their existing single-database, schema-per-module ownership.
 
 1. Register a dedicated service client named `XFramework.Yap` in the environment's `ServiceIdentity:Clients` configuration using its normal credential provisioning process. Give it a new generation ID and secret; do not reuse another application's credentials.
 2. Allow the audiences `XFramework.Bolt.Hub`, `XFramework.IdentityServer`, `XFramework.Communications`, and `XFramework.Storage`, and the explicit scopes from this app's `ServiceIdentity:DefaultScopes`: `bolt.service`, `communications.chat`, `identity.session.validate`, `datacontext.query`, `storage.read`, `storage.write`, `identity.register`, `tenant.target`. The Hub must admit this registered service identity.
@@ -46,7 +47,7 @@ The development launch profile opens at `http://localhost:5188`. HTTPS/WSS servi
 
 ## Architecture and operational limits
 
-The browser talks to this Blazor host. The host uses `ICommunicationsChatClient` for chat operations and subscriptions, `IIdentityServerServiceWrapper` for authentication, and `IStorageServiceWrapper` for files. `ChatDirectory` only reads authorized credential data through `RemoteDataContext`. No business mutation uses generic data-context writes.
+The browser runs the complete UI in WebAssembly and calls the same-origin `/api` host. There is no Blazor Server circuit. The host uses `ICommunicationsChatClient` for chat operations and subscriptions, `IIdentityServerServiceWrapper` for authentication, and `IStorageServiceWrapper` for files. `ChatDirectory` only reads authorized credential data through `RemoteDataContext`. No business mutation uses generic data-context writes.
 
 The authentication cookie contains an opaque session key and display claims. Access and refresh tokens stay in server memory. Session refresh is serialized per login; sign-out revokes the local session before attempting upstream logout. Login, registration, and logout require antiforgery tokens. Registration saves the identity, BCrypt credential, and configured role in one database transaction, enforces username uniqueness and the existing password byte limit, and applies a distributed limit of ten registrations per application per minute. Registration creates no authentication session; users sign in after confirmation. HTML renders message text as text, and attachment links require successful Communications membership validation first.
 
@@ -56,18 +57,30 @@ On narrow screens or coarse-pointer devices, editable controls use 16px text to 
 
 Yap provides a web app manifest with a stable identity, standalone display, Android icons, and an Apple touch icon. Serve it over HTTPS (localhost is allowed for development). On iPhone/iPad, open Safari's Share menu and choose **Add to Home Screen**, leaving **Open as Web App** enabled if shown. On Android Chrome, choose **Install app** / **Add to Home screen** from the browser menu. Installation help is also available on sign-in, registration, and Settings; it is hidden when running standalone.
 
-Yap remains an online Blazor Interactive Server application. Installation does not add offline messaging or background push notifications. No service worker or offline cache is registered: chat, attachments, authentication responses, and server-rendered account pages are not copied into a PWA cache. A service worker is not required for current browser installation support. The existing deployment still requires tailnet access.
+## Offline storage and synchronization
 
-This first host is intended for one instance. Sessions expire after eight hours and server restarts require sign-in again. Horizontal deployment needs shared session storage and appropriate Blazor connection affinity. Message send RPCs are not automatically retried because a timeout may occur after commit. The composer preserves an uncertain draft and asks the user to refresh before retrying. Attachment retries check an already-committed link. A completed upload abandoned before linking can remain in Storage and should follow the environment's file retention policy.
+`XFramework.Yap.Client` owns EF Core entities for cached conversations/messages, drafts, and a transactional outbox. `SqliteWasmBlazor` 0.9.3-pre supplies the native SQLite WASM bridge and OPFS persistence. This is a community prerelease provider, not Microsoft's standard browser SQLite provider. The published build has been tested for transaction rollback, persistence after reload, offline startup, and recovery after a lost send response. Use a current browser with OPFS support (Safari 16.4+); this provider currently allows one active Yap database tab per origin. A second tab displays a recoverable storage message. Private browsing, device storage pressure, and clearing site data can remove local data. Settings can request persistent storage; the browser decides whether to grant it.
+
+The service worker caches versioned application assets and the public SPA shell. It never caches API or authentication responses. Private chat data is stored separately, scoped by tenant and credential. Access tokens, refresh tokens, and service credentials stay on the server. Sign-out clears the local cache, drafts, queued sends, and files; an offline sign-out records a durable logout intent before clearing private state and revokes the cookie session after reconnecting. Switching cookie identity cannot send the previous account's outbox.
+
+An outgoing message is saved in a SQLite transaction before the composer clears. A stable `ClientMessageId` lets Communications recognize a matching retry after a timeout without creating a second message or outbox event; authorization and membership are checked before returning that receipt. Permanent API failures pause that queued item for review/retry. Upload bytes live in OPFS; SQLite stores the message, upload receipt, and link progress. A completed upload receipt survives reload so reconnect can finish attachment linking. An upload that completes on the server but loses its response can leave an unlinked Storage object; retention policies still apply. Opened attachments are cached for offline download. Files are downloaded rather than executed inside the app's origin.
+
+Synchronization runs while Yap is open, when connectivity returns, and after authenticated refresh hints. Closing/suspending the app does not guarantee background delivery. Offline use covers data already loaded on that device; registration, new conversations, reactions, edits, deletions, and previously unopened files require a connection. Replies use the existing Communications parent-message relationship, so they also remain visible in conversation history. No calls or background push are included.
+
+Application updates prompt before activating a new service worker and wait for pending local database writes. This is the first local schema; future schema changes must use explicit non-destructive migrations rather than deleting the database. Sessions remain server-memory backed, expire after eight hours, and require sign-in after a host restart. Multiple host instances would need shared session storage.
+
+The same-origin SSE endpoint sends only a refresh hint. Actual chat data is reread through authorized SDK operations; the Communications Bolt/MemoryPack topic contracts remain unchanged. The BFF checks an account scope header (or the account query on EventSource), validates antiforgery on writes, and serves attachment bytes through the authorized chat download workflow.
 
 ## Verify
 
 ```powershell
-dotnet build src/Presentation/XFramework.Yap/XFramework.Yap.csproj -m:1 /nr:false
+dotnet workload install wasm-tools
+dotnet publish src/Presentation/XFramework.Yap/XFramework.Yap.csproj -c Release -m:1 /nr:false
 dotnet test src/Tests/Yap.Tests/Yap.Tests.csproj -m:1 /nr:false
+dotnet test src/Tests/Yap.Client.Tests/Yap.Client.Tests.csproj -m:1 /nr:false
 ```
 
-The tests cover authentication/antiforgery through the actual HTTP host, token isolation and refresh, chat event/cancellation behavior, uncertain sends, message order/read acknowledgements, search scope and older-history navigation, reply-thread refresh, group typing and rapid restart, reaction ownership, and attachment part hashes, negotiated chunks, verification status, failed-upload cleanup, and authorized download-link IDs.
+The client tests cover real SQLite transactions, cache reconciliation, outbox retry identity, and account isolation. Host tests cover the browser API account/antiforgery boundary plus authentication through the actual HTTP host, token isolation and refresh, chat event/cancellation behavior, uncertain sends, message order/read acknowledgements, search scope and older-history navigation, reply-thread refresh, group typing and rapid restart, reaction ownership, and attachment part hashes, negotiated chunks, verification status, failed-upload cleanup, and authorized download-link IDs.
 
 For UI review without a live backend, the **test project only** provides an isolated in-memory fixture:
 

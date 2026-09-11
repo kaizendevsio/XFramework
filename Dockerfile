@@ -4,6 +4,11 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:493fca072aac81307027cbb7b7c9a82b6e
 ARG PROJECT_PATH
 WORKDIR /src
 
+# Yap links native SQLite into WASM; keep its toolchain cached across source edits.
+RUN case "${PROJECT_PATH}" in *XFramework.Yap*) \
+    apt-get update && apt-get install -y --no-install-recommends python3 python-is-python3 \
+    && rm -rf /var/lib/apt/lists/* && dotnet workload install wasm-tools ;; esac
+
 # Copy solution and Directory.* files first for layer caching
 COPY Directory.Packages.props Directory.Build.props* Version.props ./
 COPY XFramework.slnx ./

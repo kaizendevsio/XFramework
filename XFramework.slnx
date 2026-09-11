@@ -188,6 +188,8 @@
     <Project Path="src/Presentation/Gateway/Gateway.csproj" />
   </Folder>
   <Folder Name="/Presentation/">
+    <Project Path="src/Presentation/XFramework.Yap.Client/XFramework.Yap.Client.csproj" />
+    <Project Path="src/Presentation/XFramework.Yap.Contracts/XFramework.Yap.Contracts.csproj" />
     <Project Path="src/Presentation/XFramework.Yap/XFramework.Yap.csproj" />
   </Folder>
   <Folder Name="/Presentation/Tests/">
@@ -211,6 +213,9 @@
   <Folder Name="/src/SourceGenerators/" />
   <Folder Name="/src/Tests/">
     <Project Path="src/Tests/Audit.IntegrationTests/Audit.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="src/Tests/Yap.Client.Tests/Yap.Client.Tests.csproj" />
   </Folder>
 
   <Folder Name="/Tooling/" />
