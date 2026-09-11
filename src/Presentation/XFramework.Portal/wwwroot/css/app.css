@@ -2138,12 +2138,11 @@
 .inventario-shell [role="grid"] [role="columnheader"]:last-child,
 .inventario-shell [role="grid"] [role="gridcell"]:last-child { position: sticky; right: 0; background: var(--background); }
 .inventario-shell .inv-page { min-width: 0; }
-.inventario-shell .inv-page [data-slot="card-content"] { overflow-x: auto; }
-.inventario-shell .inv-page [data-slot="card-content"]:has([role="grid"])::after { content: "Scroll table horizontally for more columns"; display: block; font-size: .75rem; color: var(--muted-foreground); padding-top: .4rem; }
+.inventario-shell .inv-page div:has(> [role="grid"])::after { content: "Scroll table horizontally for more columns"; display: block; position: sticky; left: 0; font-size: .75rem; color: var(--muted-foreground); padding-top: .4rem; }
 .inventario-navigation-sheet { width: min(90vw, 22rem); overflow-y: auto; }
 .inv-dialog { max-height: calc(100dvh - 2rem); display: flex; flex-direction: column; overflow: hidden; }
 .inv-dialog > .inv-dialog-body { overflow-y: auto; min-height: 0; flex: 1; }
-.inv-dialog > [data-slot="dialog-header"], .inv-dialog > [data-slot="dialog-footer"] { flex-shrink: 0; }
+.inv-dialog > :not(.inv-dialog-body) { flex-shrink: 0; }
 @media (max-width: 767px) {
     .inventario-shell > .app-sidebar { display: none; }
     .inventario-shell .inventario-mobile-menu { display: inline-flex; }
