@@ -1,18 +1,19 @@
+:root{--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}
 html,body{height:100%;min-height:0;overflow:hidden;overscroll-behavior:none;touch-action:pan-x pan-y}
 body{display:block;padding:0;margin:0;background:var(--surface)}
 #app{display:block;height:100%;min-height:0}
-.app-shell{position:fixed;left:0;right:0;top:var(--viewport-top,0px);height:var(--viewport-height,100dvh);display:flex;flex-direction:column;background:var(--surface);overflow:hidden;view-transition-name:yap-screen}
+.app-shell{position:fixed;left:0;right:0;top:var(--viewport-top,0px);height:var(--viewport-height,100dvh);padding:var(--safe-top) env(safe-area-inset-right,0px) var(--safe-bottom) env(safe-area-inset-left,0px);display:flex;flex-direction:column;background:var(--surface);overflow:hidden;view-transition-name:yap-screen}
+:root[data-keyboard=open] .app-shell{padding-bottom:0}
 .screen{min-height:0;flex:1;overflow:hidden}
 .app-shell{background:radial-gradient(ellipse at 5% 0%,#d5f87945,transparent 48%),radial-gradient(ellipse at 100% 80%,#bca7e626,transparent 55%),var(--surface)}
 .scroll-surface{height:100%;min-height:0}
 .scroll-content{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
-.scroll-header{padding-top:env(safe-area-inset-top)}
-.scroll-footer{padding-bottom:env(safe-area-inset-bottom)}
+.scroll-header,.scroll-footer{padding:0}
 .scroll-footer{bottom:0}
-.scroll-content>.body,.scroll-content>.chatbody{padding-bottom:calc(var(--scroll-bottom) + 18px);scroll-padding-bottom:calc(var(--scroll-bottom) + 18px)}
+.scroll-content>.body,.scroll-content>.chatbody{padding-top:calc(var(--scroll-top) + 12px);padding-bottom:calc(var(--scroll-bottom) + 12px);scroll-padding-top:calc(var(--scroll-top) + 12px);scroll-padding-bottom:calc(var(--scroll-bottom) + 12px)}
 .bottomnav{margin:0 12px 12px;border-radius:24px;padding:8px 6px}
 .bottomnav button,.bottomnav a{border-radius:18px}
-.fab{bottom:calc(90px + env(safe-area-inset-bottom))}
+.fab{bottom:90px}
 .appbar{padding-top:12px}.appbar .mid{flex:1;min-width:0}
 input,textarea,select,.inputbox input,.searchbar input{font-size:16px!important}
 .inputbox input{min-height:44px}
@@ -24,9 +25,10 @@ input,textarea,select,.inputbox input,.searchbar input{font-size:16px!important}
 .update-notice{position:absolute;bottom:0;inset-inline:0;padding:12px;background:var(--text);color:var(--surface);z-index:150;display:flex;justify-content:space-between}
 .update-notice button{text-decoration:underline}
 .treply button.tx{text-align:left;width:100%}
-.messages{padding-bottom:16px}.msg .col{max-width:min(82%,650px)}
+.messages{display:flex;flex-direction:column;gap:3px;padding-inline:14px}.msg .col{max-width:100%}
 .body.settings{max-width:720px;margin:auto}
 .authbody{width:100%;max-width:460px;margin:0 auto;padding-top:20px}
+.screen>.authbody{height:100%;overflow-y:auto;padding-top:20px;padding-bottom:24px}
 .authbody .btn.ghost{margin-top:12px}
 .picker textarea{min-height:110px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px}
 .sheet{padding-bottom:calc(16px + env(safe-area-inset-bottom))}

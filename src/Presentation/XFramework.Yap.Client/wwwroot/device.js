@@ -1,6 +1,6 @@
 // Files stay in OPFS. SQLite owns conversations, drafts and upload receipts.
 (() => {
-    let listener, events, account, installPrompt, registration;
+    let listener, events, account, installPrompt, registration, databaseLock;
     const urls = new Set();
     const directory = async () => (await navigator.storage.getDirectory()).getDirectoryHandle('yap-files', { create: true });
     const write = async (key, blob) => {
@@ -17,6 +17,17 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden) notify(); });
     addEventListener('beforeinstallprompt', event => { event.preventDefault(); installPrompt = event; });
     window.yap.device = {
+        acquireDatabase() {
+            // Keep one document in charge of SQLite. A waiting navigation also evicts
+            // a previous document from the back/forward cache before opening OPFS.
+            return databaseLock ??= new Promise((resolve, reject) => {
+                navigator.locks.request('yap-sqlite', { signal: AbortSignal.timeout(10000) }, async () => {
+                    resolve();
+                    // The browser releases this lock when the document is destroyed.
+                    await new Promise(() => {});
+                }).catch(reject);
+            });
+        },
         online: () => navigator.onLine,
         watch: dotnet => { listener = dotnet; },
         events(scope) {
@@ -68,17 +79,32 @@
     // The visual viewport excludes the on-screen keyboard on iOS and Android.
     // Keep the app inside it; only the message body scrolls under the glass chrome.
     let frame;
+    let fullHeight = window.innerHeight;
     const viewport = () => {
         cancelAnimationFrame(frame);
         frame = requestAnimationFrame(() => {
             const view = window.visualViewport;
-            document.documentElement.style.setProperty('--viewport-height', `${view?.height ?? innerHeight}px`);
-            document.documentElement.style.setProperty('--viewport-top', `${view?.offsetTop ?? 0}px`);
+            const editing = document.activeElement?.matches('input,textarea,[contenteditable=true]');
+            if (!editing) fullHeight = window.innerHeight;
+            const keyboard = editing && view && fullHeight - view.height > 120;
+            const root = document.documentElement;
+            root.dataset.keyboard = keyboard ? 'open' : 'closed';
+            // Standalone Safari can report a smaller visual viewport even without
+            // a keyboard. Let CSS fill the display until an editor opens the keyboard.
+            if (keyboard) {
+                root.style.setProperty('--viewport-height', `${view.height}px`);
+                root.style.setProperty('--viewport-top', `${view.offsetTop}px`);
+            } else {
+                root.style.removeProperty('--viewport-height');
+                root.style.removeProperty('--viewport-top');
+            }
         });
     };
     visualViewport?.addEventListener('resize', viewport);
     visualViewport?.addEventListener('scroll', viewport);
     addEventListener('resize', viewport); viewport();
+    document.addEventListener('focusin', viewport);
+    document.addEventListener('focusout', viewport);
     for (const name of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(name, event => event.preventDefault(), { passive: false });
     document.addEventListener('touchmove', event => { if (event.touches.length > 1) event.preventDefault(); }, { passive: false });
 
