@@ -50,11 +50,11 @@ else
                             <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.ContactName)" Title="Contact" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.Email)" Title="Email" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Status" Filterable="true" SortBy="@(item => item.IsActive)" FilterBy="@(item => item.IsActive)">
+                            <InventoryTemplateColumn Title="Status" Filterable="true" SortBy="@(item => item.IsActive)" FilterBy="@(item => item.IsActive)">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@(item.IsActive ? "Active" : "Inactive")" Status="@(item.IsActive ? "active" : "inactive")" />
                                 </ChildContent>
-                            </BbDataGridTemplateColumn>
+                            </InventoryTemplateColumn>
                         <BbDataGridTemplateColumn Title="Actions"><ChildContent Context="item"><BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo($"/inventario/suppliers/{item.Id}"))">View / edit</BbButton></ChildContent></BbDataGridTemplateColumn></Columns>
                     </BbDataGrid>
                 </BbCardContent>

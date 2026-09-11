@@ -147,6 +147,16 @@ public sealed class SmokeTests : InventarioTestBase
 
     [Test]
     [Category(TestCategories.DataContext)]
+    public async Task ReservationPrerequisites_AllocationWrapper_LoadsSuccessfully()
+    {
+        var allocations = await InventarioIntegrationTestFixture.ServiceWrapper.GetReservationAllocations(
+            new XFramework.Inventario.Domain.Shared.Contracts.Requests.Reservations.GetReservationAllocationsRequest { Metadata = CreateMetadata() });
+        allocations.IsSuccess.Should().BeTrue(allocations.Message);
+        allocations.Response.Should().NotBeNull();
+    }
+
+    [Test]
+    [Category(TestCategories.DataContext)]
     public async Task RemoteQuery_ToListAsync_ReturnsProductsFromInventarioService()
     {
         await using var db = CreateDbContext();

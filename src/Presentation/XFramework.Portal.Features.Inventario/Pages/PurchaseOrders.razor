@@ -57,19 +57,19 @@ else
                                 Class="cursor-pointer">
                         <Columns>
                             <BbDataGridPropertyColumn Property="@(x => x.OrderNumber)" Title="Order" Sortable="true" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Supplier" Filterable="true" SortBy="@(item => GetSupplierName(item.SupplierId))" FilterBy="@(item => GetSupplierName(item.SupplierId))">
+                            <InventoryTemplateColumn Title="Supplier" Filterable="true" SortBy="@(item => GetSupplierName(item.SupplierId))" FilterBy="@(item => GetSupplierName(item.SupplierId))">
                                 <ChildContent Context="item">@GetSupplierName(item.SupplierId)</ChildContent>
-                            </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Status" Filterable="true" SortBy="@(item => item.Status)" FilterBy="@(item => item.Status)">
+                            </InventoryTemplateColumn>
+                            <InventoryTemplateColumn Title="Status" Filterable="true" SortBy="@(item => item.Status)" FilterBy="@(item => item.Status)">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@item.Status.ToString()" Status="@GetStatusBadge(item.Status)" />
                                 </ChildContent>
-                            </BbDataGridTemplateColumn>
+                            </InventoryTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.OrderDate)" Title="Order Date" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.ExpectedDate)" Title="Expected" Sortable="true" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Lines" Filterable="true" SortBy="@(item => _lines.Count(x => x.PurchaseOrderId == item.Id))" FilterBy="@(item => _lines.Count(x => x.PurchaseOrderId == item.Id))">
+                            <InventoryTemplateColumn Title="Lines" Filterable="true" SortBy="@(item => _lines.Count(x => x.PurchaseOrderId == item.Id))" FilterBy="@(item => _lines.Count(x => x.PurchaseOrderId == item.Id))">
                                 <ChildContent Context="item">@_lines.Count(x => x.PurchaseOrderId == item.Id)</ChildContent>
-                            </BbDataGridTemplateColumn>
+                            </InventoryTemplateColumn>
                             <BbDataGridTemplateColumn Title="Actions">
                                 <ChildContent Context="item">
                                     <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View purchase order"
