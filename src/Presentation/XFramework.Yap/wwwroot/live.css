@@ -70,6 +70,13 @@ h1:focus { outline:none; }
 .message-action-list { display:flex; flex-wrap:wrap; gap:8px; }.selected-message { white-space:pre-wrap; overflow-wrap:anywhere; max-height:180px; overflow:auto; padding:12px; border-radius:12px; background:#a4bc7420; margin-bottom:16px; }.attachment-link { display:flex; gap:10px; text-decoration:underline; margin:12px 0; }
 .authbody { max-width:430px; margin:auto; padding-top:50px; }.authbody .authbrand .tagline { display:block; margin-top:8px; }.authbody h1 { font-size:28px; font-weight:750; }.authbody .btn { margin-top:24px; }.authbody .foot { margin-top:24px; }
 .settings-body { max-width:520px; margin:auto; padding:30px; }.settings-body p { line-height:1.8; margin:18px 0; font-size:14px; }.profile-card { display:flex; align-items:center; flex-direction:column; padding:25px; }.profile-card h2 { font-size:24px; margin-top:16px; }.settings-body form { margin-top:30px; }
+.authbody .field-help { font-size:12px; color:var(--dim); margin:-6px 3px 18px; }
+.authbody .foot a { color:var(--accent); text-decoration:underline; text-underline-offset:3px; }
+/* Keep focused controls readable on iPhone/iPad without disabling user zoom. */
+@media (max-width: 1024px), (pointer: coarse) {
+  input:not([type=checkbox]):not([type=radio]):not([type=file]), textarea, select,
+  .inp input, .composer textarea { font-size:16px; }
+}
 button:disabled { cursor:not-allowed; opacity:.5; }button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible { outline:2px solid #739a39; outline-offset:3px; }
 [data-theme=dark] .composer textarea { background:#222c24; }[data-theme=dark] .inbox { border-color:#ffffff12; }[data-theme=dark] .live-alert { background:#382d20; color:#f3dbb0; }
 #blazor-error-ui { display:none; position:fixed; bottom:0; left:0; right:0; padding:15px; background:#fff0ce; color:#392d1b; z-index:9999; }

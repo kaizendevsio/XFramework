@@ -7,17 +7,19 @@
         <div class="authbrand"><Brand /><span class="tagline">A little closer.</span></div>
         <h1>Welcome back</h1><p>Sign in to keep yapping with your people.</p>
         @if (Error is not null) { <p class="form-error" role="alert">@ErrorMessage</p> }
+        @if (Registered) { <p role="status">Your account is ready. Sign in to start chatting.</p> }
         <form method="post" action="/auth/login" data-enhance="false">
             <AntiforgeryToken />
             <label class="field"><span class="lab">Username</span><span class="inp liquid-glass"><GlassLayer /><YapIcon Name="user" Size="19" /><input name="username" placeholder="Your username" required maxlength="150" autocomplete="username" /></span></label>
             <label class="field"><span class="lab">Password</span><span class="inp liquid-glass"><GlassLayer /><YapIcon Name="lock" Size="19" /><input name="password" type="password" placeholder="Your password" required maxlength="256" autocomplete="current-password" /></span></label>
             <button class="btn" type="submit">Sign in <YapIcon Name="arrow" Size="18" /></button>
         </form>
-        <p class="foot">Use your workspace account. Contact your administrator if you need access.</p>
+        <p class="foot">New here? <a href="/register">Create an account</a></p>
     </div></ChildContent>
 </ScrollSurface>
 @code {
     [SupplyParameterFromQuery] public string? Error { get; set; }
+    [SupplyParameterFromQuery] public bool Registered { get; set; }
     private string ErrorMessage => Error switch
     {
         "credentials" => "We couldn't sign you in. Check your username, password, and workspace access.",

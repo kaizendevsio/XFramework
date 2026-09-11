@@ -137,7 +137,7 @@ public sealed class ServiceIdentityComposeContractTests
         var root = FindRepositoryRoot().FullName;
         var compose = File.ReadAllText(Path.Combine(root, "docker-compose.yml"));
         ExtractAllowedScopesForClient(compose, "XFramework.Yap").Should().BeEquivalentTo(
-            new[] { "bolt.service", "communications.chat", "identity.session.validate", "datacontext.query", "storage.read", "storage.write" });
+            new[] { "bolt.service", "communications.chat", "identity.session.validate", "datacontext.query", "storage.read", "storage.write", "identity.register", "tenant.target" });
         compose.Should().Contain("ServiceIdentity__Clients__13__ClientSecret: ${YAP_SERVICE_IDENTITY_SECRET:");
         compose.Should().Contain("ServiceIdentity__Clients__13__GenerationId: ${YAP_SERVICE_CREDENTIAL_GENERATION_ID:");
         compose.Should().Contain("ServiceIdentity__Clients__13__AllowedAudiences: XFramework.Bolt.Hub,XFramework.IdentityServer,XFramework.Communications,XFramework.Storage");
