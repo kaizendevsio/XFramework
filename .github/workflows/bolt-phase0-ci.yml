@@ -223,6 +223,11 @@ jobs:
           dotnet test src/Tests/Bolt.Phase0Synthetics.Tests/Bolt.Phase0Synthetics.Tests.csproj \
             --configuration Release --no-build --no-restore
 
+      - name: Test Communications chat contracts and PostgreSQL defaults
+        run: |
+          dotnet test src/Modules/XFramework.Communications/Communications.Tests/Communications.Tests.csproj \
+            --configuration Release --no-build --no-restore
+
       - name: Test focused IdentityServer and Portal contracts
         shell: bash
         run: |

@@ -18,7 +18,7 @@ using XFramework.Domain.Shared.Contracts.Responses;
 using XFramework.Domain.Shared.DataContext;
 
 namespace Communications.Api.Services;
-public sealed class ThreadService(
+public sealed partial class ThreadService(
     IDataContext dataContext,
     ICommunicationsRequestContextResolver requestContextResolver,
     ICommunicationsTemplateService templateService,
@@ -27,6 +27,7 @@ public sealed class ThreadService(
     ICommunicationsActionRateLimiter rateLimiter,
     ICommunicationsModerationService moderationService,
     ICommunicationsTransientRealtimePublisher transientRealtimePublisher,
+    IMessageReactionSummaryReader reactionSummaryReader,
     ILogger<ThreadService> logger
 ) : IThreadService
 {
@@ -55,6 +56,7 @@ public sealed class ThreadService(
 
             var threadTypeExists = await dataContext.Query<MessageThreadType>()
                 .Where(t => t.Id == request.TypeId)
+                .Where(t => t.TenantId == caller.TenantId)
                 .Where(t => !t.IsDeleted && t.IsEnabled)
                 .AnyAsync(ct);
 
@@ -188,6 +190,11 @@ public sealed class ThreadService(
             if (typeId is null)
                 return Result<CreateThreadResponse>.NotFound("Chat thread type not found");
 
+            if (!await dataContext.Query<MessageThreadType>()
+                    .Where(x => x.Id == typeId.Value && x.TenantId == caller.TenantId)
+                    .Where(x => !x.IsDeleted && x.IsEnabled).AnyAsync(ct))
+                return Result<CreateThreadResponse>.NotFound("Chat thread type not found");
+
             var thread = new MessageThread
             {
                 Id = Guid.NewGuid(),
@@ -317,6 +324,10 @@ public sealed class ThreadService(
                 .ToListAsync(ct);
 
             var threadIds = threads.Select(t => t.Id).ToList();
+            var directThreads = await dataContext.Query<MessageDirectThread>()
+                .Where(x => x.TenantId == caller.TenantId && threadIds.Contains(x.MessageThreadId))
+                .Where(x => !x.IsDeleted && x.IsEnabled).ToListAsync(ct);
+            var directThreadIds = directThreads.Select(x => x.MessageThreadId).ToHashSet();
             var blockedCredentialIds = await GetBlockedCredentialIdsForAsync(caller.TenantId, caller.CredentialId, ct);
             var blockedSenderMemberIds = await GetBlockedThreadMemberIdsAsync(
                 caller.TenantId,
@@ -389,7 +400,8 @@ public sealed class ThreadService(
                     LastMessageAt = lastMsg?.CreatedAt,
                     UnreadCount = unreadCount,
                     IsMuted = membership?.IsMuted == true,
-                    IsArchived = membership?.IsArchived == true
+                    IsArchived = membership?.IsArchived == true,
+                    IsDirect = directThreadIds.Contains(t.Id)
                 };
             }).ToList();
 
@@ -447,6 +459,9 @@ public sealed class ThreadService(
 
             return Result<GetThreadResponse>.Success(new GetThreadResponse
             {
+                IsDirect = await dataContext.Query<MessageDirectThread>()
+                    .Where(x => x.TenantId == caller.TenantId && x.MessageThreadId == thread.Id)
+                    .Where(x => !x.IsDeleted && x.IsEnabled).AnyAsync(ct),
                 Id = thread.Id,
                 Name = thread.Name,
                 Description = thread.Description,
@@ -1522,6 +1537,17 @@ public sealed class ThreadService(
             if (hiddenMessageIds.Count > 0)
                 messageQuery = messageQuery.Where(m => !hiddenMessageIds.Contains(m.Id));
 
+            if (request.ParentMessageId is Guid parentId)
+            {
+                // The parent must itself be visible; do not expose replies to a hidden/blocked parent.
+                var parent = await dataContext.Query<Message>()
+                    .Where(m => m.Id == parentId && m.MessageThreadId == request.ThreadId)
+                    .Where(m => m.TenantId == caller.TenantId && !m.IsDeleted && m.IsEnabled).FirstOrDefaultAsync(ct);
+                if (parent is null || !await CanAccessMessageAsync(caller.TenantId, requesterMember, parent, ct))
+                    return Result<GetThreadMessagesResponse>.NotFound("Parent message not found");
+                messageQuery = messageQuery.Where(m => m.ParentMessageId == parentId);
+            }
+
             var totalCount = await messageQuery.CountAsync(ct);
 
             var messages = await messageQuery
@@ -1543,6 +1569,9 @@ public sealed class ThreadService(
             var undeliveredIds = fetchedMessageIds.Except(existingDeliveryMessageIds).ToList();
             if (undeliveredIds.Count > 0)
             {
+                var deliveredTypeId = await ResolveDeliveryTypeIdAsync(caller.TenantId, MessageDeliveryTypes.Delivered, ct);
+                if (deliveredTypeId is null)
+                    return Result<GetThreadMessagesResponse>.NotFound("Initialize chat defaults before using chat");
                 foreach (var msgId in undeliveredIds)
                 {
                     dataContext.Add(new MessageDelivery
@@ -1551,7 +1580,7 @@ public sealed class ThreadService(
                         TenantId = requesterMember.TenantId,
                         MessageThreadMemberId = requesterMember.Id,
                         MessageId = msgId,
-                        TypeId = MessageDeliveryTypes.Delivered,
+                        TypeId = deliveredTypeId.Value,
                         IsEnabled = true,
                         CreatedAt = DateTime.UtcNow,
                         ConcurrencyStamp = Guid.NewGuid()
@@ -1585,6 +1614,7 @@ public sealed class ThreadService(
 
             var pinnedSet = pins.Select(p => p.MessageId).ToHashSet();
             var savedSet = saved.Select(s => s.MessageId).ToHashSet();
+            var reactionSummaries = await reactionSummaryReader.ReadAsync(caller.TenantId, caller.CredentialId, messageIds, ct);
 
             var items = messages.Select(m =>
             {
@@ -1599,7 +1629,8 @@ public sealed class ThreadService(
                     ParentMessageId = m.ParentMessageId,
                     MentionedCredentialIds = DeserializeMentionedCredentialIds(m.MentionedCredentialIdsJson),
                     IsPinned = pinnedSet.Contains(m.Id),
-                    IsSaved = savedSet.Contains(m.Id)
+                    IsSaved = savedSet.Contains(m.Id),
+                    Reactions = reactionSummaries.GetValueOrDefault(m.Id) ?? []
                 };
             }).ToList();
 
@@ -2607,6 +2638,11 @@ public sealed class ThreadService(
                 return Result<CmdResponse>.NotFound("Message not found");
 
             // Check for duplicate reaction of the same type by this thread member.
+            if (!await dataContext.Query<MessageReactionType>()
+                    .Where(x => x.Id == request.TypeId && x.TenantId == caller.TenantId)
+                    .Where(x => !x.IsDeleted && x.IsEnabled).AnyAsync(ct))
+                return Result<CmdResponse>.NotFound("Reaction type not found");
+
             var duplicateExists = await dataContext.Query<MessageReaction>()
                 .Where(r => r.MessageId == request.MessageId)
                 .Where(r => r.TypeId == request.TypeId)
@@ -2800,15 +2836,18 @@ public sealed class ThreadService(
                 .GroupBy(d => d.MessageId)
                 .ToDictionary(g => g.Key, g => g.First());
             var markedCount = 0;
+            var readTypeId = await ResolveDeliveryTypeIdAsync(caller.TenantId, MessageDeliveryTypes.Read, ct);
+            if (readTypeId is null)
+                return Result<CmdResponse>.NotFound("Initialize chat defaults before using chat");
 
             foreach (var messageId in requestedMessageIds)
             {
                 if (existingByMessage.TryGetValue(messageId, out var delivery))
                 {
-                    if (delivery.TypeId == MessageDeliveryTypes.Read)
+                    if (delivery.TypeId == readTypeId.Value)
                         continue;
 
-                    delivery.TypeId = MessageDeliveryTypes.Read;
+                    delivery.TypeId = readTypeId.Value;
                     delivery.ModifiedAt = DateTime.UtcNow;
                     dataContext.Update(delivery);
                     markedCount++;
@@ -2821,7 +2860,7 @@ public sealed class ThreadService(
                         TenantId = member.TenantId,
                         MessageThreadMemberId = member.Id,
                         MessageId = messageId,
-                        TypeId = MessageDeliveryTypes.Read,
+                        TypeId = readTypeId.Value,
                         IsEnabled = true,
                         CreatedAt = DateTime.UtcNow,
                         ConcurrencyStamp = Guid.NewGuid()
@@ -3031,7 +3070,7 @@ public sealed class ThreadService(
     {
         var type = await dataContext.Query<MessageThreadType>()
             .Where(t => t.TenantId == tenantId)
-            .Where(t => t.MessageTypeId == MessageTypes.Chat)
+            .Where(t => t.MessageTypeId == MessageTypes.Chat || t.MessageType.SystemReferenceId == MessageTypes.Chat)
             .Where(t => !t.IsDeleted && t.IsEnabled)
             .FirstOrDefaultAsync(ct);
 
@@ -3101,10 +3140,11 @@ public sealed class ThreadService(
                 messages = messages.Where(m => !blockedSenderMemberIds.Contains(m.MessageThreadMemberId)).ToList();
         }
 
+        var readTypeId = await ResolveDeliveryTypeIdAsync(tenantId, MessageDeliveryTypes.Read, ct);
         var readDeliveries = await dataContext.Query<MessageDelivery>()
             .Where(d => memberIds.Contains(d.MessageThreadMemberId))
             .Where(d => d.TenantId == tenantId)
-            .Where(d => d.TypeId == MessageDeliveryTypes.Read)
+            .Where(d => d.TypeId == readTypeId)
             .Where(d => !d.IsDeleted)
             .ToListAsync(ct);
 
