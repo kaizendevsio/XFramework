@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Linq.Expressions;
 using XFramework.Domain.Shared.Enums;
 
@@ -56,8 +57,10 @@ public class QueryExpressionVisitor
         switch (binary.NodeType)
         {
             case ExpressionType.AndAlso:
+                var start = filters.Count;
                 Visit(binary.Left, filters);
                 Visit(binary.Right, filters);
+                filters.Add(new QueryFilter { Operation = QueryFilterOperation.And, Value = filters.Count - start });
                 break;
 
             case ExpressionType.OrElse:
@@ -148,10 +151,13 @@ public class QueryExpressionVisitor
 
     private static void VisitMethodCall(MethodCallExpression methodCall, List<QueryFilter> filters)
     {
+        if (TryVisitCollectionContains(methodCall, filters))
+            return;
+
         if (methodCall.Object is null)
         {
             throw new NotSupportedException(
-                $"Static method call '{methodCall.Method.Name}' is not supported. " +
+                $"Static method call '{methodCall.Method.DeclaringType?.FullName}.{methodCall.Method.Name}' is not supported. " +
                 "Only instance methods (string.Contains, StartsWith, EndsWith) are supported.");
         }
 
@@ -168,12 +174,70 @@ public class QueryExpressionVisitor
                 "Only string.Contains, StartsWith, and EndsWith are supported.")
         };
 
+        if (methodCall.Arguments.Count != 1)
+        {
+            if (operation == QueryFilterOperation.Contains && methodCall.Arguments.Count == 2 &&
+                EvaluateExpression(methodCall.Arguments[1]) is StringComparison.OrdinalIgnoreCase)
+                operation = QueryFilterOperation.ContainsIgnoreCase;
+            else
+                throw new NotSupportedException("Only Contains with OrdinalIgnoreCase is supported for explicit string comparisons.");
+        }
+
         filters.Add(new QueryFilter
         {
             PropertyName = propertyName,
             Operation = operation,
             Value = argument
         });
+    }
+
+    private static bool TryVisitCollectionContains(MethodCallExpression call, List<QueryFilter> filters)
+    {
+        Expression? collection = null;
+        Expression? item = null;
+        if (call.Method.DeclaringType == typeof(Enumerable) && call.Method.Name == nameof(Enumerable.Contains) &&
+            call.Arguments.Count == 2)
+            (collection, item) = (call.Arguments[0], call.Arguments[1]);
+        else if (call.Method.DeclaringType == typeof(MemoryExtensions) && call.Method.Name == "Contains" &&
+                 call.Arguments.Count == 2 && call.Arguments[0] is UnaryExpression
+                 { NodeType: ExpressionType.Convert, Operand: var array } && array.Type.IsArray)
+            // C# 14 binds array.Contains to ReadOnlySpan.Contains. Evaluate the underlying
+            // array, never compile/box the ref-struct conversion in the expression tree.
+            (collection, item) = (array, call.Arguments[1]);
+        else if (call.Method.DeclaringType == typeof(MemoryExtensions) && call.Method.Name == "Contains" &&
+                 call.Arguments.Count == 2 && call.Arguments[0] is MethodCallExpression conversion &&
+                 conversion.Method.Name == "op_Implicit" && conversion.Method.DeclaringType?.IsGenericType == true &&
+                 conversion.Method.DeclaringType.GetGenericTypeDefinition() == typeof(ReadOnlySpan<>) &&
+                 conversion.Arguments.Count == 1 && conversion.Arguments[0].Type.IsArray)
+            (collection, item) = (conversion.Arguments[0], call.Arguments[1]);
+        else if (call.Object is not null && call.Method.Name == "Contains" && call.Arguments.Count == 1 &&
+                 call.Object.Type.IsGenericType && call.Object.Type.GetGenericTypeDefinition() == typeof(List<>))
+            (collection, item) = (call.Object, call.Arguments[0]);
+        if (collection is null)
+            return false;
+
+        if (!TryExtractProperty(item!, out var property) || !TryEvaluate(collection, out var value) ||
+            value is not IList values ||
+            !(value is Array || value.GetType().IsGenericType && value.GetType().GetGenericTypeDefinition() == typeof(List<>)))
+            throw new NotSupportedException("Collection Contains requires a local array or List and an entity property.");
+        if (values.Count > 64)
+            throw new NotSupportedException("Remote collection Contains supports at most 64 values; batch larger lookups.");
+
+        var group = new List<QueryFilter>();
+        foreach (var entry in values)
+        {
+            var filter = new QueryFilter { PropertyName = property, Operation = QueryFilterOperation.In, Value = entry };
+            if (entry is null || filter.Value is null)
+                throw new NotSupportedException("Collection Contains requires non-null serializable scalar values.");
+            group.Add(filter);
+        }
+        // A null-only In group executes as an empty set, never as an omitted filter.
+        if (group.Count == 0)
+            group.Add(new QueryFilter { PropertyName = property, Operation = QueryFilterOperation.In });
+        filters.AddRange(group);
+        // Keep adjacent Contains calls on the same property as separate intersections.
+        filters.Add(new QueryFilter { Operation = QueryFilterOperation.And, Value = group.Count });
+        return true;
     }
 
     private static void VisitNot(UnaryExpression unary, List<QueryFilter> filters)
@@ -319,6 +383,9 @@ public class QueryExpressionVisitor
 
             var groupStart = i - count;
             if (groupStart < 0) continue;
+            // Rewriting nested groups changes their parent's wire-token count.
+            // Optimize only a complete top-level OR; nested groups retain their markers.
+            if (groupStart != 0 || i != filters.Count - 1) continue;
 
             var group = filters.GetRange(groupStart, count);
 
@@ -351,6 +418,7 @@ public class QueryExpressionVisitor
                         Value = values[j]
                     });
                 }
+                filters.Add(new QueryFilter { Operation = QueryFilterOperation.And, Value = values.Count });
             }
         }
     }
