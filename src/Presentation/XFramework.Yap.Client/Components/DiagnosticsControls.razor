@@ -1,0 +1,23 @@
+@inject IJSRuntime JS
+<div class="set-stack diagnostics">
+    <label class="setting-toggle"><span>Enable diagnostic logging</span><input type="checkbox" role="switch" checked="@enabled" @onchange="ToggleAsync" /></label>
+    <p>Logs stay on this device and survive a reload. They include app errors, connection status and image sizes, without messages, passwords or photo contents.</p>
+    <div class="row"><button class="btn ghost" @onclick="CopyAsync">Copy logs</button><button class="btn ghost" @onclick="ClearAsync">Clear logs</button></div>
+    @if (notice is not null) { <p role="status">@notice</p> }
+    @if (report is not null) { <textarea aria-label="Diagnostic logs" readonly rows="10" value="@report"></textarea> }
+    <p>If the app cannot open, use the <a href="diagnostics.html">recovery log page</a>. Enable logging, reproduce the problem, then copy the logs here.</p>
+</div>
+@code {
+    private bool enabled;
+    private string? notice, report;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    { if (firstRender) { enabled = await JS.InvokeAsync<bool>("yap.diagnostics.enabled"); StateHasChanged(); } }
+    private async Task ToggleAsync(ChangeEventArgs e) { enabled = e.Value is true; await JS.InvokeVoidAsync("yap.diagnostics.setEnabled", enabled); }
+    private async Task CopyAsync()
+    {
+        var copied = await JS.InvokeAsync<bool>("yap.diagnostics.copy");
+        notice = copied ? "Logs copied. You can paste them into your support conversation." : "Select and copy the logs below.";
+        report = copied ? null : await JS.InvokeAsync<string>("yap.diagnostics.report");
+    }
+    private async Task ClearAsync() { await JS.InvokeVoidAsync("yap.diagnostics.clear"); report = null; notice = "Saved logs cleared."; }
+}

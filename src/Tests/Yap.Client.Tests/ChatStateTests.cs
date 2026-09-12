@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.JSInterop;
+using Microsoft.Extensions.Logging;
 using Moq;
 using NUnit.Framework;
 using Yap.Client.Services;
@@ -11,6 +12,20 @@ namespace Yap.Client.Tests;
 
 public sealed class ChatStateTests
 {
+    [Test]
+    public void DiagnosticLogger_DoesNotFormatOrRecordSensitiveErrorDetails()
+    {
+        var js = new Mock<IJSRuntime>();
+        using var provider = new DiagnosticsLoggerProvider(js.Object);
+        var formatted = false;
+        provider.CreateLogger("private-category").Log(LogLevel.Error, new EventId(17), "private-message",
+            new InvalidOperationException("private-password"), (state, exception) => { formatted = true; return state; });
+        Assert.That(formatted, Is.False);
+        var recorded = JsonSerializer.Serialize(js.Invocations.Single().Arguments[1]);
+        Assert.That(recorded, Does.Contain("InvalidOperationException"));
+        Assert.That(recorded, Does.Not.Contain("private-"));
+    }
+
     [TestCase(false, false)]
     [TestCase(true, false)]
     [TestCase(false, true)]

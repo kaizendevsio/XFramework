@@ -11,7 +11,7 @@
             @if (IsImage(file))
             {
                 <div class="photo-preview">
-                    <button class="photo-open" aria-label="@($"View photo {file.Name}")" @onclick="() => viewing = file"><img src="@url" alt="@file.Name" draggable="false" @onerror="() => ImageFailedAsync(file, url)" /></button>
+                    <button class="photo-open" aria-label="@($"View photo {file.Name}")" @onclick="() => viewing = file" @oncontextmenu="() => OnActions.InvokeAsync()" @oncontextmenu:preventDefault><img src="@url" alt="@file.Name" draggable="false" @onerror="() => ImageFailedAsync(file, url)" /></button>
                     @if (Message.LocalFileKey is null) { <button class="photo-download" aria-label="Download original photo" title="Download original" @onclick="() => State.OpenFileAsync(Message, file)"><Icon Name="download" Size="20" /></button> }
                 </div>
             }
@@ -31,6 +31,7 @@
 @code {
     [Parameter, EditorRequired] public ChatMessage Message { get; set; } = default!;
     [Parameter] public EventCallback MetadataLoaded { get; set; }
+    [Parameter] public EventCallback OnActions { get; set; }
     private ChatAttachment? viewing;
     private readonly Dictionary<Guid, string> urls = [];
     private bool loading, failed, disposed;

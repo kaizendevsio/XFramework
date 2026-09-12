@@ -4,13 +4,9 @@
     <div class="photo-toolbar">
         <button aria-label="Close photo" @onclick="() => OnClose.InvokeAsync()"><Icon Name="close" /></button>
         <span class="photo-viewer-title">Photo</span>
-        <button aria-label="Zoom out" @onclick="() => ZoomAsync(-1)">−</button>
-        <button aria-label="Zoom in" @onclick="() => ZoomAsync(1)">+</button>
-        <button aria-label="Reset zoom" @onclick="ResetAsync">Reset</button>
         @if (CanDownload) { <button aria-label="Download original photo" @onclick="() => OnDownload.InvokeAsync()"><Icon Name="download" /></button> }
     </div>
     <div class="photo-stage"><img src="@Url" alt="@Name" draggable="false" /></div>
-    <p class="photo-hint">Pinch or double-tap to zoom</p>
 </dialog>
 @code {
     [Parameter, EditorRequired] public string Url { get; set; } = "";
@@ -27,7 +23,5 @@
         await JS.InvokeVoidAsync("yap.photoViewer.open", dialog, reference);
     }
     [JSInvokable] public Task CloseAsync() => OnClose.InvokeAsync();
-    private Task ZoomAsync(int direction) => JS.InvokeVoidAsync("yap.photoViewer.zoom", dialog, direction).AsTask();
-    private Task ResetAsync() => JS.InvokeVoidAsync("yap.photoViewer.reset", dialog).AsTask();
     public async ValueTask DisposeAsync() { await JS.InvokeVoidAsync("yap.photoViewer.dispose", dialog); reference?.Dispose(); }
 }

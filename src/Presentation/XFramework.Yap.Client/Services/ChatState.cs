@@ -55,8 +55,14 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
     public void Report(Exception ex)
     {
         Console.Error.WriteLine($"Yap action failed: {ex}");
+        _ = RecordErrorAsync(ex);
         Error = ex is ChatApiException ? ex.Message : "Could not finish this action. Check your connection and available device storage, then try again.";
         Notify();
+    }
+    private async Task RecordErrorAsync(Exception ex)
+    {
+        try { await js.InvokeVoidAsync("yap.diagnostics.record", "dotnet.error", new { type = ex.GetType().FullName, status = (ex as ChatApiException)?.Status }); }
+        catch { /* Diagnostics must never interfere with chat or error recovery. */ }
     }
 
     public async Task InitializeAsync()

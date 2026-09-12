@@ -2,8 +2,8 @@
 .photo-viewer[open] { display: flex; flex-direction: column; }
 .photo-viewer::backdrop { background: #000d; }
 .photo-toolbar { display: flex; align-items: center; gap: 8px; padding: calc(10px + env(safe-area-inset-top)) 12px 10px; z-index: 1; background: #101410; }
-.photo-toolbar button { min-width: 44px; min-height: 44px; border-radius: 22px; background: #ffffff18; color: white; }
+.photo-toolbar button { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 44px; width: 44px; height: 44px; padding: 0; border: 0; line-height: 1; border-radius: 50%; background: #ffffff18; color: white; }
+.photo-toolbar button ::deep svg { display: block; flex: none; }
 .photo-viewer-title { flex: 1; }
-.photo-stage { display: grid; place-items: center; flex: 1; min-height: 0; overflow: hidden; touch-action: none; user-select: none; }
+.photo-stage { display: grid; place-items: center; flex: 1; min-height: 0; padding-bottom: env(safe-area-inset-bottom); overflow: hidden; touch-action: none; user-select: none; }
 .photo-stage img { max-width: 100%; max-height: 100%; width: 100%; height: 100%; object-fit: contain; transform-origin: center; pointer-events: none; user-select: none; }
-.photo-hint { text-align: center; font-size: 12px; color: #fff9; margin: 0; padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); }

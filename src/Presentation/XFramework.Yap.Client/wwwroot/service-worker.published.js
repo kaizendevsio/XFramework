@@ -15,7 +15,8 @@ self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
     if (event.request.method !== 'GET' || url.origin !== self.location.origin || /^\/(?:api|auth|health)(?:\/|$)/.test(url.pathname)) return;
     if (event.request.mode === 'navigate') {
-        event.respondWith(caches.open(name).then(cache => cache.match('index.html')).then(response => response || fetch(event.request)));
+        const page = url.pathname === '/diagnostics.html' ? 'diagnostics.html' : 'index.html';
+        event.respondWith(caches.open(name).then(cache => cache.match(page)).then(response => response || fetch(event.request)));
     } else if (known.has(url.href)) {
         event.respondWith(caches.open(name).then(cache => cache.match(event.request)).then(response => response || fetch(event.request)));
     }

@@ -1,11 +1,12 @@
 @inject DatabaseStartup Startup
 @inject NavigationManager Nav
 @inject ChatState State
+@inject ILogger<App> Logger
 @using Microsoft.EntityFrameworkCore
 @using SqliteWasmBlazor
 @if (failure is not null)
 {
-    <main class="loading"><Brand /><h1>Device storage unavailable</h1><p>@failure</p><button class="btn" @onclick="() => Nav.NavigateTo(Nav.Uri, true)">Try again</button></main>
+    <main class="loading"><Brand /><h1>Device storage unavailable</h1><p>@failure</p><button class="btn" @onclick="() => Nav.NavigateTo(Nav.Uri, true)">Try again</button><a href="diagnostics.html">Open diagnostic logs</a></main>
 }
 else if (!State.Ready)
 {
@@ -29,7 +30,7 @@ else
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Yap startup failed: {ex}");
+            Logger.LogError(ex, "Yap startup failed");
             failure = "Use a current browser with device storage enabled. If Yap is open in another tab, close that tab and try again. Your saved data has not been cleared.";
         }
     }

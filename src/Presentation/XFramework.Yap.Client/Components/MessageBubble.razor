@@ -11,8 +11,7 @@
             @if (ShowText) { @Message.Text }
         </span></button>
         }
-        <MessageMedia Message="Message" MetadataLoaded="RefreshCaption" />
-        @if (!ShowText && Message.Quote is null && Message.HasAttachments) { <button class="media-actions" aria-label="Photo message actions" @onclick="() => OnSelect.InvokeAsync(Message)"><Icon Name="more" Size="18" /></button> }
+        <MessageMedia Message="Message" MetadataLoaded="RefreshCaption" OnActions="() => OnSelect.InvokeAsync(Message)" />
         @if (State.Selected?.Allows(ChatFeature.Reactions) != false && Message.Reactions.Count > 0) { <div class="reacts">@foreach (var reaction in Message.Reactions) { <button class="react @(Message.MyReactionIds.ContainsKey(reaction.Key) ? "mine" : "")" aria-label="@($"React {reaction.Key}")" aria-pressed="@Message.MyReactionIds.ContainsKey(reaction.Key).ToString().ToLowerInvariant()" @onclick="() => OnReact.InvokeAsync(reaction.Key)">@reaction.Key <span>@reaction.Value</span></button> }</div> }
         @if (State.Selected?.Allows(ChatFeature.Threads) != false && Message.ReplyTotal > 0) { <button class="threadlink" @onclick="() => OnThread.InvokeAsync(Message)"><span class="fc">@foreach (var reply in Message.Replies.Take(3)) { <Avatar Initials="@reply.Initials" Color="@reply.Color" Size="a28" /> }</span>@Message.ReplyTotal replies <Icon Name="arrow" Size="13" /></button> }
         <div class="meta">@if (Message.Pinned) { <span aria-label="Pinned">📌</span> }@Message.Time @if (Message.Mine) { <span class="rd" aria-label="@DeliveryLabel">@DeliveryLabel</span> }</div>
