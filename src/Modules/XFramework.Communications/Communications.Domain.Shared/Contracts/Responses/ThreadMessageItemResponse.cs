@@ -16,4 +16,6 @@ public partial record ThreadMessageItemResponse
     public int ReplyCount { get; set; }
     public bool HasAttachments { get; set; }
     public bool IsThreadReply { get; set; }
+    public int DeliveredCount { get; set; }
+    public int ReadCount { get; set; }
 }

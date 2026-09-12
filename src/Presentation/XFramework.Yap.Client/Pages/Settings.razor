@@ -60,7 +60,21 @@
                 <span class="set-key"><Icon Name="check" Size="19" /><span class="set-label">Installed<small>Yap is running as an app on this device</small></span></span>
             </div>
         }
-        else
+        <button type="button" class="set-row set-action" @onclick="() => changes = !changes" aria-expanded="@changes.ToString().ToLowerInvariant()">
+            <span class="set-key"><Icon Name="info" Size="19" /><span class="set-label">Version @Yap.Client.AppRelease.Version<small>What's new in Yap</small></span></span>
+            <Icon Name="arrow" Size="17" />
+        </button>
+        @if (changes)
+        {
+            <div class="set-note release-notes">
+                @foreach (var release in Yap.Client.AppRelease.History)
+                {
+                    <h3>@release.Version</h3><p>@release.Date</p>
+                    <ul>@foreach (var note in release.Notes) { <li>@note</li> }</ul>
+                }
+            </div>
+        }
+        @if (!installed)
         {
             <button type="button" class="set-row set-action" disabled="@(!canInstall)" @onclick="InstallAsync">
                 <span class="set-key"><Icon Name="download" Size="19" /><span class="set-label">Install Yap<small>@(canInstall ? "Add Yap to your home screen" : "In Safari, use Share, then Add to Home Screen")</small></span></span>
@@ -106,7 +120,7 @@
     </BottomSheet>
 }
 @code {
-    private bool signOut, gestures, glass, canInstall, installed;
+    private bool signOut, gestures, glass, changes, canInstall, installed;
     private string theme = "system";
     private string? persistNotice;
 

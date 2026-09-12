@@ -1666,6 +1666,11 @@ public sealed partial class ThreadService(
                         ConcurrencyStamp = Guid.NewGuid()
                     });
                 }
+                var receivedIds = messages.Where(m => m.MessageThreadMemberId != requesterMember.Id && undeliveredIds.Contains(m.Id)).Select(m => m.Id).ToList();
+                if (receivedIds.Count > 0)
+                    AddOutboxEvent(MessageRealtimeEvents.MessagesDelivered, caller.TenantId, request.ThreadId,
+                        requesterMember.Id, nameof(MessageDelivery), caller.CredentialId,
+                        new { request.ThreadId, MessageIds = receivedIds });
                 await SaveAndSignalAsync(ct);
             }
 
@@ -1702,6 +1707,20 @@ public sealed partial class ThreadService(
             var attachedIds = (await dataContext.Query<MessageFile>()
                 .Where(f => f.TenantId == caller.TenantId && messageIds.Contains(f.MessageId) && !f.IsDeleted && f.IsEnabled)
                 .ToListAsync(ct)).Select(f => f.MessageId).ToHashSet();
+            // Only return receipts for the caller's own messages; never count the sender's fetch.
+            var ownIds = messages.Where(m => m.MessageThreadMemberId == requesterMember.Id).Select(m => m.Id).ToList();
+            var receiptRows = await dataContext.Query<MessageDelivery>()
+                .Where(d => d.TenantId == caller.TenantId && ownIds.Contains(d.MessageId)
+                    && d.MessageThreadMemberId != requesterMember.Id && !d.IsDeleted && d.IsEnabled)
+                .ToListAsync(ct);
+            var readTypeId = await ResolveDeliveryTypeIdAsync(caller.TenantId, MessageDeliveryTypes.Read, ct);
+            var deliveredTypeIdForReceipts = await ResolveDeliveryTypeIdAsync(caller.TenantId, MessageDeliveryTypes.Delivered, ct);
+            var allowReadReceipts = await FeatureEnabledAsync(caller.TenantId, request.ThreadId, ConversationFeatures.ReadReceipts, ct)
+                && (await policyService.GetPolicyAsync(caller.TenantId, ct)).ReadReceiptsEnabled;
+            var deliveredCounts = receiptRows.Where(d => d.TypeId == readTypeId || d.TypeId == deliveredTypeIdForReceipts)
+                .GroupBy(d => d.MessageId).ToDictionary(g => g.Key, g => g.Select(d => d.MessageThreadMemberId).Distinct().Count());
+            var readCounts = receiptRows.Where(d => allowReadReceipts && d.TypeId == readTypeId)
+                .GroupBy(d => d.MessageId).ToDictionary(g => g.Key, g => g.Select(d => d.MessageThreadMemberId).Distinct().Count());
             var items = messages.Select(m =>
             {
                 memberMap.TryGetValue(m.MessageThreadMemberId, out var sender);
@@ -1719,7 +1738,9 @@ public sealed partial class ThreadService(
                     Reactions = reactionSummaries.GetValueOrDefault(m.Id) ?? [],
                     HasAttachments = attachedIds.Contains(m.Id),
                     IsThreadReply = m.IsThreadReply,
-                    ReplyCount = replyCounts.GetValueOrDefault(m.Id)
+                    ReplyCount = replyCounts.GetValueOrDefault(m.Id),
+                    DeliveredCount = deliveredCounts.GetValueOrDefault(m.Id),
+                    ReadCount = readCounts.GetValueOrDefault(m.Id)
                 };
             }).ToList();
 

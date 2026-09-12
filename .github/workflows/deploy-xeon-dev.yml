@@ -279,10 +279,10 @@ jobs:
             audit notifications storage attendance smsgateway wallets inventario pos
             portal operations-dashboard yap bolt-phase0-synthetics
           )
-          for service in "${services[@]}"; do
+          # Bound concurrency: avoid 16 competing dotnet publishers on the shared runner.
+          printf '%s\n' "${services[@]}" | xargs -r -n 1 -P 2 \
             timeout --foreground --kill-after=30s 15m \
-              docker compose -f "$COMPOSE_FILE_PATH" build "$service"
-          done
+            docker compose -f "$COMPOSE_FILE_PATH" build
 
       - name: Push images
         shell: bash
@@ -294,9 +294,8 @@ jobs:
             portal operations-dashboard yap bolt-phase0-synthetics
           )
           for service in "${services[@]}"; do
-            image="${REGISTRY_HOST}/${REGISTRY_NAMESPACE}/${service}:${IMAGE_TAG}"
-            timeout --foreground --kill-after=30s 10m docker push "$image"
-          done
+            printf '%s\n' "${REGISTRY_HOST}/${REGISTRY_NAMESPACE}/${service}:${IMAGE_TAG}"
+          done | xargs -r -n 1 -P 3 timeout --foreground --kill-after=30s 10m docker push
 
       - name: Stage candidate and capture previous release
         id: release

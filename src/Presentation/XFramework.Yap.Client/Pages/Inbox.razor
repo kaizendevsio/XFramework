@@ -20,7 +20,7 @@ else
     <div class="sectionhead">@(State.Online ? "Messages" : "Saved messages on this device")</div>
     @foreach (var hit in hits) { <a class="row" href="@($"/chat/{hit.ThreadId}?message={hit.MessageId}")"><Icon Name="search" /><span class="mid"><span class="t1">@State.Conversations.FirstOrDefault(x => x.Id == hit.ThreadId)?.Name</span><span class="t2">@hit.Text</span></span></a> }
 }
-@if (State.Conversations.Count < State.ConversationTotal) { <button class="btn ghost" disabled="@(!State.Online || State.Busy)" @onclick="State.LoadMoreConversationsAsync">Load more conversations</button> }
+@if (State.HasMoreConversations) { <button class="btn ghost" disabled="@(!State.Online || State.Busy)" @onclick="State.LoadMoreConversationsAsync">Load more conversations</button> }
 </div></ChildContent><Footer><TabBar Current="inbox" /></Footer></ScrollSurface>
 <button class="fab liquid-glass" aria-label="New conversation" disabled="@(!State.Online || State.NeedsLogin)" @onclick="() => choosing = true"><GlassLayer /><Icon Name="edit" /></button>
 }

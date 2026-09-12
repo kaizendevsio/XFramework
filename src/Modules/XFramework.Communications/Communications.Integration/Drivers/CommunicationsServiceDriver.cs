@@ -71,6 +71,8 @@ public interface ICommunicationsServiceWrapper : IServiceWrapper
     Task<CmdResponse> ArchiveThreadAsync(
         ArchiveThreadRequest request,
         CancellationToken ct = default);
+    Task<CmdResponse> DeleteThreadAsync(DeleteThreadRequest request, CancellationToken ct = default);
+    Task<QueryResponse<GetDeletedThreadsResponse>> GetDeletedThreadsAsync(GetDeletedThreadsRequest request, CancellationToken ct = default);
     Task<CmdResponse> AddThreadMemberAsync(
         AddThreadMemberRequest request,
         CancellationToken ct = default);
@@ -410,6 +412,9 @@ public sealed record CommunicationsServiceWrapper(
         ct.ThrowIfCancellationRequested();
         return SendVoidAsync(request, ct);
     }
+
+    public Task<CmdResponse> DeleteThreadAsync(DeleteThreadRequest request, CancellationToken ct = default) => SendVoidAsync(request, ct);
+    public Task<QueryResponse<GetDeletedThreadsResponse>> GetDeletedThreadsAsync(GetDeletedThreadsRequest request, CancellationToken ct = default) => SendAsync<GetDeletedThreadsRequest, GetDeletedThreadsResponse>(request, ct);
 
     public Task<CmdResponse> AddThreadMemberAsync(
         AddThreadMemberRequest request,

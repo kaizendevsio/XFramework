@@ -1,5 +1,13 @@
 # linux/amd64 manifests are pinned so deployment provenance includes immutable
 # compiler and runtime roots. Update both digests together during SDK upgrades.
+FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:493fca072aac81307027cbb7b7c9a82b6e87d222af315504d05dc6530e69b519 AS restore-inputs
+WORKDIR /inputs
+COPY src/ src/
+# Preserve paths for every project/import, without making restore depend on C#/UI edits.
+# COPY --from hashes the retained files, so source-only changes reuse the restore layer.
+RUN find src -type f ! -name '*.csproj' ! -name '*.props' ! -name '*.targets' \
+    ! -name '*.config' ! -name 'packages.lock.json' ! -name 'global.json' -delete
+
 FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:493fca072aac81307027cbb7b7c9a82b6e87d222af315504d05dc6530e69b519 AS build
 ARG PROJECT_PATH
 WORKDIR /src
@@ -13,11 +21,13 @@ RUN case "${PROJECT_PATH}" in *XFramework.Yap*) \
 COPY Directory.Packages.props Directory.Build.props* Version.props ./
 COPY XFramework.slnx ./
 
-# Copy all project files for restore
-COPY src/ src/
+# Copy dependency metadata before application sources.
+COPY --from=restore-inputs /inputs/src/ src/
 
 # Restore the specific project (and its dependencies)
 RUN dotnet restore "${PROJECT_PATH}"
+
+COPY src/ src/
 
 # Build + publish
 RUN dotnet publish "${PROJECT_PATH}" \

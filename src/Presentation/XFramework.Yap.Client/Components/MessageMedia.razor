@@ -8,10 +8,15 @@
     {
         @if (urls.TryGetValue(file.Id, out var url))
         {
-            @if (IsImage(file)) { <a href="@url" target="_blank" rel="noopener" aria-label="@($"Open {file.Name}")"><img src="@url" alt="@file.Name" draggable="false" @onerror="() => ImageFailedAsync(file, url)" /></a> }
+            @if (IsImage(file))
+            {
+                <div class="photo-preview">
+                    <button class="photo-open" aria-label="@($"View photo {file.Name}")" @onclick="() => viewing = file"><img src="@url" alt="@file.Name" draggable="false" @onerror="() => ImageFailedAsync(file, url)" /></button>
+                    @if (Message.LocalFileKey is null) { <button class="photo-download" aria-label="Download original photo" title="Download original" @onclick="() => State.OpenFileAsync(Message, file)"><Icon Name="download" Size="20" /></button> }
+                </div>
+            }
             else if (file.ContentType.StartsWith("video/")) { <video src="@url" controls playsinline preload="metadata" aria-label="@file.Name"></video> }
             else { <audio src="@url" controls preload="metadata" aria-label="Voice message"></audio> }
-            @if (IsHeif(file) && Message.LocalFileKey is null) { <button class="media-open" @onclick="() => State.OpenFileAsync(Message, file)">Download original</button> }
         }
         else { <button class="media-open" disabled="@loading" @onclick="() => OpenAsync(file)"><Icon Name="@(file.ContentType.StartsWith("audio/") ? "mic" : "file")" Size="20" /><span>@file.Name</span><small>@(file.Size / 1024) KB</small></button> }
     }
@@ -19,8 +24,14 @@
     @if (failed) { <button class="media-open" @onclick="LoadAsync">Attachment unavailable · retry</button> }
     </div>
 }
+@if (viewing is { } photo && urls.TryGetValue(photo.Id, out var photoUrl))
+{
+    <PhotoViewer Url="@photoUrl" Name="@photo.Name" OnClose="() => viewing = null" CanDownload="@(Message.LocalFileKey is null)" OnDownload="() => State.OpenFileAsync(Message, photo)" />
+}
 @code {
     [Parameter, EditorRequired] public ChatMessage Message { get; set; } = default!;
+    [Parameter] public EventCallback MetadataLoaded { get; set; }
+    private ChatAttachment? viewing;
     private readonly Dictionary<Guid, string> urls = [];
     private bool loading, failed, disposed;
     private string? loaded;
@@ -41,7 +52,7 @@
         try
         {
             await ReleaseAsync();
-            if (message.Attachments.Count == 0) await State.LoadAttachmentMetadataAsync(message);
+            if (message.Attachments.Count == 0) { await State.LoadAttachmentMetadataAsync(message); await MetadataLoaded.InvokeAsync(); }
             if (request != version || disposed) return;
             foreach (var file in message.Attachments.Where(f => IsImage(f) || message.LocalFileKey is not null && (f.ContentType.StartsWith("audio/") || f.ContentType.StartsWith("video/")))) await OpenAsync(message, file, request);
         }

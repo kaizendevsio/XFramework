@@ -20,6 +20,7 @@ public sealed class Conversation
     public int Members { get; set; }
     public int Unread { get; set; }
     public bool Muted { get; set; }
+    public bool Removed { get; set; }
     public string Preview { get; set; } = "Start a conversation";
     public DateTime? LastMessageAt { get; set; }
     public List<Person> People { get; set; } = [];
@@ -55,6 +56,8 @@ public sealed class ChatMessage
     public string? AvatarUrl { get; set; }
     public string? LocalFileKey { get; set; }
     public string Delivery { get; set; } = "Sent";
+    public int ReadCount { get; set; }
+    public int DeliveredCount { get; set; }
     public string Initials => InitialsFor(Sender);
     public string Color => Mine ? "g1" : "g3";
     public string Time => CreatedAt.ToLocalTime().ToString("HH:mm");

@@ -34,6 +34,12 @@ public static class YapApi
             return new ChatDefaults(data.ThreadTypeId,
                 data.ReactionTypes.Select(x => new ReactionType(x.Id, x.Name, x.Emoji)).ToList());
         });
+        api.MapGet("/conversations/deleted", async (int? page, ICommunicationsChatClient client, CancellationToken ct) =>
+        {
+            var session = await client.ForCurrentActorAsync(ct: ct);
+            var data = Require(await session.GetDeletedThreadsAsync(Page(page), ct));
+            return new ChatPage<Guid>(data.Items, data.TotalCount);
+        });
         api.MapGet("/conversations", async (int? page, ICommunicationsChatClient client, IChatDirectory directory, CancellationToken ct) =>
         {
             var session = await client.ForCurrentActorAsync(ct: ct);
@@ -44,7 +50,7 @@ public static class YapApi
             {
                 Id = x.Id, Name = x.IsDirect ? people.FirstOrDefault(p => p.Id == x.OtherCredentialId)?.Name ?? "Direct message" : x.Name,
                 Group = !x.IsDirect, Members = x.MemberCount, Unread = x.UnreadCount,
-                Muted = x.IsMuted,
+                Muted = x.IsMuted, Removed = x.IsArchived,
                 Preview = x.LastMessagePreview ?? "Start a conversation", LastMessageAt = x.LastMessageAt
             }).ToList(), data.TotalCount);
         });
@@ -76,6 +82,7 @@ public static class YapApi
                     ? people.FirstOrDefault(p => p.Id == x.SenderCredentialId)?.Name ?? "Workspace member" : x.SenderAlias,
                 Text = x.Text, CreatedAt = x.CreatedAt, Mine = x.SenderCredentialId == session.CredentialId,
                 HasAttachments = x.HasAttachments, IsThreadReply = x.IsThreadReply,
+                DeliveredCount = x.DeliveredCount, ReadCount = x.ReadCount,
                 AvatarUrl = people.FirstOrDefault(p => p.Id == x.SenderCredentialId)?.AvatarUrl,
                 ParentId = x.ParentMessageId, Pinned = x.IsPinned, Saved = x.IsSaved, ReplyTotal = x.ReplyCount,
                 Reactions = x.Reactions.ToDictionary(r => r.Emoji, r => r.Count),
@@ -99,6 +106,7 @@ public static class YapApi
             var data = request.Group || request.Members.Count > 1
                 ? Require(await session.CreateThreadAsync(new CreateThreadRequest { Name = request.Name, TypeId = defaults.ThreadTypeId, InitialMemberCredentialIds = request.Members }, ct))
                 : Require(await session.CreateDirectThreadAsync(request.Members[0], name: request.Name, ct: ct));
+            Require(await session.ArchiveThreadAsync(data.ThreadId, false, ct));
             return new { Id = data.ThreadId };
         });
         api.MapPost("/messages", async (SendMessage request, ICommunicationsChatClient client, CancellationToken ct) =>
@@ -160,6 +168,8 @@ public static class YapApi
             switch (request.Action)
             {
                 case "mute": Require(await session.MuteThreadAsync(request.ThreadId, request.Value, ct)); break;
+                case "delete-for-me": Require(await session.ArchiveThreadAsync(request.ThreadId, true, ct)); break;
+                case "delete-for-everyone": Require(await session.DeleteThreadAsync(request.ThreadId, ct)); break;
                 case "typing": await session.PublishTypingAsync(request.ThreadId, request.Value, ct); break;
                 default: throw new YapApiException(400, "Choose a supported conversation action.");
             }

@@ -252,6 +252,7 @@ jobs:
 
       - name: Test Yap chat application
         run: |
+          node --test src/Tests/Yap.Tests/*.test.mjs
           dotnet test src/Tests/Yap.Tests/Yap.Tests.csproj \
             --configuration Release --no-build --no-restore
           dotnet test src/Tests/Yap.Client.Tests/Yap.Client.Tests.csproj \
