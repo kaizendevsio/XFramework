@@ -75,7 +75,7 @@ else
                     </BbCardHeader>
                     <BbCardContent>
                         <BbDataGrid Items="@_balances.Where(x => Matches(x.ProductId, x.ProductVariationId, x.LotId, x.WarehouseId)).ToList()" ShowPagination="true" InitialPageSize="20"
-                                    OnRowClick="@((StockBalance item) => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}"))"
+                                    OnRowClick="@((StockBalance item) => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}{ProductQuery}"))"
                                     Class="cursor-pointer">
                             <Columns><InventoryTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></InventoryTemplateColumn>
                                 <InventoryTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
@@ -101,7 +101,7 @@ else
                                 <BbDataGridTemplateColumn Title="Actions">
                                     <ChildContent Context="item">
                                         <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View stock balance"
-                                                  OnClick="@(() => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}"))">
+                                                  OnClick="@(() => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}{ProductQuery}"))">
                                             <LucideIcon Name="eye" class="h-4 w-4" />
                                         </BbButton>
                                         <div @onclick:stopPropagation="true"><BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => OpenForBalance(item))">Adjust</BbButton></div>
@@ -122,7 +122,7 @@ else
                     </BbCardHeader>
                     <BbCardContent>
                         <BbDataGrid Items="@_movements.Where(x => Matches(x.ProductId, x.ProductVariationId, x.LotId, x.WarehouseId)).ToList()" ShowPagination="true" InitialPageSize="20"
-                                    OnRowClick="@((InventoryMovement item) => Navigation.NavigateTo($"/inventario/stock/movements/{item.Id}"))"
+                                    OnRowClick="@((InventoryMovement item) => Navigation.NavigateTo($"/inventario/stock/movements/{item.Id}{ProductQuery}"))"
                                     Class="cursor-pointer">
                             <Columns><InventoryTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></InventoryTemplateColumn>
                                 <InventoryTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
@@ -144,7 +144,7 @@ else
                                 <BbDataGridTemplateColumn Title="Actions">
                                     <ChildContent Context="item">
                                         <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View movement"
-                                                  OnClick="@(() => Navigation.NavigateTo($"/inventario/stock/movements/{item.Id}"))">
+                                                  OnClick="@(() => Navigation.NavigateTo($"/inventario/stock/movements/{item.Id}{ProductQuery}"))">
                                             <LucideIcon Name="eye" class="h-4 w-4" />
                                         </BbButton>
                                     </ChildContent>
@@ -278,6 +278,7 @@ else
     private string _warehouseFilter = "all";
     private string _stockView = "balances";
     [SupplyParameterFromQuery] public Guid? ProductId { get; set; }
+    private string ProductQuery => ProductId is { } productId ? $"?productId={productId}" : "";
     private int FilteredBalanceCount => _balances.Count(x => Matches(x.ProductId, x.ProductVariationId, x.LotId, x.WarehouseId));
     private int FilteredMovementCount => _movements.Count(x => Matches(x.ProductId, x.ProductVariationId, x.LotId, x.WarehouseId));
     private void ClearFilters()

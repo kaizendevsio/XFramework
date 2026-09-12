@@ -87,23 +87,18 @@ else
                             <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" Filterable="true" />
                             <BbDataGridTemplateColumn Title="Actions">
                                 <ChildContent Context="item">
-                                    @if (item.Status == ReservationStatus.Active)
-                                    {
-                                        <div class="flex flex-wrap gap-1" @onclick:stopPropagation="true">
+                                    <div class="flex flex-wrap gap-1" @onclick:stopPropagation="true">
+                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View reservation"
+                                                  OnClick="@(() => Navigation.NavigateTo($"/inventario/reservations/{item.Id}"))">
+                                            <LucideIcon Name="eye" class="h-4 w-4" />
+                                        </BbButton>
+                                        @if (item.Status == ReservationStatus.Active)
+                                        {
                                             <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => ReleaseReservation(item.Id))">Release</BbButton>
                                             <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => FulfillReservation(item.Id))">Fulfill</BbButton>
                                             <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Destructive" OnClick="@(() => CancelReservation(item.Id))">Cancel</BbButton>
-                                        </div>
-                                    }
-                                    else
-                                    {
-                                        <div @onclick:stopPropagation="true">
-                                            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View reservation"
-                                                      OnClick="@(() => Navigation.NavigateTo($"/inventario/reservations/{item.Id}"))">
-                                                <LucideIcon Name="eye" class="h-4 w-4" />
-                                            </BbButton>
-                                        </div>
-                                    }
+                                        }
+                                    </div>
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
                         </Columns>
@@ -194,15 +189,25 @@ else
                 }
             }
             <div class="grid gap-3 md:grid-cols-3">
+                <div>
                 <BbFormFieldNumericInput TValue="decimal"
                                          @bind-Value="_form.Quantity"
                                          Label="Quantity"
                                          Min="0"
                                          DecimalPlaces="4"
                                          Step="1" />
+                    @if (QuantityValidationMessage is { } quantityMessage)
+                    {
+                        <p role="alert" class="text-sm text-destructive">@quantityMessage</p>
+                    }
+                </div>
                 <BbFormFieldDatePicker @bind-Value="_form.ExpiresAt" Label="Expires At" />
                 <BbFormFieldInput TValue="string" @bind-Value="_form.ReferenceType" Label="Reference Type" />
             </div>
+            @if (_reserveError is not null)
+            {
+                <BbAlert><BbAlertTitle>Reservation not created</BbAlertTitle><BbAlertDescription>@_reserveError</BbAlertDescription></BbAlert>
+            }
             <div class="grid gap-3 md:grid-cols-2">
                 <BbFormFieldInput TValue="string" @bind-Value="_form.ReferenceId" Label="Reference ID" />
                 <BbFormFieldInput TValue="string" @bind-Value="_form.Reason" Label="Reason" />
@@ -226,6 +231,7 @@ else
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private ILogger<Reservations> Logger { get; set; } = default!;
     private string? _loadError;
+    private string? _reserveError;
 
     private ReservationForm _form = new();
     private List<Product> _products = [];
@@ -252,7 +258,12 @@ else
     private bool _reserving;
     private bool _expiring;
     private bool _reservationDialogOpen;
-    private bool IsReserveDisabled => _reserving || string.IsNullOrEmpty(_form.ProductId) || _form.Quantity <= 0 || _products.Count == 0 || _warehouses.Count == 0 || _locations.Count == 0;
+    private string? QuantityValidationMessage => _form.Quantity <= 0
+        ? "Enter a quantity greater than zero."
+        : !string.IsNullOrEmpty(_form.ProductId) && !string.IsNullOrEmpty(_form.WarehouseId) && !string.IsNullOrEmpty(_form.LocationId) && _form.Quantity > AvailableStock
+            ? $"Requested quantity {_form.Quantity:0.####} exceeds the {AvailableStock:0.####} currently available. Reduce the quantity or select another stock position."
+            : null;
+    private bool IsReserveDisabled => _reserving || string.IsNullOrEmpty(_form.ProductId) || string.IsNullOrEmpty(_form.WarehouseId) || string.IsNullOrEmpty(_form.LocationId) || QuantityValidationMessage is not null || _products.Count == 0 || _warehouses.Count == 0 || _locations.Count == 0;
 
     protected override void OnInitialized()
     {
@@ -369,13 +380,14 @@ else
             return;
         }
 
-        if (_form.Quantity <= 0)
+        if (QuantityValidationMessage is { } quantityMessage)
         {
-            ToastService.Show("Quantity must be greater than zero.");
+            ToastService.Show(quantityMessage);
             return;
         }
 
         _reserving = true;
+        _reserveError = null;
         try
         {
             var result = await Inventario.ReserveInventory(new ReserveInventoryRequest
@@ -395,7 +407,12 @@ else
                 ExpiredLotOverrideReason = NullIfEmpty(_form.ExpiredLotOverrideReason)
             });
 
-            ToastService.Show(result.IsSuccess ? "Inventory reserved." : "Could not reserve inventory.");
+            if (!result.IsSuccess)
+            {
+                _reserveError = ReservationFailureMessage(result);
+                return;
+            }
+            ToastService.Show("Inventory reserved.");
             if (result.IsSuccess)
             {
                 _form.Quantity = 0m;
@@ -414,8 +431,24 @@ else
         }
     }
 
+    private static string ReservationFailureMessage(CmdResponse result) => result.Message switch
+    {
+        "Insufficient allocatable stock for the requested reservation quantity." =>
+            "Not enough eligible stock is available. Reduce the quantity or refresh stock availability before trying again.",
+        "Expired lot override requires a reason." => "Enter a reason for the expired lot override.",
+        _ => result.HttpStatusCode switch
+        {
+            System.Net.HttpStatusCode.Conflict => "Stock changed while reserving. Refresh stock availability and review the quantity before trying again.",
+            System.Net.HttpStatusCode.BadRequest => "Review the quantity, selected lot, and expiry or override details before trying again.",
+            System.Net.HttpStatusCode.Unauthorized => "Your session expired. Sign in again before reserving stock.",
+            System.Net.HttpStatusCode.Forbidden => "You do not have access to reserve stock in the selected tenant.",
+            _ => "The reservation service is unavailable. Your draft is retained; try again when the service is available."
+        }
+    };
+
     private void OpenReservationDialog()
     {
+        _reserveError = null;
         _form = new();
         ApplyDefaultSelections();
         _reservationDialogOpen = true;

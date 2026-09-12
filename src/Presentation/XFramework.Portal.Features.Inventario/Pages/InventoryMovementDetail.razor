@@ -19,7 +19,7 @@ else if (!_movementsEnabled)
 else if (_outsideTenantContext)
 {
     <div class="space-y-4">
-        <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo("/inventario/stock"))">
+        <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo($"/inventario/stock{ProductQuery}"))">
             <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
             Back to Stock
         </BbButton>
@@ -39,7 +39,7 @@ else
         <div class="space-y-6 inv-page">
             <div class="flex items-center gap-4">
                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to stock"
-                          OnClick="@(() => Navigation.NavigateTo("/inventario/stock"))">
+                          OnClick="@(() => Navigation.NavigateTo($"/inventario/stock{ProductQuery}"))">
                     <LucideIcon Name="arrow-left" class="h-4 w-4" />
                 </BbButton>
                 <div class="flex-1">
@@ -142,6 +142,8 @@ else
 
 @code {
     [Parameter] public Guid Id { get; set; }
+    [SupplyParameterFromQuery] public Guid? ProductId { get; set; }
+    private string ProductQuery => ProductId is { } productId ? $"?productId={productId}" : "";
 
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;

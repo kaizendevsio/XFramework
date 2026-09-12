@@ -1,0 +1,9 @@
+C:\Users\Xeon\.codex\worktrees\8b92\XFramework\src\Tests\Inventario.IntegrationTests\Infrastructure\InventarioIntegrationTestFixture.cs(67,21): warning CS0618: 'PostgreSqlBuilder.PostgreSqlBuilder()' is obsolete: 'This parameterless constructor is obsolete and will be removed. Use the constructor with the image parameter instead: https://github.com/testcontainers/testcontainers-dotnet/discussions/1470#discussioncomment-15185721.' [C:\Users\Xeon\.codex\worktrees\8b92\XFramework\src\Tests\Inventario.IntegrationTests\Inventario.IntegrationTests.csproj]
+  Inventario.IntegrationTests -> C:\Users\Xeon\.codex\worktrees\8b92\XFramework\src\Tests\Inventario.IntegrationTests\bin\Debug\net10.0\Inventario.IntegrationTests.dll
+Test run for C:\Users\Xeon\.codex\worktrees\8b92\XFramework\src\Tests\Inventario.IntegrationTests\bin\Debug\net10.0\Inventario.IntegrationTests.dll (.NETCoreApp,Version=v10.0)
+VSTest version 18.0.1 (x64)
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+
+Passed!  - Failed:     0, Passed:    16, Skipped:     0, Total:    16, Duration: 98 ms - Inventario.IntegrationTests.dll (net10.0)

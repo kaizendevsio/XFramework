@@ -1,0 +1,189 @@
+- heading "Reservations" [level=3, ref=e1]
+- paragraph
+  - StaticText "Reserve, release, fulfill, and expire allocated inventory."
+- button "Reserve Inventory" [ref=e2]
+  - image
+  - StaticText "Reserve Inventory"
+- button "Expire Due" [ref=e3]
+  - image
+  - StaticText "Expire Due"
+- button "Refresh" [ref=e4]
+  - image
+  - StaticText "Refresh"
+- group
+  - LabelText
+    - StaticText "Search reservations"
+  - textbox "Search reservations" [ref=e7]
+- LabelText
+  - StaticText "Status"
+- combobox "Status" [expanded=false, ref=e8]: All history
+  - StaticText "All history"
+  - image
+- heading "Reservation List" [level=3, ref=e5]
+- paragraph
+  - StaticText "3 reservation(s) loaded"
+- generic
+  - grid
+    - rowgroup
+      - row "Variant Filter Variant Warehouse Filter Warehouse Allocated lots Filter Allocated lots Product Filter Product Location Filter Location Qty Filter Qty Status Filter Status Reference Filter Reference Reserved Filter Reserved Expires Filter Expires Actions"
+        - columnheader "Variant Filter Variant" [ref=e54]
+          - StaticText "Variant"
+          - button "Filter Variant" [expanded=false, ref=e74]
+            - image
+        - columnheader "Warehouse Filter Warehouse" [ref=e55]
+          - StaticText "Warehouse"
+          - button "Filter Warehouse" [expanded=false, ref=e75]
+            - image
+        - columnheader "Allocated lots Filter Allocated lots" [ref=e56]
+          - StaticText "Allocated lots"
+          - button "Filter Allocated lots" [expanded=false, ref=e76]
+            - image
+        - columnheader "Product Filter Product" [ref=e57]
+          - StaticText "Product"
+          - button "Filter Product" [expanded=false, ref=e77]
+            - image
+        - columnheader "Location Filter Location" [ref=e58]
+          - StaticText "Location"
+          - button "Filter Location" [expanded=false, ref=e78]
+            - image
+        - columnheader "Qty Filter Qty" [ref=e59] clickable [cursor:pointer, tabindex]
+          - StaticText "Qty"
+          - image
+          - button "Filter Qty" [expanded=false, ref=e79]
+            - image
+        - columnheader "Status Filter Status" [ref=e60]
+          - StaticText "Status"
+          - button "Filter Status" [expanded=false, ref=e80]
+            - image
+        - columnheader "Reference Filter Reference" [ref=e61]
+          - StaticText "Reference"
+          - button "Filter Reference" [expanded=false, ref=e81]
+            - image
+        - columnheader "Reserved Filter Reserved" [ref=e62] clickable [cursor:pointer, tabindex]
+          - StaticText "Reserved"
+          - image
+          - button "Filter Reserved" [expanded=false, ref=e82]
+            - image
+        - columnheader "Expires Filter Expires" [ref=e63] clickable [cursor:pointer, tabindex]
+          - StaticText "Expires"
+          - image
+          - button "Filter Expires" [expanded=false, ref=e83]
+            - image
+        - columnheader "Actions" [ref=e64]
+          - StaticText "Actions"
+    - row "Base product WH - Fixture warehouse Fixture Shirt Fixture bin 2 Active Fixture base 9/12/2026 12:00:00 AM View reservation Release Fulfill Cancel" [ref=e16] clickable [cursor:pointer, tabindex]
+      - gridcell "Base product" [ref=e25]
+      - gridcell "WH - Fixture warehouse" [ref=e26]
+      - gridcell
+      - gridcell "Fixture Shirt" [ref=e27]
+      - gridcell "Fixture bin" [ref=e28]
+      - gridcell "2" [ref=e29]
+      - gridcell "Active" [ref=e30]
+      - gridcell "Fixture base" [ref=e31]
+      - gridcell "9/12/2026 12:00:00 AM" [ref=e32]
+      - gridcell
+      - gridcell "View reservation Release Fulfill Cancel" [ref=e33]
+        - button "View reservation" [ref=e65]
+          - image
+        - button "Release" [ref=e66]
+        - button "Fulfill" [ref=e67]
+        - button "Cancel" [ref=e68]
+    - row "Size: QA Medium WH - Fixture warehouse Fixture Shirt Fixture bin 1 Active Fixture variant 9/12/2026 12:00:00 AM View reservation Release Fulfill Cancel" [ref=e17] clickable [cursor:pointer, tabindex]
+      - gridcell "Size: QA Medium" [ref=e34]
+      - gridcell "WH - Fixture warehouse" [ref=e35]
+      - gridcell
+      - gridcell "Fixture Shirt" [ref=e36]
+      - gridcell "Fixture bin" [ref=e37]
+      - gridcell "1" [ref=e38]
+      - gridcell "Active" [ref=e39]
+      - gridcell "Fixture variant" [ref=e40]
+      - gridcell "9/12/2026 12:00:00 AM" [ref=e41]
+      - gridcell
+      - gridcell "View reservation Release Fulfill Cancel" [ref=e42]
+        - button "View reservation" [ref=e69]
+          - image
+        - button "Release" [ref=e70]
+        - button "Fulfill" [ref=e71]
+        - button "Cancel" [ref=e72]
+    - row "Base product WH - Fixture warehouse Fixture Shirt Fixture bin 2 Released Fixture base 9/12/2026 12:00:00 AM View reservation" [ref=e18] clickable [cursor:pointer, tabindex]
+      - gridcell "Base product" [ref=e43]
+      - gridcell "WH - Fixture warehouse" [ref=e44]
+      - gridcell
+      - gridcell "Fixture Shirt" [ref=e45]
+      - gridcell "Fixture bin" [ref=e46]
+      - gridcell "2" [ref=e47]
+      - gridcell "Released" [ref=e48]
+      - gridcell "Fixture base" [ref=e49]
+      - gridcell "9/12/2026 12:00:00 AM" [ref=e50]
+      - gridcell
+      - gridcell "View reservation" [ref=e51]
+        - button "View reservation" [ref=e73]
+          - image
+  - StaticText "Scroll table horizontally for more columns"
+- navigation "Pagination" [ref=e6]
+  - StaticText "Showing 1-3 of 3"
+  - list
+    - listitem [level=1]
+      - button "Previous" [disabled, ref=e52]
+        - image
+        - StaticText "Previous"
+    - listitem [level=1]
+      - button "Next" [disabled, ref=e53]
+        - StaticText "Next"
+        - image
+- dialog "Reserve Inventory"
+  - heading "Reserve Inventory" [level=2, ref=e9]
+  - paragraph
+    - StaticText "Reservations reduce available quantity without changing on-hand stock."
+  - LabelText
+    - StaticText "Product"
+  - button "Product" [expanded=false, ref=e10]
+    - StaticText "Fixture Shirt (SHIRT)"
+    - image
+  - LabelText
+    - StaticText "Warehouse"
+  - button "Warehouse" [expanded=false, ref=e11]
+    - StaticText "WH - Fixture warehouse"
+    - image
+  - LabelText
+    - StaticText "Location"
+  - button "Location" [expanded=false, ref=e12]
+    - StaticText "BIN - Fixture bin"
+    - image
+  - LabelText
+    - StaticText "Variant"
+  - combobox "Variant" [expanded=false, ref=e19]: Base product
+    - StaticText "Base product"
+    - image
+  - paragraph
+    - StaticText "Available stock: 10. Leaving the lot empty allocates eligible stock with the earliest expiry first."
+  - group
+    - LabelText
+      - StaticText "Quantity"
+    - textbox "Quantity" [ref=e20]: 11.0000
+      - StaticText "11.0000"
+  - alert
+    - StaticText "Requested quantity 11 exceeds the 10 currently available. Reduce the quantity or select another stock position."
+  - group
+    - LabelText
+      - StaticText "Expires At"
+    - button "Pick a date" [expanded=false, ref=e21]
+      - image
+      - StaticText "Pick a date"
+  - group
+    - LabelText
+      - StaticText "Reference Type"
+    - textbox "Reference Type" [ref=e22]
+  - group
+    - LabelText
+      - StaticText "Reference ID"
+    - textbox "Reference ID" [ref=e23]
+  - group
+    - LabelText
+      - StaticText "Reason"
+    - textbox "Reason" [ref=e24]
+  - button "Cancel" [ref=e13]
+  - button "Reserve" [disabled, ref=e14]
+  - button "Close" [ref=e15]
+    - image
+    - StaticText "Close"

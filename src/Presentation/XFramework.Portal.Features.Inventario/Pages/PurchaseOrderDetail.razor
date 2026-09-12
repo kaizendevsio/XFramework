@@ -113,7 +113,9 @@ else
                                 OnRowClick="@((ReceivingDocument item) => Navigation.NavigateTo($"/inventario/receiving/{item.Id}"))"
                                 Class="cursor-pointer">
                         <EmptyTemplate>No receipts yet. Use Receive remaining on an open order to record delivery.</EmptyTemplate><Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.ReceiptNumber)" Title="Receipt" Sortable="true" Filterable="true" />
+                            <InventoryTemplateColumn Title="Receipt" Sortable="true" SortBy="@(item => item.ReceiptNumber)" Filterable="true" FilterBy="@(item => item.ReceiptNumber)">
+                                <ChildContent Context="item"><a href="@($"/inventario/receiving/{item.Id}")" aria-label="@($"View receipt: {item.ReceiptNumber}")">@item.ReceiptNumber</a></ChildContent>
+                            </InventoryTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Filterable="true" />
@@ -147,6 +149,7 @@ else
     }
 
     [Parameter] public Guid Id { get; set; }
+    [SupplyParameterFromQuery] public Guid? SupplierId { get; set; }
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
@@ -234,7 +237,9 @@ else
         }
     }
 
-    private void GoBack() => Navigation.NavigateTo("/inventario/purchase-orders");
+    private void GoBack() => Navigation.NavigateTo(SupplierId is { } supplierId
+        ? $"/inventario/purchase-orders?supplierId={supplierId}"
+        : "/inventario/purchase-orders");
     private string GetProductName(Guid productId) => _products.FirstOrDefault(x => x.Id == productId)?.Name ?? productId.ToString()[..8];
     private string GetSupplierName(Guid? supplierId) => supplierId is { } id ? _suppliers.FirstOrDefault(x => x.Id == id)?.Name ?? id.ToString()[..8] : "No supplier";
     private static string GetStatusBadge(PurchaseOrderStatus status) =>

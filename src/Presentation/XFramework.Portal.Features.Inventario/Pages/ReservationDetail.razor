@@ -111,6 +111,10 @@ else
                             <div>@GetProductLabel()</div>
                         </div>
                         <div>
+                            <BbTypographyMuted>Variant</BbTypographyMuted>
+                            <div>@InventoryDisplay.Variant(_variants, _reservation.ProductVariationId)</div>
+                        </div>
+                        <div>
                             <BbTypographyMuted>Warehouse</BbTypographyMuted>
                             <div>@GetWarehouseLabel()</div>
                         </div>
@@ -119,8 +123,12 @@ else
                             <div>@GetLocationLabel()</div>
                         </div>
                         <div>
-                            <BbTypographyMuted>Stock Balance</BbTypographyMuted>
+                            <BbTypographyMuted>Current stock position</BbTypographyMuted>
                             <div>@GetBalanceLabel()</div>
+                            @if (_reservation.StockBalanceId is { } balanceId)
+                            {
+                                <a href="@($"/inventario/stock/balances/{balanceId}")">View stock position</a>
+                            }
                         </div>
                         <div>
                             <BbTypographyMuted>Reference</BbTypographyMuted>
@@ -172,11 +180,11 @@ else
                                 <BbDataGridPropertyColumn Property="@(x => x.ReservedAt)" Title="Reserved" Sortable="true" Filterable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.ReleasedAt)" Title="Released" Sortable="true" Filterable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.FulfilledAt)" Title="Fulfilled" Sortable="true" Filterable="true" />
-                                <InventoryTemplateColumn Title="Balance" Filterable="true" SortBy="@(item => ShortId(item.StockBalanceId))" FilterBy="@(item => ShortId(item.StockBalanceId))">
+                                <BbDataGridTemplateColumn Title="Stock position">
                                     <ChildContent Context="item">
-                                        <span class="font-mono text-xs">@ShortId(item.StockBalanceId)</span>
+                                        <a href="@($"/inventario/stock/balances/{item.StockBalanceId}")">View stock position</a>
                                     </ChildContent>
-                                </InventoryTemplateColumn>
+                                </BbDataGridTemplateColumn>
                             </Columns>
                         </BbDataGrid>
                     }
@@ -198,6 +206,7 @@ else
 
     private Reservation? _reservation;
     private Product? _product;
+    private List<ProductVariation> _variants = [];
     private Warehouse? _warehouse;
     private InventoryLocation? _location;
     private StockBalance? _balance;
@@ -236,6 +245,7 @@ else
             _outsideTenantContext = false;
             _reservation = null;
             _product = null;
+            _variants = [];
             _warehouse = null;
             _location = null;
             _balance = null;
@@ -259,6 +269,15 @@ else
                 .NoCache()
                 .Where(x => x.TenantId == tenantId && x.Id == _reservation.ProductId && !x.IsDeleted)
                 .FirstOrDefaultAsync();
+
+            if (_reservation.ProductVariationId is { } variantId)
+            {
+                _variants = await DataContext.Query<ProductVariation>()
+                    .NoCache()
+                    .Where(x => x.TenantId == tenantId && x.Id == variantId && !x.IsDeleted)
+                    .Take(1)
+                    .ToListAsync();
+            }
 
             if (_reservation.WarehouseId is { } warehouseId)
             {
@@ -382,7 +401,9 @@ else
         _location is null ? ShortId(_reservation?.LocationId) : $"{_location.Code} - {_location.Name}";
 
     private string GetBalanceLabel() =>
-        _balance is null ? ShortId(_reservation?.StockBalanceId) : $"{_balance.OnHandQuantity:N2} on hand";
+        _balance is null
+            ? "See allocated stock positions below."
+            : $"{_balance.OnHandQuantity:N2} on hand / {_balance.ReservedQuantity:N2} reserved / {_balance.AvailableQuantity:N2} available";
 
     private string GetLotLabel(Guid? lotId)
     {

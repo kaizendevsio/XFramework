@@ -259,6 +259,7 @@ else
                     <BbFormFieldInput TValue="string" @bind-Value="_movementForm.UnitOfMeasure" Label="Unit" />
                     <BbFormFieldInput TValue="string" @bind-Value="_movementForm.ReferenceType" Label="Reference Type" />
                 </div>
+                <p class="text-sm text-muted-foreground">Available in selected position: @SelectedMovementAvailable.ToString("0.####"). For adjustments, use a positive quantity to add stock or a negative quantity to remove it. Reservation/release changes reserved stock; other types change on-hand.</p>
                 <BbFormFieldInput TValue="string" @bind-Value="_movementForm.Reason" Label="Reason" />
                 @if (_negativeStockEnabled)
                 {
@@ -829,8 +830,16 @@ else
     private decimal TotalOnHand => _balances.Sum(x => x.OnHandQuantity);
     private decimal TotalReserved => _balances.Sum(x => x.ReservedQuantity);
     private int ActiveLocationCount => _balances.Select(x => x.LocationId).Distinct().Count();
+    private decimal SelectedMovementAvailable => _balances.Where(x =>
+        x.ProductId == _product?.Id &&
+        (x.ProductVariationId?.ToString() ?? "") == _movementForm.ProductVariationId &&
+        x.WarehouseId.ToString() == _movementForm.WarehouseId &&
+        x.LocationId.ToString() == _movementForm.LocationId &&
+        (x.LotId?.ToString() ?? "") == _movementForm.LotId).Sum(x => x.AvailableQuantity);
     private bool IsPostMovementDisabled =>
         _savingMovement ||
+        _product is null ||
+        _movementForm.Quantity == 0 ||
         _warehouses.Count == 0 ||
         _locations.Count == 0 ||
         string.IsNullOrWhiteSpace(_movementForm.WarehouseId) ||
@@ -1241,7 +1250,7 @@ else
             </BbCardHeader>
             <BbCardContent>
                 <BbDataGrid Items="@_balances" ShowPagination="true" InitialPageSize="20"
-                            OnRowClick="@((StockBalance item) => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}"))"
+                            OnRowClick="@((StockBalance item) => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}?productId={Id}"))"
                             Class="cursor-pointer">
                     <Columns>
                         @if (CanPickVariant)
@@ -1251,7 +1260,7 @@ else
                             </InventoryTemplateColumn>
                         }
                         <InventoryTemplateColumn Title="Warehouse" Filterable="true" SortBy="@(item => GetWarehouseName(item.WarehouseId))" FilterBy="@(item => GetWarehouseName(item.WarehouseId))">
-                            <ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent>
+                            <ChildContent Context="item"><a href="@($"/inventario/stock/balances/{item.Id}?productId={Id}")" aria-label="@($"View stock position: {GetWarehouseName(item.WarehouseId)}")">@GetWarehouseName(item.WarehouseId)</a></ChildContent>
                         </InventoryTemplateColumn>
                         <InventoryTemplateColumn Title="Location" Filterable="true" SortBy="@(item => GetLocationName(item.LocationId))" FilterBy="@(item => GetLocationName(item.LocationId))">
                             <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
@@ -1332,7 +1341,9 @@ else
                             OnRowClick="@((InventoryLot item) => Navigation.NavigateTo($"/inventario/lots/{item.Id}"))"
                             Class="cursor-pointer">
                     <Columns>
-                        <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot / Batch" Sortable="true" Filterable="true" />
+                        <InventoryTemplateColumn Title="Lot / Batch" Sortable="true" SortBy="@(item => item.LotNumber)" Filterable="true" FilterBy="@(item => item.LotNumber)">
+                                <ChildContent Context="item"><a href="@($"/inventario/lots/{item.Id}")" aria-label="@($"View lot: {item.LotNumber}")">@item.LotNumber</a></ChildContent>
+                            </InventoryTemplateColumn>
                         @if (CanPickVariant)
                         {
                             <InventoryTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => GetVariantName(item.ProductVariationId))" FilterBy="@(item => GetVariantName(item.ProductVariationId))">

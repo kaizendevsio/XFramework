@@ -1,0 +1,88 @@
+- heading "Products" [level=3, ref=e1]
+- paragraph
+  - StaticText "Manage the selected tenant's product catalog."
+- button "Create Product" [ref=e2]
+  - image
+  - StaticText "Create Product"
+- heading "Total Products" [level=3, ref=e3]
+- heading "2" [level=2, ref=e4]
+- heading "Catalog enabled" [level=3, ref=e5]
+- heading "0" [level=2, ref=e6]
+- heading "Low Stock" [level=3, ref=e7]
+- heading "2" [level=2, ref=e8]
+- heading "Categories" [level=3, ref=e9]
+- heading "1" [level=2, ref=e10]
+- StaticText "Category: "
+- StaticText "Fixture clothing"
+- link "View category" [ref=e11]
+- link "Clear category filter" [ref=e12]
+- heading "Product Catalog" [level=3, ref=e13]
+- paragraph
+  - StaticText "1 product(s) shown"
+- textbox "Search products" [ref=e14]
+- button "Clear search" [ref=e15]
+- button "Refresh" [ref=e16]
+  - image
+  - StaticText "Refresh"
+- generic
+  - grid
+    - rowgroup
+      - row "Name Filter Name SKU Filter SKU Category Filter Category Price Filter Price Stock Filter Stock Catalog status Filter Catalog status Created Filter Created Actions"
+        - columnheader "Name Filter Name" [ref=e29] clickable [cursor:pointer, tabindex]
+          - StaticText "Name"
+          - image
+          - button "Filter Name" [expanded=false, ref=e38]
+            - image
+        - columnheader "SKU Filter SKU" [ref=e30]
+          - StaticText "SKU"
+          - button "Filter SKU" [expanded=false, ref=e39]
+            - image
+        - columnheader "Category Filter Category" [ref=e31]
+          - StaticText "Category"
+          - button "Filter Category" [expanded=false, ref=e40]
+            - image
+        - columnheader "Price Filter Price" [ref=e32] clickable [cursor:pointer, tabindex]
+          - StaticText "Price"
+          - image
+          - button "Filter Price" [expanded=false, ref=e41]
+            - image
+        - columnheader "Stock Filter Stock" [ref=e33] clickable [cursor:pointer, tabindex]
+          - StaticText "Stock"
+          - image
+          - button "Filter Stock" [expanded=false, ref=e42]
+            - image
+        - columnheader "Catalog status Filter Catalog status" [ref=e34]
+          - StaticText "Catalog status"
+          - button "Filter Catalog status" [expanded=false, ref=e43]
+            - image
+        - columnheader "Created Filter Created" [ref=e35] clickable [cursor:pointer, tabindex]
+          - StaticText "Created"
+          - image
+          - button "Filter Created" [expanded=false, ref=e44]
+            - image
+        - columnheader "Actions" [ref=e36]
+          - StaticText "Actions"
+    - row "Fixture Shirt SHIRT Fixture clothing PHP 0.00 0 Catalog disabled 1/1/0001 12:00:00 AM View product" [ref=e18] clickable [cursor:pointer, tabindex]
+      - gridcell "Fixture Shirt" [ref=e19]
+      - gridcell "SHIRT" [ref=e20]
+      - gridcell "Fixture clothing" [ref=e21]
+      - gridcell "PHP 0.00" [ref=e22]
+        - StaticText "PHP 0.00"
+      - gridcell "0" [ref=e23]
+      - gridcell "Catalog disabled" [ref=e24]
+      - gridcell "1/1/0001 12:00:00 AM" [ref=e25]
+      - gridcell "View product" [ref=e26]
+        - button "View product" [ref=e37]
+          - image
+  - StaticText "Scroll table horizontally for more columns"
+- navigation "Pagination" [ref=e17]
+  - StaticText "Showing 1-1 of 1"
+  - list
+    - listitem [level=1]
+      - button "Previous" [disabled, ref=e27]
+        - image
+        - StaticText "Previous"
+    - listitem [level=1]
+      - button "Next" [disabled, ref=e28]
+        - StaticText "Next"
+        - image
