@@ -1228,7 +1228,7 @@ jobs:
             "${compose[@]}" up -d --no-build postgres redis minio seq
           for service in "${services[@]}"; do
             /usr/bin/timeout --foreground --kill-after=30s 180s \
-              "${compose[@]}" up -d --no-build --no-deps --force-recreate "$service"
+              "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 120 "$service"
           done
 
           for service in "${services[@]}"; do
