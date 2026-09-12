@@ -61,6 +61,7 @@ test('recording or unsent media prevents activation; successful activation reloa
     await f.window.emit('load');
     f.busy(true); f.api.apply();
     assert.equal(f.worker.messages.length, 0);
+    f.api.notice(); // Blazor refreshes the layout after the button callback.
     assert.match(f.label.textContent, /Finish sending/);
     f.busy(false); f.window.yapRecording = {}; f.api.apply();
     assert.equal(f.worker.messages.length, 0);
