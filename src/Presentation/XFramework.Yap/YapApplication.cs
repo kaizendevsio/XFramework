@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Storage.Integration.Drivers;
 using XFramework.Integration.Extensions;
 using XFramework.Integration.Logging;
+using Yap.Contracts;
 using Yap.Services;
 
 namespace Yap;
@@ -17,6 +18,19 @@ public static class YapApplication
         var builder = WebApplication.CreateBuilder(args);
         builder.Logging.AddXFrameworkLogging(builder.Configuration);
         builder.Services.AddAntiforgery();
+        // A staged attachment arrives in one request; anything larger arrives one part at a time.
+        builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = ChatLimits.StagedFileBytes + 65536);
+        // Sessions hold refresh tokens, so they outlive a restart only when the store does.
+        // Without a connection string this falls back to memory, which suits tests and local runs.
+        var sessionCache = builder.Configuration["Yap:SessionCacheConnection"]
+            ?? builder.Configuration["CacheConfiguration:RedisConnectionString"];
+        if (string.IsNullOrWhiteSpace(sessionCache)) builder.Services.AddDistributedMemoryCache();
+        else builder.Services.AddStackExchangeRedisCache(options =>
+        {
+            options.Configuration = sessionCache;
+            options.InstanceName = string.Empty;
+        });
+        builder.Services.AddDataProtection();
         builder.Services.AddHttpClient("attachments", client => client.Timeout = TimeSpan.FromMinutes(2));
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddMemoryCache();
@@ -40,11 +54,11 @@ public static class YapApplication
                 context.Response.StatusCode = 403;
                 return Task.CompletedTask;
             };
-            options.Events.OnValidatePrincipal = context =>
+            options.Events.OnValidatePrincipal = async context =>
             {
-                if (!context.HttpContext.RequestServices.GetRequiredService<YapSessions>().Contains(context.Principal))
+                var sessions = context.HttpContext.RequestServices.GetRequiredService<YapSessions>();
+                if (!await sessions.ContainsAsync(context.Principal, context.HttpContext.RequestAborted))
                     context.RejectPrincipal();
-                return Task.CompletedTask;
             };
         });
         builder.Services.AddAuthorization();

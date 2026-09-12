@@ -70,6 +70,22 @@ public sealed record MessageAction(Guid ThreadId, Guid MessageId, string Action,
 public sealed record ReadMessages(Guid ThreadId, List<Guid> MessageIds);
 public sealed record ThreadAction(Guid ThreadId, string Action, bool Value);
 public sealed record AttachMessageFile(Guid ThreadId, Guid MessageId, Guid StorageId);
+public sealed record BeginUpload(string FileName, string ContentType, long TotalBytes);
+public sealed record UploadTicket(Guid UploadId, int ChunkSizeBytes, int TotalParts);
+public sealed record StoredFile(Guid Id);
+
+/// <summary>Attachment sizing shared by the browser and the host so the two cannot drift.</summary>
+public static class ChatLimits
+{
+    /// <summary>Largest attachment Yap accepts.</summary>
+    public const long MaxFileBytes = 4L * 1024 * 1024 * 1024;
+    /// <summary>Largest attachment copied onto the device so it can be queued offline.</summary>
+    public const long StagedFileBytes = 64L * 1024 * 1024;
+    /// <summary>Part size requested from storage; 4 GB lands in 512 parts.</summary>
+    public const int PreferredChunkBytes = 8 * 1024 * 1024;
+    /// <summary>Ceiling for a single part request, with slack for headers.</summary>
+    public const long PartRequestBytes = PreferredChunkBytes + 65536;
+}
 public sealed record SearchHit(Guid ThreadId, Guid MessageId, string Text, DateTime CreatedAt);
 public sealed record TypingUpdate(Guid ThreadId, Guid CredentialId, bool IsTyping);
 public enum ChatFeature { ReadReceipts = 1, Typing = 2, Threads = 4, Reactions = 8, Replies = 16, Voice = 32, Attachments = 64 }

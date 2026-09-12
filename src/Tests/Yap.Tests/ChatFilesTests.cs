@@ -38,6 +38,66 @@ public sealed class ChatFilesTests
     }
 
     [Test]
+    public void UploadAsync_BeyondTheStagingLimit_DirectsLargeFilesToTheResumablePath()
+    {
+        var fixture = new ChatFixture();
+        var storage = new Mock<IStorageServiceWrapper>(MockBehavior.Strict);
+        var service = new ChatFiles(storage.Object, fixture.Client.Object, Mock.Of<ICommunicationsChatActorProvider>(),
+            Mock.Of<IActorAccessTokenScope>(), NullLogger<ChatFiles>.Instance);
+
+        Assert.ThrowsAsync<ChatOperationException>(async () =>
+            await service.UploadAsync(new OversizeFile(ChatFiles.StagedFileBytes + 1), fixture.Thread, null, default));
+        storage.VerifyNoOtherCalls();
+    }
+
+    [Test]
+    public void BeginAsync_BeyondTheAttachmentCeiling_IsRefusedBeforeAnySession()
+    {
+        var fixture = new ChatFixture();
+        var storage = new Mock<IStorageServiceWrapper>(MockBehavior.Strict);
+        var service = new ChatFiles(storage.Object, fixture.Client.Object, Mock.Of<ICommunicationsChatActorProvider>(),
+            Mock.Of<IActorAccessTokenScope>(), NullLogger<ChatFiles>.Instance);
+
+        Assert.ThrowsAsync<ChatOperationException>(async () =>
+            await service.BeginAsync(fixture.Thread, "huge.mkv", "video/x-matroska", ChatFiles.MaxFileBytes + 1, default));
+        storage.VerifyNoOtherCalls();
+    }
+
+    [Test]
+    public async Task BeginAsync_SplitsAFourGigabyteFileIntoWholeParts()
+    {
+        var fixture = new ChatFixture();
+        var actors = new Mock<ICommunicationsChatActorProvider>();
+        actors.Setup(a => a.GetCurrentActorAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CommunicationsChatActor(fixture.Tenant, fixture.Credential, AccessToken: "actor"));
+        fixture.Session.Setup(s => s.CreateAttachmentUploadAsync(It.IsAny<CreateChatAttachmentUploadRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ChatFixture.Ok(new StorageUploadSessionResponse
+            { Id = Guid.NewGuid(), ChunkSizeBytes = ChatFiles.PreferredChunkBytes }));
+        var service = new ChatFiles(Mock.Of<IStorageServiceWrapper>(), fixture.Client.Object, actors.Object,
+            Mock.Of<IActorAccessTokenScope>(), NullLogger<ChatFiles>.Instance);
+
+        var ticket = await service.BeginAsync(fixture.Thread, "holiday.mp4", "video/mp4", ChatFiles.MaxFileBytes, default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ticket.ChunkSizeBytes, Is.EqualTo(ChatFiles.PreferredChunkBytes));
+            Assert.That(ticket.TotalParts, Is.EqualTo(512));
+            // S3 multipart tops out at 10,000 parts; the negotiated size must stay under it.
+            Assert.That(ticket.TotalParts, Is.LessThan(10000));
+        });
+    }
+
+    private sealed class OversizeFile(long size) : IBrowserFile
+    {
+        public string Name => "oversize.bin";
+        public DateTimeOffset LastModified => DateTimeOffset.UtcNow;
+        public long Size => size;
+        public string ContentType => "application/octet-stream";
+        public Stream OpenReadStream(long maxAllowedSize = 512000, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("The size gate must reject before any read.");
+    }
+
+    [Test]
     public async Task AttachAsync_RetryAfterCommittedLink_VerifiesExistingFile()
     {
         var fixture = new ChatFixture();

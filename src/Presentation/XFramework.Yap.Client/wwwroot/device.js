@@ -2,6 +2,9 @@
 (() => {
     let listener, events, account, activeThread, installPrompt, registration, databaseLock;
     const urls = new Set();
+    // Attachments too large to copy into OPFS are held as live File handles instead.
+    // They do not survive a reload, which is why they also require a connection.
+    const pending = new Map();
     const directory = async () => (await navigator.storage.getDirectory()).getDirectoryHandle('yap-files', { create: true });
     const write = async (key, blob) => {
         const handle = await (await directory()).getFileHandle(key, { create: true });
@@ -9,7 +12,7 @@
         try { await stream.write(blob); await stream.close(); }
         catch (error) { await stream.abort().catch(() => {}); throw error; }
     };
-    const read = async key => (await (await directory()).getFileHandle(key)).getFile();
+    const read = async key => pending.get(key) ?? (await (await directory()).getFileHandle(key)).getFile();
     const notify = () => listener?.invokeMethodAsync('ConnectivityChanged', navigator.onLine).catch(() => {});
     addEventListener('online', notify);
     addEventListener('offline', notify);
@@ -43,13 +46,37 @@
                 listener?.invokeMethodAsync('TypingChanged', state.ThreadId, state.CredentialId, state.IsTyping).catch(() => {});
             });
         },
-        async pickFile(input, key) {
+        async pickFile(input, key, stageLimit, maxBytes) {
             const file = input.files[0];
-            if (!file || file.size < 1 || file.size > 20 * 1024 * 1024) throw new Error('Choose a file up to 20 MB.');
-            await write(key, file);
-            return { key, name: file.name, contentType: file.type || 'application/octet-stream', size: file.size };
+            if (!file || file.size < 1) throw new Error('Choose a file to attach.');
+            if (file.size > maxBytes) throw new Error(`Choose a file up to ${Math.round(maxBytes / 1073741824)} GB.`);
+            // Staging copies the bytes so the message can be queued offline. Past the
+            // threshold that would cost twice the file size on the device, so stream instead.
+            const staged = file.size <= stageLimit;
+            if (staged) await write(key, file); else pending.set(key, file);
+            return { key, name: file.name, contentType: file.type || 'application/octet-stream', size: file.size, staged };
         },
-        async removeFile(key) { await (await directory()).removeEntry(key).catch(error => { if (error.name !== 'NotFoundError') throw error; }); },
+        async removeFile(key) {
+            pending.delete(key);
+            await (await directory()).removeEntry(key).catch(error => { if (error.name !== 'NotFoundError') throw error; });
+        },
+        // Slices a held File straight into the resumable endpoints. One part is in flight
+        // at a time, so peak memory is the part size rather than the file size.
+        async uploadParts(key, uploadId, chunkSizeBytes, totalParts, token, scope, reporter) {
+            const file = pending.get(key);
+            if (!file) return 410;
+            const headers = { RequestVerificationToken: token, 'X-Yap-Account': scope, 'Content-Type': 'application/octet-stream' };
+            for (let part = 1; part <= totalParts; part++) {
+                const offset = (part - 1) * chunkSizeBytes;
+                const slice = file.slice(offset, Math.min(offset + chunkSizeBytes, file.size));
+                const response = await fetch(`/api/chat/uploads/session/${uploadId}/parts/${part}?offset=${offset}`,
+                    { method: 'POST', headers, body: slice });
+                if (!response.ok) return response.status;
+                await reporter?.invokeMethodAsync('UploadProgress',
+                    Math.round((offset + slice.size) * 100 / file.size)).catch(() => {});
+            }
+            return 200;
+        },
         async upload(key, name, thread, token, scope, contentType) {
             const file = await read(key);
             const data = new FormData(); data.append('file', new Blob([file], { type: contentType || 'application/octet-stream' }), name);
@@ -103,14 +130,14 @@
                 window.yapRecording = state;
             } catch (error) { stream.getTracks().forEach(track => track.stop()); throw error; }
         },
-        async stopRecording(key, cancel) {
+        async stopRecording(key, cancel, stageLimit) {
             const state = window.yapRecording; if (!state) return null;
             window.yapRecording = null;
             if (state.recorder.state !== 'inactive') state.recorder.stop();
             try {
                 const blob = await state.finished;
                 if (cancel) return null;
-                if (!blob.size || blob.size > 20 * 1024 * 1024) throw new Error('Recording is empty or too large.');
+                if (!blob.size || blob.size > stageLimit) throw new Error('Recording is empty or too large.');
                 await write(key, blob);
                 const extension = blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm';
                 return { key, name: `Voice message.${extension}`, contentType: blob.type, size: blob.size };
@@ -127,9 +154,12 @@
         },
         async clearFiles() {
             for (const url of urls) URL.revokeObjectURL(url); urls.clear();
+            pending.clear();
             await (await navigator.storage.getDirectory()).removeEntry('yap-files', { recursive: true }).catch(error => { if (error.name !== 'NotFoundError') throw error; });
         },
         persist: async () => navigator.storage.persist ? await navigator.storage.persist() : false,
+        canInstall: () => installPrompt !== undefined && installPrompt !== null,
+        isInstalled: () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true,
         async install() { if (installPrompt) { await installPrompt.prompt(); installPrompt = null; } },
         update() { registration?.waiting?.postMessage('activate'); },
         checkUpdate() { const notice = document.getElementById('app-update'); if (notice && registration?.waiting) notice.hidden = false; }

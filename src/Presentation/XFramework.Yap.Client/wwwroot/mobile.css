@@ -1,9 +1,12 @@
-:root{--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}
+:root{--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px);
+/* Floating chrome only has to clear the home indicator, not the whole inset.
+   Padding the shell by the full inset left ~46px of dead space on iOS and 12px on Android. */
+--chrome-bottom:max(12px,calc(var(--safe-bottom) * .5))}
+:root[data-keyboard=open]{--safe-bottom:0px;--chrome-bottom:8px}
 html,body{height:100%;min-height:0;overflow:hidden;overscroll-behavior:none;touch-action:pan-x pan-y}
 body{display:block;padding:0;margin:0;background:var(--surface)}
 #app{display:block;height:100%;min-height:0}
-.app-shell{position:fixed;left:0;right:0;top:var(--viewport-top,0px);height:var(--viewport-height,100dvh);padding:var(--safe-top) env(safe-area-inset-right,0px) var(--safe-bottom) env(safe-area-inset-left,0px);display:flex;flex-direction:column;background:var(--surface);overflow:hidden;view-transition-name:yap-screen}
-:root[data-keyboard=open] .app-shell{padding-bottom:0}
+.app-shell{position:fixed;left:0;right:0;top:var(--viewport-top,0px);height:var(--viewport-height,100dvh);padding:var(--safe-top) env(safe-area-inset-right,0px) 0 env(safe-area-inset-left,0px);display:flex;flex-direction:column;background:var(--surface);overflow:hidden;view-transition-name:yap-screen}
 .screen{min-height:0;flex:1;overflow:hidden}
 .app-shell{background:radial-gradient(ellipse at 5% 0%,#d5f87945,transparent 48%),radial-gradient(ellipse at 100% 80%,#bca7e626,transparent 55%),var(--surface)}
 .scroll-surface{height:100%;min-height:0}
@@ -11,22 +14,27 @@ body{display:block;padding:0;margin:0;background:var(--surface)}
 .scroll-header,.scroll-footer{padding:0}
 .scroll-footer{bottom:0}
 .scroll-content>.body,.scroll-content>.chatbody{padding-top:calc(var(--scroll-top) + 12px);padding-bottom:calc(var(--scroll-bottom) + 12px);scroll-padding-top:calc(var(--scroll-top) + 12px);scroll-padding-bottom:calc(var(--scroll-bottom) + 12px)}
-.bottomnav{margin:0 12px 12px;border-radius:24px;padding:8px 6px}
-.bottomnav button,.bottomnav a{border-radius:18px}
-.fab{bottom:90px}
+.bottomnav{width:fit-content;margin:0 auto var(--chrome-bottom);border-radius:24px;padding:6px;gap:4px;display:flex}
+/* glass.css pins the composer 10px up; it needs the same home-indicator clearance. */
+.scroll-footer .composer{margin:0 12px var(--chrome-bottom)}
+.bottomnav button,.bottomnav a{border-radius:19px;width:72px;min-height:46px;display:flex;align-items:center;justify-content:center;color:var(--dim);padding:0}
+.bottomnav a.on,.bottomnav button.on{color:var(--text);background:color-mix(in srgb,var(--accent) 28%,transparent);box-shadow:inset 0 1px 0 var(--glass-edge)}
+.fab{bottom:calc(var(--chrome-bottom) + 76px)}
+/* A notice must not sit underneath the compose button. */
+.fab{transition:bottom .22s cubic-bezier(.2,.8,.2,1)}
+.app-shell:has(.toast-host .toast) .fab{bottom:calc(var(--chrome-bottom) + var(--yap-footer,64px) + 74px)}
+@media(prefers-reduced-motion:reduce){.fab{transition:none}}
 .appbar{padding-top:12px}.appbar .mid{flex:1;min-width:0}
 input,textarea,select,.inputbox input,.searchbar input{font-size:16px!important}
 .inputbox input{min-height:44px}
-.attachment-pick{position:relative;width:44px;height:44px;border-radius:50%;overflow:hidden;flex:none}
-.attachment-pick input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
-.bottomnav a{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--dim);padding:5px 0}
-.connection{display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--accent-soft);font-size:12px;flex:none}
-.connection span{flex:1}.connection button,.connection a{text-decoration:underline}
-.update-notice{position:absolute;bottom:0;inset-inline:0;padding:12px;background:var(--text);color:var(--surface);z-index:150;display:flex;justify-content:space-between}
+.update-notice{position:absolute;bottom:0;inset-inline:0;padding:12px 12px calc(12px + var(--safe-bottom));background:var(--text);color:var(--surface);z-index:150;display:flex;justify-content:space-between;align-items:center;gap:12px}
 .update-notice button{text-decoration:underline}
 .treply button.tx{text-align:left;width:100%}
 .messages{display:flex;flex-direction:column;gap:3px;padding-inline:14px}.msg .col{max-width:100%}
-.body.settings{max-width:720px;margin:auto}
+/* [data-window-row] is display:flow-root, where align-self does nothing. Auto margins
+   align in both flow and flex parents without disturbing height measurement. */
+.msg.out{margin-inline-start:auto}.msg.in{margin-inline-end:auto}
+
 .authbody{width:100%;max-width:460px;margin:0 auto;padding-top:20px}
 .screen>.authbody{height:100%;overflow-y:auto;padding-top:20px;padding-bottom:24px}
 .authbody .btn.ghost{margin-top:12px}
@@ -39,13 +47,11 @@ input,textarea,select,.inputbox input,.searchbar input{font-size:16px!important}
 /* Touch chrome behaves like app controls; message text and editors remain selectable. */
 *{-webkit-tap-highlight-color:transparent}
 button,a,label,nav,.avatar,.appbar,.bottomnav{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
-button:focus:not(:focus-visible),a:focus:not(:focus-visible),input:focus:not(:focus-visible),textarea:focus:not(:focus-visible){outline:none;box-shadow:none}
-button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+:root:not([data-input=keyboard]) :focus,:root:not([data-input=keyboard]) :focus-visible{outline:none}
+[tabindex="-1"]:focus{outline:none}
+:root[data-input=keyboard] :is(button,a,input,textarea,select,[tabindex="0"]):focus-visible{outline:2px solid var(--accent-ink);outline-offset:3px}
 .bubble-content,.bubble-content *,.tx,input,textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
 .avatar img{width:100%;height:100%;border-radius:inherit;object-fit:cover}
-.attachment-pick{display:grid;place-items:center;align-self:flex-end;margin:0;padding:0}
-.attachment-pick>.ic{position:relative;pointer-events:none;grid-area:1/1}
-.attachment-pick>input[type=file]{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0}
 .inputbox{min-width:0;align-items:flex-end}
 .inputbox textarea{flex:1;min-width:0;height:44px;min-height:44px;max-height:144px;border:0;outline:0;background:transparent;color:inherit;padding:11px 0;margin:0;resize:none;line-height:22px;overflow-y:auto;font-family:inherit}
 .inputbox>button{height:44px;flex:none}
@@ -78,3 +84,64 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-off
 .message-window>[data-window-top],.message-window>[data-window-bottom],.message-window>[data-window-lead]{flex:none;min-height:0}
 .history-loader{display:block;margin:0 auto 12px;padding:8px 16px;color:var(--dim);font-size:12px}
 @media(prefers-reduced-motion:reduce){.typing-dots i,.recording-dot{animation:none}.composer-action,.composer-action .sendbtn,.composer-action .voicebtn{transition:none}}
+
+/* Toasts float above the bottom chrome, whose height app.js measures into --yap-footer. */
+.toast-host{position:absolute;left:0;right:0;bottom:calc(var(--chrome-bottom) + var(--yap-footer,64px) + 8px);z-index:120;display:flex;flex-direction:column;gap:8px;padding:0 12px;pointer-events:none}
+.toast{pointer-events:auto;position:static;left:auto;right:auto;bottom:auto;display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:18px;font-size:13.5px;line-height:1.35;color:var(--text);background:transparent;box-shadow:var(--glass-shadow);animation:toast-in .22s cubic-bezier(.2,.8,.2,1)}
+.toast .toast-text{flex:1;min-width:0}
+.toast .toast-icon{color:var(--dim)}
+.toast.warn .toast-icon{color:var(--warn)}
+.toast.error .toast-icon{color:var(--danger)}
+.toast.ok .toast-icon{color:var(--ok)}
+.toast .toast-action{flex:none;font-weight:700;color:var(--accent-ink);padding:6px 10px;border-radius:12px;background:color-mix(in srgb,var(--accent) 30%,transparent);text-decoration:none}
+.toast .toast-close{flex:none;float:none;margin:0;width:28px;height:28px;display:grid;place-items:center;border-radius:50%;color:var(--dim)}
+@keyframes toast-in{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
+@media(prefers-reduced-motion:reduce){.toast{animation:none}}
+
+/* Settings: a grouped mobile list, not a stack of full-width buttons. */
+.body.settings{max-width:560px;margin-inline:auto;padding-inline:12px}
+.identity-card{display:flex;flex-direction:column;align-items:center;gap:10px;padding:24px 18px 22px;border-radius:26px;text-align:center}
+.identity-card h2{margin:0;font-size:21px;font-weight:750;letter-spacing:-.02em}
+.identity-card .btn{max-width:220px}
+.set-group{margin:22px 6px 8px;font-size:11.5px;font-weight:750;letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}
+.set-list{border-radius:22px;overflow:hidden;padding:2px 0}
+.set-row{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:10px 16px;text-align:left;color:inherit}
+.set-row + .set-row,.set-row + .set-note{border-top:1px solid var(--glass-edge)}
+.set-action:active{background:color-mix(in srgb,var(--text) 7%,transparent)}
+.set-action:disabled{opacity:.55}
+.set-key{display:flex;align-items:center;gap:12px;flex:1;min-width:0}
+.set-key>.ic{color:var(--dim)}
+.set-label{display:flex;flex-direction:column;gap:2px;min-width:0;font-size:15px;font-weight:600;letter-spacing:-.01em}
+.set-label small{font-size:12.2px;font-weight:500;color:var(--dim);line-height:1.35}
+.set-value{flex:none;font-size:15px;font-weight:700;color:var(--dim);font-variant-numeric:tabular-nums}
+.set-chevron{color:var(--faint);transform:rotate(90deg);transition:transform .18s ease}
+.set-chevron.open{transform:rotate(-90deg)}
+.set-row.danger .set-label,.set-row.danger .set-key>.ic{color:var(--danger)}
+.set-stack{padding:0 10px 12px}
+.set-note{padding:2px 16px 14px;color:var(--dim);font-size:12.8px}
+.set-note p{margin:8px 0}
+.set-note b{color:var(--text);font-weight:650}
+.set-footnote{margin:16px 8px 4px;color:var(--dim);font-size:12.2px;line-height:1.5}
+.segmented{display:inline-flex;gap:2px;padding:3px;border-radius:14px;background:color-mix(in srgb,var(--surface) 45%,transparent)}
+.segmented button{padding:7px 12px;border-radius:11px;font-size:12.5px;font-weight:650;color:var(--dim)}
+.segmented button.on{background:color-mix(in srgb,var(--accent) 42%,transparent);color:var(--text);box-shadow:inset 0 1px 0 var(--glass-edge)}
+@media(prefers-reduced-motion:reduce){.set-chevron{transition:none}}
+
+/* Attach menu: one file input per source so the browser opens the right picker. */
+.attach-open{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;align-self:flex-end;flex:none;margin:0;padding:0}
+.attach-picker{padding:6px}
+.attach-picker .sheetitem{position:relative;overflow:hidden;gap:14px;min-height:60px}
+.attach-picker .sheetitem .mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.attach-picker .sheetitem .n{font-size:15px;font-weight:650}
+.attach-picker .sheetitem .p{font-size:12.2px;color:var(--dim);font-weight:500}
+.attach-picker input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.attach-note{margin:2px 16px 14px;font-size:12px;color:var(--dim);line-height:1.45}
+.attachment-preview .mid{display:flex;flex-direction:column;gap:3px}
+.upload-bar{display:block;height:4px;border-radius:3px;background:color-mix(in srgb,var(--text) 16%,transparent);overflow:hidden;margin-top:4px}
+.upload-bar i{display:block;height:100%;background:var(--accent-ink);transition:width .2s ease}
+@media(prefers-reduced-motion:reduce){.upload-bar i{transition:none}}
+
+/* A sheet must cover the app, not the subtree that opened it. The composer's attach
+   sheet renders inside the absolutely positioned scroll footer, which would otherwise
+   clip it to a strip a few pixels tall. */
+.overlay{position:fixed;inset:0;padding:14px 14px calc(14px + var(--safe-bottom))}

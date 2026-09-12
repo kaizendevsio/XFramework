@@ -1,0 +1,10 @@
+@* Icons carry the meaning; the accessible name comes from aria-label so screen
+   readers and keyboard users lose nothing when the captions go. *@
+<nav class="bottomnav liquid-glass" aria-label="Sections">
+    <GlassLayer />
+    <a href="/" class="@(Current == "inbox" ? "on" : "")" aria-label="Inbox" title="Inbox" aria-current="@(Current == "inbox" ? "page" : null)"><Icon Name="chat" Size="23" /></a>
+    <a href="/settings" class="@(Current == "settings" ? "on" : "")" aria-label="Settings" title="Settings" aria-current="@(Current == "settings" ? "page" : null)"><Icon Name="settings" Size="23" /></a>
+</nav>
+@code {
+    [Parameter] public string Current { get; set; } = "inbox";
+}

@@ -172,7 +172,29 @@ public static class YapApi
             if (form.Files.Count != 1) throw new YapApiException(400, "Choose one attachment.");
             var id = await files.UploadAsync(new UploadedFile(form.Files[0]), thread, null, ct);
             return Results.Ok(new { Id = id });
-        }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(ChatFiles.MaxFileBytes + 65536));
+        }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(ChatFiles.StagedFileBytes + 65536));
+
+        // Resumable path for attachments too large to buffer in one request. The browser
+        // slices the file and posts parts; only one part is ever held in this process.
+        api.MapPost("/uploads/{thread:guid}/session", async (Guid thread, BeginUpload request, ChatFiles files, CancellationToken ct) =>
+            Results.Ok(await files.BeginAsync(thread, request.FileName, request.ContentType, request.TotalBytes, ct)));
+        api.MapPost("/uploads/session/{upload:guid}/parts/{part:int}", async (Guid upload, int part, long offset, HttpContext context, ChatFiles files, CancellationToken ct) =>
+        {
+            if (part < 1) throw new YapApiException(400, "Part numbers start at one.");
+            if (offset < 0) throw new YapApiException(400, "Part offset cannot be negative.");
+            using var buffer = new MemoryStream();
+            await context.Request.Body.CopyToAsync(buffer, ct);
+            if (buffer.Length == 0) throw new YapApiException(400, "The attachment part is empty.");
+            await files.UploadPartAsync(upload, part, offset, buffer.ToArray(), ct);
+            return Results.NoContent();
+        }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(ChatFiles.PartRequestBytes));
+        api.MapPost("/uploads/session/{upload:guid}/complete", async (Guid upload, ChatFiles files, CancellationToken ct) =>
+            Results.Ok(new { Id = await files.CompleteAsync(upload, ct) }));
+        api.MapPost("/uploads/session/{upload:guid}/abort", async (Guid upload, ChatFiles files, CancellationToken ct) =>
+        {
+            await files.AbortAsync(upload, ct);
+            return Results.NoContent();
+        });
         api.MapPost("/attachments", async (AttachMessageFile request, ChatFiles files, CancellationToken ct) =>
         {
             await files.AttachAsync(request.ThreadId, request.MessageId, request.StorageId, ct);
@@ -202,7 +224,8 @@ public static class YapApi
         public long Size => file.Length;
         public string ContentType => file.ContentType;
         public Stream OpenReadStream(long maxAllowedSize = 512000, CancellationToken cancellationToken = default) =>
-            file.Length <= maxAllowedSize ? file.OpenReadStream() : throw new YapApiException(413, "The attachment exceeds 20 MB.");
+            file.Length <= maxAllowedSize ? file.OpenReadStream()
+                : throw new YapApiException(413, $"Send attachments over {ChatFiles.StagedFileBytes / (1024 * 1024)} MB with a resumable upload.");
     }
 
     private static async Task StreamEventsAsync(HttpContext context, ICommunicationsChatClient client, Guid? thread, CancellationToken ct)

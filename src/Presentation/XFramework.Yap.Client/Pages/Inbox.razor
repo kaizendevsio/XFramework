@@ -6,7 +6,7 @@
 @if (State.User is null) { <div class="authbody"><div class="authbrand"><Brand /><p>A little closer.</p></div><h1>Good conversations start here.</h1><p>Your people, one conversation away.</p><a class="btn" href="/login">Sign in</a><a class="btn ghost" href="/register">Create an account</a></div> }
 else
 {
-<ScrollSurface><Header><div class="appbar plain liquid-glass"><GlassLayer /><Brand /><span class="sp"></span><button class="iconbtn" aria-label="Search conversations" @onclick="() => searchVisible = !searchVisible"><Icon Name="search" /></button><a class="iconbtn" href="/settings" aria-label="Settings"><Avatar Initials="@ChatMessage.InitialsFor(State.User.Name)" Size="a34" /></a></div>
+<ScrollSurface><Header><div class="appbar plain liquid-glass"><GlassLayer /><Brand /><span class="sp"></span><button class="iconbtn" aria-label="Search conversations" @onclick="() => searchVisible = !searchVisible"><Icon Name="search" /></button></div>
 @if (searchVisible) { <label class="searchbar liquid-glass"><GlassLayer /><Icon Name="search" Size="18" /><input aria-label="Search conversations and messages" placeholder="Search conversations and messages" @bind="search" @bind:event="oninput" @bind:after="SearchMessagesAsync" /></label> }
 <div class="tabs liquid-glass" role="tablist" aria-label="Conversation type"><GlassLayer />@foreach (var value in new[] { "Chats", "Groups" }) { <button class="tab" role="tab" aria-selected="@((tab == value).ToString().ToLowerInvariant())" @onclick="() => tab = value">@value <span class="n">@(value == "Chats" ? State.Conversations.Sum(c => c.Unread) : State.Conversations.Count(c => c.Group))</span></button> }</div>
 </Header><ChildContent><div class="body inbox-panel" role="tabpanel" data-swipe-tabs @key="tab">
@@ -21,7 +21,7 @@ else
     @foreach (var hit in hits) { <a class="row" href="@($"/chat/{hit.ThreadId}?message={hit.MessageId}")"><Icon Name="search" /><span class="mid"><span class="t1">@State.Conversations.FirstOrDefault(x => x.Id == hit.ThreadId)?.Name</span><span class="t2">@hit.Text</span></span></a> }
 }
 @if (State.Conversations.Count < State.ConversationTotal) { <button class="btn ghost" disabled="@(!State.Online || State.Busy)" @onclick="State.LoadMoreConversationsAsync">Load more conversations</button> }
-</div></ChildContent><Footer><nav class="bottomnav liquid-glass"><GlassLayer /><button class="@(tab == "Chats" ? "on" : "")" @onclick='() => tab = "Chats"'><Icon Name="chat" />Chats</button><button class="@(tab == "Groups" ? "on" : "")" @onclick='() => tab = "Groups"'><Icon Name="users" />Groups</button><a href="/settings"><Icon Name="user" />Settings</a></nav></Footer></ScrollSurface>
+</div></ChildContent><Footer><TabBar Current="inbox" /></Footer></ScrollSurface>
 <button class="fab liquid-glass" aria-label="New conversation" disabled="@(!State.Online || State.NeedsLogin)" @onclick="() => choosing = true"><GlassLayer /><Icon Name="edit" /></button>
 }
 @if (choosing)

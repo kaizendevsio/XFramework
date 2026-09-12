@@ -1,0 +1,116 @@
+@implements IDisposable
+@inject ChatState State
+@* Connectivity, session and failure notices all surface here. The app never keeps a
+   permanent status bar: a notice appears when the state changes and leaves again. *@
+<div class="toast-host" aria-live="polite">
+    @foreach (var notice in notices)
+    {
+        <div class="toast liquid-glass @notice.Kind" role="status" @key="notice.Id">
+            <GlassLayer />
+            <Icon Name="@notice.Icon" Size="17" Class="toast-icon" />
+            <span class="toast-text">@notice.Message</span>
+            @if (notice is { ActionText: not null, ActionHref: not null })
+            {
+                <a class="toast-action" href="@notice.ActionHref">@notice.ActionText</a>
+            }
+            else if (notice.ActionText is not null)
+            {
+                <button type="button" class="toast-action" @onclick="() => RunAsync(notice)">@notice.ActionText</button>
+            }
+            <button type="button" class="toast-close" aria-label="Dismiss notification" @onclick="() => Dismiss(notice)"><Icon Name="close" Size="15" /></button>
+        </div>
+    }
+</div>
+@code {
+    private const string Connectivity = "connectivity";
+    private readonly List<Notice> notices = [];
+    private bool lastOnline = true, lastNeedsLogin;
+    private string? lastError;
+
+    protected override void OnInitialized()
+    {
+        // Capture the state as it stands so the first real change is a change, not a baseline.
+        lastOnline = State.Online;
+        lastNeedsLogin = State.NeedsLogin;
+        lastError = State.Error;
+        State.Changed += Changed;
+    }
+
+    private void Changed() => _ = InvokeAsync(() =>
+    {
+        Sync();
+        StateHasChanged();
+    });
+
+    private void Sync()
+    {
+        if (State.NeedsLogin != lastNeedsLogin || State.Online != lastOnline)
+        {
+            Drop(Connectivity);
+            if (State.NeedsLogin)
+                // Actionable and easy to miss, so this one waits for the reader.
+                Show(new Notice(Guid.NewGuid(), Connectivity, "warn", "lock",
+                    "Your session ended. Sign in to sync.", "Sign in", "/login"), null);
+            else if (!State.Online)
+                Show(new Notice(Guid.NewGuid(), Connectivity, "warn", "wifi",
+                    "Offline. Messages are saved on this device.", "Retry", null), TimeSpan.FromSeconds(8));
+            else if (State.PendingCount > 0)
+                Show(new Notice(Guid.NewGuid(), Connectivity, "ok", "wifi",
+                    "Back online. Syncing your messages.", null, null), TimeSpan.FromSeconds(4));
+            lastOnline = State.Online; lastNeedsLogin = State.NeedsLogin;
+        }
+
+        if (State.Error != lastError)
+        {
+            lastError = State.Error;
+            Drop("error");
+            if (State.Error is not null)
+                Show(new Notice(Guid.NewGuid(), "error", "error", "alert", State.Error, null, null), TimeSpan.FromSeconds(9));
+        }
+    }
+
+    private void Show(Notice notice, TimeSpan? life)
+    {
+        notices.Add(notice);
+        if (life is not { } span) return;
+        notice.Expiry = new CancellationTokenSource();
+        _ = DismissLaterAsync(notice, span, notice.Expiry.Token);
+    }
+
+    private async Task DismissLaterAsync(Notice notice, TimeSpan life, CancellationToken ct)
+    {
+        try { await Task.Delay(life, ct); } catch (OperationCanceledException) { return; }
+        await InvokeAsync(() => { Dismiss(notice); StateHasChanged(); });
+    }
+
+    private void Drop(string group)
+    {
+        foreach (var notice in notices.Where(x => x.Group == group).ToList()) Dismiss(notice);
+    }
+
+    private void Dismiss(Notice notice)
+    {
+        notice.Expiry?.Cancel();
+        notice.Expiry?.Dispose();
+        notice.Expiry = null;
+        notices.Remove(notice);
+        if (notice.Group == "error") State.DismissError();
+    }
+
+    private async Task RunAsync(Notice notice)
+    {
+        Dismiss(notice);
+        await State.RetryAsync();
+    }
+
+    public void Dispose()
+    {
+        State.Changed -= Changed;
+        foreach (var notice in notices) { notice.Expiry?.Cancel(); notice.Expiry?.Dispose(); }
+    }
+
+    private sealed record Notice(Guid Id, string Group, string Kind, string Icon, string Message, string? ActionText, string? ActionHref)
+    {
+        public CancellationTokenSource? Expiry { get; set; }
+    }
+}

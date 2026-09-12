@@ -23,6 +23,29 @@ public sealed class OfflineDatabase(DbContextOptions<OfflineDatabase> options) :
         model.Entity<LocalSetting>().HasKey(x => x.Key);
         model.Entity<CachedAttachment>().HasKey(x => new { x.Scope, x.Id });
     }
+
+    /// <summary>
+    /// EnsureCreated never alters a database an earlier build already created, so additive
+    /// columns are applied here instead. Each statement is skipped when the column exists.
+    /// </summary>
+    public static async Task UpgradeAsync(OfflineDatabase db, CancellationToken ct = default)
+    {
+        await AddColumnAsync(db, "Outbox", "UploadId", "TEXT NULL", ct);
+    }
+
+    private static async Task AddColumnAsync(OfflineDatabase db, string table, string column, string definition, CancellationToken ct)
+    {
+        var connection = db.Database.GetDbConnection();
+        if (connection.State != System.Data.ConnectionState.Open) await connection.OpenAsync(ct);
+        await using (var probe = connection.CreateCommand())
+        {
+            probe.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = '{column}'";
+            if (Convert.ToInt64(await probe.ExecuteScalarAsync(ct)) > 0) return;
+        }
+        await using var alter = connection.CreateCommand();
+        alter.CommandText = $"ALTER TABLE \"{table}\" ADD COLUMN \"{column}\" {definition}";
+        await alter.ExecuteNonQueryAsync(ct);
+    }
 }
 
 public sealed class CachedConversation
@@ -54,6 +77,8 @@ public sealed class QueuedMessage
     public string? ContentType { get; set; }
     public long FileSize { get; set; }
     public Guid? StorageId { get; set; }
+    /// <summary>Resumable session for an attachment too large to stage. Completed at send time.</summary>
+    public Guid? UploadId { get; set; }
     public string? Error { get; set; }
     public bool Paused { get; set; }
 }
