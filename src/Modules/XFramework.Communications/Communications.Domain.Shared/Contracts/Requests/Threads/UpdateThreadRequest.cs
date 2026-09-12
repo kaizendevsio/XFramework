@@ -12,4 +12,7 @@ public partial record UpdateThreadRequest : RequestBase,
     public Guid RequesterCredentialId { get; set; }
     public string? Name { get; set; }
     public string? Description { get; set; }
+    public ConversationFeatures? Features { get; set; }
+    public Guid? NicknameMemberId { get; set; }
+    public string? Nickname { get; set; }
 }

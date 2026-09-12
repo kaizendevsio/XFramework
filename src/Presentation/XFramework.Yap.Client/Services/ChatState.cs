@@ -14,6 +14,8 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
     private DotNetObjectReference<ChatState>? reference;
     private Task? polling;
     private int pages = 1;
+    private int loadedLimit = 100, cachedCount;
+    public bool HasEarlierMessages => Selected is { } selected && (cachedCount > selected.Messages.Count || Online && !NeedsLogin && selected.Messages.Count < selected.MessageTotal);
     private int inboxPages = 1;
     private bool refreshPending;
     private Task? refreshing;
@@ -32,6 +34,8 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         }
     }
     public int ConversationTotal { get; private set; }
+    public List<Person> TypingPeople => typing.Where(x => x.Value > DateTime.UtcNow)
+        .Select(x => Selected?.People.FirstOrDefault(p => p.Id == x.Key) ?? new Person(x.Key, "Someone", "")).ToList();
     public UserSession? User { get; private set; }
     public bool Ready { get; private set; }
     public bool Online { get; private set; } = true;
@@ -133,7 +137,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         await typingPublish.WaitAsync();
         try
         {
-            if (!Online || NeedsLogin || User is null) return;
+            if (!Online || NeedsLogin || User is null || Selected?.Allows(ChatFeature.Typing) == false) return;
             if (active && publishingThread == thread && DateTime.UtcNow - lastTyping < TimeSpan.FromSeconds(3)) return;
             if (!active && publishingThread != thread) return;
             publishingThread = active ? thread : null;
@@ -206,11 +210,12 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         await sync.WaitAsync();
         try
         {
-            pages = 1;
+            pages = 1; loadedLimit = 100;
             typing.Clear();
             acknowledged.Clear();
             Selected = Conversations.FirstOrDefault(x => x.Id == id) ?? new Conversation { Id = id };
-            Selected.Messages = await store.MessagesAsync(Scope, id);
+            Selected.Messages = await store.MessagesAsync(Scope, id, limit: loadedLimit);
+            cachedCount = await store.MessageCountAsync(Scope, id);
             ComposeReplies(Selected.Messages);
             Notify();
             if (Online && !NeedsLogin) await RefreshSelectedAsync(id);
@@ -228,14 +233,11 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         conversation.Preview = summary?.Preview ?? "Start a conversation";
         conversation.Muted = summary?.Muted ?? false;
         var fetched = new List<ChatMessage>();
-        for (var page = 0; page < pages; page++)
-        {
-            var result = await api.GetAsync<ChatPage<ChatMessage>>($"api/chat/conversations/{id}/messages?page={page}");
-            fetched.AddRange(result.Items); conversation.MessageTotal = result.TotalCount;
-            if (fetched.Count >= result.TotalCount) break;
-        }
+        var result = await api.GetAsync<ChatPage<ChatMessage>>($"api/chat/conversations/{id}/messages?page=0");
+        fetched.AddRange(result.Items); conversation.MessageTotal = result.TotalCount;
         await store.ReplaceWindowAsync(Scope, id, fetched, fetched.Count >= conversation.MessageTotal);
-        conversation.Messages = await store.MessagesAsync(Scope, id);
+        conversation.Messages = await store.MessagesAsync(Scope, id, limit: loadedLimit);
+        cachedCount = await store.MessageCountAsync(Scope, id);
         ComposeReplies(conversation.Messages);
         await store.SaveConversationsAsync(Scope, [conversation]);
         Selected = conversation;
@@ -243,7 +245,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         if (index >= 0) Conversations[index] = conversation;
         Notify(); // Read receipts must not delay rendering a received message.
         var unread = fetched.Where(x => !x.Mine && !acknowledged.Contains(x.Id)).Select(x => x.Id).Take(100).ToList();
-        if (unread.Count > 0)
+        if (unread.Count > 0 && conversation.Allows(ChatFeature.ReadReceipts))
         {
             await api.PostAsync("api/chat/read", new ReadMessages(id, unread));
             acknowledged.UnionWith(unread);
@@ -251,7 +253,25 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
     }
 
     public async Task LoadEarlierAsync()
-    { pages++; await SynchronizeAsync(); }
+    {
+        await sync.WaitAsync();
+        try
+        {
+            if (Selected is not { } conversation) return;
+            if (cachedCount <= conversation.Messages.Count && Online && !NeedsLogin)
+            {
+                pages = Math.Max(1, conversation.Messages.Count / 50);
+                var result = await api.GetAsync<ChatPage<ChatMessage>>($"api/chat/conversations/{conversation.Id}/messages?page={pages}");
+                await store.SaveMessagesAsync(Scope, result.Items); conversation.MessageTotal = result.TotalCount;
+            }
+            loadedLimit += 50;
+            conversation.Messages = await store.MessagesAsync(Scope, conversation.Id, limit: loadedLimit);
+            cachedCount = await store.MessageCountAsync(Scope, conversation.Id);
+            ComposeReplies(conversation.Messages);
+        }
+        catch (Exception ex) { Report(ex); }
+        finally { sync.Release(); Notify(); }
+    }
     public async Task LoadMoreConversationsAsync() { inboxPages++; await SynchronizeAsync(); }
 
     public async Task<List<SearchHit>> SearchAsync(string query, Guid? thread = null)
@@ -268,8 +288,8 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
 
     public async Task LocateAsync(Guid id)
     {
-        while (Online && Selected is { } conversation && conversation.Messages.All(x => x.Id != id)
-            && pages * 50 < conversation.MessageTotal) await LoadEarlierAsync();
+        while (Selected is { } conversation && conversation.Messages.All(x => x.Id != id)
+            && HasEarlierMessages) { var before = conversation.Messages.Count; await LoadEarlierAsync(); if (Selected?.Messages.Count == before) break; }
     }
 
     public async Task MuteAsync()
@@ -281,15 +301,21 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
 
     public async Task LoadRepliesAsync(ChatMessage parent)
     {
-        if (!Online || NeedsLogin) return;
+        await sync.WaitAsync();
         try
         {
-            var result = await api.GetAsync<ChatPage<ChatMessage>>($"api/chat/conversations/{parent.ThreadId}/messages?parent={parent.Id}&page={parent.Replies.Count / 50}");
-            await store.SaveMessagesAsync(Scope, result.Items);
-            if (Selected is not null) { Selected.Messages = await store.MessagesAsync(Scope, parent.ThreadId); ComposeReplies(Selected.Messages); }
+            if (Selected?.Id != parent.ThreadId) return;
+            if (Online && !NeedsLogin)
+            {
+                var result = await api.GetAsync<ChatPage<ChatMessage>>($"api/chat/conversations/{parent.ThreadId}/messages?parent={parent.Id}&page={parent.Replies.Count / 50}");
+                await store.SaveMessagesAsync(Scope, result.Items);
+            }
+            Selected.Messages = await store.MessagesAsync(Scope, parent.ThreadId);
+            loadedLimit = Math.Max(loadedLimit, Selected.Messages.Count);
+            ComposeReplies(Selected.Messages);
         }
         catch (Exception ex) { Report(ex); }
-        Notify();
+        finally { sync.Release(); Notify(); }
     }
 
     private static void ComposeReplies(List<ChatMessage> messages)
@@ -306,7 +332,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
     public Task SaveDraftAsync(string key, string text) => store.SaveDraftAsync(Scope, key, text);
     public Task SaveBeforeUpdateAsync() => store.UseAsync(_ => Task.FromResult(true));
 
-    public async Task SendAsync(Guid thread, string text, Guid? parent, string draftKey, PickedFile? file = null)
+    public async Task SendAsync(Guid thread, string text, Guid? parent, string draftKey, PickedFile? file = null, bool threadReply = false)
     {
         await sync.WaitAsync();
         try
@@ -316,7 +342,9 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         var content = string.IsNullOrWhiteSpace(text) ? file?.Name ?? "" : text.Trim();
         if (content.Length is 0 or > 4000) throw new InvalidOperationException("Write a message up to 4,000 characters.");
         var message = new ChatMessage { Id = id, ThreadId = thread, SenderId = User.CredentialId,
-            Text = content, CreatedAt = DateTime.UtcNow, Mine = true, ParentId = parent, Delivery = "Queued" };
+            Text = content, CreatedAt = DateTime.UtcNow, Mine = true, ParentId = parent, Delivery = "Queued",
+            LocalFileKey = file?.Key, HasAttachments = file is not null, IsThreadReply = threadReply,
+            Attachments = file is null ? [] : [new ChatAttachment(id, file.Name, file.ContentType, file.Size)] };
         await store.QueueAsync(new QueuedMessage { Scope = Scope, Id = id, ThreadId = thread, Text = content,
             ParentId = parent, CreatedTicks = message.CreatedAt.Ticks, FileKey = file?.Key, FileName = file?.Name,
             ContentType = file?.ContentType, FileSize = file?.Size ?? 0 }, message, draftKey);
@@ -336,7 +364,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
             {
                 if (!item.MessageConfirmed)
                 {
-                    var receipt = await api.PostAsync<MessageReceipt>("api/chat/messages", new SendMessage(item.Id, item.ThreadId, item.Text, item.ParentId));
+                    var receipt = await api.PostAsync<MessageReceipt>("api/chat/messages", new SendMessage(item.Id, item.ThreadId, item.Text, item.ParentId, (await store.MessageAsync(Scope, item.Id))?.IsThreadReply == true));
                     if (receipt?.MessageId != item.Id) throw new InvalidOperationException("Message receipt did not match.");
                     item.MessageConfirmed = true; await store.SaveQueueAsync(item);
                 }
@@ -345,7 +373,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
                     if (item.StorageId is null)
                     {
                         var upload = await js.InvokeAsync<UploadReceipt>("yap.device.upload", item.FileKey, item.FileName,
-                            item.ThreadId, api.Token, Scope);
+                            item.ThreadId, api.Token, Scope, item.ContentType);
                         if (upload.Status is < 200 or >= 300) throw new ChatApiException(upload.Status);
                         item.StorageId = upload.Id; await store.SaveQueueAsync(item);
                     }
@@ -385,6 +413,18 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
     {
         var result = await api.PostAsync<CreatedConversation>("api/chat/conversations", new CreateConversation(name, people, group));
         await SynchronizeAsync(); return result!.Id;
+    }
+
+    public async Task UpdateConversationAsync(ConversationUpdate update)
+    { await api.PostAsync("api/chat/conversation-settings", update); await SynchronizeAsync(); }
+    public async Task ChangeMemberAsync(ConversationMemberAction action)
+    { await api.PostAsync("api/chat/conversation-members", action); await SynchronizeAsync(); }
+
+    public async Task LoadAttachmentMetadataAsync(ChatMessage message)
+    {
+        if (!Online || NeedsLogin) return;
+        message.Attachments = await api.GetAsync<List<ChatAttachment>>($"api/chat/conversations/{message.ThreadId}/messages/{message.Id}/attachments");
+        await store.SaveMessagesAsync(Scope, [message]);
     }
 
     public async Task OpenAttachmentsAsync(ChatMessage message)

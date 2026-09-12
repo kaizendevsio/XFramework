@@ -35,3 +35,46 @@ input,textarea,select,.inputbox input,.searchbar input{font-size:16px!important}
 .msg .bub,.msg .tx{white-space:pre-wrap;overflow-wrap:anywhere}
 .typing-indicator{padding:0 12px 6px;font-size:12px;color:var(--muted);min-height:20px}
 @media(min-width:800px){.appbar{padding-inline:28px}.messages,.inbox-panel{padding-inline:28px}.composer{max-width:1000px;margin:auto;width:100%}.sheet{max-width:620px;margin:auto}.fab{right:28px}}
+
+/* Touch chrome behaves like app controls; message text and editors remain selectable. */
+*{-webkit-tap-highlight-color:transparent}
+button,a,label,nav,.avatar,.appbar,.bottomnav{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+button:focus:not(:focus-visible),a:focus:not(:focus-visible),input:focus:not(:focus-visible),textarea:focus:not(:focus-visible){outline:none;box-shadow:none}
+button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.bubble-content,.bubble-content *,.tx,input,textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+.avatar img{width:100%;height:100%;border-radius:inherit;object-fit:cover}
+.attachment-pick{display:grid;place-items:center;align-self:flex-end;margin:0;padding:0}
+.attachment-pick>.ic{position:relative;pointer-events:none;grid-area:1/1}
+.attachment-pick>input[type=file]{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0}
+.inputbox{min-width:0;align-items:flex-end}
+.inputbox textarea{flex:1;min-width:0;height:44px;min-height:44px;max-height:144px;border:0;outline:0;background:transparent;color:inherit;padding:11px 0;margin:0;resize:none;line-height:22px;overflow-y:auto;font-family:inherit}
+.inputbox>button{height:44px;flex:none}
+.composer-action{position:relative;flex:none;width:44px;height:44px;transition:width .2s ease}
+.composer-action .sendbtn,.composer-action .voicebtn{position:absolute;inset:0;width:44px;height:44px;transition:opacity .18s ease,transform .22s cubic-bezier(.2,.8,.2,1)}
+.composer-action .sendbtn{opacity:0;transform:scale(.5) rotate(-35deg);pointer-events:none}
+.has-send .sendbtn{opacity:1;transform:scale(1) rotate(0);pointer-events:auto}
+.has-send .voicebtn{opacity:0;transform:scale(.5) rotate(35deg);pointer-events:none}
+.inputrow:not(.has-send) .composer-action:not(:has(.voicebtn)){width:0}
+.typing-indicator{display:flex;align-items:center;gap:5px;padding:0 6px 7px;color:var(--dim)}
+.typing-dots{display:flex;align-items:center;gap:4px;min-height:30px;padding:8px 12px;border-radius:18px;background:var(--surface2)}
+.typing-dots i{width:5px;height:5px;border-radius:50%;background:currentColor;animation:typing-dot 1.15s ease-in-out infinite}
+.typing-dots i:nth-child(2){animation-delay:.15s}.typing-dots i:nth-child(3){animation-delay:.3s}
+@keyframes typing-dot{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-4px);opacity:1}}
+.spinner{display:inline-block;width:26px;height:26px;border:3px solid color-mix(in srgb,var(--accent) 25%,transparent);border-top-color:var(--accent);border-radius:50%;animation:yap-spin .8s linear infinite}
+@keyframes yap-spin{to{transform:rotate(360deg)}}
+.recording-bar{display:flex;align-items:center;gap:8px;padding:10px;font-size:13px}.recording-bar button{margin-left:auto;text-decoration:underline}
+.recording-dot{width:9px;height:9px;border-radius:50%;background:#e26767;animation:typing-dot 1s infinite}
+.conversation-title{background:transparent;border:0;text-align:left;color:inherit;padding:0;cursor:pointer}
+.setting-toggle{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:48px;border-bottom:1px solid var(--border)}
+.setting-toggle input{width:38px;height:22px;accent-color:var(--accent);cursor:pointer}
+.conversation-settings h3{margin:22px 0 6px}.conversation-member small{display:block;color:var(--dim);font-size:12px}.conversation-member>.row{padding-inline:0}
+.member-actions{display:flex;gap:8px;flex-wrap:wrap}.member-actions .btn{flex:1;font-size:13px}.conversation-member{border-bottom:1px solid var(--border);padding-bottom:8px}
+.message-media{display:flex;flex-direction:column;gap:6px;max-width:min(72vw,360px);margin:5px 0}
+.message-media img,.message-media video{display:block;width:100%;max-height:420px;object-fit:contain;border-radius:18px;background:var(--surface2)}
+.message-media audio{width:min(72vw,320px);height:44px}
+.media-open{display:flex;align-items:center;gap:8px;background:var(--surface2);padding:12px;border-radius:16px;text-align:left}.media-open span{overflow-wrap:anywhere}.media-open small{white-space:nowrap;color:var(--dim)}
+.message-window{gap:0;overflow-anchor:none;scroll-behavior:auto}
+.message-window>[data-window-row]{display:flow-root;flex:none;min-width:0;width:100%}
+.message-window>[data-window-top],.message-window>[data-window-bottom],.message-window>[data-window-lead]{flex:none;min-height:0}
+.history-loader{display:block;margin:0 auto 12px;padding:8px 16px;color:var(--dim);font-size:12px}
+@media(prefers-reduced-motion:reduce){.typing-dots i,.recording-dot{animation:none}.composer-action,.composer-action .sendbtn,.composer-action .voicebtn{transition:none}}

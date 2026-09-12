@@ -4,11 +4,10 @@
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 <main class="app-shell">
-    @if (!State.Online || State.NeedsLogin || State.PendingCount > 0)
+    @if (!State.Online || State.NeedsLogin)
     {
         <div class="connection" role="status"><Icon Name="wifi" Size="15" />
-            <span>@(State.NeedsLogin ? "Sign in to sync" : !State.Online ? "Offline · saved on this device" : "Syncing saved messages")
-            @if (State.PendingCount > 0) { <span> · @State.PendingCount queued</span> }</span>
+            <span>@(State.NeedsLogin ? "Sign in to sync" : "Offline · saved on this device")</span>
             <button @onclick="State.RetryAsync">Retry</button>
             @if (State.NeedsLogin) { <a href="/login">Sign in</a> }
         </div>

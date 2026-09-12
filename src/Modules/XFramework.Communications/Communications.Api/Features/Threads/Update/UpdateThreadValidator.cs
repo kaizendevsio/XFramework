@@ -17,5 +17,8 @@ public sealed class UpdateThreadValidator : AbstractValidator<UpdateThreadReques
         RuleFor(x => x.Description)
             .MaximumLength(1000).WithMessage("Description cannot exceed 1000 characters")
             .When(x => x.Description is not null);
+        RuleFor(x => x.Features).Must(value => !value.HasValue || (value.Value & ~Communications.Domain.Shared.Contracts.ConversationFeatures.All) == 0)
+            .WithMessage("Unknown conversation feature");
+        RuleFor(x => x.Nickname).NotNull().MaximumLength(80).When(x => x.NicknameMemberId.HasValue);
     }
 }

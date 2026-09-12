@@ -30,7 +30,8 @@ public sealed partial class ThreadService(
     IMessageReactionSummaryReader reactionSummaryReader,
     IMessageReplySummaryReader replySummaryReader,
     ILogger<ThreadService> logger,
-    CommunicationsOutboxSignal outboxSignal
+    CommunicationsOutboxSignal outboxSignal,
+    DbContext? db
 ) : IThreadService
 {
     private static readonly JsonSerializerOptions OutboxJsonOptions = new(JsonSerializerDefaults.Web);
@@ -225,7 +226,7 @@ public sealed partial class ThreadService(
             foreach (var (credentialId, role) in new[]
                      {
                          (caller.CredentialId, MessageThreadMemberRoles.Owner),
-                         (request.OtherCredentialId, MessageThreadMemberRoles.Member)
+                         (request.OtherCredentialId, MessageThreadMemberRoles.Admin)
                      })
             {
                 dataContext.Add(new MessageThreadMember
@@ -481,6 +482,8 @@ public sealed partial class ThreadService(
                 Id = thread.Id,
                 Name = thread.Name,
                 Description = thread.Description,
+                Features = thread.Features,
+                CanManage = await CanManageThreadAsync(members.First(m => m.CredentialId == caller.CredentialId), ct),
                 TypeId = thread.TypeId,
                 CreatedAt = thread.CreatedAt,
                 Members = members.Select(m => new ThreadMemberResponse
@@ -489,7 +492,8 @@ public sealed partial class ThreadService(
                     CredentialId = m.CredentialId,
                     Alias = m.Alias,
                     Status = m.Status,
-                    JoinedAt = m.CreatedAt
+                    JoinedAt = m.CreatedAt,
+                    Role = m.Role
                 }).ToList()
             });
         }
@@ -551,6 +555,7 @@ public sealed partial class ThreadService(
                 return CallerFailure<CmdResponse>(callerResult);
 
             var caller = callerResult.Data!;
+            await using var mutationLock = await ConversationMutationLock.AcquireAsync(db, caller.TenantId, request.ThreadId, ct);
             var thread = await dataContext.Query<MessageThread>()
                 .Where(t => t.Id == request.ThreadId)
                 .Where(t => t.TenantId == caller.TenantId)
@@ -573,6 +578,23 @@ public sealed partial class ThreadService(
             if (!await CanManageThreadAsync(member, ct))
                 return Result<CmdResponse>.Forbidden("Only thread admins can update this thread");
 
+            if (request.Features is { } features)
+            {
+                if ((features & ~ConversationFeatures.All) != 0)
+                    return Result<CmdResponse>.Failure("Unknown conversation feature", 400);
+            }
+            if (request.NicknameMemberId is { } nicknameMemberId)
+            {
+                if (request.Nickname is null || request.Nickname.Length > 80)
+                    return Result<CmdResponse>.Failure("Nicknames must be at most 80 characters", 400);
+                var target = await dataContext.Query<MessageThreadMember>()
+                    .Where(m => m.Id == nicknameMemberId && m.MessageThreadId == thread.Id && m.TenantId == caller.TenantId)
+                    .Where(m => !m.IsDeleted && m.IsEnabled).FirstOrDefaultAsync(ct);
+                if (target is null) return Result<CmdResponse>.NotFound("Thread member not found");
+                target.Alias = request.Nickname.Trim();
+                dataContext.Update(target);
+            }
+            if (request.Features is { } selectedFeatures) thread.Features = selectedFeatures;
             if (request.Name is not null)
                 thread.Name = request.Name;
 
@@ -620,6 +642,7 @@ public sealed partial class ThreadService(
                 return CallerFailure<CmdResponse>(callerResult);
 
             var caller = callerResult.Data!;
+            await using var mutationLock = await ConversationMutationLock.AcquireAsync(db, caller.TenantId, request.ThreadId, ct);
             var member = await GetActiveMemberAsync(caller.TenantId, request.ThreadId, caller.CredentialId, ct);
             if (member is null)
                 return Result<CmdResponse>.Forbidden("Requester is not a member of this thread");
@@ -634,20 +657,16 @@ public sealed partial class ThreadService(
             if (activeMembers.Count <= 1)
                 return Result<CmdResponse>.Failure("Cannot leave as the last member of a thread", 400);
 
+            if (member.Role is MessageThreadMemberRoles.Admin or MessageThreadMemberRoles.Owner &&
+                !await HasAnotherAdminAsync(caller.TenantId, request.ThreadId, member.Id, ct))
+                return Result<CmdResponse>.Failure("Promote another admin before leaving or removing the last admin", 400);
+            await ConvertDirectToGroupAsync(caller.TenantId, request.ThreadId, ct);
+
             member.IsDeleted = true;
             member.IsEnabled = false;
             member.DeletedAt = DateTime.UtcNow;
             member.ModifiedAt = DateTime.UtcNow;
             dataContext.Update(member);
-
-            if (member.Role == MessageThreadMemberRoles.Owner &&
-                activeMembers.Where(m => m.Id != member.Id).All(m => m.Role != MessageThreadMemberRoles.Owner))
-            {
-                var replacementOwner = activeMembers.First(m => m.Id != member.Id);
-                replacementOwner.Role = MessageThreadMemberRoles.Owner;
-                replacementOwner.ModifiedAt = DateTime.UtcNow;
-                dataContext.Update(replacementOwner);
-            }
 
             AddOutboxEvent(
                 MessageRealtimeEvents.ThreadLeft,
@@ -778,6 +797,7 @@ public sealed partial class ThreadService(
                 return CallerFailure<CmdResponse>(callerResult);
 
             var caller = callerResult.Data!;
+            await using var mutationLock = await ConversationMutationLock.AcquireAsync(db, caller.TenantId, request.ThreadId, ct);
 
             // Validate thread exists
             var thread = await dataContext.Query<MessageThread>()
@@ -879,6 +899,7 @@ public sealed partial class ThreadService(
                 ConcurrencyStamp = Guid.NewGuid()
             };
 
+            await ConvertDirectToGroupAsync(caller.TenantId, request.ThreadId, ct);
             dataContext.Add(member);
             AddOutboxEvent(
                 MessageRealtimeEvents.ThreadMemberAdded,
@@ -918,6 +939,7 @@ public sealed partial class ThreadService(
                 return CallerFailure<CmdResponse>(callerResult);
 
             var caller = callerResult.Data!;
+            await using var mutationLock = await ConversationMutationLock.AcquireAsync(db, caller.TenantId, request.ThreadId, ct);
             var actorMember = await GetActiveMemberAsync(caller.TenantId, request.ThreadId, caller.CredentialId, ct);
             if (actorMember is null)
                 return Result<CmdResponse>.Failure("Requester is not a member of this thread", 403);
@@ -949,6 +971,11 @@ public sealed partial class ThreadService(
             {
                 return Result<CmdResponse>.Failure("Cannot remove the last member from a thread");
             }
+
+            if (member.Role is MessageThreadMemberRoles.Admin or MessageThreadMemberRoles.Owner &&
+                !await HasAnotherAdminAsync(caller.TenantId, request.ThreadId, member.Id, ct))
+                return Result<CmdResponse>.Failure("Promote another admin before leaving or removing the last admin", 400);
+            await ConvertDirectToGroupAsync(caller.TenantId, request.ThreadId, ct);
 
             // Soft delete the member
             member.IsDeleted = true;
@@ -1221,6 +1248,7 @@ public sealed partial class ThreadService(
                 return CallerFailure<CmdResponse>(callerResult);
 
             var caller = callerResult.Data!;
+            await using var mutationLock = await ConversationMutationLock.AcquireAsync(db, caller.TenantId, request.ThreadId, ct);
             var actorMember = await GetActiveMemberAsync(caller.TenantId, request.ThreadId, caller.CredentialId, ct);
             if (actorMember is null)
                 return Result<CmdResponse>.Forbidden("Requester is not a member of this thread");
@@ -1234,6 +1262,9 @@ public sealed partial class ThreadService(
             if (targetMember is null)
                 return Result<CmdResponse>.NotFound("Thread member not found");
 
+            if (!new[] { MessageThreadMemberRoles.Owner, MessageThreadMemberRoles.Admin, MessageThreadMemberRoles.Member }
+                .Contains(request.Role, StringComparer.OrdinalIgnoreCase))
+                return Result<CmdResponse>.Failure("Choose Owner, Admin or Member", 400);
             var normalizedRole = NormalizeRole(request.Role);
             if (normalizedRole == MessageThreadMemberRoles.Owner && actorMember.Role != MessageThreadMemberRoles.Owner)
                 return Result<CmdResponse>.Forbidden("Only a thread owner can transfer ownership");
@@ -1248,10 +1279,10 @@ public sealed partial class ThreadService(
                 .Where(m => !m.IsDeleted && m.IsEnabled)
                 .ToListAsync(ct);
 
-            if (targetMember.Role == MessageThreadMemberRoles.Owner &&
-                normalizedRole != MessageThreadMemberRoles.Owner &&
-                owners.All(owner => owner.Id == targetMember.Id))
-                return Result<CmdResponse>.Failure("Cannot remove the last owner from a thread", 400);
+            if (targetMember.Role is MessageThreadMemberRoles.Owner or MessageThreadMemberRoles.Admin &&
+                normalizedRole == MessageThreadMemberRoles.Member &&
+                !await HasAnotherAdminAsync(caller.TenantId, request.ThreadId, targetMember.Id, ct))
+                return Result<CmdResponse>.Failure("Cannot remove the last admin from a thread", 400);
 
             if (normalizedRole == MessageThreadMemberRoles.Owner)
             {
@@ -1263,6 +1294,12 @@ public sealed partial class ThreadService(
                 }
             }
 
+            if (normalizedRole == MessageThreadMemberRoles.Member)
+            {
+                var legacyRoles = await dataContext.Query<MessageThreadMemberRole>()
+                    .Where(r => r.MessageThreadMemberId == targetMember.Id && r.TenantId == caller.TenantId && !r.IsDeleted && r.IsEnabled).ToListAsync(ct);
+                foreach (var legacyRole in legacyRoles) { legacyRole.IsDeleted = true; legacyRole.IsEnabled = false; dataContext.Update(legacyRole); }
+            }
             targetMember.Role = normalizedRole;
             targetMember.ModifiedAt = DateTime.UtcNow;
             dataContext.Update(targetMember);
@@ -1355,6 +1392,7 @@ public sealed partial class ThreadService(
                     var mentions = JsonSerializer.Deserialize<List<Guid>>(previous.MentionedCredentialIdsJson ?? "[]") ?? [];
                     if (previous.MessageThreadId != request.ThreadId || previous.MessageThreadMemberId != senderMember.Id ||
                         previous.Text != request.Text?.Trim() || previous.ParentMessageId != request.ParentMessageId ||
+                        previous.IsThreadReply != request.IsThreadReply ||
                         !mentions.ToHashSet().SetEquals(request.MentionedCredentialIds.Where(id => id != Guid.Empty)))
                         return Result<CreateThreadMessageResponse>.Failure("This client message ID has already been used", 409);
                     return Result<CreateThreadMessageResponse>.Success(new CreateThreadMessageResponse { MessageId = clientMessageId });
@@ -1379,6 +1417,9 @@ public sealed partial class ThreadService(
 
             if (request.ParentMessageId is Guid parentMessageId)
             {
+                var feature = request.IsThreadReply ? ConversationFeatures.Threads : ConversationFeatures.Replies;
+                if (!thread.Features.HasFlag(feature))
+                    return Result<CreateThreadMessageResponse>.Forbidden("This reply type is disabled for this conversation");
                 var parentExists = await dataContext.Query<Message>()
                     .Where(m => m.Id == parentMessageId)
                     .Where(m => m.MessageThreadId == request.ThreadId)
@@ -1440,6 +1481,7 @@ public sealed partial class ThreadService(
                 MessageThreadMemberId = senderMember.Id,
                 Text = messageText,
                 ParentMessageId = request.ParentMessageId,
+                IsThreadReply = request.IsThreadReply,
                 MentionedCredentialIdsJson = JsonSerializer.Serialize(mentionedCredentialIds, OutboxJsonOptions),
                 TemplateId = renderedTemplate?.TemplateId,
                 TemplateKey = renderedTemplate?.TemplateKey,
@@ -1657,6 +1699,9 @@ public sealed partial class ThreadService(
             var replyCounts = await replySummaryReader.ReadAsync(caller.TenantId, request.ThreadId,
                 messageIds, blockedSenderMemberIds, hiddenMessageIds, ct);
 
+            var attachedIds = (await dataContext.Query<MessageFile>()
+                .Where(f => f.TenantId == caller.TenantId && messageIds.Contains(f.MessageId) && !f.IsDeleted && f.IsEnabled)
+                .ToListAsync(ct)).Select(f => f.MessageId).ToHashSet();
             var items = messages.Select(m =>
             {
                 memberMap.TryGetValue(m.MessageThreadMemberId, out var sender);
@@ -1672,6 +1717,8 @@ public sealed partial class ThreadService(
                     IsPinned = pinnedSet.Contains(m.Id),
                     IsSaved = savedSet.Contains(m.Id),
                     Reactions = reactionSummaries.GetValueOrDefault(m.Id) ?? [],
+                    HasAttachments = attachedIds.Contains(m.Id),
+                    IsThreadReply = m.IsThreadReply,
                     ReplyCount = replyCounts.GetValueOrDefault(m.Id)
                 };
             }).ToList();
@@ -2403,6 +2450,10 @@ public sealed partial class ThreadService(
                 return Result<CmdResponse>.Failure("Storage file is not available for this attachment", (int)storageFileResult.HttpStatusCode);
 
             var storageFile = storageFileResult.Response;
+            var fileFeature = storageFile.ContentType?.StartsWith("audio/", StringComparison.OrdinalIgnoreCase) == true
+                ? ConversationFeatures.Voice : ConversationFeatures.Attachments;
+            if (!await FeatureEnabledAsync(caller.TenantId, request.ThreadId, fileFeature, ct))
+                return Result<CmdResponse>.Forbidden("This attachment type is disabled for this conversation");
             if (!storageFile.IsValid)
                 return Result<CmdResponse>.Failure(storageFile.Message ?? "Storage file is not available", 400);
 
@@ -2647,6 +2698,8 @@ public sealed partial class ThreadService(
                 return CallerFailure<CmdResponse>(callerResult);
 
             var caller = callerResult.Data!;
+            if (!await FeatureEnabledAsync(caller.TenantId, request.ThreadId, ConversationFeatures.Reactions, ct))
+                return Result<CmdResponse>.Forbidden("Reactions are disabled for this conversation");
             var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
             var rateLimit = rateLimiter.Check(
                 caller.TenantId,
@@ -2836,6 +2889,8 @@ public sealed partial class ThreadService(
                 return CallerFailure<CmdResponse>(callerResult);
 
             var caller = callerResult.Data!;
+            if (!await FeatureEnabledAsync(caller.TenantId, request.ThreadId, ConversationFeatures.ReadReceipts, ct))
+                return Result<CmdResponse>.Forbidden("ReadReceipts are disabled for this conversation");
             var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
             if (!policy.ReadReceiptsEnabled)
                 return Result<CmdResponse>.Forbidden("Read receipts are disabled for this tenant");
@@ -2957,6 +3012,8 @@ public sealed partial class ThreadService(
                 return CallerFailure<CmdResponse>(callerResult);
 
             var caller = callerResult.Data!;
+            if (!await FeatureEnabledAsync(caller.TenantId, request.ThreadId, ConversationFeatures.Typing, ct))
+                return Result<CmdResponse>.Forbidden("Typing are disabled for this conversation");
             var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
             if (!policy.TypingIndicatorsEnabled)
                 return Result<CmdResponse>.Forbidden("Typing indicators are disabled for this tenant");
@@ -3058,25 +3115,6 @@ public sealed partial class ThreadService(
             .Where(m => !m.IsDeleted && m.IsEnabled)
             .FirstOrDefaultAsync(ct);
 
-    private async Task<bool> ThreadHasExplicitRolesAsync(Guid tenantId, Guid threadId, CancellationToken ct)
-    {
-        var members = await dataContext.Query<MessageThreadMember>()
-            .Where(m => m.MessageThreadId == threadId)
-            .Where(m => m.TenantId == tenantId)
-            .Where(m => !m.IsDeleted && m.IsEnabled)
-            .ToListAsync(ct);
-
-        var memberIds = members.Select(m => m.Id).ToList();
-        if (memberIds.Count == 0)
-            return false;
-
-        return await dataContext.Query<MessageThreadMemberRole>()
-            .Where(r => memberIds.Contains(r.MessageThreadMemberId))
-            .Where(r => r.TenantId == tenantId)
-            .Where(r => !r.IsDeleted && r.IsEnabled)
-            .AnyAsync(ct);
-    }
-
     private async Task<bool> MemberHasAdminRoleAsync(Guid tenantId, Guid memberId, CancellationToken ct)
     {
         var memberRoles = await dataContext.Query<MessageThreadMemberRole>()
@@ -3105,7 +3143,7 @@ public sealed partial class ThreadService(
         if (await MemberHasAdminRoleAsync(member.TenantId, member.Id, ct))
             return true;
 
-        return !await ThreadHasExplicitRolesAsync(member.TenantId, member.MessageThreadId, ct);
+        return false;
     }
 
     private async Task<Guid?> ResolveChatThreadTypeIdAsync(Guid tenantId, CancellationToken ct)

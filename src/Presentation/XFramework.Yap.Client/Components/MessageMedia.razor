@@ -1,0 +1,58 @@
+@implements IAsyncDisposable
+@inject ChatState State
+@inject IJSRuntime JS
+@if (Message.HasAttachments || Message.Attachments.Count > 0)
+{
+    <div class="message-media">
+    @foreach (var file in Message.Attachments)
+    {
+        @if (urls.TryGetValue(file.Id, out var url))
+        {
+            @if (file.ContentType.StartsWith("image/")) { <a href="@url" target="_blank" rel="noopener" aria-label="@($"Open {file.Name}")"><img src="@url" alt="@file.Name" draggable="false" /></a> }
+            else if (file.ContentType.StartsWith("video/")) { <video src="@url" controls playsinline preload="metadata" aria-label="@file.Name"></video> }
+            else { <audio src="@url" controls preload="metadata" aria-label="Voice message"></audio> }
+        }
+        else { <button class="media-open" disabled="@loading" @onclick="() => OpenAsync(file)"><Icon Name="@(file.ContentType.StartsWith("audio/") ? "mic" : "file")" Size="20" /><span>@file.Name</span><small>@(file.Size / 1024) KB</small></button> }
+    }
+    @if (loading && Message.Attachments.Count == 0) { <span class="spinner" role="status" aria-label="Loading attachment"></span> }
+    @if (failed) { <button class="media-open" @onclick="LoadAsync">Attachment unavailable · retry</button> }
+    </div>
+}
+@code {
+    [Parameter, EditorRequired] public ChatMessage Message { get; set; } = default!;
+    private readonly Dictionary<Guid, string> urls = [];
+    private bool loading, failed, disposed;
+    private string? loaded;
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = $"{Message.Id}:{Message.LocalFileKey}:{Message.HasAttachments}";
+        if (key != loaded) { loaded = key; await ReleaseAsync(); await LoadAsync(); }
+    }
+    private async Task LoadAsync()
+    {
+        if (loading || disposed || !Message.HasAttachments && Message.Attachments.Count == 0) return;
+        loading = true; failed = false;
+        try
+        {
+            if (Message.Attachments.Count == 0) await State.LoadAttachmentMetadataAsync(Message);
+            foreach (var file in Message.Attachments.Where(f => f.ContentType.StartsWith("image/") || Message.LocalFileKey is not null)) await OpenAsync(file);
+        }
+        catch { failed = true; }
+        finally { loading = false; }
+    }
+    private async Task OpenAsync(ChatAttachment file)
+    {
+        try
+        {
+            var url = await JS.InvokeAsync<string?>("yap.device.mediaUrl", Message.LocalFileKey ?? $"{State.Scope.Replace(':', '-')}-{file.Id:N}",
+                $"api/chat/conversations/{Message.ThreadId}/messages/{Message.Id}/attachments/{file.Id}", State.Scope,
+                State.Online && !State.NeedsLogin, file.ContentType, Message.LocalFileKey is not null);
+            if (url is null) { await State.OpenFileAsync(Message, file); return; }
+            if (disposed) await JS.InvokeVoidAsync("yap.device.releaseMedia", url);
+            else { if (urls.Remove(file.Id, out var old)) await JS.InvokeVoidAsync("yap.device.releaseMedia", old); urls[file.Id] = url; }
+        }
+        catch { failed = true; }
+    }
+    private async Task ReleaseAsync() { foreach (var url in urls.Values) await JS.InvokeVoidAsync("yap.device.releaseMedia", url); urls.Clear(); }
+    public async ValueTask DisposeAsync() { disposed = true; await ReleaseAsync(); }
+}

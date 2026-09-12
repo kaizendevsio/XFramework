@@ -23,6 +23,7 @@ public class MessageThreadConfiguration : IEntityTypeConfiguration<MessageThread
             .HasDefaultValueSql("true");
         entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
         entity.Property(e => e.Name).HasColumnType("character varying");
+        entity.Property(e => e.Features).HasDefaultValue(ConversationFeatures.All);
 
         entity.HasIndex(e => new { e.TenantId, e.CreatedAt })
             .HasDatabaseName("IX_MessageThread_Tenant_CreatedAt");

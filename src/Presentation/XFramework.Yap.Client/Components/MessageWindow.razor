@@ -1,0 +1,41 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+<div class="body messages message-window" data-messages @ref="element">
+    <div data-window-lead>@Header
+
+    @if (start == 0 && HasMore) { <button class="history-loader" disabled="@loading" @onclick="LoadEarlier">@(loading ? "Loading earlier messages…" : "Earlier messages")</button> }
+    </div><div data-window-top aria-hidden="true"></div>
+    @foreach (var message in Items.Skip(start).Take(count))
+    { <div data-window-row="@message.Id" @key="message.Id">@ChildContent(message)</div> }
+    <div data-window-bottom aria-hidden="true"></div>
+    @if (Items.Count == 0) { <p class="empty">Say hello. This is the beginning of your conversation.</p> }
+</div>
+@code {
+    [Parameter, EditorRequired] public List<ChatMessage> Items { get; set; } = [];
+    [Parameter, EditorRequired] public RenderFragment<ChatMessage> ChildContent { get; set; } = default!;
+    [Parameter] public RenderFragment? Header { get; set; }
+    [Parameter] public EventCallback Earlier { get; set; }
+    [Parameter] public bool HasMore { get; set; }
+    private ElementReference element;
+    private DotNetObjectReference<MessageWindow>? reference;
+    private int start, count = 40;
+    private Guid? first;
+    private bool initialized, loading;
+    protected override void OnParametersSet()
+    {
+        if (!initialized) { initialized = true; start = Math.Max(0, Items.Count - count); }
+        else if (first is { } id && Items.FindIndex(x => x.Id == id) is var index && index >= 0) start = index;
+        start = Math.Clamp(start, 0, Math.Max(0, Items.Count - 1));
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        first = Items.Skip(start).FirstOrDefault()?.Id;
+        reference ??= DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("yap.messageWindow.sync", element, reference, Items.Select(x => x.Id).ToArray(), start, count, HasMore);
+    }
+    [JSInvokable] public Task WindowChanged(int index, int length)
+    { start = Math.Clamp(index, 0, Math.Max(0, Items.Count - 1)); count = Math.Clamp(length, 1, 80); first = Items.Skip(start).FirstOrDefault()?.Id; return InvokeAsync(StateHasChanged); }
+    [JSInvokable] public async Task LoadEarlier()
+    { if (loading || !HasMore) return; loading = true; try { await Earlier.InvokeAsync(); } finally { loading = false; await InvokeAsync(StateHasChanged); } }
+    public async ValueTask DisposeAsync() { await JS.InvokeVoidAsync("yap.messageWindow.dispose", element); reference?.Dispose(); }
+}

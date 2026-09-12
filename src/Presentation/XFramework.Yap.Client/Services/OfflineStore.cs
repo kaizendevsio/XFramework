@@ -35,7 +35,11 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         {
             var row = await db.Conversations.FindAsync([scope, conversation.Id], ct);
             if (row is not null && conversation.People.Count == 0)
-                conversation.People = JsonSerializer.Deserialize<Conversation>(row.Json, Json)!.People;
+            {
+                var saved = JsonSerializer.Deserialize<Conversation>(row.Json, Json)!;
+                conversation.People = saved.People; conversation.Features = saved.Features;
+                conversation.CanManage = saved.CanManage; conversation.MessageTotal = saved.MessageTotal;
+            }
             var json = JsonSerializer.Serialize(conversation, Json);
             if (row is null) db.Conversations.Add(new() { Scope = scope, Id = conversation.Id, Json = json });
             else row.Json = json;
@@ -53,9 +57,19 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         return await db.SaveChangesAsync(ct);
     }, ct);
 
-    public Task<List<ChatMessage>> MessagesAsync(string scope, Guid thread, CancellationToken ct = default) => UseAsync(async db =>
+    public Task<int> MessageCountAsync(string scope, Guid thread) => UseAsync(db => db.Messages.CountAsync(x => x.Scope == scope && x.ThreadId == thread));
+
+    public Task<ChatMessage?> MessageAsync(string scope, Guid id) => UseAsync(async db =>
     {
-        var messages = (await db.Messages.AsNoTracking().Where(x => x.Scope == scope && x.ThreadId == thread).OrderBy(x => x.CreatedTicks).ToListAsync(ct))
+        var row = await db.Messages.AsNoTracking().SingleOrDefaultAsync(x => x.Scope == scope && x.Id == id);
+        return row is null ? null : JsonSerializer.Deserialize<ChatMessage>(row.Json, Json);
+    });
+
+    public Task<List<ChatMessage>> MessagesAsync(string scope, Guid thread, CancellationToken ct = default, int limit = 0) => UseAsync(async db =>
+    {
+        var query = db.Messages.AsNoTracking().Where(x => x.Scope == scope && x.ThreadId == thread).OrderByDescending(x => x.CreatedTicks).ThenByDescending(x => x.Id).AsQueryable();
+        if (limit > 0) query = query.Take(limit);
+        var messages = (await query.ToListAsync(ct)).AsEnumerable().Reverse()
             .Select(x => JsonSerializer.Deserialize<ChatMessage>(x.Json, Json)!).ToList();
         var pending = await db.Outbox.AsNoTracking().Where(x => x.Scope == scope && x.ThreadId == thread).ToDictionaryAsync(x => x.Id, ct);
         foreach (var message in messages)
@@ -75,7 +89,12 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         {
             var existing = await db.Messages.FindAsync([scope, message.Id], ct);
             // Preserve already opened attachment metadata when the message listing omits files.
-            if (existing is not null) message.Attachments = JsonSerializer.Deserialize<ChatMessage>(existing.Json, Json)!.Attachments;
+            if (existing is not null)
+            {
+                var cached = JsonSerializer.Deserialize<ChatMessage>(existing.Json, Json)!;
+                if (cached.LocalFileKey is null && message.HasAttachments) message.Attachments = cached.Attachments;
+                if (pending.Contains(message.Id)) { message.LocalFileKey = cached.LocalFileKey; message.Attachments = cached.Attachments; }
+            }
             await UpsertMessageAsync(db, scope, message, ct);
         }
         await db.SaveChangesAsync(ct);
@@ -108,7 +127,7 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         if (cached is not null)
         {
             var message = JsonSerializer.Deserialize<ChatMessage>(cached.Json, Json)!;
-            message.Delivery = "Sent";
+            message.Delivery = "Sent"; message.LocalFileKey = null; message.Attachments = [];
             cached.Json = JsonSerializer.Serialize(message, Json);
         }
         db.Outbox.Remove(item);

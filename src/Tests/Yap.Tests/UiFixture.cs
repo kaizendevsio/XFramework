@@ -39,6 +39,8 @@ internal static class UiFixture
             new() { Id = Guid.NewGuid(), Name = "Yap Core", MemberCount = 24, LastMessagePreview = "Amara: shipped 🚀", LastMessageAt = DateTime.UtcNow.AddHours(-2) },
             new() { Id = Guid.NewGuid(), Name = "Lena Novak", MemberCount = 2, LastMessagePreview = "Thanks for the review", LastMessageAt = DateTime.UtcNow.AddHours(-3) }
         };
+        var features = Communications.Domain.Shared.Contracts.ConversationFeatures.All;
+        var fixtureMembers = new List<ThreadMemberResponse> { new() { Id = Guid.NewGuid(), CredentialId = fixture.Credential, Alias = "Jamie Davis", Role = "Admin" }, new() { Id = Guid.NewGuid(), CredentialId = friend, Alias = "Sarah Mensah", Role = "Admin" } };
         var messages = new List<ThreadMessageItemResponse>
         {
             new() { Id = Guid.NewGuid(), SenderCredentialId = friend, SenderAlias = "Sarah Mensah", Text = "Hey! Are you around? 👀", CreatedAt = DateTime.UtcNow.AddMinutes(-25) },
@@ -53,11 +55,11 @@ internal static class UiFixture
         fixture.Session.Setup(s => s.GetThreadAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Guid id, CancellationToken _) => ChatFixture.Ok(new GetThreadResponse
             {
-                Id = id, Name = conversations.First(c => c.Id == id).Name,
-                Members = [new() { CredentialId = fixture.Credential, Alias = "Jamie Davis" }, new() { CredentialId = friend, Alias = "Sarah Mensah" }]
+                Id = id, Name = conversations.First(c => c.Id == id).Name, IsDirect = conversations.First(c => c.Id == id).IsDirect, CanManage = true, Features = features,
+                Members = fixtureMembers.ToList()
             }));
         fixture.Session.Setup(s => s.GetMessagesAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(() => ChatFixture.Ok(new GetThreadMessagesResponse { Items = messages.ToList(), TotalCount = messages.Count }));
+            .ReturnsAsync((Guid thread, int page, int size, CancellationToken _) => ChatFixture.Ok(new GetThreadMessagesResponse { Items = messages.OrderByDescending(m => m.CreatedAt).Skip(page * size).Take(size).ToList(), TotalCount = messages.Count }));
         foreach (var conversation in conversations) conversation.IsDirect = conversation.MemberCount == 2;
         fixture.Session.Setup(s => s.GetRepliesAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Guid thread, Guid parent, int page, int size, CancellationToken _) =>
@@ -164,11 +166,31 @@ internal static class UiFixture
             .ReturnsAsync(ChatFixture.Ok(new StorageUploadPartResponse()));
         storage.Setup(s => s.CompleteStorageUploadSession(It.IsAny<CompleteStorageUploadSessionRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ChatFixture.Ok(new StorageFileResponse { Id = fileId }));
+        var mediaLinks = new Dictionary<Guid, Guid>();
+        var stored = new Dictionary<Guid, (string Name, string Type, MemoryStream Data)>();
+        fixture.Session.Setup(s => s.CreateAttachmentUploadAsync(It.IsAny<Communications.Domain.Shared.Contracts.Requests.Attachments.CreateChatAttachmentUploadRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Communications.Domain.Shared.Contracts.Requests.Attachments.CreateChatAttachmentUploadRequest request, CancellationToken _) => {
+                var id = Guid.NewGuid(); stored[id] = (request.FileName, request.ContentType, new MemoryStream());
+                return ChatFixture.Ok(new StorageUploadSessionResponse { Id = id, StorageFileId = id, ChunkSizeBytes = 256 * 1024 });
+            });
+        storage.Setup(s => s.UploadChatStorageFilePart(It.IsAny<UploadChatStorageFilePartRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((UploadChatStorageFilePartRequest request, CancellationToken _) => { stored[request.UploadSessionId].Data.Write(request.ChunkBytes); return ChatFixture.Ok(new StorageUploadPartResponse()); });
+        storage.Setup(s => s.CompleteChatStorageUploadSession(It.IsAny<CompleteChatStorageUploadSessionRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((CompleteChatStorageUploadSessionRequest request, CancellationToken _) => ChatFixture.Ok(new StorageFileResponse { Id = request.UploadSessionId, Status = XFramework.Domain.Shared.Contracts.StorageFileStatus.Available }));
+        storage.Setup(s => s.GetStorageFile(It.IsAny<GetStorageFileRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((GetStorageFileRequest request, CancellationToken _) => {
+                var data = stored.GetValueOrDefault(request.StorageFileId, ("offline-proof.txt", "text/plain", new MemoryStream()));
+                return ChatFixture.Ok(new StorageFileResponse { Id = request.StorageFileId, Name = data.Item1, ContentType = data.Item2, ContentLengthBytes = data.Item3.Length, Status = XFramework.Domain.Shared.Contracts.StorageFileStatus.Available });
+            });
+        fixture.Session.Setup(s => s.GetAttachmentDownloadUrlAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid thread, Guid message, Guid attachment, CancellationToken _) => ChatFixture.Ok(new StorageDownloadUrlResponse { Url = $"http://127.0.0.1:{port}/test/media/{mediaLinks[attachment]}" }));
         var attachments = new List<MessageFileResponse>();
         fixture.Session.Setup(s => s.AttachFileAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Guid thread, Guid message, Guid storedFile, CancellationToken _) =>
             {
-                attachments.Add(new MessageFileResponse { Id = Guid.NewGuid(), MessageId = message, StorageFileId = storedFile });
+                var id = Guid.NewGuid(); mediaLinks[id] = storedFile;
+                attachments.Add(new MessageFileResponse { Id = id, MessageId = message, StorageFileId = storedFile });
+                messages.First(m => m.Id == message).HasAttachments = true;
                 return Success();
             });
         fixture.Session.Setup(s => s.GetFilesAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -177,6 +199,10 @@ internal static class UiFixture
         storage.Setup(s => s.GetStorageDownloadUrl(It.IsAny<GetStorageDownloadUrlRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ChatFixture.Ok(new StorageDownloadUrlResponse { StorageFileId = fileId, Url = $"http://127.0.0.1:{port}/test/file", ExpiresAt = DateTime.UtcNow.AddMinutes(5) }));
 
+        fixture.Session.Setup(s => s.UpdateThreadAsync(It.IsAny<UpdateThreadRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((UpdateThreadRequest request, CancellationToken _) => { features = request.Features ?? features; if (request.NicknameMemberId.HasValue) fixtureMembers.First(m => m.Id == request.NicknameMemberId).Alias = request.Nickname ?? ""; return Success(); });
+        fixture.Session.Setup(s => s.UpdateMemberRoleAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid thread, Guid member, string role, CancellationToken _) => { fixtureMembers.First(m => m.Id == member).Role = role; return Success(); });
         configureIdentity?.Invoke(identity);
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Presentation/XFramework.Yap"));
         var app = YapApplication.Build([
@@ -196,6 +222,11 @@ internal static class UiFixture
             builder.Services.Replace(ServiceDescriptor.Singleton(identity.Object));
             builder.Services.Replace(ServiceDescriptor.Singleton(directory.Object));
             builder.Services.Replace(ServiceDescriptor.Singleton(storage.Object));
+        });
+        app.MapGet("/test/media/{id:guid}", (Guid id) => Results.Bytes(stored[id].Data.ToArray(), stored[id].Type));
+        app.MapPost("/test/history/{count:int}", (int count) => {
+            for (var i = 0; i < Math.Min(count, 2000); i++) messages.Add(new() { Id = Guid.NewGuid(), Text = $"History {i}: " + new string('a', i % 5 * 70), SenderCredentialId = friend, SenderAlias = "Sarah Mensah", CreatedAt = DateTime.UtcNow.AddDays(-1).AddSeconds(i) });
+            return Results.Ok();
         });
         app.MapPost("/test/incoming", async () =>
         {

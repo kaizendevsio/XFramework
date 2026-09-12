@@ -53,10 +53,13 @@ public static class YapApi
             var session = await client.ForCurrentActorAsync(ct: ct);
             var data = Require(await session.GetThreadAsync(id, ct));
             var people = await directory.ResolveAsync(data.Members.Select(x => x.CredentialId).ToArray(), ct);
-            var members = data.Members.Select(x => new Person(x.CredentialId,
-                people.FirstOrDefault(p => p.Id == x.CredentialId)?.Name ?? x.Alias ?? "Workspace member", "")).ToList();
+            var members = data.Members.Select(x => {
+                var person = people.FirstOrDefault(p => p.Id == x.CredentialId);
+                return new Person(x.CredentialId, string.IsNullOrWhiteSpace(x.Alias) ? person?.Name ?? "Workspace member" : x.Alias,
+                    person?.UserName ?? "", person?.AvatarUrl, x.Id, x.Role, x.Alias);
+            }).ToList();
             return new Conversation { Id = id, Name = data.IsDirect ? members.FirstOrDefault(x => x.Id != session.CredentialId)?.Name ?? "Direct message" : data.Name,
-                Group = !data.IsDirect, Members = members.Count, People = members };
+                Group = !data.IsDirect, Members = members.Count, People = members, Features = (int)data.Features, CanManage = data.CanManage };
         });
         api.MapGet("/conversations/{id:guid}/messages", async (Guid id, int? page, Guid? parent,
             ICommunicationsChatClient client, IChatDirectory directory, CancellationToken ct) =>
@@ -64,7 +67,7 @@ public static class YapApi
             var session = await client.ForCurrentActorAsync(ct: ct);
             var data = Require(parent.HasValue ? await session.GetRepliesAsync(id, parent.Value, Page(page), 50, ct)
                 : await session.GetMessagesAsync(id, Page(page), 50, ct));
-            var people = await directory.ResolveAsync(data.Items.Where(x => string.IsNullOrWhiteSpace(x.SenderAlias))
+            var people = await directory.ResolveAsync(data.Items
                 .Select(x => x.SenderCredentialId).Distinct().ToArray(), ct);
             return new ChatPage<ApiMessage>(data.Items.Select(x => new ApiMessage
             {
@@ -72,13 +75,15 @@ public static class YapApi
                 Sender = x.SenderCredentialId == session.CredentialId ? "You" : string.IsNullOrWhiteSpace(x.SenderAlias)
                     ? people.FirstOrDefault(p => p.Id == x.SenderCredentialId)?.Name ?? "Workspace member" : x.SenderAlias,
                 Text = x.Text, CreatedAt = x.CreatedAt, Mine = x.SenderCredentialId == session.CredentialId,
+                HasAttachments = x.HasAttachments, IsThreadReply = x.IsThreadReply,
+                AvatarUrl = people.FirstOrDefault(p => p.Id == x.SenderCredentialId)?.AvatarUrl,
                 ParentId = x.ParentMessageId, Pinned = x.IsPinned, Saved = x.IsSaved, ReplyTotal = x.ReplyCount,
                 Reactions = x.Reactions.ToDictionary(r => r.Emoji, r => r.Count),
                 MyReactionIds = x.Reactions.Where(r => r.MyReactionId.HasValue).ToDictionary(r => r.Emoji, r => r.MyReactionId!.Value)
             }).ToList(), data.TotalCount);
         });
         api.MapGet("/people", async (string search, IChatDirectory directory, CancellationToken ct) =>
-            (await directory.SearchAsync(search, ct)).Select(x => new Person(x.Id, x.Name, x.UserName)));
+            (await directory.SearchAsync(search, ct)).Select(x => new Person(x.Id, x.Name, x.UserName, x.AvatarUrl)));
         api.MapGet("/search", async (string query, Guid? thread, int? page, ICommunicationsChatClient client, CancellationToken ct) =>
         {
             var session = await client.ForCurrentActorAsync(ct: ct);
@@ -102,8 +107,27 @@ public static class YapApi
                 throw new YapApiException(400, "Write a message up to 4,000 characters.");
             var session = await client.ForCurrentActorAsync(ct: ct);
             var data = Require(await session.SendMessageAsync(new CreateThreadMessageRequest
-            { ThreadId = request.ThreadId, Text = request.Text, ParentMessageId = request.ParentId, ClientMessageId = request.Id }, ct));
+            { ThreadId = request.ThreadId, Text = request.Text, ParentMessageId = request.ParentId, ClientMessageId = request.Id, IsThreadReply = request.IsThreadReply }, ct));
             return new MessageReceipt(data.MessageId);
+        });
+        api.MapPost("/conversation-settings", async (ConversationUpdate request, ICommunicationsChatClient client, CancellationToken ct) =>
+        {
+            var session = await client.ForCurrentActorAsync(ct: ct);
+            Require(await session.UpdateThreadAsync(new UpdateThreadRequest { ThreadId = request.ThreadId,
+                Features = request.Features.HasValue ? (Communications.Domain.Shared.Contracts.ConversationFeatures)request.Features.Value : null,
+                NicknameMemberId = request.NicknameMemberId, Nickname = request.Nickname }, ct));
+            return Results.NoContent();
+        });
+        api.MapPost("/conversation-members", async (ConversationMemberAction request, ICommunicationsChatClient client, CancellationToken ct) =>
+        {
+            var session = await client.ForCurrentActorAsync(ct: ct);
+            Require(request.Action switch {
+                "add" => await session.AddThreadMemberAsync(request.ThreadId, request.CredentialId, ct),
+                "remove" => await session.RemoveThreadMemberAsync(request.ThreadId, request.CredentialId, ct),
+                "role" when request.Role is "Admin" or "Member" => await session.UpdateMemberRoleAsync(request.ThreadId, request.MemberId, request.Role, ct),
+                _ => throw new YapApiException(400, "Choose a supported member action.")
+            });
+            return Results.NoContent();
         });
         api.MapPost("/message-actions", async (MessageAction request, ICommunicationsChatClient client, CancellationToken ct) =>
         {

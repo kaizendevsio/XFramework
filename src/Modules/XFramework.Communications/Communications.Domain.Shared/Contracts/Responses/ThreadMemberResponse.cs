@@ -8,4 +8,5 @@ public partial record ThreadMemberResponse
     public string Alias { get; set; } = null!;
     public short Status { get; set; }
     public DateTime JoinedAt { get; set; }
+    public string Role { get; set; } = "Member";
 }

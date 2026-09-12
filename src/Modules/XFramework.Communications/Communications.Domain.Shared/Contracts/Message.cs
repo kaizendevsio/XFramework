@@ -53,4 +53,7 @@ public partial class Message : BaseModel
 
     [MemoryPackOrder(15)]
     public virtual ICollection<Message> Replies { get; set; } = new List<Message>();
+
+    [MemoryPackOrder(16)]
+    public bool IsThreadReply { get; set; }
 }

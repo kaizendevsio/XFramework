@@ -1,0 +1,55 @@
+@inject ChatState State
+<div class="picker conversation-settings">
+    <h2>@Conversation.Name</h2>
+    <p class="muted">@(Conversation.CanManage ? "Admins manage features and members for everyone in this conversation." : "Only conversation admins can change these settings.")</p>
+    @foreach (var (feature, label) in Features)
+    {
+        <label class="setting-toggle"><span>@label</span><input type="checkbox" role="switch" checked="@Conversation.Allows(feature)" disabled="@Locked" @onchange="e => ToggleAsync(feature, e.Value is true)" /></label>
+    }
+    <h3>Members</h3>
+    @foreach (var person in Conversation.People)
+    {
+        <div class="conversation-member" @key="person.Id">
+            <div class="row"><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" ImageUrl="@person.AvatarUrl" Size="a34" /><span class="mid"><b>@person.Name</b><small>@(person.Role is "Admin" or "Owner" ? "Admin" : "Member")</small></span>
+            @if (!Locked) { <button class="iconbtn" aria-label="@($"Edit {person.Name}")" @onclick="() => Edit(person)"><Icon Name="edit" Size="18" /></button> }</div>
+            @if (editing == person.Id)
+            {
+                <label class="field"><span class="lab">Nickname in this conversation</span><span class="inp"><input aria-label="Nickname" @bind="nickname" @bind:event="oninput" maxlength="80" /></span></label>
+                <div class="member-actions"><button class="btn ghost" disabled="@Locked" @onclick="() => SaveNicknameAsync(person)">Save nickname</button>
+                <button class="btn ghost" disabled="@(Locked || LastAdmin(person))" @onclick='() => MemberAsync(person, "role", person.Role is "Admin" or "Owner" ? "Member" : "Admin")'>@(person.Role is "Admin" or "Owner" ? "Make member" : "Make admin")</button></div>
+                @if (LastAdmin(person)) { <p class="muted">Promote another admin before stepping down or leaving.</p> }
+                @if (removing == person.Id) { <p>Remove @person.Name from this conversation?</p><button class="btn danger" disabled="@Locked" @onclick='() => MemberAsync(person, "remove")'>Confirm removal</button> }
+                else { <button class="sheetitem danger" disabled="@(Locked || LastAdmin(person))" @onclick="() => removing = person.Id">Remove member</button> }
+            }
+        </div>
+    }
+    @if (Conversation.CanManage)
+    {
+        <h3>Add members</h3>
+        @if (!Conversation.Group) { <p class="muted">Adding someone turns this direct conversation into a group.</p> }
+        <label class="field"><span class="inp"><input aria-label="Find a member" placeholder="Search people" @bind="search" @bind:event="oninput" @bind:after="SearchAsync" disabled="@Locked" /></span></label>
+        @foreach (var person in results.Where(p => Conversation.People.All(m => m.Id != p.Id)))
+        { <button class="row" disabled="@Locked" @onclick='() => MemberAsync(person, "add")'><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" ImageUrl="@person.AvatarUrl" Size="a34" /><span class="mid">@person.Name</span><Icon Name="plus" Size="18" /></button> }
+    }
+    <button class="btn ghost" disabled="@(!State.Online || State.NeedsLogin || busy)" @onclick="State.MuteAsync">@(Conversation.Muted ? "Unmute conversation" : "Mute conversation")</button>
+</div>
+@code {
+    [Parameter, EditorRequired] public Conversation Conversation { get; set; } = default!;
+    private bool busy;
+    private bool Locked => busy || !Conversation.CanManage || !State.Online || State.NeedsLogin;
+    private Guid? editing, removing;
+    private string nickname = "", search = "";
+    private List<Person> results = [];
+    private static readonly (ChatFeature Feature, string Label)[] Features = [
+        (ChatFeature.ReadReceipts, "Read receipts"), (ChatFeature.Typing, "Typing indicators"),
+        (ChatFeature.Threads, "Threads"), (ChatFeature.Reactions, "Reactions"), (ChatFeature.Replies, "Replies"),
+        (ChatFeature.Voice, "Voice messages"), (ChatFeature.Attachments, "Media and attachments")];
+    private bool LastAdmin(Person person) => person.Role is "Admin" or "Owner" && Conversation.People.Count(p => p.Role is "Admin" or "Owner") <= 1;
+    private void Edit(Person person) { editing = editing == person.Id ? null : person.Id; nickname = person.Nickname ?? ""; removing = null; }
+    private Task ToggleAsync(ChatFeature feature, bool enabled) => RunAsync(() => State.UpdateConversationAsync(new(Conversation.Id,
+        enabled ? Conversation.Features | (int)feature : Conversation.Features & ~(int)feature)));
+    private Task SaveNicknameAsync(Person person) => RunAsync(() => State.UpdateConversationAsync(new(Conversation.Id, NicknameMemberId: person.MemberId, Nickname: nickname)));
+    private Task MemberAsync(Person person, string action, string? role = null) => RunAsync(() => State.ChangeMemberAsync(new(Conversation.Id, person.Id, person.MemberId, action, role)));
+    private async Task RunAsync(Func<Task> action) { busy = true; try { await action(); editing = removing = null; } catch (Exception ex) { State.Report(ex); } finally { busy = false; } }
+    private async Task SearchAsync() { var query = search; try { var people = await State.SearchPeopleAsync(query); if (query == search) results = people; } catch (Exception ex) { State.Report(ex); } }
+}
