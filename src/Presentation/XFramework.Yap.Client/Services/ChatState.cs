@@ -332,6 +332,22 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
     public Task SaveDraftAsync(string key, string text) => store.SaveDraftAsync(Scope, key, text);
     public Task SaveBeforeUpdateAsync() => store.UseAsync(_ => Task.FromResult(true));
 
+    public async Task DeleteConversationAsync(Guid thread)
+    {
+        if (!Online || NeedsLogin) throw new InvalidOperationException("Connect and sign in before removing a conversation.");
+        await sync.WaitAsync(lifetime.Token);
+        try
+        {
+            if ((await store.PendingAsync(Scope)).Any(x => x.ThreadId == thread))
+                throw new InvalidOperationException("Wait for this conversation's messages to finish sending before removing it.");
+            await api.PostAsync("api/chat/thread-actions", new ThreadAction(thread, "delete-for-me", true));
+            await store.RemoveConversationAsync(Scope, thread, lifetime.Token);
+            Conversations.RemoveAll(x => x.Id == thread);
+            if (Selected?.Id == thread) { Selected = null; typing.Clear(); await WatchEventsAsync(); }
+        }
+        finally { sync.Release(); Notify(); }
+    }
+
     public async Task SendAsync(Guid thread, string text, Guid? parent, string draftKey, PickedFile? file = null, bool threadReply = false)
     {
         await sync.WaitAsync();

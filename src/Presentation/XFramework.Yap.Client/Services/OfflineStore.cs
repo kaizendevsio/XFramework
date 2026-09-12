@@ -34,6 +34,11 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         foreach (var conversation in conversations)
         {
             var row = await db.Conversations.FindAsync([scope, conversation.Id], ct);
+            if (conversation.Removed)
+            {
+                if (row is not null) db.Conversations.Remove(row);
+                continue;
+            }
             if (row is not null && conversation.People.Count == 0)
             {
                 var saved = JsonSerializer.Deserialize<Conversation>(row.Json, Json)!;
@@ -55,6 +60,17 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
     {
         foreach (var message in messages) await UpsertMessageAsync(db, scope, message, ct);
         return await db.SaveChangesAsync(ct);
+    }, ct);
+
+    public Task RemoveConversationAsync(string scope, Guid thread, CancellationToken ct = default) => UseAsync(async db =>
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await db.Conversations.Where(x => x.Scope == scope && x.Id == thread).ExecuteDeleteAsync(ct);
+        await db.Messages.Where(x => x.Scope == scope && x.ThreadId == thread).ExecuteDeleteAsync(ct);
+        var prefix = thread.ToString("N") + ":";
+        await db.Drafts.Where(x => x.Scope == scope && x.Key.StartsWith(prefix)).ExecuteDeleteAsync(ct);
+        await transaction.CommitAsync(ct);
+        return true;
     }, ct);
 
     public Task<int> MessageCountAsync(string scope, Guid thread) => UseAsync(db => db.Messages.CountAsync(x => x.Scope == scope && x.ThreadId == thread));

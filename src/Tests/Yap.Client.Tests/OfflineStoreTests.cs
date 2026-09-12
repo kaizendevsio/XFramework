@@ -9,6 +9,30 @@ namespace Yap.Client.Tests;
 public sealed class OfflineStoreTests
 {
     [Test]
+    public async Task RemoveConversation_DeletesOnlyItsLocalHistoryAndDrafts_AndArchiveRefreshKeepsItHidden()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var message = fixture.Message(); var other = fixture.Message();
+        var draft = message.ThreadId.ToString("N") + ":main";
+        await fixture.Store.SaveConversationsAsync("account-a", [new() { Id = message.ThreadId }, new() { Id = other.ThreadId }]);
+        await fixture.Store.SaveConversationsAsync("account-b", [new() { Id = message.ThreadId }]);
+        await fixture.Store.SaveMessagesAsync("account-a", [message, other]);
+        await fixture.Store.SaveMessagesAsync("account-b", [message]);
+        await fixture.Store.SaveDraftAsync("account-a", draft, "local draft");
+        await fixture.Store.SaveDraftAsync("account-b", draft, "other account draft");
+        await fixture.Store.RemoveConversationAsync("account-a", message.ThreadId);
+        await fixture.Store.SaveConversationsAsync("account-a", [new() { Id = message.ThreadId, Removed = true }]);
+        Assert.That((await fixture.Store.ConversationsAsync("account-a")).Single().Id, Is.EqualTo(other.ThreadId));
+        Assert.That(await fixture.Store.MessagesAsync("account-a", message.ThreadId), Is.Empty);
+        Assert.That(await fixture.Store.MessagesAsync("account-a", other.ThreadId), Has.Count.EqualTo(1));
+        Assert.That(await fixture.Store.MessagesAsync("account-b", message.ThreadId), Has.Count.EqualTo(1));
+        Assert.That(await fixture.Store.DraftAsync("account-a", draft), Is.Empty);
+        Assert.That(await fixture.Store.DraftAsync("account-b", draft), Is.EqualTo("other account draft"));
+        await fixture.Store.SaveConversationsAsync("account-a", [new() { Id = message.ThreadId }]);
+        Assert.That(await fixture.Store.ConversationsAsync("account-a"), Has.Count.EqualTo(2), "Explicitly reopening the chat restores its list entry");
+    }
+
+    [Test]
     public async Task MessagesAsync_LimitsLatestWindowWithoutLosingOlderOfflineHistory()
     {
         await using var fixture = await StoreFixture.CreateAsync();

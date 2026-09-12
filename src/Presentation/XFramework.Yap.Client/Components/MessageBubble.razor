@@ -4,14 +4,18 @@
     @if (!Message.Mine) { <Avatar ImageUrl="@Message.AvatarUrl" Initials="@Message.Initials" Color="@Message.Color" Size="a34" /> }
     <div class="col">
         @if (ShowSender && !Message.Mine) { <span class="who">@Message.Sender</span> }
+        @if (ShowText || Message.Quote is not null)
+        {
         <button class="bub liquid-glass" @onclick="() => OnSelect.InvokeAsync(Message)" aria-label="@($"Message from {Message.Sender}: {Message.Text}. Open actions")"><GlassLayer /><span class="bubble-content">
             @if (Message.Quote is not null) { <span class="quote"><span class="qn">@Message.Quote.Sender</span>@Message.Quote.Text</span> }
-            @Message.Text
+            @if (ShowText) { @Message.Text }
         </span></button>
-        <MessageMedia Message="Message" />
+        }
+        <MessageMedia Message="Message" MetadataLoaded="RefreshCaption" />
+        @if (!ShowText && Message.Quote is null && Message.HasAttachments) { <button class="media-actions" aria-label="Photo message actions" @onclick="() => OnSelect.InvokeAsync(Message)"><Icon Name="more" Size="18" /></button> }
         @if (State.Selected?.Allows(ChatFeature.Reactions) != false && Message.Reactions.Count > 0) { <div class="reacts">@foreach (var reaction in Message.Reactions) { <button class="react @(Message.MyReactionIds.ContainsKey(reaction.Key) ? "mine" : "")" aria-label="@($"React {reaction.Key}")" aria-pressed="@Message.MyReactionIds.ContainsKey(reaction.Key).ToString().ToLowerInvariant()" @onclick="() => OnReact.InvokeAsync(reaction.Key)">@reaction.Key <span>@reaction.Value</span></button> }</div> }
         @if (State.Selected?.Allows(ChatFeature.Threads) != false && Message.ReplyTotal > 0) { <button class="threadlink" @onclick="() => OnThread.InvokeAsync(Message)"><span class="fc">@foreach (var reply in Message.Replies.Take(3)) { <Avatar Initials="@reply.Initials" Color="@reply.Color" Size="a28" /> }</span>@Message.ReplyTotal replies <Icon Name="arrow" Size="13" /></button> }
-        <div class="meta">@if (Message.Pinned) { <span aria-label="Pinned">📌</span> }@Message.Time @if (Message.Mine) { <span class="rd">@(Message.Delivery == "Sent" ? "✓" : Message.Delivery)</span> }</div>
+        <div class="meta">@if (Message.Pinned) { <span aria-label="Pinned">📌</span> }@Message.Time @if (Message.Mine) { <span class="rd" aria-label="@DeliveryLabel">@DeliveryLabel</span> }</div>
     </div>
 </div>
 @code {
@@ -21,4 +25,14 @@
     [Parameter] public EventCallback<ChatMessage> OnThread { get; set; }
     [Parameter] public EventCallback<ChatMessage> OnReply { get; set; }
     [Parameter] public EventCallback<string> OnReact { get; set; }
+    private bool ShowText => !Message.HasAttachments && Message.Attachments.Count == 0 || Message.Attachments.Count > 0 && !Message.Attachments.Any(f => f.Name == Message.Text);
+    private string DeliveryLabel => Message.Delivery switch
+    {
+        "Queued" or "Sending" => !State.Online ? "Sending · offline" : State.NeedsLogin ? "Sending · sign in" : "Sending",
+        "Sent" when State.Selected?.Allows(ChatFeature.ReadReceipts) != false && Message.ReadCount > 0 => State.Selected?.Group == true ? $"Read by {Message.ReadCount}" : "Read",
+        "Sent" when Message.DeliveredCount > 0 => State.Selected?.Group == true ? $"Delivered to {Message.DeliveredCount}" : "Delivered",
+        "Sent" => "Sent",
+        _ => "Not sent · retry"
+    };
+    private Task RefreshCaption() => InvokeAsync(StateHasChanged);
 }

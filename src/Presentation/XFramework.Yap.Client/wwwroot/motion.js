@@ -64,7 +64,7 @@
     }, true);
     document.addEventListener('pointerdown', e => {
         if (e.pointerType === 'mouse' || !e.isPrimary || e.button !== 0) { clear(); return; }
-        if (e.target.closest('input,textarea,select')) return;
+        if (e.target.closest('input,textarea,select,dialog')) return;
         clear();
         const handle = e.target.closest('[data-sheet-drag]');
         const bubble = e.target.closest('.bub');

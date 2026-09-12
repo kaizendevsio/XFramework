@@ -14,7 +14,9 @@
     const top = state => (parseFloat(getComputedStyle(state.element).paddingTop) || 0) + state.element.querySelector('[data-window-lead]').getBoundingClientRect().height;
     const remember = state => {
         const element = state.element;
-        state.pinned = element.scrollHeight - element.scrollTop - element.clientHeight < 64;
+        // After upward input, only reaching the actual bottom may re-enable following.
+        state.pinned = !state.readingHistory && element.scrollHeight - element.scrollTop - element.clientHeight < 8;
+        state.lastTop = element.scrollTop;
         const index = rowAt(state, Math.max(0, element.scrollTop - top(state)));
         state.anchor = state.ids[index]; state.anchorOffset = element.scrollTop - top(state) - state.offsets[index];
     };
@@ -61,9 +63,30 @@
             let state = states.get(element);
             if (!state) {
                 state = { element, ref, ids: [], heights: new Map(), offsets: [0], pinned: true, observed: new Set() };
-                state.scroll = () => { if (!state.adjusting) { remember(state); request(state); } };
+                state.scroll = () => {
+                    if (state.readingHistory || !state.adjusting) {
+                        if (element.scrollTop > (state.lastTop ?? 0) && element.scrollHeight - element.scrollTop - element.clientHeight < 8) state.readingHistory = false;
+                        remember(state); request(state);
+                    }
+                };
+                const releaseBottom = () => {
+                    remember(state); state.readingHistory = true; state.pinned = false; state.adjusting = false;
+                    cancelAnimationFrame(state.restoreFrame);
+                };
+                state.wheel = event => { if (event.deltaY < 0) releaseBottom(); };
+                state.touchStart = event => { state.touchY = event.touches[0]?.clientY; };
+                state.touchMove = event => {
+                    const y = event.touches[0]?.clientY;
+                    if (y > state.touchY + 1) releaseBottom();
+                    state.touchY = y;
+                };
+                state.key = event => { if (['ArrowUp', 'PageUp', 'Home'].includes(event.key)) releaseBottom(); };
                 state.resize = new ResizeObserver(() => measure(state));
                 element.addEventListener('scroll', state.scroll, { passive: true });
+                element.addEventListener('wheel', state.wheel, { passive: true });
+                element.addEventListener('touchstart', state.touchStart, { passive: true });
+                element.addEventListener('touchmove', state.touchMove, { passive: true });
+                element.addEventListener('keydown', state.key);
                 state.resize.observe(element); states.set(element, state);
             }
             Object.assign(state, { ids, start, count, hasMore }); prefix(state);
@@ -72,7 +95,7 @@
             spacers(state); measure(state); restore(state);
             requestAnimationFrame(() => request(state));
         },
-        bottom(element) { const state = states.get(element); if (state) { state.pinned = true; restore(state); request(state); } },
+        bottom(element) { const state = states.get(element); if (state) { state.readingHistory = false; state.pinned = true; restore(state); request(state); } },
         show(element, id) {
             const state = states.get(element), index = state?.ids.indexOf(id);
             if (index === undefined || index < 0) return;
@@ -82,6 +105,8 @@
         dispose(element) {
             const state = states.get(element); if (!state) return;
             state.resize.disconnect(); cancelAnimationFrame(state.restoreFrame); element.removeEventListener('scroll', state.scroll); states.delete(element);
+            element.removeEventListener('wheel', state.wheel); element.removeEventListener('touchstart', state.touchStart);
+            element.removeEventListener('touchmove', state.touchMove); element.removeEventListener('keydown', state.key);
         }
     };
 })();

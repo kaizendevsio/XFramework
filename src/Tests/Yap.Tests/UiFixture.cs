@@ -50,6 +50,11 @@ internal static class UiFixture
             new() { Id = Guid.NewGuid(), SenderCredentialId = fixture.Credential, Text = "Perfect. Let's also sort the copy on step 3.", CreatedAt = DateTime.UtcNow.AddMinutes(-12) },
             new() { Id = Guid.NewGuid(), SenderCredentialId = friend, SenderAlias = "Sarah Mensah", Text = "Perfect, I'll push the new build tonight", CreatedAt = DateTime.UtcNow.AddMinutes(-1) }
         };
+        messages[2].DeliveredCount = 1;
+        messages[4].DeliveredCount = 1; messages[4].ReadCount = 1;
+        fixture.Session.Setup(s => s.ArchiveThreadAsync(It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid thread, bool archived, CancellationToken _) =>
+            { conversations.First(c => c.Id == thread).IsArchived = archived; return Success(); });
         fixture.Session.Setup(s => s.GetThreadsAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => ChatFixture.Ok(new GetThreadListResponse { Items = conversations.ToList(), TotalCount = conversations.Count }));
         fixture.Session.Setup(s => s.GetThreadAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
