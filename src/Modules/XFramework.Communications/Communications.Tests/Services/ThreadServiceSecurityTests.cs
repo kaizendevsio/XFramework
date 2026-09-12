@@ -32,7 +32,7 @@ using XFramework.Integration.Security;
 
 namespace Communications.Tests.Services;
 
-public sealed class ThreadServiceSecurityTests
+public sealed partial class ThreadServiceSecurityTests
 {
     private static readonly AsyncLocal<TrustedInvocationContext?> TrustedContext = new();
 
@@ -736,7 +736,7 @@ public sealed class ThreadServiceSecurityTests
         var message = Message(Guid.NewGuid(), member.MessageThreadId, member.Id, tenant, "hello");
         var type = new MessageReactionType { Id = Guid.NewGuid(), TenantId = Guid.NewGuid(), IsEnabled = true };
         var context = new InMemoryDataContext();
-        context.Seed(member, message, type);
+        context.Seed(Thread(member.MessageThreadId, tenant), member, message, type);
         var service = CreateService(context);
         var result = await service.CreateMessageReactionAsync(new CreateMessageReactionRequest
         {
@@ -932,10 +932,10 @@ public sealed class ThreadServiceSecurityTests
     }
 
     private static ThreadService CreateService(
-        InMemoryDataContext dataContext,
+        IDataContext dataContext,
         ICommunicationsTemplateService? templateService = null,
         IStorageServiceWrapper? storage = null,
-        CommunicationsOutboxSignal? signal = null)
+        CommunicationsOutboxSignal? signal = null, Microsoft.EntityFrameworkCore.DbContext? database = null)
     {
         TrustedContext.Value = null;
         var resolver = new CommunicationsRequestContextResolver(
@@ -954,7 +954,7 @@ public sealed class ThreadServiceSecurityTests
             new EmptyReactionSummaryReader(),
             new EmptyReplySummaryReader(),
             NullLogger<ThreadService>.Instance,
-            signal ?? new CommunicationsOutboxSignal());
+            signal ?? new CommunicationsOutboxSignal(), database);
     }
 
     private sealed class EmptyReplySummaryReader : IMessageReplySummaryReader

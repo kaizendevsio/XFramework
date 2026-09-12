@@ -9,6 +9,39 @@ namespace Yap.Client.Tests;
 public sealed class OfflineStoreTests
 {
     [Test]
+    public async Task MessagesAsync_LimitsLatestWindowWithoutLosingOlderOfflineHistory()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var thread = Guid.NewGuid();
+        var messages = Enumerable.Range(0, 250).Select(i => { var m = fixture.Message(thread); m.Text = $"Message {i}"; m.CreatedAt = DateTime.UtcNow.Date.AddSeconds(i); return m; }).ToList();
+        await fixture.Store.SaveMessagesAsync("account-a", messages);
+        var window = await fixture.Store.MessagesAsync("account-a", thread, limit: 50);
+        Assert.That(window.Count, Is.EqualTo(50));
+        Assert.That(window[0].Text, Is.EqualTo("Message 200"));
+        Assert.That(window[^1].Text, Is.EqualTo("Message 249"));
+        Assert.That(await fixture.Store.MessageCountAsync("account-a", thread), Is.EqualTo(250));
+    }
+
+    [Test]
+    public async Task SummaryRefresh_PreservesConversationControls_AndPendingMediaKeepsPreview()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var message = fixture.Message(); message.LocalFileKey = "photo"; message.HasAttachments = true;
+        message.Attachments = [new(message.Id, "photo.png", "image/png", 42)]; message.IsThreadReply = true;
+        await fixture.Store.QueueAsync(fixture.Queue(message), message, "main");
+        var server = fixture.Message(message.ThreadId); server.Id = message.Id;
+        await fixture.Store.ReplaceWindowAsync("account-a", message.ThreadId, [server], true);
+        Assert.That((await fixture.Store.MessageAsync("account-a", message.Id))!.LocalFileKey, Is.EqualTo("photo"));
+        var details = new Conversation { Id = message.ThreadId, Features = 3, CanManage = true, People = [new(Guid.NewGuid(), "Admin", "admin", Role: "Admin")] };
+        await fixture.Store.SaveConversationsAsync("account-a", [details]);
+        await fixture.Store.SaveConversationsAsync("account-a", [new() { Id = details.Id, Preview = "New message" }]);
+        var cached = (await fixture.Store.ConversationsAsync("account-a")).Single();
+        Assert.That(cached.Features, Is.EqualTo(3));
+        Assert.That(cached.CanManage, Is.True);
+        Assert.That(cached.People.Single().Role, Is.EqualTo("Admin"));
+    }
+
+    [Test]
     public async Task QueueAsync_Reload_PreservesMessageUploadAndClearsOnlyItsDraft()
     {
         await using var fixture = await StoreFixture.CreateAsync();

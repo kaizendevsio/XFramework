@@ -6,8 +6,8 @@ window.yap = {
         document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#181e19' : '#f7f8f2';
         try { localStorage.setItem('yap-theme', theme); } catch {}
     },
-    scrollMessages() { const list = document.querySelector('[data-messages]'); if (list) list.scrollTop = list.scrollHeight; },
-    showMessage(id) { const element = document.querySelector(`[data-message-id="${CSS.escape(id)}"]`); element?.scrollIntoView({block:'center',behavior:'smooth'}); },
+    scrollMessages() { const list = document.querySelector('[data-messages]'); if (list) { if (list.classList.contains('message-window')) yap.messageWindow.bottom(list); else list.scrollTop = list.scrollHeight; } },
+    showMessage(id) { const list = document.querySelector('.message-window'); if (list) { yap.messageWindow.show(list, id); return; } const element = document.querySelector(`[data-message-id="${CSS.escape(id)}"]`); element?.scrollIntoView({block:'center',behavior:'smooth'}); },
     focusSheet(element) {
         element.yapPreviousFocus = document.activeElement;
         element.yapTrap = event => {
@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const resize = new ResizeObserver(entries => {
         for (const {target} of entries) {
             if (target.hasAttribute('data-messages')) {
+                if (target.classList.contains('message-window')) { yap.messageWindow.resize(target); continue; }
                 if (pinned.get(target)) target.scrollTop = target.scrollHeight;
                 continue;
             }
@@ -49,7 +50,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (surface) {
                 surface.style.setProperty(target.hasAttribute('data-scroll-header') ? '--scroll-top' : '--scroll-bottom', `${target.getBoundingClientRect().height}px`);
                 const list = surface.querySelector('[data-messages]');
-                if (list && pinned.get(list)) list.scrollTop = list.scrollHeight;
+                if (list?.classList.contains('message-window')) yap.messageWindow.resize(list);
+                else if (list && pinned.get(list)) list.scrollTop = list.scrollHeight;
             }
         }
     });

@@ -6,7 +6,7 @@ using XFramework.Integration.Security;
 
 namespace Yap.Services;
 
-public sealed record ChatPerson(Guid Id, string Name, string UserName);
+public sealed record ChatPerson(Guid Id, string Name, string UserName, string? AvatarUrl = null);
 
 public interface IChatDirectory
 {
@@ -36,7 +36,7 @@ public sealed class ChatDirectory(IServiceProvider services, ICommunicationsChat
                 .Take(50).ToListAsync(ct);
             people.AddRange(members.Select(p => new ChatPerson(p.Id,
                 string.IsNullOrWhiteSpace(p.UserAlias) ? p.UserName ?? "Workspace member" : p.UserAlias,
-                p.UserName ?? "")));
+                p.UserName ?? "", p.AvatarUrl)));
         }
         return people;
     }
@@ -58,6 +58,6 @@ public sealed class ChatDirectory(IServiceProvider services, ICommunicationsChat
             .OrderBy(p => p.UserName).Take(20).ToListAsync(ct);
         return people.Select(p => new ChatPerson(p.Id,
             string.IsNullOrWhiteSpace(p.UserAlias) ? p.UserName ?? "Workspace member" : p.UserAlias,
-            p.UserName ?? "")).ToArray();
+            p.UserName ?? "", p.AvatarUrl)).ToArray();
     }
 }

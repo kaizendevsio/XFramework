@@ -11,36 +11,27 @@ else
 {
     <ScrollSurface><Header><div class="appbar liquid-glass"><GlassLayer /><a class="iconbtn" href="@(ParentId.HasValue ? $"/chat/{Id}" : "/")" aria-label="Go back"><Icon Name="back" /></a>
         @if (!ParentId.HasValue) { <Avatar Initials="@chat.Initials" Color="@chat.Color" /> }
-        <div class="mid"><h1 style="font-size:16px">@(ParentId.HasValue ? "Thread" : chat.Name)</h1><span class="muted" style="font-size:12px">@(ParentId.HasValue ? $"{chat.Name} · {Parent?.ReplyTotal ?? 0} replies" : chat.Group ? $"{chat.Members} members" : "Direct conversation")</span></div>
+        <button class="mid conversation-title" aria-label="Conversation settings" @onclick='() => mode = "details"'><h1 style="font-size:16px">@(ParentId.HasValue ? "Thread" : chat.Name)</h1><span class="muted" style="font-size:12px">@(ParentId.HasValue ? $"{chat.Name} · {Parent?.ReplyTotal ?? 0} replies" : chat.Group ? $"{chat.Members} members" : "Direct conversation")</span></button>
         <button class="iconbtn" aria-label="Search messages" @onclick='() => mode = "search"'><Icon Name="search" /></button>
         <button class="iconbtn" aria-label="Conversation details" @onclick='() => mode = "details"'><Icon Name="users" /></button>
     </div></Header>
     <ChildContent>
     @if (ParentId.HasValue)
     {
-        <div class="body" data-messages>
         @if (Parent is { } parent)
         {
-            <div class="threadhead"><div class="parentmsg"><Avatar Initials="@parent.Initials" Color="@parent.Color" Size="a34" /><div class="mid"><div class="nm">@parent.Sender <span class="meta">@parent.Time</span></div><div class="tx">@parent.Text</div></div></div><div class="replycount">@parent.ReplyTotal replies</div></div>
-            @foreach (var message in parent.Replies)
-            {
-                <article class="treply" @key="message.Id"><Avatar Initials="@message.Initials" Color="@message.Color" Size="a34" /><div class="mid"><div class="nm"><b>@message.Sender</b><i>@message.Time</i></div><button class="tx liquid-glass @(message.Mine ? "own-bubble" : "")" @onclick="() => Select(message)"><GlassLayer /><span class="bubble-content">@message.Text</span></button>
-                @if (message.Reactions.Count > 0) { <div class="reacts">@foreach (var reaction in message.Reactions) { <button class="react" aria-label="@($"React {reaction.Key}")" @onclick='() => State.ActionAsync(message, "react", emoji: reaction.Key)'>@reaction.Key @reaction.Value</button> }</div> }
-                @if (message.Delivery != "Sent") { <div class="meta">@message.Delivery</div> }</div></article>
-            }
-            @if (parent.Replies.Count < parent.ReplyTotal) { <button class="btn ghost" @onclick="() => State.LoadRepliesAsync(parent)">Load more replies</button> }
-            @if (parent.Replies.Count == 0) { <p class="empty">Start the side conversation.</p> }
+            <MessageWindow @key="ParentId" Items="parent.Replies" HasMore="@(State.Online && parent.Replies.Count < parent.ReplyTotal)" Earlier="() => State.LoadRepliesAsync(parent)">
+                <Header><div class="threadhead"><div class="parentmsg"><Avatar Initials="@parent.Initials" ImageUrl="@parent.AvatarUrl" Color="@parent.Color" Size="a34" /><div class="mid"><div class="nm">@parent.Sender <span class="meta">@parent.Time</span></div><div class="tx">@parent.Text</div><MessageMedia Message="parent" /></div></div><div class="replycount">@parent.ReplyTotal replies</div></div></Header>
+                <ChildContent Context="message"><MessageBubble Message="message" ShowSender="true" OnSelect="Select" OnReply="ReplyTo" OnThread="OpenThreadAsync" OnReact='emoji => State.ActionAsync(message, "react", emoji: emoji)' /></ChildContent>
+            </MessageWindow>
         }
         else { <p class="empty">This message is not saved on this device.</p> }
-        </div>
     }
     else
     {
-        <div class="body messages" data-messages>
-        @if (chat.Messages.Count < chat.MessageTotal) { <button class="btn ghost" disabled="@(!State.Online || State.Busy)" @onclick="State.LoadEarlierAsync">Load earlier messages</button> }
-        @foreach (var message in chat.Messages) { <MessageBubble @key="message.Id" Message="message" ShowSender="chat.Group" OnSelect="Select" OnReply="ReplyTo" OnThread="OpenThreadAsync" OnReact='emoji => State.ActionAsync(message, "react", emoji: emoji)' /> }
-        @if (chat.Messages.Count == 0) { <p class="empty">Say hello. This is the beginning of your conversation.</p> }
-        </div>
+        <MessageWindow @key="Id" Items="chat.Messages" HasMore="State.HasEarlierMessages" Earlier="State.LoadEarlierAsync">
+            <ChildContent Context="message"><MessageBubble Message="message" ShowSender="chat.Group" OnSelect="Select" OnReply="ReplyTo" OnThread="OpenThreadAsync" OnReact='emoji => State.ActionAsync(message, "react", emoji: emoji)' /></ChildContent>
+        </MessageWindow>
     }
     </ChildContent><Footer><Composer @key="@(ParentId ?? Id)" ThreadId="Id" ParentId="ParentId" Reply="reply" Cancel="() => reply = null" Sent="ScrollAsync" /></Footer></ScrollSurface>
 }
@@ -49,9 +40,9 @@ else
 <BottomSheet Title="@(mode == "details" ? "Conversation" : mode == "files" ? "Attachments" : mode == "edit" ? "Edit message" : "Message actions")" ShowHeader='@(mode != "message")' OnClose="() => mode = null">
 @if (mode == "message" && selected is not null)
 {
-    <div class="emojirow">@foreach (var reaction in State.Defaults?.Reactions ?? []) { <button aria-label="@($"React {reaction.Emoji}")" disabled="@(!State.Online || State.NeedsLogin)" @onclick="() => ReactAsync(reaction.Emoji)">@reaction.Emoji</button> }</div>
-    <button class="sheetitem" @onclick="() => ReplyTo(selected)"><Icon Name="reply" Size="20" />Reply</button>
-    <button class="sheetitem" @onclick="() => OpenThreadAsync(selected)"><Icon Name="thread" Size="20" />Reply in thread</button>
+    @if (State.Selected?.Allows(ChatFeature.Reactions) != false) { <div class="emojirow">@foreach (var reaction in State.Defaults?.Reactions ?? []) { <button aria-label="@($"React {reaction.Emoji}")" disabled="@(!State.Online || State.NeedsLogin)" @onclick="() => ReactAsync(reaction.Emoji)">@reaction.Emoji</button> }</div> }
+    @if (State.Selected?.Allows(ChatFeature.Replies) != false) { <button class="sheetitem" @onclick="() => ReplyTo(selected)"><Icon Name="reply" Size="20" />Reply</button> }
+    @if (State.Selected?.Allows(ChatFeature.Threads) != false) { <button class="sheetitem" @onclick="() => OpenThreadAsync(selected)"><Icon Name="thread" Size="20" />Reply in thread</button> }
     <button class="sheetitem" @onclick='() => mode = "forward"'><Icon Name="arrow" Size="20" />Forward text</button>
     <button class="sheetitem" @onclick="CopyAsync"><Icon Name="file" Size="20" />Copy text</button>
     <button class="sheetitem" @onclick="FilesAsync"><Icon Name="file" Size="20" />Attachments</button>
@@ -66,7 +57,7 @@ else if (mode == "edit")
 else if (mode == "delete")
 { <div class="picker"><p>Delete this message for everyone?</p><button class="btn" @onclick='() => ActionAsync("delete")'>Delete message</button></div> }
 else if (mode == "details" && State.Selected is { } details)
-{ <div class="picker"><h2>@details.Name</h2>@foreach (var person in details.People) { <div class="row"><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" Size="a34" />@person.Name</div> }<button class="btn ghost" disabled="@(!State.Online || State.NeedsLogin)" @onclick="State.MuteAsync">@(details.Muted ? "Unmute conversation" : "Mute conversation")</button></div> }
+{ <ConversationSettings Conversation="details" /> }
 else if (mode == "forward")
 { <div class="picker">@foreach (var target in State.Conversations) { <button class="row" @onclick="() => ForwardAsync(target.Id)"><Avatar Initials="@target.Initials" Size="a34" />@target.Name</button> }</div> }
 else if (mode == "search")
@@ -82,6 +73,7 @@ else if (mode == "search")
     private string? mode;
     private string edit = "";
     private Guid loaded;
+    private Guid? loadedParent;
     private bool scroll;
     private Guid? focus;
     private string query = "";
@@ -90,6 +82,13 @@ else if (mode == "search")
     protected override async Task OnParametersSetAsync()
     {
         if (State.User is not null && loaded != Id) { loaded = Id; await State.SelectAsync(Id); scroll = true; }
+        if (ParentId.HasValue && loadedParent != ParentId)
+        {
+            await State.LocateAsync(ParentId.Value);
+            if (Parent is { } parent) await State.LoadRepliesAsync(parent);
+            loadedParent = ParentId; scroll = true;
+        }
+        if (!ParentId.HasValue) loadedParent = null;
         if (FocusMessage.HasValue) { await State.LocateAsync(FocusMessage.Value); focus = FocusMessage; scroll = false; }
     }
     private void Changed() => _ = InvokeAsync(StateHasChanged);
@@ -100,8 +99,8 @@ else if (mode == "search")
     }
     private Task ScrollAsync() { scroll = true; return Task.CompletedTask; }
     private void Select(ChatMessage message) { selected = message; mode = "message"; }
-    private void ReplyTo(ChatMessage message) { reply = message; mode = null; }
-    private async Task OpenThreadAsync(ChatMessage message) { mode = null; await State.LoadRepliesAsync(message); Nav.NavigateTo($"/thread/{Id}/{message.Id}"); scroll = true; }
+    private void ReplyTo(ChatMessage message) { if (State.Selected?.Allows(ChatFeature.Replies) == false) return; reply = message; mode = null; }
+    private Task OpenThreadAsync(ChatMessage message) { if (State.Selected?.Allows(ChatFeature.Threads) != false) { mode = null; Nav.NavigateTo($"/thread/{Id}/{message.Id}"); scroll = true; } return Task.CompletedTask; }
     private async Task CopyAsync() { try { await JS.InvokeVoidAsync("yap.copy", selected!.Text); mode = null; } catch (Exception ex) { State.Report(ex); } }
     private async Task FilesAsync() { await State.OpenAttachmentsAsync(selected!); mode = "files"; }
     private async Task ReactAsync(string emoji) { await State.ActionAsync(selected!, "react", emoji: emoji); mode = null; }

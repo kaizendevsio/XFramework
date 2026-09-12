@@ -19,4 +19,5 @@ public partial record CreateThreadMessageRequest : RequestBase,
     public Dictionary<string, string> TemplateVariables { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     /// <summary>Stable ID for a client outbox send. Reusing it with different content is rejected.</summary>
     public Guid? ClientMessageId { get; set; }
+    public bool IsThreadReply { get; set; }
 }

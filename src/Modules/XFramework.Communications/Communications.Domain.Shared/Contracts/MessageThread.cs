@@ -27,4 +27,7 @@ public partial class MessageThread : BaseModel
 
     [MemoryPackOrder(6)]
     public virtual ICollection<Message> Messages { get; set; } = new List<Message>();
+
+    [MemoryPackOrder(7)]
+    public ConversationFeatures Features { get; set; } = ConversationFeatures.All;
 }

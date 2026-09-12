@@ -16,6 +16,7 @@ public class MessageConfiguration : IEntityTypeConfiguration<Message>
             .HasColumnName("ID")
             .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
         entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+        entity.Property(e => e.IsThreadReply).HasDefaultValue(false);
 
         entity.Property(e => e.IsEnabled)
             .IsRequired()

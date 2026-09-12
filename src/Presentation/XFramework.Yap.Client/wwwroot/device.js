@@ -50,9 +50,9 @@
             return { key, name: file.name, contentType: file.type || 'application/octet-stream', size: file.size };
         },
         async removeFile(key) { await (await directory()).removeEntry(key).catch(error => { if (error.name !== 'NotFoundError') throw error; }); },
-        async upload(key, name, thread, token, scope) {
+        async upload(key, name, thread, token, scope, contentType) {
             const file = await read(key);
-            const data = new FormData(); data.append('file', file, name);
+            const data = new FormData(); data.append('file', new Blob([file], { type: contentType || 'application/octet-stream' }), name);
             const response = await fetch(`/api/chat/uploads/${thread}`, { method: 'POST', body: data,
                 headers: { RequestVerificationToken: token, 'X-Yap-Account': scope } });
             return { status: response.status, id: response.ok ? (await response.json()).id : '00000000-0000-0000-0000-000000000000' };
@@ -71,6 +71,59 @@
             // Download untrusted files rather than execute HTML/SVG inside this origin.
             const link = document.createElement('a'); link.href = url; link.download = name; link.click();
             setTimeout(() => { URL.revokeObjectURL(url); urls.delete(url); }, 60000);
+        },
+        async mediaUrl(key, path, scope, online, contentType, local) {
+            if (!/^(image\/(png|jpeg|gif|webp|avif|heic|heif)|video\/(mp4|webm|quicktime)|audio\/(mp4|mpeg|ogg|webm|wav|x-wav|aac))$/i.test(contentType.split(';')[0])) return null;
+            let file;
+            try { file = await read(key); }
+            catch (error) {
+                if (local || error.name !== 'NotFoundError' || !online) throw error;
+                const response = await fetch(path, { headers: { 'X-Yap-Account': scope }, cache: 'no-store' });
+                if (!response.ok) throw new Error('The attachment is unavailable.');
+                file = await response.blob(); await write(key, file);
+            }
+            const url = URL.createObjectURL(new Blob([file], { type: contentType })); urls.add(url); return url;
+        },
+        releaseMedia(url) { URL.revokeObjectURL(url); urls.delete(url); },
+        async startRecording() {
+            if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) throw new Error('Voice recording is unavailable in this browser.');
+            if (window.yapRecording) throw new Error('A recording is already active.');
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            try {
+                const mimeType = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].find(type => MediaRecorder.isTypeSupported(type));
+                const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+                const state = { recorder, stream, chunks: [], size: 0, timer: null, finished: null };
+                state.finished = new Promise((resolve, reject) => {
+                    recorder.ondataavailable = event => { if (event.data.size) { state.chunks.push(event.data); state.size += event.data.size; } if (state.size > 19 * 1024 * 1024 && recorder.state !== 'inactive') recorder.stop(); };
+                    recorder.onerror = () => reject(new Error('Recording failed.'));
+                    recorder.onstop = () => { clearTimeout(state.timer); stream.getTracks().forEach(track => track.stop()); resolve(new Blob(state.chunks, { type: recorder.mimeType })); };
+                });
+                state.finished.catch(() => { stream.getTracks().forEach(track => track.stop()); });
+                recorder.start(1000); state.timer = setTimeout(() => { if (recorder.state !== 'inactive') recorder.stop(); }, 300000);
+                window.yapRecording = state;
+            } catch (error) { stream.getTracks().forEach(track => track.stop()); throw error; }
+        },
+        async stopRecording(key, cancel) {
+            const state = window.yapRecording; if (!state) return null;
+            window.yapRecording = null;
+            if (state.recorder.state !== 'inactive') state.recorder.stop();
+            try {
+                const blob = await state.finished;
+                if (cancel) return null;
+                if (!blob.size || blob.size > 20 * 1024 * 1024) throw new Error('Recording is empty or too large.');
+                await write(key, blob);
+                const extension = blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm';
+                return { key, name: `Voice message.${extension}`, contentType: blob.type, size: blob.size };
+            } finally { clearTimeout(state.timer); state.stream.getTracks().forEach(track => track.stop()); }
+        },
+        resizeComposer(input) {
+            if (!input) return;
+            const previous = input.getBoundingClientRect().height;
+            input.style.height = 'auto';
+            const height = Math.min(144, Math.max(44, input.scrollHeight));
+            input.style.height = `${height}px`;
+            if (Math.abs(height - previous) > 1 && !matchMedia('(prefers-reduced-motion: reduce)').matches)
+                input.animate([{ height: `${previous}px` }, { height: `${height}px` }], { duration: 180, easing: 'ease-out' });
         },
         async clearFiles() {
             for (const url of urls) URL.revokeObjectURL(url); urls.clear();
@@ -101,7 +154,7 @@
                 root.style.setProperty('--viewport-height', `${view.height}px`);
                 root.style.setProperty('--viewport-top', `${view.offsetTop}px`);
             } else {
-                root.style.removeProperty('--viewport-height');
+                root.style.setProperty('--viewport-height', `${window.innerHeight}px`);
                 root.style.removeProperty('--viewport-top');
             }
         });
@@ -110,7 +163,10 @@
     visualViewport?.addEventListener('scroll', viewport);
     addEventListener('resize', viewport); viewport();
     document.addEventListener('focusin', viewport);
-    document.addEventListener('focusout', viewport);
+    document.addEventListener('focusout', () => { viewport(); setTimeout(viewport, 350); });
+    addEventListener('pageshow', viewport);
+    addEventListener('orientationchange', () => setTimeout(viewport, 350));
+    document.addEventListener('contextmenu', event => { if (event.target.closest('button,a,label,nav,.avatar') && !event.target.closest('.bubble-content,input,textarea')) event.preventDefault(); });
     for (const name of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(name, event => event.preventDefault(), { passive: false });
     document.addEventListener('touchmove', event => { if (event.touches.length > 1) event.preventDefault(); }, { passive: false });
 

@@ -1,7 +1,9 @@
-<span class="avatar @Size @Color">@Initials@if (Online){<span class="presence"></span>}</span>
+<span class="avatar @Size @Color">@if (!string.IsNullOrWhiteSpace(ImageUrl) && !failed) { <img src="@ImageUrl" alt="" draggable="false" @onerror="() => failed = true" /> } else { @Initials }@if (Online){<span class="presence"></span>}</span>
 @code {
     [Parameter] public string Initials { get; set; } = "JE";
     [Parameter] public string Color { get; set; } = "g1";
     [Parameter] public string Size { get; set; } = "a40";
     [Parameter] public bool Online { get; set; }
+    [Parameter] public string? ImageUrl { get; set; }
+    private bool failed;
 }
