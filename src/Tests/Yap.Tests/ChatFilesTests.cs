@@ -184,8 +184,6 @@ public sealed class ChatFilesTests
             .ReturnsAsync(ChatFixture.Ok(new StorageUploadPartResponse()));
         storage.Setup(s => s.CompleteChatStorageUploadSession(It.IsAny<CompleteChatStorageUploadSessionRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ChatFixture.Ok(new StorageFileResponse { Id = fileId, Status = completionStatus }));
-        storage.Setup(s => s.GetStorageFile(It.Is<GetStorageFileRequest>(r => r.StorageFileId == fileId), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ChatFixture.Ok(new StorageFileResponse { Id = fileId, Status = StorageFileStatus.Available }));
         var service = new ChatFiles(storage.Object, fixture.Client.Object, actors.Object, scope.Object, NullLogger<ChatFiles>.Instance);
         var result = await service.UploadAsync(new BrowserFile([1,2,3,4,5,6,7]), thread, null, default);
         Assert.Multiple(() =>
@@ -208,8 +206,44 @@ public sealed class ChatFilesTests
             Assert.That(parts.All(p => p.UploadSessionId == upload), Is.True);
             Assert.That(parts.All(p => p.Metadata!.RequestedTenantId == tenant), Is.True);
         });
-        storage.Verify(s => s.GetStorageFile(It.Is<GetStorageFileRequest>(r => r.StorageFileId == fileId), It.IsAny<CancellationToken>()),
-            completionStatus == StorageFileStatus.Verifying ? Times.Once() : Times.Never());
+        // Yap is not authorized for a generic storage read on a chat attachment, and does
+        // not need one: the attach step validates availability through Communications.
+        storage.Verify(s => s.GetStorageFile(It.IsAny<GetStorageFileRequest>(), It.IsAny<CancellationToken>()), Times.Never());
+    }
+
+    [Test]
+    public async Task AttachAsync_StorageStillVerifying_WaitsInsteadOfFailingTheQueuedMessage()
+    {
+        var fixture = new ChatFixture();
+        var messageId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var calls = 0;
+        fixture.Session.Setup(s => s.AttachFileAsync(fixture.Thread, messageId, fileId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => ++calls < 3
+                ? new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Storage file is not available for reference" }
+                : new CmdResponse { HttpStatusCode = HttpStatusCode.OK });
+        var service = new ChatFiles(Mock.Of<IStorageServiceWrapper>(), fixture.Client.Object,
+            Mock.Of<ICommunicationsChatActorProvider>(), Mock.Of<IActorAccessTokenScope>(), NullLogger<ChatFiles>.Instance);
+
+        await service.AttachAsync(fixture.Thread, messageId, fileId, default);
+
+        Assert.That(calls, Is.EqualTo(3));
+    }
+
+    [Test]
+    public void AttachAsync_RejectedForAnotherReason_FailsWithoutRetrying()
+    {
+        var fixture = new ChatFixture();
+        var messageId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var calls = 0;
+        fixture.Session.Setup(s => s.AttachFileAsync(fixture.Thread, messageId, fileId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => { calls++; return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Storage file type is not allowed for Communications attachments" }; });
+        var service = new ChatFiles(Mock.Of<IStorageServiceWrapper>(), fixture.Client.Object,
+            Mock.Of<ICommunicationsChatActorProvider>(), Mock.Of<IActorAccessTokenScope>(), NullLogger<ChatFiles>.Instance);
+
+        Assert.ThrowsAsync<YapApiException>(async () => await service.AttachAsync(fixture.Thread, messageId, fileId, default));
+        Assert.That(calls, Is.EqualTo(1));
     }
 
     [Test]

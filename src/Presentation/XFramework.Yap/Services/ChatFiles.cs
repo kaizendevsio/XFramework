@@ -121,20 +121,14 @@ public sealed class ChatFiles(IStorageServiceWrapper storage, ICommunicationsCha
         }, ct));
     }
 
-    private async Task<Guid> FinishAsync(Guid uploadId, RequestMetadata metadata, CancellationToken ct)
-    {
-        var completed = YapApi.Require(await storage.CompleteChatStorageUploadSession(new CompleteChatStorageUploadSessionRequest
-        { UploadSessionId = uploadId, Metadata = metadata }, ct));
-        for (var attempt = 0; attempt < 60 && completed.Status is StorageFileStatus.Verifying or StorageFileStatus.VerificationInProgress; attempt++)
-        {
-            await Task.Delay(TimeSpan.FromSeconds(1), ct);
-            completed = YapApi.Require(await storage.GetStorageFile(new GetStorageFileRequest
-            { StorageFileId = completed.Id, Metadata = metadata }, ct));
-        }
-        if (completed.Status != StorageFileStatus.Available)
-            throw new ChatOperationException("The attachment is not ready to share. Try again after the file has been checked.");
-        return completed.Id;
-    }
+    /// <summary>
+    /// Sealing the session is the last step Yap owns. Whether the object has finished
+    /// verifying is Communications' call, made through the chat-scoped validator when the
+    /// file is attached, so this does not read storage directly to find out.
+    /// </summary>
+    private async Task<Guid> FinishAsync(Guid uploadId, RequestMetadata metadata, CancellationToken ct) =>
+        YapApi.Require(await storage.CompleteChatStorageUploadSession(new CompleteChatStorageUploadSessionRequest
+        { UploadSessionId = uploadId, Metadata = metadata }, ct)).Id;
 
     private async Task SafeAbortAsync(Guid uploadId, RequestMetadata metadata)
     {
@@ -155,15 +149,32 @@ public sealed class ChatFiles(IStorageServiceWrapper storage, ICommunicationsCha
     public async Task AttachAsync(Guid threadId, Guid messageId, Guid storageId, CancellationToken ct)
     {
         var session = await chat.ForCurrentActorAsync(ct: ct);
-        var result = await session.AttachFileAsync(threadId, messageId, storageId, ct);
-        if ((int)result.HttpStatusCode == 409)
+        for (var attempt = 0; ; attempt++)
         {
-            // A prior attempt may have committed before its response was interrupted.
-            var linked = YapApi.Require(await session.GetFilesAsync(threadId, messageId, pageSize: 100, ct: ct));
-            if (linked.Items.Any(file => file.StorageFileId == storageId)) return;
+            var result = await session.AttachFileAsync(threadId, messageId, storageId, ct);
+            if ((int)result.HttpStatusCode == 409)
+            {
+                // A prior attempt may have committed before its response was interrupted.
+                var linked = YapApi.Require(await session.GetFilesAsync(threadId, messageId, pageSize: 100, ct: ct));
+                if (linked.Items.Any(file => file.StorageFileId == storageId)) return;
+            }
+            // A large object can still be verifying. That is a wait, not a rejection.
+            if (attempt < VerificationAttempts && StillVerifying(result))
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1), ct);
+                continue;
+            }
+            YapApi.Require(result);
+            return;
         }
-        YapApi.Require(result);
     }
+
+    /// <summary>How long an attach waits for storage to finish verifying the object.</summary>
+    private const int VerificationAttempts = 90;
+
+    private static bool StillVerifying(CmdResponse result) =>
+        (int)result.HttpStatusCode == 400 &&
+        result.Message?.Contains("not available", StringComparison.OrdinalIgnoreCase) == true;
 
     public async Task<IReadOnlyList<ChatFileLink>> GetLinksAsync(Guid threadId, Guid messageId, CancellationToken ct)
     {

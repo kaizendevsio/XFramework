@@ -3,10 +3,11 @@
    Padding the shell by the full inset left ~46px of dead space on iOS and 12px on Android. */
 --chrome-bottom:max(12px,calc(var(--safe-bottom) * .5))}
 :root[data-keyboard=open]{--safe-bottom:0px;--chrome-bottom:8px}
-html,body{height:100%;min-height:0;overflow:hidden;overscroll-behavior:none;touch-action:pan-x pan-y}
+:root[data-keyboard=open] .app-shell{bottom:auto;height:var(--viewport-height,100dvh)}
+html,body{height:100%;min-height:0;overflow:hidden;overscroll-behavior:none;touch-action:pan-x pan-y;background:var(--surface)}
 body{display:block;padding:0;margin:0;background:var(--surface)}
 #app{display:block;height:100%;min-height:0}
-.app-shell{position:fixed;left:0;right:0;top:var(--viewport-top,0px);height:var(--viewport-height,100dvh);padding:var(--safe-top) env(safe-area-inset-right,0px) 0 env(safe-area-inset-left,0px);display:flex;flex-direction:column;background:var(--surface);overflow:hidden;view-transition-name:yap-screen}
+.app-shell{position:fixed;left:0;right:0;top:var(--viewport-top,0px);bottom:0;height:auto;padding:var(--safe-top) env(safe-area-inset-right,0px) 0 env(safe-area-inset-left,0px);display:flex;flex-direction:column;background:var(--surface);overflow:hidden;view-transition-name:yap-screen}
 .screen{min-height:0;flex:1;overflow:hidden}
 .app-shell{background:radial-gradient(ellipse at 5% 0%,#d5f87945,transparent 48%),radial-gradient(ellipse at 100% 80%,#bca7e626,transparent 55%),var(--surface)}
 .scroll-surface{height:100%;min-height:0}
