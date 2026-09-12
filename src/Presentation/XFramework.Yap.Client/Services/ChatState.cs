@@ -35,6 +35,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
     }
     public int ConversationTotal { get; private set; }
     public bool HasMoreConversations => inboxPages * 30 < ConversationTotal;
+    public event Action<Guid>? ConversationRemoved;
     public List<Person> TypingPeople => typing.Where(x => x.Value > DateTime.UtcNow)
         .Select(x => Selected?.People.FirstOrDefault(p => p.Id == x.Key) ?? new Person(x.Key, "Someone", "")).ToList();
     public UserSession? User { get; private set; }
@@ -99,6 +100,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
                     refreshPending = false;
                     // Show the open conversation before fetching inbox summaries.
                     if (Selected is not null) await RefreshSelectedAsync(Selected.Id);
+                    await SynchronizeDeletedConversationsAsync();
                     for (var page = 0; page < inboxPages; page++)
                     {
                         var list = await api.GetAsync<ChatPage<Conversation>>($"api/chat/conversations?page={page}", lifetime.Token);
@@ -182,6 +184,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
             NeedsLogin = false;
             await store.SetSettingAsync("user", JsonSerializer.Serialize(User));
             Defaults ??= await api.PostAsync<ChatDefaults>("api/chat/initialize");
+            await SynchronizeDeletedConversationsAsync();
             await FlushAsync();
             for (var page = 0; page < inboxPages; page++)
             {
@@ -228,7 +231,9 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
 
     private async Task RefreshSelectedAsync(Guid id)
     {
-        var conversation = await api.GetAsync<Conversation>($"api/chat/conversations/{id}");
+        Conversation conversation;
+        try { conversation = await api.GetAsync<Conversation>($"api/chat/conversations/{id}"); }
+        catch (ChatApiException ex) when (ex.Status is 403 or 404) { Report(ex); return; }
         var summary = Conversations.FirstOrDefault(x => x.Id == id);
         conversation.LastMessageAt = summary?.LastMessageAt;
         conversation.Preview = summary?.Preview ?? "Start a conversation";
@@ -333,7 +338,33 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
     public Task SaveDraftAsync(string key, string text) => store.SaveDraftAsync(Scope, key, text);
     public Task SaveBeforeUpdateAsync() => store.UseAsync(_ => Task.FromResult(true));
 
-    public async Task DeleteConversationAsync(Guid thread)
+    private async Task SynchronizeDeletedConversationsAsync()
+    {
+        var known = Conversations.Select(c => c.Id).ToHashSet();
+        foreach (var item in await store.PendingAsync(Scope)) known.Add(item.ThreadId);
+        if (Selected is not null) known.Add(Selected.Id);
+        if (known.Count == 0) return;
+        for (var page = 0; ; page++)
+        {
+            var removed = await api.GetAsync<ChatPage<Guid>>($"api/chat/conversations/deleted?page={page}", lifetime.Token);
+            foreach (var id in removed.Items.Where(known.Contains)) await ForgetDeletedConversationAsync(id);
+            if ((page + 1) * 100 >= removed.TotalCount) break;
+        }
+    }
+
+    private async Task ForgetDeletedConversationAsync(Guid thread)
+    {
+        foreach (var item in (await store.PendingAsync(Scope)).Where(x => x.ThreadId == thread && x.FileKey is not null))
+            await js.InvokeVoidAsync("yap.device.removeFile", item.FileKey);
+        await store.RemoveConversationAsync(Scope, thread, lifetime.Token, discardPending: true);
+        Conversations.RemoveAll(x => x.Id == thread);
+        if (Selected?.Id == thread) { Selected = null; typing.Clear(); }
+        PendingCount = (await store.PendingAsync(Scope)).Count;
+        Error = null;
+        ConversationRemoved?.Invoke(thread);
+    }
+
+    public async Task DeleteConversationAsync(Guid thread, bool everyone = false)
     {
         if (!Online || NeedsLogin) throw new InvalidOperationException("Connect and sign in before removing a conversation.");
         await sync.WaitAsync(lifetime.Token);
@@ -341,7 +372,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         {
             if ((await store.PendingAsync(Scope)).Any(x => x.ThreadId == thread))
                 throw new InvalidOperationException("Wait for this conversation's messages to finish sending before removing it.");
-            await api.PostAsync("api/chat/thread-actions", new ThreadAction(thread, "delete-for-me", true));
+            await api.PostAsync("api/chat/thread-actions", new ThreadAction(thread, everyone ? "delete-for-everyone" : "delete-for-me", true));
             await store.RemoveConversationAsync(Scope, thread, lifetime.Token);
             Conversations.RemoveAll(x => x.Id == thread);
             if (Selected?.Id == thread) { Selected = null; typing.Clear(); await WatchEventsAsync(); }

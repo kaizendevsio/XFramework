@@ -96,6 +96,7 @@ public static class MessageRealtimeEvents
     public static readonly string ReactionDeleted = nameof(ReactionDeleted);
     public static readonly string MessagesRead = nameof(MessagesRead);
     public static readonly string MessagesDelivered = nameof(MessagesDelivered);
+    public static readonly string ThreadDeleted = nameof(ThreadDeleted);
     public static readonly string ThreadMuted = nameof(ThreadMuted);
     public static readonly string ThreadArchived = nameof(ThreadArchived);
     public static readonly string ThreadLeft = nameof(ThreadLeft);

@@ -24,6 +24,8 @@ public interface IThreadService
     Task<Result<CmdResponse>> LeaveThreadAsync(LeaveThreadRequest request, CancellationToken ct = default);
     Task<Result<CmdResponse>> MuteThreadAsync(MuteThreadRequest request, CancellationToken ct = default);
     Task<Result<CmdResponse>> ArchiveThreadAsync(ArchiveThreadRequest request, CancellationToken ct = default);
+    Task<Result<CmdResponse>> DeleteThreadAsync(DeleteThreadRequest request, CancellationToken ct = default);
+    Task<Result<GetDeletedThreadsResponse>> GetDeletedThreadsAsync(GetDeletedThreadsRequest request, CancellationToken ct = default);
     Task<Result<CmdResponse>> AddThreadMemberAsync(AddThreadMemberRequest request, CancellationToken ct = default);
     Task<Result<CmdResponse>> RemoveThreadMemberAsync(RemoveThreadMemberRequest request, CancellationToken ct = default);
     Task<Result<CmdResponse>> CreateThreadInviteAsync(CreateThreadInviteRequest request, CancellationToken ct = default);

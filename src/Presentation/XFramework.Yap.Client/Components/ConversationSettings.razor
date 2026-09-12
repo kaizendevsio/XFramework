@@ -37,10 +37,19 @@
     @if (deleting)
     {
         <div class="set-note" role="group" aria-label="Confirm conversation deletion">
-            <p>Remove this conversation from your chat list? Other members keep their conversation. Starting this conversation again restores its history.</p>
+            @if (deleteEveryone)
+            {
+                <p>Delete this conversation for everyone? Members will lose access to its messages in Yap. Their cached chat and unsent messages will be removed when they reconnect. This cannot be undone.</p>
+            }
+            else { <p>Remove this conversation from your chat list? Other members keep their conversation. Starting this conversation again restores its history.</p> }
             @if (deleteError is not null) { <p role="alert">@deleteError</p> }
-            <button class="btn danger" disabled="@busy" @onclick="DeleteAsync">Delete for me</button>
-            <button class="btn ghost" disabled="@busy" @onclick="() => deleting = false">Cancel</button>
+            @if (deleteEveryone) { <button class="btn danger" disabled="@busy" @onclick="DeleteAsync">Confirm delete for everyone</button> }
+            else
+            {
+                <button class="btn danger" disabled="@busy" @onclick="DeleteAsync">Delete for me</button>
+                @if (Conversation.CanManage) { <button class="btn danger" disabled="@busy" @onclick="() => deleteEveryone = true">Delete for everyone</button> }
+            }
+            <button class="btn ghost" disabled="@busy" @onclick="() => { deleting = false; deleteEveryone = false; }">Cancel</button>
         </div>
     }
 </div>
@@ -48,6 +57,7 @@
     [Parameter, EditorRequired] public Conversation Conversation { get; set; } = default!;
     private bool busy;
     private bool deleting;
+    private bool deleteEveryone;
     private string? deleteError;
     private bool Locked => busy || !Conversation.CanManage || !State.Online || State.NeedsLogin;
     private Guid? editing, removing;
@@ -68,7 +78,7 @@
     private async Task DeleteAsync()
     {
         busy = true; deleteError = null;
-        try { await State.DeleteConversationAsync(Conversation.Id); Nav.NavigateTo("/"); }
+        try { await State.DeleteConversationAsync(Conversation.Id, deleteEveryone); Nav.NavigateTo("/"); }
         catch (Exception ex) { deleteError = ex is InvalidOperationException or ChatApiException ? ex.Message : "Could not remove this conversation. Try again."; }
         finally { busy = false; }
     }

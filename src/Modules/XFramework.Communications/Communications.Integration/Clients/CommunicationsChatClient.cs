@@ -81,6 +81,8 @@ public interface ICommunicationsChatSession
     Task<CmdResponse> LeaveThreadAsync(Guid threadId, CancellationToken ct = default);
     Task<CmdResponse> MuteThreadAsync(Guid threadId, bool isMuted, CancellationToken ct = default);
     Task<CmdResponse> ArchiveThreadAsync(Guid threadId, bool isArchived, CancellationToken ct = default);
+    Task<CmdResponse> DeleteThreadAsync(Guid threadId, CancellationToken ct = default);
+    Task<QueryResponse<GetDeletedThreadsResponse>> GetDeletedThreadsAsync(int pageIndex = 0, CancellationToken ct = default);
     Task<CmdResponse> AddThreadMemberAsync(Guid threadId, Guid credentialId, CancellationToken ct = default);
     Task<CmdResponse> RemoveThreadMemberAsync(Guid threadId, Guid credentialId, CancellationToken ct = default);
     Task<CmdResponse> InviteMemberAsync(Guid threadId, Guid credentialId, CancellationToken ct = default);
@@ -301,6 +303,11 @@ internal sealed class CommunicationsChatSession(
 
     public Task<CmdResponse> ArchiveThreadAsync(Guid threadId, bool isArchived, CancellationToken ct = default) =>
         InvokeAsync(callCt => wrapper.ArchiveThreadAsync(Prepare(new ArchiveThreadRequest { ThreadId = threadId, IsArchived = isArchived }), callCt), ct);
+
+    public Task<CmdResponse> DeleteThreadAsync(Guid threadId, CancellationToken ct = default) =>
+        InvokeAsync(callCt => wrapper.DeleteThreadAsync(Prepare(new DeleteThreadRequest { ThreadId = threadId }), callCt), ct);
+    public Task<QueryResponse<GetDeletedThreadsResponse>> GetDeletedThreadsAsync(int pageIndex = 0, CancellationToken ct = default) =>
+        InvokeAsync(callCt => wrapper.GetDeletedThreadsAsync(Prepare(new GetDeletedThreadsRequest { PageIndex = pageIndex, PageSize = 100 }), callCt), ct);
 
     public Task<CmdResponse> AddThreadMemberAsync(Guid threadId, Guid credentialId, CancellationToken ct = default) =>
         InvokeAsync(callCt => wrapper.AddThreadMemberAsync(Prepare(new AddThreadMemberRequest { ThreadId = threadId, CredentialId = credentialId }), callCt), ct);

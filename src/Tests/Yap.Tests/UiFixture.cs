@@ -52,6 +52,12 @@ internal static class UiFixture
         };
         messages[2].DeliveredCount = 1;
         messages[4].DeliveredCount = 1; messages[4].ReadCount = 1;
+        var deletedThreads = new List<Guid>();
+        fixture.Session.Setup(s => s.GetDeletedThreadsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int page, CancellationToken _) => ChatFixture.Ok(new GetDeletedThreadsResponse { Items = deletedThreads.Skip(page * 100).Take(100).ToList(), TotalCount = deletedThreads.Count }));
+        fixture.Session.Setup(s => s.DeleteThreadAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid thread, CancellationToken _) =>
+            { deletedThreads.Add(thread); conversations.RemoveAll(c => c.Id == thread); return Success(); });
         fixture.Session.Setup(s => s.ArchiveThreadAsync(It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Guid thread, bool archived, CancellationToken _) =>
             { conversations.First(c => c.Id == thread).IsArchived = archived; return Success(); });

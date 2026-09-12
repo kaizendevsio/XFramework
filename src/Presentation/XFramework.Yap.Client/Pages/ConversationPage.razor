@@ -78,7 +78,8 @@ else if (mode == "search")
     private Guid? focus;
     private string query = "";
     private List<SearchHit> hits = [];
-    protected override void OnInitialized() => State.Changed += Changed;
+    protected override void OnInitialized() { State.Changed += Changed; State.ConversationRemoved += Removed; }
+    private void Removed(Guid id) { if (id == Id) _ = InvokeAsync(() => Nav.NavigateTo("/")); }
     protected override async Task OnParametersSetAsync()
     {
         if (State.User is not null && loaded != Id) { loaded = Id; await State.SelectAsync(Id); scroll = true; }
@@ -108,5 +109,5 @@ else if (mode == "search")
     private async Task ForwardAsync(Guid target) { try { await State.SendAsync(target, selected!.Text, null, $"forward:{Guid.NewGuid()}"); mode = null; Nav.NavigateTo($"/chat/{target}"); } catch (Exception ex) { State.Report(ex); } }
     private async Task SearchAsync() { var text = query; try { var result = await State.SearchAsync(text, Id); if (text == query) hits = result; } catch (Exception ex) { State.Report(ex); } }
     private async Task ShowHitAsync(Guid id) { await State.LocateAsync(id); mode = null; focus = id; }
-    public void Dispose() => State.Changed -= Changed;
+    public void Dispose() { State.Changed -= Changed; State.ConversationRemoved -= Removed; }
 }

@@ -11,9 +11,11 @@ namespace Yap.Client.Tests;
 
 public sealed class ChatStateTests
 {
-    [TestCase(false)]
-    [TestCase(true)]
-    public async Task DeleteConversation_RemainsHiddenAfterRefresh_AndPreservesPendingSends(bool pending)
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    [TestCase(true, true)]
+    public async Task DeleteConversation_RemainsHiddenAfterRefresh_AndPreservesPendingSends(bool pending, bool everyone)
     {
         await using var fixture = await StoreFixture.CreateAsync();
         var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Sender");
@@ -28,7 +30,7 @@ public sealed class ChatStateTests
             if (path.EndsWith("thread-actions"))
             {
                 var action = (await request.Content!.ReadFromJsonAsync<ThreadAction>())!;
-                Assert.That(action.Action, Is.EqualTo("delete-for-me"));
+                Assert.That(action.Action, Is.EqualTo(everyone ? "delete-for-everyone" : "delete-for-me"));
                 deletes++; chat.Removed = true; return new(HttpStatusCode.NoContent);
             }
             return Json(new ChatPage<Conversation>([chat], 1));
@@ -40,16 +42,56 @@ public sealed class ChatStateTests
             var message = fixture.Message(chat.Id); var item = fixture.Queue(message);
             item.Scope = OfflineStore.Scope(user); item.Paused = true;
             await fixture.Store.QueueAsync(item, message, "main");
-            Assert.ThrowsAsync<InvalidOperationException>(() => state.DeleteConversationAsync(chat.Id));
+            Assert.ThrowsAsync<InvalidOperationException>(() => state.DeleteConversationAsync(chat.Id, everyone));
             Assert.That(deletes, Is.Zero);
             Assert.That(await fixture.Store.PendingAsync(item.Scope), Has.Count.EqualTo(1));
         }
         else
         {
-            await state.DeleteConversationAsync(chat.Id); await state.SynchronizeAsync();
+            await state.DeleteConversationAsync(chat.Id, everyone); await state.SynchronizeAsync();
             Assert.That(deletes, Is.EqualTo(1)); Assert.That(state.Conversations, Is.Empty);
             Assert.That(state.HasMoreConversations, Is.False, "Archived entries must not leave an endless Load more button");
         }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task Reconnect_OnlyConfirmedDeletionClearsCachedChatAndOutbox(bool confirmed)
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Recipient");
+        var scope = OfflineStore.Scope(user); var chat = new Conversation { Id = Guid.NewGuid() };
+        await fixture.Store.SetSettingAsync("user", JsonSerializer.Serialize(user));
+        await fixture.Store.SaveConversationsAsync(scope, [chat]);
+        var message = fixture.Message(chat.Id); var pending = fixture.Queue(message);
+        pending.Scope = scope; pending.Paused = true;
+        await fixture.Store.QueueAsync(pending, message, "main");
+        await fixture.Store.SaveDraftAsync(scope, $"{chat.Id:N}:main", "draft");
+        // Even the same conversation ID in another account's cache must be preserved.
+        await fixture.Store.SaveMessagesAsync("other-account", [message]);
+        var online = false; var removed = new List<Guid>(); var deletions = new List<Guid>();
+        var js = new Mock<IJSRuntime>();
+        js.Setup(x => x.InvokeAsync<bool>("yap.device.online", It.IsAny<object?[]?>())).Returns(() => ValueTask.FromResult(online));
+        using var http = new HttpClient(new Handler(request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path == "/api/session") return Task.FromResult(Json(new SessionResponse(user, "token")));
+            if (path.EndsWith("initialize")) return Task.FromResult(Json(new ChatDefaults(Guid.NewGuid(), [])));
+            if (path.EndsWith(chat.Id.ToString())) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden));
+            Assert.That(request.Method, Is.EqualTo(HttpMethod.Get), "Deleted or paused messages must never be sent.");
+            return Task.FromResult(Json(new ChatPage<Conversation>([], 0)));
+        }, deletions)) { BaseAddress = new("https://yap.test/") };
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), js.Object);
+        await state.InitializeAsync(); await state.SelectAsync(chat.Id);
+        state.ConversationRemoved += removed.Add;
+        if (confirmed) deletions.Add(chat.Id);
+        online = true; await state.ConnectivityChanged(true);
+        Assert.That(await fixture.Store.MessagesAsync(scope, chat.Id), Has.Count.EqualTo(confirmed ? 0 : 1));
+        Assert.That(await fixture.Store.PendingAsync(scope), Has.Count.EqualTo(confirmed ? 0 : 1));
+        Assert.That(await fixture.Store.DraftAsync(scope, $"{chat.Id:N}:main"), Is.EqualTo(confirmed ? "" : "draft"));
+        Assert.That(removed, Has.Count.EqualTo(confirmed ? 1 : 0));
+        Assert.That(state.Selected is null, Is.EqualTo(confirmed));
+        Assert.That(await fixture.Store.MessagesAsync("other-account", chat.Id), Has.Count.EqualTo(1));
     }
 
     [Test]
@@ -229,8 +271,10 @@ public sealed class ChatStateTests
     }
 
     private static HttpResponseMessage Json<T>(T value) => new(HttpStatusCode.OK) { Content = JsonContent.Create(value) };
-    private sealed class Handler(Func<HttpRequestMessage, Task<HttpResponseMessage>> handle) : HttpMessageHandler
+    private sealed class Handler(Func<HttpRequestMessage, Task<HttpResponseMessage>> handle, List<Guid>? deleted = null) : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) => handle(request);
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+            request.RequestUri!.AbsolutePath == "/api/chat/conversations/deleted"
+                ? Task.FromResult(Json(new ChatPage<Guid>(deleted ?? [], deleted?.Count ?? 0))) : handle(request);
     }
 }

@@ -34,6 +34,12 @@ public static class YapApi
             return new ChatDefaults(data.ThreadTypeId,
                 data.ReactionTypes.Select(x => new ReactionType(x.Id, x.Name, x.Emoji)).ToList());
         });
+        api.MapGet("/conversations/deleted", async (int? page, ICommunicationsChatClient client, CancellationToken ct) =>
+        {
+            var session = await client.ForCurrentActorAsync(ct: ct);
+            var data = Require(await session.GetDeletedThreadsAsync(Page(page), ct));
+            return new ChatPage<Guid>(data.Items, data.TotalCount);
+        });
         api.MapGet("/conversations", async (int? page, ICommunicationsChatClient client, IChatDirectory directory, CancellationToken ct) =>
         {
             var session = await client.ForCurrentActorAsync(ct: ct);
@@ -163,6 +169,7 @@ public static class YapApi
             {
                 case "mute": Require(await session.MuteThreadAsync(request.ThreadId, request.Value, ct)); break;
                 case "delete-for-me": Require(await session.ArchiveThreadAsync(request.ThreadId, true, ct)); break;
+                case "delete-for-everyone": Require(await session.DeleteThreadAsync(request.ThreadId, ct)); break;
                 case "typing": await session.PublishTypingAsync(request.ThreadId, request.Value, ct); break;
                 default: throw new YapApiException(400, "Choose a supported conversation action.");
             }

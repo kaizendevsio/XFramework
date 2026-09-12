@@ -62,11 +62,12 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         return await db.SaveChangesAsync(ct);
     }, ct);
 
-    public Task RemoveConversationAsync(string scope, Guid thread, CancellationToken ct = default) => UseAsync(async db =>
+    public Task RemoveConversationAsync(string scope, Guid thread, CancellationToken ct = default, bool discardPending = false) => UseAsync(async db =>
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         await db.Conversations.Where(x => x.Scope == scope && x.Id == thread).ExecuteDeleteAsync(ct);
         await db.Messages.Where(x => x.Scope == scope && x.ThreadId == thread).ExecuteDeleteAsync(ct);
+        if (discardPending) await db.Outbox.Where(x => x.Scope == scope && x.ThreadId == thread).ExecuteDeleteAsync(ct);
         var prefix = thread.ToString("N") + ":";
         await db.Drafts.Where(x => x.Scope == scope && x.Key.StartsWith(prefix)).ExecuteDeleteAsync(ct);
         await transaction.CommitAsync(ct);

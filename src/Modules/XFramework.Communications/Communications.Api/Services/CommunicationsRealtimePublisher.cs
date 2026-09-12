@@ -43,6 +43,16 @@ public sealed class CommunicationsRealtimePublisher(
     {
         if (outboxEvent.ThreadId is Guid threadId)
         {
+            if (outboxEvent.EventType == MessageRealtimeEvents.ThreadDeleted)
+            {
+                // Memberships have already been revoked. Notify only the members captured
+                // by the deletion transaction, still constrained to its tenant and thread.
+                var deletedRecipients = JsonSerializer.Deserialize<DeletedThreadRecipients>(outboxEvent.PayloadJson,
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web))?.RecipientCredentialIds ?? [];
+                return await dbContext.Set<MessageThreadMember>().IgnoreQueryFilters().AsNoTracking()
+                    .Where(m => m.TenantId == outboxEvent.TenantId && m.MessageThreadId == threadId && deletedRecipients.Contains(m.CredentialId))
+                    .Select(m => m.CredentialId).Distinct().ToListAsync(ct);
+            }
             if (IsModerationEvent(outboxEvent))
                 return await ResolveModerationRecipientsAsync(outboxEvent, threadId, ct);
 
@@ -186,6 +196,8 @@ public sealed class CommunicationsRealtimePublisher(
             .FirstOrDefaultAsync(ct)
             ?? TryReadGuid(outboxEvent.PayloadJson, "MessageId");
     }
+
+    private sealed record DeletedThreadRecipients(Guid[] RecipientCredentialIds);
 
     private static Guid? TryReadGuid(string payloadJson, string propertyName)
     {
