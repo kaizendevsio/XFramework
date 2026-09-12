@@ -34,6 +34,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         }
     }
     public int ConversationTotal { get; private set; }
+    public bool HasMoreConversations => inboxPages * 30 < ConversationTotal;
     public List<Person> TypingPeople => typing.Where(x => x.Value > DateTime.UtcNow)
         .Select(x => Selected?.People.FirstOrDefault(p => p.Id == x.Key) ?? new Person(x.Key, "Someone", "")).ToList();
     public UserSession? User { get; private set; }

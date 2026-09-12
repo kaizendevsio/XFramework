@@ -11,6 +11,47 @@ namespace Yap.Client.Tests;
 
 public sealed class ChatStateTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task DeleteConversation_RemainsHiddenAfterRefresh_AndPreservesPendingSends(bool pending)
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Sender");
+        var chat = new Conversation { Id = Guid.NewGuid() }; var deletes = 0;
+        var js = new Mock<IJSRuntime>();
+        js.Setup(x => x.InvokeAsync<bool>("yap.device.online", It.IsAny<object?[]?>())).ReturnsAsync(true);
+        using var http = new HttpClient(new Handler(async request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path == "/api/session") return Json(new SessionResponse(user, "token"));
+            if (path.EndsWith("initialize")) return Json(new ChatDefaults(Guid.NewGuid(), []));
+            if (path.EndsWith("thread-actions"))
+            {
+                var action = (await request.Content!.ReadFromJsonAsync<ThreadAction>())!;
+                Assert.That(action.Action, Is.EqualTo("delete-for-me"));
+                deletes++; chat.Removed = true; return new(HttpStatusCode.NoContent);
+            }
+            return Json(new ChatPage<Conversation>([chat], 1));
+        })) { BaseAddress = new("https://yap.test/") };
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), js.Object);
+        await state.InitializeAsync();
+        if (pending)
+        {
+            var message = fixture.Message(chat.Id); var item = fixture.Queue(message);
+            item.Scope = OfflineStore.Scope(user); item.Paused = true;
+            await fixture.Store.QueueAsync(item, message, "main");
+            Assert.ThrowsAsync<InvalidOperationException>(() => state.DeleteConversationAsync(chat.Id));
+            Assert.That(deletes, Is.Zero);
+            Assert.That(await fixture.Store.PendingAsync(item.Scope), Has.Count.EqualTo(1));
+        }
+        else
+        {
+            await state.DeleteConversationAsync(chat.Id); await state.SynchronizeAsync();
+            Assert.That(deletes, Is.EqualTo(1)); Assert.That(state.Conversations, Is.Empty);
+            Assert.That(state.HasMoreConversations, Is.False, "Archived entries must not leave an endless Load more button");
+        }
+    }
+
     [Test]
     public async Task SendAsync_BackendBlip_LeavesTheMessageQueuedWithoutAlarmingTheReader()
     {
