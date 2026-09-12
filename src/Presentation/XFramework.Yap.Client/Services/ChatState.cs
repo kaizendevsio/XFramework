@@ -193,7 +193,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
             if (Selected is not null) await RefreshSelectedAsync(Selected.Id);
             await WatchEventsAsync();
         }
-        catch (ChatApiException ex) { NeedsLogin = ex.Status == 401; if (ex.Status >= 500) Online = false; Error = ex.Message; }
+        catch (ChatApiException ex) { NeedsLogin = ex.Status == 401; Error = ex.Message; }
         catch (HttpRequestException) { Online = false; Error = "Cannot reach chat. Your messages are saved and will retry."; }
         catch (TaskCanceledException) when (!lifetime.IsCancellationRequested) { Online = false; Error = "Chat took too long to respond. Saved messages will retry."; }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
@@ -392,8 +392,25 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
             }
             catch (ChatApiException ex) when (ex.Status is >= 400 and < 500 && ex.Status is not (401 or 408 or 429))
             { item.Paused = true; item.Error = ex.Message; await store.SaveQueueAsync(item); Error = ex.Message; }
+            catch (Exception ex) when (Transient(ex))
+            {
+                // The message stays queued and its own bubble already says so. A backend
+                // blip that the next sync clears is not worth interrupting the reader,
+                // and the rest of the queue is behind this one anyway.
+                Console.Error.WriteLine($"Yap send will retry: {ex.Message}");
+                break;
+            }
         }
     }
+
+    /// <summary>A failure the outbox can simply try again, as opposed to a rejection.</summary>
+    private static bool Transient(Exception ex) => ex switch
+    {
+        ChatApiException api => api.Status is >= 500 or 408 or 429,
+        HttpRequestException or TaskCanceledException => true,
+        JSException => true,
+        _ => false
+    };
 
     public async Task RetryAsync()
     {

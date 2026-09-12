@@ -35,7 +35,7 @@ window.yap = {
 };
 // Focus rings are a keyboard affordance. Touch and mouse must never paint one,
 // including on the programmatically focused sheet container.
-const inputModality = mode => document.documentElement.dataset.input = mode;
+const inputModality = mode => { if (document.documentElement.dataset.input !== mode) document.documentElement.dataset.input = mode; };
 addEventListener('keydown', event => { if (event.key === 'Tab' || event.key.startsWith('Arrow')) inputModality('keyboard'); }, true);
 addEventListener('pointerdown', () => inputModality('pointer'), true);
 inputModality('pointer');
@@ -50,6 +50,7 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
 // Measure overlay chrome without fixed assumptions about composer/header height.
 document.addEventListener('DOMContentLoaded', () => {
     const watched = new Set();
+    let footerHeight = null;
     const pinned = new WeakMap();
     const rememberPosition = event => {
         const list = event.target;
@@ -67,8 +68,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const height = target.getBoundingClientRect().height;
                 const header = target.hasAttribute('data-scroll-header');
                 surface.style.setProperty(header ? '--scroll-top' : '--scroll-bottom', `${height}px`);
-                // Toasts live outside the surface, so the footer height is published globally.
-                if (!header) document.documentElement.style.setProperty('--yap-footer', `${height}px`);
+                // Toasts live outside the surface, so the footer height is published
+                // globally, but never from inside the callback: writing to the document
+                // there can start an observer loop and stall other observers.
+                if (!header && footerHeight !== height) {
+                    footerHeight = height;
+                    requestAnimationFrame(() => document.documentElement.style.setProperty('--yap-footer', `${footerHeight}px`));
+                }
                 const list = surface.querySelector('[data-messages]');
                 if (list?.classList.contains('message-window')) yap.messageWindow.resize(list);
                 else if (list && pinned.get(list)) list.scrollTop = list.scrollHeight;
