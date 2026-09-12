@@ -5,8 +5,10 @@ using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using Storage.Api.Services;
+using Storage.Api.Services.Providers;
 using Storage.Domain.Shared.Contracts.Requests;
 using Storage.Domain.Shared.Contracts.Responses;
 using Storage.IntegrationTests.Infrastructure;
@@ -21,6 +23,52 @@ namespace Storage.IntegrationTests;
 [TestFixture]
 public sealed class ChatStorageUploadTests : StorageIntegrationTestBase
 {
+    [Test]
+    public async Task CompleteChatUpload_Multipart_WakesVerifierWithoutWaitingForPoll()
+    {
+        var owner = Guid.NewGuid();
+        var bytes = Enumerable.Range(0, 50).Select(i => (byte)i).ToArray();
+        var upload = await CreateAsync(owner, Guid.NewGuid(), bytes, 2);
+        using var actor = ActorScope(owner);
+        for (var part = 0; part < 2; part++)
+        {
+            var chunk = bytes.Skip(part * 25).Take(25).ToArray();
+            (await ServiceWrapper.UploadChatStorageFilePart(new UploadChatStorageFilePartRequest
+            {
+                Metadata = CreateMetadata(), UploadSessionId = upload.Id, PartNumber = part + 1,
+                OffsetBytes = part * 25, ChunkBytes = chunk, PartSha256Hash = Sha(chunk)
+            })).IsSuccess.Should().BeTrue();
+        }
+
+        var signal = new StorageMaintenanceSignal();
+        var services = new ServiceCollection();
+        services.AddScoped(_ => CreateDbContext());
+        services.AddSingleton<IStorageProviderFactory>(new IntegrationStorageProviderFactory(StorageIntegrationTestFixture.Provider));
+        services.Configure<StorageOptions>(options => options.MaintenancePollSeconds = 3600);
+        services.AddSingleton(TimeProvider.System);
+        services.AddLogging();
+        services.AddScoped<StorageMaintenanceService>();
+        await using var provider = services.BuildServiceProvider();
+        using var worker = new StorageMaintenanceHostedService(provider.GetRequiredService<IServiceScopeFactory>(),
+            Options.Create(new StorageOptions { MaintenancePollSeconds = 3600 }), TimeProvider.System,
+            signal, NullLogger<StorageMaintenanceHostedService>.Instance);
+        // Let the initial scan finish while this file is still uploading.
+        await worker.StartAsync(CancellationToken.None);
+        await Task.Delay(300);
+        await using var db = CreateDbContext();
+        try
+        {
+            var result = await Service(db, owner, signal: signal).CompleteChatUploadAsync(new CompleteChatStorageUploadSessionRequest
+            { Metadata = CreateMetadata(), UploadSessionId = upload.Id, ExpectedSha256Hash = Sha(bytes) });
+            result.IsSuccess.Should().BeTrue(result.Message);
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            while (await db.Set<StorageFile>().Where(f => f.Id == upload.StorageFileId)
+                       .Select(f => f.Status).SingleAsync(deadline.Token) != StorageFileStatus.Available)
+                await Task.Delay(30, deadline.Token);
+        }
+        finally { await worker.StopAsync(CancellationToken.None); }
+    }
+
     [TestCase(1)]
     [TestCase(2)]
     public async Task ChatUpload_RegularActorOwnsSingleAndMultipartUploads(int parts)
@@ -256,7 +304,7 @@ public sealed class ChatStorageUploadTests : StorageIntegrationTestBase
             IdentityAuthorizationConstants.Manage)).Data.Should().BeFalse();
     }
 
-    private static StorageService Service(XFramework.Domain.Contexts.AppDbContext db, Guid owner, Guid? tenant = null) =>
+    private static StorageService Service(XFramework.Domain.Contexts.AppDbContext db, Guid owner, Guid? tenant = null, StorageMaintenanceSignal? signal = null) =>
         new(db, new IntegrationStorageProviderFactory(StorageIntegrationTestFixture.Provider),
             Options.Create(new StorageOptions
             {
@@ -271,7 +319,7 @@ public sealed class ChatStorageUploadTests : StorageIntegrationTestBase
                 new TrustedServiceIdentity(XFrameworkServiceNames.Communications, XFrameworkServiceNames.Storage,
                     new HashSet<string> { XFrameworkServiceScopes.StorageRead, XFrameworkServiceScopes.StorageWrite }, "test"),
                 tenant ?? StorageIntegrationTestFixture.TestTenantId, null, Guid.NewGuid())),
-            NullLogger<StorageService>.Instance);
+            NullLogger<StorageService>.Instance, signal ?? new StorageMaintenanceSignal());
 
     private static IDisposable ActorScope(Guid owner, Guid? tenant = null, bool canCreate = true) =>
         TestInvocationActorTokenScope.Push(TestInvocationIdentityExtensions.CreateTestActorToken(

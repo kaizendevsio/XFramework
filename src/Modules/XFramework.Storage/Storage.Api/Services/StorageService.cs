@@ -16,7 +16,8 @@ public sealed partial class StorageService(
     IStorageProviderFactory providerFactory,
     IOptions<StorageOptions> options,
     ITrustedInvocationContextAccessor trustedInvocationContextAccessor,
-    ILogger<StorageService> logger)
+    ILogger<StorageService> logger,
+    StorageMaintenanceSignal maintenanceSignal)
 {
     private readonly StorageOptions storageOptions = options.Value;
     private const int MaxChunkSizeBytes = 100 * 1024 * 1024;
@@ -665,6 +666,9 @@ public sealed partial class StorageService(
 
         if (singlePartHashMismatch)
             return Result<StorageFileResponse>.Conflict("Completed object hash does not match the expected SHA-256 hash");
+
+        if (session.StorageFile.Status == StorageFileStatus.Verifying)
+            maintenanceSignal.Notify();
 
         return Result<StorageFileResponse>.Success(
             ToFileResponse(session.StorageFile),

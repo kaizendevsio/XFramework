@@ -6,12 +6,12 @@ public sealed class StorageMaintenanceHostedService(
     IServiceScopeFactory scopeFactory,
     IOptions<StorageOptions> options,
     TimeProvider timeProvider,
+    StorageMaintenanceSignal signal,
     ILogger<StorageMaintenanceHostedService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var pollInterval = TimeSpan.FromSeconds(Math.Clamp(options.Value.MaintenancePollSeconds, 5, 3600));
-        using var timer = new PeriodicTimer(pollInterval, timeProvider);
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -29,7 +29,7 @@ public sealed class StorageMaintenanceHostedService(
                 logger.LogError(ex, "Storage maintenance poll failed.");
             }
 
-            await timer.WaitForNextTickAsync(stoppingToken);
+            await signal.WaitAsync(pollInterval, timeProvider, stoppingToken);
         }
     }
 }

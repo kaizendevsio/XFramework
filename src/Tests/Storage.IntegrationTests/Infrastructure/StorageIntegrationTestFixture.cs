@@ -274,6 +274,7 @@ public sealed class StorageIntegrationTestFixture
         builder.Services.AddTenantModuleFeatures();
         builder.Services.Configure<StorageOptions>(builder.Configuration.GetSection(StorageOptions.SectionName));
         builder.Services.AddScoped<StorageService>();
+        builder.Services.AddSingleton<StorageMaintenanceSignal>();
         builder.Services.AddSingleton(Provider);
         builder.Services.AddScoped<IStorageProviderFactory, IntegrationStorageProviderFactory>();
         builder.Services.AddValidatorsFromAssemblyContaining<StorageService>();
