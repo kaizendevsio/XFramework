@@ -50,7 +50,10 @@
                 image.data[i]=Math.round(128+dx*127);image.data[i+1]=Math.round(128+dy*127);image.data[i+2]=128;image.data[i+3]=255;
             }
             ctx.putImageData(image,0,0);
-            const filter=make('filter',{id:entry.id,x:0,y:0,width,height,filterUnits:'userSpaceOnUse','color-interpolation-filters':'sRGB'});
+            // The live CSS box owns the output bounds, including fractional mobile
+            // pixels and the frames between a composer resize and this observer.
+            // Only the displacement texture needs the measured pixel dimensions.
+            const filter=make('filter',{id:entry.id,x:0,y:0,width:1,height:1,filterUnits:'objectBoundingBox','color-interpolation-filters':'sRGB'});
             filter.appendChild(make('feImage',{href:canvas.toDataURL(),x:0,y:0,width,height,preserveAspectRatio:'none',result:'bezel'}));
             // Keep both stages in one SVG graph so the lens consumes the blurred backdrop.
             filter.appendChild(make('feGaussianBlur',{in:'SourceGraphic',stdDeviation:window.yap.glassSettings?.get().blur ?? 2,result:'softBackdrop'}));
