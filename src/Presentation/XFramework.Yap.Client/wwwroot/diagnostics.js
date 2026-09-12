@@ -6,7 +6,9 @@
     const get = key => { try { return localStorage.getItem(key); } catch { return null; } };
     let enabled = get(flag) === 'true', entries = [], version = 'unknown';
     try { entries = JSON.parse(get(key) || '[]').slice(-200); } catch {}
+    version = entries.findLast(e => e.version)?.version || version;
     const tokens = new Set('api chat auth session conversations messages attachments uploads initialize thread-actions read settings login register logout events health ready parts members actions search deleted'.split(' '));
+    for (const name of ['diagnostics.html', 'diagnostics.js', 'device.js', 'image-previews.js', 'photo-viewer.js', 'app.js', 'motion.js', 'updates.js', '_framework', 'blazor.webassembly.js', 'dotnet.native.js']) tokens.add(name);
     const route = value => {
         try { return new URL(value, location.origin).pathname.split('/').map(s => !s || tokens.has(s) ? s : ':id').join('/'); }
         catch { return '/unknown'; }
@@ -28,6 +30,7 @@
             if (typeof details[name] === 'number' || typeof details[name] === 'boolean') data[name] = details[name];
         if (details.route) data.route = route(details.route);
         if (details.type) data.type = errorType(details.type);
+        if (Array.isArray(details.frames)) data.frames = details.frames.filter(f => typeof f === 'string' && /^[A-Za-z0-9_.+<>`-]{1,200}$/.test(f)).slice(0, 8);
         for (const name of ['phase', 'kind', 'reason', 'method', 'version'])
             if (typeof details[name] === 'string' && /^[a-zA-Z0-9._-]{1,40}$/.test(details[name])) data[name] = details[name];
         entries.push({ time: new Date().toISOString(), event: /^[a-z.-]{1,40}$/.test(event) ? event : 'event', ...data }); save();
@@ -53,7 +56,7 @@
     addEventListener('pagehide', e => record('page.hide', { persisted: e.persisted }));
     for (const event of ['online', 'offline']) addEventListener(event, () => record('network.' + event));
     document.addEventListener('visibilitychange', () => record('page.visibility', { kind: document.visibilityState }));
-    addEventListener('error', e => record('error', { type: errorType(e.error || e.message), line: e.lineno, column: e.colno }));
+    addEventListener('error', e => record('error', { type: errorType(e.error || e.message), route: e.filename, line: e.lineno, column: e.colno }));
     addEventListener('unhandledrejection', e => record('promise.error', { type: errorType(e.reason) }));
     document.addEventListener('load', e => {
         if (e.target?.matches?.('.message-media img,dialog.photo-viewer img'))
