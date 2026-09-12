@@ -20,6 +20,7 @@ public sealed class ServicesInstaller : IInstaller
         services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.SectionName));
         services.AddScoped<StorageService>();
         services.AddScoped<StorageMaintenanceService>();
+        services.AddSingleton<StorageMaintenanceSignal>();
         services.AddHostedService<StorageMaintenanceHostedService>();
         services.AddSingleton<IStorageProviderFactory, StorageProviderFactory>();
         services.AddSingleton<AzureBlobStorageProvider>();

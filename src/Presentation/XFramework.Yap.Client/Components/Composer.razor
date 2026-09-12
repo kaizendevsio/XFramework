@@ -16,7 +16,7 @@
             <button type="button" class="iconbtn" aria-label="Remove attachment" @onclick="RemoveFileAsync"><Icon Name="close" Size="16" /></button>
         </div>
     }
-    @if (file is not null && file.ContentType.StartsWith("audio/")) { <MessageMedia Message="@(new ChatMessage { Id = Guid.Parse(file.Key), LocalFileKey = file.Key, HasAttachments = true, Attachments = [new(Guid.Parse(file.Key), file.Name, file.ContentType, file.Size)] })" /> }
+    @if (file is not null && (file.ContentType.StartsWith("audio/") || file.ContentType.StartsWith("image/"))) { <MessageMedia @key="file.Key" Message="@(new ChatMessage { Id = Guid.Parse(file.Key), LocalFileKey = file.Key, HasAttachments = true, Attachments = [new(Guid.Parse(file.Key), file.Name, file.ContentType, file.Size)] })" /> }
     @if (recording) { <div class="recording-bar" role="status"><span class="recording-dot"></span>Recording voice message<button type="button" @onclick="FinishRecordingAsync">Stop and preview</button><button type="button" aria-label="Cancel recording" @onclick="CancelRecordingAsync"><Icon Name="close" Size="18" /></button></div> }
     <div class="inputrow @(CanSend ? "has-send" : "")">
         @if (State.Selected?.Allows(ChatFeature.Attachments) != false) { <button type="button" class="iconbtn liquid-glass attach-open" aria-label="Attach" disabled="@(busy || recording || uploading)" @onclick="() => attaching = true"><GlassLayer /><Icon Name="plus" /></button> }

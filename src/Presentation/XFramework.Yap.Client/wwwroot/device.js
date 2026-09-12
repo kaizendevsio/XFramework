@@ -5,6 +5,7 @@
     // Attachments too large to copy into OPFS are held as live File handles instead.
     // They do not survive a reload, which is why they also require a connection.
     const pending = new Map();
+    const previews = new Map();
     const directory = async () => (await navigator.storage.getDirectory()).getDirectoryHandle('yap-files', { create: true });
     const write = async (key, blob) => {
         const handle = await (await directory()).getFileHandle(key, { create: true });
@@ -54,11 +55,13 @@
             // threshold that would cost twice the file size on the device, so stream instead.
             const staged = file.size <= stageLimit;
             if (staged) await write(key, file); else pending.set(key, file);
-            return { key, name: file.name, contentType: file.type || 'application/octet-stream', size: file.size, staged };
+            return { key, name: file.name, contentType: await yap.imagePreviews.contentType(file), size: file.size, staged };
         },
         async removeFile(key) {
             pending.delete(key);
+            previews.delete(key);
             await (await directory()).removeEntry(key).catch(error => { if (error.name !== 'NotFoundError') throw error; });
+            await (await directory()).removeEntry(`${key}.preview-v1.jpg`).catch(error => { if (error.name !== 'NotFoundError') throw error; });
         },
         // Slices a held File straight into the resumable endpoints. One part is in flight
         // at a time, so peak memory is the part size rather than the file size.
@@ -99,8 +102,9 @@
             const link = document.createElement('a'); link.href = url; link.download = name; link.click();
             setTimeout(() => { URL.revokeObjectURL(url); urls.delete(url); }, 60000);
         },
-        async mediaUrl(key, path, scope, online, contentType, local) {
-            if (!/^(image\/(png|jpeg|gif|webp|avif|heic|heif)|video\/(mp4|webm|quicktime)|audio\/(mp4|mpeg|ogg|webm|wav|x-wav|aac))$/i.test(contentType.split(';')[0])) return null;
+        async mediaUrl(key, path, scope, online, contentType, local, name = '') {
+            const heif = yap.imagePreviews.isHeif(contentType, name);
+            if (!heif && !/^(image\/(png|jpeg|gif|webp|avif)|video\/(mp4|webm|quicktime)|audio\/(mp4|mpeg|ogg|webm|wav|x-wav|aac))$/i.test(contentType.split(';')[0])) return null;
             let file;
             try { file = await read(key); }
             catch (error) {
@@ -108,6 +112,23 @@
                 const response = await fetch(path, { headers: { 'X-Yap-Account': scope }, cache: 'no-store' });
                 if (!response.ok) throw new Error('The attachment is unavailable.');
                 file = await response.blob(); await write(key, file);
+            }
+            if (heif) {
+                const previewKey = `${key}.preview-v1.jpg`;
+                let preview = previews.get(key);
+                if (!preview) {
+                    preview = (async () => {
+                        try { return await read(previewKey); }
+                        catch (error) { if (error.name !== 'NotFoundError') throw error; }
+                        const jpeg = await yap.imagePreviews.jpeg(file);
+                        // A full device must still be able to show the decoded image.
+                        if (previews.get(key) === preview) await write(previewKey, jpeg).catch(() => {});
+                        return jpeg;
+                    })();
+                    previews.set(key, preview);
+                }
+                try { file = await preview; contentType = 'image/jpeg'; }
+                finally { if (previews.get(key) === preview) previews.delete(key); }
             }
             const url = URL.createObjectURL(new Blob([file], { type: contentType })); urls.add(url); return url;
         },
@@ -154,7 +175,7 @@
         },
         async clearFiles() {
             for (const url of urls) URL.revokeObjectURL(url); urls.clear();
-            pending.clear();
+            pending.clear(); previews.clear();
             await (await navigator.storage.getDirectory()).removeEntry('yap-files', { recursive: true }).catch(error => { if (error.name !== 'NotFoundError') throw error; });
         },
         persist: async () => navigator.storage.persist ? await navigator.storage.persist() : false,
