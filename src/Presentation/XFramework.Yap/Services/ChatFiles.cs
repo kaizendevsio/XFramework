@@ -36,27 +36,28 @@ public sealed class ChatFiles(IStorageServiceWrapper storage, ICommunicationsCha
     /// </summary>
     public async Task UploadPartAsync(Guid uploadId, int partNumber, long offset, byte[] bytes, CancellationToken ct)
     {
-        var (metadata, token) = await ScopeAsync(ct);
-        using (token)
-            YapApi.Require(await storage.UploadChatStorageFilePart(new UploadChatStorageFilePartRequest
-            {
-                UploadSessionId = uploadId, PartNumber = partNumber, OffsetBytes = offset,
-                ChunkBytes = bytes, PartSha256Hash = Convert.ToHexString(SHA256.HashData(bytes)), Metadata = metadata
-            }, ct));
+        var actor = await ActorAsync(ct);
+        using var token = tokens.Push(actor.AccessToken!);
+        YapApi.Require(await storage.UploadChatStorageFilePart(new UploadChatStorageFilePartRequest
+        {
+            UploadSessionId = uploadId, PartNumber = partNumber, OffsetBytes = offset,
+            ChunkBytes = bytes, PartSha256Hash = Convert.ToHexString(SHA256.HashData(bytes)), Metadata = Metadata(actor)
+        }, ct));
     }
 
     public async Task<Guid> CompleteAsync(Guid uploadId, CancellationToken ct)
     {
-        var (metadata, token) = await ScopeAsync(ct);
-        using (token) return await FinishAsync(uploadId, metadata, ct);
+        var actor = await ActorAsync(ct);
+        using var token = tokens.Push(actor.AccessToken!);
+        return await FinishAsync(uploadId, Metadata(actor), ct);
     }
 
     public async Task AbortAsync(Guid uploadId, CancellationToken ct)
     {
-        var (metadata, token) = await ScopeAsync(ct);
-        using (token)
-            YapApi.Require(await storage.AbortChatStorageUploadSession(new AbortChatStorageUploadSessionRequest
-            { UploadSessionId = uploadId, Metadata = metadata }, ct));
+        var actor = await ActorAsync(ct);
+        using var token = tokens.Push(actor.AccessToken!);
+        YapApi.Require(await storage.AbortChatStorageUploadSession(new AbortChatStorageUploadSessionRequest
+        { UploadSessionId = uploadId, Metadata = Metadata(actor) }, ct));
     }
 
     /// <summary>
@@ -67,8 +68,9 @@ public sealed class ChatFiles(IStorageServiceWrapper storage, ICommunicationsCha
     {
         if (file.Size is <= 0 or > StagedFileBytes)
             throw new ChatOperationException($"Choose a file between 1 byte and {StagedFileBytes / (1024 * 1024)} MB.");
-        var (metadata, token) = await ScopeAsync(ct);
-        using var scope = token;
+        var actor = await ActorAsync(ct);
+        using var token = tokens.Push(actor.AccessToken!);
+        var metadata = Metadata(actor);
         var upload = await CreateSessionAsync(threadId, Path.GetFileName(file.Name),
             string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType, file.Size, ct);
         var completedUpload = false;
@@ -140,12 +142,15 @@ public sealed class ChatFiles(IStorageServiceWrapper storage, ICommunicationsCha
         catch (Exception ex) { logger.LogWarning(ex, "Could not abort incomplete Yap upload {UploadId}.", uploadId); }
     }
 
-    private async Task<(RequestMetadata Metadata, IDisposable Token)> ScopeAsync(CancellationToken ct)
-    {
-        var actor = await actors.GetCurrentActorAsync(ct) ?? throw new UnauthorizedAccessException();
-        var token = tokens.Push(actor.AccessToken!);
-        return (new RequestMetadata { RequestedTenantId = actor.TenantId, RequestId = Guid.NewGuid(), OperationName = "Yap attachment" }, token);
-    }
+    /// <summary>
+    /// Resolves the actor only. The access token rides on an AsyncLocal, so the caller
+    /// must push it in its own body: a push inside an async helper is discarded on return.
+    /// </summary>
+    private async Task<CommunicationsChatActor> ActorAsync(CancellationToken ct) =>
+        await actors.GetCurrentActorAsync(ct) ?? throw new UnauthorizedAccessException();
+
+    private static RequestMetadata Metadata(CommunicationsChatActor actor) => new()
+    { RequestedTenantId = actor.TenantId, RequestId = Guid.NewGuid(), OperationName = "Yap attachment" };
 
     public async Task AttachAsync(Guid threadId, Guid messageId, Guid storageId, CancellationToken ct)
     {
