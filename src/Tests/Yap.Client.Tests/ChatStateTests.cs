@@ -12,6 +12,56 @@ namespace Yap.Client.Tests;
 public sealed class ChatStateTests
 {
     [Test]
+    public async Task SendAsync_BackendBlip_LeavesTheMessageQueuedWithoutAlarmingTheReader()
+    {
+        // Bolt drops its socket periodically on the shared stack, so a send can meet a
+        // 503 and succeed moments later. The queued badge on the bubble is the signal;
+        // an error toast plus an "offline" claim is not.
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Sender");
+        var thread = Guid.NewGuid();
+        var chat = new Conversation { Id = thread };
+        var failSend = true;
+        var sends = 0;
+        var js = new Mock<IJSRuntime>();
+        js.Setup(x => x.InvokeAsync<bool>("yap.device.online", It.IsAny<object?[]?>())).ReturnsAsync(true);
+        using var http = new HttpClient(new Handler(async request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path == "/api/session") return Json(new SessionResponse(user, "token"));
+            if (path.EndsWith("initialize")) return Json(new ChatDefaults(Guid.NewGuid(), []));
+            if (path.EndsWith("/messages") && request.Method == HttpMethod.Post)
+            {
+                sends++;
+                if (failSend) return new(HttpStatusCode.ServiceUnavailable);
+                var sent = (await request.Content!.ReadFromJsonAsync<SendMessage>())!;
+                return Json(new MessageReceipt(sent.Id));
+            }
+            if (path.EndsWith("/messages")) return Json(new ChatPage<ChatMessage>([], 0));
+            if (path.EndsWith(thread.ToString())) return Json(chat);
+            return Json(new ChatPage<Conversation>([chat], 1));
+        })) { BaseAddress = new("https://yap.test/") };
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), js.Object);
+        await state.InitializeAsync();
+
+        await state.SendAsync(thread, "hello", null, "main");
+        await state.SynchronizeAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(sends, Is.GreaterThan(0), "The send was attempted.");
+            Assert.That(state.Error, Is.Null, "A retryable blip must not raise a notice.");
+            Assert.That(state.Online, Is.True, "A backend fault is not the device being offline.");
+            Assert.That(state.PendingCount, Is.EqualTo(1), "The message stays queued.");
+        });
+
+        failSend = false;
+        await state.SynchronizeAsync();
+
+        Assert.That(state.PendingCount, Is.EqualTo(0), "The retry clears the queue.");
+    }
+
+    [Test]
     public async Task RefreshHint_RendersBeforeReadReceiptAndKeepsEventsArrivingDuringRefresh()
     {
         await using var fixture = await StoreFixture.CreateAsync();
