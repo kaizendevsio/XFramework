@@ -10,7 +10,7 @@ self.addEventListener('install', event => event.waitUntil((async () => {
 self.addEventListener('activate', event => event.waitUntil((async () => {
     for (const key of await caches.keys()) if (key.startsWith(prefix) && key !== name) await caches.delete(key);
 })()));
-self.addEventListener('message', event => { if (event.data === 'activate') self.skipWaiting(); });
+self.addEventListener('message', event => { if (event.data === 'activate') event.waitUntil(self.skipWaiting()); });
 self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
     if (event.request.method !== 'GET' || url.origin !== self.location.origin || /^\/(?:api|auth|health)(?:\/|$)/.test(url.pathname)) return;

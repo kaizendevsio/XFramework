@@ -1,6 +1,6 @@
 // Files stay in OPFS. SQLite owns conversations, drafts and upload receipts.
 (() => {
-    let listener, events, account, activeThread, installPrompt, registration, databaseLock;
+    let listener, events, account, activeThread, installPrompt, databaseLock;
     const urls = new Set();
     // Attachments too large to copy into OPFS are held as live File handles instead.
     // They do not survive a reload, which is why they also require a connection.
@@ -161,8 +161,8 @@
         canInstall: () => installPrompt !== undefined && installPrompt !== null,
         isInstalled: () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true,
         async install() { if (installPrompt) { await installPrompt.prompt(); installPrompt = null; } },
-        update() { registration?.waiting?.postMessage('activate'); },
-        checkUpdate() { const notice = document.getElementById('app-update'); if (notice && registration?.waiting) notice.hidden = false; }
+        update() { window.yap.updates.apply(); },
+        checkUpdate() { window.yap.updates.notice(); }
     };
 
     // The visual viewport excludes the on-screen keyboard on iOS and Android.
@@ -200,21 +200,4 @@
     for (const name of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(name, event => event.preventDefault(), { passive: false });
     document.addEventListener('touchmove', event => { if (event.touches.length > 1) event.preventDefault(); }, { passive: false });
 
-    if ('serviceWorker' in navigator) {
-        let reloading = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (reloading) return; reloading = true; location.reload();
-        });
-        const showUpdate = () => { const notice = document.getElementById('app-update'); if (notice) notice.hidden = false; };
-        addEventListener('load', async () => {
-            try {
-                registration = await navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' });
-                if (registration.waiting) showUpdate();
-                registration.addEventListener('updatefound', () => {
-                    const worker = registration.installing;
-                    worker?.addEventListener('statechange', () => { if (worker.state === 'installed' && navigator.serviceWorker.controller) showUpdate(); });
-                });
-            } catch { /* Browser settings may disable installation; the app still loads online. */ }
-        });
-    }
 })();

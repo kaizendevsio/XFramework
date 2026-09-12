@@ -6,7 +6,7 @@
 <main class="app-shell">
     <div class="screen">@Body</div>
     <ToastHost />
-    <div id="app-update" class="update-notice" hidden><span>A Yap update is ready.</span><button @onclick="UpdateAsync">Update app</button></div>
+    <div id="app-update" class="update-notice" role="status" hidden><span>A new version of Yap is ready.</span><button @onclick="UpdateAsync">Update app</button></div>
 </main>
 @code {
     private IDisposable? navigation;
