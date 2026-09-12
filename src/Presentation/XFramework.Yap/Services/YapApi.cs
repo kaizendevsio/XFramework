@@ -181,12 +181,13 @@ public static class YapApi
         api.MapGet("/conversations/{thread:guid}/messages/{message:guid}/attachments",
             (Guid thread, Guid message, ChatFiles files, CancellationToken ct) => files.GetDetailsAsync(thread, message, ct));
         api.MapGet("/conversations/{thread:guid}/messages/{message:guid}/attachments/{file:guid}",
-            async (Guid thread, Guid message, Guid file, HttpContext context, ICommunicationsChatClient client, IHttpClientFactory http, CancellationToken ct) =>
+            async (Guid thread, Guid message, Guid file, HttpContext context, ICommunicationsChatClient client, IHttpClientFactory http, IConfiguration configuration, CancellationToken ct) =>
             {
                 var session = await client.ForCurrentActorAsync(ct: ct);
                 // The URL is minted by the authorized SDK; the browser cannot supply a proxy target.
                 var download = Require(await session.GetAttachmentDownloadUrlAsync(thread, message, file, ct));
-                using var response = await http.CreateClient("attachments").GetAsync(download.Url, HttpCompletionOption.ResponseHeadersRead, ct);
+                using var request = CreateAttachmentDownloadRequest(download.Url, configuration);
+                using var response = await http.CreateClient("attachments").SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
                 response.EnsureSuccessStatusCode();
                 context.Response.ContentType = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream";
                 context.Response.Headers.XContentTypeOptions = "nosniff";
@@ -244,6 +245,30 @@ public static class YapApi
             catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         }
         finally { await lifetime.CancelAsync(); }
+    }
+
+    public static HttpRequestMessage CreateAttachmentDownloadRequest(string url, IConfiguration configuration)
+    {
+        var signed = new Uri(url, UriKind.Absolute);
+        if (signed.Scheme is not ("http" or "https") || !string.IsNullOrEmpty(signed.UserInfo))
+            throw new YapApiException(503, "This attachment cannot be opened.");
+        var target = signed;
+        var publicEndpoint = configuration["Yap:AttachmentPublicEndpoint"];
+        var internalEndpoint = configuration["Yap:AttachmentInternalEndpoint"];
+        if (!string.IsNullOrWhiteSpace(publicEndpoint) && !string.IsNullOrWhiteSpace(internalEndpoint))
+        {
+            var external = new Uri(publicEndpoint, UriKind.Absolute);
+            var local = new Uri(internalEndpoint, UriKind.Absolute);
+            if (local.Scheme is not ("http" or "https") || !string.IsNullOrEmpty(local.UserInfo) || local.AbsolutePath != "/")
+                throw new InvalidOperationException("The attachment internal endpoint must be an HTTP origin.");
+            if (string.Equals(signed.GetLeftPart(UriPartial.Authority), external.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase))
+                target = new UriBuilder(signed) { Scheme = local.Scheme, Host = local.Host, Port = local.Port }.Uri;
+        }
+        var request = new HttpRequestMessage(HttpMethod.Get, target);
+        // S3 signs the public Host header. Change only where the server connects;
+        // retain the signed authority, object path and query on the wire.
+        if (target != signed) request.Headers.Host = signed.Authority;
+        return request;
     }
 
     private static int Page(int? page) => Math.Clamp(page ?? 0, 0, 10000);
