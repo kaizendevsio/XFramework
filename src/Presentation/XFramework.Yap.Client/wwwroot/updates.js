@@ -14,7 +14,7 @@
             ? 'Finish sending, or remove your attachment or recording, before updating.'
             : 'A new version of Yap is ready.';
     };
-    const reload = () => { if (!reloading) { reloading = true; location.reload(); } };
+    const reload = () => { if (!reloading) { reloading = true; window.yap.diagnostics?.record('page.reload-requested', { reason: 'app-update' }); location.reload(); } };
     const observeWorker = () => {
         const worker = registration?.installing;
         if (worker && !workers.has(worker)) {

@@ -1,0 +1,5 @@
+.diagnostics { padding: 16px; }
+.diagnostics p { color: var(--muted); font-size: 13px; margin: 12px 0; }
+.diagnostics .row { gap: 8px; }
+.diagnostics textarea { width: 100%; min-height: 180px; font: 16px monospace; user-select: text; -webkit-user-select: text; }
+.diagnostics a { text-decoration: underline; }

@@ -8,6 +8,7 @@ using Yap.Client.Services;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Error);
+builder.Services.AddSingleton<ILoggerProvider, DiagnosticsLoggerProvider>();
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 builder.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress), Timeout = TimeSpan.FromSeconds(30) });
@@ -21,6 +22,7 @@ builder.Services.AddSingleton(startup);
 var host = builder.Build();
 try
 {
+    await host.Services.GetRequiredService<IJSRuntime>().InvokeVoidAsync("yap.diagnostics.version", AppRelease.Version);
     await host.Services.GetRequiredService<IJSRuntime>().InvokeVoidAsync("yap.device.acquireDatabase");
     await host.Services.InitializeSqliteWasmAsync();
     await host.Services.InitializeSqliteWasmDatabaseAsync<OfflineDatabase>();
@@ -28,7 +30,7 @@ try
     await db.Database.EnsureCreatedAsync();
     await OfflineDatabase.UpgradeAsync(db);
 }
-catch (Exception ex) { startup.Failed = true; Console.Error.WriteLine($"Yap database startup failed: {ex}"); }
+catch (Exception ex) { startup.Failed = true; host.Services.GetRequiredService<ILogger<DatabaseStartup>>().LogError(ex, "Device storage initialization failed"); }
 await host.RunAsync();
 
 public sealed class DatabaseStartup { public bool Failed { get; set; } }

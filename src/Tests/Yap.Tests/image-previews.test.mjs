@@ -80,12 +80,13 @@ test('removing an attachment during decoding does not recreate its preview on di
     assert.equal(f.files.size, 0);
 });
 
-test('JPEG bypasses conversion and extension/magic recover missing HEIF MIME types', async () => {
+test('JPEG uses a bounded display copy and extension/magic recover missing HEIF MIME types', async () => {
     const f = fixture();
     f.files.set('jpg', new Blob(['JPEG']));
     const url = await f.api.mediaUrl('jpg', '/file', 'account', false, 'image/jpeg', true);
-    assert.equal(await f.displayed.get(url).text(), 'JPEG');
-    assert.equal(f.stats().conversions, 0);
+    assert.equal(await f.displayed.get(url).text(), 'JPEG preview');
+    assert.equal(await f.files.get('jpg').text(), 'JPEG');
+    assert.equal(f.stats().conversions, 1);
     assert.equal(await f.helper.contentType(new File(['x'], 'IMG.HEIF')), 'image/heif');
     assert.equal(await f.helper.contentType(new File(['0000ftypheic'], 'image', { type: 'application/octet-stream' })), 'image/heif');
 });

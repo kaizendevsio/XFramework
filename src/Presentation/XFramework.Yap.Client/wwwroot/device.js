@@ -62,6 +62,7 @@
             previews.delete(key);
             await (await directory()).removeEntry(key).catch(error => { if (error.name !== 'NotFoundError') throw error; });
             await (await directory()).removeEntry(`${key}.preview-v1.jpg`).catch(error => { if (error.name !== 'NotFoundError') throw error; });
+            await (await directory()).removeEntry(`${key}.preview-v2.jpg`).catch(error => { if (error.name !== 'NotFoundError') throw error; });
         },
         // Slices a held File straight into the resumable endpoints. One part is in flight
         // at a time, so peak memory is the part size rather than the file size.
@@ -113,14 +114,14 @@
                 if (!response.ok) throw new Error('The attachment is unavailable.');
                 file = await response.blob(); await write(key, file);
             }
-            if (heif) {
-                const previewKey = `${key}.preview-v1.jpg`;
+            if (heif || /^image\/jpeg$/i.test(contentType.split(';')[0])) {
+                const previewKey = `${key}.preview-v2.jpg`;
                 let preview = previews.get(key);
                 if (!preview) {
                     preview = (async () => {
                         try { return await read(previewKey); }
                         catch (error) { if (error.name !== 'NotFoundError') throw error; }
-                        const jpeg = await yap.imagePreviews.jpeg(file);
+                        const jpeg = await yap.imagePreviews.jpeg(file, heif);
                         // A full device must still be able to show the decoded image.
                         if (previews.get(key) === preview) await write(previewKey, jpeg).catch(() => {});
                         return jpeg;
@@ -130,9 +131,10 @@
                 try { file = await preview; contentType = 'image/jpeg'; }
                 finally { if (previews.get(key) === preview) previews.delete(key); }
             }
-            const url = URL.createObjectURL(new Blob([file], { type: contentType })); urls.add(url); return url;
+            const url = URL.createObjectURL(new Blob([file], { type: contentType })); urls.add(url);
+            window.yap.diagnostics?.record('media.open', { active: urls.size, bytes: file.size }); return url;
         },
-        releaseMedia(url) { URL.revokeObjectURL(url); urls.delete(url); },
+        releaseMedia(url) { URL.revokeObjectURL(url); urls.delete(url); window.yap.diagnostics?.record('media.release', { active: urls.size }); },
         async startRecording() {
             if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) throw new Error('Voice recording is unavailable in this browser.');
             if (window.yapRecording) throw new Error('A recording is already active.');

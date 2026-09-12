@@ -67,7 +67,7 @@
         if (e.target.closest('input,textarea,select,dialog')) return;
         clear();
         const handle = e.target.closest('[data-sheet-drag]');
-        const bubble = e.target.closest('.bub');
+        const bubble = e.target.closest('.bub,.photo-open');
         const message = bubble?.closest('[data-swipe-reply]');
         const panel = e.target.closest('[data-swipe-tabs]');
         const element = handle?.closest('.sheet') || message || panel;
@@ -79,7 +79,8 @@
                 g.fired = true;
                 element.classList.add('is-holding');
                 suppressClick();
-                bubble.click();
+                if (bubble.matches('.photo-open')) bubble.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+                else bubble.click();
             }, 450);
         }
         if (handle) element.setPointerCapture(e.pointerId);
@@ -122,5 +123,5 @@
     });
     document.addEventListener('pointercancel', clear);
     document.addEventListener('visibilitychange', () => { if (document.hidden) { clear(); complete(); } });
-    document.addEventListener('contextmenu', e => { if (e.target.closest('.bub') && gesture) e.preventDefault(); });
+    document.addEventListener('contextmenu', e => { if (e.target.closest('.bub,.photo-open') && gesture) e.preventDefault(); });
 })();
