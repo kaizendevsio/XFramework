@@ -524,7 +524,10 @@ public sealed class ServiceIdentityComposeContractTests
         workflow.Should().Contain("src/Modules/**");
         workflow.Should().Contain("src/Presentation/**");
         workflow.Should().Contain("for service in \"${services[@]}\"; do");
-        workflow.Should().Contain("docker compose -f \"$COMPOSE_FILE_PATH\" build \"$service\"");
+        // xargs gives each build one service and caps concurrent dotnet publishers.
+        workflow.Should().Contain("xargs -r -n 1 -P 2");
+        workflow.Should().Contain("docker compose -f \"$COMPOSE_FILE_PATH\" build");
+        workflow.Should().Contain("xargs -r -n 1 -P 3 timeout --foreground --kill-after=30s 10m docker push");
         workflow.Should().NotContain(
             "docker compose -f \"$COMPOSE_FILE_PATH\" build \"${services[@]}\"");
         workflow.Should().Contain("REMOTE_ACTIVE_ENV:");
