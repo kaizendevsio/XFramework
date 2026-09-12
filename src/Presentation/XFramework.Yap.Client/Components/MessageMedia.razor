@@ -38,7 +38,7 @@
     private string? loaded;
     private int version;
     private static bool IsHeif(ChatAttachment file) => file.ContentType.StartsWith("image/heic", StringComparison.OrdinalIgnoreCase) || file.ContentType.StartsWith("image/heif", StringComparison.OrdinalIgnoreCase) || Path.GetExtension(file.Name).ToLowerInvariant() is ".heic" or ".heif";
-    private static bool IsImage(ChatAttachment file) => IsHeif(file) || file.ContentType.Split(';')[0].ToLowerInvariant() is "image/jpeg" or "image/png" or "image/gif" or "image/webp" or "image/avif";
+    public static bool IsImage(ChatAttachment file) => IsHeif(file) || file.ContentType.Split(';')[0].ToLowerInvariant() is "image/jpeg" or "image/png" or "image/gif" or "image/webp" or "image/avif";
     protected override async Task OnParametersSetAsync()
     {
         var key = $"{Message.Id}:{Message.LocalFileKey}:{Message.HasAttachments}:{string.Join(',', Message.Attachments.Select(f => f.Id))}";
