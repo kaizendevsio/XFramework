@@ -38,6 +38,28 @@ public sealed class ChatFilesTests
     }
 
     [Test]
+    public async Task UploadPartAsync_CarriesTheActorTokenIntoTheStorageCall()
+    {
+        // The token rides on an AsyncLocal. Pushing it inside an async helper leaves the
+        // caller's context untouched, and storage answers 401 on every part.
+        var ambient = new AmbientTokenScope();
+        var fixture = new ChatFixture();
+        var actors = new Mock<ICommunicationsChatActorProvider>();
+        actors.Setup(a => a.GetCurrentActorAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CommunicationsChatActor(fixture.Tenant, fixture.Credential, AccessToken: "actor-token"));
+        string? seen = null;
+        var storage = new Mock<IStorageServiceWrapper>();
+        storage.Setup(s => s.UploadChatStorageFilePart(It.IsAny<UploadChatStorageFilePartRequest>(), It.IsAny<CancellationToken>()))
+            .Callback(() => seen = AmbientTokenScope.Current)
+            .ReturnsAsync(ChatFixture.Ok(new StorageUploadPartResponse()));
+        var service = new ChatFiles(storage.Object, fixture.Client.Object, actors.Object, ambient, NullLogger<ChatFiles>.Instance);
+
+        await service.UploadPartAsync(Guid.NewGuid(), 1, 0, [1, 2, 3], default);
+
+        Assert.That(seen, Is.EqualTo("actor-token"));
+    }
+
+    [Test]
     public void UploadAsync_BeyondTheStagingLimit_DirectsLargeFilesToTheResumablePath()
     {
         var fixture = new ChatFixture();
@@ -85,6 +107,26 @@ public sealed class ChatFilesTests
             // S3 multipart tops out at 10,000 parts; the negotiated size must stay under it.
             Assert.That(ticket.TotalParts, Is.LessThan(10000));
         });
+    }
+
+    /// <summary>
+    /// Mirrors the production scope, which keeps the actor token in a static AsyncLocal.
+    /// A mock cannot catch a push made in the wrong execution context; this can.
+    /// </summary>
+    private sealed class AmbientTokenScope : IActorAccessTokenScope
+    {
+        private static readonly AsyncLocal<string?> Token = new();
+        public static string? Current => Token.Value;
+        public IDisposable Push(string actorAccessToken)
+        {
+            var previous = Token.Value;
+            Token.Value = actorAccessToken;
+            return new Pop(previous);
+        }
+        private sealed class Pop(string? previous) : IDisposable
+        {
+            public void Dispose() => Token.Value = previous;
+        }
     }
 
     private sealed class OversizeFile(long size) : IBrowserFile
