@@ -21,6 +21,23 @@ namespace Yap.Tests;
 public sealed class ChatFilesTests
 {
     [Test]
+    public void UploadAsync_DisabledFeature_PreservesForbiddenStatus()
+    {
+        var fixture = new ChatFixture();
+        var actors = new Mock<ICommunicationsChatActorProvider>();
+        actors.Setup(a => a.GetCurrentActorAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CommunicationsChatActor(fixture.Tenant, fixture.Credential, AccessToken: "actor"));
+        fixture.Session.Setup(s => s.CreateAttachmentUploadAsync(It.IsAny<CreateChatAttachmentUploadRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new QueryResponse<StorageUploadSessionResponse> { HttpStatusCode = HttpStatusCode.Forbidden });
+        var storage = new Mock<IStorageServiceWrapper>(MockBehavior.Strict);
+        var service = new ChatFiles(storage.Object, fixture.Client.Object, actors.Object,
+            Mock.Of<IActorAccessTokenScope>(), NullLogger<ChatFiles>.Instance);
+        var error = Assert.ThrowsAsync<YapApiException>(async () => await service.UploadAsync(new BrowserFile([1]), fixture.Thread, null, default));
+        Assert.That(error!.Status, Is.EqualTo(403));
+        storage.VerifyNoOtherCalls();
+    }
+
+    [Test]
     public async Task AttachAsync_RetryAfterCommittedLink_VerifiesExistingFile()
     {
         var fixture = new ChatFixture();
@@ -111,7 +128,7 @@ public sealed class ChatFilesTests
         var service = new ChatFiles(storage.Object, fixture.Client.Object, actors.Object,
             Mock.Of<IActorAccessTokenScope>(), NullLogger<ChatFiles>.Instance);
 
-        Assert.ThrowsAsync<ChatOperationException>(async () =>
+        Assert.ThrowsAsync<YapApiException>(async () =>
             await service.UploadAsync(new BrowserFile([1, 2, 3]), fixture.Thread, null, default));
 
         storage.Verify(s => s.AbortChatStorageUploadSession(

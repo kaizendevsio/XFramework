@@ -22,7 +22,7 @@ public sealed class ChatFiles(IStorageServiceWrapper storage, ICommunicationsCha
         using var token = tokens.Push(actor.AccessToken!);
         var metadata = new RequestMetadata { RequestedTenantId = actor.TenantId, RequestId = Guid.NewGuid(), OperationName = "Yap attachment" };
         var session = await chat.ForCurrentActorAsync(ct: ct);
-        var upload = ChatWorkspace.Require(await session.CreateAttachmentUploadAsync(new CreateChatAttachmentUploadRequest
+        var upload = YapApi.Require(await session.CreateAttachmentUploadAsync(new CreateChatAttachmentUploadRequest
         {
             ThreadId = threadId, FileName = Path.GetFileName(file.Name),
             ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
@@ -43,7 +43,7 @@ public sealed class ChatFiles(IStorageServiceWrapper storage, ICommunicationsCha
                 var length = (int)Math.Min(buffer.Length, file.Size - offset);
                 await stream.ReadExactlyAsync(buffer.AsMemory(0, length), ct);
                 var partBytes = buffer.AsSpan(0, length).ToArray();
-                ChatWorkspace.Require(await storage.UploadChatStorageFilePart(new UploadChatStorageFilePartRequest
+                YapApi.Require(await storage.UploadChatStorageFilePart(new UploadChatStorageFilePartRequest
                 {
                     UploadSessionId = upload.Id, PartNumber = part++, OffsetBytes = offset,
                     ChunkBytes = partBytes, PartSha256Hash = Convert.ToHexString(SHA256.HashData(partBytes)), Metadata = metadata
@@ -51,13 +51,13 @@ public sealed class ChatFiles(IStorageServiceWrapper storage, ICommunicationsCha
                 offset += length;
                 progress?.Report((int)(offset * 100 / file.Size));
             }
-            var completed = ChatWorkspace.Require(await storage.CompleteChatStorageUploadSession(new CompleteChatStorageUploadSessionRequest
+            var completed = YapApi.Require(await storage.CompleteChatStorageUploadSession(new CompleteChatStorageUploadSessionRequest
             { UploadSessionId = upload.Id, Metadata = metadata }, ct));
             completedUpload = true;
             for (var attempt = 0; attempt < 60 && completed.Status is StorageFileStatus.Verifying or StorageFileStatus.VerificationInProgress; attempt++)
             {
                 await Task.Delay(TimeSpan.FromSeconds(1), ct);
-                completed = ChatWorkspace.Require(await storage.GetStorageFile(new GetStorageFileRequest
+                completed = YapApi.Require(await storage.GetStorageFile(new GetStorageFileRequest
                 { StorageFileId = completed.Id, Metadata = metadata }, ct));
             }
             if (completed.Status != StorageFileStatus.Available)
@@ -68,7 +68,7 @@ public sealed class ChatFiles(IStorageServiceWrapper storage, ICommunicationsCha
         {
             if (!completedUpload)
             {
-                try { ChatWorkspace.Require(await storage.AbortChatStorageUploadSession(new AbortChatStorageUploadSessionRequest { UploadSessionId = upload.Id, Metadata = metadata }, CancellationToken.None)); }
+                try { YapApi.Require(await storage.AbortChatStorageUploadSession(new AbortChatStorageUploadSessionRequest { UploadSessionId = upload.Id, Metadata = metadata }, CancellationToken.None)); }
                 catch (Exception ex) { logger.LogWarning(ex, "Could not abort incomplete Yap upload {UploadId}.", upload.Id); }
             }
             throw;
@@ -82,20 +82,20 @@ public sealed class ChatFiles(IStorageServiceWrapper storage, ICommunicationsCha
         if ((int)result.HttpStatusCode == 409)
         {
             // A prior attempt may have committed before its response was interrupted.
-            var linked = ChatWorkspace.Require(await session.GetFilesAsync(threadId, messageId, pageSize: 100, ct: ct));
+            var linked = YapApi.Require(await session.GetFilesAsync(threadId, messageId, pageSize: 100, ct: ct));
             if (linked.Items.Any(file => file.StorageFileId == storageId)) return;
         }
-        ChatWorkspace.Require(result);
+        YapApi.Require(result);
     }
 
     public async Task<IReadOnlyList<ChatFileLink>> GetLinksAsync(Guid threadId, Guid messageId, CancellationToken ct)
     {
         var session = await chat.ForCurrentActorAsync(ct: ct);
-        var files = ChatWorkspace.Require(await session.GetFilesAsync(threadId, messageId, pageSize: 100, ct: ct));
+        var files = YapApi.Require(await session.GetFilesAsync(threadId, messageId, pageSize: 100, ct: ct));
         var links = new List<ChatFileLink>();
         foreach (var file in files.Items)
         {
-            var result = ChatWorkspace.Require(await session.GetAttachmentDownloadUrlAsync(threadId, messageId, file.Id, ct));
+            var result = YapApi.Require(await session.GetAttachmentDownloadUrlAsync(threadId, messageId, file.Id, ct));
             if (!Uri.TryCreate(result.Url, UriKind.Absolute, out var uri) || uri.Scheme is not ("https" or "http"))
                 throw new ChatOperationException("This attachment cannot be opened.");
             links.Add(new ChatFileLink(file.Id, result.Url));
