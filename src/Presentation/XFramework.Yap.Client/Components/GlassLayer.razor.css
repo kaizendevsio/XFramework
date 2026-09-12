@@ -2,8 +2,8 @@
 .glass-backdrop,.glass-refraction,.glass-highlight{position:absolute;inset:0;border-radius:inherit;pointer-events:none}
 /* Keep a full-size native backdrop even when the SVG enhancement is clipped or
    awaiting a resize repaint. Tint is painted once, above both optical layers. */
-.glass-backdrop{-webkit-backdrop-filter:blur(var(--glass-blur,2px)) saturate(1.35);backdrop-filter:blur(var(--glass-blur,2px)) saturate(1.35)}
-.glass-refraction{background:var(--glass-custom-tint,var(--glass-tint))}
+.glass-backdrop{-webkit-backdrop-filter:blur(max(var(--glass-blur,2px),var(--glass-min-blur,0px))) saturate(1.35);backdrop-filter:blur(max(var(--glass-blur,2px),var(--glass-min-blur,0px))) saturate(1.35)}
+.glass-refraction{background:var(--glass-custom-tint,var(--glass-material-tint,var(--glass-tint)))}
 .glass-optics[data-refracted] .glass-refraction{-webkit-backdrop-filter:var(--glass-filter) saturate(1.25);backdrop-filter:var(--glass-filter) saturate(1.25)}
 .glass-highlight{background:linear-gradient(145deg,var(--glass-shine),transparent 38%,transparent 65%,var(--glass-edge));box-shadow:inset 0 1px 0 var(--glass-rim),inset 1px 0 0 var(--glass-edge),inset 0 -1px 0 var(--glass-edge);border:1px solid var(--glass-edge)}
 @media(prefers-reduced-transparency:reduce){.glass-backdrop{display:none}.glass-refraction{background:var(--surface)!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}.glass-highlight{background:none}}
