@@ -2,7 +2,7 @@
 @inject ChatApi Api
 @inject IJSRuntime JS
 @implements IAsyncDisposable
-<form class="composer" @onsubmit="SendAsync" @onsubmit:preventDefault>
+<form class="composer" data-update-busy="@((busy || recording || uploading || attaching || file is not null).ToString().ToLowerInvariant())" @onsubmit="SendAsync" @onsubmit:preventDefault>
     @if (State.Selected?.Allows(ChatFeature.Typing) != false && State.TypingPeople is { Count: > 0 } people)
     { <div class="typing-indicator" role="status" aria-label="@State.TypingText">@foreach (var person in people) { <Avatar Initials="@ChatMessage.InitialsFor(person.Name)" ImageUrl="@person.AvatarUrl" Size="a28" /> }<span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span></div> }
     @if (Reply is not null && ParentId is null) { <div class="replyto liquid-glass"><GlassLayer /><Icon Name="reply" Size="17" /><span class="mid"><span class="n">Replying to @Reply.Sender</span><span class="p">@Reply.Text</span></span><button type="button" class="iconbtn" aria-label="Cancel reply" @onclick="Cancel"><Icon Name="close" Size="16" /></button></div> }
