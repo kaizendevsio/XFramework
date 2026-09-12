@@ -347,7 +347,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
             Attachments = file is null ? [] : [new ChatAttachment(id, file.Name, file.ContentType, file.Size)] };
         await store.QueueAsync(new QueuedMessage { Scope = Scope, Id = id, ThreadId = thread, Text = content,
             ParentId = parent, CreatedTicks = message.CreatedAt.Ticks, FileKey = file?.Key, FileName = file?.Name,
-            ContentType = file?.ContentType, FileSize = file?.Size ?? 0 }, message, draftKey);
+            ContentType = file?.ContentType, FileSize = file?.Size ?? 0, UploadId = file?.UploadId }, message, draftKey);
         if (Selected?.Id == thread) { Selected.Messages.Add(message); ComposeReplies(Selected.Messages); }
         PendingCount++; Notify();
         }
@@ -368,17 +368,25 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
                     if (receipt?.MessageId != item.Id) throw new InvalidOperationException("Message receipt did not match.");
                     item.MessageConfirmed = true; await store.SaveQueueAsync(item);
                 }
-                if (item.FileKey is not null)
+                if (item.FileKey is not null && item.StorageId is null)
                 {
-                    if (item.StorageId is null)
+                    if (item.UploadId is { } session)
+                    {
+                        // A streamed attachment already has every part in the bucket; only sealing remains.
+                        var stored = await api.PostAsync<StoredFile>($"api/chat/uploads/session/{session}/complete");
+                        item.StorageId = stored!.Id;
+                    }
+                    else
                     {
                         var upload = await js.InvokeAsync<UploadReceipt>("yap.device.upload", item.FileKey, item.FileName,
                             item.ThreadId, api.Token, Scope, item.ContentType);
                         if (upload.Status is < 200 or >= 300) throw new ChatApiException(upload.Status);
-                        item.StorageId = upload.Id; await store.SaveQueueAsync(item);
+                        item.StorageId = upload.Id;
                     }
-                    await api.PostAsync("api/chat/attachments", new AttachMessageFile(item.ThreadId, item.Id, item.StorageId.Value));
+                    await store.SaveQueueAsync(item);
                 }
+                if (item.StorageId is { } storage)
+                    await api.PostAsync("api/chat/attachments", new AttachMessageFile(item.ThreadId, item.Id, storage));
                 await store.CompleteQueueAsync(item);
                 if (item.FileKey is not null) await js.InvokeVoidAsync("yap.device.removeFile", item.FileKey);
             }
@@ -471,7 +479,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
 
     public async ValueTask DisposeAsync()
     { lifetime.Cancel(); if (polling is not null) await polling; reference?.Dispose(); lifetime.Dispose(); }
-    public sealed record PickedFile(string Key, string Name, string ContentType, long Size);
+    public sealed record PickedFile(string Key, string Name, string ContentType, long Size, bool Staged = true, Guid? UploadId = null);
     private sealed record UploadReceipt(int Status, Guid Id);
     private sealed record CreatedConversation(Guid Id);
 }

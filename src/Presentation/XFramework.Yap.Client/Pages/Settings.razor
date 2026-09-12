@@ -1,26 +1,148 @@
 @page "/settings"
+@implements IDisposable
 @inject ChatState State
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 <PageTitle>Settings · Yap</PageTitle>
-<ScrollSurface><Header><div class="appbar liquid-glass"><GlassLayer /><a class="iconbtn" href="/" aria-label="Back to chats"><Icon Name="back" /></a><h1>Settings</h1></div></Header><ChildContent><div class="body settings">
-<Avatar Initials="@ChatMessage.InitialsFor(State.User?.Name)" Size="a92" /><h1>@(State.User?.Name ?? "Yap")</h1>
-<button class="btn ghost" @onclick="ThemeAsync">Switch light / dark appearance</button>
-<GlassControls />
-<h2>A few handy gestures</h2><p class="muted">Swipe a message right to reply. Press and hold to open its actions. Swipe across your inbox to switch tabs. Pull a sheet’s handle down to close it.</p>
-<h2>On this device</h2><p class="muted">Loaded conversations, replies, drafts and opened attachments are available offline. Messages and uploads you send offline are saved here and sync when you reconnect.</p>
-<p>@State.PendingCount messages waiting to sync.</p><button class="btn ghost" @onclick="State.RetryAsync">Sync now</button>
-<button class="btn ghost" @onclick="PersistAsync">Keep offline data on this device</button>
-@if (storageNotice is not null) { <p role="status">@storageNotice</p> }
-<h2>Install Yap</h2><p class="muted">On iPhone, use Safari’s Share menu, then Add to Home Screen. On Android, use your browser’s Install app option.</p><button class="btn ghost" @onclick="InstallAsync">Install app</button>
-@if (State.User is not null) { <button class="btn" @onclick="() => signOut = true">Sign out</button> }
-</div></ChildContent></ScrollSurface>
-@if (signOut) { <BottomSheet Title="Sign out" OnClose="() => signOut = false"><div class="picker"><p>Sign out and remove this account’s offline data from this device? @if (State.PendingCount > 0) { <strong>@State.PendingCount queued messages and uploads will be discarded.</strong> }</p><button class="btn" @onclick="LogoutAsync">Sign out and clear device data</button></div></BottomSheet> }
+<ScrollSurface>
+<Header><div class="appbar plain liquid-glass"><GlassLayer /><h1>Settings</h1><span class="sp"></span></div></Header>
+<ChildContent>
+<div class="body settings">
+
+    <section class="identity-card liquid-glass">
+        <GlassLayer />
+        <Avatar Initials="@ChatMessage.InitialsFor(State.User?.Name)" Size="a92" />
+        <h2>@(State.User?.Name ?? "Not signed in")</h2>
+        @if (State.User is null) { <a class="btn h46" href="/login">Sign in</a> }
+    </section>
+
+    <h3 class="set-group">Appearance</h3>
+    <div class="set-list liquid-glass">
+        <GlassLayer />
+        <div class="set-row">
+            <span class="set-key"><Icon Name="moon" Size="19" /><span class="set-label">Theme</span></span>
+            <span class="segmented" role="group" aria-label="Theme">
+                @foreach (var option in new[] { ("system", "Auto"), ("light", "Light"), ("dark", "Dark") })
+                {
+                    <button type="button" class="@(theme == option.Item1 ? "on" : "")" aria-pressed="@((theme == option.Item1).ToString().ToLowerInvariant())" @onclick="() => ThemeAsync(option.Item1)">@option.Item2</button>
+                }
+            </span>
+        </div>
+        <button type="button" class="set-row set-action" @onclick="() => glass = !glass" aria-expanded="@glass.ToString().ToLowerInvariant()">
+            <span class="set-key"><Icon Name="image" Size="19" /><span class="set-label">Glass<small>Blur, refraction and tint for this browser</small></span></span>
+            <Icon Name="arrow" Size="17" Class="@(glass ? "set-chevron open" : "set-chevron")" />
+        </button>
+        @if (glass) { <div class="set-stack"><GlassControls /></div> }
+    </div>
+
+    <h3 class="set-group">Storage and sync</h3>
+    <div class="set-list liquid-glass">
+        <GlassLayer />
+        <div class="set-row">
+            <span class="set-key"><Icon Name="wifi" Size="19" /><span class="set-label">Waiting to sync<small>@(State.Online ? State.NeedsLogin ? "Sign in to resume" : "Connected" : "Offline")</small></span></span>
+            <span class="set-value">@State.PendingCount</span>
+        </div>
+        <button type="button" class="set-row set-action" @onclick="SyncAsync">
+            <span class="set-key"><Icon Name="arrow" Size="19" /><span class="set-label">Sync now<small>Send anything queued on this device</small></span></span>
+            @if (State.Busy) { <span class="spinner set-value"></span> }
+        </button>
+        <button type="button" class="set-row set-action" @onclick="PersistAsync">
+            <span class="set-key"><Icon Name="shield" Size="19" /><span class="set-label">Keep data on this device<small>@(persistNotice ?? "Ask the browser not to evict offline messages")</small></span></span>
+        </button>
+    </div>
+
+    <h3 class="set-group">App</h3>
+    <div class="set-list liquid-glass">
+        <GlassLayer />
+        @if (installed)
+        {
+            <div class="set-row">
+                <span class="set-key"><Icon Name="check" Size="19" /><span class="set-label">Installed<small>Yap is running as an app on this device</small></span></span>
+            </div>
+        }
+        else
+        {
+            <button type="button" class="set-row set-action" disabled="@(!canInstall)" @onclick="InstallAsync">
+                <span class="set-key"><Icon Name="download" Size="19" /><span class="set-label">Install Yap<small>@(canInstall ? "Add Yap to your home screen" : "In Safari, use Share, then Add to Home Screen")</small></span></span>
+            </button>
+        }
+        <button type="button" class="set-row set-action" @onclick="() => gestures = !gestures" aria-expanded="@gestures.ToString().ToLowerInvariant()">
+            <span class="set-key"><Icon Name="info" Size="19" /><span class="set-label">Gestures<small>How to reply, react and navigate</small></span></span>
+            <Icon Name="arrow" Size="17" Class="@(gestures ? "set-chevron open" : "set-chevron")" />
+        </button>
+        @if (gestures)
+        {
+            <div class="set-note">
+                <p><b>Swipe a message right</b> to reply to it.</p>
+                <p><b>Press and hold, or tap, a message</b> to open its actions.</p>
+                <p><b>Swipe across the inbox</b> to switch between chats and groups.</p>
+                <p><b>Pull a sheet down by its handle</b> to close it.</p>
+            </div>
+        }
+    </div>
+
+    <p class="set-footnote">Loaded conversations, replies, drafts and opened attachments stay available offline. Messages and uploads you send while offline are saved here and sync when you reconnect.</p>
+
+    @if (State.User is not null)
+    {
+        <div class="set-list liquid-glass">
+            <GlassLayer />
+            <button type="button" class="set-row set-action danger" @onclick="() => signOut = true">
+                <span class="set-key"><Icon Name="trash" Size="19" /><span class="set-label">Sign out<small>Removes this account's offline data from this device</small></span></span>
+            </button>
+        </div>
+    }
+</div>
+</ChildContent>
+<Footer><TabBar Current="settings" /></Footer>
+</ScrollSurface>
+@if (signOut)
+{
+    <BottomSheet Title="Sign out" OnClose="() => signOut = false">
+        <div class="picker">
+            <p>Sign out and remove this account's offline data from this device? @if (State.PendingCount > 0) { <strong>@State.PendingCount queued messages and uploads will be discarded.</strong> }</p>
+            <button class="btn" @onclick="LogoutAsync">Sign out and clear device data</button>
+        </div>
+    </BottomSheet>
+}
 @code {
-    private bool signOut;
-    private string? storageNotice;
-    private async Task ThemeAsync() { var theme = await JS.InvokeAsync<string>("yap.getTheme"); await JS.InvokeVoidAsync("yap.setTheme", theme == "dark" ? "light" : "dark"); }
-    private async Task PersistAsync() { storageNotice = await JS.InvokeAsync<bool>("yap.device.persist") ? "The browser has granted persistent storage." : "Your browser manages storage automatically. Keep enough free space for offline data."; }
-    private Task InstallAsync() => JS.InvokeVoidAsync("yap.device.install").AsTask();
+    private bool signOut, gestures, glass, canInstall, installed;
+    private string theme = "system";
+    private string? persistNotice;
+
+    protected override void OnInitialized() => State.Changed += Changed;
+    private void Changed() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() => State.Changed -= Changed;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        theme = await JS.InvokeAsync<string>("yap.themePreference");
+        canInstall = await JS.InvokeAsync<bool>("yap.device.canInstall");
+        installed = await JS.InvokeAsync<bool>("yap.device.isInstalled");
+        StateHasChanged();
+    }
+
+    private async Task ThemeAsync(string preference)
+    {
+        theme = preference;
+        await JS.InvokeVoidAsync("yap.setThemePreference", preference);
+    }
+
+    private Task SyncAsync() => State.RetryAsync();
+
+    private async Task PersistAsync()
+    {
+        persistNotice = await JS.InvokeAsync<bool>("yap.device.persist")
+            ? "The browser granted persistent storage."
+            : "The browser manages storage automatically. Keep enough free space for offline data.";
+    }
+
+    private async Task InstallAsync()
+    {
+        await JS.InvokeVoidAsync("yap.device.install");
+        canInstall = await JS.InvokeAsync<bool>("yap.device.canInstall");
+    }
+
     private async Task LogoutAsync() { await State.LogoutAsync(); Nav.NavigateTo("/login"); }
 }

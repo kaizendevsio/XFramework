@@ -126,6 +126,29 @@ public sealed class OfflineStoreTests
     }
 }
 
+public sealed class OfflineSchemaTests
+{
+    [Test]
+    public async Task UpgradeAsync_DeviceFromAnEarlierBuild_GainsTheStreamedUploadColumn()
+    {
+        // EnsureCreated leaves an existing device database untouched, so a device that
+        // installed Yap before streamed uploads would otherwise fail on every outbox read.
+        await using var fixture = await StoreFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"Outbox\" DROP COLUMN \"UploadId\"");
+
+        await OfflineDatabase.UpgradeAsync(db);
+        await OfflineDatabase.UpgradeAsync(db);
+
+        var message = fixture.Message();
+        var queued = fixture.Queue(message);
+        queued.UploadId = Guid.NewGuid();
+        await fixture.Store.QueueAsync(queued, message, "main");
+
+        Assert.That((await fixture.Store.PendingAsync("account-a")).Single().UploadId, Is.EqualTo(queued.UploadId));
+    }
+}
+
 internal sealed class StoreFixture(SqliteConnection connection) : IDbContextFactory<OfflineDatabase>, IAsyncDisposable
 {
     public OfflineStore Store => new(this);

@@ -26,6 +26,7 @@ try
     await host.Services.InitializeSqliteWasmDatabaseAsync<OfflineDatabase>();
     await using var db = await host.Services.GetRequiredService<IDbContextFactory<OfflineDatabase>>().CreateDbContextAsync();
     await db.Database.EnsureCreatedAsync();
+    await OfflineDatabase.UpgradeAsync(db);
 }
 catch (Exception ex) { startup.Failed = true; Console.Error.WriteLine($"Yap database startup failed: {ex}"); }
 await host.RunAsync();

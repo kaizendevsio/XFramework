@@ -96,7 +96,7 @@ public static class YapAuth
             }, ct);
             if (!response.IsSuccess || response.Response?.Credential?.TenantId != tenant)
                 return Redirect(context, "/login?error=credentials");
-            var principal = sessions.Create(response.Response);
+            var principal = await sessions.CreateAsync(response.Response, ct);
             await context.SignInAsync(Scheme, principal,
                 new AuthenticationProperties { ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8) });
             return Redirect(context, "/");

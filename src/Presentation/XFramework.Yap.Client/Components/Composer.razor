@@ -1,15 +1,25 @@
 @inject ChatState State
+@inject ChatApi Api
 @inject IJSRuntime JS
 @implements IAsyncDisposable
 <form class="composer" @onsubmit="SendAsync" @onsubmit:preventDefault>
     @if (State.Selected?.Allows(ChatFeature.Typing) != false && State.TypingPeople is { Count: > 0 } people)
     { <div class="typing-indicator" role="status" aria-label="@State.TypingText">@foreach (var person in people) { <Avatar Initials="@ChatMessage.InitialsFor(person.Name)" ImageUrl="@person.AvatarUrl" Size="a28" /> }<span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span></div> }
     @if (Reply is not null && ParentId is null) { <div class="replyto liquid-glass"><GlassLayer /><Icon Name="reply" Size="17" /><span class="mid"><span class="n">Replying to @Reply.Sender</span><span class="p">@Reply.Text</span></span><button type="button" class="iconbtn" aria-label="Cancel reply" @onclick="Cancel"><Icon Name="close" Size="16" /></button></div> }
-    @if (file is not null) { <div class="replyto liquid-glass"><GlassLayer /><Icon Name="file" Size="17" /><span class="mid">@file.Name <small>(saved on this device)</small></span><button type="button" class="iconbtn" aria-label="Remove attachment" @onclick="RemoveFileAsync"><Icon Name="close" Size="16" /></button></div> }
+    @if (file is not null)
+    {
+        <div class="replyto liquid-glass attachment-preview"><GlassLayer />
+            <Icon Name="@Glyph(file.ContentType)" Size="17" />
+            <span class="mid"><span class="n">@file.Name</span><span class="p">@Describe(file)</span>
+                @if (uploading) { <span class="upload-bar" role="progressbar" aria-valuenow="@progress" aria-valuemin="0" aria-valuemax="100" aria-label="Upload progress"><i style="width:@(progress)%"></i></span> }
+            </span>
+            <button type="button" class="iconbtn" aria-label="Remove attachment" @onclick="RemoveFileAsync"><Icon Name="close" Size="16" /></button>
+        </div>
+    }
     @if (file is not null && file.ContentType.StartsWith("audio/")) { <MessageMedia Message="@(new ChatMessage { Id = Guid.Parse(file.Key), LocalFileKey = file.Key, HasAttachments = true, Attachments = [new(Guid.Parse(file.Key), file.Name, file.ContentType, file.Size)] })" /> }
     @if (recording) { <div class="recording-bar" role="status"><span class="recording-dot"></span>Recording voice message<button type="button" @onclick="FinishRecordingAsync">Stop and preview</button><button type="button" aria-label="Cancel recording" @onclick="CancelRecordingAsync"><Icon Name="close" Size="18" /></button></div> }
     <div class="inputrow @(CanSend ? "has-send" : "")">
-        @if (State.Selected?.Allows(ChatFeature.Attachments) != false) { <label class="iconbtn liquid-glass attachment-pick" title="Attach file"><GlassLayer /><Icon Name="plus" /><InputFile @ref="input" OnChange="PickAsync" aria-label="Attach file" disabled="@(busy || recording)" /></label> }
+        @if (State.Selected?.Allows(ChatFeature.Attachments) != false) { <button type="button" class="iconbtn liquid-glass attach-open" aria-label="Attach" disabled="@(busy || recording || uploading)" @onclick="() => attaching = true"><GlassLayer /><Icon Name="plus" /></button> }
         <div class="inputbox liquid-glass"><GlassLayer /><textarea @ref="editor" rows="1" aria-label="@(ParentId.HasValue ? "Reply in thread" : "Message")" placeholder="@(ParentId.HasValue ? "Reply in thread" : "Message")" @bind="draft" @bind:event="oninput" @bind:after="SaveDraftAsync" @onblur="StopTypingAsync" disabled="@(busy || recording)" maxlength="4000" autocomplete="off"></textarea><button type="button" aria-label="Add smile emoji" @onclick="AddEmojiAsync">☺</button></div>
         <div class="composer-action">
             <button type="submit" class="sendbtn liquid-glass" aria-label="Send message" tabindex="@(CanSend ? 0 : -1)" disabled="@(busy || !CanSend || recording)"><GlassLayer /><Icon Name="send" Size="20" /></button>
@@ -17,6 +27,19 @@
         </div>
     </div>
 </form>
+@if (attaching)
+{
+    <BottomSheet Title="Attach" OnClose="() => attaching = false">
+        @* Each source is its own file input so the browser opens the right picker.
+           No option filters or re-encodes the chosen file. *@
+        <div class="attach-picker">
+            <label class="sheetitem"><Icon Name="image" Size="20" /><span class="mid"><span class="n">Photo or video</span><span class="p">Sent at original quality</span></span><InputFile @ref="mediaInput" accept="image/*,video/*" OnChange="e => PickAsync(e, mediaInput)" aria-label="Choose a photo or video" /></label>
+            <label class="sheetitem"><Icon Name="camera" Size="20" /><span class="mid"><span class="n">Camera</span><span class="p">Take a photo or video now</span></span><InputFile @ref="cameraInput" accept="image/*,video/*" capture="environment" OnChange="e => PickAsync(e, cameraInput)" aria-label="Use the camera" /></label>
+            <label class="sheetitem"><Icon Name="clip" Size="20" /><span class="mid"><span class="n">File</span><span class="p">Documents, PDFs, archives, anything</span></span><InputFile @ref="fileInput" OnChange="e => PickAsync(e, fileInput)" aria-label="Choose a file" /></label>
+        </div>
+        <p class="attach-note">Up to @(ChatLimits.MaxFileBytes / 1073741824) GB. Files over @(ChatLimits.StagedFileBytes / 1048576) MB upload as you compose and need a connection.</p>
+    </BottomSheet>
+}
 @code {
     [Parameter] public Guid ThreadId { get; set; }
     [Parameter] public Guid? ParentId { get; set; }
@@ -25,15 +48,17 @@
     [Parameter] public EventCallback Sent { get; set; }
     private string Key => $"{ThreadId:N}:{ParentId?.ToString("N") ?? "main"}";
     private string draft = "", loaded = "";
-    private bool busy, recording;
+    private bool busy, recording, attaching, uploading;
+    private int progress;
     private ElementReference editor;
-    private bool CanSend => !string.IsNullOrWhiteSpace(draft) || file is not null;
-    private InputFile? input;
+    private bool CanSend => !uploading && (!string.IsNullOrWhiteSpace(draft) || file is not null);
+    private InputFile? mediaInput, cameraInput, fileInput;
     private ChatState.PickedFile? file;
+    private DotNetObjectReference<Composer>? reporter;
     protected override void OnInitialized() => State.Changed += Changed;
     private void Changed() => _ = InvokeAsync(StateHasChanged);
     protected override async Task OnParametersSetAsync()
-    { if (loaded != Key) { loaded = Key; draft = await State.DraftAsync(Key); file = null; } }
+    { if (loaded != Key) { loaded = Key; draft = await State.DraftAsync(Key); await RemoveFileAsync(); } }
     private async Task SaveDraftAsync()
     {
         _ = State.PublishTypingAsync(ThreadId, !string.IsNullOrWhiteSpace(draft));
@@ -41,7 +66,14 @@
     }
     protected override async Task OnAfterRenderAsync(bool firstRender) => await JS.InvokeVoidAsync("yap.device.resizeComposer", editor);
     private Task StopTypingAsync() => State.PublishTypingAsync(ThreadId, false);
-    public async ValueTask DisposeAsync() { State.Changed -= Changed; await StopTypingAsync(); await CancelRecordingAsync(); }
+    public async ValueTask DisposeAsync()
+    {
+        State.Changed -= Changed;
+        await StopTypingAsync();
+        await CancelRecordingAsync();
+        await RemoveFileAsync();
+        reporter?.Dispose();
+    }
     private async Task AddEmojiAsync() { draft += "😊"; await SaveDraftAsync(); }
     private async Task StartRecordingAsync()
     {
@@ -51,24 +83,86 @@
     private async Task FinishRecordingAsync()
     {
         busy = true;
-        try { var picked = await JS.InvokeAsync<ChatState.PickedFile?>("yap.device.stopRecording", Guid.NewGuid().ToString("N"), false); await RemoveFileAsync(); file = picked; }
+        try { var picked = await JS.InvokeAsync<ChatState.PickedFile?>("yap.device.stopRecording", Guid.NewGuid().ToString("N"), false, ChatLimits.StagedFileBytes); await RemoveFileAsync(); file = picked; }
         catch (Exception ex) { State.Report(ex); }
         finally { busy = recording = false; }
     }
-    private async Task CancelRecordingAsync() { if (recording) await JS.InvokeVoidAsync("yap.device.stopRecording", "", true); recording = false; }
-    private async Task PickAsync(InputFileChangeEventArgs e)
+    private async Task CancelRecordingAsync() { if (recording) await JS.InvokeVoidAsync("yap.device.stopRecording", "", true, ChatLimits.StagedFileBytes); recording = false; }
+
+    private async Task PickAsync(InputFileChangeEventArgs e, InputFile? source)
     {
+        attaching = false;
         busy = true;
         try
         {
-            if (e.File.Size is <= 0 or > 20 * 1024 * 1024) throw new InvalidOperationException("Choose a file up to 20 MB.");
-            var picked = await JS.InvokeAsync<ChatState.PickedFile>("yap.device.pickFile", input!.Element, Guid.NewGuid().ToString("N"));
-            await RemoveFileAsync(); file = picked;
+            if (e.File.Size <= 0) throw new InvalidOperationException("Choose a file to attach.");
+            if (e.File.Size > ChatLimits.MaxFileBytes)
+                throw new InvalidOperationException($"Choose a file up to {ChatLimits.MaxFileBytes / 1073741824} GB.");
+            if (e.File.Size > ChatLimits.StagedFileBytes && (!State.Online || State.NeedsLogin))
+                throw new InvalidOperationException("Attachments this large need a connection. Reconnect and try again.");
+            await RemoveFileAsync();
+            var picked = await JS.InvokeAsync<ChatState.PickedFile>("yap.device.pickFile", source!.Element,
+                Guid.NewGuid().ToString("N"), ChatLimits.StagedFileBytes, ChatLimits.MaxFileBytes);
+            file = picked;
+            if (!picked.Staged) await StreamAsync(picked);
         }
-        catch (Exception ex) { State.Report(ex); }
+        catch (Exception ex) { State.Report(ex); await RemoveFileAsync(); }
         finally { busy = false; }
     }
-    private async Task RemoveFileAsync() { if (file is not null) await JS.InvokeVoidAsync("yap.device.removeFile", file.Key); file = null; }
+
+    /// <summary>
+    /// Sends every part of an unstaged file now and keeps the session open. Completing it
+    /// is left to the outbox, so removing the attachment aborts instead of orphaning bytes.
+    /// </summary>
+    private async Task StreamAsync(ChatState.PickedFile picked)
+    {
+        uploading = true;
+        progress = 0;
+        reporter ??= DotNetObjectReference.Create(this);
+        Guid? session = null;
+        try
+        {
+            var ticket = await Api.PostAsync<UploadTicket>($"api/chat/uploads/{ThreadId}/session",
+                new BeginUpload(picked.Name, picked.ContentType, picked.Size)) ?? throw new ChatApiException(503);
+            session = ticket.UploadId;
+            var status = await JS.InvokeAsync<int>("yap.device.uploadParts", picked.Key, ticket.UploadId,
+                ticket.ChunkSizeBytes, ticket.TotalParts, Api.Token, State.Scope, reporter);
+            if (status is < 200 or >= 300) throw new ChatApiException(status);
+            // The attachment may have been removed or replaced while the parts were in
+            // flight. Never resurrect it; abandon the session instead.
+            if (file?.Key != picked.Key) return;
+            file = picked with { UploadId = ticket.UploadId };
+            session = null;
+        }
+        catch
+        {
+            if (session is { } incomplete) await AbortAsync(incomplete);
+            throw;
+        }
+        finally { uploading = false; }
+    }
+
+    [JSInvokable]
+    public Task UploadProgress(int percent)
+    {
+        progress = percent;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task AbortAsync(Guid session)
+    {
+        try { await Api.PostAsync<object>($"api/chat/uploads/session/{session}/abort"); }
+        catch (Exception ex) { Console.Error.WriteLine($"Yap could not abort upload {session}: {ex.Message}"); }
+    }
+
+    private async Task RemoveFileAsync()
+    {
+        if (file is not { } previous) return;
+        file = null;
+        if (previous.UploadId is { } session) await AbortAsync(session);
+        await JS.InvokeVoidAsync("yap.device.removeFile", previous.Key);
+    }
+
     private async Task SendAsync()
     {
         busy = true;
@@ -76,10 +170,29 @@
         {
             _ = StopTypingAsync();
             await State.SendAsync(ThreadId, draft, ParentId ?? Reply?.Id, Key, file, ParentId.HasValue);
+            // The outbox owns the attachment from here, so this must not abort it.
             draft = ""; file = null;
             await Cancel.InvokeAsync(); await Sent.InvokeAsync();
         }
         catch (Exception ex) { State.Report(ex); }
         finally { busy = false; }
     }
+
+    private string Describe(ChatState.PickedFile picked) => uploading
+        ? $"Uploading {progress}% · {Size(picked.Size)}"
+        : picked.UploadId is not null ? $"Ready to send · {Size(picked.Size)}"
+        : $"Saved on this device · {Size(picked.Size)}";
+
+    private static string Size(long bytes) => bytes switch
+    {
+        >= 1073741824 => $"{bytes / 1073741824d:0.#} GB",
+        >= 1048576 => $"{bytes / 1048576d:0.#} MB",
+        >= 1024 => $"{bytes / 1024d:0} KB",
+        _ => $"{bytes} B"
+    };
+
+    private static string Glyph(string contentType) => contentType.Split('/')[0] switch
+    {
+        "image" => "image", "video" => "video", "audio" => "mic", _ => "file"
+    };
 }

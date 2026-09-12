@@ -46,8 +46,6 @@ body{background:radial-gradient(ellipse at 15% 15%,#d5f87925,transparent 48%),ra
 .phone:has(.scroll-surface) .screen{position:absolute;inset:46px 0 0}
 @media(max-width:520px){
  .phone{height:100dvh}
- .scroll-footer{bottom:calc(64px + env(safe-area-inset-bottom))}
- .scroll-content>.body,.scroll-content>.chatbody{padding-bottom:calc(var(--scroll-bottom) + 82px + env(safe-area-inset-bottom));scroll-padding-bottom:calc(var(--scroll-bottom) + 82px + env(safe-area-inset-bottom))}
  .phone .fab{bottom:158px}
  .callinner{padding-bottom:calc(90px + env(safe-area-inset-bottom))}
  .callscreen:has(.vidbar){padding-bottom:calc(64px + env(safe-area-inset-bottom))}
