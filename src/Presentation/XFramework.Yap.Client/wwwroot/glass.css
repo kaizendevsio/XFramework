@@ -38,6 +38,9 @@ body{background:radial-gradient(ellipse at 15% 15%,#d5f87925,transparent 48%),ra
 .scroll-content{position:absolute;inset:0;display:flex;flex-direction:column;min-height:0}
 .scroll-content>.body,.scroll-content>.chatbody{padding-top:calc(var(--scroll-top) + 12px);padding-bottom:calc(var(--scroll-bottom) + 18px);scroll-padding-top:calc(var(--scroll-top) + 12px);scroll-padding-bottom:calc(var(--scroll-bottom) + 18px)}
 .scroll-header,.scroll-footer{position:absolute;left:0;right:0;z-index:10;pointer-events:none}
+/* Floating controls need enough frost to soften photo boundaries as media scrolls
+   underneath them. Keep the separate refraction and highlight layers intact. */
+.scroll-header,.scroll-footer{--glass-min-blur:8px;--glass-material-tint:color-mix(in srgb,var(--surface) 35%,var(--glass-tint))}
 .scroll-header{top:0}.scroll-footer{bottom:0}
 .scroll-header>*,.scroll-footer>*{pointer-events:auto}
 .scroll-header .appbar{margin:0 10px 8px;border-radius:23px;padding:10px 8px}
