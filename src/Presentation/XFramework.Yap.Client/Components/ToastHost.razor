@@ -3,6 +3,7 @@
 @* Connectivity, session and failure notices all surface here. The app never keeps a
    permanent status bar: a notice appears when the state changes and leaves again. *@
 <div class="toast-host" aria-live="polite">
+    @ChildContent
     @foreach (var notice in notices)
     {
         <div class="toast liquid-glass @notice.Kind" role="status" @key="notice.Id">
@@ -22,6 +23,7 @@
     }
 </div>
 @code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
     private const string Connectivity = "connectivity";
     private readonly List<Notice> notices = [];
     private bool lastOnline = true, lastNeedsLogin;

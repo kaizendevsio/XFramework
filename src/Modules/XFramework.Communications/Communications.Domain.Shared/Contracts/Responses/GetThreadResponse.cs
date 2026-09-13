@@ -10,6 +10,7 @@ public partial record GetThreadResponse
     public DateTime CreatedAt { get; set; }
     public List<ThreadMemberResponse> Members { get; set; } = [];
     public bool IsDirect { get; set; }
+    public bool HasCustomName { get; set; }
     public ConversationFeatures Features { get; set; } = ConversationFeatures.All;
     public bool CanManage { get; set; }
 }

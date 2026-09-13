@@ -2,17 +2,21 @@
 @implements IDisposable
 @inject ChatState State
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 <PageTitle>Yap · A little closer.</PageTitle>
 @if (State.User is null) { <div class="authbody"><div class="authbrand"><Brand /><p>A little closer.</p></div><h1>Good conversations start here.</h1><p>Your people, one conversation away.</p><a class="btn" href="/login">Sign in</a><a class="btn ghost" href="/register">Create an account</a></div> }
 else
 {
-<ScrollSurface><Header><div class="appbar plain liquid-glass"><GlassLayer /><Brand /><span class="sp"></span><button class="iconbtn" aria-label="Search conversations" @onclick="() => searchVisible = !searchVisible"><Icon Name="search" /></button></div>
+<ScrollSurface><Header><div class="appbar plain liquid-glass inbox-header"><GlassLayer /><Brand /><span class="sp"></span><button class="iconbtn" aria-label="Search conversations" @onclick="() => searchVisible = !searchVisible"><Icon Name="search" /></button></div>
 @if (searchVisible) { <label class="searchbar liquid-glass"><GlassLayer /><Icon Name="search" Size="18" /><input aria-label="Search conversations and messages" placeholder="Search conversations and messages" @bind="search" @bind:event="oninput" @bind:after="SearchMessagesAsync" /></label> }
-<div class="tabs liquid-glass" role="tablist" aria-label="Conversation type"><GlassLayer />@foreach (var value in new[] { "Chats", "Groups" }) { <button class="tab" role="tab" aria-selected="@((tab == value).ToString().ToLowerInvariant())" @onclick="() => tab = value">@value <span class="n">@(value == "Chats" ? State.Conversations.Sum(c => c.Unread) : State.Conversations.Count(c => c.Group))</span></button> }</div>
-</Header><ChildContent><div class="body inbox-panel" role="tabpanel" data-swipe-tabs @key="tab">
+
+</Header><ChildContent><div class="body inbox-panel" aria-label="Conversations">
 @foreach (var chat in Filtered)
 {
-    <a class="row" href="@($"/chat/{chat.Id}")"><Avatar Initials="@chat.Initials" Color="@chat.Color" Size="a48" /><span class="mid"><span class="t1">@chat.Name @if (chat.Group) { <span class="tag">@chat.Members</span> }</span><span class="t2 @(chat.Unread > 0 ? "unread" : "")">@chat.Preview</span></span><span class="end"><span class="time">@chat.LastMessageAt?.ToLocalTime().ToString("HH:mm")</span>@if (chat.Unread > 0) { <span class="badge">@chat.Unread</span> }</span></a>
+    <div class="inbox-item" data-conversation-menu @oncontextmenu="e => OpenMenu(chat, e)" @oncontextmenu:preventDefault>
+    <a class="row" href="@($"/chat/{chat.Id}")"><Avatar Initials="@chat.Initials" Color="@chat.Color" Size="a48" /><span class="mid"><span class="t1">@if(chat.IsFavorite){<span class="favorite-mark" aria-label="Favorite">&#9733;</span>}@chat.Name @if (chat.Group) { <span class="tag">@chat.Members</span> }</span><span class="t2 @(chat.Unread > 0 ? "unread" : "")">@chat.Preview</span></span><span class="end"><span class="time">@chat.LastMessageAt?.ToLocalTime().ToString("HH:mm")</span>@if (chat.Unread > 0) { <span class="badge">@chat.Unread</span> }</span></a>
+    <button class="inbox-menu-trigger iconbtn" aria-label="@($"Options for {chat.Name}")" @onclick="e => OpenMenu(chat, e)"><Icon Name="more" Size="18" /></button>
+    </div>
 }
 @if (!Filtered.Any()) { <p class="empty">No conversations yet. Start one with your people.</p> }
 @if (search.Length >= 2)
@@ -32,14 +36,50 @@ else
 @if (group || members.Count > 1) { <label class="field"><span class="lab">Group name</span><span class="inp"><input @bind="groupName" @bind:event="oninput" maxlength="100" /></span></label> }
 <button class="btn" disabled="@(members.Count == 0 || creating)" @onclick="CreateAsync">Start conversation</button></div></BottomSheet>
 }
+@if (menu is { } chosen)
+{
+    <div class="conversation-menu-dismiss" @onclick="() => menu = null"></div>
+    <div class="conversation-menu" @ref="menuElement" tabindex="-1" role="menu" aria-label="Conversation actions" style="left:clamp(12px,@(menuX)px,calc(100vw - 202px));top:clamp(12px,@(menuY)px,calc(100dvh - 172px))" @onkeydown="MenuKeyDown">
+        <button role="menuitem" @onclick="() => FavoriteAsync(chosen)">@(chosen.IsFavorite ? "Remove favorite" : "Favorite")</button>
+        <button role="menuitem" disabled="@(!State.Online || State.NeedsLogin)" @onclick="() => BeginRenameAsync(chosen)">Rename</button>
+        <button role="menuitem" class="danger" disabled="@(!State.Online || State.NeedsLogin)" @onclick="() => BeginDeleteAsync(chosen)">Delete</button>
+    </div>
+}
+@if (renaming is { } rename)
+{
+    <BottomSheet Title="Rename conversation" OnClose="() => renaming = null"><div class="picker"><label class="field"><span class="lab">Conversation name</span><span class="inp"><input aria-label="Conversation name" @bind="newTitle" @bind:event="oninput" maxlength="100" /></span></label><p class="muted">Everyone in this conversation will see this name.</p><button class="btn" disabled="@(working || string.IsNullOrWhiteSpace(newTitle))" @onclick="RenameAsync">Save name</button></div></BottomSheet>
+}
+@if (deleting is { } remove)
+{
+    <BottomSheet Title="Delete conversation" OnClose="() => deleting = null"><div class="picker"><p>@(deleteEveryone ? "Delete this conversation for everyone? This cannot be undone." : $"Remove {remove.Name} from your list? Other members keep their conversation.")</p><button class="btn danger" disabled="@working" @onclick="DeleteAsync">@(deleteEveryone ? "Confirm delete for everyone" : "Delete for me")</button>@if(remove.CanManage && !deleteEveryone){<button class="btn ghost danger" @onclick="() => deleteEveryone = true">Delete for everyone</button>}</div></BottomSheet>
+}
 @code {
-    private string tab = "Chats", search = "", peopleSearch = "", groupName = "";
+    private string search = "", peopleSearch = "", groupName = "";
+    private void MenuKeyDown(KeyboardEventArgs e) { if (e.Key == "Escape") menu = null; }
+    private ElementReference menuElement;
+    private bool focusMenu;
+    protected override async Task OnAfterRenderAsync(bool firstRender) { if (focusMenu && menu is not null) { focusMenu = false; await JS.InvokeVoidAsync("yap.focusSheet", menuElement); } }
+    private Conversation? menu, renaming, deleting;
+    private double menuX, menuY;
+    private string newTitle = "";
+    private bool working, deleteEveryone;
+    private async Task BeginDeleteAsync(Conversation chat) { menu = null; deleteEveryone = false; try { deleting = await State.ConversationDetailsAsync(chat.Id); } catch(Exception ex) { State.Report(ex); } }
+    private void OpenMenu(Conversation chat, MouseEventArgs e) { menu = chat; focusMenu = true; menuX = Math.Max(12, e.ClientX - 170); menuY = Math.Max(12, e.ClientY - 70); }
+    private async Task FavoriteAsync(Conversation chat) { menu = null; try { await State.ToggleFavoriteAsync(chat); } catch(Exception ex) { State.Report(ex); } }
+    private async Task BeginRenameAsync(Conversation chat)
+    {
+        menu = null;
+        try { var detail = await State.ConversationDetailsAsync(chat.Id); if(!detail.CanManage) { State.Report(new InvalidOperationException("Only conversation admins can rename this conversation.")); return; } newTitle = detail.Name; renaming = chat; }
+        catch(Exception ex) { State.Report(ex); }
+    }
+    private async Task RenameAsync() { working = true; try { await State.UpdateConversationAsync(new(renaming!.Id, Name: newTitle)); renaming = null; } catch(Exception ex) { State.Report(ex); } finally { working = false; } }
+    private async Task DeleteAsync() { working = true; try { await State.DeleteConversationAsync(deleting!.Id, deleteEveryone); deleting = null; } catch(Exception ex) { State.Report(ex); } finally { working = false; } }
     private bool searchVisible, choosing, group, creating;
     private List<Person> people = [];
     private List<SearchHit> hits = [];
     private readonly HashSet<Guid> members = [];
     private readonly Dictionary<Guid, string> names = [];
-    private IEnumerable<Conversation> Filtered => State.Conversations.Where(c => (tab != "Groups" || c.Group) && c.Name.Contains(search, StringComparison.OrdinalIgnoreCase)).OrderByDescending(c => c.LastMessageAt);
+    private IEnumerable<Conversation> Filtered => State.Conversations.Where(c => c.Name.Contains(search, StringComparison.OrdinalIgnoreCase)).OrderByDescending(c => c.IsFavorite).ThenByDescending(c => c.LastMessageAt);
     protected override void OnInitialized() => State.Changed += Changed;
     private void Changed() => _ = InvokeAsync(StateHasChanged);
     private async Task SearchAsync()

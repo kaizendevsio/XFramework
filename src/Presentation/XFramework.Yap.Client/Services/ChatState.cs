@@ -547,6 +547,16 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         await SynchronizeAsync(); return result!.Id;
     }
 
+    public async Task ToggleFavoriteAsync(Conversation conversation)
+    {
+        var favorite = !conversation.IsFavorite;
+        await store.SetFavoriteAsync(Scope, conversation.Id, favorite);
+        conversation.IsFavorite = favorite;
+        Changed?.Invoke();
+    }
+
+    public Task<Conversation> ConversationDetailsAsync(Guid id) => api.GetAsync<Conversation>($"api/chat/conversations/{id}");
+
     public async Task UpdateConversationAsync(ConversationUpdate update)
     { await api.PostAsync("api/chat/conversation-settings", update); await SynchronizeAsync(); }
     public async Task ChangeMemberAsync(ConversationMemberAction action)

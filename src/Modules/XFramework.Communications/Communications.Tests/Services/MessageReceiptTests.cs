@@ -32,6 +32,7 @@ public sealed partial class ThreadServiceSecurityTests
         Assert.That(result.IsSuccess, Is.True, result.Message);
         Assert.That(result.Data!.Items.Single().DeliveredCount, Is.EqualTo(2));
         Assert.That(result.Data.Items.Single().ReadCount, Is.EqualTo(readEnabled ? 1 : 0));
+        Assert.That(result.Data.Items.Single().ReadCredentialIds, Is.EqualTo(readEnabled ? new[] { recipient.CredentialId } : Array.Empty<Guid>()));
     }
 
     [Test]
@@ -51,6 +52,7 @@ public sealed partial class ThreadServiceSecurityTests
         {
             var received = await service.GetThreadMessagesAsync(new() { ThreadId = thread.Id, Metadata = Metadata(recipient.CredentialId, tenant) });
             Assert.That(received.IsSuccess, Is.True, received.Message);
+            Assert.That(received.Data!.Items.Single().ReadCredentialIds, Is.Empty);
             Assert.That(received.Data!.Items.Single().DeliveredCount, Is.Zero, "Recipients must not receive other members' receipts");
         }
         Assert.That(context.Set<MessageOutboxEvent>().Single().EventType, Is.EqualTo(MessageRealtimeEvents.MessagesDelivered));

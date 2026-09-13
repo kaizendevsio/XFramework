@@ -51,7 +51,7 @@ internal static class UiFixture
             new() { Id = Guid.NewGuid(), SenderCredentialId = friend, SenderAlias = "Sarah Mensah", Text = "Perfect, I'll push the new build tonight", CreatedAt = DateTime.UtcNow.AddMinutes(-1) }
         };
         messages[2].DeliveredCount = 1;
-        messages[4].DeliveredCount = 1; messages[4].ReadCount = 1;
+        messages[4].DeliveredCount = 1; messages[4].ReadCount = 1; messages[4].ReadCredentialIds = [friend];
         var deletedThreads = new List<Guid>();
         fixture.Session.Setup(s => s.GetDeletedThreadsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((int page, CancellationToken _) => ChatFixture.Ok(new GetDeletedThreadsResponse { Items = deletedThreads.Skip(page * 100).Take(100).ToList(), TotalCount = deletedThreads.Count }));
@@ -66,7 +66,7 @@ internal static class UiFixture
         fixture.Session.Setup(s => s.GetThreadAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Guid id, CancellationToken _) => ChatFixture.Ok(new GetThreadResponse
             {
-                Id = id, Name = conversations.First(c => c.Id == id).Name, IsDirect = conversations.First(c => c.Id == id).IsDirect, CanManage = true, Features = features,
+                Id = id, Name = conversations.First(c => c.Id == id).Name, IsDirect = conversations.First(c => c.Id == id).IsDirect, HasCustomName = conversations.First(c => c.Id == id).HasCustomName, CanManage = true, Features = features,
                 Members = fixtureMembers.ToList()
             }));
         fixture.Session.Setup(s => s.GetMessagesAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -152,7 +152,7 @@ internal static class UiFixture
                 ? ChatFixture.Ok(auth) : new() { HttpStatusCode = HttpStatusCode.Unauthorized });
         identity.Setup(i => i.Logout(It.IsAny<LogoutRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(Success());
         var directory = new Mock<IChatDirectory>();
-        directory.Setup(d => d.ResolveAsync(It.IsAny<Guid[]>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        directory.Setup(d => d.ResolveAsync(It.IsAny<Guid[]>(), It.IsAny<CancellationToken>())).ReturnsAsync((Guid[] ids, CancellationToken _) => ids.Contains(friend) ? new[] { new ChatPerson(friend, "Sarah Mensah", "sarah", "/yap-app-v2-192.png") } : Array.Empty<ChatPerson>());
         directory.Setup(d => d.SearchAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([new ChatPerson(friend, "Sarah Mensah", "sarah"), new ChatPerson(Guid.NewGuid(), "Marco Bianchi", "marco")]);
         var storage = new Mock<IStorageServiceWrapper>();
@@ -229,7 +229,7 @@ internal static class UiFixture
             .ReturnsAsync(ChatFixture.Ok(new StorageDownloadUrlResponse { StorageFileId = fileId, Url = $"http://127.0.0.1:{port}/test/file", ExpiresAt = DateTime.UtcNow.AddMinutes(5) }));
 
         fixture.Session.Setup(s => s.UpdateThreadAsync(It.IsAny<UpdateThreadRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((UpdateThreadRequest request, CancellationToken _) => { features = request.Features ?? features; if (request.NicknameMemberId.HasValue) fixtureMembers.First(m => m.Id == request.NicknameMemberId).Alias = request.Nickname ?? ""; return Success(); });
+            .ReturnsAsync((UpdateThreadRequest request, CancellationToken _) => { if(request.Name is not null) { var chat = conversations.First(c => c.Id == request.ThreadId); chat.Name = request.Name; chat.HasCustomName = true; } features = request.Features ?? features; if (request.NicknameMemberId.HasValue) fixtureMembers.First(m => m.Id == request.NicknameMemberId).Alias = request.Nickname ?? ""; return Success(); });
         fixture.Session.Setup(s => s.UpdateMemberRoleAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Guid thread, Guid member, string role, CancellationToken _) => { fixtureMembers.First(m => m.Id == member).Role = role; return Success(); });
         configureIdentity?.Invoke(identity);

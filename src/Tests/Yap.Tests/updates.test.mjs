@@ -13,7 +13,7 @@ function fixture({ waiting = false, installing = false, controlled = true } = {}
         async update() { checks++; if (fail) throw Error('Offline'); } };
     const serviceWorker = { ...events(), controller: controlled ? {} : null,
         async register(_url, options) { registrations++; assert.equal(options.updateViaCache, 'none'); return registration; } };
-    const label = { textContent: '' }, notice = { hidden: true, querySelector: () => label };
+    const label = { textContent: '' }, notice = { hidden: true, querySelector: selector => { assert.equal(selector, ".toast-text"); return label; } };
     const document = { ...events(), hidden: false, getElementById: () => notice, querySelector: () => busy ? {} : null };
     const window = { ...events(), yap: {} }, navigator = { onLine: true, serviceWorker };
     let interval;
@@ -90,4 +90,12 @@ test('first installation never prompts or forces a reload', async () => {
     await f.serviceWorker.emit('controllerchange');
     assert.equal(f.notice.hidden, true);
     assert.equal(f.counts().reloads, 0);
+});
+
+test('update toast can be dismissed without activating or reloading', async () => {
+    const f = fixture({ waiting: true }); await f.window.emit('load');
+    assert.equal(f.notice.hidden, false); f.api.dismiss();
+    assert.equal(f.notice.hidden, true); f.tick(); await f.interval();
+    assert.equal(f.notice.hidden, true); assert.equal(f.counts().reloads, 0);
+    assert.deepEqual(f.worker.messages, []);
 });

@@ -2,10 +2,15 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.1.3";
+    public const string Version = "1.1.4";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "13 September 2026", [
+            "Swipe up or down to close a photo, and tap reader avatars to see who has seen your message.",
+            "Conversation settings now have tabs and easy-to-use switches.",
+            "Hold a conversation to favorite, rename or remove it. Favorites stay at the top on this device.",
+            "A simpler inbox, borderless composer buttons and a compact update notification."]),
+        ("1.1.3", "13 September 2026", [
             "Headers now stretch across the screen, with clean glass and a flat background.",
             "Choose your favorite accent color in Settings.",
             "Photos show a loading placeholder and smoothly expand when you open them."]),

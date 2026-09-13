@@ -3,10 +3,20 @@
 <div class="picker conversation-settings">
     <h2>@Conversation.Name</h2>
     <p class="muted">@(Conversation.CanManage ? "Admins manage features and members for everyone in this conversation." : "Only conversation admins can change these settings.")</p>
+    <div class="conversation-tabs" role="tablist" aria-label="Conversation settings">
+        @foreach (var item in new[] { ("features", "Features"), ("members", "Members"), ("general", "General") })
+        { <button role="tab" aria-selected="@((tab == item.Item1).ToString().ToLowerInvariant())" @onclick="() => tab = item.Item1">@item.Item2</button> }
+    </div>
+    <div role="tabpanel">
+    @if (tab == "features")
+    {
     @foreach (var (feature, label) in Features)
     {
-        <label class="setting-toggle"><span>@label</span><input type="checkbox" role="switch" checked="@Conversation.Allows(feature)" disabled="@Locked" @onchange="e => ToggleAsync(feature, e.Value is true)" /></label>
+        <label class="setting-toggle"><span>@label</span><input type="checkbox" role="switch" checked="@Conversation.Allows(feature)" disabled="@Locked" @onchange="e => ToggleAsync(feature, e.Value is true)" /><span class="switch-track" aria-hidden="true"></span></label>
     }
+    }
+    @if (tab == "members")
+    {
     <h3>Members</h3>
     @foreach (var person in Conversation.People)
     {
@@ -32,6 +42,11 @@
         @foreach (var person in results.Where(p => Conversation.People.All(m => m.Id != p.Id)))
         { <button class="row" disabled="@Locked" @onclick='() => MemberAsync(person, "add")'><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" ImageUrl="@person.AvatarUrl" Size="a34" /><span class="mid">@person.Name</span><Icon Name="plus" Size="18" /></button> }
     }
+    }
+    @if (tab == "general")
+    {
+    <label class="field"><span class="lab">Conversation name</span><span class="inp"><input aria-label="Conversation name" @bind="title" @bind:event="oninput" maxlength="100" disabled="@Locked" /></span></label>
+    <button class="btn ghost" disabled="@(Locked || string.IsNullOrWhiteSpace(title))" @onclick="RenameAsync">Save name</button>
     <button class="btn ghost" disabled="@(!State.Online || State.NeedsLogin || busy)" @onclick="State.MuteAsync">@(Conversation.Muted ? "Unmute conversation" : "Mute conversation")</button>
     <button class="btn ghost danger" disabled="@(!State.Online || State.NeedsLogin || busy)" @onclick="() => deleting = true"><Icon Name="trash" Size="18" />Delete conversation</button>
     @if (deleting)
@@ -52,9 +67,14 @@
             <button class="btn ghost" disabled="@busy" @onclick="() => { deleting = false; deleteEveryone = false; }">Cancel</button>
         </div>
     }
+    }
+    </div>
 </div>
 @code {
     [Parameter, EditorRequired] public Conversation Conversation { get; set; } = default!;
+    private string tab = "features", title = "";
+    protected override void OnInitialized() => title = Conversation.Name;
+    private Task RenameAsync() => RunAsync(() => State.UpdateConversationAsync(new(Conversation.Id, Name: title)));
     private bool busy;
     private bool deleting;
     private bool deleteEveryone;

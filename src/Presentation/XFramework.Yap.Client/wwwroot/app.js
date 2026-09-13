@@ -34,6 +34,10 @@ window.yap = {
     },
     scrollMessages() { const list = document.querySelector('[data-messages]'); if (list) { if (list.classList.contains('message-window')) yap.messageWindow.bottom(list); else list.scrollTop = list.scrollHeight; } },
     showMessage(id) { const list = document.querySelector('.message-window'); if (list) { yap.messageWindow.show(list, id); return; } const element = document.querySelector(`[data-message-id="${CSS.escape(id)}"]`); element?.scrollIntoView({block:'center',behavior:'smooth'}); },
+    openSheet(dialog, element) {
+        dialog.addEventListener('cancel', event => { event.preventDefault(); element.querySelector('[data-sheet-drag]')?.click(); });
+        dialog.showModal(); yap.focusSheet(element);
+    },
     focusSheet(element) {
         element.yapPreviousFocus = document.activeElement;
         element.yapTrap = event => {
@@ -49,6 +53,8 @@ window.yap = {
     releaseSheet(element) {
         if (!element) return;
         element.removeEventListener('keydown', element.yapTrap);
+        const dialog = element.closest('dialog');
+        if (dialog?.open) dialog.close();
         if (element.yapPreviousFocus?.isConnected) element.yapPreviousFocus.focus({preventScroll:true});
     },
     copy: text => navigator.clipboard.writeText(text)

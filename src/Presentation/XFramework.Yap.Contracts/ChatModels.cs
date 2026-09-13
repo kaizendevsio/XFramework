@@ -20,6 +20,7 @@ public sealed class Conversation
     public int Members { get; set; }
     public int Unread { get; set; }
     public bool Muted { get; set; }
+    public bool IsFavorite { get; set; }
     public bool Removed { get; set; }
     public string Preview { get; set; } = "Start a conversation";
     public DateTime? LastMessageAt { get; set; }
@@ -57,6 +58,7 @@ public sealed class ChatMessage
     public string? LocalFileKey { get; set; }
     public string Delivery { get; set; } = "Sent";
     public int ReadCount { get; set; }
+    public List<Person> Readers { get; set; } = [];
     public int DeliveredCount { get; set; }
     public string Initials => InitialsFor(Sender);
     public string Color => Mine ? "g1" : "g3";
@@ -92,5 +94,5 @@ public static class ChatLimits
 public sealed record SearchHit(Guid ThreadId, Guid MessageId, string Text, DateTime CreatedAt);
 public sealed record TypingUpdate(Guid ThreadId, Guid CredentialId, bool IsTyping);
 public enum ChatFeature { ReadReceipts = 1, Typing = 2, Threads = 4, Reactions = 8, Replies = 16, Voice = 32, Attachments = 64 }
-public sealed record ConversationUpdate(Guid ThreadId, int? Features = null, Guid? NicknameMemberId = null, string? Nickname = null);
+public sealed record ConversationUpdate(Guid ThreadId, int? Features = null, Guid? NicknameMemberId = null, string? Nickname = null, string? Name = null);
 public sealed record ConversationMemberAction(Guid ThreadId, Guid CredentialId, Guid MemberId, string Action, string? Role = null);

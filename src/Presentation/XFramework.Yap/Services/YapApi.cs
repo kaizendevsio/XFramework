@@ -48,7 +48,7 @@ public static class YapApi
                 .Select(x => x.OtherCredentialId!.Value).Distinct().ToArray(), ct);
             return new ChatPage<Conversation>(data.Items.Select(x => new Conversation
             {
-                Id = x.Id, Name = x.IsDirect ? people.FirstOrDefault(p => p.Id == x.OtherCredentialId)?.Name ?? "Direct message" : x.Name,
+                Id = x.Id, Name = x.IsDirect && !x.HasCustomName ? people.FirstOrDefault(p => p.Id == x.OtherCredentialId)?.Name ?? "Direct message" : x.Name,
                 Group = !x.IsDirect, Members = x.MemberCount, Unread = x.UnreadCount,
                 Muted = x.IsMuted, Removed = x.IsArchived,
                 Preview = x.LastMessagePreview ?? "Start a conversation", LastMessageAt = x.LastMessageAt
@@ -64,7 +64,7 @@ public static class YapApi
                 return new Person(x.CredentialId, string.IsNullOrWhiteSpace(x.Alias) ? person?.Name ?? "Workspace member" : x.Alias,
                     person?.UserName ?? "", person?.AvatarUrl, x.Id, x.Role, x.Alias);
             }).ToList();
-            return new Conversation { Id = id, Name = data.IsDirect ? members.FirstOrDefault(x => x.Id != session.CredentialId)?.Name ?? "Direct message" : data.Name,
+            return new Conversation { Id = id, Name = data.IsDirect && !data.HasCustomName ? members.FirstOrDefault(x => x.Id != session.CredentialId)?.Name ?? "Direct message" : data.Name,
                 Group = !data.IsDirect, Members = members.Count, People = members, Features = (int)data.Features, CanManage = data.CanManage };
         });
         api.MapGet("/conversations/{id:guid}/messages", async (Guid id, int? page, Guid? parent,
@@ -74,7 +74,7 @@ public static class YapApi
             var data = Require(parent.HasValue ? await session.GetRepliesAsync(id, parent.Value, Page(page), 50, ct)
                 : await session.GetMessagesAsync(id, Page(page), 50, ct));
             var people = await directory.ResolveAsync(data.Items
-                .Select(x => x.SenderCredentialId).Distinct().ToArray(), ct);
+                .SelectMany(x => x.ReadCredentialIds.Append(x.SenderCredentialId)).Distinct().ToArray(), ct);
             return new ChatPage<ApiMessage>(data.Items.Select(x => new ApiMessage
             {
                 Id = x.Id, ThreadId = id, SenderId = x.SenderCredentialId,
@@ -83,6 +83,7 @@ public static class YapApi
                 Text = x.Text, CreatedAt = x.CreatedAt, Mine = x.SenderCredentialId == session.CredentialId,
                 HasAttachments = x.HasAttachments, IsThreadReply = x.IsThreadReply,
                 DeliveredCount = x.DeliveredCount, ReadCount = x.ReadCount,
+                Readers = x.ReadCredentialIds.Select(id => { var person = people.FirstOrDefault(p => p.Id == id); return new Person(id, person?.Name ?? "Workspace member", person?.UserName ?? "", person?.AvatarUrl); }).ToList(),
                 AvatarUrl = people.FirstOrDefault(p => p.Id == x.SenderCredentialId)?.AvatarUrl,
                 ParentId = x.ParentMessageId, Pinned = x.IsPinned, Saved = x.IsSaved, ReplyTotal = x.ReplyCount,
                 Reactions = x.Reactions.ToDictionary(r => r.Emoji, r => r.Count),
@@ -123,7 +124,7 @@ public static class YapApi
             var session = await client.ForCurrentActorAsync(ct: ct);
             Require(await session.UpdateThreadAsync(new UpdateThreadRequest { ThreadId = request.ThreadId,
                 Features = request.Features.HasValue ? (Communications.Domain.Shared.Contracts.ConversationFeatures)request.Features.Value : null,
-                NicknameMemberId = request.NicknameMemberId, Nickname = request.Nickname }, ct));
+                NicknameMemberId = request.NicknameMemberId, Nickname = request.Nickname, Name = request.Name }, ct));
             return Results.NoContent();
         });
         api.MapPost("/conversation-members", async (ConversationMemberAction request, ICommunicationsChatClient client, CancellationToken ct) =>

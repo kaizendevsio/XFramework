@@ -406,6 +406,7 @@ public sealed partial class ThreadService(
                 {
                     Id = t.Id,
                     Name = t.Name,
+                    HasCustomName = t.HasCustomName,
                     Description = t.Description,
                     TypeId = t.TypeId,
                     CreatedAt = t.CreatedAt,
@@ -481,6 +482,7 @@ public sealed partial class ThreadService(
                     .Where(x => !x.IsDeleted && x.IsEnabled).AnyAsync(ct),
                 Id = thread.Id,
                 Name = thread.Name,
+                HasCustomName = thread.HasCustomName,
                 Description = thread.Description,
                 Features = thread.Features,
                 CanManage = await CanManageThreadAsync(members.First(m => m.CredentialId == caller.CredentialId), ct),
@@ -596,7 +598,12 @@ public sealed partial class ThreadService(
             }
             if (request.Features is { } selectedFeatures) thread.Features = selectedFeatures;
             if (request.Name is not null)
-                thread.Name = request.Name;
+            {
+                if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Trim().Length > 100)
+                    return Result<CmdResponse>.Failure("Conversation names must be between 1 and 100 characters", 400);
+                thread.Name = request.Name.Trim();
+                thread.HasCustomName = true;
+            }
 
             if (request.Description is not null)
                 thread.Description = request.Description;
@@ -1721,6 +1728,13 @@ public sealed partial class ThreadService(
                 .GroupBy(d => d.MessageId).ToDictionary(g => g.Key, g => g.Select(d => d.MessageThreadMemberId).Distinct().Count());
             var readCounts = receiptRows.Where(d => allowReadReceipts && d.TypeId == readTypeId)
                 .GroupBy(d => d.MessageId).ToDictionary(g => g.Key, g => g.Select(d => d.MessageThreadMemberId).Distinct().Count());
+            var readerIds = receiptRows.Where(d => allowReadReceipts && d.TypeId == readTypeId).Select(d => d.MessageThreadMemberId).Distinct().ToList();
+            var readers = await dataContext.Query<MessageThreadMember>()
+                .Where(m => m.TenantId == caller.TenantId && m.MessageThreadId == request.ThreadId && readerIds.Contains(m.Id))
+                .ToListAsync(ct);
+            var credentials = readers.ToDictionary(m => m.Id, m => m.CredentialId);
+            var readBy = receiptRows.Where(d => allowReadReceipts && d.TypeId == readTypeId && credentials.ContainsKey(d.MessageThreadMemberId))
+                .GroupBy(d => d.MessageId).ToDictionary(g => g.Key, g => g.Select(d => credentials[d.MessageThreadMemberId]).Distinct().ToList());
             var items = messages.Select(m =>
             {
                 memberMap.TryGetValue(m.MessageThreadMemberId, out var sender);
@@ -1740,7 +1754,8 @@ public sealed partial class ThreadService(
                     IsThreadReply = m.IsThreadReply,
                     ReplyCount = replyCounts.GetValueOrDefault(m.Id),
                     DeliveredCount = deliveredCounts.GetValueOrDefault(m.Id),
-                    ReadCount = readCounts.GetValueOrDefault(m.Id)
+                    ReadCount = readCounts.GetValueOrDefault(m.Id),
+                    ReadCredentialIds = readBy.GetValueOrDefault(m.Id) ?? []
                 };
             }).ToList();
 
