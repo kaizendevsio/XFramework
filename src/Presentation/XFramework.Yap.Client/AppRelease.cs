@@ -2,10 +2,15 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.1.1";
+    public const string Version = "1.1.2";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "13 September 2026", [
+            "Sign-in is preserved through browser recovery and temporary connection problems.",
+            "Messages are marked read only while visible in the conversation you're viewing.",
+            "Scrolling through older messages stays steady while photos load.",
+            "Check your sign-in and connection status in Settings."]),
+        ("1.1.1", "13 September 2026", [
             "Turn on diagnostic logging in Settings and copy logs to help troubleshoot a problem, even after a reload.",
             "The photo viewer has a simpler layout. Pinch or double-tap the photo to zoom.",
             "Photo actions are available with a long press, without an extra menu below the photo.",

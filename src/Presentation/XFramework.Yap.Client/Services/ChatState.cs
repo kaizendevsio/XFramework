@@ -10,6 +10,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
 {
     private readonly SemaphoreSlim sync = new(1, 1);
     private readonly SemaphoreSlim typingPublish = new(1, 1);
+    private readonly SemaphoreSlim readReceipts = new(1, 1);
     private readonly CancellationTokenSource lifetime = new();
     private DotNetObjectReference<ChatState>? reference;
     private Task? polling;
@@ -21,6 +22,8 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
     private Task? refreshing;
     private readonly ConcurrentDictionary<Guid, DateTime> typing = new();
     private readonly HashSet<Guid> acknowledged = [];
+    private Guid? viewedConversation;
+    private long selectionVersion;
     private DateTime lastTyping;
     private Guid? publishingThread;
     public string? TypingText
@@ -121,7 +124,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
             finally { sync.Release(); }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
-        catch (ChatApiException ex) { NeedsLogin = ex.Status == 401; Report(ex); }
+        catch (ChatApiException ex) { await HandleApiFailureAsync(ex); Notify(); }
         catch (Exception ex) { Report(ex); }
     }
 
@@ -203,7 +206,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
             if (Selected is not null) await RefreshSelectedAsync(Selected.Id);
             await WatchEventsAsync();
         }
-        catch (ChatApiException ex) { NeedsLogin = ex.Status == 401; Error = ex.Message; }
+        catch (ChatApiException ex) { await HandleApiFailureAsync(ex); }
         catch (HttpRequestException) { Online = false; Error = "Cannot reach chat. Your messages are saved and will retry."; }
         catch (TaskCanceledException) when (!lifetime.IsCancellationRequested) { Online = false; Error = "Chat took too long to respond. Saved messages will retry."; }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
@@ -217,16 +220,21 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
 
     public async Task SelectAsync(Guid id)
     {
+        viewedConversation = id;
+        var version = ++selectionVersion;
         await sync.WaitAsync();
         try
         {
+            if (version != selectionVersion) return;
             pages = 1; loadedLimit = 100;
             typing.Clear();
             acknowledged.Clear();
-            Selected = Conversations.FirstOrDefault(x => x.Id == id) ?? new Conversation { Id = id };
-            Selected.Messages = await store.MessagesAsync(Scope, id, limit: loadedLimit);
-            cachedCount = await store.MessageCountAsync(Scope, id);
-            ComposeReplies(Selected.Messages);
+            var conversation = Conversations.FirstOrDefault(x => x.Id == id) ?? new Conversation { Id = id };
+            conversation.Messages = await store.MessagesAsync(Scope, id, limit: loadedLimit);
+            var count = await store.MessageCountAsync(Scope, id);
+            if (version != selectionVersion) return;
+            Selected = conversation; cachedCount = count;
+            ComposeReplies(conversation.Messages);
             Notify();
             if (Online && !NeedsLogin) await RefreshSelectedAsync(id);
             if (Online && !NeedsLogin) await WatchEventsAsync();
@@ -235,8 +243,28 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         finally { sync.Release(); Notify(); }
     }
 
+    private async Task HandleApiFailureAsync(ChatApiException error)
+    {
+        Error = error.Message;
+        if (error.Status != 401) return;
+        try
+        {
+            // An upstream API rejection is not proof that the browser session ended.
+            var session = await api.GetAsync<SessionResponse>("api/session", lifetime.Token);
+            NeedsLogin = session.User is null || User is null || OfflineStore.Scope(session.User) != Scope;
+            api.Token = session.AntiforgeryToken;
+            if (!NeedsLogin) Error = "Chat connection interrupted. Your sign-in is saved; reconnecting will retry.";
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or ChatApiException)
+        {
+            // If session validation itself is unavailable, retain the last known state.
+            Error = "Cannot check your connection yet. Your saved sign-in has been kept.";
+        }
+    }
+
     private async Task RefreshSelectedAsync(Guid id)
     {
+        var version = selectionVersion;
         Conversation conversation;
         try { conversation = await api.GetAsync<Conversation>($"api/chat/conversations/{id}"); }
         catch (ChatApiException ex) when (ex.Status is 403 or 404) { Report(ex); return; }
@@ -252,16 +280,41 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         cachedCount = await store.MessageCountAsync(Scope, id);
         ComposeReplies(conversation.Messages);
         await store.SaveConversationsAsync(Scope, [conversation]);
+        if (version != selectionVersion || viewedConversation != id) return;
         Selected = conversation;
         var index = Conversations.FindIndex(x => x.Id == id);
         if (index >= 0) Conversations[index] = conversation;
-        Notify(); // Read receipts must not delay rendering a received message.
-        var unread = fetched.Where(x => !x.Mine && !acknowledged.Contains(x.Id)).Select(x => x.Id).Take(100).ToList();
-        if (unread.Count > 0 && conversation.Allows(ChatFeature.ReadReceipts))
+        Notify();
+    }
+
+    public void LeaveConversation(Guid id)
+    {
+        if (viewedConversation != id) return;
+        viewedConversation = null;
+        selectionVersion++;
+        Selected = null;
+        typing.Clear();
+        _ = WatchEventsAsync();
+    }
+
+    public async Task ReadVisibleAsync(Guid id, Guid? parent = null)
+    {
+        await readReceipts.WaitAsync(lifetime.Token);
+        try
         {
-            await api.PostAsync("api/chat/read", new ReadMessages(id, unread));
+            if (!Online || NeedsLogin || viewedConversation != id || Selected is not { } conversation || !conversation.Allows(ChatFeature.ReadReceipts)) return;
+            var version = selectionVersion;
+            var visible = await js.InvokeAsync<Guid[]>("yap.device.visibleMessages", id, parent);
+            if (version != selectionVersion || viewedConversation != id) return;
+            var messages = parent is { } root ? conversation.Messages.FirstOrDefault(x => x.Id == root)?.Replies ?? [] : conversation.Messages;
+            var unread = messages.Where(x => !x.Mine && visible.Contains(x.Id) && !acknowledged.Contains(x.Id)).Select(x => x.Id).Take(100).ToList();
+            if (unread.Count == 0) return;
+            await api.PostAsync("api/chat/read", new ReadMessages(id, unread), lifetime.Token);
             acknowledged.UnionWith(unread);
         }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) { await RecordErrorAsync(ex); }
+        finally { readReceipts.Release(); }
     }
 
     public async Task LoadEarlierAsync()

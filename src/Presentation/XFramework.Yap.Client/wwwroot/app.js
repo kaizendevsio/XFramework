@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const resize = new ResizeObserver(entries => {
         for (const {target} of entries) {
             if (target.hasAttribute('data-messages')) {
-                if (target.classList.contains('message-window')) { yap.messageWindow.resize(target); continue; }
+                if (target.classList.contains('message-window')) continue;
                 if (pinned.get(target)) target.scrollTop = target.scrollHeight;
                 continue;
             }

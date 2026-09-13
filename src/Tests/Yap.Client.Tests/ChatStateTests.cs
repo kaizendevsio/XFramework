@@ -13,6 +13,78 @@ namespace Yap.Client.Tests;
 public sealed class ChatStateTests
 {
     [Test]
+    public async Task ReadReceipts_RequireVisibleMessages_AndLeavingStopsLateRefresh()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Recipient");
+        var chat = new Conversation { Id = Guid.NewGuid() };
+        var messages = new List<ChatMessage> { new() { Id = Guid.NewGuid(), ThreadId = chat.Id, SenderId = Guid.NewGuid(), Text = "First", CreatedAt = DateTime.UtcNow }, new() { Id = Guid.NewGuid(), ThreadId = chat.Id, SenderId = Guid.NewGuid(), Text = "Second", CreatedAt = DateTime.UtcNow.AddSeconds(1) } };
+        Guid[] visible = []; var receipts = new List<Guid>();
+        TaskCompletionSource? started = null, resume = null;
+        var js = new Mock<IJSRuntime>();
+        js.Setup(x => x.InvokeAsync<bool>("yap.device.online", It.IsAny<object?[]?>())).ReturnsAsync(true);
+        js.Setup(x => x.InvokeAsync<Guid[]>("yap.device.visibleMessages", It.IsAny<object?[]?>())).Returns(() => ValueTask.FromResult(visible));
+        using var http = new HttpClient(new Handler(async request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path == "/api/session") return Json(new SessionResponse(user, "token"));
+            if (path.EndsWith("initialize")) return Json(new ChatDefaults(Guid.NewGuid(), []));
+            if (path.EndsWith("/read")) { receipts.AddRange((await request.Content!.ReadFromJsonAsync<ReadMessages>())!.MessageIds); return new(HttpStatusCode.NoContent); }
+            if (path.EndsWith("/messages")) { if (resume is not null) { started!.SetResult(); await resume.Task; } return Json(new ChatPage<ChatMessage>(messages, messages.Count)); }
+            if (path.EndsWith(chat.Id.ToString())) return Json(chat);
+            return Json(new ChatPage<Conversation>([chat], 1));
+        })) { BaseAddress = new("https://yap.test/") };
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), js.Object);
+        await state.InitializeAsync(); await state.SelectAsync(chat.Id);
+        await state.ReadVisibleAsync(chat.Id); Assert.That(receipts, Is.Empty);
+        visible = [messages[0].Id]; await state.ReadVisibleAsync(chat.Id); await state.ReadVisibleAsync(chat.Id);
+        Assert.That(receipts, Is.EqualTo(visible));
+        started = new(); resume = new();
+        var refresh = state.RefreshHint(); await started.Task;
+        state.LeaveConversation(chat.Id); visible = [messages[1].Id]; resume.SetResult();
+        await refresh; await state.ReadVisibleAsync(chat.Id);
+        Assert.That(state.Selected, Is.Null, "A late response cannot reopen a conversation after navigation");
+        Assert.That(receipts, Is.EqualTo(new[] { messages[0].Id }));
+    }
+
+    [Test]
+    public async Task RuntimeErrorAndTemporaryServiceFailure_KeepSavedSignInAndDrafts()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Recipient");
+        await fixture.Store.SetSettingAsync("user", JsonSerializer.Serialize(user));
+        await fixture.Store.SaveDraftAsync(OfflineStore.Scope(user), "main", "Keep this draft");
+        var js = new Mock<IJSRuntime>();
+        js.Setup(x => x.InvokeAsync<bool>("yap.device.online", It.IsAny<object?[]?>())).ReturnsAsync(true);
+        using var http = new HttpClient(new Handler(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)))) { BaseAddress = new("https://yap.test/") };
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), js.Object);
+        await state.InitializeAsync(); state.Report(new InvalidOperationException("Runtime failure"));
+        await state.SynchronizeAsync();
+        Assert.That(state.User, Is.EqualTo(user)); Assert.That(state.NeedsLogin, Is.False);
+        Assert.That(await fixture.Store.SettingAsync("pendingLogout"), Is.Not.EqualTo("true"));
+        Assert.That(await fixture.Store.DraftAsync(OfflineStore.Scope(user), "main"), Is.EqualTo("Keep this draft"));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task UpstreamUnauthorized_OnlyRequiresSignInWhenSessionAlsoEnded(bool ended)
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Recipient");
+        var sessions = 0;
+        var js = new Mock<IJSRuntime>();
+        js.Setup(x => x.InvokeAsync<bool>("yap.device.online", It.IsAny<object?[]?>())).ReturnsAsync(true);
+        using var http = new HttpClient(new Handler(request => Task.FromResult(request.RequestUri!.AbsolutePath == "/api/session"
+            ? Json(new SessionResponse(++sessions > 1 && ended ? null : user, "token"))
+            : new HttpResponseMessage(HttpStatusCode.Unauthorized)))) { BaseAddress = new("https://yap.test/") };
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), js.Object);
+        await state.InitializeAsync();
+        Assert.That(state.User, Is.EqualTo(user));
+        Assert.That(state.NeedsLogin, Is.EqualTo(ended));
+        Assert.That(sessions, Is.EqualTo(2));
+    }
+
+    [Test]
     public void DiagnosticLogger_DoesNotFormatOrRecordSensitiveErrorDetails()
     {
         var js = new Mock<IJSRuntime>();
@@ -173,6 +245,7 @@ public sealed class ChatStateTests
         var typingRequests = new List<bool>();
         var js = new Mock<IJSRuntime>();
         js.Setup(x => x.InvokeAsync<bool>("yap.device.online", It.IsAny<object?[]?>())).ReturnsAsync(true);
+        js.Setup(x => x.InvokeAsync<Guid[]>("yap.device.visibleMessages", It.IsAny<object?[]?>())).Returns(() => ValueTask.FromResult(messages.Select(x => x.Id).ToArray()));
         using var http = new HttpClient(new Handler(async request =>
         {
             var path = request.RequestUri!.AbsolutePath;
@@ -187,18 +260,20 @@ public sealed class ChatStateTests
         await using var state = new ChatState(fixture.Store, new ChatApi(http), js.Object);
         await state.InitializeAsync(); await state.SelectAsync(thread);
         messages.Add(new() { Id = Guid.NewGuid(), ThreadId = thread, SenderId = friend, Text = "First" });
-        var refresh = state.RefreshHint();
+        await state.RefreshHint();
+        var readingVisible = state.ReadVisibleAsync(thread);
         try
         {
             await reading.Task.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.That(state.Selected!.Messages.Select(x => x.Text), Does.Contain("First"));
             messages.Add(new() { Id = Guid.NewGuid(), ThreadId = thread, SenderId = friend, Text = "Second" });
-            _ = state.RefreshHint();
+            await state.RefreshHint().WaitAsync(TimeSpan.FromSeconds(5));
         }
         finally { release.TrySetResult(); }
-        await refresh.WaitAsync(TimeSpan.FromSeconds(5));
+        await readingVisible.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.That(state.Selected!.Messages.Select(x => x.Text), Does.Contain("Second"));
         await state.RefreshHint();
+        await state.ReadVisibleAsync(thread);
         Assert.That(readRequests, Is.EqualTo(2));
         Assert.That(sessionRequests, Is.EqualTo(1));
         state.TypingChanged(thread, user.CredentialId, true);

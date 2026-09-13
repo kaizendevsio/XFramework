@@ -3,6 +3,7 @@ using Communications.Integration.Clients;
 using Communications.Integration.Drivers;
 using IdentityServer.Integration.Drivers;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication;
 using Storage.Integration.Drivers;
 using XFramework.Integration.Extensions;
 using XFramework.Integration.Logging;
@@ -59,6 +60,12 @@ public static class YapApplication
                 var sessions = context.HttpContext.RequestServices.GetRequiredService<YapSessions>();
                 if (!await sessions.ContainsAsync(context.Principal, context.HttpContext.RequestAborted))
                     context.RejectPrincipal();
+                else if (!context.Properties.IsPersistent)
+                {
+                    // Upgrade existing browser-session cookies without extending the sign-in.
+                    context.Properties.IsPersistent = true;
+                    await context.HttpContext.SignInAsync(YapAuth.Scheme, context.Principal!, context.Properties);
+                }
             };
         });
         builder.Services.AddAuthorization();

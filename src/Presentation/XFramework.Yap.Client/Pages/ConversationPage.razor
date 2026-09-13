@@ -20,7 +20,7 @@ else
     {
         @if (Parent is { } parent)
         {
-            <MessageWindow @key="ParentId" Items="parent.Replies" HasMore="@(State.Online && parent.Replies.Count < parent.ReplyTotal)" Earlier="() => State.LoadRepliesAsync(parent)">
+            <MessageWindow @key="ParentId" Items="parent.Replies" Visible="() => State.ReadVisibleAsync(Id, ParentId)" HasMore="@(State.Online && parent.Replies.Count < parent.ReplyTotal)" Earlier="() => State.LoadRepliesAsync(parent)">
                 <Header><div class="threadhead"><div class="parentmsg"><Avatar Initials="@parent.Initials" ImageUrl="@parent.AvatarUrl" Color="@parent.Color" Size="a34" /><div class="mid"><div class="nm">@parent.Sender <span class="meta">@parent.Time</span></div><div class="tx">@parent.Text</div><MessageMedia Message="parent" /></div></div><div class="replycount">@parent.ReplyTotal replies</div></div></Header>
                 <ChildContent Context="message"><MessageBubble Message="message" ShowSender="true" OnSelect="Select" OnReply="ReplyTo" OnThread="OpenThreadAsync" OnReact='emoji => State.ActionAsync(message, "react", emoji: emoji)' /></ChildContent>
             </MessageWindow>
@@ -29,11 +29,11 @@ else
     }
     else
     {
-        <MessageWindow @key="Id" Items="chat.Messages" HasMore="State.HasEarlierMessages" Earlier="State.LoadEarlierAsync">
+        <MessageWindow @key="Id" Items="chat.Messages" Visible="() => State.ReadVisibleAsync(Id)" HasMore="State.HasEarlierMessages" Earlier="State.LoadEarlierAsync">
             <ChildContent Context="message"><MessageBubble Message="message" ShowSender="chat.Group" OnSelect="Select" OnReply="ReplyTo" OnThread="OpenThreadAsync" OnReact='emoji => State.ActionAsync(message, "react", emoji: emoji)' /></ChildContent>
         </MessageWindow>
     }
-    </ChildContent><Footer><Composer @key="@(ParentId ?? Id)" ThreadId="Id" ParentId="ParentId" Reply="reply" Cancel="() => reply = null" Sent="ScrollAsync" /></Footer></ScrollSurface>
+    </ChildContent><Footer><Composer @key="@(ParentId ?? Id)" ThreadId="Id" ParentId="ParentId" Reply="reply" Cancel="() => reply = null" /></Footer></ScrollSurface>
 }
 @if (mode is not null)
 {
@@ -74,7 +74,6 @@ else if (mode == "search")
     private string edit = "";
     private Guid loaded;
     private Guid? loadedParent;
-    private bool scroll;
     private Guid? focus;
     private string query = "";
     private List<SearchHit> hits = [];
@@ -82,26 +81,24 @@ else if (mode == "search")
     private void Removed(Guid id) { if (id == Id) _ = InvokeAsync(() => Nav.NavigateTo("/")); }
     protected override async Task OnParametersSetAsync()
     {
-        if (State.User is not null && loaded != Id) { loaded = Id; await State.SelectAsync(Id); scroll = true; }
+        if (State.User is not null && loaded != Id) { loaded = Id; await State.SelectAsync(Id); }
         if (ParentId.HasValue && loadedParent != ParentId)
         {
             await State.LocateAsync(ParentId.Value);
             if (Parent is { } parent) await State.LoadRepliesAsync(parent);
-            loadedParent = ParentId; scroll = true;
+            loadedParent = ParentId;
         }
         if (!ParentId.HasValue) loadedParent = null;
-        if (FocusMessage.HasValue) { await State.LocateAsync(FocusMessage.Value); focus = FocusMessage; scroll = false; }
+        if (FocusMessage.HasValue) { await State.LocateAsync(FocusMessage.Value); focus = FocusMessage; }
     }
     private void Changed() => _ = InvokeAsync(StateHasChanged);
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (scroll) { scroll = false; await JS.InvokeVoidAsync("yap.scrollMessages"); }
         if (focus.HasValue) { var id = focus; focus = null; await JS.InvokeVoidAsync("yap.showMessage", id); }
     }
-    private Task ScrollAsync() { scroll = true; return Task.CompletedTask; }
     private void Select(ChatMessage message) { selected = message; mode = "message"; }
     private void ReplyTo(ChatMessage message) { if (State.Selected?.Allows(ChatFeature.Replies) == false) return; reply = message; mode = null; }
-    private Task OpenThreadAsync(ChatMessage message) { if (State.Selected?.Allows(ChatFeature.Threads) != false) { mode = null; Nav.NavigateTo($"/thread/{Id}/{message.Id}"); scroll = true; } return Task.CompletedTask; }
+    private Task OpenThreadAsync(ChatMessage message) { if (State.Selected?.Allows(ChatFeature.Threads) != false) { mode = null; Nav.NavigateTo($"/thread/{Id}/{message.Id}"); } return Task.CompletedTask; }
     private async Task CopyAsync() { try { await JS.InvokeVoidAsync("yap.copy", selected!.Text); mode = null; } catch (Exception ex) { State.Report(ex); } }
     private async Task FilesAsync() { await State.OpenAttachmentsAsync(selected!); mode = "files"; }
     private async Task ReactAsync(string emoji) { await State.ActionAsync(selected!, "react", emoji: emoji); mode = null; }
@@ -109,5 +106,5 @@ else if (mode == "search")
     private async Task ForwardAsync(Guid target) { try { await State.SendAsync(target, selected!.Text, null, $"forward:{Guid.NewGuid()}"); mode = null; Nav.NavigateTo($"/chat/{target}"); } catch (Exception ex) { State.Report(ex); } }
     private async Task SearchAsync() { var text = query; try { var result = await State.SearchAsync(text, Id); if (text == query) hits = result; } catch (Exception ex) { State.Report(ex); } }
     private async Task ShowHitAsync(Guid id) { await State.LocateAsync(id); mode = null; focus = id; }
-    public void Dispose() { State.Changed -= Changed; State.ConversationRemoved -= Removed; }
+    public void Dispose() { State.Changed -= Changed; State.ConversationRemoved -= Removed; State.LeaveConversation(loaded); }
 }

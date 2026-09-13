@@ -196,6 +196,24 @@ internal static class UiFixture
         fixture.Session.Setup(s => s.GetAttachmentDownloadUrlAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Guid thread, Guid message, Guid attachment, CancellationToken _) => ChatFixture.Ok(new StorageDownloadUrlResponse { Url = $"http://127.0.0.1:{port}/test/media/{mediaLinks[attachment]}" }));
         var attachments = new List<MessageFileResponse>();
+        if (int.TryParse(Environment.GetEnvironmentVariable("YAP_FIXTURE_HISTORY"), out var history))
+        {
+            // Optional browser stress fixture: paginated variable-height text and real PNG previews.
+            var image = Guid.NewGuid();
+            stored[image] = ("scroll-fixture.png", "image/png", new MemoryStream(File.ReadAllBytes(Path.GetFullPath("src/Presentation/XFramework.Yap.Client/wwwroot/yap-app-v2-512.png"))));
+            for (var i = 0; i < Math.Clamp(history, 0, 1000); i++)
+            {
+                var item = new ThreadMessageItemResponse { Id = Guid.NewGuid(), SenderCredentialId = i % 2 == 0 ? friend : fixture.Credential,
+                    SenderAlias = "Scroll fixture", Text = $"History {i:D4}: " + string.Join(' ', Enumerable.Repeat("Variable height message for rapid scrolling.", i % 6 + 1)),
+                    CreatedAt = DateTime.UtcNow.AddMinutes(-2000 + i), HasAttachments = i % 5 == 0 };
+                messages.Add(item);
+                if (item.HasAttachments)
+                {
+                    var attachment = Guid.NewGuid(); mediaLinks[attachment] = image;
+                    attachments.Add(new MessageFileResponse { Id = attachment, MessageId = item.Id, StorageFileId = image });
+                }
+            }
+        }
         fixture.Session.Setup(s => s.AttachFileAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Guid thread, Guid message, Guid storedFile, CancellationToken _) =>
             {

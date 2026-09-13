@@ -13,7 +13,8 @@
         <GlassLayer />
         <Avatar Initials="@ChatMessage.InitialsFor(State.User?.Name)" Size="a92" />
         <h2>@(State.User?.Name ?? "Not signed in")</h2>
-        @if (State.User is null) { <a class="btn h46" href="/login">Sign in</a> }
+        <p role="status">@(State.User is null ? "Not signed in" : State.NeedsLogin ? "Sign-in required to sync" : !State.Online ? "Offline · saved sign-in retained" : State.Error is not null ? "Signed in · last action could not finish" : "Signed in")</p>
+        @if (State.User is null || State.NeedsLogin) { <a class="btn h46" href="/login">Sign in</a> }
     </section>
 
     <h3 class="set-group">Appearance</h3>
