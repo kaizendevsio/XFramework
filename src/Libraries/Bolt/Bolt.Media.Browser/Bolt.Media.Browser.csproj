@@ -5,6 +5,7 @@
         <LangVersion>14</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <DefaultItemExcludes>$(DefaultItemExcludes);sframe/target/**</DefaultItemExcludes>
 
         <PackageId>Bolt.Net.Media.Browser</PackageId>
         <!-- Keep JS import URLs stable independently of the NuGet package name. -->

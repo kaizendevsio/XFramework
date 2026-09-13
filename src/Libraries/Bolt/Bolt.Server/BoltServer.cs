@@ -107,6 +107,7 @@ public sealed partial class BoltServer : IDisposable
     private readonly int _maxActiveCallsPerPrincipal;
     private readonly int _maxCallParticipants;
     private readonly bool _authenticatedMediaOnly;
+    private readonly bool _requireEncryptedMedia;
 
     // Direct handlers — when registered, server handles requests locally instead of routing
     private readonly ConcurrentDictionary<int, Func<BoltRequestContext, ReadOnlyMemory<byte>, Guid, CancellationToken, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>>> _localHandlers = new();
@@ -238,6 +239,9 @@ public sealed partial class BoltServer : IDisposable
         if (_groupCallAuthorizer is not null && (!options.AuthenticatedMediaOnly || !options.RequireSecureTransport))
             throw new InvalidOperationException("Host-managed groups require authenticated media-only secure transport.");
         _authenticatedMediaOnly = options.AuthenticatedMediaOnly;
+        _requireEncryptedMedia = options.RequireEncryptedMedia;
+        if (_requireEncryptedMedia && !_authenticatedMediaOnly)
+            throw new InvalidOperationException("Encrypted media requires the authenticated media-only host.");
         if (_authenticatedMediaOnly && (!options.RequireSecureTransport || _callAuthorizer is null))
             throw new InvalidOperationException("Authenticated media requires secure transport and a call authorizer.");
         _maxActiveCalls = Math.Max(1, options.MaxActiveCalls);
@@ -1982,6 +1986,9 @@ public sealed partial class BoltServer : IDisposable
 
     private async Task RouteMediaFrameCoreAsync(BoltHubConnection sender, byte[] buffer, int length, CancellationToken ct)
     {
+        if (_requireEncryptedMedia && (!BoltCodec.TryReadMediaFrame(buffer.AsSpan(0, length), out var encryptedFrame) ||
+            !encryptedFrame.IsEncrypted || encryptedFrame.PayloadLength > 5155))
+            return;
         if (length > 256 * 1024)
             return;
         if (!BoltCodec.TryReadMediaFrameHeader(buffer.AsSpan(0, length), out var streamId))
@@ -2051,7 +2058,7 @@ public sealed partial class BoltServer : IDisposable
         }
 
         // Tap: send a copy to media processors (non-blocking, drops if full)
-        if (_mediaProcessors.Count > 0)
+        if (!_requireEncryptedMedia && _mediaProcessors.Count > 0)
         {
             if (BoltCodec.TryReadMediaFrame(buffer.AsSpan(0, length), out var mfHeader))
             {
@@ -2093,6 +2100,17 @@ public sealed partial class BoltServer : IDisposable
 
         if (_authenticatedMediaOnly && (config.MediaType != MediaType.Audio || config.CodecId != CodecId.Opus))
             return;
+
+        if (_requireEncryptedMedia)
+        {
+            if ((config.Flags & 0x10) == 0 || sender.ClientId is not { Length: > 0 and <= 128 }) return;
+            var stamped = new ArrayBufferWriter<byte>();
+            BoltCodec.WriteMediaConfig(stamped, config.StreamId, config.CallId, config.MediaType,
+                config.CodecId, config.Param1, config.Param2, config.BitrateKbps, config.Flags,
+                Encoding.UTF8.GetBytes("SFR1:" + sender.ClientId));
+            buffer = stamped.WrittenSpan.ToArray();
+            length = buffer.Length;
+        }
 
         if (!_activeCalls.TryGetValue(config.CallId, out var callState))
         {

@@ -38,6 +38,10 @@ public sealed class BoltMediaClient : IAsyncDisposable
     public event Action<Guid>? OnKeyframeRequested;
     public event Action<BoltMediaStream>? OnMediaStreamConfigured;
 
+    /// <summary>Explicit externally authenticated payload mode; configure before connecting.
+    /// The factory must return a fail-closed provider before the stream is published to frame handlers.</summary>
+    public Func<Guid, string, IMediaEncryption>? AuthenticatedStreamEncryptionFactory { get; set; }
+
     /// <summary>
     /// The current call-signaling contract does not bind ECDH keys to an authenticated
     /// transport identity, so built-in encrypted calls remain unavailable.
@@ -74,6 +78,17 @@ public sealed class BoltMediaClient : IAsyncDisposable
     }
 
     // ── Call API ─────────────────────────────────────────────
+
+    /// <summary>Initializes only local call state. The authenticated host independently authorizes group admission.</summary>
+    public Task JoinHostedGroupAsync(Guid callId)
+    {
+        if (callId == Guid.Empty) throw new ArgumentException("A host-assigned call ID is required.", nameof(callId));
+        if (_client.ServerUri.Scheme != "wss") throw new InvalidOperationException("Hosted media requires a secure WebSocket connection.");
+        _client.GetPrimaryConnection(); // Do not create a local active call on an unconnected transport.
+        if (!_activeCalls.TryAdd(callId, new ClientCallInfo { CallId = callId, IsOutgoing = true, Status = ClientCallStatus.Active }))
+            throw new InvalidOperationException("This call is already active.");
+        return Task.CompletedTask;
+    }
 
     public async Task<Guid> StartCallAsync(string recipientId, bool video = false, bool encrypted = false, Guid? authorizedCallId = null)
     {
@@ -196,6 +211,7 @@ public sealed class BoltMediaClient : IAsyncDisposable
     private void HandleMediaFrame(BoltConnection conn, byte[] buffer, int length)
     {
         if (!BoltCodec.TryReadMediaFrame(buffer.AsSpan(0, length), out var header)) return;
+        if (AuthenticatedStreamEncryptionFactory is not null && header.PayloadLength > 5155) return;
         if (_mediaStreams.TryGetValue(header.StreamId, out var stream))
         {
             var payload = header.GetPayload(buffer.AsSpan(0, length)).ToArray();
@@ -213,9 +229,18 @@ public sealed class BoltMediaClient : IAsyncDisposable
 
         var isAudio = config.MediaType == MediaType.Audio;
         var stream = new BoltMediaStream(conn, config.StreamId, config.CallId, isAudio);
+        if (AuthenticatedStreamEncryptionFactory is { } encryptionFactory)
+        {
+            if (_mediaStreams.Count >= 8 || !isAudio || config.CodecId != CodecId.Opus || (config.Flags & 0x10) == 0 ||
+                config.ExtensionLength is < 6 or > 133) return;
+            var owner = System.Text.Encoding.UTF8.GetString(buffer, config.ExtensionOffset, config.ExtensionLength);
+            if (!owner.StartsWith("SFR1:", StringComparison.Ordinal)) return;
+            try { stream.SetEncryption(encryptionFactory(config.CallId, owner[5..])); }
+            catch { return; }
+        }
         if (!_mediaStreams.TryAdd(config.StreamId, stream)) return;
 
-        stream.EnableFec(isAudio ? 4 : 8);
+        if (AuthenticatedStreamEncryptionFactory is null) stream.EnableFec(isAudio ? 4 : 8);
         stream.EnableNack(isAudio ? 128 : 256);
         stream.EnableDelayBasedControl(config.BitrateKbps);
 

@@ -47,6 +47,10 @@ public class BoltServerOptions
     /// bolt_media_client_id claim. Transport encryption, not end-to-end encryption.</summary>
     public bool AuthenticatedMediaOnly { get; set; }
 
+    /// <summary>Dedicated end-to-end payload mode: requires authenticated WSS, rejects plaintext/FEC,
+    /// and stamps each Opus configuration with its transport-bound sender identity.</summary>
+    public bool RequireEncryptedMedia { get; set; }
+
     /// <summary>Required for call admission. Missing policy denies calls even when media is enabled.</summary>
     public IBoltCallAuthorizer? CallAuthorizer { get; set; }
 

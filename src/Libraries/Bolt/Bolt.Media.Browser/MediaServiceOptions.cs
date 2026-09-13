@@ -6,7 +6,9 @@ public enum MediaSecurityMode
     /// <summary>Requires identity-bound end-to-end keys; currently unavailable.</summary>
     EndToEndEncrypted,
     /// <summary>Authenticated WSS to a trusted relay. The relay can access media.</summary>
-    AuthenticatedTransport
+    AuthenticatedTransport,
+    /// <summary>RFC9605 frames; keys and epochs must be provisioned through authenticated envelopes.</summary>
+    AuthenticatedSFrame
 }
 
 public sealed class MediaServiceOptions

@@ -24,6 +24,10 @@ At most eight participants and 256 epochs are accepted. Duplicate sender/KID and
 
 ## Sources and license
 
+The .NET bridge is `BoltSFrameInterop`, registered by `AddBoltMediaBrowser`, with explicit `MediaSecurityMode.AuthenticatedSFrame`. The older `EndToEndEncrypted` value remains unavailable and never invokes its unauthenticated ECDH exchange. `BoltMediaStream` passes timestamps into the new context-aware async encryption overloads before transmission and before jitter buffering/decoding. Inbound providers are installed synchronously before a configured stream becomes visible to receive handlers. The dedicated relay's `RequireEncryptedMedia` option rejects unencrypted configurations/frames and FEC; it overwrites configuration extension data with `SFR1:` plus the authenticated sender client ID. Encrypted packets are never fed to server media processors. This flag checks framing, while recipients cryptographically authenticate payloads.
+
+The bridge admits at most 32 outstanding crypto operations, serializes epoch/key mutations with frame work, and rejects results overtaken by a pause or key change. Providers are bound to their original call, so a disposed call's stream cannot use a replacement call's keys. All-member acknowledgment and immediate server-side pause/removal ordering still belong to the calling coordinator; the library cannot infer membership changes from ciphertext.
+
 - [RFC 9605](https://www.rfc-editor.org/rfc/rfc9605.html), particularly sections 4.4, 9.1, 9.3 and Appendix C.3.
 - [sframe 2.0.0](https://github.com/TobTheRock/sframe-rs/tree/v2.0.0), MIT or Apache-2.0.
 - [ring 0.17.14](https://github.com/briansmith/ring/tree/0.17.14), ISC/MIT/OpenSSL licenses.

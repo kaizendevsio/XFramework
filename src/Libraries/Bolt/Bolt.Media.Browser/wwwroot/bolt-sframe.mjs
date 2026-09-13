@@ -9,6 +9,11 @@ export async function initializeSFrame(wasmBytes) {
     await initialized;
 }
 
+export async function createSession(callId, localSenderId) {
+    await initializeSFrame();
+    return new SFrameSession(callId, localSenderId);
+}
+
 function identifier(value) {
     if (typeof value !== 'string' || value.length < 1 || value.length > 128)
         throw new Error('Invalid SFrame identity');

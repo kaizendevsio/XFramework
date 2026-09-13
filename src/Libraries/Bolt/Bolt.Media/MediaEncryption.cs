@@ -43,6 +43,14 @@ public interface IMediaEncryption : IDisposable
     /// <summary>Async variant of Decrypt for environments where sync crypto is unsafe (e.g. Blazor WASM JS interop).</summary>
     Task<byte[]> DecryptAsync(byte[] ciphertextWithTag, uint sequenceNumber, Guid streamId)
         => Task.FromResult(Decrypt(ciphertextWithTag, sequenceNumber, streamId));
+
+    /// <summary>Context-aware encryption for protocols binding media timestamps. Legacy providers retain their behavior.</summary>
+    Task<byte[]> EncryptAsync(byte[] plaintext, uint sequenceNumber, uint timestamp, Guid streamId)
+        => EncryptAsync(plaintext, sequenceNumber, streamId);
+
+    /// <summary>Context-aware decryption, before any codec or jitter-buffer processing.</summary>
+    Task<byte[]> DecryptAsync(byte[] ciphertext, uint sequenceNumber, uint timestamp, Guid streamId)
+        => DecryptAsync(ciphertext, sequenceNumber, streamId);
 }
 
 /// <summary>
