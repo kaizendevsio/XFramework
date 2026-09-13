@@ -28,7 +28,7 @@ namespace Bolt.Server;
 ///
 /// Zero SignalR overhead — frames go directly: binary WebSocket ↔ MemoryPack.
 /// </summary>
-public sealed class BoltServer : IDisposable
+public sealed partial class BoltServer : IDisposable
 {
     private const string DefaultRequiredServiceScope = "bolt.service";
     private static readonly TimeSpan MaxMigrationAllowanceLifetime = TimeSpan.FromDays(7);
@@ -234,6 +234,9 @@ public sealed class BoltServer : IDisposable
             : Timeout.InfiniteTimeSpan;
         _mediaEnabled = options.MediaEnabled;
         _callAuthorizer = options.CallAuthorizer;
+        _groupCallAuthorizer = options.GroupCallAuthorizer;
+        if (_groupCallAuthorizer is not null && (!options.AuthenticatedMediaOnly || !options.RequireSecureTransport))
+            throw new InvalidOperationException("Host-managed groups require authenticated media-only secure transport.");
         _authenticatedMediaOnly = options.AuthenticatedMediaOnly;
         if (_authenticatedMediaOnly && (!options.RequireSecureTransport || _callAuthorizer is null))
             throw new InvalidOperationException("Authenticated media requires secure transport and a call authorizer.");
@@ -1965,6 +1968,20 @@ public sealed class BoltServer : IDisposable
     /// </summary>
     private async Task RouteMediaFrameAsync(BoltHubConnection sender, byte[] buffer, int length, CancellationToken ct)
     {
+        if (BoltCodec.TryReadMediaFrameHeader(buffer.AsSpan(0, length), out var stream) &&
+            _activeMediaStreams.TryGetValue(stream, out var route) &&
+            _activeCalls.TryGetValue(route.CallId, out var call) && call.HostManagedGroup)
+        {
+            await call.GroupGate.WaitAsync(ct);
+            try { await RouteMediaFrameCoreAsync(sender, buffer, length, ct); }
+            finally { call.GroupGate.Release(); }
+            return;
+        }
+        await RouteMediaFrameCoreAsync(sender, buffer, length, ct);
+    }
+
+    private async Task RouteMediaFrameCoreAsync(BoltHubConnection sender, byte[] buffer, int length, CancellationToken ct)
+    {
         if (length > 256 * 1024)
             return;
         if (!BoltCodec.TryReadMediaFrameHeader(buffer.AsSpan(0, length), out var streamId))
@@ -2000,6 +2017,8 @@ public sealed class BoltServer : IDisposable
 
         if (_authenticatedMediaOnly && !await RenewMediaAuthorizationAsync(owningCall, ct))
             return;
+        if (!IsCallParticipant(owningCall, sender) || !_activeMediaStreams.TryGetValue(streamId, out var currentRoute) || !ReferenceEquals(route, currentRoute))
+            return;
 
         // Simulcast-aware routing: if this stream has a layer ID, only forward to
         // recipients whose preferred layer matches (or who have no preference = forward all)
@@ -2007,7 +2026,7 @@ public sealed class BoltServer : IDisposable
 
         foreach (var recipient in route.GetRecipientSnapshot())
         {
-            if (recipient.StreamId == sender.StreamId || !recipient.IsAlive)
+            if (recipient.StreamId == sender.StreamId || !recipient.IsAlive || !IsCallParticipant(owningCall, recipient))
                 continue;
 
             // Simulcast filtering: skip if recipient prefers a different layer
@@ -2022,11 +2041,13 @@ public sealed class BoltServer : IDisposable
             if (recipient.IsUnderPressure)
             {
                 // Check if frame is drop-eligible (flag 0x40)
-                if (length > 25 && (buffer[25] & 0x40) != 0)
+                if (owningCall.HostManagedGroup || (length > 25 && (buffer[25] & 0x40) != 0))
                     continue; // Drop this frame — recipient can't keep up
             }
 
-            await recipient.SendAsync(data, ct);
+            try { await recipient.SendAsync(data, ct); }
+            catch (Exception) when (owningCall.HostManagedGroup && !ct.IsCancellationRequested)
+            { /* A congested receiver cannot disconnect the group's sender or block other recipients. */ }
         }
 
         // Tap: send a copy to media processors (non-blocking, drops if full)
@@ -2044,6 +2065,23 @@ public sealed class BoltServer : IDisposable
     /// Handle MediaConfig: register the media stream in the routing table and forward to recipients.
     /// </summary>
     private async Task HandleMediaConfigAsync(BoltHubConnection sender, byte[] buffer, int length, CancellationToken ct)
+    {
+        if (BoltCodec.TryReadMediaConfig(buffer.AsSpan(0, length), out var config) &&
+            _activeCalls.TryGetValue(config.CallId, out var call) && call.HostManagedGroup)
+        {
+            await call.GroupGate.WaitAsync(ct);
+            try
+            {
+                if (await RenewGroupAuthorizationAsync(call, ct))
+                    await HandleMediaConfigCoreAsync(sender, buffer, length, ct);
+            }
+            finally { call.GroupGate.Release(); }
+            return;
+        }
+        await HandleMediaConfigCoreAsync(sender, buffer, length, ct);
+    }
+
+    private async Task HandleMediaConfigCoreAsync(BoltHubConnection sender, byte[] buffer, int length, CancellationToken ct)
     {
         if (length > 4096)
             return;
@@ -2089,6 +2127,9 @@ public sealed class BoltServer : IDisposable
             var reservedMediaSlot = false;
             if (!_activeMediaStreams.TryGetValue(config.StreamId, out route))
             {
+                if (callState.HostManagedGroup && GetMediaStreamSnapshot(callState).Any(id =>
+                    _activeMediaStreams.TryGetValue(id, out var existing) && existing.Sender.StreamId == sender.StreamId))
+                    return; // One audio stream per group participant keeps decode and fanout work bounded.
                 if (!TryReserveQuota(_activeMediaStreamsByPrincipal, sender.QuotaKey, _maxMediaStreamsPerPrincipal))
                 {
                     BoltServerMetrics.RecordQuotaRejection("media_streams");
@@ -2136,6 +2177,7 @@ public sealed class BoltServer : IDisposable
             }
 
             AddMediaStream(callState, config.StreamId);
+            if (callState.HostManagedGroup) route.Configuration = buffer.AsSpan(0, length).ToArray();
             route.AddRecipients(GetParticipantSnapshot(callState));
             recipients = route.GetRecipientSnapshot();
         }
@@ -2146,7 +2188,13 @@ public sealed class BoltServer : IDisposable
         {
             if (recipient.IsAlive && IsCallParticipant(callState, recipient))
             {
-                await recipient.SendAsync(data, ct);
+                try { await recipient.SendAsync(data, ct); }
+                catch (Exception) when (callState.HostManagedGroup && !ct.IsCancellationRequested)
+                {
+                    // Missing codec configuration makes future audio unusable for this receiver.
+                    // Remove that receiver without failing the healthy sender's connection.
+                    await RemoveGroupParticipantCoreAsync(callState, recipient, ct);
+                }
             }
         }
 
@@ -2222,6 +2270,13 @@ public sealed class BoltServer : IDisposable
         }
 
         // Group consent and direct transport negotiation are still experimental.
+        if (_activeCalls.TryGetValue(header.CallId, out var group) && group.HostManagedGroup)
+        {
+            // The host admits accepted participants. A peer can leave itself, never mutate another member or hold/end the room.
+            if (header.SignalType == SignalType.End)
+                await LeaveGroupCallAsync(header.CallId, sender.ClientId, ct);
+            return;
+        }
         if (_authenticatedMediaOnly && header.SignalType is SignalType.AddParticipant or
             SignalType.RemoveParticipant or SignalType.DirectOffer or SignalType.DirectAnswer or SignalType.KeyExchange)
             return;
@@ -2314,7 +2369,9 @@ public sealed class BoltServer : IDisposable
         lock (_callAdmissionLock)
         {
             admitted = _activeCalls.Count < _maxActiveCalls &&
-                _activeCalls.Values.Count(call => call.CallerConnection.QuotaKey == caller.QuotaKey) < _maxActiveCallsPerPrincipal &&
+                _activeCalls.Values.Count(call => call.HostManagedGroup
+                    ? GetParticipantSnapshot(call).Any(x => x.QuotaKey == caller.QuotaKey)
+                    : call.CallerConnection.QuotaKey == caller.QuotaKey) < _maxActiveCallsPerPrincipal &&
                 _activeCalls.TryAdd(header.CallId, callState);
         }
         if (!admitted)
@@ -2761,6 +2818,7 @@ public sealed class BoltServer : IDisposable
 
     private async Task<bool> RenewMediaAuthorizationAsync(ServerCallState call, CancellationToken ct)
     {
+        if (call.HostManagedGroup) return await RenewGroupAuthorizationAsync(call, ct);
         if (Environment.TickCount64 - Volatile.Read(ref call.LastMediaAuthorizationTick) < 5000)
             return IsCallMediaActive(call);
 
@@ -4103,6 +4161,12 @@ public sealed class BoltServer : IDisposable
         {
             if (!IsCallParticipant(callState, connection))
                 continue;
+
+            if (callState.HostManagedGroup)
+            {
+                await LeaveGroupCallAsync(callId, connection.ClientId, CancellationToken.None);
+                continue;
+            }
 
             callState.Status = ServerCallStatus.Ended;
 
@@ -5473,6 +5537,7 @@ internal sealed class MediaStreamRoute
 
     public BoltHubConnection Sender { get; init; } = null!;
     public Guid CallId { get; init; }
+    public byte[]? Configuration { get; set; }
 
     /// <summary>
     /// For simulcast: maps this stream to a simulcast layer group.
@@ -5544,6 +5609,8 @@ internal sealed class ServerCallState
     private int _status;
 
     public readonly SemaphoreSlim MediaAuthorizationGate = new(1, 1);
+    public readonly SemaphoreSlim GroupGate = new(1, 1);
+    public bool HostManagedGroup { get; init; }
     public long LastMediaAuthorizationTick;
 
     public object SyncRoot { get; } = new();

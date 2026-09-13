@@ -8,6 +8,7 @@
     @foreach (var message in Items.Skip(start).Take(count))
     { <div data-window-row="@message.Id" @key="message.Id">@ChildContent(message)</div> }
     </div>
+    @if (HasNewer) { <button class="history-loader" disabled="@loading" @onclick="LoadNewer">Newer messages</button> }
     @if (Items.Count == 0) { <p class="empty">Say hello. This is the beginning of your conversation.</p> }
 </div>
 @code {
@@ -15,6 +16,8 @@
     [Parameter, EditorRequired] public RenderFragment<ChatMessage> ChildContent { get; set; } = default!;
     [Parameter] public RenderFragment? Header { get; set; }
     [Parameter] public EventCallback Earlier { get; set; }
+    [Parameter] public EventCallback Newer { get; set; }
+    [Parameter] public bool HasNewer { get; set; }
     [Parameter] public EventCallback Visible { get; set; }
     [Parameter] public bool HasMore { get; set; }
     private ElementReference element;
@@ -32,12 +35,14 @@
     {
         first = Items.Skip(start).FirstOrDefault()?.Id;
         reference ??= DotNetObjectReference.Create(this);
-        await JS.InvokeVoidAsync("yap.messageWindow.sync", element, reference, Items.Select(x => x.Id).ToArray(), start, count, HasMore);
+        await JS.InvokeVoidAsync("yap.messageWindow.sync", element, reference, Items.Select(x => x.Id).ToArray(), start, count, HasMore, HasNewer);
     }
     [JSInvokable] public Task WindowChanged(int index, int length)
     { start = Math.Clamp(index, 0, Math.Max(0, Items.Count - 1)); count = Math.Clamp(length, 1, 80); first = Items.Skip(start).FirstOrDefault()?.Id; return InvokeAsync(StateHasChanged); }
     [JSInvokable] public async Task LoadEarlier()
     { if (loading || !HasMore) return; loading = true; try { await Earlier.InvokeAsync(); } finally { loading = false; await InvokeAsync(StateHasChanged); } }
     [JSInvokable] public Task ReadVisible() => Visible.InvokeAsync();
+    [JSInvokable] public async Task LoadNewer()
+    { if (loading || !HasNewer) return; loading = true; try { await Newer.InvokeAsync(); } finally { loading = false; await InvokeAsync(StateHasChanged); } }
     public async ValueTask DisposeAsync() { await JS.InvokeVoidAsync("yap.messageWindow.dispose", element); reference?.Dispose(); }
 }

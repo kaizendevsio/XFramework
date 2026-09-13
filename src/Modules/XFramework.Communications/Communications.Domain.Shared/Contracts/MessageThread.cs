@@ -33,4 +33,7 @@ public partial class MessageThread : BaseModel
 
     [MemoryPackOrder(7)]
     public ConversationFeatures Features { get; set; } = ConversationFeatures.All;
+
+    [MemoryPackOrder(9)]
+    public Guid? PhotoStorageFileId { get; set; }
 }

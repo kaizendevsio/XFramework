@@ -20,9 +20,10 @@ function fixture() {
     const window = { yap: {} };
     const context = { window, yap: window.yap, Blob, File, DOMException, Map, Set, Uint8Array,
         navigator: { storage: { getDirectory: async () => ({ getDirectoryHandle: async () => directory }) } },
-        document: { addEventListener() {} }, addEventListener() {}, visualViewport: null,
+        document: { baseURI: 'https://yap.test/', addEventListener() {} }, addEventListener() {}, visualViewport: null,
         requestAnimationFrame() { return 1; }, cancelAnimationFrame() {},
-        URL: { createObjectURL(blob) { const url = `blob:${displayed.size}`; displayed.set(url, blob); return url; }, revokeObjectURL() {} },
+        location: { href: 'https://yap.test/chat/one' },
+        URL: class extends URL { static createObjectURL(blob) { const url = `blob:${displayed.size}`; displayed.set(url, blob); return url; } static revokeObjectURL() {} },
         async fetch() { downloads++; return { ok: true, blob: async () => new Blob(['original HEIF']) }; }
     };
     vm.createContext(context);
@@ -89,4 +90,12 @@ test('JPEG uses a bounded display copy and extension/magic recover missing HEIF 
     assert.equal(f.stats().conversions, 1);
     assert.equal(await f.helper.contentType(new File(['x'], 'IMG.HEIF')), 'image/heif');
     assert.equal(await f.helper.contentType(new File(['0000ftypheic'], 'image', { type: 'application/octet-stream' })), 'image/heif');
+});
+
+test('received video streams through the account-bound route without buffering a file', async () => {
+    const f = fixture();
+    const url = await f.api.mediaUrl('large', 'api/chat/video', 'tenant:user', true, 'video/quicktime', false, 'IMG.MOV');
+    assert.equal(url, '/api/chat/video?account=tenant%3Auser&mediaType=video%2Fquicktime');
+    assert.equal(f.files.size, 0);
+    assert.deepEqual(f.stats(), { conversions: 0, downloads: 0 });
 });

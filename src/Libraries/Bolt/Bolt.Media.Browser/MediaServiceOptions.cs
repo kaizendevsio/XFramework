@@ -12,7 +12,7 @@ public enum MediaSecurityMode
 public sealed class MediaServiceOptions
 {
     public MediaSecurityMode SecurityMode { get; set; } = MediaSecurityMode.EndToEndEncrypted;
-    public int AudioBitrateKbps { get; set; } = 64;
+    public int AudioBitrateKbps { get; set; } = 128;
     public int AudioSampleRate { get; set; } = 48_000;
     public int AudioChannels { get; set; } = 1;
 

@@ -13,4 +13,5 @@ public partial record GetThreadResponse
     public bool HasCustomName { get; set; }
     public ConversationFeatures Features { get; set; } = ConversationFeatures.All;
     public bool CanManage { get; set; }
+    public Guid? PhotoStorageFileId { get; set; }
 }

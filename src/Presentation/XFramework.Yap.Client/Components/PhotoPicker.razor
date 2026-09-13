@@ -1,0 +1,28 @@
+@inject ChatState State
+@inject ChatApi Api
+@inject IJSRuntime JS
+<label class="photo-picker" aria-busy="@busy.ToString().ToLowerInvariant()">
+    <Icon Name="camera" Size="18" />
+    <span>@(busy ? "Updating photo…" : Label)</span>
+    <InputFile @ref="input" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" OnChange="UploadAsync" disabled="@(busy || !State.Online || State.NeedsLogin)" aria-label="@Label" />
+</label>
+@code {
+    [Parameter] public string Label { get; set; } = "Change photo";
+    [Parameter] public string Path { get; set; } = "api/chat/profile/photo";
+    [Parameter] public EventCallback Uploaded { get; set; }
+    private InputFile? input;
+    private bool busy;
+    private async Task UploadAsync(InputFileChangeEventArgs e)
+    {
+        if (busy) return;
+        busy = true;
+        try
+        {
+            var status = await JS.InvokeAsync<int>("yap.device.uploadPhoto", input!.Element, Path, State.Scope, Api.Token);
+            if (status is < 200 or >= 300) throw new ChatApiException(status);
+            await Uploaded.InvokeAsync();
+        }
+        catch (Exception ex) { State.Report(ex); }
+        finally { busy = false; }
+    }
+}

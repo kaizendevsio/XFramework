@@ -16,17 +16,23 @@ public static class YapApi
 {
     public static void MapYapApi(this WebApplication app)
     {
-        app.MapGet("/api/session", (HttpContext context, IAntiforgery antiforgery) =>
+        app.MapGet("/api/session", async (HttpContext context, IAntiforgery antiforgery, IChatDirectory directory, CancellationToken ct) =>
         {
             context.Response.Headers.CacheControl = "no-store";
             var user = context.User.Identity?.IsAuthenticated == true
                 ? new UserSession(Guid.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!),
                     Guid.Parse(context.User.FindFirstValue(YapAuth.TenantClaim)!), context.User.Identity.Name ?? "You")
                 : null;
+            if (user is not null)
+            {
+                try { user = user with { AvatarUrl = (await directory.ResolveAsync([user.CredentialId], ct)).FirstOrDefault()?.AvatarUrl }; }
+                catch { /* A directory outage must not invalidate a saved sign-in. */ }
+            }
             return Results.Ok(new SessionResponse(user, antiforgery.GetAndStoreTokens(context).RequestToken!));
         });
 
         var api = app.MapGroup("/api/chat").RequireAuthorization().AddEndpointFilter<YapApiFilter>();
+        api.MapYapProfile();
         api.MapPost("/initialize", async (ICommunicationsChatClient client, CancellationToken ct) =>
         {
             var session = await client.ForCurrentActorAsync(ct: ct);
@@ -50,6 +56,7 @@ public static class YapApi
             {
                 Id = x.Id, Name = x.IsDirect && !x.HasCustomName ? people.FirstOrDefault(p => p.Id == x.OtherCredentialId)?.Name ?? "Direct message" : x.Name,
                 Group = !x.IsDirect, Members = x.MemberCount, Unread = x.UnreadCount,
+                AvatarUrl = x.IsDirect ? people.FirstOrDefault(p => p.Id == x.OtherCredentialId)?.AvatarUrl : YapProfile.GroupPhoto(x.Id, x.PhotoStorageFileId, session.TenantId, session.CredentialId),
                 Muted = x.IsMuted, Removed = x.IsArchived,
                 Preview = x.LastMessagePreview ?? "Start a conversation", LastMessageAt = x.LastMessageAt
             }).ToList(), data.TotalCount);
@@ -65,7 +72,8 @@ public static class YapApi
                     person?.UserName ?? "", person?.AvatarUrl, x.Id, x.Role, x.Alias);
             }).ToList();
             return new Conversation { Id = id, Name = data.IsDirect && !data.HasCustomName ? members.FirstOrDefault(x => x.Id != session.CredentialId)?.Name ?? "Direct message" : data.Name,
-                Group = !data.IsDirect, Members = members.Count, People = members, Features = (int)data.Features, CanManage = data.CanManage };
+                Group = !data.IsDirect, AvatarUrl = data.IsDirect ? members.FirstOrDefault(x => x.Id != session.CredentialId)?.AvatarUrl : YapProfile.GroupPhoto(id, data.PhotoStorageFileId, session.TenantId, session.CredentialId),
+                Members = members.Count, People = members, Features = (int)data.Features, CanManage = data.CanManage };
         });
         api.MapGet("/conversations/{id:guid}/messages", async (Guid id, int? page, Guid? parent,
             ICommunicationsChatClient client, IChatDirectory directory, CancellationToken ct) =>
@@ -220,12 +228,21 @@ public static class YapApi
                 // The URL is minted by the authorized SDK; the browser cannot supply a proxy target.
                 var download = Require(await session.GetAttachmentDownloadUrlAsync(thread, message, file, ct));
                 using var request = CreateAttachmentDownloadRequest(download.Url, configuration);
+                if (System.Net.Http.Headers.RangeHeaderValue.TryParse(context.Request.Headers.Range, out var range))
+                    request.Headers.Range = range;
                 using var response = await http.CreateClient("attachments").SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-                response.EnsureSuccessStatusCode();
+                if (response.StatusCode != HttpStatusCode.RequestedRangeNotSatisfiable) response.EnsureSuccessStatusCode();
+                context.Response.StatusCode = (int)response.StatusCode;
                 context.Response.ContentType = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream";
+                var mediaType = context.Request.Query["mediaType"].ToString();
+                if (context.Response.ContentType == "application/octet-stream" && mediaType is "video/mp4" or "video/quicktime" or "video/webm")
+                    context.Response.ContentType = mediaType;
+                if (response.Content.Headers.ContentLength is { } length) context.Response.ContentLength = length;
+                if (response.Content.Headers.ContentRange is { } contentRange) context.Response.Headers.ContentRange = contentRange.ToString();
+                context.Response.Headers.AcceptRanges = "bytes";
                 context.Response.Headers.XContentTypeOptions = "nosniff";
                 await response.Content.CopyToAsync(context.Response.Body, ct);
-            });
+            }).WithMetadata(new MediaAccountQuery());
     }
 
     private sealed class UploadedFile(IFormFile file) : Microsoft.AspNetCore.Components.Forms.IBrowserFile
@@ -316,6 +333,10 @@ public static class YapApi
 public sealed class YapApiException(int status, string message) : Exception(message)
 { public int Status { get; } = status is >= 400 and <= 599 ? status : 503; }
 
+// Native media elements cannot attach a custom account header. This identifier is
+// still matched to the authenticated cookie and every file request checks membership.
+public sealed class MediaAccountQuery;
+
 public sealed class YapApiFilter(IAntiforgery antiforgery, ILogger<YapApiFilter> logger) : IEndpointFilter
 {
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext invocation, EndpointFilterDelegate next)
@@ -324,7 +345,9 @@ public sealed class YapApiFilter(IAntiforgery antiforgery, ILogger<YapApiFilter>
         context.Response.Headers.CacheControl = "no-store";
         var expected = $"{Guid.Parse(context.User.FindFirstValue(YapAuth.TenantClaim)!):N}:{Guid.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!):N}";
         var account = context.Request.Headers["X-Yap-Account"].ToString();
-        if (string.IsNullOrEmpty(account) && context.Request.Path == "/api/chat/events") account = context.Request.Query["account"].ToString();
+        if (string.IsNullOrEmpty(account) && (context.Request.Path == "/api/chat/events" ||
+            context.GetEndpoint()?.Metadata.GetMetadata<MediaAccountQuery>() is not null))
+            account = context.Request.Query["account"].ToString();
         if (account != expected) return Results.Problem("The signed-in account changed. Sign in again.", statusCode: 401);
         try
         {

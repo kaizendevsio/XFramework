@@ -16,8 +16,14 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
     private DotNetObjectReference<ChatState>? reference;
     private Task? polling;
     private int pages = 1;
-    private int loadedLimit = 100, cachedCount;
-    public bool HasEarlierMessages => Selected is { } selected && (cachedCount > selected.Messages.Count || Online && !NeedsLogin && selected.Messages.Count < selected.MessageTotal);
+    private const int HistoryWindowSize = 100;
+    private int historyOffset, cachedCount;
+    private Guid? replyParent;
+    private int replyOffset, replyPages, replyCached;
+    public bool HasNewerReplies => replyOffset > 0;
+    public bool HasEarlierReplies(ChatMessage parent) => replyCached > replyOffset + parent.Replies.Count || Online && !NeedsLogin && replyCached < parent.ReplyTotal;
+    public bool HasNewerMessages => historyOffset > 0;
+    public bool HasEarlierMessages => Selected is { } selected && (cachedCount > historyOffset + selected.Messages.Count || Online && !NeedsLogin && cachedCount < selected.MessageTotal);
     private int inboxPages = 1;
     private bool refreshPending;
     private Task? refreshing;
@@ -61,6 +67,14 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         return call is not null && CallReceived is not null ? CallReceived(call) : Task.CompletedTask;
     }
     public void Notify() => Changed?.Invoke();
+    public async Task RefreshProfileAsync()
+    {
+        var session = await api.GetAsync<SessionResponse>("api/session");
+        if (session.User is not null && OfflineStore.Scope(session.User) == Scope)
+        { User = session.User; await store.SetSettingAsync("user", JsonSerializer.Serialize(User)); }
+        api.Token = session.AntiforgeryToken;
+        Notify();
+    }
     public void DismissError() { Error = null; Notify(); }
     public void Report(Exception ex)
     {
@@ -233,11 +247,12 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         try
         {
             if (version != selectionVersion) return;
-            pages = 1; loadedLimit = 100;
+            pages = 1; historyOffset = 0; replyParent = null;
+            foreach (var old in Conversations) old.Messages.Clear();
             typing.Clear();
             acknowledged.Clear();
             var conversation = Conversations.FirstOrDefault(x => x.Id == id) ?? new Conversation { Id = id };
-            conversation.Messages = await store.MessagesAsync(Scope, id, limit: loadedLimit);
+            conversation.Messages = await store.MessagesAsync(Scope, id, limit: HistoryWindowSize);
             var count = await store.MessageCountAsync(Scope, id);
             if (version != selectionVersion) return;
             Selected = conversation; cachedCount = count;
@@ -283,9 +298,12 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         var result = await api.GetAsync<ChatPage<ChatMessage>>($"api/chat/conversations/{id}/messages?page=0");
         fetched.AddRange(result.Items); conversation.MessageTotal = result.TotalCount;
         await store.ReplaceWindowAsync(Scope, id, fetched, fetched.Count >= conversation.MessageTotal);
-        conversation.Messages = await store.MessagesAsync(Scope, id, limit: loadedLimit);
+        if (historyOffset > 0 && Selected?.Messages.LastOrDefault() is { } anchor)
+            historyOffset = await store.MessageOffsetAsync(Scope, id, anchor.Id);
+        conversation.Messages = await store.MessagesAsync(Scope, id, limit: HistoryWindowSize, skip: historyOffset);
         cachedCount = await store.MessageCountAsync(Scope, id);
         ComposeReplies(conversation.Messages);
+        await RestoreReplyWindowAsync(conversation);
         await store.SaveConversationsAsync(Scope, [conversation]);
         if (version != selectionVersion || viewedConversation != id) return;
         Selected = conversation;
@@ -299,6 +317,8 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         if (viewedConversation != id) return;
         viewedConversation = null;
         selectionVersion++;
+        Selected?.Messages.Clear();
+        foreach (var conversation in Conversations) conversation.Messages.Clear();
         Selected = null;
         typing.Clear();
         _ = WatchEventsAsync();
@@ -330,15 +350,30 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         try
         {
             if (Selected is not { } conversation) return;
-            if (cachedCount <= conversation.Messages.Count && Online && !NeedsLogin)
+            while (cachedCount <= historyOffset + conversation.Messages.Count && Online && !NeedsLogin && pages * 50 < conversation.MessageTotal)
             {
-                pages = Math.Max(1, conversation.Messages.Count / 50);
+                // Reply/search caches may contain gaps: row count is not a server page cursor.
                 var result = await api.GetAsync<ChatPage<ChatMessage>>($"api/chat/conversations/{conversation.Id}/messages?page={pages}");
                 await store.SaveMessagesAsync(Scope, result.Items); conversation.MessageTotal = result.TotalCount;
+                pages++;
+                cachedCount = await store.MessageCountAsync(Scope, conversation.Id);
             }
-            loadedLimit += 50;
-            conversation.Messages = await store.MessagesAsync(Scope, conversation.Id, limit: loadedLimit);
             cachedCount = await store.MessageCountAsync(Scope, conversation.Id);
+            historyOffset = Math.Min(historyOffset + 50, Math.Max(0, cachedCount - HistoryWindowSize));
+            conversation.Messages = await store.MessagesAsync(Scope, conversation.Id, limit: HistoryWindowSize, skip: historyOffset);
+            ComposeReplies(conversation.Messages);
+        }
+        catch (Exception ex) { Report(ex); }
+        finally { sync.Release(); Notify(); }
+    }
+    public async Task LoadNewerAsync()
+    {
+        await sync.WaitAsync();
+        try
+        {
+            if (Selected is not { } conversation || historyOffset == 0) return;
+            historyOffset = Math.Max(0, historyOffset - 50);
+            conversation.Messages = await store.MessagesAsync(Scope, conversation.Id, limit: HistoryWindowSize, skip: historyOffset);
             ComposeReplies(conversation.Messages);
         }
         catch (Exception ex) { Report(ex); }
@@ -353,15 +388,34 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
             return (await api.GetAsync<ChatPage<SearchHit>>($"api/chat/search?query={Uri.EscapeDataString(query)}{(thread.HasValue ? $"&thread={thread}" : "")}")).Items;
         var results = new List<SearchHit>();
         foreach (var conversation in Conversations.Where(x => !thread.HasValue || x.Id == thread))
-            results.AddRange((await store.MessagesAsync(Scope, conversation.Id)).Where(x => x.Text.Contains(query, StringComparison.OrdinalIgnoreCase))
-                .Select(x => new SearchHit(x.ThreadId, x.Id, x.Text, x.CreatedAt)));
+        {
+            for (var offset = 0; ; offset += 100)
+            {
+                var batch = await store.MessagesAsync(Scope, conversation.Id, limit: 100, skip: offset);
+                results.AddRange(batch.Where(x => x.Text.Contains(query, StringComparison.OrdinalIgnoreCase)).Select(x => new SearchHit(x.ThreadId, x.Id, x.Text, x.CreatedAt)));
+                results = results.OrderByDescending(x => x.CreatedAt).Take(30).ToList();
+                if (batch.Count < 100) break;
+            }
+        }
         return results.OrderByDescending(x => x.CreatedAt).Take(30).ToList();
     }
 
     public async Task LocateAsync(Guid id)
     {
+        await sync.WaitAsync();
+        try
+        {
+            if (Selected is { } selected && selected.Messages.All(x => x.Id != id)
+                && await store.MessageAsync(Scope, id) is { } cached && cached.ThreadId == selected.Id)
+            {
+                historyOffset = Math.Max(0, await store.MessageOffsetAsync(Scope, selected.Id, id) - HistoryWindowSize / 2);
+                selected.Messages = await store.MessagesAsync(Scope, selected.Id, limit: HistoryWindowSize, skip: historyOffset);
+                ComposeReplies(selected.Messages);
+            }
+        }
+        finally { sync.Release(); Notify(); }
         while (Selected is { } conversation && conversation.Messages.All(x => x.Id != id)
-            && HasEarlierMessages) { var before = conversation.Messages.Count; await LoadEarlierAsync(); if (Selected?.Messages.Count == before) break; }
+            && HasEarlierMessages) { var before = conversation.Messages.FirstOrDefault()?.Id; await LoadEarlierAsync(); if (Selected?.Messages.FirstOrDefault()?.Id == before) break; }
     }
 
     public async Task MuteAsync()
@@ -371,20 +425,28 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         catch (Exception ex) { Report(ex); }
     }
 
-    public async Task LoadRepliesAsync(ChatMessage parent)
+    public async Task LoadRepliesAsync(ChatMessage parent, bool newer = false)
     {
         await sync.WaitAsync();
         try
         {
             if (Selected?.Id != parent.ThreadId) return;
-            if (Online && !NeedsLogin)
+            var first = replyParent != parent.Id;
+            if (first) { replyParent = parent.Id; replyOffset = 0; replyPages = 0; }
+            replyCached = await store.ReplyCountAsync(Scope, parent.Id);
+            while (!newer && Online && !NeedsLogin && (first || replyCached <= replyOffset + parent.Replies.Count) && (replyPages == 0 || replyPages * 50 < parent.ReplyTotal))
             {
-                var result = await api.GetAsync<ChatPage<ChatMessage>>($"api/chat/conversations/{parent.ThreadId}/messages?parent={parent.Id}&page={parent.Replies.Count / 50}");
+                var result = await api.GetAsync<ChatPage<ChatMessage>>($"api/chat/conversations/{parent.ThreadId}/messages?parent={parent.Id}&page={replyPages}");
                 await store.SaveMessagesAsync(Scope, result.Items);
+                parent.ReplyTotal = result.TotalCount; replyPages++;
+                replyCached = await store.ReplyCountAsync(Scope, parent.Id);
+                if (first) break;
             }
-            Selected.Messages = await store.MessagesAsync(Scope, parent.ThreadId);
-            loadedLimit = Math.Max(loadedLimit, Selected.Messages.Count);
-            ComposeReplies(Selected.Messages);
+            // Thread replies have their own bounded window, independent of the main timeline.
+            replyCached = await store.ReplyCountAsync(Scope, parent.Id);
+            if (newer) replyOffset = Math.Max(0, replyOffset - 50);
+            else if (!first) replyOffset = Math.Min(replyOffset + 50, Math.Max(0, replyCached - HistoryWindowSize));
+            parent.Replies = await store.MessagesAsync(Scope, parent.ThreadId, limit: HistoryWindowSize, skip: replyOffset, parent: parent.Id);
         }
         catch (Exception ex) { Report(ex); }
         finally { sync.Release(); Notify(); }
@@ -398,6 +460,17 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
             if (lookup.TryGetValue(message.ParentId!.Value, out var parent))
             { parent.Replies.Add(message); message.Quote = new(parent.Id, parent.Sender, parent.Text); }
         foreach (var message in messages) message.ReplyTotal = Math.Max(message.ReplyTotal, message.Replies.Count);
+    }
+
+    private async Task RestoreReplyWindowAsync(Conversation conversation)
+    {
+        if (replyParent is not { } parentId || conversation.Messages.FirstOrDefault(x => x.Id == parentId) is not { } parent) return;
+        var previous = Selected?.Messages.FirstOrDefault(x => x.Id == parentId);
+        if (replyOffset > 0 && previous?.Replies.LastOrDefault() is { } anchor)
+            replyOffset = await store.MessageOffsetAsync(Scope, conversation.Id, anchor.Id, parentId);
+        replyCached = await store.ReplyCountAsync(Scope, parentId);
+        parent.Replies = await store.MessagesAsync(Scope, conversation.Id, limit: HistoryWindowSize, skip: replyOffset, parent: parentId);
+        parent.ReplyTotal = Math.Max(parent.ReplyTotal, Math.Max(previous?.ReplyTotal ?? 0, replyCached));
     }
 
     public Task<string> DraftAsync(string key) => store.DraftAsync(Scope, key);
@@ -462,7 +535,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         await store.QueueAsync(new QueuedMessage { Scope = Scope, Id = id, ThreadId = thread, Text = content,
             ParentId = parent, CreatedTicks = message.CreatedAt.Ticks, FileKey = file?.Key, FileName = file?.Name,
             ContentType = file?.ContentType, FileSize = file?.Size ?? 0, UploadId = file?.UploadId }, message, draftKey);
-        if (Selected?.Id == thread) { Selected.Messages.Add(message); ComposeReplies(Selected.Messages); }
+        if (Selected?.Id == thread && historyOffset == 0) { Selected.Messages.Add(message); if (Selected.Messages.Count > HistoryWindowSize) Selected.Messages.RemoveAt(0); ComposeReplies(Selected.Messages); }
         PendingCount++; Notify();
         }
         finally { sync.Release(); }

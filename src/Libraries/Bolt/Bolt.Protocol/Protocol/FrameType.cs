@@ -87,6 +87,8 @@ public enum SignalType : byte
     DirectOffer = 0x0A,
     DirectAnswer = 0x0B,
     KeyExchange = 0x0C,
+    /// <summary>Server-to-client notification: exactly one 16-byte stream ID was removed from a host-managed room.</summary>
+    StreamEnded = 0x0D,
 }
 
 /// <summary>Quality hint from receiver to sender.</summary>

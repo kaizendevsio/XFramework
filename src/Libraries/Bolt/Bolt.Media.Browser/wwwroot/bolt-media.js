@@ -6,7 +6,8 @@
 class AudioPipeline {
     constructor() {
         this.encoder = null;
-        this.decoder = null;
+        this.receivers = new Map();
+        this.decoderConfig = null;
         this.audioContext = null;
         this.mediaStream = null;
         this.captureNode = null;
@@ -18,7 +19,6 @@ class AudioPipeline {
         this.encodedQueue = [];
         this.sending = false;
         this.sources = new Set();
-        this.nextPlayTime = 0;
         this.playbackEnabled = true;
         this.managed = false;
     }
@@ -63,12 +63,7 @@ class AudioPipeline {
         if (!(await AudioDecoder.isConfigSupported(config)).supported)
             throw new Error('Opus audio decoding is unavailable in this browser.');
         this.audioContext ??= new AudioContext({ sampleRate, latencyHint: 'interactive' });
-        this.decoder?.close();
-        this.decoder = new AudioDecoder({
-            output: data => this._playAudioData(data),
-            error: e => console.error('Bolt audio decoder:', e)
-        });
-        this.decoder.configure(config);
+        this.decoderConfig = config;
     }
 
     initManaged() {
@@ -149,15 +144,43 @@ class AudioPipeline {
 
     stopPlayback() {
         this.playbackEnabled = false;
-        for (const source of this.sources) { source.stop(); source.disconnect(); }
-        this.sources.clear();
-        this.nextPlayTime = 0;
+        for (const streamId of [...this.receivers.keys()]) this.removeRemoteStream(streamId);
     }
 
-    decodeFrame(data, timestamp) {
-        if (!this.playbackEnabled || this.decoder?.state !== 'configured' || this.decoder.decodeQueueSize >= 8) return;
+    receiver(streamId) {
+        if (this.receivers.has(streamId)) return this.receivers.get(streamId);
+        if (!this.playbackEnabled || this.receivers.size >= 8) return null;
+        const receiver = { decoder: null, sources: new Set(), nextPlayTime: 0, active: true };
+        if (!this.managed) {
+            if (!this.decoderConfig) return null;
+            receiver.decoder = new AudioDecoder({
+                output: data => this._playAudioData(data, streamId, receiver),
+                error: e => console.error('Bolt audio decoder:', e)
+            });
+            receiver.decoder.configure(this.decoderConfig);
+        }
+        this.receivers.set(streamId, receiver);
+        return receiver;
+    }
+
+    removeRemoteStream(streamId) {
+        const receiver = this.receivers.get(streamId);
+        if (!receiver) return;
+        receiver.active = false;
+        if (receiver.decoder?.state !== 'closed') receiver.decoder?.close();
+        for (const source of receiver.sources) {
+            source.stop(); source.disconnect(); this.sources.delete(source);
+        }
+        receiver.sources.clear();
+        this.receivers.delete(streamId);
+    }
+
+    decodeFrame(data, timestamp, streamId = 'default') {
+        if (!this.playbackEnabled) return;
+        const decoder = this.receiver(streamId)?.decoder;
+        if (decoder?.state !== 'configured' || decoder.decodeQueueSize >= 8) return;
         // Bolt audio timestamps use a 48 kHz clock; WebCodecs expects microseconds.
-        this.decoder.decode(new EncodedAudioChunk({ type: 'key', timestamp: Math.round(timestamp * 1000000 / 48000), data }));
+        decoder.decode(new EncodedAudioChunk({ type: 'key', timestamp: Math.round(timestamp * 1000000 / 48000), data }));
     }
 
     reconfigureBitrate(sampleRate, channels, bitrate) {
@@ -165,12 +188,12 @@ class AudioPipeline {
             this.encoder.configure({ codec: 'opus', sampleRate, numberOfChannels: channels, bitrate: bitrate * 1000 });
     }
 
-    _playAudioData(data) {
+    _playAudioData(data, streamId = 'default', receiver = this.receiver(streamId)) {
         try {
             const context = this.audioContext;
             // Do not accumulate delayed playback during suspension or a slow renderer.
-            if (!this.playbackEnabled || context?.state !== 'running' ||
-                this.nextPlayTime - context.currentTime > 0.2 || this.sources.size >= 16) return;
+            if (!this.playbackEnabled || !receiver?.active || context?.state !== 'running' ||
+                receiver.nextPlayTime - context.currentTime > 0.2 || receiver.sources.size >= 16) return;
             const buffer = context.createBuffer(data.numberOfChannels, data.numberOfFrames, data.sampleRate);
             for (let ch = 0; ch < data.numberOfChannels; ch++) {
                 const samples = new Float32Array(data.numberOfFrames);
@@ -180,29 +203,29 @@ class AudioPipeline {
             const source = context.createBufferSource();
             source.buffer = buffer;
             source.connect(context.destination);
-            source.onended = () => { this.sources.delete(source); source.disconnect(); };
+            source.onended = () => { this.sources.delete(source); receiver.sources.delete(source); source.disconnect(); };
             this.sources.add(source);
-            this.nextPlayTime = Math.max(this.nextPlayTime, context.currentTime);
-            source.start(this.nextPlayTime);
-            this.nextPlayTime += buffer.duration;
+            receiver.sources.add(source);
+            receiver.nextPlayTime = Math.max(receiver.nextPlayTime, context.currentTime);
+            source.start(receiver.nextPlayTime);
+            receiver.nextPlayTime += buffer.duration;
         } finally { data.close(); }
     }
 
-    playPcm(bytes) {
+    playPcm(bytes, streamId = 'default') {
         if (bytes.length !== 1920) return;
         const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
         this._playAudioData({ numberOfFrames: 960, numberOfChannels: 1, sampleRate: 48000,
             copyTo: samples => { for (let i = 0; i < 960; i++) samples[i] = view.getInt16(i * 2, true) / 32768; },
-            close() {} });
+            close() {} }, streamId);
     }
 
     async dispose() {
         this.stopCapture();
         this.stopPlayback();
         if (this.encoder?.state !== 'closed') this.encoder?.close();
-        if (this.decoder?.state !== 'closed') this.decoder?.close();
         if (this.audioContext?.state !== 'closed') await this.audioContext?.close();
-        this.encoder = this.decoder = this.audioContext = null;
+        this.encoder = this.audioContext = null;
     }
 }
 
@@ -430,7 +453,7 @@ export async function checkVoiceCapabilities() {
     try {
         const config = { codec: 'opus', sampleRate: 48000, numberOfChannels: 1 };
         const [encoder, decoder] = await Promise.all([
-            AudioEncoder.isConfigSupported({ ...config, bitrate: 64000 }),
+            AudioEncoder.isConfigSupported({ ...config, bitrate: 128000 }),
             AudioDecoder.isConfigSupported(config)
         ]);
         if (typeof AudioData !== 'undefined' && encoder.supported && decoder.supported)

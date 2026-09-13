@@ -1,0 +1,19 @@
+.message-menu-dialog{position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:16px;border:0;background:transparent;color:var(--text);overflow:auto}
+.message-menu-dialog:not([open]){display:none}
+.message-menu-dialog::backdrop{background:#0005;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.message-menu-stack{position:absolute;left:16px;right:16px;top:var(--menu-top,20%);max-width:420px;margin-right:auto;display:flex;flex-direction:column;gap:12px;animation:message-menu-in .18s ease-out;transform-origin:center}
+.message-menu-stack.mine{margin-left:auto;margin-right:0}
+.message-menu-stack ::deep .menu-reactions{display:flex;justify-content:space-evenly;gap:4px;border-radius:32px;padding:8px;background:var(--surface2)}
+.message-menu-stack ::deep .menu-reactions button{font-size:28px;min-width:40px;min-height:44px}
+.message-menu-stack ::deep .menu-message-preview{order:1;align-self:flex-start;max-width:90%;padding:12px 16px;border-radius:20px;background:var(--surface2);white-space:pre-wrap;overflow-wrap:anywhere;max-height:140px;overflow:auto}
+.message-menu-stack.mine ::deep .menu-message-preview{align-self:flex-end;background:var(--bub-out);color:var(--bub-out-text)}
+.message-menu-stack ::deep .menu-message-preview img{display:block;max-width:180px;max-height:140px;object-fit:contain;border-radius:12px}
+.message-menu-stack ::deep .menu-message-preview:has(img) .menu-preview-label{display:none}
+.message-menu-stack ::deep .menu-message-preview:has(img){padding:0;max-height:none;overflow:hidden;background:transparent}
+.message-menu-stack ::deep .menu-actions{order:2;width:min(270px,100%);border-radius:20px;overflow:hidden;background:var(--surface2)}
+.message-menu-stack.mine ::deep .menu-actions{align-self:flex-end}
+.message-menu-stack ::deep .menu-actions button{display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:48px;padding:12px 18px;width:100%;text-align:left;border-bottom:1px solid var(--border);font-size:16px}
+.message-menu-stack ::deep .menu-actions button:last-child{border:0}
+.message-menu-stack ::deep .menu-actions button.danger{color:var(--danger)}
+@keyframes message-menu-in{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+@media(prefers-reduced-motion:reduce){.message-menu-stack{animation:none}}

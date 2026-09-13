@@ -407,6 +407,7 @@ public sealed partial class ThreadService(
                     Id = t.Id,
                     Name = t.Name,
                     HasCustomName = t.HasCustomName,
+                    PhotoStorageFileId = t.PhotoStorageFileId,
                     Description = t.Description,
                     TypeId = t.TypeId,
                     CreatedAt = t.CreatedAt,
@@ -483,6 +484,7 @@ public sealed partial class ThreadService(
                 Id = thread.Id,
                 Name = thread.Name,
                 HasCustomName = thread.HasCustomName,
+                PhotoStorageFileId = thread.PhotoStorageFileId,
                 Description = thread.Description,
                 Features = thread.Features,
                 CanManage = await CanManageThreadAsync(members.First(m => m.CredentialId == caller.CredentialId), ct),
@@ -579,6 +581,19 @@ public sealed partial class ThreadService(
 
             if (!await CanManageThreadAsync(member, ct))
                 return Result<CmdResponse>.Forbidden("Only thread admins can update this thread");
+
+            if (request.PhotoStorageFileId is { } photoId)
+            {
+                if (await dataContext.Query<MessageDirectThread>().Where(x => x.TenantId == caller.TenantId && x.MessageThreadId == thread.Id && !x.IsDeleted && x.IsEnabled).AnyAsync(ct))
+                    return Result<CmdResponse>.Failure("Only group conversations have a shared photo", 400);
+                var photo = await storageServiceWrapper.ValidateChatStorageFileReference(new ValidateChatStorageFileReferenceRequest
+                { Metadata = request.Metadata, ThreadId = thread.Id, StorageFileId = photoId }, ct);
+                if (!photo.IsSuccess || photo.Response is not { IsValid: true } image)
+                    return Result<CmdResponse>.Failure("The conversation photo is not available", photo.IsSuccess ? 400 : (int)photo.HttpStatusCode);
+                if (image.ContentType is not ("image/jpeg" or "image/png" or "image/webp") || image.ContentLengthBytes is not (> 0 and <= 5 * 1024 * 1024))
+                    return Result<CmdResponse>.Failure("Choose a JPEG, PNG or WebP photo up to 5 MB", 400);
+                thread.PhotoStorageFileId = photoId;
+            }
 
             if (request.Features is { } features)
             {

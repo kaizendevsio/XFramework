@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace Yap.Contracts;
 
 // Browser-facing models contain chat data only, never service credentials or actor tokens.
-public sealed record UserSession(Guid CredentialId, Guid TenantId, string Name);
+public sealed record UserSession(Guid CredentialId, Guid TenantId, string Name, string? AvatarUrl = null);
 public sealed record SessionResponse(UserSession? User, string AntiforgeryToken);
 public sealed record Person(Guid Id, string Name, string UserName, string? AvatarUrl = null, Guid MemberId = default, string Role = "Member", string? Nickname = null);
 public sealed record ReactionType(Guid Id, string Name, string Emoji);
@@ -16,6 +16,7 @@ public sealed class Conversation
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = "Conversation";
+    public string? AvatarUrl { get; set; }
     public bool Group { get; set; }
     public int Members { get; set; }
     public int Unread { get; set; }

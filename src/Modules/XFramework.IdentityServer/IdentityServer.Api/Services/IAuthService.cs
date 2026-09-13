@@ -96,6 +96,9 @@ public interface IAuthService
         UploadCredentialAvatarRequest request,
         CancellationToken ct = default);
 
+    Task<Result<CredentialAvatarResponse>> UploadOwnAvatarAsync(
+        UploadOwnAvatarRequest request, CancellationToken ct = default);
+
     Task<Result<CredentialAvatarResponse>> SetCredentialAvatarAsync(
         SetCredentialAvatarRequest request,
         CancellationToken ct = default);

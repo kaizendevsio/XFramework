@@ -6,7 +6,7 @@ using XFramework.Integration.Security;
 
 namespace Yap.Services;
 
-public sealed record ChatPerson(Guid Id, string Name, string UserName, string? AvatarUrl = null);
+public sealed record ChatPerson(Guid Id, string Name, string UserName, string? AvatarUrl = null, Guid? AvatarStorageFileId = null);
 
 public interface IChatDirectory
 {
@@ -31,12 +31,12 @@ public sealed class ChatDirectory(IServiceProvider services, ICommunicationsChat
         var people = new List<ChatPerson>();
         foreach (var ids in credentialIds.Distinct().Chunk(50))
         {
-            var members = await data.Query<IdentityCredential>()
+            var members = await data.Query<IdentityCredential>().NoCache()
                 .Where(p => p.TenantId == actor.TenantId && ids.Contains(p.Id) && p.IsEnabled && !p.IsDeleted)
                 .Take(50).ToListAsync(ct);
             people.AddRange(members.Select(p => new ChatPerson(p.Id,
                 string.IsNullOrWhiteSpace(p.UserAlias) ? p.UserName ?? "Workspace member" : p.UserAlias,
-                p.UserName ?? "", p.AvatarUrl)));
+                p.UserName ?? "", AvatarUrl(p, actor), p.AvatarStorageFileId)));
         }
         return people;
     }
@@ -58,6 +58,11 @@ public sealed class ChatDirectory(IServiceProvider services, ICommunicationsChat
             .OrderBy(p => p.UserName).Take(20).ToListAsync(ct);
         return people.Select(p => new ChatPerson(p.Id,
             string.IsNullOrWhiteSpace(p.UserAlias) ? p.UserName ?? "Workspace member" : p.UserAlias,
-            p.UserName ?? "", p.AvatarUrl)).ToArray();
+            p.UserName ?? "", AvatarUrl(p, actor), p.AvatarStorageFileId)).ToArray();
     }
+
+    private static string? AvatarUrl(IdentityCredential person, CommunicationsChatActor actor) =>
+        person.AvatarStorageFileId is { } file
+            ? $"/api/chat/people/{person.Id}/photo?account={actor.TenantId:N}:{actor.CredentialId:N}&v={file:N}"
+            : person.AvatarUrl;
 }

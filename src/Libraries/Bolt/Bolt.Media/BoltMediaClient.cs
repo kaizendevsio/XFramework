@@ -278,7 +278,27 @@ public sealed class BoltMediaClient : IAsyncDisposable
     private void HandleCallSignal(BoltConnection conn, byte[] buffer, int length)
     {
         if (!BoltCodec.TryReadCallSignal(buffer.AsSpan(0, length), out var header)) return;
+        if (header.SignalType == SignalType.StreamEnded)
+        {
+            if (header.PayloadLength == 16 && _activeCalls.ContainsKey(header.CallId))
+                _ = RemoveRemoteStreamAsync(header.CallId, new Guid(buffer.AsSpan(header.PayloadOffset, 16)));
+            return;
+        }
         _ = HandleCallSignalAsync(header);
+    }
+
+    private async Task RemoveRemoteStreamAsync(Guid callId, Guid streamId)
+    {
+        if (!_mediaStreams.TryGetValue(streamId, out var stream) || stream.CallId != callId) return;
+        if (!_mediaStreams.TryRemove(new KeyValuePair<Guid, BoltMediaStream>(streamId, stream))) return;
+        _bitrateControllers.TryRemove(streamId, out var controller);
+        try { await stream.DisposeAsync(); }
+        catch (Exception ex) { _logger.LogWarning(ex, "Failed to dispose ended media stream {StreamId}", streamId); }
+        if (controller is not null)
+        {
+            try { await controller.DisposeAsync(); }
+            catch (Exception ex) { _logger.LogWarning(ex, "Failed to dispose ended bitrate controller {StreamId}", streamId); }
+        }
     }
 
     private async Task HandleCallSignalAsync(CallSignalHeader header)

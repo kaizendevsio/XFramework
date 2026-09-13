@@ -17,4 +17,5 @@ public partial record ThreadListItemResponse
     public bool IsDirect { get; set; }
     public bool HasCustomName { get; set; }
     public Guid? OtherCredentialId { get; set; }
+    public Guid? PhotoStorageFileId { get; set; }
 }

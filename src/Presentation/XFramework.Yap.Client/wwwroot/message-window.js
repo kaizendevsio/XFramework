@@ -14,7 +14,7 @@
     const origin = state => (parseFloat(getComputedStyle(state.element).paddingTop) || 0) + state.element.querySelector('[data-window-lead]').getBoundingClientRect().height;
     const sample = state => {
         const position = state.element.scrollTop;
-        if (position > state.lastTop + .5 && state.element.scrollHeight - position - state.element.clientHeight < 8) state.pinned = true;
+        if (!state.hasNewer && position > state.lastTop + .5 && state.element.scrollHeight - position - state.element.clientHeight < 8) state.pinned = true;
         state.lastTop = position;
     };
     const move = (state, position) => {
@@ -46,6 +46,10 @@
             state.loadedBefore = state.ids[0];
             state.ref.invokeMethodAsync('LoadEarlier').catch(() => {});
         }
+        if (state.hasNewer && last >= state.ids.length - 8 && state.loadedAfter !== state.ids.at(-1)) {
+            state.loadedAfter = state.ids.at(-1);
+            state.ref.invokeMethodAsync('LoadNewer').catch(() => {});
+        }
     };
     const schedule = state => {
         if (state.frame || !state.element.isConnected) return;
@@ -66,7 +70,14 @@
         const position = state.element.scrollTop;
         const index = rowAt(state, Math.max(0, position - state.origin));
         const anchor = state.ids[index], oldOffset = state.offsets[index] || 0, oldOrigin = state.origin;
-        if (next) Object.assign(state, next, { ids: [...next.ids] });
+        if (next) {
+            if (state.ids[0] !== next.ids[0]) state.loadedBefore = undefined;
+            if (state.ids.at(-1) !== next.ids.at(-1)) state.loadedAfter = undefined;
+            Object.assign(state, next, { ids: [...next.ids] });
+            const retained = new Set(state.ids);
+            for (const id of state.heights.keys()) if (!retained.has(id)) state.heights.delete(id);
+            if (state.hasNewer) state.pinned = false;
+        }
         for (const row of state.element.querySelectorAll('[data-window-row]')) {
             const height = row.getBoundingClientRect().height;
             if (height) state.heights.set(row.dataset.windowRow, height);
@@ -82,7 +93,7 @@
         schedule(state);
     };
     window.yap.messageWindow = {
-        sync(element, ref, ids, start, count, hasMore) {
+        sync(element, ref, ids, start, count, hasMore, hasNewer = false) {
             let state = states.get(element);
             if (!state) {
                 state = { element, ref, ids: [], heights: new Map(), offsets: [0], origin: origin({ element }), lastTop: element.scrollTop, pinned: true, observed: new Set() };
@@ -106,7 +117,7 @@
             }
             for (const row of state.observed) if (!row.isConnected) { state.resize.unobserve(row); state.observed.delete(row); }
             for (const row of element.querySelectorAll('[data-window-row]')) if (!state.observed.has(row)) { state.observed.add(row); state.resize.observe(row); }
-            layout(state, { ids, start, count, hasMore });
+            layout(state, { ids, start, count, hasMore, hasNewer });
         },
         bottom(element) { const state = states.get(element); if (state) { state.pinned = true; move(state, element.scrollHeight - element.clientHeight); schedule(state); } },
         show(element, id) {

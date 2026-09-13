@@ -25,7 +25,13 @@ public sealed class BoltMediaService : IAsyncDisposable
     private readonly ILogger<BoltMediaService> _logger;
 
     private BoltMediaClient? _mediaClient;
-    private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _streamPlaybackTasks = new();
+    private sealed class PlaybackLoop
+    {
+        public CancellationTokenSource Cancellation { get; } = new();
+        public Task Completion { get; set; } = Task.CompletedTask;
+    }
+
+    private readonly ConcurrentDictionary<Guid, PlaybackLoop> _streamPlaybackTasks = new();
 
     private Guid _activeAudioStreamId;
     private Guid _activeVideoStreamId;
@@ -286,21 +292,21 @@ public sealed class BoltMediaService : IAsyncDisposable
 
     private void StartPlaybackLoop(BoltMediaStream stream)
     {
-        var cts = new CancellationTokenSource();
-        if (!_streamPlaybackTasks.TryAdd(stream.StreamId, cts))
+        var loop = new PlaybackLoop();
+        if (!_streamPlaybackTasks.TryAdd(stream.StreamId, loop))
         {
-            cts.Dispose();
+            loop.Cancellation.Dispose();
             return;
         }
 
-        _ = Task.Run(async () =>
+        loop.Completion = Task.Run(async () =>
         {
             try
             {
-                await foreach (var frame in stream.ReadFramesAsync(cts.Token))
+                await foreach (var frame in stream.ReadFramesAsync(loop.Cancellation.Token))
                 {
                     if (stream.IsAudio)
-                        await _audio.DecodeFrameAsync(frame.Data, frame.Timestamp);
+                        await _audio.DecodeFrameAsync(stream.StreamId, frame.Data, frame.Timestamp);
                     else
                         await _video.DecodeFrameAsync(frame.Data, frame.Timestamp, frame.IsKeyframe);
                 }
@@ -312,21 +318,28 @@ public sealed class BoltMediaService : IAsyncDisposable
             }
             finally
             {
-                if (_streamPlaybackTasks.TryRemove(stream.StreamId, out var removed))
-                    removed.Dispose();
+                try
+                {
+                    if (stream.IsAudio) await _audio.ReleaseRemoteStreamAsync(stream.StreamId);
+                }
+                finally
+                {
+                    if (_streamPlaybackTasks.TryRemove(stream.StreamId, out var removed))
+                        removed.Cancellation.Dispose();
+                }
             }
         });
     }
 
     private async Task StopPipelinesAsync()
     {
-        foreach (var (streamId, _) in _streamPlaybackTasks.ToArray())
+        var loops = _streamPlaybackTasks.Values.ToArray();
+        foreach (var loop in loops)
         {
-            if (!_streamPlaybackTasks.TryRemove(streamId, out var cts))
-                continue;
-            await cts.CancelAsync();
-            cts.Dispose();
+            try { await loop.Cancellation.CancelAsync(); }
+            catch (ObjectDisposedException) { /* The completed loop has already released its token. */ }
         }
+        await Task.WhenAll(loops.Select(loop => loop.Completion));
         _activeAudioStreamId = Guid.Empty;
         _activeVideoStreamId = Guid.Empty;
         _hasVideo = false;

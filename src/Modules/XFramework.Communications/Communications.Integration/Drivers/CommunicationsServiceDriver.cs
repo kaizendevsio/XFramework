@@ -30,6 +30,7 @@ public interface ICommunicationsServiceWrapper : IServiceWrapper
 {
     Task<QueryResponse<StorageUploadSessionResponse>> CreateChatAttachmentUploadAsync(CreateChatAttachmentUploadRequest request, CancellationToken ct = default);
     Task<QueryResponse<StorageDownloadUrlResponse>> GetChatAttachmentDownloadUrlAsync(GetChatAttachmentDownloadUrlRequest request, CancellationToken ct = default);
+    Task<QueryResponse<StorageDownloadUrlResponse>> GetThreadPhotoDownloadUrlAsync(GetThreadPhotoDownloadUrlRequest request, CancellationToken ct = default);
     Task<QueryResponse<ChatReferenceDataResponse>> EnsureChatDefaultsAsync(EnsureChatDefaultsRequest request, CancellationToken ct = default);
     Task<QueryResponse<ChatReferenceDataResponse>> GetChatReferenceDataAsync(GetChatReferenceDataRequest request, CancellationToken ct = default);
     Task<QueryResponse<PaginatedResult<MessageReactionResponse>>> GetMessageReactionsAsync(GetMessageReactionsRequest request, CancellationToken ct = default);
@@ -552,6 +553,9 @@ public sealed record CommunicationsServiceWrapper(
 
     public Task<QueryResponse<StorageDownloadUrlResponse>> GetChatAttachmentDownloadUrlAsync(GetChatAttachmentDownloadUrlRequest request, CancellationToken ct = default) =>
         SendAsync<GetChatAttachmentDownloadUrlRequest, StorageDownloadUrlResponse>(request, ct);
+
+    public Task<QueryResponse<StorageDownloadUrlResponse>> GetThreadPhotoDownloadUrlAsync(GetThreadPhotoDownloadUrlRequest request, CancellationToken ct = default) =>
+        SendAsync<GetThreadPhotoDownloadUrlRequest, StorageDownloadUrlResponse>(request, ct);
 
     public Task<QueryResponse<ChatReferenceDataResponse>> GetChatReferenceDataAsync(GetChatReferenceDataRequest request, CancellationToken ct = default) =>
         SendAsync<GetChatReferenceDataRequest, ChatReferenceDataResponse>(request, ct);

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-function fixture() {
+function fixture(ref = { invokeMethodAsync: async () => {} }) {
     const events = new Map(), frames = new Map(); let nextFrame = 0, resize;
     const ids = Array.from({ length: 30 }, (_, i) => `m${i}`);
     const rows = ids.map(id => ({ dataset: { windowRow: id }, style: {}, isConnected: true, height: 100, getBoundingClientRect() { return { height: this.height }; } }));
@@ -19,7 +19,7 @@ function fixture() {
         ResizeObserver: class { constructor(callback) { resize = callback; } observe() {} unobserve() {} disconnect() {} }
     };
     vm.runInNewContext(readFileSync(new URL('../../Presentation/XFramework.Yap.Client/wwwroot/message-window.js', import.meta.url), 'utf8'), context);
-    const api = context.window.yap.messageWindow, ref = { invokeMethodAsync: async () => {} };
+    const api = context.window.yap.messageWindow;
     const sync = () => api.sync(element, ref, ids, 0, ids.length, true);
     const flush = () => { const pending = [...frames.values()]; frames.clear(); pending.forEach(callback => callback()); };
     sync(); flush();
@@ -76,4 +76,28 @@ test('late image above the viewport adjusts once without undoing subsequent upwa
     f.element.scrollTop -= 80;
     f.resize(); f.sync();
     assert.equal(f.element.scrollTop, 2020);
+});
+
+test('bounded history windows preserve the same visible message in both directions', () => {
+    const f = fixture();
+    f.events.get('wheel')({ deltaY: -800 }); f.element.scrollTop = 1800; f.events.get('scroll')();
+    const original = [...f.ids];
+    const older = ['old0', 'old1', 'old2', 'old3', 'old4', ...original.slice(0, -5)];
+    f.api.sync(f.element, { invokeMethodAsync: async () => {} }, older, 0, 30, true, true);
+    assert.equal(f.element.scrollTop, 2300);
+    f.api.sync(f.element, { invokeMethodAsync: async () => {} }, original, 0, 30, true, false);
+    assert.equal(f.element.scrollTop, 1800);
+});
+
+test('returning to a previous history window can load its earlier edge again', () => {
+    const calls = [];
+    const ref = { invokeMethodAsync: async name => { calls.push(name); } };
+    const f = fixture(ref);
+    f.events.get('wheel')({ deltaY: -3000 }); f.element.scrollTop = 0;
+    f.api.sync(f.element, ref, f.ids, 0, 30, true, true); f.flush();
+    assert.equal(calls.filter(x => x === 'LoadEarlier').length, 1);
+    const other = ['older', ...f.ids.slice(0, -1)];
+    f.api.sync(f.element, ref, other, 0, 30, true, true);
+    f.api.sync(f.element, ref, f.ids, 0, 30, true, true); f.flush();
+    assert.equal(calls.filter(x => x === 'LoadEarlier').length, 2);
 });

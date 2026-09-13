@@ -9,6 +9,36 @@ namespace Communications.Tests.Services;
 public sealed partial class ThreadServiceSecurityTests
 {
     [Test]
+    public async Task GroupPhoto_RequiresAdminAndAuthorizedStorage_AndDownloadRequiresMembership()
+    {
+        var tenant = Guid.NewGuid(); var thread = Thread(Guid.NewGuid(), tenant);
+        var admin = Member(Guid.NewGuid(), thread.Id, Guid.NewGuid(), tenant); admin.Role = MessageThreadMemberRoles.Admin;
+        var member = Member(Guid.NewGuid(), thread.Id, Guid.NewGuid(), tenant);
+        var context = new InMemoryDataContext(); context.Seed(thread, admin, member);
+        var storage = new TestStorageServiceWrapper(); var service = CreateService(context, storage: storage);
+        var photo = Guid.NewGuid();
+        var request = new UpdateThreadRequest { ThreadId = thread.Id, PhotoStorageFileId = photo, Metadata = Metadata(member.CredentialId, tenant) };
+        Assert.That((await service.UpdateThreadAsync(request)).StatusCode, Is.EqualTo(403));
+        Assert.That(thread.PhotoStorageFileId, Is.Null);
+        var denied = CreateService(context, storage: new TestStorageServiceWrapper { DenyChatAttachment = true });
+        request.Metadata = Metadata(admin.CredentialId, tenant);
+        Assert.That((await denied.UpdateThreadAsync(request)).StatusCode, Is.EqualTo(403));
+        Assert.That(thread.PhotoStorageFileId, Is.Null);
+        Assert.That((await service.UpdateThreadAsync(request)).IsSuccess, Is.True);
+        Assert.That(thread.PhotoStorageFileId, Is.EqualTo(photo));
+        var result = await service.GetThreadPhotoDownloadUrlAsync(new() { ThreadId = thread.Id, Metadata = Metadata(member.CredentialId, tenant) });
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(storage.LastChatDownload!.StorageFileId, Is.EqualTo(photo));
+        Assert.That(storage.LastChatDownload.ThreadId, Is.EqualTo(thread.Id));
+        var calls = storage.ChatDownloadCalls;
+        Assert.That((await service.GetThreadPhotoDownloadUrlAsync(new() { ThreadId = thread.Id, Metadata = Metadata(Guid.NewGuid(), tenant) })).IsSuccess, Is.False);
+        Assert.That(storage.ChatDownloadCalls, Is.EqualTo(calls));
+        request.Metadata = Metadata(admin.CredentialId, tenant);
+        context.Seed(new MessageDirectThread { Id = Guid.NewGuid(), TenantId = tenant, MessageThreadId = thread.Id, IsEnabled = true });
+        Assert.That((await service.UpdateThreadAsync(request)).StatusCode, Is.EqualTo(400));
+    }
+
+    [Test]
     public async Task Settings_RequireAdmin_AndReturnFeaturesAndNicknames()
     {
         var tenant = Guid.NewGuid(); var thread = Thread(Guid.NewGuid(), tenant);

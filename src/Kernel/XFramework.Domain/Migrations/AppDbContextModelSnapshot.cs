@@ -1951,6 +1951,9 @@ namespace XFramework.Domain.Migrations
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<Guid?>("PhotoStorageFileId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 

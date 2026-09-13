@@ -7,6 +7,18 @@ namespace Communications.Api.Services;
 
 public sealed partial class ThreadService
 {
+    public async Task<Result<StorageDownloadUrlResponse>> GetThreadPhotoDownloadUrlAsync(GetThreadPhotoDownloadUrlRequest request, CancellationToken ct = default)
+    {
+        var thread = await GetThreadAsync(new Communications.Domain.Shared.Contracts.Requests.Threads.GetThreadRequest
+        { Id = request.ThreadId, Metadata = request.Metadata }, ct);
+        if (!thread.IsSuccess) return Result<StorageDownloadUrlResponse>.Failure(thread.Message ?? "Conversation unavailable", thread.StatusCode);
+        if (thread.Data?.PhotoStorageFileId is not { } photo) return Result<StorageDownloadUrlResponse>.NotFound("No conversation photo");
+        var result = await storageServiceWrapper.GetChatStorageDownloadUrl(new GetChatStorageDownloadUrlRequest
+        { Metadata = request.Metadata, ThreadId = request.ThreadId, StorageFileId = photo, ExpirationMinutes = 1 }, ct);
+        return result.IsSuccess && result.Response is not null
+            ? Result<StorageDownloadUrlResponse>.Success(result.Response)
+            : Result<StorageDownloadUrlResponse>.Failure(result.Message ?? "Conversation photo unavailable", result.IsSuccess ? 502 : (int)result.HttpStatusCode);
+    }
     public async Task<Result<StorageUploadSessionResponse>> CreateChatAttachmentUploadAsync(
         CreateChatAttachmentUploadRequest request, CancellationToken ct = default)
     {

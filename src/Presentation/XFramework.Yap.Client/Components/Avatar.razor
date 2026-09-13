@@ -6,4 +6,11 @@
     [Parameter] public bool Online { get; set; }
     [Parameter] public string? ImageUrl { get; set; }
     private bool failed;
+    private string? previousImage;
+    protected override void OnParametersSet()
+    {
+        if (previousImage == ImageUrl) return;
+        previousImage = ImageUrl;
+        failed = false;
+    }
 }

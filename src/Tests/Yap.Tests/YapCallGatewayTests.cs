@@ -22,6 +22,96 @@ namespace Yap.Tests;
 [TestFixture]
 public sealed class YapCallGatewayTests
 {
+    [Test]
+    public async Task GroupAdmission_ProductionConstructor_RemainsDisabled()
+    {
+        await using var f = await Fixture.CreateAsync();
+        var error = Assert.ThrowsAsync<YapApiException>(() => f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId, f.CharlieId]));
+        Assert.That(error!.Status, Is.EqualTo(503));
+    }
+
+    [Test]
+    public async Task GroupConnect_RequiresEachInvitedMemberToAccept()
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        var room = await f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId, f.CharlieId]);
+        var denied = Assert.ThrowsAsync<YapApiException>(() => f.Gateway.ConnectGroupAsync(f.Bob, room.Id));
+        Assert.That(denied!.Status, Is.EqualTo(403));
+        await f.Gateway.AcceptGroupAsync(f.Bob, room.Id);
+        Assert.That((await f.Gateway.ConnectGroupAsync(f.Bob, room.Id)).ClientId, Is.EqualTo(YapCallGateway.ClientId(room.Id, f.BobId)));
+        Assert.ThrowsAsync<YapApiException>(() => f.Gateway.ConnectGroupAsync(f.Charlie, room.Id));
+        Assert.That(f.Gateway.GroupRoster(f.Alice, room.Id).Participants.Count(x => x.Accepted), Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task GroupAdmission_NonmemberAndForeignTenant_AreRejected()
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        Assert.ThrowsAsync<YapApiException>(() => f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId, Guid.NewGuid()]));
+        var room = await f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId, f.CharlieId]);
+        Assert.That(Assert.Throws<YapApiException>(() => f.Gateway.GroupRoster(f.OtherTenant, room.Id))!.Status, Is.EqualTo(404));
+    }
+
+    [Test]
+    public async Task GroupAcceptanceAndConnection_RecheckMembership()
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        var room = await f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId, f.CharlieId]);
+        await f.Gateway.AcceptGroupAsync(f.Bob, room.Id);
+        f.Members.RemoveAll(x => x.CredentialId == f.BobId || x.CredentialId == f.CharlieId);
+        Assert.That(Assert.ThrowsAsync<YapApiException>(() => f.Gateway.ConnectGroupAsync(f.Bob, room.Id))!.Status, Is.EqualTo(403));
+        Assert.That(Assert.ThrowsAsync<YapApiException>(() => f.Gateway.AcceptGroupAsync(f.Charlie, room.Id))!.Status, Is.EqualTo(403));
+    }
+
+    [Test]
+    public async Task GroupLeave_RemovesOwnMembershipAndTicket_WithoutEndingRemainingMembers()
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        var room = await f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId, f.CharlieId]);
+        await f.Gateway.AcceptGroupAsync(f.Bob, room.Id);
+        await f.Gateway.AcceptGroupAsync(f.Charlie, room.Id);
+        var ticket = await f.Gateway.ConnectGroupAsync(f.Bob, room.Id);
+        await f.Gateway.LeaveGroupAsync(f.Bob, room.Id);
+        Assert.That(f.Gateway.GroupRoster(f.Alice, room.Id).Participants.Single(x => x.CredentialId == f.BobId).Left, Is.True);
+        Assert.That(f.Gateway.GroupRoster(f.Charlie, room.Id).Participants.Count(x => x.Accepted && !x.Left), Is.EqualTo(2));
+        Assert.Throws<YapApiException>(() => f.Gateway.GroupRoster(f.Bob, room.Id));
+        Assert.That(Assert.ThrowsAsync<YapApiException>(() => f.Gateway.AcceptSocketAsync(Context(f.Bob, ticket.Url)))!.Status, Is.EqualTo(403));
+    }
+
+    [Test]
+    public async Task GroupAccept_IsBoundToTheAcceptingSession()
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        var room = await f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId, f.CharlieId]);
+        await f.Gateway.AcceptGroupAsync(f.Bob, room.Id);
+        var otherIdentity = new ClaimsIdentity(f.Bob.Identity as ClaimsIdentity);
+        otherIdentity.RemoveClaim(otherIdentity.FindFirst(YapAuth.SessionClaim)!);
+        otherIdentity.AddClaim(new(YapAuth.SessionClaim, "another-session"));
+        Assert.That(Assert.ThrowsAsync<YapApiException>(() => f.Gateway.ConnectGroupAsync(new(otherIdentity), room.Id))!.Status, Is.EqualTo(403));
+    }
+
+    [Test]
+    public async Task GroupReady_BeforeRegistration_IsDenied()
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        var room = await f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId, f.CharlieId]);
+        await f.Gateway.AcceptGroupAsync(f.Bob, room.Id);
+        Assert.That(Assert.ThrowsAsync<YapApiException>(() => f.Gateway.ReadyGroupAsync(f.Bob, room.Id))!.Status, Is.EqualTo(409));
+    }
+
+    [Test]
+    public async Task GroupFailedUpgrade_LeavesOnlyFailedMember()
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        var room = await f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId, f.CharlieId]);
+        await f.Gateway.AcceptGroupAsync(f.Bob, room.Id);
+        var ticket = await f.Gateway.ConnectGroupAsync(f.Bob, room.Id);
+        Assert.ThrowsAsync<IOException>(() => f.Gateway.AcceptSocketAsync(Context(f.Bob, ticket.Url)));
+        var roster = f.Gateway.GroupRoster(f.Alice, room.Id);
+        Assert.That(roster.Participants.Single(x => x.CredentialId == f.BobId).Left, Is.True);
+        Assert.That(roster.Participants.Count(x => !x.Left), Is.EqualTo(2));
+    }
+
     [TestCase("https://yap.example", true)]
     [TestCase("https://yap.example:8443", false)]
     [TestCase("https://other.example", false)]
@@ -133,14 +223,16 @@ public sealed class YapCallGatewayTests
     {
         public Guid Thread { get; } = Guid.NewGuid();
         public Guid BobId { get; private set; }
+        public Guid CharlieId { get; private set; }
         public List<ThreadMemberResponse> Members { get; } = [];
         public ClaimsPrincipal Alice { get; private set; } = null!;
         public ClaimsPrincipal Bob { get; private set; } = null!;
+        public ClaimsPrincipal Charlie { get; private set; } = null!;
         public ClaimsPrincipal OtherTenant { get; private set; } = null!;
         public YapCallGateway Gateway { get; private set; } = null!;
         private ServiceProvider provider = null!;
 
-        public static async Task<Fixture> CreateAsync()
+        public static async Task<Fixture> CreateAsync(bool groupLifecycle = false)
         {
             var fixture = new Fixture();
             var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
@@ -156,14 +248,21 @@ public sealed class YapCallGatewayTests
             var sessions = fixture.provider.GetRequiredService<YapSessions>();
             var alice = YapSessionsTests.Session();
             var bob = YapSessionsTests.Session();
+            var charlie = YapSessionsTests.Session();
             bob.Credential!.TenantId = alice.Credential!.TenantId;
+            charlie.Credential!.TenantId = alice.Credential.TenantId;
             fixture.BobId = bob.Credential.Id;
+            fixture.CharlieId = charlie.Credential.Id;
             fixture.Alice = await sessions.CreateAsync(alice);
             fixture.Bob = await sessions.CreateAsync(bob);
+            fixture.Charlie = await sessions.CreateAsync(charlie);
             fixture.OtherTenant = await sessions.CreateAsync(YapSessionsTests.Session());
             fixture.Members.Add(new() { CredentialId = alice.Credential.Id });
             fixture.Members.Add(new() { CredentialId = bob.Credential.Id });
-            fixture.Gateway = new(configuration, fixture.provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<BoltServer>.Instance);
+            fixture.Members.Add(new() { CredentialId = charlie.Credential.Id });
+            fixture.Gateway = groupLifecycle
+                ? new(configuration, fixture.provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<BoltServer>.Instance, enableGroupLifecycle: true)
+                : new(configuration, fixture.provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<BoltServer>.Instance);
             return fixture;
         }
         public async ValueTask DisposeAsync() { Gateway.Dispose(); await provider.DisposeAsync(); }

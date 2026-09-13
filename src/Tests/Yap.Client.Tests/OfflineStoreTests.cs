@@ -9,6 +9,25 @@ namespace Yap.Client.Tests;
 public sealed class OfflineStoreTests
 {
     [Test]
+    public async Task HistoryWindow_AnchorsAcrossNewArrivals_AndKeepsEqualTimestampOrder()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var thread = Guid.NewGuid(); var now = DateTime.UtcNow.Date;
+        var messages = Enumerable.Range(0, 250).Select(i => { var m = fixture.Message(thread); m.CreatedAt = now.AddSeconds(i / 2); return m; }).ToList();
+        await fixture.Store.SaveMessagesAsync("a", messages);
+        var window = await fixture.Store.MessagesAsync("a", thread, limit: 100, skip: 50);
+        Assert.That(window, Has.Count.EqualTo(100));
+        Assert.That(await fixture.Store.MessageOffsetAsync("a", thread, window[^1].Id), Is.EqualTo(50));
+        var arrival = fixture.Message(thread); arrival.CreatedAt = now.AddDays(1);
+        await fixture.Store.SaveMessagesAsync("a", [arrival]);
+        var offset = await fixture.Store.MessageOffsetAsync("a", thread, window[^1].Id);
+        Assert.That(offset, Is.EqualTo(51));
+        var refreshed = await fixture.Store.MessagesAsync("a", thread, limit: 100, skip: offset);
+        Assert.That(refreshed.Select(x => x.Id), Is.EqualTo(window.Select(x => x.Id)));
+        Assert.That(await fixture.Store.MessageOffsetAsync("b", thread, window[^1].Id), Is.Zero);
+    }
+
+    [Test]
     public async Task Favorite_SurvivesServerRefresh_AndStaysWithinAccount()
     {
         await using var fixture = await StoreFixture.CreateAsync();

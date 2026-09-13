@@ -11,7 +11,7 @@ using Yap.Contracts;
 namespace Yap.Services;
 
 /// <summary>One Yap instance, trusted-server TLS relay. This is explicitly not end-to-end encryption.</summary>
-public sealed class YapCallGateway : IBoltCallAuthorizer, IDisposable
+public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCallAuthorizer, IDisposable
 {
     private readonly object gate = new();
     private readonly Dictionary<Guid, ActiveInvite> invites = [];
@@ -23,8 +23,13 @@ public sealed class YapCallGateway : IBoltCallAuthorizer, IDisposable
     public BoltServer Server { get; }
 
     public YapCallGateway(IConfiguration configuration, IServiceScopeFactory scopes, ILogger<BoltServer> logger)
+        : this(configuration, scopes, logger, enableGroupLifecycle: false) { }
+
+    // No configuration or public endpoint enables this path until the shared E2EE implementation is verified.
+    internal YapCallGateway(IConfiguration configuration, IServiceScopeFactory scopes, ILogger<BoltServer> logger, bool enableGroupLifecycle)
     {
         this.scopes = scopes;
+        groupLifecycleEnabled = enableGroupLifecycle;
         Enabled = configuration.GetValue<bool>("Yap:Calls:Enabled");
         if (Enabled && configuration["Yap:Calls:SecurityMode"] != "TrustedServerTls")
             throw new InvalidOperationException("Yap calls require the explicit TrustedServerTls security mode.");
@@ -32,10 +37,13 @@ public sealed class YapCallGateway : IBoltCallAuthorizer, IDisposable
         {
             MediaEnabled = Enabled, RequireSecureTransport = true, AuthenticatedMediaOnly = true,
             CallAuthorizer = this, MaxActiveCalls = 64, MaxActiveCallsPerPrincipal = 1,
-            MaxCallParticipants = 2, MaxMediaStreamsPerPrincipal = 2,
+            GroupCallAuthorizer = enableGroupLifecycle ? this : null,
+            MaxCallParticipants = enableGroupLifecycle ? 8 : 2, MaxMediaStreamsPerPrincipal = 2,
             MaxFrameBytes = 64 * 1024, SendQueueCapacity = 64, SendQueueByteCapacity = 1024 * 1024,
+            SendEnqueueTimeoutMs = enableGroupLifecycle ? 250 : 0,
             MaxConnectionsPerPrincipal = 2, MaxConnectionLifetimeSeconds = 3600
         });
+        Server.GroupParticipantRemoved += GroupParticipantRemoved;
         cleanup = new Timer(_ => Prune(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
     }
 
@@ -54,7 +62,7 @@ public sealed class YapCallGateway : IBoltCallAuthorizer, IDisposable
             user.Identity?.Name ?? "Someone", request.RecipientId, DateTimeOffset.UtcNow.AddSeconds(60));
         lock (gate)
         {
-            if (invites.Count >= 64 || invites.Values.Any(x => x.Tenant == tenant &&
+            if (invites.Count + groups.Count >= 64 || GroupMemberBusy(tenant, caller) || GroupMemberBusy(tenant, request.RecipientId) || invites.Values.Any(x => x.Tenant == tenant &&
                 (x.Invite.CallerId == caller || x.Invite.RecipientId == caller ||
                  x.Invite.CallerId == request.RecipientId || x.Invite.RecipientId == request.RecipientId)))
                 throw new YapApiException(409, "One of you is already in a call.");
@@ -140,6 +148,9 @@ public sealed class YapCallGateway : IBoltCallAuthorizer, IDisposable
         if (!context.WebSockets.IsWebSocketRequest) throw new YapApiException(400, "A call connection is required.");
         var (tenant, credential) = Identity(context.User);
         var token = context.Request.Query["ticket"].ToString();
+        bool groupTicket;
+        lock (gate) groupTicket = tickets.TryGetValue(token, out var candidate) && candidate.Group;
+        if (groupTicket) { await AcceptGroupSocketAsync(context, token); return; }
         Ticket ticket;
         ActiveInvite active;
         lock (gate)
@@ -201,6 +212,12 @@ public sealed class YapCallGateway : IBoltCallAuthorizer, IDisposable
 
     private async Task VerifyMembershipAsync(ClaimsPrincipal user, Guid thread, Guid other, CancellationToken ct)
     {
+        if (!(await CurrentMembersAsync(user, thread, ct)).Contains(other))
+            throw new YapApiException(403, "Calls are available only to current conversation members.");
+    }
+
+    private async Task<HashSet<Guid>> CurrentMembersAsync(ClaimsPrincipal user, Guid thread, CancellationToken ct)
+    {
         await using var scope = scopes.CreateAsyncScope();
         var services = scope.ServiceProvider;
         var client = new CommunicationsChatClient(services.GetRequiredService<ICommunicationsServiceWrapper>(),
@@ -208,9 +225,9 @@ public sealed class YapCallGateway : IBoltCallAuthorizer, IDisposable
             services.GetRequiredService<IActorAccessTokenScope>());
         var session = await client.ForCurrentActorAsync(ct: ct);
         var response = await session.GetThreadAsync(thread, ct);
-        if (!response.IsSuccess || response.Response is null || !response.Response.Members.Any(x => x.CredentialId == session.CredentialId) ||
-            !response.Response.Members.Any(x => x.CredentialId == other))
+        if (!response.IsSuccess || response.Response is null || !response.Response.Members.Any(x => x.CredentialId == session.CredentialId))
             throw new YapApiException(403, "Calls are available only to current conversation members.");
+        return response.Response.Members.Select(x => x.CredentialId).ToHashSet();
     }
 
     public static bool HasSameOrigin(HttpRequest request) => Uri.TryCreate(request.Headers.Origin.ToString(), UriKind.Absolute, out var origin) &&
@@ -240,6 +257,7 @@ public sealed class YapCallGateway : IBoltCallAuthorizer, IDisposable
     }
     private void Prune()
     {
+        PruneGroups();
         ActiveInvite[] expired;
         lock (gate)
         {
@@ -249,8 +267,18 @@ public sealed class YapCallGateway : IBoltCallAuthorizer, IDisposable
         }
         foreach (var item in expired) { PublishBoth(item, "ended"); item.Lifetime.Cancel(); }
     }
-    public void Dispose() { cleanup.Dispose(); lock (gate) foreach (var item in invites.Values) item.Lifetime.Cancel(); Server.Dispose(); }
-    private sealed record Ticket(Guid CallId, Guid Tenant, Guid User, string Session, DateTimeOffset ExpiresAt);
+    public void Dispose()
+    {
+        cleanup.Dispose();
+        Server.GroupParticipantRemoved -= GroupParticipantRemoved;
+        lock (gate)
+        {
+            foreach (var item in invites.Values) item.Lifetime.Cancel();
+            foreach (var room in groups.Values) foreach (var member in room.Members.Values) member.Lifetime.Cancel();
+        }
+        Server.Dispose();
+    }
+    private sealed record Ticket(Guid CallId, Guid Tenant, Guid User, string Session, DateTimeOffset ExpiresAt, bool Group = false);
     private sealed class ActiveInvite(Guid tenant, YapCallInvite invite)
     {
         public Guid Tenant { get; } = tenant;

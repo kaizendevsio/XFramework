@@ -21,6 +21,23 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden) notify(); });
     addEventListener('beforeinstallprompt', event => { event.preventDefault(); installPrompt = event; });
     window.yap.device = {
+        async uploadPhoto(input, path, scope, token) {
+            const file = input.files?.[0];
+            if (!file || file.size > 20 * 1024 * 1024) throw new Error('Choose a photo up to 20 MB.');
+            const jpeg = await yap.imagePreviews.jpeg(file, yap.imagePreviews.isHeif(file.type, file.name));
+            const bitmap = await createImageBitmap(jpeg);
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = 512;
+            let bytes;
+            try {
+                const size = Math.min(bitmap.width, bitmap.height);
+                canvas.getContext('2d').drawImage(bitmap, (bitmap.width - size) / 2, (bitmap.height - size) / 2, size, size, 0, 0, 512, 512);
+                bytes = canvas.toDataURL('image/jpeg', .86).split(',')[1];
+            } finally { bitmap.close(); canvas.width = canvas.height = 1; }
+            const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Yap-Account': scope, 'RequestVerificationToken': token }, body: JSON.stringify({ bytes }) });
+            input.value = '';
+            return response.status;
+        },
         acquireDatabase() {
             // Keep one document in charge of SQLite. A waiting navigation also evicts
             // a previous document from the back/forward cache before opening OPFS.
@@ -118,6 +135,14 @@
         async mediaUrl(key, path, scope, online, contentType, local, name = '') {
             const heif = yap.imagePreviews.isHeif(contentType, name);
             if (!heif && !/^(image\/(png|jpeg|gif|webp|avif)|video\/(mp4|webm|quicktime)|audio\/(mp4|mpeg|ogg|webm|wav|x-wav|aac))$/i.test(contentType.split(';')[0])) return null;
+            // Let the browser range-stream received videos. Reading a multi-GB video
+            // into a Blob before showing a player exhausts mobile browser memory.
+            if (!local && online && contentType.startsWith('video/')) {
+                const stream = new URL(path, document.baseURI);
+                stream.searchParams.set('account', scope);
+                stream.searchParams.set('mediaType', contentType);
+                return stream.pathname + stream.search;
+            }
             let file;
             try { file = await read(key); }
             catch (error) {

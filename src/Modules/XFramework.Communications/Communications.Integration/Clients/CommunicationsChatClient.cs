@@ -44,6 +44,7 @@ public interface ICommunicationsChatClient
 
 public interface ICommunicationsChatSession
 {
+    Task<QueryResponse<StorageDownloadUrlResponse>> GetThreadPhotoDownloadUrlAsync(Guid threadId, CancellationToken ct = default);
     Task<QueryResponse<StorageUploadSessionResponse>> CreateAttachmentUploadAsync(CreateChatAttachmentUploadRequest request, CancellationToken ct = default);
     Task<QueryResponse<StorageDownloadUrlResponse>> GetAttachmentDownloadUrlAsync(Guid threadId, Guid messageId, Guid fileId, CancellationToken ct = default);
     Guid TenantId { get; }
@@ -294,6 +295,9 @@ internal sealed class CommunicationsChatSession(
 
     public Task<CmdResponse> UpdateThreadAsync(UpdateThreadRequest request, CancellationToken ct = default) =>
         InvokeAsync(callCt => wrapper.UpdateThreadAsync(Prepare(request), callCt), ct);
+
+    public Task<QueryResponse<StorageDownloadUrlResponse>> GetThreadPhotoDownloadUrlAsync(Guid threadId, CancellationToken ct = default) =>
+        InvokeAsync(callCt => wrapper.GetThreadPhotoDownloadUrlAsync(Prepare(new GetThreadPhotoDownloadUrlRequest { ThreadId = threadId }), callCt), ct);
 
     public Task<CmdResponse> LeaveThreadAsync(Guid threadId, CancellationToken ct = default) =>
         InvokeAsync(callCt => wrapper.LeaveThreadAsync(Prepare(new LeaveThreadRequest { ThreadId = threadId }), callCt), ct);

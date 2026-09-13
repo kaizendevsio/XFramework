@@ -15,4 +15,5 @@ public partial record UpdateThreadRequest : RequestBase,
     public ConversationFeatures? Features { get; set; }
     public Guid? NicknameMemberId { get; set; }
     public string? Nickname { get; set; }
+    public Guid? PhotoStorageFileId { get; set; }
 }

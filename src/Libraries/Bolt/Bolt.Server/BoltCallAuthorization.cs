@@ -16,3 +16,9 @@ public interface IBoltCallAuthorizer
 {
     ValueTask<bool> AuthorizeAsync(BoltCallAuthorizationContext context, CancellationToken ct = default);
 }
+
+/// <summary>Host policy must require explicit acceptance and current conversation membership for this device.</summary>
+public interface IBoltGroupCallAuthorizer
+{
+    ValueTask<bool> AuthorizeParticipantAsync(Guid callId, string clientId, ClaimsPrincipal participant, CancellationToken ct = default);
+}

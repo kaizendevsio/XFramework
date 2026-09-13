@@ -10,7 +10,7 @@ function fixture() {
     class Encoder {
         static async isConfigSupported() { return { supported: true }; }
         constructor(callbacks) { this.callbacks = callbacks; this.state = 'unconfigured'; this.encodeQueueSize = 0; }
-        configure() { this.state = 'configured'; }
+        configure(config) { this.state = 'configured'; this.config = config; }
         encode(data) { stats.encoded.push(data); }
         close() { this.state = 'closed'; }
     }
@@ -41,7 +41,7 @@ function fixture() {
     vm.runInContext(source + '\nthis.pipeline = createAudioPipeline(); this.check = checkVoiceCapabilities;', sandbox);
     return { p: sandbox.pipeline, sandbox, stats, stream };
 }
-async function initialized(f) { await f.p.initEncoder(48000, 1, 64); await f.p.initDecoder(48000, 1); }
+async function initialized(f) { await f.p.initEncoder(48000, 1, 128); await f.p.initDecoder(48000, 1); }
 function audio(stats) { return { numberOfFrames: 960, numberOfChannels: 1, sampleRate: 48000, copyTo() {}, close() { stats.closedFrames++; } }; }
 
 test('capture uses AudioWorklet without audio TrackProcessor', async () => {
@@ -75,7 +75,7 @@ test('encoder and JS interop work stay bounded under slow transport', async () =
 test('wire clock converts to microseconds and decoder queue stays bounded', async () => {
     const f = fixture(); await initialized(f); f.p.decodeFrame(new Uint8Array(1), 960);
     assert.equal(f.stats.decoded[0].timestamp, 20000);
-    f.p.decoder.decodeQueueSize = 8; f.p.decodeFrame(new Uint8Array(1), 1920);
+    f.p.receivers.get('default').decoder.decodeQueueSize = 8; f.p.decodeFrame(new Uint8Array(1), 1920);
     assert.equal(f.stats.decoded.length, 1);
 });
 test('playback stays bounded and hangup stops scheduled audio', async () => {
@@ -174,4 +174,47 @@ test('mute stops encoding and resume keeps the same codec history', async () => 
     f.p.captureNode.port.onmessage({ data: { samples: new Float32Array(960), timestamp: 0 } });
     assert.equal(f.stats.encoded.length, 1);
     await f.p.dispose();
+});
+
+test('native voice encoder uses 128 kbps and retains it in reconfiguration', async () => {
+    const f = fixture(); await initialized(f);
+    assert.equal(f.p.encoder.config.bitrate, 128000);
+    f.p.reconfigureBitrate(48000, 1, 128);
+    assert.equal(f.p.encoder.config.bitrate, 128000);
+});
+
+test('group native audio has independent decoders and releases departed streams', async () => {
+    const f = fixture(); await initialized(f);
+    for (let i = 0; i < 9; i++) f.p.decodeFrame(new Uint8Array(1), 0, `peer-${i}`);
+    assert.equal(f.p.receivers.size, 8);
+    const decoders = [...f.p.receivers.values()].map(receiver => receiver.decoder);
+    assert.equal(new Set(decoders).size, 8);
+    assert.equal(f.stats.decoded.length, 8);
+    const departed = f.p.receivers.get('peer-3');
+    departed.decoder.callbacks.output(audio(f.stats));
+    f.p.removeRemoteStream('peer-3');
+    assert.equal(departed.decoder.state, 'closed');
+    departed.decoder.callbacks.output(audio(f.stats));
+    assert.equal(f.p.receivers.size, 7, 'Late decoder output must not resurrect a departed stream.');
+    assert.equal(f.p.sources.size, 0);
+    f.p.decodeFrame(new Uint8Array(1), 0, 'replacement');
+    assert.equal(f.p.receivers.size, 8);
+    f.p.stopPlayback();
+    assert.ok(decoders.every(decoder => decoder.state === 'closed'));
+    assert.equal(f.p.receivers.size, 0);
+});
+
+test('group playback overlaps speakers instead of serializing them and remains bounded', () => {
+    const f = fixture(); f.p.initManaged();
+    const pcm = new Uint8Array(1920);
+    f.p.playPcm(pcm, 'alice'); f.p.playPcm(pcm, 'bob');
+    assert.equal(f.stats.played[0], f.stats.played[1]);
+    for (let speaker = 0; speaker < 8; speaker++)
+        for (let frame = 0; frame < 100; frame++) f.p.playPcm(pcm, `speaker-${speaker}`);
+    assert.equal(f.p.receivers.size, 8);
+    assert.ok(f.p.sources.size <= 8 * 11);
+    const sources = [...f.p.sources];
+    f.p.stopPlayback();
+    assert.equal(f.p.sources.size, 0); assert.equal(f.p.receivers.size, 0);
+    assert.ok(sources.every(source => source.stopped));
 });
