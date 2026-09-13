@@ -76,6 +76,7 @@ class BaselineTests(unittest.TestCase):
         (self.release / "protected-env.sha256").write_text(hashlib.sha256(self.env.read_bytes()).hexdigest())
         self.image = "sha256:" + "b" * 64
         manifest = {"services": {s: {"image": self.image} for s in baseline.RUNTIME_SERVICES}}
+        manifest["services"]["bolt-phase0-synthetics"] = {"image": self.image}
         (self.release / "images.override.json").write_text(json.dumps(manifest))
         self.container = {"Image": self.image, "State": {"Running": True, "Health": {"Status": "healthy"}}}
         self.mock = patch.object(baseline.subprocess, "run")
@@ -85,7 +86,7 @@ class BaselineTests(unittest.TestCase):
 
     def test_complete_healthy_unchanged_release_qualifies(self):
         self.assertEqual(self.commit, baseline.baseline(self.root, self.env))
-        self.assertEqual(len(baseline.RUNTIME_SERVICES), self.run.call_count)
+        self.assertEqual(len(baseline.RUNTIME_SERVICES) + 1, self.run.call_count)
 
     def test_configuration_change_requires_full(self):
         self.env.write_text("FIXTURE=rotated\n")

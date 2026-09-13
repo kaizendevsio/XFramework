@@ -32,6 +32,12 @@ def baseline(releases, protected_env):
         return None
     # Also detect manual runtime drift before carrying forward old image pins.
     manifest = json.loads((release / "images.override.json").read_text())["services"]
+    # Synthetics is a one-shot image, so runtime-container checks cannot detect pruning.
+    synthetic_image = manifest["bolt-phase0-synthetics"]["image"]
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", synthetic_image):
+        return None
+    subprocess.run(["docker", "image", "inspect", synthetic_image], check=True,
+                   capture_output=True, timeout=15)
     for service in RUNTIME_SERVICES:
         expected = manifest[service]["image"]
         if not re.fullmatch(r"sha256:[0-9a-f]{64}", expected):
