@@ -7,6 +7,7 @@ using NUnit.Framework;
 using IdentityServer.Domain.Shared.Contracts;
 using IdentityServer.Domain.Shared.Contracts.Responses;
 using System.Text.Json;
+using Communications.Domain.Shared.Contracts.Requests.Attachments;
 
 namespace Communications.Tests.Services;
 
@@ -140,4 +141,22 @@ public sealed partial class ThreadServiceSecurityTests
 
     private static string Devices(Guid device, string? revocation = null) => JsonSerializer.Serialize(
         new[] { new EncryptionDevice { DeviceId = device, Revocation = revocation } }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+    [TestCase("voice.pgp", ConversationFeatures.Voice, 201)]
+    [TestCase("voice.pgp", ConversationFeatures.Attachments, 403)]
+    [TestCase("attachment.pgp", ConversationFeatures.Voice, 403)]
+    [TestCase("attachment.pgp", ConversationFeatures.Attachments, 201)]
+    public async Task EncryptedUpload_VoiceMarkerPreservesIndependentConversationFeature(string name, ConversationFeatures enabled, int status)
+    {
+        var tenant = Guid.NewGuid(); var actor = Guid.NewGuid();
+        var thread = Thread(Guid.NewGuid(), tenant); thread.Features = enabled;
+        var context = new InMemoryDataContext(); context.Seed(thread, Member(Guid.NewGuid(), thread.Id, actor, tenant));
+        var storage = new TestStorageServiceWrapper(); var service = CreateService(context, storage: storage);
+        var result = await service.CreateChatAttachmentUploadAsync(new CreateChatAttachmentUploadRequest
+        { ThreadId = thread.Id, FileName = name, ContentType = "application/octet-stream", TotalSizeBytes = 1024,
+            Metadata = Metadata(actor, tenant) });
+        Assert.That(result.StatusCode, Is.EqualTo(status), result.Message);
+        Assert.That(storage.ChatUploadCalls, Is.EqualTo(status == 201 ? 1 : 0));
+        if (status == 201) Assert.That(storage.LastChatUpload!.FileName, Is.EqualTo(name));
+    }
 }
