@@ -101,6 +101,12 @@ public sealed class BoltServer : IDisposable
 
     // Call state management: callId → state
     private readonly ConcurrentDictionary<Guid, ServerCallState> _activeCalls = new();
+    private readonly object _callAdmissionLock = new();
+    private readonly IBoltCallAuthorizer? _callAuthorizer;
+    private readonly int _maxActiveCalls;
+    private readonly int _maxActiveCallsPerPrincipal;
+    private readonly int _maxCallParticipants;
+    private readonly bool _authenticatedMediaOnly;
 
     // Direct handlers — when registered, server handles requests locally instead of routing
     private readonly ConcurrentDictionary<int, Func<BoltRequestContext, ReadOnlyMemory<byte>, Guid, CancellationToken, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>>> _localHandlers = new();
@@ -227,6 +233,13 @@ public sealed class BoltServer : IDisposable
             ? TimeSpan.FromSeconds(options.MaxConnectionLifetimeSeconds)
             : Timeout.InfiniteTimeSpan;
         _mediaEnabled = options.MediaEnabled;
+        _callAuthorizer = options.CallAuthorizer;
+        _authenticatedMediaOnly = options.AuthenticatedMediaOnly;
+        if (_authenticatedMediaOnly && (!options.RequireSecureTransport || _callAuthorizer is null))
+            throw new InvalidOperationException("Authenticated media requires secure transport and a call authorizer.");
+        _maxActiveCalls = Math.Max(1, options.MaxActiveCalls);
+        _maxActiveCallsPerPrincipal = Math.Max(1, options.MaxActiveCallsPerPrincipal);
+        _maxCallParticipants = Math.Clamp(options.MaxCallParticipants, 2, 32);
         if (!Enum.IsDefined(options.RegistrationIdentityBindingMode))
         {
             throw new InvalidOperationException(
@@ -256,7 +269,8 @@ public sealed class BoltServer : IDisposable
         var cleanupInterval = TimeSpan.FromSeconds(Math.Max(1, options.CleanupIntervalSeconds));
         _cleanupTimer = new Timer(CleanupStaleInvocations, null, cleanupInterval, cleanupInterval);
         _mediaTapChannel = Channel.CreateBounded<(Guid, Guid, byte[], uint, uint)>(
-            new BoundedChannelOptions(10_000)
+            // Frame size is capped below, so retained processor data is at most 16 MiB.
+            new BoundedChannelOptions(64)
             {
                 FullMode = BoundedChannelFullMode.DropWrite,
                 SingleReader = true,
@@ -351,9 +365,19 @@ public sealed class BoltServer : IDisposable
     public Task HandleConnectionAsync(IBoltConnection transport, CancellationToken ct) =>
         HandleConnectionAsync(transport, user: null, ct);
 
-    public async Task HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal? user, CancellationToken ct)
+    public Task HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal? user, CancellationToken ct) =>
+        HandleConnectionAsync(transport, user, ct, isSecureTransport: false);
+
+    public async Task HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal? user, CancellationToken ct, bool isSecureTransport)
     {
         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+        // Only the host can attest to TLS after checking the request and authenticated session.
+        if (_authenticatedMediaOnly && (!isSecureTransport || user?.Identity?.IsAuthenticated != true ||
+            string.IsNullOrWhiteSpace(user.FindFirst("bolt_media_client_id")?.Value)))
+        {
+            await CloseTransportAsync(transport);
+            return;
+        }
         using var connectionCts = CreateConnectionCancellation(user, ct);
         var connectionCt = connectionCts.Token;
         var connection = new BoltHubConnection(
@@ -559,6 +583,14 @@ public sealed class BoltServer : IDisposable
     {
         var frameType = (FrameType)buffer[0];
 
+        if (_authenticatedMediaOnly && frameType != FrameType.Register && !IsMediaFrame(frameType))
+        {
+            using var closeCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            closeCts.CancelAfter(_transportCloseTimeout);
+            await connection.CloseAsync(closeCts.Token);
+            return;
+        }
+
         if (frameType != FrameType.Register && !connection.IsRegistered)
         {
             _logger.LogWarning("Closing unregistered Bolt connection after {FrameType} frame", frameType);
@@ -741,7 +773,9 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
-        if (!ValidateRegisterIdentity(connection, clientId, clientName))
+        if ((_authenticatedMediaOnly && !string.Equals(
+                connection.User?.FindFirst("bolt_media_client_id")?.Value, clientId, StringComparison.Ordinal)) ||
+            !ValidateRegisterIdentity(connection, clientId, clientName))
         {
             BoltServerMetrics.RecordRegistrationRejection("identity_mismatch");
             _logger.LogWarning(
@@ -1848,11 +1882,12 @@ public sealed class BoltServer : IDisposable
         }
     }
 
-    private static bool TryAddCallParticipant(ServerCallState callState, BoltHubConnection connection)
+    private bool TryAddCallParticipant(ServerCallState callState, BoltHubConnection connection)
     {
         lock (callState.Participants)
         {
-            if (callState.Participants.Any(p => p.StreamId == connection.StreamId))
+            if (callState.Participants.Count >= _maxCallParticipants ||
+                callState.Participants.Any(p => p.StreamId == connection.StreamId))
                 return false;
 
             callState.Participants.Add(connection);
@@ -1930,6 +1965,8 @@ public sealed class BoltServer : IDisposable
     /// </summary>
     private async Task RouteMediaFrameAsync(BoltHubConnection sender, byte[] buffer, int length, CancellationToken ct)
     {
+        if (length > 256 * 1024)
+            return;
         if (!BoltCodec.TryReadMediaFrameHeader(buffer.AsSpan(0, length), out var streamId))
             return;
 
@@ -1960,6 +1997,9 @@ public sealed class BoltServer : IDisposable
         }
 
         var data = buffer.AsMemory(0, length);
+
+        if (_authenticatedMediaOnly && !await RenewMediaAuthorizationAsync(owningCall, ct))
+            return;
 
         // Simulcast-aware routing: if this stream has a layer ID, only forward to
         // recipients whose preferred layer matches (or who have no preference = forward all)
@@ -2005,11 +2045,16 @@ public sealed class BoltServer : IDisposable
     /// </summary>
     private async Task HandleMediaConfigAsync(BoltHubConnection sender, byte[] buffer, int length, CancellationToken ct)
     {
+        if (length > 4096)
+            return;
         if (!BoltCodec.TryReadMediaConfig(buffer.AsSpan(0, length), out var config))
         {
             _logger.LogWarning("Invalid MediaConfig frame from {ClientId}", sender.ClientId);
             return;
         }
+
+        if (_authenticatedMediaOnly && (config.MediaType != MediaType.Audio || config.CodecId != CodecId.Opus))
+            return;
 
         if (!_activeCalls.TryGetValue(config.CallId, out var callState))
         {
@@ -2167,12 +2212,19 @@ public sealed class BoltServer : IDisposable
     /// </summary>
     private async Task HandleCallSignalAsync(BoltHubConnection sender, byte[] buffer, int length, CancellationToken ct)
     {
+        if (length > 16 * 1024)
+            return;
         var span = buffer.AsSpan(0, length);
         if (!BoltCodec.TryReadCallSignal(span, out var header))
         {
             _logger.LogWarning("Invalid CallSignal frame from {ClientId}", sender.ClientId);
             return;
         }
+
+        // Group consent and direct transport negotiation are still experimental.
+        if (_authenticatedMediaOnly && header.SignalType is SignalType.AddParticipant or
+            SignalType.RemoveParticipant or SignalType.DirectOffer or SignalType.DirectAnswer or SignalType.KeyExchange)
+            return;
 
         switch (header.SignalType)
         {
@@ -2242,6 +2294,12 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
+        if (header.CallId == Guid.Empty || !await AuthorizeCallAsync(caller, callee, header, ct))
+        {
+            await SendCallEndAsync(caller, header.CallId, ct);
+            return;
+        }
+
         var callState = new ServerCallState
         {
             CallId = header.CallId,
@@ -2252,12 +2310,20 @@ public sealed class BoltServer : IDisposable
         callState.Participants.Add(caller);
         callState.Participants.Add(callee);
 
-        if (!_activeCalls.TryAdd(header.CallId, callState))
+        bool admitted;
+        lock (_callAdmissionLock)
+        {
+            admitted = _activeCalls.Count < _maxActiveCalls &&
+                _activeCalls.Values.Count(call => call.CallerConnection.QuotaKey == caller.QuotaKey) < _maxActiveCallsPerPrincipal &&
+                _activeCalls.TryAdd(header.CallId, callState);
+        }
+        if (!admitted)
         {
             _logger.LogWarning(
-                "Rejected CallSignal Initiate with duplicate call id. call={CallId} sender={ClientId}",
+                "Rejected CallSignal Initiate because the call ID or capacity is unavailable. call={CallId} sender={ClientId}",
                 header.CallId,
                 caller.ClientId);
+            await SendCallEndAsync(caller, header.CallId, ct);
             return;
         }
 
@@ -2293,7 +2359,21 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
-        callState.Status = ServerCallStatus.Active;
+        if (!await AuthorizeCallAsync(callState.CallerConnection, sender, header, ct))
+        {
+            CleanupCall(header.CallId);
+            await SendCallEndAsync(callState.CallerConnection, header.CallId, ct);
+            await SendCallEndAsync(sender, header.CallId, ct);
+            return;
+        }
+
+        lock (callState.SyncRoot)
+        {
+            if (callState.Status != ServerCallStatus.Ringing)
+                return;
+            callState.Status = ServerCallStatus.Active;
+            callState.LastMediaAuthorizationTick = Environment.TickCount64;
+        }
 
         // Forward Answer to the caller
         await callState.CallerConnection.SendAsync(buffer.AsMemory(0, length), ct);
@@ -2462,6 +2542,9 @@ public sealed class BoltServer : IDisposable
             _logger.LogDebug("Call {CallId} AddParticipant failed: no recipient for hash {RecipientHash}", header.CallId, recipientHash);
             return;
         }
+
+        if (!await AuthorizeCallAsync(sender, newParticipant, header, ct))
+            return;
 
         if (!TryAddCallParticipant(callState, newParticipant))
         {
@@ -2644,6 +2727,7 @@ public sealed class BoltServer : IDisposable
         {
             lock (callState.SyncRoot)
             {
+                callState.Status = ServerCallStatus.Ended;
                 foreach (var streamId in GetMediaStreamSnapshot(callState))
                 {
                     if (_activeMediaStreams.TryRemove(streamId, out var removedRoute))
@@ -2651,6 +2735,65 @@ public sealed class BoltServer : IDisposable
                 }
             }
         }
+    }
+
+    private async ValueTask<bool> AuthorizeCallAsync(
+        BoltHubConnection caller, BoltHubConnection recipient, CallSignalHeader header, CancellationToken ct)
+    {
+        if (_callAuthorizer is null || caller.User?.Identity?.IsAuthenticated != true ||
+            recipient.User?.Identity?.IsAuthenticated != true ||
+            string.IsNullOrEmpty(caller.ClientId) || string.IsNullOrEmpty(recipient.ClientId))
+            return false;
+
+        try
+        {
+            return await _callAuthorizer.AuthorizeAsync(new BoltCallAuthorizationContext(
+                header.CallId, header.SignalType, caller.ClientId, caller.User,
+                recipient.ClientId, recipient.User), ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception)
+        {
+            _logger.LogWarning("Call authorization failed closed for call {CallId}", header.CallId);
+            return false;
+        }
+    }
+
+    private async Task<bool> RenewMediaAuthorizationAsync(ServerCallState call, CancellationToken ct)
+    {
+        if (Environment.TickCount64 - Volatile.Read(ref call.LastMediaAuthorizationTick) < 5000)
+            return IsCallMediaActive(call);
+
+        await call.MediaAuthorizationGate.WaitAsync(ct);
+        try
+        {
+            if (!IsCallMediaActive(call))
+                return false;
+            if (Environment.TickCount64 - Volatile.Read(ref call.LastMediaAuthorizationTick) < 5000)
+                return true;
+            var authorized = call.CalleeConnection is { } callee && await AuthorizeCallAsync(
+                call.CallerConnection, callee,
+                new CallSignalHeader { CallId = call.CallId, SignalType = SignalType.Answer }, ct);
+            if (authorized)
+            {
+                Volatile.Write(ref call.LastMediaAuthorizationTick, Environment.TickCount64);
+                return IsCallMediaActive(call);
+            }
+
+            CleanupCall(call.CallId);
+            foreach (var participant in GetParticipantSnapshot(call))
+                if (participant.IsAlive)
+                    await SendCallEndAsync(participant, call.CallId, ct);
+            return false;
+        }
+        finally { call.MediaAuthorizationGate.Release(); }
+    }
+
+    private static async Task SendCallEndAsync(BoltHubConnection recipient, Guid callId, CancellationToken ct)
+    {
+        var writer = RentedBufferWriter.GetThreadLocal();
+        BoltCodec.WriteCallSignal(writer, callId, SignalType.End, ReadOnlySpan<byte>.Empty);
+        await recipient.SendAsync(writer, ct);
     }
 
     // ── Pub/Sub handlers ──
@@ -5399,6 +5542,9 @@ internal enum ServerCallStatus { Ringing, Active, Held, Ended, Rejected, Missed 
 internal sealed class ServerCallState
 {
     private int _status;
+
+    public readonly SemaphoreSlim MediaAuthorizationGate = new(1, 1);
+    public long LastMediaAuthorizationTick;
 
     public object SyncRoot { get; } = new();
     public Guid CallId { get; init; }

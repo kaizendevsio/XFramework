@@ -2,10 +2,15 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.1.4";
+    public const string Version = "1.2.0";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "13 September 2026", [
+            "Call someone from your conversation, keep chatting during the call, and mute your microphone when needed.",
+            "The message box expands while you write, with easier-to-reach attachment and send buttons.",
+            "Favorites have their own section, and selected people stay visible when starting a group conversation.",
+            "Message search has clearer results, settings are tidier, and repeated reactions or attachment retries recover automatically."]),
+        ("1.1.4", "13 September 2026", [
             "Swipe up or down to close a photo, and tap reader avatars to see who has seen your message.",
             "Conversation settings now have tabs and easy-to-use switches.",
             "Hold a conversation to favorite, rename or remove it. Favorites stay at the top on this device.",

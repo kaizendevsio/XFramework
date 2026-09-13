@@ -20,6 +20,8 @@ public sealed class BoltTransportNegotiator
 
     public async Task<IBoltConnection> ConnectAsync(Uri serverUri, BoltClientOptions options, CancellationToken ct)
     {
+        var endpoint = serverUri.GetLeftPart(UriPartial.Path);
+        string? failure = null;
         foreach (var transport in options.PreferredTransports)
         {
             try
@@ -37,22 +39,28 @@ public sealed class BoltTransportNegotiator
                 if (conn is not null)
                 {
                     LastTransportUsed = transport;
-                    _logger.LogInformation("Bolt connected via {Transport} to {Uri}", transport, serverUri);
+                    _logger.LogInformation("Bolt connected via {Transport} to {Uri}", transport, endpoint);
                     return conn;
                 }
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
+                failure = "Timeout";
                 _logger.LogDebug("Transport {Transport} timed out, trying next", transport);
             }
+            catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                _logger.LogDebug(ex, "Transport {Transport} failed, trying next", transport);
+                // Browser/socket exception messages can contain the one-use ticket or access token.
+                failure = ex is WebSocketException socket
+                    ? $"{ex.GetType().Name} ({socket.WebSocketErrorCode})"
+                    : ex.GetType().Name;
+                _logger.LogDebug("Transport {Transport} failed ({Failure}), trying next", transport, failure);
             }
         }
 
         throw new InvalidOperationException(
-            $"All transports failed for {serverUri}. Tried: {string.Join(", ", options.PreferredTransports)}");
+            $"All transports failed for {endpoint}. Tried: {string.Join(", ", options.PreferredTransports)}. Failure: {failure ?? "Unavailable"}");
     }
 
     private static Task<IBoltConnection?> TryWebTransportAsync(Uri serverUri, CancellationToken ct)
@@ -85,8 +93,16 @@ public sealed class BoltTransportNegotiator
             }
         }
 
-        await ws.ConnectAsync(wsUri, ct);
-        return new WebSocketBoltConnection(ws);
+        try
+        {
+            await ws.ConnectAsync(wsUri, ct);
+            return new WebSocketBoltConnection(ws);
+        }
+        catch
+        {
+            ws.Dispose();
+            throw;
+        }
     }
 
     private static async ValueTask<string?> ResolveAccessTokenAsync(BoltClientOptions options, CancellationToken ct)

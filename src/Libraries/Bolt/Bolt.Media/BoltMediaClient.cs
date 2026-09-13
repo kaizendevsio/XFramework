@@ -48,6 +48,7 @@ public sealed class BoltMediaClient : IAsyncDisposable
     {
         _client = client;
         _logger = logger;
+        _client.Disconnected += HandleDisconnected;
 
         // Register frame handlers for all media frame types
         RegisterBorrowedFrameHandler(FrameType.MediaFrame, HandleMediaFrame);
@@ -74,14 +75,17 @@ public sealed class BoltMediaClient : IAsyncDisposable
 
     // ── Call API ─────────────────────────────────────────────
 
-    public async Task<Guid> StartCallAsync(string recipientId, bool video = false, bool encrypted = false)
+    public async Task<Guid> StartCallAsync(string recipientId, bool video = false, bool encrypted = false, Guid? authorizedCallId = null)
     {
         if (encrypted)
             throw new NotSupportedException(
                 "Encrypted Bolt Media calls are disabled until key exchange is bound to authenticated peer identities.");
 
-        var callId = Guid.NewGuid();
-        _activeCalls[callId] = new ClientCallInfo { CallId = callId, IsOutgoing = true, RemoteClientId = recipientId };
+        var callId = authorizedCallId ?? Guid.NewGuid();
+        if (callId == Guid.Empty)
+            throw new ArgumentException("The authorized call ID cannot be empty.", nameof(authorizedCallId));
+        if (!_activeCalls.TryAdd(callId, new ClientCallInfo { CallId = callId, IsOutgoing = true, RemoteClientId = recipientId }))
+            throw new InvalidOperationException("This call is already active.");
 
         var recipientHash = BoltCodec.Fnv1aHash(recipientId);
         var payload = new byte[4];
@@ -215,7 +219,8 @@ public sealed class BoltMediaClient : IAsyncDisposable
         stream.EnableNack(isAudio ? 128 : 256);
         stream.EnableDelayBasedControl(config.BitrateKbps);
 
-        if (isAudio) { stream.EnableVad(); stream.EnablePlc(); }
+        // VAD/PLC primitives operate on decoded PCM, not compressed Opus packets.
+        // Encoded frames must reach the codec unchanged.
 
         var controller = new AdaptiveBitrateController(conn, config.StreamId, config.BitrateKbps, isAudio);
         _bitrateControllers[config.StreamId] = controller;
@@ -328,8 +333,27 @@ public sealed class BoltMediaClient : IAsyncDisposable
         }
     }
 
+    private void HandleDisconnected() => _ = EndDisconnectedCallsAsync();
+
+    private async Task EndDisconnectedCallsAsync()
+    {
+        foreach (var callId in _activeCalls.Keys)
+        {
+            if (!_activeCalls.TryRemove(callId, out _))
+                continue;
+            await CleanupCallStreamsAsync(callId);
+            try
+            {
+                if (OnCallEnded is not null)
+                    await OnCallEnded(callId);
+            }
+            catch (Exception ex) { _logger.LogWarning(ex, "Disconnected media call cleanup callback failed"); }
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
+        _client.Disconnected -= HandleDisconnected;
         _client.UnregisterFrameHandler(FrameType.MediaFrame, HandleMediaFrame);
         _client.UnregisterFrameHandler(FrameType.MediaConfig, HandleMediaConfig);
         _client.UnregisterFrameHandler(FrameType.MediaFeedback, HandleMediaFeedback);

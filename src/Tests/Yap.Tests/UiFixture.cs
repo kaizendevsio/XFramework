@@ -3,6 +3,10 @@ using Communications.Domain.Shared.Contracts.Realtime;
 using Communications.Domain.Shared.Contracts.Requests.Threads;
 using Communications.Domain.Shared.Contracts.Responses;
 using Communications.Integration.Clients;
+using Communications.Integration.Drivers;
+using System.Security.Claims;
+using System.Security.Cryptography.X509Certificates;
+using Microsoft.AspNetCore.Hosting;
 using IdentityServer.Domain.Shared.Contracts.Requests;
 using IdentityServer.Integration.Drivers;
 using Microsoft.AspNetCore.Builder;
@@ -23,7 +27,7 @@ namespace Yap.Tests;
 // Browser fixture only. The production project has no demo flag, fake login, or seeded chats.
 internal static class UiFixture
 {
-    public static WebApplication Create(int port = 5189, Action<Mock<IIdentityServerServiceWrapper>>? configureIdentity = null)
+    public static WebApplication Create(int port = 5189, Action<Mock<IIdentityServerServiceWrapper>>? configureIdentity = null, bool? enableCalls = null, X509Certificate2? certificate = null)
     {
         var fixture = new ChatFixture();
         var registrationRole = Guid.NewGuid();
@@ -31,6 +35,14 @@ internal static class UiFixture
         auth.Credential!.Id = fixture.Credential;
         auth.Credential.TenantId = fixture.Tenant;
         var friend = Guid.NewGuid();
+        var voiceFixture = enableCalls ?? Environment.GetEnvironmentVariable("YAP_FIXTURE_CALLS") == "1";
+        var friendAuth = YapSessionsTests.Session("fixture-callee-token");
+        friendAuth.Credential!.Id = friend;
+        friendAuth.Credential.TenantId = fixture.Tenant;
+        friendAuth.Credential.UserName = "Sarah Mensah";
+        if (voiceFixture)
+            fixture.Session.SetupGet(s => s.CredentialId).Returns(() =>
+                Guid.TryParse(new HttpContextAccessor().HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier), out var current) ? current : fixture.Credential);
         var conversations = new List<ThreadListItemResponse>
         {
             new() { Id = fixture.Thread, Name = "Sarah Mensah", MemberCount = 2, LastMessagePreview = "Perfect, I'll push the new build tonight", LastMessageAt = DateTime.UtcNow, UnreadCount = 2 },
@@ -147,9 +159,9 @@ internal static class UiFixture
             { HttpStatusCode = HttpStatusCode.OK, Response = new()
                 { CredentialId = Guid.NewGuid(), TenantId = fixture.Tenant, RoleId = registrationRole } });
         identity.Setup(i => i.AuthenticateIdentity(It.IsAny<AuthenticateIdentityRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((AuthenticateIdentityRequest request, CancellationToken _) => request.UserName == "fixture"
+            .ReturnsAsync((AuthenticateIdentityRequest request, CancellationToken _) => (request.UserName == "fixture" || voiceFixture && request.UserName == "callee")
                 && request.Password == (Environment.GetEnvironmentVariable("YAP_FIXTURE_PASSWORD") ?? "fixture")
-                ? ChatFixture.Ok(auth) : new() { HttpStatusCode = HttpStatusCode.Unauthorized });
+                ? ChatFixture.Ok(request.UserName == "callee" ? friendAuth : auth) : new() { HttpStatusCode = HttpStatusCode.Unauthorized });
         identity.Setup(i => i.Logout(It.IsAny<LogoutRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(Success());
         var directory = new Mock<IChatDirectory>();
         directory.Setup(d => d.ResolveAsync(It.IsAny<Guid[]>(), It.IsAny<CancellationToken>())).ReturnsAsync((Guid[] ids, CancellationToken _) => ids.Contains(friend) ? new[] { new ChatPerson(friend, "Sarah Mensah", "sarah", "/yap-app-v2-192.png") } : Array.Empty<ChatPerson>());
@@ -233,17 +245,26 @@ internal static class UiFixture
         fixture.Session.Setup(s => s.UpdateMemberRoleAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Guid thread, Guid member, string role, CancellationToken _) => { fixtureMembers.First(m => m.Id == member).Role = role; return Success(); });
         configureIdentity?.Invoke(identity);
+        var callMembership = new Mock<ICommunicationsServiceWrapper>();
+        callMembership.Setup(c => c.GetThreadAsync(It.IsAny<GetThreadRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((GetThreadRequest request, CancellationToken _) => request.Id == fixture.Thread
+                ? ChatFixture.Ok(new GetThreadResponse { Id = fixture.Thread, Name = "Fixture voice conversation", IsDirect = true, Members = fixtureMembers })
+                : new() { HttpStatusCode = HttpStatusCode.Forbidden });
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Presentation/XFramework.Yap"));
         var app = YapApplication.Build([
             "--contentRoot", root, "--applicationName", "XFramework.Yap", "--environment", "Development",
             "--webroot", Environment.GetEnvironmentVariable("YAP_FIXTURE_WEBROOT") ?? Path.Combine(root, "wwwroot"),
             "--staticWebAssets", Environment.GetEnvironmentVariable("YAP_FIXTURE_WEBROOT") is null
                 ? Path.Combine(AppContext.BaseDirectory, "XFramework.Yap.staticwebassets.runtime.json") : Path.Combine(root, "fixture-published-no-runtime-manifest.json"),
-            "--urls", $"http://127.0.0.1:{port}", "--Yap:TenantId", fixture.Tenant.ToString(),
+            "--urls", $"{(voiceFixture ? "https" : "http")}://127.0.0.1:{port}", "--Yap:TenantId", fixture.Tenant.ToString(),
+            "--AllowedHosts", "localhost;127.0.0.1;*.dev.localhost",
+            "--Yap:Calls:Enabled", voiceFixture.ToString(), "--Yap:Calls:SecurityMode", "TrustedServerTls",
             "--Yap:RoleId", registrationRole.ToString(),
             "--ServiceIdentity:GenerationId", "fixture-g1", "--ServiceIdentity:ClientSecret", "fixture-only-secret-not-for-any-real-service"
         ], builder =>
         {
+            if (certificate is not null) builder.WebHost.ConfigureKestrel(options =>
+                options.ConfigureHttpsDefaults(https => https.ServerCertificate = certificate));
             foreach (var service in builder.Services.Where(d => d.ServiceType == typeof(IHostedService) &&
                          d.ImplementationType?.Name.Contains("Bolt", StringComparison.Ordinal) == true).ToArray())
                 builder.Services.Remove(service);
@@ -251,6 +272,7 @@ internal static class UiFixture
             builder.Services.Replace(ServiceDescriptor.Singleton(identity.Object));
             builder.Services.Replace(ServiceDescriptor.Singleton(directory.Object));
             builder.Services.Replace(ServiceDescriptor.Singleton(storage.Object));
+            if (voiceFixture) builder.Services.Replace(ServiceDescriptor.Singleton(callMembership.Object));
         });
         app.MapGet("/test/media/{id:guid}", (Guid id) => Results.Bytes(stored[id].Data.ToArray(), stored[id].Type));
         app.MapPost("/test/history/{count:int}", (int count) => {

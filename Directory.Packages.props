@@ -6,6 +6,7 @@
   <ItemGroup>
     <!-- API & Versioning -->
     <PackageVersion Include="Asp.Versioning.Http" Version="8.1.0" />
+    <PackageVersion Include="Concentus" Version="2.2.2" />
 
     <!-- AspNetCore Packages -->
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />

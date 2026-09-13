@@ -9,7 +9,7 @@
     </section>
 </dialog>
 @code {
-    [Parameter] public bool ShowHeader { get; set; } = true;
+    [Parameter] public bool ShowHeader { get; set; }
     [Parameter] public string Title { get; set; } = "Actions";
     [Parameter] public EventCallback OnClose { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }

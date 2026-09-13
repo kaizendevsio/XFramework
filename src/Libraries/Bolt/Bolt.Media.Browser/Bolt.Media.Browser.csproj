@@ -7,6 +7,8 @@
         <Nullable>enable</Nullable>
 
         <PackageId>Bolt.Net.Media.Browser</PackageId>
+        <!-- Keep JS import URLs stable independently of the NuGet package name. -->
+        <StaticWebAssetBasePath>_content/Bolt.Media.Browser</StaticWebAssetBasePath>
         <Version>$(BoltVersion)</Version>
         <Authors>KaizenDevs</Authors>
         <Description>Bolt Media browser integration for Blazor WASM — JS interop for WebCodecs, Web Crypto, and getUserMedia. Add-on for Bolt.Net.Media.</Description>
@@ -22,6 +24,7 @@
 
     <ItemGroup>
         <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+        <PackageReference Include="Concentus" />
     </ItemGroup>
 
 </Project>

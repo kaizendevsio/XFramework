@@ -2502,13 +2502,14 @@ public sealed partial class ThreadService(
                 return Result<CmdResponse>.Failure("Storage file type is not allowed for Communications attachments", 400);
 
             var duplicateExists = await dataContext.Query<MessageFile>()
+                .NoCache()
                 .Where(f => f.MessageId == request.MessageId)
                 .Where(f => f.StorageId == request.StorageFileId)
                 .Where(f => f.TenantId == caller.TenantId)
                 .Where(f => !f.IsDeleted && f.IsEnabled)
                 .AnyAsync(ct);
             if (duplicateExists)
-                return Result<CmdResponse>.Conflict("Storage file is already attached to this message");
+                return Result<CmdResponse>.Success(new CmdResponse { Message = "File is attached" });
 
             var file = new MessageFile
             {
@@ -2775,6 +2776,7 @@ public sealed partial class ThreadService(
                 return Result<CmdResponse>.NotFound("Reaction type not found");
 
             var duplicateExists = await dataContext.Query<MessageReaction>()
+                .NoCache()
                 .Where(r => r.MessageId == request.MessageId)
                 .Where(r => r.TypeId == request.TypeId)
                 .Where(r => r.MessageThreadMemberId == member.Id)
@@ -2783,7 +2785,7 @@ public sealed partial class ThreadService(
                 .AnyAsync(ct);
 
             if (duplicateExists)
-                return Result<CmdResponse>.Conflict("A reaction of this type already exists on this message");
+                return Result<CmdResponse>.Success(new CmdResponse { Message = "Reaction is applied" });
 
             var reaction = new MessageReaction
             {

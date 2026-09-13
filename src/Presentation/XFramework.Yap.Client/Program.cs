@@ -5,6 +5,7 @@ using Microsoft.JSInterop;
 using SqliteWasmBlazor;
 using Yap.Client;
 using Yap.Client.Services;
+using Bolt.Media.Browser;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Error);
@@ -17,6 +18,8 @@ builder.Services.AddSqliteWasm();
 builder.Services.AddScoped<OfflineStore>();
 builder.Services.AddScoped<ChatApi>();
 builder.Services.AddScoped<ChatState>();
+builder.Services.AddScoped<VoiceState>();
+builder.Services.AddBoltMediaBrowser(options => options.SecurityMode = Bolt.Media.Browser.MediaSecurityMode.AuthenticatedTransport);
 var startup = new DatabaseStartup();
 builder.Services.AddSingleton(startup);
 var host = builder.Build();

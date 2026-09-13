@@ -31,6 +31,7 @@ public sealed class BoltMediaService : IAsyncDisposable
     private Guid _activeVideoStreamId;
     private bool _hasVideo;
     private bool _initialized;
+    private readonly HashSet<Guid> _configuredCalls = [];
 
     // ── Events for Blazor UI ──
 
@@ -51,6 +52,20 @@ public sealed class BoltMediaService : IAsyncDisposable
     /// <summary>Get the device manager for enumeration and permissions.</summary>
     public BoltDeviceManager Devices => _devices;
 
+    /// <summary>Run before creating or accepting an invitation; does not request microphone access.</summary>
+    public Task<VoiceCapabilities> CheckVoiceCapabilitiesAsync() => _audio.CheckCapabilitiesAsync();
+
+    /// <summary>Invoke from Start/Accept before network requests to request the microphone
+    /// and resume browser audio. Encoding waits until an answered call has a stream.</summary>
+    public async Task PrepareVoiceAsync()
+    {
+        await _audio.InitializeAsync(_options.AudioSampleRate, _options.AudioChannels, _options.AudioBitrateKbps);
+        await _audio.StartCaptureAsync(_options.AudioSampleRate, _options.AudioChannels, transmit: false);
+    }
+
+    /// <summary>Release prepared devices if an invitation fails or is cancelled before connection.</summary>
+    public Task CancelPreparedVoiceAsync() => StopPipelinesAsync();
+
     public BoltMediaService(
         BoltCryptoInterop crypto,
         BoltAudioPipeline audio,
@@ -68,16 +83,20 @@ public sealed class BoltMediaService : IAsyncDisposable
     }
 
     /// <summary>
-    /// Initialize the media service. Call once after BoltClient is connected.
-    /// Loads JS modules, generates encryption keys, wires call events.
+    /// Initialize the media service before connecting BoltClient or starting signaling.
+    /// Loads audio modules, verifies the security mode, and installs media frame handlers
+    /// so an immediately arriving call cannot be missed after registration.
     /// </summary>
     public async Task InitializeAsync(BoltClient client)
     {
         if (_initialized) return;
 
-        if (_options.EnableEncryption)
+        if (_options.SecurityMode != MediaSecurityMode.AuthenticatedTransport)
             throw new NotSupportedException(
                 "Encrypted Bolt Media calls are disabled until key exchange is bound to authenticated peer identities.");
+
+        if (client.ServerUri.Scheme != "wss")
+            throw new InvalidOperationException("Authenticated transport media requires a WSS endpoint.");
 
         // Initialize audio pipeline
         await _audio.InitializeAsync(_options.AudioSampleRate, _options.AudioChannels, _options.AudioBitrateKbps);
@@ -113,7 +132,7 @@ public sealed class BoltMediaService : IAsyncDisposable
     // ── Call API ──
 
     /// <summary>Start a voice or voice+video call to a recipient.</summary>
-    public async Task<Guid> StartCallAsync(string recipientId, bool video = false)
+    public async Task<Guid> StartCallAsync(string recipientId, bool video = false, Guid? callId = null)
     {
         EnsureInitialized();
 
@@ -128,9 +147,9 @@ public sealed class BoltMediaService : IAsyncDisposable
             _video.OnEncoded += OnVideoEncodedForStream;
         }
 
-        var callId = await _mediaClient!.StartCallAsync(recipientId, video, _options.EnableEncryption);
-        _logger.LogInformation("Call started: {CallId} to {Recipient}, video={Video}", callId, recipientId, video);
-        return callId;
+        var startedCallId = await _mediaClient!.StartCallAsync(recipientId, video, encrypted: false, authorizedCallId: callId);
+        _logger.LogInformation("Call started: {CallId} to {Recipient}, video={Video}", startedCallId, recipientId, video);
+        return startedCallId;
     }
 
     /// <summary>Answer an incoming call.</summary>
@@ -149,7 +168,7 @@ public sealed class BoltMediaService : IAsyncDisposable
             _video.OnEncoded += OnVideoEncodedForStream;
         }
 
-        await _mediaClient!.AnswerCallAsync(callId, _options.EnableEncryption);
+        await _mediaClient!.AnswerCallAsync(callId, encrypted: false);
         await HandleCallAnsweredAsync(callId);
     }
 
@@ -200,6 +219,10 @@ public sealed class BoltMediaService : IAsyncDisposable
 
     private async Task HandleCallAnsweredAsync(Guid callId)
     {
+        // An answer may be observed locally and echoed by the relay. Configure once.
+        lock (_configuredCalls)
+            if (!_configuredCalls.Add(callId)) return;
+
         var client = _mediaClient!.Client;
         var conn = client.GetPrimaryConnection();
         var writer = Bolt.Protocol.Buffers.RentedBufferWriter.GetThreadLocal();
@@ -208,8 +231,7 @@ public sealed class BoltMediaService : IAsyncDisposable
         var audioStream = new BoltMediaStream(conn, _activeAudioStreamId, callId, true);
         if (_options.EnableFec) audioStream.EnableFec(_options.FecAudioGroupSize);
         audioStream.EnableNack(128);
-        audioStream.EnableVad();
-        audioStream.EnablePlc();
+        // Audio is already Opus-encoded. PCM VAD/PLC must never inspect these bytes.
         audioStream.OnBitrateChanged += kbps =>
             _ = _audio.ReconfigureBitrateAsync(_options.AudioSampleRate, _options.AudioChannels, kbps);
         if (!_mediaClient.RegisterMediaStream(audioStream))
@@ -248,11 +270,11 @@ public sealed class BoltMediaService : IAsyncDisposable
         if (OnCallAnswered is not null) await OnCallAnswered(callId);
     }
 
-    private void OnAudioEncodedForStream(byte[] data)
+    private async Task OnAudioEncodedForStream(byte[] data)
     {
         var stream = _mediaClient?.GetMediaStream(_activeAudioStreamId);
         if (stream is not null)
-            _ = stream.SendFrameAsync(data, false);
+            await stream.SendFrameAsync(data, false);
     }
 
     private void OnVideoEncodedForStream(byte[] data, bool isKeyframe)
@@ -308,8 +330,10 @@ public sealed class BoltMediaService : IAsyncDisposable
         _activeAudioStreamId = Guid.Empty;
         _activeVideoStreamId = Guid.Empty;
         _hasVideo = false;
+        lock (_configuredCalls) _configuredCalls.Clear();
 
         if (_audio.IsCapturing) await _audio.StopCaptureAsync();
+        await _audio.StopPlaybackAsync();
         if (_video.IsCapturing) await _video.StopCaptureAsync();
     }
 
@@ -322,10 +346,10 @@ public sealed class BoltMediaService : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await StopPipelinesAsync();
+        _audio.OnEncoded -= OnAudioEncodedForStream;
+        _video.OnEncoded -= OnVideoEncodedForStream;
         if (_mediaClient is not null) await _mediaClient.DisposeAsync();
-        await _audio.DisposeAsync();
-        await _video.DisposeAsync();
-        await _crypto.DisposeAsync();
-        await _devices.DisposeAsync();
+        // These dependencies belong to the DI scope; it disposes each once after this service.
+        _initialized = false;
     }
 }

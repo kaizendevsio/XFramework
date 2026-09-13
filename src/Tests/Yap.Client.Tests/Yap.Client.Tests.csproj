@@ -6,6 +6,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
     <ProjectReference Include="../../Presentation/XFramework.Yap.Contracts/XFramework.Yap.Contracts.csproj" />
+    <ProjectReference Include="../../Libraries/Bolt/Bolt.Media.Browser/Bolt.Media.Browser.csproj" />
     <!-- Execute the actual cache/outbox code against SQLite, independent of the browser-only worker. -->
     <Compile Include="../../Presentation/XFramework.Yap.Client/Services/*.cs" Link="Services/%(Filename)%(Extension)" />
   </ItemGroup>

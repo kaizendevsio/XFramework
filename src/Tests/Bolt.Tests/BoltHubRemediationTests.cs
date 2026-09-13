@@ -246,11 +246,11 @@ public sealed class BoltHubRemediationTests
         var logger = new HeldMediaLogger();
         using var server = new BoltServer(
             logger,
-            new BoltServerOptions { MediaEnabled = true });
+            new BoltServerOptions { MediaEnabled = true, CallAuthorizer = MediaTestAuthorization.Instance });
         await using var caller = new ChannelBoltConnection();
         await using var callee = new ChannelBoltConnection();
-        var callerTask = server.HandleConnectionAsync(caller, CancellationToken.None);
-        var calleeTask = server.HandleConnectionAsync(callee, CancellationToken.None);
+        var callerTask = server.HandleConnectionAsync(caller, MediaTestAuthorization.User("caller"), CancellationToken.None);
+        var calleeTask = server.HandleConnectionAsync(callee, MediaTestAuthorization.User("callee"), CancellationToken.None);
         caller.Enqueue(WriteFrame(writer => BoltCodec.WriteRegister(writer, "hold-caller", "HoldCaller")));
         callee.Enqueue(WriteFrame(writer => BoltCodec.WriteRegister(writer, "hold-callee", "HoldCallee")));
         await Task.WhenAll(caller.WaitForSentFramesAsync(1), callee.WaitForSentFramesAsync(1));

@@ -11,12 +11,16 @@ else
 @if (searchVisible) { <label class="searchbar liquid-glass"><GlassLayer /><Icon Name="search" Size="18" /><input aria-label="Search conversations and messages" placeholder="Search conversations and messages" @bind="search" @bind:event="oninput" @bind:after="SearchMessagesAsync" /></label> }
 
 </Header><ChildContent><div class="body inbox-panel" aria-label="Conversations">
-@foreach (var chat in Filtered)
+@foreach (var section in Filtered.GroupBy(chat => chat.IsFavorite))
+{
+<h2 class="inbox-section">@(section.Key ? "Favorites" : "Messages")</h2>
+@foreach (var chat in section)
 {
     <div class="inbox-item" data-conversation-menu @oncontextmenu="e => OpenMenu(chat, e)" @oncontextmenu:preventDefault>
     <a class="row" href="@($"/chat/{chat.Id}")"><Avatar Initials="@chat.Initials" Color="@chat.Color" Size="a48" /><span class="mid"><span class="t1">@if(chat.IsFavorite){<span class="favorite-mark" aria-label="Favorite">&#9733;</span>}@chat.Name @if (chat.Group) { <span class="tag">@chat.Members</span> }</span><span class="t2 @(chat.Unread > 0 ? "unread" : "")">@chat.Preview</span></span><span class="end"><span class="time">@chat.LastMessageAt?.ToLocalTime().ToString("HH:mm")</span>@if (chat.Unread > 0) { <span class="badge">@chat.Unread</span> }</span></a>
     <button class="inbox-menu-trigger iconbtn" aria-label="@($"Options for {chat.Name}")" @onclick="e => OpenMenu(chat, e)"><Icon Name="more" Size="18" /></button>
     </div>
+}
 }
 @if (!Filtered.Any()) { <p class="empty">No conversations yet. Start one with your people.</p> }
 @if (search.Length >= 2)
@@ -31,9 +35,9 @@ else
 @if (choosing)
 {
 <BottomSheet Title="New conversation" OnClose="() => choosing = false"><div class="picker"><label class="field"><span class="lab">Find people</span><span class="inp"><input aria-label="Find people" placeholder="Name or username" @bind="peopleSearch" @bind:event="oninput" @bind:after="SearchAsync" /></span></label>
-@foreach (var person in people) { <label class="row"><input type="checkbox" checked="@members.Contains(person.Id)" @onchange="() => Toggle(person.Id)" /><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" Size="a34" /><span>@person.Name <small class="muted">@person.UserName</small></span></label> }
-<label class="check"><input type="checkbox" @bind="group" />Create a group</label>
-@if (group || members.Count > 1) { <label class="field"><span class="lab">Group name</span><span class="inp"><input @bind="groupName" @bind:event="oninput" maxlength="100" /></span></label> }
+@if(members.Count > 0){<div class="selected-people" aria-label="Selected people">@foreach(var id in members){<button class="selected-person" aria-label="@($"Remove {names[id]}")" @onclick="() => Toggle(id)"><Avatar Initials="@ChatMessage.InitialsFor(names[id])" Size="a28" /><span>@names[id]</span><Icon Name="close" Size="14" /></button>}</div>}
+@foreach (var person in people) { <label class="row"><input type="checkbox" checked="@members.Contains(person.Id)" @onchange="() => Toggle(person.Id)" /><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" ImageUrl="@person.AvatarUrl" Size="a34" /><span>@person.Name <small class="muted">@person.UserName</small></span></label> }
+@if (members.Count > 1) { <label class="field"><span class="lab">Group name (optional)</span><span class="inp"><input aria-label="Group name" @bind="groupName" @bind:event="oninput" maxlength="100" /></span></label> }
 <button class="btn" disabled="@(members.Count == 0 || creating)" @onclick="CreateAsync">Start conversation</button></div></BottomSheet>
 }
 @if (menu is { } chosen)
@@ -74,7 +78,7 @@ else
     }
     private async Task RenameAsync() { working = true; try { await State.UpdateConversationAsync(new(renaming!.Id, Name: newTitle)); renaming = null; } catch(Exception ex) { State.Report(ex); } finally { working = false; } }
     private async Task DeleteAsync() { working = true; try { await State.DeleteConversationAsync(deleting!.Id, deleteEveryone); deleting = null; } catch(Exception ex) { State.Report(ex); } finally { working = false; } }
-    private bool searchVisible, choosing, group, creating;
+    private bool searchVisible, choosing, creating;
     private List<Person> people = [];
     private List<SearchHit> hits = [];
     private readonly HashSet<Guid> members = [];
@@ -90,7 +94,7 @@ else
     private async Task CreateAsync()
     {
         creating = true;
-        try { var id = await State.CreateAsync(group || members.Count > 1 ? groupName : names[members.Single()], members.ToList(), group); Nav.NavigateTo($"/chat/{id}"); }
+        try { var title = members.Count > 1 ? (string.IsNullOrWhiteSpace(groupName) ? string.Join(", ", members.Select(id => names[id])) : groupName.Trim()) : names[members.Single()]; var id = await State.CreateAsync(title[..Math.Min(title.Length, 100)], members.ToList(), members.Count > 1); Nav.NavigateTo($"/chat/{id}"); }
         catch (Exception ex) { State.Report(ex); }
         finally { creating = false; }
     }

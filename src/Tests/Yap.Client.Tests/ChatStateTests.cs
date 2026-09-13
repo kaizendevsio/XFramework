@@ -13,6 +13,60 @@ namespace Yap.Client.Tests;
 public sealed class ChatStateTests
 {
     [Test]
+    public async Task DuplicateReactionTap_OnlySendsOneAction_AndReconcilesConflict()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Sender");
+        var chat = new Conversation { Id = Guid.NewGuid() };
+        var message = new ChatMessage { Id = Guid.NewGuid(), ThreadId = chat.Id, Text = "hello" };
+        var started = new TaskCompletionSource(); var resume = new TaskCompletionSource(); var actions = 0;
+        var js = new Mock<IJSRuntime>();
+        js.Setup(x => x.InvokeAsync<bool>("yap.device.online", It.IsAny<object?[]?>())).ReturnsAsync(true);
+        using var http = new HttpClient(new Handler(async request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path == "/api/session") return Json(new SessionResponse(user, "token"));
+            if (path.EndsWith("initialize")) return Json(new ChatDefaults(Guid.NewGuid(), []));
+            if (path.EndsWith("message-actions")) { actions++; started.SetResult(); await resume.Task; return new(HttpStatusCode.Conflict); }
+            return Json(new ChatPage<Conversation>([chat], 1));
+        })) { BaseAddress = new("https://yap.test/") };
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), js.Object);
+        await state.InitializeAsync();
+        var first = state.ActionAsync(message, "react", emoji: "heart"); await started.Task;
+        await state.ActionAsync(message, "react", emoji: "heart"); resume.SetResult(); await first;
+        Assert.That(actions, Is.EqualTo(1));
+        Assert.That(state.Error, Is.Null);
+    }
+
+    [Test]
+    public async Task PreviouslyPausedAttachmentConflict_ResumesWithoutResendingMessage()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Sender");
+        var scope = OfflineStore.Scope(user); var chat = new Conversation { Id = Guid.NewGuid() };
+        var message = new ChatMessage { Id = Guid.NewGuid(), ThreadId = chat.Id, Text = "photo" };
+        await fixture.Store.QueueAsync(new QueuedMessage { Scope = scope, Id = message.Id, ThreadId = chat.Id, Text = message.Text,
+            MessageConfirmed = true, StorageId = Guid.NewGuid(), Paused = true,
+            Error = "This change conflicts with a message already saved. Review it before retrying." }, message, "main");
+        var attachments = 0; var sends = 0;
+        var js = new Mock<IJSRuntime>();
+        js.Setup(x => x.InvokeAsync<bool>("yap.device.online", It.IsAny<object?[]?>())).ReturnsAsync(true);
+        using var http = new HttpClient(new Handler(request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path == "/api/session") return Task.FromResult(Json(new SessionResponse(user, "token")));
+            if (path.EndsWith("initialize")) return Task.FromResult(Json(new ChatDefaults(Guid.NewGuid(), [])));
+            if (path.EndsWith("/attachments")) { attachments++; return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent)); }
+            if (path.EndsWith("/messages")) sends++;
+            return Task.FromResult(Json(new ChatPage<Conversation>([chat], 1)));
+        })) { BaseAddress = new("https://yap.test/") };
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), js.Object);
+        await state.InitializeAsync();
+        Assert.That(attachments, Is.EqualTo(1)); Assert.That(sends, Is.Zero);
+        Assert.That(await fixture.Store.PendingAsync(scope), Is.Empty);
+    }
+
+    [Test]
     public async Task ReadReceipts_RequireVisibleMessages_AndLeavingStopsLateRefresh()
     {
         await using var fixture = await StoreFixture.CreateAsync();

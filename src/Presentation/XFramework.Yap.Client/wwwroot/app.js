@@ -38,6 +38,7 @@ window.yap = {
         dialog.addEventListener('cancel', event => { event.preventDefault(); element.querySelector('[data-sheet-drag]')?.click(); });
         dialog.showModal(); yap.focusSheet(element);
     },
+    openCall(dialog) { dialog.addEventListener('cancel', event => event.preventDefault()); dialog.showModal(); },
     focusSheet(element) {
         element.yapPreviousFocus = document.activeElement;
         element.yapTrap = event => {

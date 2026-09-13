@@ -193,6 +193,26 @@ public sealed class BoltMediaEnablementSafetyTests
         connection.CompleteSendChannel();
     }
 
+    [Test]
+    public async Task BoltMediaClient_TransportDisconnected_ReleasesStreamsAndNotifiesCallEnded()
+    {
+        await using var client = CreateClientWithConnection(out var connection);
+        await using var media = new BoltMediaClient(client, NullLogger<BoltMediaClient>.Instance);
+        var callId = await media.StartCallAsync("peer");
+        var stream = new BoltMediaStream(connection, Guid.NewGuid(), callId, true);
+        media.RegisterMediaStream(stream).Should().BeTrue();
+        var ended = new TaskCompletionSource<Guid>(TaskCreationOptions.RunContinuationsAsynchronously);
+        media.OnCallEnded += id => { ended.TrySetResult(id); return Task.CompletedTask; };
+
+        var disconnected = (Action?)typeof(BoltClient)
+            .GetField("Disconnected", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(client);
+        disconnected!.Invoke();
+
+        (await ended.Task.WaitAsync(TimeSpan.FromSeconds(2))).Should().Be(callId);
+        media.GetMediaStream(stream.StreamId).Should().BeNull();
+        connection.CompleteSendChannel();
+    }
+
     private static Channel<MediaFrameData> GetInboundChannel(BoltMediaStream stream) =>
         (Channel<MediaFrameData>)typeof(BoltMediaStream)
             .GetField("_inbound", BindingFlags.Instance | BindingFlags.NonPublic)!

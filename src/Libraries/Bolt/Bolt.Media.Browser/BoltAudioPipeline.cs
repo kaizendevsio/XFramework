@@ -1,5 +1,7 @@
 namespace Bolt.Media.Browser;
 
+public sealed record VoiceCapabilities(bool Supported, string? Reason, bool NativeCodecs = false);
+
 /// <summary>
 /// Audio capture → WebCodecs encode → C# callback, and C# → WebCodecs decode → AudioContext playback.
 /// Bridges browser audio APIs to <see cref="BoltMediaStream"/>.
@@ -12,11 +14,20 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
     private IJSObjectReference? _pipeline;
     private DotNetObjectReference<BoltAudioPipeline>? _dotNetRef;
     private bool _capturing;
+    private ManagedOpusCodec? _managedCodec;
 
     /// <summary>Fires when the audio encoder produces an encoded Opus frame.</summary>
-    public event Action<byte[]>? OnEncoded;
+    public event Func<byte[], Task>? OnEncoded;
 
     public bool IsCapturing => _capturing;
+
+    /// <summary>Checks codec support without opening the microphone or starting a call.</summary>
+    public async Task<VoiceCapabilities> CheckCapabilitiesAsync()
+    {
+        _module ??= await _js.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/Bolt.Media.Browser/bolt-media.js");
+        return await _module.InvokeAsync<VoiceCapabilities>("checkVoiceCapabilities");
+    }
 
     public BoltAudioPipeline(IJSRuntime js, ILogger<BoltAudioPipeline> logger)
     {
@@ -27,17 +38,39 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
     /// <summary>Load JS module, initialize Opus encoder and decoder.</summary>
     public async Task InitializeAsync(int sampleRate = 48_000, int channels = 1, int bitrateKbps = 64)
     {
-        _module = await _js.InvokeAsync<IJSObjectReference>(
+        if (_pipeline is not null) return;
+        _module ??= await _js.InvokeAsync<IJSObjectReference>(
             "import", "./_content/Bolt.Media.Browser/bolt-media.js");
+        await _module.InvokeVoidAsync("requireSecureVoiceContext");
         _pipeline = await _module.InvokeAsync<IJSObjectReference>("createAudioPipeline");
         _dotNetRef = DotNetObjectReference.Create(this);
 
-        await _pipeline.InvokeVoidAsync("initEncoder", sampleRate, channels, bitrateKbps);
-        await _pipeline.InvokeVoidAsync("initDecoder", sampleRate, channels);
+        try
+        {
+            var capabilities = await CheckCapabilitiesAsync();
+            if (!capabilities.Supported) throw new NotSupportedException(capabilities.Reason);
+            if (capabilities.NativeCodecs)
+            {
+                await _pipeline.InvokeVoidAsync("initEncoder", sampleRate, channels, bitrateKbps);
+                await _pipeline.InvokeVoidAsync("initDecoder", sampleRate, channels);
+            }
+            else
+            {
+                if (sampleRate != 48_000 || channels != 1)
+                    throw new NotSupportedException("Managed voice requires 48 kHz mono audio.");
+                _managedCodec = new ManagedOpusCodec(bitrateKbps);
+                await _pipeline.InvokeVoidAsync("initManaged");
+            }
+        }
+        catch
+        {
+            await DisposeAsync();
+            throw;
+        }
     }
 
     /// <summary>Start capturing audio from the microphone.</summary>
-    public async Task StartCaptureAsync(int? sampleRate = null, int? channels = null)
+    public async Task StartCaptureAsync(int? sampleRate = null, int? channels = null, bool transmit = true)
     {
         if (_pipeline is null) throw new InvalidOperationException("Call InitializeAsync first");
 
@@ -45,8 +78,7 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
             ? new { sampleRate = sampleRate ?? 48_000, channels = channels ?? 1 }
             : null;
 
-        await _pipeline.InvokeVoidAsync("startCapture", _dotNetRef, constraints);
-        _capturing = true;
+        _capturing = await _pipeline.InvokeAsync<bool>("startCapture", _dotNetRef, constraints, transmit);
         _logger.LogDebug("Audio capture started");
     }
 
@@ -63,26 +95,48 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
     public async ValueTask DecodeFrameAsync(ReadOnlyMemory<byte> data, uint timestamp)
     {
         if (_pipeline is null) return;
-        await _pipeline.InvokeVoidAsync("decodeFrame", data.ToArray(), timestamp);
+        if (_managedCodec is not null)
+            await _pipeline.InvokeVoidAsync("playPcm", _managedCodec.Decode(data.Span));
+        else
+            await _pipeline.InvokeVoidAsync("decodeFrame", data.ToArray(), timestamp);
     }
 
     /// <summary>Change the encoder bitrate in response to ABR feedback.</summary>
     public async ValueTask ReconfigureBitrateAsync(int sampleRate, int channels, int newBitrateKbps)
     {
         if (_pipeline is null) return;
+        if (_managedCodec is not null)
+        {
+            _managedCodec.SetBitrate(newBitrateKbps);
+            return;
+        }
         await _pipeline.InvokeVoidAsync("reconfigureBitrate", sampleRate, channels, newBitrateKbps);
     }
 
     /// <summary>Called from JS when an encoded audio chunk is ready.</summary>
     [JSInvokable]
-    public void OnAudioEncoded(byte[] data)
+    public async Task OnAudioEncoded(byte[] data)
     {
-        OnEncoded?.Invoke(data);
+        if (OnEncoded is not { } handlers) return;
+        foreach (Func<byte[], Task> handler in handlers.GetInvocationList())
+            await handler(data);
+    }
+
+    [JSInvokable]
+    public Task OnAudioPcm(byte[] pcm) => _managedCodec is null
+        ? Task.CompletedTask
+        : OnAudioEncoded(_managedCodec.Encode(pcm));
+
+    public async Task StopPlaybackAsync()
+    {
+        if (_pipeline is not null) await _pipeline.InvokeVoidAsync("stopPlayback");
     }
 
     public async ValueTask DisposeAsync()
     {
         _capturing = false;
+        _managedCodec?.Dispose();
+        _managedCodec = null;
         if (_pipeline is not null)
         {
             await _pipeline.InvokeVoidAsync("dispose");
@@ -90,5 +144,8 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
         }
         _dotNetRef?.Dispose();
         if (_module is not null) await _module.DisposeAsync();
+        _pipeline = null;
+        _module = null;
+        _dotNetRef = null;
     }
 }

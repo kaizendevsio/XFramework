@@ -78,6 +78,7 @@ public static class YapApplication
         builder.Services.AddScoped<ICommunicationsChatActorProvider, YapActorProvider>();
         builder.Services.AddScoped<IChatDirectory, ChatDirectory>();
         builder.Services.AddScoped<ChatFiles>();
+        builder.Services.AddYapCalls();
 
         configure?.Invoke(builder);
         var app = builder.Build();
@@ -89,6 +90,7 @@ public static class YapApplication
                 branch => branch.UseHttpsRedirection());
         }
         app.UseAuthentication();
+        app.UseWebSockets();
         app.UseAuthorization();
         app.UseAntiforgery();
         app.UseBlazorFrameworkFiles();
@@ -102,6 +104,7 @@ public static class YapApplication
         });
         app.MapYapAuth();
         app.MapYapApi();
+        app.MapYapCalls();
         app.MapGet("/health/live", () => Results.Ok(new { status = "Healthy" }));
         app.MapGet("/health/ready", (BoltClient client, IConfiguration configuration) =>
         {
