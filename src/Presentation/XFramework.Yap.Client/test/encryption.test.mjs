@@ -150,8 +150,40 @@ test('recovery key stays stable and recovery revokes previous active identities'
     const restored = await fresh.api.recovery(a.scope, first.recoveryKey, first.recoveryArchive, added.directory);
     assert.equal(restored.recoveryKey, first.recoveryKey);
     assert.equal(restored.directory.devices.filter(d => !d.revocation).length, 1);
-    assert.equal(restored.directory.devices.filter(d => !!d.revocation).length, 2);
+    assert.equal(restored.directory.devices.filter(d => !!d.revocation).length, 3);
     assert.notEqual(restored.directory.devices.find(d => !d.revocation).deviceId, proposal.deviceId);
+});
+
+test('approval rotates the owner before transferring history and retries the exact staged result', async () => {
+    const owner = await account(), sender = await account(), target = client();
+    const oldOwner = structuredClone(stored(owner).device);
+    const before = context(sender), history = await sender.api.encrypt(sender.scope, before, { text: 'Earlier photo message' }, [sender.directory, owner.directory]);
+    const proposal = await target.api.proposeDevice(owner.scope);
+    const first = await owner.api.approveDevice(owner.scope, proposal, owner.directory);
+    const retry = await owner.api.approveDevice(owner.scope, proposal, owner.directory);
+    assert.deepEqual(retry, first);
+    assert.equal((await owner.api.status(owner.scope)).deviceId, oldOwner.deviceId, 'pending CAS must not change the active device');
+    assert.ok(first.directory.devices.find(d => d.deviceId === oldOwner.deviceId).revocation);
+    assert.equal(first.directory.devices.filter(d => !d.revocation).length, 2);
+    await target.api.importApproval(owner.scope, first.approval, first.directory);
+    assert.equal((await target.api.decrypt(owner.scope, before, history, sender.directory)).text, 'Earlier photo message');
+    // Simulate lost POST response: the next call sees the confirmed server roster.
+    const confirmedRetry = await owner.api.approveDevice(owner.scope, proposal, first.directory);
+    assert.equal(confirmedRetry.alreadyPublished, true); assert.deepEqual(confirmedRetry.approval, first.approval);
+    assert.notEqual((await owner.api.status(owner.scope)).deviceId, oldOwner.deviceId);
+    const after = context(sender), future = await sender.api.encrypt(sender.scope, after, { text: 'New encrypted message' }, [sender.directory, first.directory]);
+    for (const recipient of [owner, target]) assert.equal((await recipient.api.decrypt(owner.scope, after, future, sender.directory)).text, 'New encrypted message');
+    await assert.rejects(pgp.decrypt({ message: await pgp.readMessage({ armoredMessage: future }), decryptionKeys: await pgp.readPrivateKey({ armoredKey: oldOwner.encryptionPrivateKey }) }));
+    const outgoing = context(owner), reply = await owner.api.encrypt(owner.scope, outgoing, { text: 'Rotated owner can send' }, [first.directory, sender.directory]);
+    assert.equal((await sender.api.decrypt(sender.scope, outgoing, reply, first.directory)).text, 'Rotated owner can send');
+    assert.equal((await target.api.status(owner.scope)).canApproveDevices, false);
+    await assert.rejects(target.api.exportRecovery(owner.scope), /owner device/);
+});
+
+test('recipient count accepts existing 101-account conversation bound', async () => {
+    const a = await account();
+    await assert.rejects(a.api.encrypt(a.scope, context(a), {}, new Array(101).fill(a.directory)), /Duplicate recipient account/);
+    await assert.rejects(a.api.encrypt(a.scope, context(a), {}, new Array(102).fill(a.directory)), /Missing recipient directories/);
 });
 
 const streamOf = (bytes, chunkSize = 8192) => new ReadableStream({

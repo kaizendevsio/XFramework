@@ -24,8 +24,14 @@ All persistence and trust pins are bound to this account and tenant.
   pin verified. The user must compare fingerprints through another trusted path.
 - `proposeDevice(scope)` creates a fresh keypair and returns a public proposal.
 - `approveDevice(scope,proposal,directory)` returns
-  `{expectedRevision,directory,approval}`. Publish its directory using CAS, then
+  `{alreadyPublished,expectedRevision,directory,approval}`. Publish its directory using CAS unless `alreadyPublished` is true, then
   give the approval object to the new device through the explicit approval flow.
+  In that same roster revision it revokes the owner's old device keys and adds
+  fresh owner keys. Pending keys/results are persisted before publishing; retry
+  returns the exact staged result. `acceptDirectory` activates replacement owner
+  keys only after the server confirms the roster. Refresh the owner's C# status
+  and save its updated recovery archive after confirmation. Two device slots are
+  consumed per additional-device approval, within the 16-record lifetime bound.
 - `importApproval(scope,approval,directory)` validates the directory against the
   approving device's fingerprint and decrypts its root-signed transfer. That
   transfer contains only retired history keys. **Active device keys and the
@@ -43,8 +49,10 @@ All persistence and trust pins are bound to this account and tenant.
 The account owner device holds the master signing key. Revoking a device does
 not protect an account whose master key or recovery secret has been stolen.
 Additional devices cannot approve others or export the owner's recovery archive.
-For complete history transfer to an additional device, re-encrypt cached history
-content to its fresh key; never copy the private key of another active device.
+Approving a device transfers history readable using the owner's retired keys.
+The owner key rotation occurs atomically with approval, so those transferred
+keys cannot decrypt future messages addressed to the fresh active devices.
+Never copy the private key of another active device.
 
 ## Directory wire records
 

@@ -153,11 +153,20 @@ export function createEncryption(store = indexedDbStore()) {
         const result = await validateDirectory(s, directory, state.pins);
         if (result.directory.credentialId === s.credentialId) {
             check(state.rootFingerprint === result.rootFingerprint, 'The account security key changed.');
+            const rotation = state.pendingRotation;
+            if (rotation && result.directory.revision >= rotation.result.directory.revision) {
+                const confirmed = result.directory.devices.find(d => d.deviceId === rotation.device.deviceId && !d.revocation);
+                if (confirmed && confirmed.signingPublicKey === rotation.device.signingPublicKey && confirmed.encryptionPublicKey === rotation.device.encryptionPublicKey) {
+                    state.device = rotation.device; state.historyKeys = rotation.historyKeys;
+                    state.lastApproval = { proposal: rotation.proposal, approval: rotation.result.approval };
+                    state.pendingRotation = null;
+                }
+            }
             const own = result.directory.devices.find(d => d.deviceId === state.device.deviceId);
             check(own && own.signingPublicKey === state.device.signingPublicKey && own.encryptionPublicKey === state.device.encryptionPublicKey, 'This device is not in the approved roster.');
             state.directory = result.directory;
             state.approved = !own.revocation;
-            state.pendingDirectory = null;
+            if (!state.pendingRotation) state.pendingDirectory = null;
         }
         return result;
     }
@@ -193,7 +202,7 @@ export function createEncryption(store = indexedDbStore()) {
     async function prepareEncryption(s, key, context, directories, recipientDeviceIds = null) {
         const state = await requireState(key), c = contextOf(s, context);
         check(state.approved && c.senderId === s.credentialId, 'The sending device is not approved.');
-        check(Array.isArray(directories) && directories.length > 0 && directories.length <= 64, 'Missing recipient directories.');
+        check(Array.isArray(directories) && directories.length > 0 && directories.length <= 101, 'Missing recipient directories.');
         const recipients = [], encryptionKeys = [], accounts = new Set();
         const selected = recipientDeviceIds === null ? null : new Set(recipientDeviceIds.map(guid));
         check(selected === null || selected.size > 0 && selected.size === recipientDeviceIds.length, 'Invalid selected recipient devices.');
@@ -355,23 +364,43 @@ export function createEncryption(store = indexedDbStore()) {
         approveDevice: (scope, proposal, directory) => locked(scope, async (s, key) => {
             const state = await requireState(key);
             check(state.rootPrivateKey && state.approved, 'This device cannot approve other devices.');
-            const { directory: d } = await accept(s, state, directory);
+            const { directory: validated } = await accept(s, state, directory);
+            check(state.approved, 'This device was revoked.');
+            const d = structuredClone(validated);
             check(d.credentialId === s.credentialId && proposal.v === 1 && proposal.kind === 'device-proposal' && guid(proposal.tenantId) === s.tenantId && guid(proposal.credentialId) === s.credentialId, 'The proposed device belongs to another account.');
             const device = { ...proposal, deviceId: guid(proposal.deviceId) };
-            check(d.devices.length < MAX_DIRECTORY_DEVICES && !d.devices.some(x => x.deviceId === device.deviceId), 'This device cannot be added.');
-            const updated = await signDirectory({ ...d, revision: d.revision + 1, devices: [...d.devices, await approveRecord(s, device, d.revision + 1, state.rootPrivateKey)] }, state.rootPrivateKey);
-            // Never clone another active device's private key: that would let a
-            // revoked target continue decrypting packets addressed to its source.
+            const proposalText = canonical(device);
+            if (state.lastApproval?.proposal === proposalText && d.devices.some(x => x.deviceId === device.deviceId && !x.revocation)) {
+                await store.put(key, state);
+                return { alreadyPublished: true, expectedRevision: d.revision, directory: d, approval: state.lastApproval.approval };
+            }
+            if (state.pendingRotation) {
+                check(state.pendingRotation.proposal === proposalText, 'Finish the pending device approval first.');
+                if (d.revision === state.pendingRotation.result.expectedRevision) { await store.put(key, state); return state.pendingRotation.result; }
+                // A different confirmed mutation won CAS; these unpublished keys
+                // were never shared/used and can safely be replaced against it.
+                state.pendingRotation = null; state.pendingDirectory = null;
+            }
+            check(d.devices.length + 2 <= MAX_DIRECTORY_DEVICES && !d.devices.some(x => x.deviceId === device.deviceId), 'The device limit has been reached.');
+            const replacement = await newDevice();
+            const previous = d.devices.find(x => x.deviceId === state.device.deviceId);
+            previous.revocation = await signed({ v: 1, kind: 'device-revocation', ...s, deviceId: previous.deviceId, revokedRevision: d.revision + 1 }, state.rootPrivateKey);
+            const updated = await signDirectory({ ...d, revision: d.revision + 1, devices: [...d.devices,
+                await approveRecord(s, replacement, d.revision + 1, state.rootPrivateKey),
+                await approveRecord(s, device, d.revision + 1, state.rootPrivateKey)] }, state.rootPrivateKey);
             const retiredFingerprints = new Set(d.devices.filter(x => x.revocation).map(x => x.encryptionPublicKey));
             const retiredKeys = [];
-            for (const armor of state.historyKeys ?? []) {
+            for (const armor of [...new Set([state.device.encryptionPrivateKey, ...(state.historyKeys ?? [])])]) {
                 const publicArmor = (await readPrivate(armor)).toPublic().armor();
                 if (retiredFingerprints.has(publicArmor)) retiredKeys.push(armor);
             }
             const transfer = { v: 1, kind: 'device-transfer', ...s, deviceId: device.deviceId, rootFingerprint: state.rootFingerprint, directoryRevision: updated.revision, decryptionKeys: retiredKeys };
             const encryptedTransfer = await pgp.encrypt({ message: await pgp.createMessage({ binary: encoder.encode(canonical(transfer)) }), encryptionKeys: await readPublic(device.encryptionPublicKey), signingKeys: await readPrivate(state.rootPrivateKey), format: 'armored', config });
+            const result = { alreadyPublished: false, expectedRevision: d.revision, directory: updated, approval: { rootFingerprint: state.rootFingerprint, deviceId: device.deviceId, encryptedTransfer } };
+            state.pendingDirectory = updated;
+            state.pendingRotation = { proposal: proposalText, device: replacement, historyKeys: retiredKeys, result };
             await store.put(key, state);
-            return { expectedRevision: d.revision, directory: updated, approval: { rootFingerprint: state.rootFingerprint, deviceId: device.deviceId, encryptedTransfer } };
+            return result;
         }),
         importApproval: (scope, approval, directory) => locked(scope, async (s, key) => {
             const state = await requireState(key);
