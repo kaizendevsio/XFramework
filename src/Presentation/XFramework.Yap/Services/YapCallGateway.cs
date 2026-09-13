@@ -20,6 +20,7 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
     private readonly IServiceScopeFactory scopes;
     private readonly Timer cleanup;
     public bool Enabled { get; }
+    public bool EncryptedGroupsEnabled => Enabled && groupLifecycleEnabled;
     public BoltServer Server { get; }
 
     public YapCallGateway(IConfiguration configuration, IServiceScopeFactory scopes, ILogger<BoltServer> logger)
@@ -31,11 +32,13 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
         this.scopes = scopes;
         groupLifecycleEnabled = enableGroupLifecycle;
         Enabled = configuration.GetValue<bool>("Yap:Calls:Enabled");
-        if (Enabled && configuration["Yap:Calls:SecurityMode"] != "TrustedServerTls")
-            throw new InvalidOperationException("Yap calls require the explicit TrustedServerTls security mode.");
+        var requiredMode = enableGroupLifecycle ? "EndToEndEncrypted" : "TrustedServerTls";
+        if (Enabled && configuration["Yap:Calls:SecurityMode"] != requiredMode)
+            throw new InvalidOperationException($"Yap calls require the explicit {requiredMode} security mode.");
         Server = new BoltServer(logger, new BoltServerOptions
         {
             MediaEnabled = Enabled, RequireSecureTransport = true, AuthenticatedMediaOnly = true,
+            RequireEncryptedMedia = enableGroupLifecycle,
             CallAuthorizer = this, MaxActiveCalls = 64, MaxActiveCallsPerPrincipal = 1,
             GroupCallAuthorizer = enableGroupLifecycle ? this : null,
             MaxCallParticipants = enableGroupLifecycle ? 8 : 2, MaxMediaStreamsPerPrincipal = 2,
@@ -136,6 +139,7 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
             // Snapshot precedes live events: an End racing subscription must not be followed
             // by a stale incoming snapshot that reopens a finished call in the client.
             foreach (var value in pending) handler(value);
+            ReplayGroupsLocked(key.Tenant, key.User, handler);
         }
         return new Subscription(() => { lock (gate) { if (!listeners.TryGetValue(key, out var handlers)) return; handlers.Remove(handler); if (handlers.Count == 0) listeners.Remove(key); } });
     }
@@ -316,11 +320,29 @@ public static class YapCallEndpoints
     public static void MapYapCalls(this WebApplication app)
     {
         var api = app.MapGroup("/api/chat/calls").RequireAuthorization().AddEndpointFilter<YapApiFilter>();
-        api.MapGet("/config", (YapCallGateway gateway) => new { enabled = gateway.Enabled, securityMode = "TrustedServerTls", groupCalls = false });
+        api.MapGet("/config", (YapCallGateway gateway) => new { enabled = gateway.Enabled,
+            securityMode = gateway.EncryptedGroupsEnabled ? "EndToEndEncrypted" : "TrustedServerTls", groupCalls = gateway.EncryptedGroupsEnabled });
         api.MapPost("/", (StartYapCall request, HttpContext context, YapCallGateway gateway, CancellationToken ct) => gateway.StartAsync(context.User, request, ct));
         api.MapPost("/{id:guid}/connect", (Guid id, HttpContext context, YapCallGateway gateway, CancellationToken ct) => gateway.ConnectAsync(context.User, id, ct));
         api.MapPost("/{id:guid}/ready", (Guid id, HttpContext context, YapCallGateway gateway) => { gateway.Ready(context.User, id); return Results.NoContent(); });
         api.MapPost("/{id:guid}/end", (Guid id, HttpContext context, YapCallGateway gateway) => { gateway.End(context.User, id); return Results.NoContent(); });
+        // Admission stays disabled in the production constructor until encrypted group audio is verified.
+        api.MapPost("/groups", (StartYapGroupCall request, HttpContext context, YapCallGateway gateway, CancellationToken ct) =>
+        {
+            if (request.DeviceId == Guid.Empty || request.Recipients is null) throw new YapApiException(400, "An approved device is required.");
+            return gateway.StartGroupAsync(context.User, request.ThreadId, request.Recipients, ct, request.DeviceId);
+        });
+        api.MapGet("/groups/{id:guid}", (Guid id, HttpContext context, YapCallGateway gateway) => gateway.GroupRoster(context.User, id));
+        api.MapPost("/groups/{id:guid}/accept", (Guid id, AcceptYapGroupCall request, HttpContext context, YapCallGateway gateway, CancellationToken ct) =>
+        {
+            if (request.DeviceId == Guid.Empty) throw new YapApiException(400, "An approved device is required.");
+            return gateway.AcceptGroupAsync(context.User, id, ct, request.DeviceId);
+        });
+        api.MapPost("/groups/{id:guid}/connect", (Guid id, HttpContext context, YapCallGateway gateway, CancellationToken ct) => gateway.ConnectGroupAsync(context.User, id, ct));
+        api.MapPost("/groups/{id:guid}/ready", async (Guid id, YapGroupReady request, HttpContext context, YapCallGateway gateway, CancellationToken ct) => { await gateway.ReadyGroupAsync(context.User, id, ct, request.Revision); return Results.NoContent(); });
+        api.MapPost("/groups/{id:guid}/leave", async (Guid id, HttpContext context, YapCallGateway gateway, CancellationToken ct) => { await gateway.LeaveGroupAsync(context.User, id, ct); return Results.NoContent(); });
+        api.MapPost("/groups/{id:guid}/control", async (Guid id, YapGroupControl request, HttpContext context, YapCallGateway gateway, CancellationToken ct) => { await gateway.RelayGroupControlAsync(context.User, id, request, ct); return Results.NoContent(); });
+        api.MapPost("/groups/{id:guid}/mute", (Guid id, YapGroupMute request, HttpContext context, YapCallGateway gateway) => { gateway.MuteGroup(context.User, id, request.Muted); return Results.NoContent(); });
         // The one-use ticket and exact Origin check protect the upgrade; the cookie is still required.
         // HTTP/2 WebSockets use extended CONNECT; HTTP/1.1 upgrades use GET.
         app.MapMethods("/api/chat/calls/socket", [HttpMethods.Get, HttpMethods.Connect], async (HttpContext context, YapCallGateway gateway, ILogger<YapCallGateway> logger) =>

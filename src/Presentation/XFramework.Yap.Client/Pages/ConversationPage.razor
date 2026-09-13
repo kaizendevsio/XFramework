@@ -71,8 +71,6 @@ else if (mode == "details" && State.Selected is { } details)
 { <ConversationSettings Conversation="details" /> }
 else if (mode == "forward")
 { <div class="picker">@foreach (var target in State.Conversations) { <button class="row" @onclick="() => ForwardAsync(target.Id)"><Avatar Initials="@target.Initials" Size="a34" />@target.Name</button> }</div> }
-else if (mode == "call")
-{ <div class="picker"><p>Choose someone to call</p>@foreach(var person in State.Selected?.People.Where(p=>p.Id!=State.User?.CredentialId) ?? []){<button class="row" @onclick="() => CallPersonAsync(person)"><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" ImageUrl="@person.AvatarUrl" Size="a34" />@person.Name</button>}</div> }
 else if (mode == "search")
 { <div class="picker"><label class="field"><span class="lab">Search messages</span><span class="inp"><input aria-label="Search messages" placeholder="Search this conversation" @bind="query" @bind:event="oninput" @bind:after="SearchAsync" /></span></label><p class="muted" role="status">@(searching ? "Searching..." : query.Trim().Length < 2 ? "Type at least two characters." : hits.Count == 0 ? "No matching messages." : $"{hits.Count} matching messages")</p>@foreach (var hit in hits) { <button class="row search-hit" @onclick="() => ShowHitAsync(hit.MessageId)"><span>@hit.Text</span><small>@hit.CreatedAt.ToLocalTime().ToString("MMM d, HH:mm")</small></button> }</div> }
 </BottomSheet>
@@ -121,7 +119,11 @@ else if (mode == "search")
     private async Task ForwardAsync(Guid target) { try { await State.SendAsync(target, selected!.Text, null, $"forward:{Guid.NewGuid()}"); mode = null; Nav.NavigateTo($"/chat/{target}"); } catch (Exception ex) { State.Report(ex); } }
     private async Task SearchAsync() { var text = query; searching = text.Trim().Length >= 2; try { await Task.Delay(200); if(text != query) return; var result = await State.SearchAsync(text, Id); if (text == query) hits = result; } catch (Exception ex) { State.Report(ex); } finally { if(text == query) searching = false; } }
     private async Task ShowHitAsync(Guid id) { await State.LocateAsync(id); mode = null; focus = id; }
-    private async Task CallAsync(){var people=State.Selected?.People.Where(p=>p.Id!=State.User?.CredentialId).ToArray() ?? [];if(people.Length==1)await CallPersonAsync(people[0]);else mode="call";}
-    private async Task CallPersonAsync(Person person){mode=null;await Voice.StartAsync(Id,person);}
+    private async Task CallAsync()
+    {
+        if (State.Selected is not { } conversation) return;
+        mode = null;
+        await Voice.StartGroupAsync(Id, conversation.Name, conversation.People);
+    }
     public void Dispose() { State.Changed -= Changed; State.ConversationRemoved -= Removed; Voice.Changed -= Changed; State.LeaveConversation(loaded); }
 }

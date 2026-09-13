@@ -22,7 +22,7 @@ public sealed class VoiceStateTests
         js.Setup(x => x.InvokeAsync<IJSObjectReference>("import", It.IsAny<object?[]?>()))
             .ThrowsAsync(new InvalidOperationException("All transports failed for wss://yap.test/socket?ticket=private-ticket"));
         await using var fixture = new Fixture((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-        { Content = JsonContent.Create(new { enabled = true }) }), js.Object);
+        { Content = JsonContent.Create(new { enabled = true, groupCalls = true, securityMode = "EndToEndEncrypted" }) }), js.Object);
         await fixture.Voice.InitializeAsync();
         await fixture.Voice.StartAsync(Guid.NewGuid(), new Person(Guid.NewGuid(), "Friend", "friend"));
         Assert.Multiple(() =>
@@ -39,11 +39,11 @@ public sealed class VoiceStateTests
         await using var fixture = new Fixture(async (_, ct) =>
         { await release.Task.WaitAsync(ct); return new(HttpStatusCode.NoContent); });
         var invite = fixture.Invite();
-        await fixture.DeliverAsync(new("incoming", invite));
+        await fixture.DeliverAsync(fixture.GroupEvent(invite));
         Assert.That(fixture.Voice.IsCalling, Is.True);
         await fixture.Voice.EndAsync().WaitAsync(TimeSpan.FromSeconds(1));
         Assert.That(fixture.Voice.IsCalling, Is.False);
-        await fixture.DeliverAsync(new("incoming", invite));
+        await fixture.DeliverAsync(fixture.GroupEvent(invite));
         await fixture.DeliverAsync(new("ready", invite, invite.RecipientId));
         Assert.That(fixture.Voice.IsCalling, Is.False);
         release.TrySetResult();
@@ -53,7 +53,7 @@ public sealed class VoiceStateTests
     public async Task AccountChanged_EndsOldAccountCall()
     {
         await using var fixture = new Fixture();
-        await fixture.DeliverAsync(new("incoming", fixture.Invite()));
+        await fixture.DeliverAsync(fixture.GroupEvent(fixture.Invite()));
         fixture.Api.Account = "another-account";
         fixture.Chat.Notify();
         Assert.That(fixture.Voice.IsCalling, Is.False);
@@ -73,7 +73,7 @@ public sealed class VoiceStateTests
         var invitations = 0;
         await using var fixture = new Fixture((request, _) =>
         {
-            if (request.RequestUri!.AbsolutePath.EndsWith("/config")) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new { enabled = true }) });
+            if (request.RequestUri!.AbsolutePath.EndsWith("/config")) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new { enabled = true, groupCalls = true, securityMode = "EndToEndEncrypted" }) });
             invitations++;
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
         }, js.Object);
@@ -93,6 +93,19 @@ public sealed class VoiceStateTests
         });
     }
 
+    [Test]
+    public async Task TrustedServerOnlyConfiguration_NeverEnablesPlaintextFallback()
+    {
+        await using var fixture = new Fixture((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            { Content = JsonContent.Create(new { enabled = true, groupCalls = false, securityMode = "TrustedServerTls" }) }));
+        await fixture.Voice.InitializeAsync();
+        await fixture.Voice.StartAsync(Guid.NewGuid(), new Person(Guid.NewGuid(), "Friend", "friend"));
+        Assert.That(fixture.Voice.Enabled, Is.False);
+        Assert.That(fixture.Voice.IsCalling, Is.False);
+        await fixture.DeliverAsync(new("incoming", fixture.Invite()));
+        Assert.That(fixture.Voice.IsCalling, Is.False);
+    }
+
     private sealed class Fixture : IAsyncDisposable
     {
         private readonly ServiceProvider provider;
@@ -109,12 +122,17 @@ public sealed class VoiceStateTests
             Api = new ChatApi(http) { Account = OfflineStore.Scope(user) };
             Chat = new ChatState(null!, Api, js);
             typeof(ChatState).GetProperty(nameof(ChatState.User))!.SetValue(Chat, user);
+            Chat.Encryption.Status.Approved = true;
+            Chat.Encryption.Status.DeviceId = Guid.NewGuid();
             var services = new ServiceCollection();
             services.AddLogging(); services.AddSingleton(js); services.AddBoltMediaBrowser();
             provider = services.BuildServiceProvider();
             Voice = new VoiceState(Chat, Api, provider.GetRequiredService<IServiceScopeFactory>(), new Navigation(), NullLoggerFactory.Instance);
         }
         public YapCallInvite Invite() => new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Caller", user.CredentialId, DateTimeOffset.UtcNow.AddMinutes(1));
+        public YapCallEvent GroupEvent(YapCallInvite invite) => new("group-incoming", invite, Group: new(invite.Id, invite.ThreadId,
+            invite.CallerId, invite.CallerName, 1, invite.ExpiresAt,
+            [new(invite.CallerId, Guid.NewGuid(), true, false, false, false), new(user.CredentialId, Guid.Empty, false, false, false, false)]));
         public Task DeliverAsync(YapCallEvent value) => Chat.VoiceEvent(JsonSerializer.Serialize(value));
         public async ValueTask DisposeAsync()
         { await Voice.DisposeAsync(); await Chat.DisposeAsync(); await provider.DisposeAsync(); http.Dispose(); }

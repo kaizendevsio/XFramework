@@ -101,9 +101,12 @@ public sealed partial class BoltServer
     private async Task<bool> RenewGroupAuthorizationAsync(ServerCallState call, CancellationToken ct, bool force = false)
     {
         if (!force && Environment.TickCount64 - call.LastMediaAuthorizationTick < 5000) return IsCallMediaActive(call);
-        foreach (var participant in GetParticipantSnapshot(call))
-            if (!participant.IsAlive || !await AuthorizeGroupParticipantAsync(call.CallId, participant, ct))
-                await RemoveGroupParticipantCoreAsync(call, participant, ct);
+        // At most eight independent policy checks; do not serialize remote directory lookups
+        // and stall the audio fanout for the sum of every participant's round-trip time.
+        var results = await Task.WhenAll(GetParticipantSnapshot(call).Select(async participant =>
+            (Participant: participant, Allowed: participant.IsAlive && await AuthorizeGroupParticipantAsync(call.CallId, participant, ct))));
+        foreach (var result in results)
+            if (!result.Allowed) await RemoveGroupParticipantCoreAsync(call, result.Participant, ct);
         call.LastMediaAuthorizationTick = Environment.TickCount64;
         return IsCallMediaActive(call);
     }

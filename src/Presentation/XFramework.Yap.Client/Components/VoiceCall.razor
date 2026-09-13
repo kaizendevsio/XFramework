@@ -9,13 +9,26 @@
     {
     <dialog class="voice-dialog" @ref="dialog" data-update-busy="true" aria-label="Voice call">
         <div class="callscreen"><div class="callbg"></div><div class="callinner">
-            <div class="call-top"><button class="iconbtn" aria-label="Back to chat" @onclick="Minimize"><Icon Name="back" /></button><span class="callenc"><Icon Name="lock" Size="14" />Yap voice call</span></div>
+            <div class="call-top"><button class="iconbtn" aria-label="Back to chat" @onclick="Minimize"><Icon Name="back" /></button><span class="callenc"><Icon Name="lock" Size="14" />Encrypted voice call</span></div>
             <div class="call-center"><Avatar Initials="@ChatMessage.InitialsFor(Voice.Name)" ImageUrl="@Voice.AvatarUrl" Size="a92" /><h1 class="callname">@Voice.Name</h1><p class="callstate" role="status">@Elapsed</p></div>
+            @if (Voice.Participants.Count > 2)
+            {
+                <div class="call-participants" aria-label="Call participants">
+                    @foreach (var participant in Voice.Participants)
+                    {
+                        <div class="call-participant">
+                            <Avatar Initials="@ChatMessage.InitialsFor(Voice.ParticipantName(participant.CredentialId))" ImageUrl="@Voice.ParticipantAvatar(participant.CredentialId)" />
+                            <span>@Voice.ParticipantName(participant.CredentialId)</span>
+                            <small>@(!participant.Accepted ? "Invited" : !participant.Ready ? "Connecting" : participant.Muted ? "Muted" : "In call")</small>
+                        </div>
+                    }
+                </div>
+            }
             @if(Voice.Incoming)
             { <div class="callrow2"><button class="cbtn end" @onclick="() => Voice.EndAsync()"><span class="k"><Icon Name="phone" Class="rot135" Size="26" /></span>Decline</button><button class="cbtn accept" @onclick="Voice.AcceptAsync"><span class="k"><Icon Name="phone" Size="26" /></span>Accept</button></div> }
             else
             { <div class="callrow2"><button class="cbtn @(Voice.Muted ? "on" : "")" disabled="@(Voice.ConnectedAt is null)" aria-pressed="@Voice.Muted" @onclick="Voice.ToggleMuteAsync"><span class="k"><Icon Name="mic" Size="24" /></span>@(Voice.Muted ? "Unmute" : "Mute")</button><button class="cbtn end" @onclick="() => Voice.EndAsync()"><span class="k"><Icon Name="phone" Class="rot135" Size="26" /></span>End</button></div> }
-            <p class="call-footer">Encrypted connection through Yap</p>
+            <p class="call-footer">End-to-end encrypted</p>
         </div></div>
     </dialog>
     }
@@ -26,7 +39,7 @@
     private ElementReference dialog;
     private readonly CancellationTokenSource lifetime = new();
     private bool shown;
-    private string Elapsed => Voice.ConnectedAt is { } time ? (DateTimeOffset.UtcNow - time).ToString(@"mm\:ss") : Voice.Status;
+    private string Elapsed => Voice.Status == "Connected" && Voice.ConnectedAt is { } time ? (DateTimeOffset.UtcNow - time).ToString(@"mm\:ss") : Voice.Status;
     protected override void OnInitialized(){ Voice.Changed += Changed; _ = Tick(); }
     private void Changed() => _ = InvokeAsync(StateHasChanged);
     private async Task Tick(){ try { while(!lifetime.IsCancellationRequested){await Task.Delay(1000,lifetime.Token);if(Voice.ConnectedAt is not null)await InvokeAsync(StateHasChanged);} }catch(OperationCanceledException){} }

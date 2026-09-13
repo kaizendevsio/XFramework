@@ -1,0 +1,27 @@
+.call-participants {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    gap: 18px 12px;
+    width: min(100%, 440px);
+    max-height: 30dvh;
+    overflow-y: auto;
+    margin: 0 auto 24px;
+}
+
+.call-participant {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    font-size: 13px;
+}
+
+.call-participant > span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.call-participant small { opacity: .65; }
