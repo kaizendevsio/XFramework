@@ -27,19 +27,37 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
+          fetch-depth: 0
+
+      - name: Select validation scope
+        id: scope
+        shell: bash
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          scope=full
+          if [ -n "$PR_BASE" ]; then
+            scope="$(python3 scripts/deployment-scope.py "$PR_BASE" HEAD)"
+          fi
+          echo "scope=$scope" >> "$GITHUB_OUTPUT"
+          echo "Validation scope: $scope (Yap-only coverage runs in Validate Phase 0)." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up .NET 10
+        if: steps.scope.outputs.scope != 'yap'
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: 10.x
 
       - name: Restore
+        if: steps.scope.outputs.scope != 'yap'
         run: |
           dotnet restore src/Tests/IdentityServer.UnitTests/IdentityServer.UnitTests.csproj
           dotnet restore src/Tests/IdentityServer.IntegrationTests/IdentityServer.IntegrationTests.csproj
           dotnet restore src/Tests/Portal.E2ETests/Portal.E2ETests.csproj
 
       - name: Run IdentityServer unit tests
+        if: steps.scope.outputs.scope != 'yap'
         run: >-
           dotnet test
           src/Tests/IdentityServer.UnitTests/IdentityServer.UnitTests.csproj
@@ -48,6 +66,7 @@ jobs:
           /nr:false
 
       - name: Run IdentityServer Portal contract tests
+        if: steps.scope.outputs.scope != 'yap'
         run: >-
           dotnet test
           src/Tests/Portal.E2ETests/Portal.E2ETests.csproj
@@ -57,6 +76,7 @@ jobs:
           --filter "TestCategory=Module:IdentityServer&TestCategory=Area:PortalContract"
 
       - name: Run IdentityServer integration tests
+        if: steps.scope.outputs.scope != 'yap'
         shell: bash
         env:
           TEST_FILTER: ${{ inputs.test_filter }}

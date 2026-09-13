@@ -526,7 +526,10 @@ public sealed class ServiceIdentityComposeContractTests
         workflow.Should().Contain("for service in \"${services[@]}\"; do");
         // xargs gives each build one service and caps concurrent dotnet publishers.
         workflow.Should().Contain("xargs -r -n 1 -P 2");
-        workflow.Should().Contain("docker compose -f \"$COMPOSE_FILE_PATH\" build");
+        workflow.Should().Contain("docker compose -f \"$COMPOSE_FILE_PATH\" -f \"$build_override\" build");
+        workflow.Should().Contain("prepare-dotnet-build-context.py");
+        workflow.Should().Contain("deployed-yap-baseline.py");
+        workflow.Should().Contain("if [ \"$DEPLOY_SCOPE\" = yap ]; then services=(yap); fi");
         workflow.Should().Contain("xargs -r -n 1 -P 3 timeout --foreground --kill-after=30s 10m docker push");
         workflow.Should().NotContain(
             "docker compose -f \"$COMPOSE_FILE_PATH\" build \"${services[@]}\"");
@@ -604,7 +607,9 @@ public sealed class ServiceIdentityComposeContractTests
 
         workflow.Should().Contain("run --rm --no-TTY migrate </dev/null");
         workflow.Should().Contain(
-            "run --rm --no-TTY --no-deps bolt-phase0-synthetics </dev/null");
+            "run --rm --no-TTY --no-deps \"${smoke_args[@]}\" bolt-phase0-synthetics </dev/null");
+        workflow.Should().Contain("expiry_enabled=true");
+        workflow.Should().Contain("test \"$observation_status\" -eq 0");
         workflow.Should().NotContain("--no-interactive");
         workflow.Should().Contain("Migration runner did not report a successful result.");
         workflow.Should().Contain("Migration verification found pending database migrations.");

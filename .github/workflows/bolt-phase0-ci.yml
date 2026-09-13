@@ -45,6 +45,21 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
+          fetch-depth: 0
+
+      - name: Select validation scope
+        id: scope
+        shell: bash
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          scope=full
+          if [ -n "$PR_BASE" ]; then
+            scope="$(python3 scripts/deployment-scope.py "$PR_BASE" HEAD)"
+          fi
+          echo "scope=$scope" >> "$GITHUB_OUTPUT"
+          echo "Validation scope: $scope" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up .NET 10
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
@@ -177,14 +192,25 @@ jobs:
           python3 -B scripts/verify-bolt-tailscale-boundary-test.py
           python3 -B scripts/verify-bolt-phase0-diagnostic-sinks-test.py
           python3 -B scripts/refresh-bolt-phase0-synthetic-tokens-test.py
+          "$RUNNER_TEMP/workflow-yaml/bin/python" -B scripts/deployment-pipeline-test.py
+          bash -n scripts/observe-core-services.sh
 
       - name: Restore and build
+        if: steps.scope.outputs.scope != 'yap'
         run: |
           dotnet workload install wasm-tools
           dotnet restore XFramework.slnx
           dotnet build XFramework.slnx --configuration Release --no-restore
 
+      - name: Restore and build Yap dependency closure
+        if: steps.scope.outputs.scope == 'yap'
+        run: |
+          dotnet workload install wasm-tools
+          dotnet build src/Tests/Yap.Tests/Yap.Tests.csproj --configuration Release
+          dotnet build src/Tests/Yap.Client.Tests/Yap.Client.Tests.csproj --configuration Release
+
       - name: Start Storage provider contract dependencies
+        if: steps.scope.outputs.scope != 'yap'
         shell: bash
         run: |
           set -euo pipefail
@@ -212,6 +238,7 @@ jobs:
           exit 1
 
       - name: Test complete Bolt suite
+        if: steps.scope.outputs.scope != 'yap'
         env:
           BOLT_TEST_POSTGRES_CONNECTION: Host=localhost;Port=5432;Database=bolt_authorization_test;Username=bolt_test;Password=bolt_test_password
           BOLT_TEST_REDIS_CONNECTION: localhost:6379,abortConnect=false
@@ -221,16 +248,19 @@ jobs:
             --configuration Release --no-build --no-restore
 
       - name: Test complete Phase 0 synthetics suite
+        if: steps.scope.outputs.scope != 'yap'
         run: |
           dotnet test src/Tests/Bolt.Phase0Synthetics.Tests/Bolt.Phase0Synthetics.Tests.csproj \
             --configuration Release --no-build --no-restore
 
       - name: Test Communications chat contracts and PostgreSQL defaults
+        if: steps.scope.outputs.scope != 'yap'
         run: |
           dotnet test src/Modules/XFramework.Communications/Communications.Tests/Communications.Tests.csproj \
             --configuration Release --no-build --no-restore
 
       - name: Test remote query authorization and PostgreSQL semantics
+        if: steps.scope.outputs.scope != 'yap'
         run: |
           dotnet test src/Tests/XFramework.SourceGenerators.Tests/XFramework.SourceGenerators.Tests.csproj \
             --configuration Release --no-build --no-restore \
@@ -240,6 +270,7 @@ jobs:
             --filter "FullyQualifiedName~DataContext|FullyQualifiedName~TrustedInvocationFeatureGateTests|FullyQualifiedName~RateLimiting"
 
       - name: Test focused IdentityServer and Portal contracts
+        if: steps.scope.outputs.scope != 'yap'
         shell: bash
         run: |
           set -euo pipefail
@@ -259,6 +290,7 @@ jobs:
             --configuration Release --no-build --no-restore
 
       - name: Test Storage authorization and provider contracts
+        if: steps.scope.outputs.scope != 'yap'
         shell: bash
         env:
           STORAGE_TEST_POSTGRES_CONNECTION: Host=localhost;Port=5432;Database=storage_integration_test;Username=bolt_test;Password=bolt_test_password
@@ -280,7 +312,7 @@ jobs:
             --configuration Release --no-build --no-restore
 
       - name: Stop Storage provider contract dependencies
-        if: always()
+        if: always() && steps.scope.outputs.scope != 'yap'
         run: |
           docker rm --force storage-ci-minio >/dev/null 2>&1 || true
           docker rm --force storage-ci-azurite >/dev/null 2>&1 || true
