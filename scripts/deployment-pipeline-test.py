@@ -175,6 +175,8 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual("env.DEPLOY_SCOPE != 'yap'", self.steps[name]["if"])
 
     def test_build_push_pull_are_scoped(self):
+        self.assertIn('docker compose --profile phase0-verification -f "$COMPOSE_FILE_PATH" config --format json',
+                      self.steps["Build images"]["run"])
         for name in ["Build images", "Push images", "Pull candidate images"]:
             self.assertIn('if [ "$DEPLOY_SCOPE" = yap ]; then services=(yap); fi', self.steps[name]["run"])
 

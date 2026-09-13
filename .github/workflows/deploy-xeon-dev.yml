@@ -302,7 +302,7 @@ jobs:
           context_root="$(mktemp -d "$RUNNER_TEMP/xframework-build.XXXXXX")"
           trap 'rm -rf -- "$context_root"' EXIT
           build_override="$context_root/compose-build.json"
-          docker compose -f "$COMPOSE_FILE_PATH" config --format json |
+          docker compose --profile phase0-verification -f "$COMPOSE_FILE_PATH" config --format json |
             python3 scripts/prepare-dotnet-build-context.py \
               --output "$build_override" --services "${services[@]}"
           # Bound concurrency: avoid 16 competing dotnet publishers on the shared runner.
