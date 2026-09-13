@@ -1315,9 +1315,14 @@ public class MediaStressTests
         builder.WebHost.UseUrls($"http://localhost:{_port}");
         builder.Services.AddSingleton(sp => new BoltServer(
             sp.GetRequiredService<ILogger<BoltServer>>(),
-            new BoltServerOptions { MediaEnabled = true }));
+            new BoltServerOptions { MediaEnabled = true, CallAuthorizer = MediaTestAuthorization.Instance }));
         builder.Logging.SetMinimumLevel(LogLevel.Warning);
         _serverApp = builder.Build();
+        _serverApp.Use(async (context, next) =>
+        {
+            context.User = MediaTestAuthorization.User(context.Connection.Id);
+            await next(context);
+        });
         _serverApp.UseWebSockets();
         _serverApp.MapBolt("/bolt");
         _serverApp.MapGet("/health", () => "ok");

@@ -982,12 +982,13 @@ public sealed class BoltPhase0ContainmentTests
             new BoltServerOptions
             {
                 MediaEnabled = true,
+                CallAuthorizer = MediaTestAuthorization.Instance,
                 MaxMediaStreamsPerPrincipal = 1
             });
         await using var caller = new ChannelBoltConnection();
         await using var callee = new ChannelBoltConnection();
-        var callerTask = server.HandleConnectionAsync(caller, CancellationToken.None);
-        var calleeTask = server.HandleConnectionAsync(callee, CancellationToken.None);
+        var callerTask = server.HandleConnectionAsync(caller, MediaTestAuthorization.User("caller"), CancellationToken.None);
+        var calleeTask = server.HandleConnectionAsync(callee, MediaTestAuthorization.User("callee"), CancellationToken.None);
 
         caller.Enqueue(WriteFrame(writer => BoltCodec.WriteRegister(writer, "media-caller", "MediaCaller")));
         callee.Enqueue(WriteFrame(writer => BoltCodec.WriteRegister(writer, "media-callee", "MediaCallee")));

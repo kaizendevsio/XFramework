@@ -596,7 +596,7 @@ public sealed partial class ThreadServiceSecurityTests
     }
 
     [Test]
-    public async Task CreateMessageFileAsync_WhenDuplicateActiveLink_ReturnsConflict()
+    public async Task CreateMessageFileAsync_WhenDuplicateActiveLink_ReturnsSuccessWithoutDuplicating()
     {
         var tenantId = Guid.NewGuid();
         var threadId = Guid.NewGuid();
@@ -621,8 +621,9 @@ public sealed partial class ThreadServiceSecurityTests
             Metadata = Metadata(callerCredentialId, tenantId)
         });
 
-        Assert.That(result.IsSuccess, Is.False);
-        Assert.That(result.StatusCode, Is.EqualTo(409));
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(dataContext.Set<MessageFile>().Count(), Is.EqualTo(1));
+        Assert.That(dataContext.Set<MessageOutboxEvent>(), Is.Empty);
     }
 
     [Test]

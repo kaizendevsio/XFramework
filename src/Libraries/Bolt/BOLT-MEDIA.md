@@ -6,11 +6,11 @@ Bolt Media is an experimental extension of the Bolt binary RPC protocol for audi
 
 For standard XFramework module RPC, prefer the generated `[BoltHandler]` plus `IBoltRequest<TRequest, TResponse>` pattern documented in `BOLT.md`. Bolt Media is the specialized media-streaming layer, not the default pattern for CRUD or feature-command handlers.
 
-**Current status:** quarantined pending remediation. The audit identified broken browser stream wiring, unbounded peer-controlled work, incomplete FEC/NACK behavior, unauthenticated key exchange, and lifecycle leaks. Existing unit tests do not establish a secure or operational end-to-end media path.
+**Current status:** the general Hub media, ECDH, video and group-conference paths remain quarantined. A separate, explicitly scoped two-party voice implementation now serves Yap through its authenticated HTTPS host. See [Yap voice trusted-server relay](../../../docs/solutions/architecture-patterns/yap-voice-trusted-server-relay.md) for its security decision, browser verification and device limitations. This transport-encrypted relay is not end-to-end encrypted and is not a replacement for WebRTC.
 
 ### Deployment Containment
 
-Bolt Hub enforces `BoltConfiguration:MediaEnabled`, which defaults to `false` and is explicitly disabled in every XFramework Hub environment and Compose deployment. While quarantined, deployments must not override it, instantiate `BoltMediaClient` or `BoltMediaService`, expose media UI, route production media clients to the Hub, or advertise Bolt Media capability. Recognition of media frame types by the protocol does not constitute production enablement.
+Bolt Hub enforces `BoltConfiguration:MediaEnabled`, which defaults to `false` and is explicitly disabled in every XFramework Hub environment and Compose deployment. Deployments must not override this shared Hub quarantine or route production media clients to it. The documented Yap exception uses a dedicated media-only server with `AuthenticatedMediaOnly`, an authorization policy, server-assigned identities and explicit `TrustedServerTls` configuration. Only that authenticated WSS voice path may instantiate the browser media services for Yap; other media capabilities remain unavailable. Recognition of media frame types alone does not constitute production enablement.
 
 QUIC/WebTransport and direct P2P are not wired as supported end-to-end transports. They must remain absent from negotiated capabilities and production documentation until secure browser and server integration tests pass.
 

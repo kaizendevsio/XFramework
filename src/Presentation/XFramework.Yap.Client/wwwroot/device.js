@@ -52,6 +52,7 @@
             events = new EventSource(`/api/chat/events?account=${encodeURIComponent(scope)}${thread ? `&thread=${thread}` : ''}`);
             events.onmessage = () => listener?.invokeMethodAsync('RefreshHint').catch(() => {});
             events.onopen = events.onmessage;
+            events.addEventListener('call', event => listener?.invokeMethodAsync('VoiceEvent', event.data).catch(() => {}));
             events.addEventListener('typing', event => {
                 if (account !== scope || activeThread !== thread) return;
                 const state = JSON.parse(event.data);

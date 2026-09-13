@@ -1,4 +1,6 @@
 using Bolt.Media.Browser;
+using Bolt.Client;
+using System.Buffers.Binary;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -99,5 +101,80 @@ public class BoltMediaBrowserTests
 
         var act = async () => await service.StartCallAsync("someone");
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*InitializeAsync*");
+    }
+
+    [Test]
+    public async Task MediaService_LegacyEncryptionFalse_DoesNotOptIntoTransportSecurity()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(Substitute.For<IJSRuntime>());
+        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+        services.AddBoltMediaBrowser(options => options.EnableEncryption = false);
+        await using var provider = services.BuildServiceProvider();
+        await using var client = new BoltClient(new Uri("wss://example.test/media"), "caller", "Test", new(), NullLogger.Instance);
+
+        var initialize = () => provider.GetRequiredService<BoltMediaService>().InitializeAsync(client);
+
+        await initialize.Should().ThrowAsync<NotSupportedException>().WithMessage("*authenticated peer identities*");
+    }
+
+    [Test]
+    public async Task MediaService_TransportSecurity_RejectsPlaintextEndpoint()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(Substitute.For<IJSRuntime>());
+        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+        services.AddBoltMediaBrowser(options => options.SecurityMode = MediaSecurityMode.AuthenticatedTransport);
+        await using var provider = services.BuildServiceProvider();
+        await using var client = new BoltClient(new Uri("ws://example.test/media"), "caller", "Test", new(), NullLogger.Instance);
+
+        var initialize = () => provider.GetRequiredService<BoltMediaService>().InitializeAsync(client);
+
+        await initialize.Should().ThrowAsync<InvalidOperationException>().WithMessage("*WSS*");
+    }
+
+    [Test]
+    public async Task AudioPipeline_EncodedCallback_AwaitsTransportCompletion()
+    {
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pipeline = new BoltAudioPipeline(Substitute.For<IJSRuntime>(), NullLogger<BoltAudioPipeline>.Instance);
+        pipeline.OnEncoded += _ => completion.Task;
+
+        var pending = pipeline.OnAudioEncoded([1, 2, 3]);
+
+        pending.IsCompleted.Should().BeFalse();
+        completion.SetResult();
+        await pending;
+    }
+
+    [Test]
+    public void ManagedOpusCodec_EncodesAndDecodesVoiceWithoutNativeLibrary()
+    {
+        using var sender = new ManagedOpusCodec();
+        using var receiver = new ManagedOpusCodec();
+        var pcm = new byte[1920];
+        for (var i = 0; i < 960; i++)
+            BinaryPrimitives.WriteInt16LittleEndian(pcm.AsSpan(i * 2), (short)(Math.Sin(2 * Math.PI * 440 * i / 48000) * 12000));
+
+        var packet = sender.Encode(pcm);
+        var decoded = receiver.Decode(packet);
+
+        packet.Length.Should().BeInRange(1, 1275);
+        decoded.Length.Should().Be(1920);
+        decoded.Any(sample => sample != 0).Should().BeTrue();
+    }
+
+    [Test]
+    public void ManagedOpusCodec_RejectsUnboundedOrInvalidFrameSizes()
+    {
+        using var codec = new ManagedOpusCodec();
+
+        var encode = () => codec.Encode(new byte[3840]);
+        var decode = () => codec.Decode(new byte[1276]);
+        var empty = () => codec.Decode([]);
+
+        encode.Should().Throw<ArgumentException>();
+        decode.Should().Throw<ArgumentException>();
+        empty.Should().Throw<ArgumentException>();
     }
 }

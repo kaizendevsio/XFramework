@@ -11,10 +11,12 @@
 
     <section class="identity-card liquid-glass">
         <GlassLayer />
-        <Avatar Initials="@ChatMessage.InitialsFor(State.User?.Name)" Size="a92" />
+        <Avatar Initials="@ChatMessage.InitialsFor(State.User?.Name)" Size="a48" />
+        <div class="identity-summary">
         <h2>@(State.User?.Name ?? "Not signed in")</h2>
         <p role="status">@(State.User is null ? "Not signed in" : State.NeedsLogin ? "Sign-in required to sync" : !State.Online ? "Offline · saved sign-in retained" : State.Error is not null ? "Signed in · last action could not finish" : "Signed in")</p>
         @if (State.User is null || State.NeedsLogin) { <a class="btn h46" href="/login">Sign in</a> }
+        </div>
     </section>
 
     <h3 class="set-group">Appearance</h3>
@@ -107,7 +109,7 @@
     </div>
 
     <h3 class="set-group">Troubleshooting</h3>
-    <div class="set-list liquid-glass"><GlassLayer /><DiagnosticsControls /></div>
+    <div class="set-list liquid-glass"><GlassLayer /><button class="set-row set-action" aria-expanded="@diagnostics.ToString().ToLowerInvariant()" @onclick="() => diagnostics = !diagnostics"><span class="set-key"><Icon Name="info" Size="19" /><span class="set-label">Diagnostics<small>Collect and share troubleshooting logs</small></span></span><Icon Name="arrow" Size="17" Class="@(diagnostics ? "set-chevron open" : "set-chevron")" /></button>@if(diagnostics){<DiagnosticsControls />}</div>
     <p class="set-footnote">Loaded conversations, replies, drafts and opened attachments stay available offline. Messages and uploads you send while offline are saved here and sync when you reconnect.</p>
 
     @if (State.User is not null)
@@ -133,7 +135,7 @@
     </BottomSheet>
 }
 @code {
-    private bool signOut, gestures, glass, changes, canInstall, installed;
+    private bool signOut, gestures, glass, changes, canInstall, installed, diagnostics;
     private string theme = "system";
     private string accent = "#d5f879";
     private string? persistNotice;

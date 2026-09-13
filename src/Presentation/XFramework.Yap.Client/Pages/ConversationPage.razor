@@ -4,6 +4,7 @@
 @inject ChatState State
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject VoiceState Voice
 <PageTitle>@(ParentId.HasValue ? "Thread" : State.Selected?.Name ?? "Conversation") · Yap</PageTitle>
 @if (State.User is null) { <div class="body"><p>Sign in to open this conversation.</p><a class="btn" href="/login">Sign in</a></div> }
 else if (State.Selected is not { } chat || chat.Id != Id) { <div class="empty">Opening conversation…</div> }
@@ -13,7 +14,7 @@ else
         @if (!ParentId.HasValue) { <Avatar Initials="@chat.Initials" Color="@chat.Color" /> }
         <button class="mid conversation-title" aria-label="Conversation settings" @onclick='() => mode = "details"'><h1 style="font-size:16px">@(ParentId.HasValue ? "Thread" : chat.Name)</h1><span class="muted" style="font-size:12px">@(ParentId.HasValue ? $"{chat.Name} · {Parent?.ReplyTotal ?? 0} replies" : chat.Group ? $"{chat.Members} members" : "Direct conversation")</span></button>
         <button class="iconbtn" aria-label="Search messages" @onclick='() => mode = "search"'><Icon Name="search" /></button>
-        <button class="iconbtn" aria-label="Conversation details" @onclick='() => mode = "details"'><Icon Name="users" /></button>
+        @if(Voice.Enabled){<button class="iconbtn" aria-label="Start voice call" disabled="@(!State.Online || State.NeedsLogin || Voice.IsCalling)" @onclick="CallAsync"><Icon Name="phone" /></button>}
     </div></Header>
     <ChildContent>
     @if (ParentId.HasValue)
@@ -37,7 +38,7 @@ else
 }
 @if (mode is not null)
 {
-<BottomSheet Title="@(mode == "details" ? "Conversation" : mode == "files" ? "Attachments" : mode == "edit" ? "Edit message" : "Message actions")" ShowHeader='@(mode != "message")' OnClose="() => mode = null">
+<BottomSheet Title="@(mode == "details" ? "Conversation" : mode == "files" ? "Attachments" : mode == "edit" ? "Edit message" : "Message actions")" OnClose="() => mode = null">
 @if (mode == "message" && selected is not null)
 {
     @if (State.Selected?.Allows(ChatFeature.Reactions) != false) { <div class="emojirow">@foreach (var reaction in State.Defaults?.Reactions ?? []) { <button aria-label="@($"React {reaction.Emoji}")" disabled="@(!State.Online || State.NeedsLogin)" @onclick="() => ReactAsync(reaction.Emoji)">@reaction.Emoji</button> }</div> }
@@ -60,8 +61,10 @@ else if (mode == "details" && State.Selected is { } details)
 { <ConversationSettings Conversation="details" /> }
 else if (mode == "forward")
 { <div class="picker">@foreach (var target in State.Conversations) { <button class="row" @onclick="() => ForwardAsync(target.Id)"><Avatar Initials="@target.Initials" Size="a34" />@target.Name</button> }</div> }
+else if (mode == "call")
+{ <div class="picker"><p>Choose someone to call</p>@foreach(var person in State.Selected?.People.Where(p=>p.Id!=State.User?.CredentialId) ?? []){<button class="row" @onclick="() => CallPersonAsync(person)"><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" ImageUrl="@person.AvatarUrl" Size="a34" />@person.Name</button>}</div> }
 else if (mode == "search")
-{ <div class="picker"><label class="field"><span class="lab">Search messages</span><span class="inp"><input @bind="query" @bind:event="oninput" @bind:after="SearchAsync" /></span></label>@foreach (var hit in hits) { <button class="row" @onclick="() => ShowHitAsync(hit.MessageId)">@hit.Text</button> }</div> }
+{ <div class="picker"><label class="field"><span class="lab">Search messages</span><span class="inp"><input aria-label="Search messages" placeholder="Search this conversation" @bind="query" @bind:event="oninput" @bind:after="SearchAsync" /></span></label><p class="muted" role="status">@(searching ? "Searching..." : query.Trim().Length < 2 ? "Type at least two characters." : hits.Count == 0 ? "No matching messages." : $"{hits.Count} matching messages")</p>@foreach (var hit in hits) { <button class="row search-hit" @onclick="() => ShowHitAsync(hit.MessageId)"><span>@hit.Text</span><small>@hit.CreatedAt.ToLocalTime().ToString("MMM d, HH:mm")</small></button> }</div> }
 </BottomSheet>
 }
 @code {
@@ -77,7 +80,8 @@ else if (mode == "search")
     private Guid? focus;
     private string query = "";
     private List<SearchHit> hits = [];
-    protected override void OnInitialized() { State.Changed += Changed; State.ConversationRemoved += Removed; }
+    private bool searching;
+    protected override void OnInitialized() { State.Changed += Changed; State.ConversationRemoved += Removed; Voice.Changed += Changed; }
     private void Removed(Guid id) { if (id == Id) _ = InvokeAsync(() => Nav.NavigateTo("/")); }
     protected override async Task OnParametersSetAsync()
     {
@@ -104,7 +108,9 @@ else if (mode == "search")
     private async Task ReactAsync(string emoji) { await State.ActionAsync(selected!, "react", emoji: emoji); mode = null; }
     private async Task ActionAsync(string action, string? text = null) { await State.ActionAsync(selected!, action, text); mode = null; }
     private async Task ForwardAsync(Guid target) { try { await State.SendAsync(target, selected!.Text, null, $"forward:{Guid.NewGuid()}"); mode = null; Nav.NavigateTo($"/chat/{target}"); } catch (Exception ex) { State.Report(ex); } }
-    private async Task SearchAsync() { var text = query; try { var result = await State.SearchAsync(text, Id); if (text == query) hits = result; } catch (Exception ex) { State.Report(ex); } }
+    private async Task SearchAsync() { var text = query; searching = text.Trim().Length >= 2; try { await Task.Delay(200); if(text != query) return; var result = await State.SearchAsync(text, Id); if (text == query) hits = result; } catch (Exception ex) { State.Report(ex); } finally { if(text == query) searching = false; } }
     private async Task ShowHitAsync(Guid id) { await State.LocateAsync(id); mode = null; focus = id; }
-    public void Dispose() { State.Changed -= Changed; State.ConversationRemoved -= Removed; State.LeaveConversation(loaded); }
+    private async Task CallAsync(){var people=State.Selected?.People.Where(p=>p.Id!=State.User?.CredentialId).ToArray() ?? [];if(people.Length==1)await CallPersonAsync(people[0]);else mode="call";}
+    private async Task CallPersonAsync(Person person){mode=null;await Voice.StartAsync(Id,person);}
+    public void Dispose() { State.Changed -= Changed; State.ConversationRemoved -= Removed; Voice.Changed -= Changed; State.LeaveConversation(loaded); }
 }

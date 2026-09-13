@@ -13,6 +13,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
     <PackageReference Include="SqliteWasmBlazor" />
     <ProjectReference Include="../XFramework.Yap.Contracts/XFramework.Yap.Contracts.csproj" />
+    <ProjectReference Include="../../Libraries/Bolt/Bolt.Media.Browser/Bolt.Media.Browser.csproj" />
     <ServiceWorker Include="wwwroot\service-worker.js" PublishedContent="wwwroot\service-worker.published.js" />
   </ItemGroup>
 </Project>

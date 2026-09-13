@@ -11,6 +11,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
     private readonly SemaphoreSlim sync = new(1, 1);
     private readonly SemaphoreSlim typingPublish = new(1, 1);
     private readonly SemaphoreSlim readReceipts = new(1, 1);
+    private readonly HashSet<Guid> activeActions = [];
     private readonly CancellationTokenSource lifetime = new();
     private DotNetObjectReference<ChatState>? reference;
     private Task? polling;
@@ -53,6 +54,12 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
     public ChatDefaults? Defaults { get; private set; }
     public string Scope => User is null ? "" : OfflineStore.Scope(User);
     public event Action? Changed;
+    public event Func<YapCallEvent, Task>? CallReceived;
+    [JSInvokable] public Task VoiceEvent(string json)
+    {
+        var call = JsonSerializer.Deserialize<YapCallEvent>(json);
+        return call is not null && CallReceived is not null ? CallReceived(call) : Task.CompletedTask;
+    }
     public void Notify() => Changed?.Invoke();
     public void DismissError() { Error = null; Notify(); }
     public void Report(Exception ex)
@@ -466,6 +473,11 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
     {
         foreach (var item in await store.PendingAsync(Scope))
         {
+            // Older clients paused an attachment if its successful response was lost.
+            // The same stored-file link can now be retried idempotently.
+            if (item.Paused && item.MessageConfirmed && item.StorageId.HasValue &&
+                item.Error == "This change conflicts with a message already saved. Review it before retrying.")
+            { item.Paused = false; item.Error = null; await store.SaveQueueAsync(item); }
             if (item.Paused) continue;
             try
             {
@@ -528,6 +540,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
     public async Task ActionAsync(ChatMessage message, string action, string? text = null, string? emoji = null)
     {
         if (!Online || NeedsLogin) { Error = "Connect and sign in to change a message."; Notify(); return; }
+        if (!activeActions.Add(message.Id)) return;
         try
         {
             var reaction = Defaults?.Reactions.FirstOrDefault(x => x.Emoji == emoji);
@@ -536,7 +549,9 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
             await api.PostAsync("api/chat/message-actions", new MessageAction(message.ThreadId, message.Id, action, text, reaction?.Id, mine));
             await SynchronizeAsync();
         }
+        catch (ChatApiException ex) when (ex.Status == 409 && action is "react" or "unreact" or "pin" or "unpin" or "save" or "unsave") { await SynchronizeAsync(); }
         catch (Exception ex) { Report(ex); }
+        finally { activeActions.Remove(message.Id); }
     }
 
     public async Task<List<Person>> SearchPeopleAsync(string text) => !Online || text.Trim().Length < 2 ? []

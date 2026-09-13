@@ -59,6 +59,7 @@ status: current
 - [Portal service wrapper and integration test contract](developer-experience/portal-service-wrapper-and-integration-test-contract.md) - wrapper-first Portal business operations, direct `IDataContext` mutation rules, and standard/extended integration-test tiers.
 - [Portal feature Razor Class Library architecture](developer-experience/portal-feature-rcl-architecture.md) - modular-monolith boundaries for the Portal host, shared UI, feature projects, service registration, and route discovery.
 - [Yap-scoped deployment pipeline](developer-experience/yap-scoped-deployment-pipeline.md) - conservative app-only deployment, image reuse, verification gates, rollback, and focused CI inside the normal release workflow.
+- [Yap voice trusted-server relay](architecture-patterns/yap-voice-trusted-server-relay.md) - authenticated browser voice, transport security, codec fallback, verification evidence and remaining device limitations.
 - [UI guidelines](../../rules/UiGuidelines.md) - primary Portal and Blazor UI rules, with links to BlazorBlueprint component details.
 - [Bolt protocol, Hub, and Media audit](workflow-issues/bolt-protocol-hub-media-audit-2026-07-12.md) - active correctness, security, performance, scalability, and Media finding inventory.
 - [Bolt protocol, Hub, and Media remediation plan](workflow-issues/bolt-protocol-hub-media-remediation-plan-2026-07-12.md) - authoritative phased execution order, dependencies, acceptance gates, and certification requirements.

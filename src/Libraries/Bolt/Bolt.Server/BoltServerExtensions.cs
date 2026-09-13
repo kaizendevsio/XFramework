@@ -43,6 +43,22 @@ public class BoltServerOptions
     /// <summary>Enable Bolt media signaling and frame routing. Disabled unless a host explicitly opts in.</summary>
     public bool MediaEnabled { get; set; }
 
+    /// <summary>Dedicated authenticated WSS voice relay; binds registration to the host-issued
+    /// bolt_media_client_id claim. Transport encryption, not end-to-end encryption.</summary>
+    public bool AuthenticatedMediaOnly { get; set; }
+
+    /// <summary>Required for call admission. Missing policy denies calls even when media is enabled.</summary>
+    public IBoltCallAuthorizer? CallAuthorizer { get; set; }
+
+    /// <summary>Maximum retained ringing and active calls across the server.</summary>
+    public int MaxActiveCalls { get; set; } = 128;
+
+    /// <summary>Maximum calls initiated by one authenticated principal.</summary>
+    public int MaxActiveCallsPerPrincipal { get; set; } = 2;
+
+    /// <summary>Maximum members in an experimental call, including its caller.</summary>
+    public int MaxCallParticipants { get; set; } = 8;
+
     /// <summary>Maximum pending RPC calls across the server. Default: 1000.</summary>
     public int MaxPendingRpcCalls { get; set; } = 1000;
 
@@ -187,7 +203,7 @@ public static class BoltServerExtensions
             var server = context.RequestServices.GetRequiredService<BoltServer>();
             var webSocket = await context.WebSockets.AcceptWebSocketAsync();
             var transport = new WebSocketBoltConnection(webSocket);
-            await server.HandleConnectionAsync(transport, context.User, context.RequestAborted);
+            await server.HandleConnectionAsync(transport, context.User, context.RequestAborted, context.Request.IsHttps);
         });
     }
 }

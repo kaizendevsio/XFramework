@@ -24,6 +24,9 @@ namespace Bolt.Client;
 public sealed class BoltClient : IAsyncDisposable
 {
     private readonly Uri _serverUri;
+
+    /// <summary>Configured endpoint for explicit secure media transport policies.</summary>
+    public Uri ServerUri => _serverUri;
     private readonly string _clientId;
     private readonly string _clientName;
     private readonly int _senderHash;

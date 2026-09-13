@@ -239,7 +239,7 @@ public static class YapApi
                 : throw new YapApiException(413, $"Send attachments over {ChatFiles.StagedFileBytes / (1024 * 1024)} MB with a resumable upload.");
     }
 
-    private static async Task StreamEventsAsync(HttpContext context, ICommunicationsChatClient client, Guid? thread, CancellationToken ct)
+    private static async Task StreamEventsAsync(HttpContext context, ICommunicationsChatClient client, Guid? thread, YapCallGateway calls, CancellationToken ct)
     {
         var session = await client.ForCurrentActorAsync(ct: ct);
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -247,6 +247,7 @@ public static class YapApi
         try
         {
             var hints = Channel.CreateBounded<string>(new BoundedChannelOptions(64) { FullMode = BoundedChannelFullMode.DropOldest });
+            using var callEvents = calls.Subscribe(context.User, call => hints.Writer.TryWrite($"event: call\ndata: {JsonSerializer.Serialize(call)}\n\n"));
             if (thread.HasValue)
             {
                 Require(await session.GetThreadAsync(thread.Value, lifetime.Token));
