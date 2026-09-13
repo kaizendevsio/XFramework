@@ -1,4 +1,4 @@
-name: Deploy Xeon Dev - All Services
+name: Deploy Xeon Dev
 
 on:
   push:
@@ -27,6 +27,10 @@ on:
       - scripts/refresh-bolt-phase0-synthetic-tokens.py
       - scripts/provision-yap-dev-secret.sh
       - scripts/configure-yap-dev-ingress.sh
+      - scripts/deployment-scope.py
+      - scripts/deployed-yap-baseline.py
+      - scripts/prepare-dotnet-build-context.py
+      - scripts/observe-core-services.sh
       - .github/workflows/deploy-xeon-dev.yml
   workflow_dispatch:
     inputs:
@@ -49,7 +53,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy all services to xeon-dev
+    name: Deploy selected services to xeon-dev
     runs-on: [self-hosted, Linux, X64, xframework-build]
     timeout-minutes: 120
     env:
@@ -77,6 +81,7 @@ jobs:
       IDENTITY_PUBLIC_URL: https://xeon-dev.tailed40e.ts.net:8261
       HUB_PUBLIC_URL: https://xeon-dev.tailed40e.ts.net:7000
       OBSERVATION_SECONDS: 120
+      DEPLOY_SCOPE: full
       DB_PASSWORD: compose-validation-placeholder
       USER_JWT_GENERATION_ID: compose-validation-user-jwt-g1
       BOLT_SIGNATURE: compose-validation-placeholder
@@ -135,7 +140,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Configure pinned SSH trust and command bounds
         id: ssh_setup
@@ -270,6 +275,20 @@ jobs:
           printf '%s' "$XSYSTEMS_DEV_REGISTRY_PASSWORD" |
             ssh "$DEPLOY_HOST" "docker login '$REGISTRY_HOST' --username '$XSYSTEMS_DEV_REGISTRY_USERNAME' --password-stdin"
 
+      - name: Select deployment scope from the active release
+        shell: bash
+        run: |
+          set -euo pipefail
+          scope=full
+          baseline="$(ssh "$DEPLOY_HOST" "python3 - '$REMOTE_RELEASES_DIR' '$XFRAMEWORK_ENV_FILE'" < scripts/deployed-yap-baseline.py)"
+          # Manual dispatch is deliberately a full repair/revalidation path.
+          if [ "$GITHUB_EVENT_NAME" = push ] && [[ "$baseline" =~ ^[0-9a-f]{40}$ ]]; then
+            scope="$(python3 scripts/deployment-scope.py "$baseline" "$GITHUB_SHA")"
+          fi
+          echo "DEPLOY_SCOPE=$scope" >> "$GITHUB_ENV"
+          echo "DEPLOY_BASELINE=$baseline" >> "$GITHUB_ENV"
+          echo "Deployment scope: $scope (compared with the verified active release)." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Build images
         shell: bash
         run: |
@@ -279,10 +298,17 @@ jobs:
             audit notifications storage attendance smsgateway wallets inventario pos
             portal operations-dashboard yap bolt-phase0-synthetics
           )
+          if [ "$DEPLOY_SCOPE" = yap ]; then services=(yap); fi
+          context_root="$(mktemp -d "$RUNNER_TEMP/xframework-build.XXXXXX")"
+          trap 'rm -rf -- "$context_root"' EXIT
+          build_override="$context_root/compose-build.json"
+          docker compose -f "$COMPOSE_FILE_PATH" config --format json |
+            python3 scripts/prepare-dotnet-build-context.py \
+              --output "$build_override" --services "${services[@]}"
           # Bound concurrency: avoid 16 competing dotnet publishers on the shared runner.
           printf '%s\n' "${services[@]}" | xargs -r -n 1 -P 2 \
             timeout --foreground --kill-after=30s 15m \
-            docker compose -f "$COMPOSE_FILE_PATH" build
+            docker compose -f "$COMPOSE_FILE_PATH" -f "$build_override" build
 
       - name: Push images
         shell: bash
@@ -293,6 +319,7 @@ jobs:
             audit notifications storage attendance smsgateway wallets inventario pos
             portal operations-dashboard yap bolt-phase0-synthetics
           )
+          if [ "$DEPLOY_SCOPE" = yap ]; then services=(yap); fi
           for service in "${services[@]}"; do
             printf '%s\n' "${REGISTRY_HOST}/${REGISTRY_NAMESPACE}/${service}:${IMAGE_TAG}"
           done | xargs -r -n 1 -P 3 timeout --foreground --kill-after=30s 10m docker push
@@ -310,6 +337,7 @@ jobs:
           scp scripts/refresh-bolt-phase0-synthetic-tokens.py "$DEPLOY_HOST:$REMOTE_REFRESH_TOKENS"
           scp scripts/provision-yap-dev-secret.sh "$DEPLOY_HOST:$REMOTE_RUN_DIR/provision-yap-dev-secret.sh"
           scp scripts/configure-yap-dev-ingress.sh "$DEPLOY_HOST:$REMOTE_RUN_DIR/configure-yap-dev-ingress.sh"
+          scp scripts/observe-core-services.sh "$DEPLOY_HOST:$REMOTE_RUN_DIR/observe-core-services.sh"
           ssh "$DEPLOY_HOST" "chmod 700 '$REMOTE_RUN_DIR/provision-yap-dev-secret.sh' && '$REMOTE_RUN_DIR/provision-yap-dev-secret.sh'"
 
           ssh "$DEPLOY_HOST" \
@@ -324,6 +352,7 @@ jobs:
           test "$(stat -Lc '%u:%a:%h' "$XFRAMEWORK_ENV_FILE")" = "$(id -u):600:1"
 
           token_dir="$REMOTE_RUN_DIR/synthetic-tokens"
+          sha256sum "$XFRAMEWORK_ENV_FILE" | cut -d ' ' -f 1 > "$REMOTE_RUN_DIR/protected-env.sha256"
           install -d -m 700 "$token_dir"
           install -m 600 /dev/null "$token_dir/communications-transport-token"
           install -m 600 /dev/null "$token_dir/communications-identity-service-token"
@@ -666,6 +695,29 @@ jobs:
           chmod 600 "$REMOTE_RUN_DIR/tailscale-serve-before.json"
           REMOTE_SCRIPT
 
+      - name: Preserve unchanged image pins for a Yap release
+        if: env.DEPLOY_SCOPE == 'yap'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Re-check after the build: changed configuration or runtime drift blocks mutation.
+          baseline="$(ssh "$DEPLOY_HOST" "python3 - '$REMOTE_RELEASES_DIR' '$XFRAMEWORK_ENV_FILE'" < scripts/deployed-yap-baseline.py)"
+          test "$baseline" = "$DEPLOY_BASELINE"
+          ssh "$DEPLOY_HOST" "python3 - '$REMOTE_RUN_DIR' '$REMOTE_RELEASES_DIR'" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          run, releases = map(pathlib.Path, sys.argv[1:])
+          active = pathlib.Path((releases / "current").read_text().strip())
+          (run / "active-release-before").write_text(str(active) + "\n")
+          previous = json.loads((active / "images.override.json").read_text())
+          candidate = json.loads((run / "images.override.json").read_text())
+          previous["services"]["yap"] = candidate["services"]["yap"]
+          (run / "images.override.json").write_text(json.dumps(previous) + "\n")
+          (run / "yap-only").touch(mode=0o600)
+          PY
+
       - name: Pull candidate images
         shell: bash
         run: |
@@ -675,6 +727,7 @@ jobs:
             audit notifications storage attendance smsgateway wallets inventario pos
             portal operations-dashboard yap bolt-phase0-synthetics
           )
+          if [ "$DEPLOY_SCOPE" = yap ]; then services=(yap); fi
           service_args="$(printf '%q ' "${services[@]}")"
           ssh "$DEPLOY_HOST" \
             "COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' XFRAMEWORK_ENV_FILE='$REMOTE_CANDIDATE_ENV' REMOTE_CANDIDATE_COMPOSE='$REMOTE_CANDIDATE_COMPOSE' REMOTE_IMAGE_OVERRIDE='$REMOTE_IMAGE_OVERRIDE' bash -s -- $service_args" <<'REMOTE_SCRIPT'
@@ -704,7 +757,7 @@ jobs:
               text=True,
           )
           compose = json.loads(rendered.stdout)
-          resolved_services = {}
+          resolved_services = json.loads(path.read_text())["services"]
           for service in service_names:
               reference = compose.get("services", {}).get(service, {}).get("image")
               if not reference:
@@ -782,6 +835,7 @@ jobs:
           REMOTE_SCRIPT
 
       - name: Stop legacy Bolt Hub for bounded transition
+        if: env.DEPLOY_SCOPE != 'yap'
         shell: bash
         run: |
           set -euo pipefail
@@ -794,6 +848,7 @@ jobs:
           REMOTE_SCRIPT
 
       - name: Run migration
+        if: env.DEPLOY_SCOPE != 'yap'
         shell: bash
         run: |
           set -euo pipefail
@@ -837,6 +892,7 @@ jobs:
           REMOTE_SCRIPT
 
       - name: Configure and verify Tailscale Serve boundary
+        if: env.DEPLOY_SCOPE != 'yap'
         shell: bash
         run: |
           set -euo pipefail
@@ -856,6 +912,7 @@ jobs:
           REMOTE_SCRIPT
 
       - name: Deploy IdentityServer
+        if: env.DEPLOY_SCOPE != 'yap'
         shell: bash
         run: |
           set -euo pipefail
@@ -876,6 +933,7 @@ jobs:
           REMOTE_SCRIPT
 
       - name: Deploy Bolt Hub
+        if: env.DEPLOY_SCOPE != 'yap'
         shell: bash
         run: |
           set -euo pipefail
@@ -896,6 +954,7 @@ jobs:
           REMOTE_SCRIPT
 
       - name: Deploy Communications
+        if: env.DEPLOY_SCOPE != 'yap'
         shell: bash
         run: |
           set -euo pipefail
@@ -915,12 +974,12 @@ jobs:
           exit 1
           REMOTE_SCRIPT
 
-      - name: Run authenticated Bolt smoke
+      - name: Run authenticated Bolt smoke and concurrent core observation
         shell: bash
         run: |
           set -euo pipefail
           ssh "$DEPLOY_HOST" \
-            "COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REMOTE_CANDIDATE_ENV='$REMOTE_CANDIDATE_ENV' REMOTE_RUN_DIR='$REMOTE_RUN_DIR' REMOTE_CANDIDATE_COMPOSE='$REMOTE_CANDIDATE_COMPOSE' REMOTE_IMAGE_OVERRIDE='$REMOTE_IMAGE_OVERRIDE' REMOTE_REFRESH_TOKENS='$REMOTE_REFRESH_TOKENS' bash -s" <<'REMOTE_SCRIPT'
+            "COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REMOTE_CANDIDATE_ENV='$REMOTE_CANDIDATE_ENV' REMOTE_RUN_DIR='$REMOTE_RUN_DIR' REMOTE_CANDIDATE_COMPOSE='$REMOTE_CANDIDATE_COMPOSE' REMOTE_IMAGE_OVERRIDE='$REMOTE_IMAGE_OVERRIDE' REMOTE_REFRESH_TOKENS='$REMOTE_REFRESH_TOKENS' IDENTITY_PUBLIC_URL='$IDENTITY_PUBLIC_URL' HUB_PUBLIC_URL='$HUB_PUBLIC_URL' OBSERVATION_SECONDS='$OBSERVATION_SECONDS' DEPLOY_SCOPE='$DEPLOY_SCOPE' bash -s" <<'REMOTE_SCRIPT'
           set -euo pipefail
           umask 077
           journal_probe="$REMOTE_RUN_DIR/tailscale-journal-probe"
@@ -950,43 +1009,46 @@ jobs:
           date -u +'%Y-%m-%dT%H:%M:%SZ' > "$REMOTE_RUN_DIR/diagnostic-window-start"
           chmod 600 "$REMOTE_RUN_DIR/diagnostic-window-start"
 
+          expiry_enabled=true
+          smoke_args=()
+          observation_pid=
+          if [ "$DEPLOY_SCOPE" = yap ]; then
+            # Core images/configuration are unchanged; retain authenticated transport checks,
+            # but do not wait for the already-qualified backend's token to expire again.
+            # Refresh still writes every marker token for the mandatory leak scan.
+            smoke_args=(-e BOLT_SYNTHETIC_EXPIRY_TRANSPORT_TOKEN_FILE=)
+          else
+            bash "$REMOTE_RUN_DIR/observe-core-services.sh" > "$REMOTE_RUN_DIR/core-observation.log" 2>&1 &
+            observation_pid=$!
+          fi
+          cleanup_observation() {
+            if [ -n "$observation_pid" ]; then
+              kill "$observation_pid" 2>/dev/null || true
+              wait "$observation_pid" 2>/dev/null || true
+            fi
+          }
+          trap cleanup_observation EXIT
           env -i \
             PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
             HOME="${HOME:-/tmp}" \
             XFRAMEWORK_ENV_FILE="$REMOTE_CANDIDATE_ENV" \
             BOLT_SYNTHETIC_REFRESH_RECEIPT="$REMOTE_RUN_DIR/token-refresh.json" \
-            BOLT_SYNTHETIC_EXPIRY_ENABLED=true \
+            BOLT_SYNTHETIC_EXPIRY_ENABLED="$expiry_enabled" \
             /usr/bin/timeout --foreground --kill-after=10s 120s \
               python3 -B "$REMOTE_REFRESH_TOKENS"
           /usr/bin/timeout --foreground --kill-after=30s 420s \
             docker compose --project-name "$COMPOSE_PROJECT_NAME" \
               --env-file "$REMOTE_CANDIDATE_ENV" \
               -f "$REMOTE_CANDIDATE_COMPOSE" -f "$REMOTE_IMAGE_OVERRIDE" \
-              --profile phase0-verification run --rm --no-TTY --no-deps bolt-phase0-synthetics </dev/null \
+              --profile phase0-verification run --rm --no-TTY --no-deps "${smoke_args[@]}" bolt-phase0-synthetics </dev/null \
               | tee "$REMOTE_RUN_DIR/bolt-smoke.json"
-          REMOTE_SCRIPT
-
-      - name: Observe core services
-        shell: bash
-        run: |
-          set -euo pipefail
-          ssh "$DEPLOY_HOST" \
-            "IDENTITY_PUBLIC_URL='$IDENTITY_PUBLIC_URL' HUB_PUBLIC_URL='$HUB_PUBLIC_URL' OBSERVATION_SECONDS='$OBSERVATION_SECONDS' bash -s" <<'REMOTE_SCRIPT'
-          set -euo pipefail
-          [[ "$OBSERVATION_SECONDS" =~ ^[1-9][0-9]{1,3}$ ]]
-          deadline=$((SECONDS + OBSERVATION_SECONDS))
-          samples=0
-          while [ "$SECONDS" -lt "$deadline" ]; do
-            curl -fsS --connect-timeout 3 --max-time 10 "$IDENTITY_PUBLIC_URL/health/live" >/dev/null
-            curl -fsS --connect-timeout 3 --max-time 10 "$HUB_PUBLIC_URL/health/ready" >/dev/null
-            curl -fsS --connect-timeout 3 --max-time 10 http://127.0.0.1:5148/health/ready >/dev/null
-            samples=$((samples + 1))
-            remaining=$((deadline - SECONDS))
-            [ "$remaining" -le 0 ] && break
-            [ "$remaining" -lt 15 ] && sleep "$remaining" || sleep 15
-          done
-          test "$samples" -ge 4
-          echo "Core observation passed with ${samples} samples."
+          if [ -n "$observation_pid" ]; then
+            observation_status=0
+            wait "$observation_pid" || observation_status=$?
+            observation_pid=
+            cat "$REMOTE_RUN_DIR/core-observation.log"
+            test "$observation_status" -eq 0
+          fi
           REMOTE_SCRIPT
 
       - name: Verify diagnostic sink marker absence
@@ -1047,9 +1109,11 @@ jobs:
         run: |
           set -euo pipefail
           ssh "$DEPLOY_HOST" \
-            "COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' XFRAMEWORK_ENV_FILE='$REMOTE_CANDIDATE_ENV' REMOTE_CANDIDATE_COMPOSE='$REMOTE_CANDIDATE_COMPOSE' REMOTE_IMAGE_OVERRIDE='$REMOTE_IMAGE_OVERRIDE' bash -s" <<'REMOTE_SCRIPT'
+            "COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' XFRAMEWORK_ENV_FILE='$REMOTE_CANDIDATE_ENV' REMOTE_CANDIDATE_COMPOSE='$REMOTE_CANDIDATE_COMPOSE' REMOTE_IMAGE_OVERRIDE='$REMOTE_IMAGE_OVERRIDE' REMOTE_RUN_DIR='$REMOTE_RUN_DIR' DEPLOY_SCOPE='$DEPLOY_SCOPE' bash -s" <<'REMOTE_SCRIPT'
           set -euo pipefail
           clients=(audit notifications storage attendance smsgateway wallets inventario pos portal operations-dashboard yap)
+          if [ "$DEPLOY_SCOPE" = yap ]; then clients=(yap); fi
+          : > "$REMOTE_RUN_DIR/mutation-started"
           compose=(docker compose --project-name "$COMPOSE_PROJECT_NAME" --env-file "$XFRAMEWORK_ENV_FILE" -f "$REMOTE_CANDIDATE_COMPOSE" -f "$REMOTE_IMAGE_OVERRIDE")
           /usr/bin/timeout --foreground --kill-after=30s 600s \
             "${compose[@]}" up -d --no-build --no-deps --force-recreate "${clients[@]}"
@@ -1067,6 +1131,7 @@ jobs:
             operations-dashboard=http://127.0.0.1:5050/health/ready
             yap=http://127.0.0.1:5188/health/ready
           )
+          if [ "$DEPLOY_SCOPE" = yap ]; then checks=(yap=http://127.0.0.1:5188/health/ready); fi
           for check in "${checks[@]}"; do
             name="${check%%=*}"
             url="${check#*=}"
@@ -1084,10 +1149,23 @@ jobs:
           REMOTE_SCRIPT
 
       - name: Configure and verify Yap HTTPS ingress
+        if: env.DEPLOY_SCOPE != 'yap'
         shell: bash
         run: |
           set -euo pipefail
           ssh "$DEPLOY_HOST" "bash '$REMOTE_RUN_DIR/configure-yap-dev-ingress.sh' '$REMOTE_RUN_DIR/yap-ingress-owned'"
+
+      - name: Verify deployed Yap HTTPS and anonymous authorization boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh "$DEPLOY_HOST" bash -s <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          base=https://xeon-dev.tailed40e.ts.net:5188
+          curl -fsS --connect-timeout 3 --max-time 15 "$base/health/ready" >/dev/null
+          status="$(curl -sS --connect-timeout 3 --max-time 15 -o /dev/null -w '%{http_code}' "$base/api/chat/conversations")"
+          test "$status" = 401
+          REMOTE_SCRIPT
 
       - name: Activate complete release
         shell: bash
@@ -1148,14 +1226,16 @@ jobs:
           fi
 
           stop_hub() {
-            echo "Stopping Bolt Hub because no complete rollback could be applied." >&2
+            failed_container=xframework-bolt-hub
+            if [ -f "$REMOTE_RUN_DIR/yap-only" ]; then failed_container=xframework-yap; fi
+            echo "Stopping ${failed_container} because no complete rollback could be applied." >&2
             rm -f "$REMOTE_RUN_DIR/complete"
             if [ -f "$REMOTE_RELEASES_DIR/current" ] && \
                [ "$(cat "$REMOTE_RELEASES_DIR/current")" = "$REMOTE_RUN_DIR" ]; then
               rm -f "$REMOTE_RELEASES_DIR/current"
             fi
-            /usr/bin/timeout --foreground --kill-after=10s 60s docker stop xframework-bolt-hub >/dev/null 2>&1 || \
-              /usr/bin/timeout --foreground --kill-after=10s 30s docker kill xframework-bolt-hub >/dev/null 2>&1 || true
+            /usr/bin/timeout --foreground --kill-after=10s 60s docker stop "$failed_container" >/dev/null 2>&1 || \
+              /usr/bin/timeout --foreground --kill-after=10s 30s docker kill "$failed_container" >/dev/null 2>&1 || true
           }
           trap 'stop_hub; exit 1' ERR
 
@@ -1178,6 +1258,29 @@ jobs:
           test -f "$REMOTE_RUN_DIR/previous-release-kind"
           release="$(cat "$REMOTE_RUN_DIR/previous-release")"
           kind="$(cat "$REMOTE_RUN_DIR/previous-release-kind")"
+          if [ -f "$REMOTE_RUN_DIR/yap-only" ]; then
+            test "$kind" = normal
+            test -f "$release/complete"
+            /usr/bin/timeout --foreground --kill-after=30s 180s \
+              docker compose --project-name "$COMPOSE_PROJECT_NAME" \
+                --env-file "$release/candidate.env" \
+                -f "$release/docker-compose.yml" -f "$release/images.override.json" \
+                up -d --no-build --no-deps --force-recreate --wait --wait-timeout 120 yap
+            install -m 600 "$release/docker-compose.yml" "${REMOTE_COMPOSE_FILE}.tmp.$$"
+            mv -f "${REMOTE_COMPOSE_FILE}.tmp.$$" "$REMOTE_COMPOSE_FILE"
+            install -m 600 "$release/candidate.env" "${REMOTE_ACTIVE_ENV}.tmp.$$"
+            mv -f "${REMOTE_ACTIVE_ENV}.tmp.$$" "$REMOTE_ACTIVE_ENV"
+            rm -f "$REMOTE_RUN_DIR/complete" "$REMOTE_RUN_DIR/mutation-started"
+            # Keep the previous active pointer: the pre-deployment snapshot has no
+            # source/config qualification metadata and is only a recovery artifact.
+            if [ -f "$REMOTE_RUN_DIR/active-release-before" ]; then
+              install -m 600 "$REMOTE_RUN_DIR/active-release-before" "$REMOTE_RELEASES_DIR/.current.rollback.$$"
+              mv -f "$REMOTE_RELEASES_DIR/.current.rollback.$$" "$REMOTE_RELEASES_DIR/current"
+            fi
+            trap - ERR
+            echo "Restored Yap only; backend services were not restarted."
+            exit 0
+          fi
           services=(identityserver bolt-hub communications notifications storage attendance smsgateway wallets inventario pos portal operations-dashboard)
 
           if [ "$kind" = normal ]; then

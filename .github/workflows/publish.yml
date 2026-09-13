@@ -3,6 +3,20 @@ name: Publish NuGet Packages
 on:
   push:
     branches: [main, develop]
+    paths:
+      - src/**
+      - '!src/Presentation/XFramework.Yap/**'
+      - '!src/Presentation/XFramework.Yap.Client/**'
+      - '!src/Presentation/XFramework.Yap.Contracts/**'
+      - '!src/Tests/Yap.Tests/**'
+      - '!src/Tests/Yap.Client.Tests/**'
+      - src/**/*.csproj
+      - Directory.*
+      - Version.props
+      - XFramework.slnx
+      - global.json
+      - NuGet.config
+      - .github/workflows/publish.yml
 
 jobs:
   publish:
