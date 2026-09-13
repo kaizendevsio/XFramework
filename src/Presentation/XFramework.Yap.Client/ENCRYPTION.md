@@ -6,6 +6,12 @@ bundle is unmodified; its npm SHA-512 integrity was checked before copying.
 It uses RFC 9580 authenticated encryption and signatures, with 256 KiB AEAD
 chunks. No plaintext fallback exists in this library.
 
+This is Yap's in-house integration with IdentityServer, Communications, Storage
+and Bolt; it does not require Matrix or a separate encryption service. The
+implementation is being prepared for release 1.3.0. Source and automated coverage
+do not establish deployment, physical iOS/Android compatibility or an independent
+security audit. See the [architecture and deployment gates](../../../docs/solutions/architecture-patterns/yap-encrypted-recovery-decision.md).
+
 ## Account/device lifecycle
 
 Scope is `{tenantId, credentialId}` (GUID D strings), or `tenantN:credentialN`.
@@ -54,6 +60,13 @@ The owner key rotation occurs atomically with approval, so those transferred
 keys cannot decrypt future messages addressed to the fresh active devices.
 Never copy the private key of another active device.
 
+The C# coordinator reconciles an uncertain directory publication by fetching the
+server's signed roster and comparing it with the persisted pending result. A
+confirmed recovery must reuse its fresh identity when repairing a failed backup,
+rather than recovering again and rotating another time. Backup repair does not
+display the recovery key: only the explicit Show action reveals it. Account
+switches invalidate pending callbacks, and leaving settings hides revealed keys.
+
 ## Directory wire records
 
 Directory: `{tenantId,credentialId,revision,rootPublicKey,roster,devices}`.
@@ -98,10 +111,40 @@ actual signing device, useful for call rosters. Optional
 **The server must stamp the validated current sender device/revision when a new
 message is accepted and provide that stamp for decryption.** This distinguishes
 valid older history from a revoked device forging a new backdated envelope.
+The server also checks the recipient account set and directory revisions on a
+new send. Persist ciphertext and its attachment contexts before a request; a
+response-loss retry must not replace an already accepted randomized envelope.
+
+Encrypted attachment objects use `application/octet-stream` and an opaque
+`attachment.pgp` filename. Voice recordings instead use `voice.pgp` so the server
+can enforce the conversation's voice-message switch independently of its file
+switch. This exposes **voice-versus-other-attachment category**, alongside routing,
+membership, timing and sizes. Original names, MIME types and contents remain
+encrypted. Profile/group avatar images use the separate authorized image feature;
+they are not encrypted chat attachments.
+
+`device.js` stages streamed ciphertext in OPFS before chunked upload, with at most
+4 GiB plaintext plus 16 MiB ciphertext overhead. Decrypted OPFS files remain
+quarantined until the stream API verifies the complete signature and context.
+After closing the final file, a ready sidecar records its account, signed-context
+digest and byte size. Cache existence alone is insufficient. A valid sidecar lets
+the client open verified media offline without fetching a sender directory;
+startup removes abandoned temporary files. The sidecar protects against partial
+writes and cache mix-ups, not a compromised same-origin script.
 
 For call-key envelopes include call ID, epoch, recipient device and authoritative
 roster binding in context and use exact-device encryption. SFrame itself and
 epoch agreement are separate; this module does not implement an audio cipher.
+The [Bolt SFrame adapter](../../Libraries/Bolt/Bolt.Media.Browser/sframe/README.md)
+uses pinned sframe 2.0.0 WASM and ring 0.17.14. Encrypted calls require the explicit
+authenticated SFrame mode, exact-device key envelopes, immediate pause on roster
+change and acknowledgment by all current members before a fresh epoch transmits.
+There is no silent trusted-server fallback. The prepared group path is bounded
+to eight participants with a 128 kbps Opus encoder target; WebCodecs and the
+managed Concentus fallback share the audio lifecycle. Legacy experimental ECDH
+remains unavailable. End-to-end encrypted three-browser exchange, participant
+changes and teardown must pass through the real client/gateway before enabling
+the production group path.
 
 ## Security and verification limits
 
@@ -112,6 +155,12 @@ metadata and traffic timing remain visible. Origin script compromise/XSS can
 read unlocked local keys. OpenPGP static device keys do not provide forward
 secrecy or post-compromise security; do not make those claims for messages or
 call-key envelopes.
+In particular, later private-key compromise can decrypt recorded OpenPGP
+call-key envelopes and therefore expose recorded calls; adding SFrame does not
+make that key distribution forward-secret. A stolen master/recovery secret is
+account-authority compromise, beyond ordinary device revocation. Older plaintext
+messages do not become confidential retroactively, and login alone cannot restore
+encrypted history without a trusted device or the recovery key.
 
 Run `node --test src/Presentation/XFramework.Yap.Client/test/encryption.test.mjs`.
 Tests use the actual vendored browser crypto bundle, with in-memory storage.
@@ -120,3 +169,8 @@ content, context replay, directory substitution/rollback, account isolation,
 stable recovery and fresh identities, revoked devices, exact-device call keys,
 stream integrity/quarantine and an 80 MiB stream with bounded output chunks.
 These tests are not an external security audit or a real iOS/Android UI test.
+Also run `node --test src/Presentation/XFramework.Yap.Client/test/encrypted-files.test.mjs`
+for OPFS verification markers, interrupted writes, offline reads and account
+isolation. Actual BFF enrollment, send/edit, attachments, approval, recovery and
+public WSS group audio remain integration/deployment gates; a mobile viewport in
+desktop Chrome is not a physical Safari or Android test.
