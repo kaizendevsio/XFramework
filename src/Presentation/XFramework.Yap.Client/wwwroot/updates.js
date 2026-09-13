@@ -2,15 +2,15 @@
 // explicit so a deployment cannot reload a recording or an attachment in progress.
 (() => {
     let registration, checking, lastCheck = -Infinity, changed = false, applying = false;
-    let reloading = false, blocked = false;
+    let reloading = false, blocked = false, dismissed = false;
     const workers = new WeakSet();
     const busy = () => !!(document.querySelector('[data-update-busy="true"]') || window.yapRecording);
     const notice = () => {
         const element = document.getElementById('app-update');
         if (!element) return;
         blocked = blocked && busy();
-        element.hidden = !(registration?.waiting || changed);
-        element.querySelector('span').textContent = blocked
+        element.hidden = dismissed || !(registration?.waiting || changed);
+        element.querySelector('.toast-text').textContent = blocked
             ? 'Finish sending, or remove your attachment or recording, before updating.'
             : 'A new version of Yap is ready.';
     };
@@ -41,6 +41,7 @@
     }
     window.yap.updates = {
         check,
+        dismiss() { dismissed = true; notice(); },
         notice,
         apply() {
             if (busy()) {

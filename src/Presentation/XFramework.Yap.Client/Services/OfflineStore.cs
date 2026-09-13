@@ -39,6 +39,8 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
                 if (row is not null) db.Conversations.Remove(row);
                 continue;
             }
+            if (row is not null)
+                conversation.IsFavorite = JsonSerializer.Deserialize<Conversation>(row.Json, Json)!.IsFavorite;
             if (row is not null && conversation.People.Count == 0)
             {
                 var saved = JsonSerializer.Deserialize<Conversation>(row.Json, Json)!;
@@ -51,6 +53,16 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         }
         return await db.SaveChangesAsync(ct);
     }, ct);
+
+    public Task SetFavoriteAsync(string scope, Guid id, bool favorite) => UseAsync(async db =>
+    {
+        var row = await db.Conversations.FindAsync([scope, id]);
+        if (row is null) return 0;
+        var conversation = JsonSerializer.Deserialize<Conversation>(row.Json, Json)!;
+        conversation.IsFavorite = favorite;
+        row.Json = JsonSerializer.Serialize(conversation, Json);
+        return await db.SaveChangesAsync();
+    });
 
     public Task<List<Conversation>> ConversationsAsync(string scope, CancellationToken ct = default) => UseAsync(async db =>
         (await db.Conversations.AsNoTracking().Where(x => x.Scope == scope).ToListAsync(ct))

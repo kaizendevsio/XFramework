@@ -18,4 +18,5 @@ public partial record ThreadMessageItemResponse
     public bool IsThreadReply { get; set; }
     public int DeliveredCount { get; set; }
     public int ReadCount { get; set; }
+    public List<Guid> ReadCredentialIds { get; set; } = [];
 }

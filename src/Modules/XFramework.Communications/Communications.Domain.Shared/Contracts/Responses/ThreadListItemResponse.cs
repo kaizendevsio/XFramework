@@ -15,5 +15,6 @@ public partial record ThreadListItemResponse
     public bool IsMuted { get; set; }
     public bool IsArchived { get; set; }
     public bool IsDirect { get; set; }
+    public bool HasCustomName { get; set; }
     public Guid? OtherCredentialId { get; set; }
 }

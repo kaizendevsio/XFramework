@@ -1,0 +1,16 @@
+<button class="reader-avatars" aria-label="@($"Seen by {People.Count} people. Show readers")" @onclick="() => open = true">
+    @foreach (var person in People.Take(3)) { <Avatar Initials="@ChatMessage.InitialsFor(person.Name)" ImageUrl="@person.AvatarUrl" Size="a20" /> }
+    @if (People.Count > 3) { <span class="reader-extra">+@(People.Count - 3)</span> }
+</button>
+@if (open)
+{
+    <BottomSheet Title="Seen by" OnClose="() => open = false">
+        <div class="reader-list">
+            @foreach (var person in People) { <div class="row"><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" ImageUrl="@person.AvatarUrl" Size="a40" /><span>@person.Name</span></div> }
+        </div>
+    </BottomSheet>
+}
+@code {
+    [Parameter] public List<Person> People { get; set; } = [];
+    private bool open;
+}

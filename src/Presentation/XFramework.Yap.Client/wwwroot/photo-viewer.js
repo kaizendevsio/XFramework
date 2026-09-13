@@ -51,11 +51,19 @@
                 state.points.set(event.pointerId, { x: event.clientX, y: event.clientY });
                 state.stage.setPointerCapture(event.pointerId);
                 state.previous = gesture(state); state.origin = state.previous; state.moved = state.points.size > 1;
+                state.swipe = state.scale === 1 && state.points.size === 1;
+                state.swipeY = 0;
             });
             on(state.stage, 'pointermove', event => {
                 if (!state.points.has(event.pointerId)) return;
                 state.points.set(event.pointerId, { x: event.clientX, y: event.clientY });
                 const next = gesture(state), previous = state.previous;
+                if (state.points.size > 1) state.swipe = false;
+                if (state.swipe && state.points.size === 1 && Math.abs(next.y - state.origin.y) > Math.abs(next.x - state.origin.x) * 1.2) {
+                    state.swipeY = next.y - state.origin.y; state.moved = true;
+                    state.image.style.transform = `translateY(${state.swipeY}px)`;
+                    return;
+                }
                 if (previous) {
                     if (Math.hypot(next.x - state.origin.x, next.y - state.origin.y) > 6) state.moved = true;
                     if (next.distance && previous.distance) state.scale = clamp(state.scale * next.distance / previous.distance, 1, 6);
@@ -64,6 +72,8 @@
                 state.previous = next;
             });
             const end = event => {
+                if (state.swipe && event.type === 'pointerup' && Math.abs(state.swipeY) >= 80) { state.points.clear(); state.close(); return; }
+                if (state.swipeY) { state.swipeY = 0; paint(state); }
                 if (event.type === 'pointerup' && !state.moved && event.pointerType === 'touch') {
                     const now = performance.now(); if (state.lastTap && now - state.lastTap < 300) { toggle(); state.lastTap = 0; } else state.lastTap = now;
                 }

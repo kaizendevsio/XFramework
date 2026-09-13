@@ -1,0 +1,4 @@
+.reader-avatars{display:inline-flex;align-items:center;padding:3px 0 3px 5px;background:none;border:0;gap:0}
+.reader-avatars ::deep .avatar{width:20px;height:20px;font-size:9px;margin-left:-5px;border:1px solid var(--surface)}
+.reader-extra{font-size:10px;margin-left:3px;color:var(--dim)}
+.reader-list{padding:8px 12px}

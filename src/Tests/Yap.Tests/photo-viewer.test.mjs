@@ -58,3 +58,18 @@ test('reduced motion opens and closes without animation', async () => {
     await f.api.close(f.dialog);
     assert.equal(f.closed(), 1);
 });
+
+for (const distance of [-120, 120]) test(`vertical swipe ${distance} dismisses a fitted photo`, () => {
+    const f = fixture(true);
+    f.pointer('pointerdown', 1, 200, 400); f.pointer('pointermove', 1, 205, 400 + distance);
+    f.pointer('pointerup', 1, 205, 400 + distance);
+    assert.equal(f.closed(), 1);
+});
+test('short vertical drag springs back, and zoomed panning does not dismiss', () => {
+    const f = fixture(true);
+    f.pointer('pointerdown', 1, 200, 400); f.pointer('pointermove', 1, 200, 440); f.pointer('pointerup', 1, 200, 440);
+    assert.equal(f.closed(), 0); assert.equal(f.image.style.transform, 'translate(0px, 0px) scale(1)');
+    f.api.zoom(f.dialog, 1);
+    f.pointer('pointerdown', 2, 200, 400); f.pointer('pointermove', 2, 200, 600); f.pointer('pointerup', 2, 200, 600);
+    assert.equal(f.closed(), 0);
+});

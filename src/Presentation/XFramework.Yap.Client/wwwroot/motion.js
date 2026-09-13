@@ -63,23 +63,26 @@
         }
     }, true);
     document.addEventListener('pointerdown', e => {
+        if (e.target.closest('.conversation-menu')) { suppressUntil = 0; clear(); return; }
         if (e.pointerType === 'mouse' || !e.isPrimary || e.button !== 0) { clear(); return; }
-        if (e.target.closest('input,textarea,select,dialog')) return;
+        if (e.target.closest('input,textarea,select,.photo-viewer')) return;
         clear();
         const handle = e.target.closest('[data-sheet-drag]');
         const bubble = e.target.closest('.bub,.photo-open');
         const message = bubble?.closest('[data-swipe-reply]');
         const panel = e.target.closest('[data-swipe-tabs]');
-        const element = handle?.closest('.sheet') || message || panel;
+        const conversation = e.target.closest('[data-conversation-menu]');
+        const element = handle?.closest('.sheet') || message || conversation || panel;
         if (!element) return;
-        const g = gesture = {element, bubble, kind:handle?'sheet':message?'message':'tabs', id:e.pointerId, x:e.clientX, y:e.clientY, dx:0, dy:0, axis:'pending', fired:false, timer:null};
-        if (g.kind === 'message') {
+        const g = gesture = {element, bubble, kind:handle?'sheet':message?'message':conversation?'conversation':'tabs', id:e.pointerId, x:e.clientX, y:e.clientY, dx:0, dy:0, axis:'pending', fired:false, timer:null};
+        if (g.kind === 'message' || g.kind === 'conversation') {
             g.timer = setTimeout(() => {
                 if (gesture !== g || g.axis !== 'pending') return;
                 g.fired = true;
                 element.classList.add('is-holding');
                 suppressClick();
-                if (bubble.matches('.photo-open')) bubble.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+                if (g.kind === 'conversation') element.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX:g.x, clientY:g.y }));
+                else if (bubble.matches('.photo-open')) bubble.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
                 else bubble.click();
             }, 450);
         }
@@ -98,7 +101,7 @@
         if (g.axis === 'pending') g.axis = yap.motion.intent(g.dx,g.dy);
         if (g.axis !== 'pending') clearTimeout(g.timer);
         if (g.axis === 'vertical' || g.fired) { clear(); return; }
-        if (g.axis !== 'horizontal') return;
+        if (g.kind === 'conversation' || g.axis !== 'horizontal') return;
         e.preventDefault();
         g.element.classList.add('is-dragging');
         if (g.kind === 'message') {

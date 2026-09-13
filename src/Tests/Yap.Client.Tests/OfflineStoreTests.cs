@@ -9,6 +9,21 @@ namespace Yap.Client.Tests;
 public sealed class OfflineStoreTests
 {
     [Test]
+    public async Task Favorite_SurvivesServerRefresh_AndStaysWithinAccount()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var id = Guid.NewGuid();
+        await fixture.Store.SaveConversationsAsync("a", [new() { Id = id }]);
+        await fixture.Store.SaveConversationsAsync("b", [new() { Id = id }]);
+        await fixture.Store.SetFavoriteAsync("a", id, true);
+        await fixture.Store.SaveConversationsAsync("a", [new() { Id = id, Name = "Updated" }]);
+        Assert.That((await fixture.Store.ConversationsAsync("a")).Single().IsFavorite, Is.True);
+        Assert.That((await fixture.Store.ConversationsAsync("b")).Single().IsFavorite, Is.False);
+        await fixture.Store.SetFavoriteAsync("a", id, false);
+        Assert.That((await fixture.Store.ConversationsAsync("a")).Single().IsFavorite, Is.False);
+    }
+
+    [Test]
     public async Task RemoveConversation_DeletesOnlyItsLocalHistoryAndDrafts_AndArchiveRefreshKeepsItHidden()
     {
         await using var fixture = await StoreFixture.CreateAsync();

@@ -16,7 +16,7 @@ public sealed partial class ThreadServiceSecurityTests
         var member = Member(Guid.NewGuid(), thread.Id, Guid.NewGuid(), tenant);
         var context = new InMemoryDataContext(); context.Seed(thread, admin, member);
         var service = CreateService(context);
-        var request = new UpdateThreadRequest { ThreadId = thread.Id, Features = ConversationFeatures.Typing,
+        var request = new UpdateThreadRequest { ThreadId = thread.Id, Features = ConversationFeatures.Typing, Name = "  Weekend plans  ",
             NicknameMemberId = member.Id, Nickname = "  Teammate  ", Metadata = Metadata(member.CredentialId, tenant) };
         Assert.That((await service.UpdateThreadAsync(request)).StatusCode, Is.EqualTo(403));
         Assert.That(thread.Features, Is.EqualTo(ConversationFeatures.All));
@@ -26,6 +26,8 @@ public sealed partial class ThreadServiceSecurityTests
         Assert.Multiple(() => {
             Assert.That(result.Data!.Features, Is.EqualTo(ConversationFeatures.Typing));
             Assert.That(result.Data.CanManage, Is.True);
+            Assert.That(result.Data.Name, Is.EqualTo("Weekend plans"));
+            Assert.That(result.Data.HasCustomName, Is.True);
             Assert.That(result.Data.Members.Single(x => x.Id == member.Id).Alias, Is.EqualTo("Teammate"));
             Assert.That(result.Data.Members.Single(x => x.Id == admin.Id).Role, Is.EqualTo(MessageThreadMemberRoles.Admin));
         });
