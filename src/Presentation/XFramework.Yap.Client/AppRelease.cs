@@ -2,10 +2,14 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.1.2";
+    public const string Version = "1.1.3";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "13 September 2026", [
+            "Headers now stretch across the screen, with clean glass and a flat background.",
+            "Choose your favorite accent color in Settings.",
+            "Photos show a loading placeholder and smoothly expand when you open them."]),
+        ("1.1.2", "13 September 2026", [
             "Sign-in is preserved through browser recovery and temporary connection problems.",
             "Messages are marked read only while visible in the conversation you're viewing.",
             "Scrolling through older messages stays steady while photos load.",

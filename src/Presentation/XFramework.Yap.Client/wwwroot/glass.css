@@ -1,7 +1,7 @@
-:root{--glass-tint:#ffffff45;--glass-sheet:#f7f8f24d;--glass-shine:#ffffff69;--glass-edge:#ffffff65;--glass-rim:#fffffff0;--glass-shadow:0 8px 28px -12px #33402238,0 2px 5px #3340220c}
-:root[data-theme=dark]{--glass-tint:#28362755;--glass-sheet:#202c2255;--glass-shine:#d9f6c322;--glass-edge:#d9f6c326;--glass-rim:#edffdc59;--glass-shadow:0 8px 28px -12px #0009,0 2px 5px #0003}
-body{background:radial-gradient(ellipse at 15% 15%,#d5f87925,transparent 48%),radial-gradient(ellipse at 90% 75%,#bca7e625,transparent 48%),var(--page)}
-.phone{background:radial-gradient(ellipse at 5% 0%,#d5f87945,transparent 48%),radial-gradient(ellipse at 100% 80%,#bca7e626,transparent 55%),var(--surface)}
+:root{--glass-tint:#ffffff45;--glass-sheet:#f7f7f74d;--glass-shine:#ffffff69;--glass-edge:#ffffff65;--glass-rim:#fffffff0;--glass-shadow:0 8px 28px -12px #33402238,0 2px 5px #3340220c}
+:root[data-theme=dark]{--glass-tint:#28282855;--glass-sheet:#24242455;--glass-shine:#ffffff22;--glass-edge:#ffffff26;--glass-rim:#ffffff59;--glass-shadow:0 8px 28px -12px #0009,0 2px 5px #0003}
+body{background:var(--page)}
+.phone{background:var(--surface)}
 .phone .screen,.phone .chatbody{background:transparent}
 :where(.liquid-glass){position:relative}
 /* Only GlassLayer filters the backdrop: filtering its host hides detail from the lens. */
@@ -40,7 +40,8 @@ body{background:radial-gradient(ellipse at 15% 15%,#d5f87925,transparent 48%),ra
 .scroll-header,.scroll-footer{position:absolute;left:0;right:0;z-index:10;pointer-events:none}
 .scroll-header{top:0}.scroll-footer{bottom:0}
 .scroll-header>*,.scroll-footer>*{pointer-events:auto}
-.scroll-header .appbar{margin:0 10px 8px;border-radius:23px;padding:10px 8px}
+.scroll-header .appbar{margin:0;border-radius:0;padding:12px 16px;border:0;box-shadow:none}
+.scroll-header .appbar .glass-highlight{border:0;box-shadow:none}
 .scroll-footer .composer{margin:0 8px 8px;border-radius:26px;padding-bottom:13px}
 .pagebar.liquid-glass{backdrop-filter:none}
 .phone:has(.scroll-surface) .screen{position:absolute;inset:46px 0 0}

@@ -29,6 +29,16 @@
                 }
             </span>
         </div>
+        <label class="set-row">
+            <span class="set-key"><Icon Name="image" Size="19" /><span class="set-label">Accent color<small>Choose your favorite color for this device</small></span></span>
+            <input class="accent-picker" type="color" aria-label="Accent color" value="@accent" @oninput="AccentAsync" />
+        </label>
+        <div class="accent-swatches" role="group" aria-label="Accent color presets">
+            @foreach (var option in new[] { ("#d5f879", "Lime"), ("#82b5ff", "Blue"), ("#c5a0ff", "Purple"), ("#ffb4cf", "Pink"), ("#ffc582", "Peach") })
+            {
+                <button aria-label="@option.Item2" aria-pressed="@((accent == option.Item1).ToString().ToLowerInvariant())" style="background:@option.Item1" @onclick="() => SetAccentAsync(option.Item1)"></button>
+            }
+        </div>
         <button type="button" class="set-row set-action" @onclick="() => glass = !glass" aria-expanded="@glass.ToString().ToLowerInvariant()">
             <span class="set-key"><Icon Name="image" Size="19" /><span class="set-label">Glass<small>Blur, refraction and tint for this browser</small></span></span>
             <Icon Name="arrow" Size="17" Class="@(glass ? "set-chevron open" : "set-chevron")" />
@@ -125,6 +135,7 @@
 @code {
     private bool signOut, gestures, glass, changes, canInstall, installed;
     private string theme = "system";
+    private string accent = "#d5f879";
     private string? persistNotice;
 
     protected override void OnInitialized() => State.Changed += Changed;
@@ -135,6 +146,7 @@
     {
         if (!firstRender) return;
         theme = await JS.InvokeAsync<string>("yap.themePreference");
+        accent = await JS.InvokeAsync<string>("yap.accentPreference");
         canInstall = await JS.InvokeAsync<bool>("yap.device.canInstall");
         installed = await JS.InvokeAsync<bool>("yap.device.isInstalled");
         StateHasChanged();
@@ -146,6 +158,8 @@
         await JS.InvokeVoidAsync("yap.setThemePreference", preference);
     }
 
+    private Task AccentAsync(ChangeEventArgs args) => SetAccentAsync(args.Value?.ToString() ?? accent);
+    private async Task SetAccentAsync(string color) { accent = color; await JS.InvokeVoidAsync("yap.setAccent", color); }
     private Task SyncAsync() => State.RetryAsync();
 
     private async Task PersistAsync()
