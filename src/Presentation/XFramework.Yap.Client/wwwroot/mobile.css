@@ -9,7 +9,7 @@ body{display:block;padding:0;margin:0;background:var(--surface)}
 #app{display:block;height:100%;min-height:0}
 .app-shell{position:fixed;left:0;right:0;top:var(--viewport-top,0px);bottom:0;height:auto;padding:var(--safe-top) env(safe-area-inset-right,0px) 0 env(safe-area-inset-left,0px);display:flex;flex-direction:column;background:var(--surface);overflow:hidden;view-transition-name:yap-screen}
 .screen{min-height:0;flex:1;overflow:hidden}
-.app-shell{background:radial-gradient(ellipse at 5% 0%,#d5f87945,transparent 48%),radial-gradient(ellipse at 100% 80%,#bca7e626,transparent 55%),var(--surface)}
+.app-shell{background:var(--surface)}
 .scroll-surface{height:100%;min-height:0}
 .scroll-content{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .scroll-header,.scroll-footer{padding:0}
@@ -148,3 +148,8 @@ button,a,label,nav,.avatar,.appbar,.bottomnav{-webkit-user-select:none;user-sele
    sheet renders inside the absolutely positioned scroll footer, which would otherwise
    clip it to a strip a few pixels tall. */
 .overlay{position:fixed;inset:0;padding:14px 14px calc(14px + var(--safe-bottom))}
+.accent-picker{width:44px;height:36px;padding:2px;border:1px solid var(--border);border-radius:10px;background:transparent;cursor:pointer}
+.accent-swatches{display:flex;gap:12px;padding:6px 16px 16px}
+.accent-swatches button{width:32px;height:32px;border-radius:50%;border:2px solid transparent}
+.accent-swatches button[aria-pressed=true]{outline:2px solid var(--text);outline-offset:3px}
+.wordmark b{color:var(--accent-ink)}.g1{background:var(--accent-soft);color:var(--accent-ink)}

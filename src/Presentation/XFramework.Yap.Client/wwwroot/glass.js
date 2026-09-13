@@ -37,7 +37,7 @@
             if(media.matches){element.removeAttribute('data-refracted');return;}
             const width=Math.round(element.clientWidth),height=Math.round(element.clientHeight);
             if(width<8||height<8)return;
-            const radius=Math.min(parseFloat(getComputedStyle(element).borderTopLeftRadius)||18,width/2,height/2);
+            const radius=Math.min(parseFloat(getComputedStyle(element).borderTopLeftRadius)||0,width/2,height/2);
             const key=`${width}:${height}:${radius}`;
             if(entry.key===key){element.setAttribute('data-refracted','');return;}
             const canvas=document.createElement('canvas');

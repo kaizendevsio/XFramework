@@ -3,7 +3,27 @@ window.yap = {
     getTheme: () => document.documentElement.dataset.theme,
     applyTheme(theme) {
         document.documentElement.dataset.theme = theme;
-        document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#181e19' : '#f7f8f2';
+        document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#1b1b1b' : '#f7f7f7';
+        yap.applyAccent(yap.accentPreference());
+    },
+    accentPreference() { try { const value = localStorage.getItem('yap-accent'); return /^#[0-9a-f]{6}$/i.test(value) ? value : '#d5f879'; } catch { return '#d5f879'; } },
+    setAccent(value) {
+        if (!/^#[0-9a-f]{6}$/i.test(value)) return;
+        try { localStorage.setItem('yap-accent', value); } catch {}
+        yap.applyAccent(value);
+    },
+    applyAccent(value) {
+        const root = document.documentElement, dark = root.dataset.theme === 'dark';
+        const rgb = value.slice(1).match(/../g).map(n => parseInt(n, 16) / 255).map(n => n <= .04045 ? n / 12.92 : ((n + .055) / 1.055) ** 2.4);
+        const luminance = rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722;
+        const ink = luminance > .179 ? '#161616' : '#ffffff';
+        const tokens = {
+            '--accent': value, '--accent2': value, '--on-accent': ink,
+            '--accent-ink': `color-mix(in srgb,${value} 55%,${dark ? 'white' : 'black'})`,
+            '--accent-soft': `color-mix(in srgb,${value} 18%,var(--surface))`,
+            '--bub-out': value, '--bub-out-text': ink
+        };
+        for (const [key, color] of Object.entries(tokens)) root.style.setProperty(key, color);
     },
     setTheme(theme) { yap.applyTheme(theme); try { localStorage.setItem('yap-theme', theme); } catch {} },
     // "system" is the absence of a stored choice, so it keeps tracking the OS.

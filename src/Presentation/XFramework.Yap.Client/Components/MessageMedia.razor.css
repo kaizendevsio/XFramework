@@ -1,3 +1,6 @@
 .photo-preview { position: relative; max-width: 100%; }
+.photo-skeleton { width: min(280px, 72vw); max-width: 100%; height: 260px; border-radius: 18px; background: var(--surface2); display: grid; place-items: center; color: var(--dim); }
+.photo-pending .photo-open { position: absolute; inset: 0; visibility: hidden; }
+.photo-pending .photo-download { display: none; }
 .photo-open { display: block; padding: 0; border: 0; background: none; border-radius: 18px; overflow: hidden; }
 .photo-download { position: absolute; right: 10px; bottom: 10px; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; color: white; background: #0009; }

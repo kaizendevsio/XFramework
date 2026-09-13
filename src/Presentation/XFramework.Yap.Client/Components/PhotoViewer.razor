@@ -2,7 +2,7 @@
 @inject IJSRuntime JS
 <dialog class="photo-viewer" aria-label="Photo viewer" @ref="dialog">
     <div class="photo-toolbar">
-        <button aria-label="Close photo" @onclick="() => OnClose.InvokeAsync()"><Icon Name="close" /></button>
+        <button aria-label="Close photo" @onclick="CloseAnimatedAsync"><Icon Name="close" /></button>
         <span class="photo-viewer-title">Photo</span>
         @if (CanDownload) { <button aria-label="Download original photo" @onclick="() => OnDownload.InvokeAsync()"><Icon Name="download" /></button> }
     </div>
@@ -11,6 +11,7 @@
 @code {
     [Parameter, EditorRequired] public string Url { get; set; } = "";
     [Parameter] public string Name { get; set; } = "Photo";
+    [Parameter] public string? SourceId { get; set; }
     [Parameter] public bool CanDownload { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
     [Parameter] public EventCallback OnDownload { get; set; }
@@ -20,8 +21,9 @@
     {
         if (!firstRender) return;
         reference = DotNetObjectReference.Create(this);
-        await JS.InvokeVoidAsync("yap.photoViewer.open", dialog, reference);
+        await JS.InvokeVoidAsync("yap.photoViewer.open", dialog, reference, SourceId);
     }
     [JSInvokable] public Task CloseAsync() => OnClose.InvokeAsync();
+    private async Task CloseAnimatedAsync() => await JS.InvokeVoidAsync("yap.photoViewer.close", dialog);
     public async ValueTask DisposeAsync() { await JS.InvokeVoidAsync("yap.photoViewer.dispose", dialog); reference?.Dispose(); }
 }
