@@ -1,0 +1,16 @@
+.encryption-settings { padding: 18px; display: grid; gap: 14px; }
+.security-summary { display: flex; gap: 12px; align-items: center; }
+p { color: var(--text-muted); font-size: 13px; margin: 8px 0; }
+details { display: grid; padding-top: 8px; }
+summary { cursor: pointer; padding: 10px 0; }
+label { display: block; margin-top: 16px; }
+textarea { display: block; width: 100%; min-height: 80px; margin: 8px 0; padding: 12px; border-radius: 14px; background: var(--surface); color: var(--text); border: 1px solid var(--border); font: inherit; user-select: text; }
+.secret-code, .fingerprint { font-family: monospace; overflow-wrap: anywhere; }
+.btn { margin: 6px 0; }
+select, input { display: block; width: 100%; margin: 8px 0; padding: 12px; border-radius: 14px; background: var(--surface); color: var(--text); border: 1px solid var(--border); font: inherit; }
+.device-list { margin-top: 12px; }
+.device-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); }
+.device-row small { display: block; margin-top: 4px; color: var(--text-muted); }
+.device-remove { color: var(--danger, #e57777); }
+.device-confirm { padding: 8px 12px; border-radius: 12px; background: var(--surface); }
+.verified-person { color: var(--accent); }

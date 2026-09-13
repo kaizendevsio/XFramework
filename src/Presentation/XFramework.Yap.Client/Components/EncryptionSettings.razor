@@ -1,0 +1,142 @@
+@inject ChatState State
+@inject IJSRuntime JS
+@implements IDisposable
+@if (State.User is not null && State.EncryptionEnabled)
+{
+    <h3 class="set-group">Privacy</h3>
+    <section class="encryption-settings set-list">
+        <div class="security-summary">
+            <Icon Name="shield" Size="22" />
+            <div><strong>Encrypted messages</strong><p>@(State.Encryption.Status.Approved ? "This device is ready" : "Unlock this device to send and read encrypted messages")</p></div>
+        </div>
+        @if (State.Encryption.Status.Approved && State.Encryption.Status.CanApproveDevices)
+        {
+            <details>
+                <summary>Recovery and devices</summary>
+                <p>Keep your recovery key somewhere safe. Your password alone cannot restore encrypted messages.</p>
+                <button class="btn" disabled="@busy" @onclick="ShowRecoveryAsync">Show recovery key</button>
+                @if (State.Encryption.RecoveryKey is { } key)
+                {
+                    <textarea class="secret-code" readonly aria-label="Recovery key" value="@key"></textarea>
+                    <button class="btn" @onclick="() => CopyAsync(key)">Copy recovery key</button>
+                    <button class="btn" @onclick="State.Encryption.HideRecovery">Hide recovery key</button>
+                }
+                <label>Approve another device<textarea @bind="deviceRequest" placeholder="Paste the request from your new device" autocomplete="off" spellcheck="false"></textarea></label>
+                <button class="btn" disabled="@(busy || string.IsNullOrWhiteSpace(deviceRequest))" @onclick="ApproveAsync">Approve device</button>
+                @if (approval is not null)
+                {
+                    <textarea readonly aria-label="Device approval" value="@approval"></textarea>
+                    <button class="btn" @onclick="() => CopyAsync(approval)">Copy approval</button>
+                }
+                <p class="fingerprint">Your identity fingerprint: @State.Encryption.Status.RootFingerprint</p>
+                <button class="btn" disabled="@busy" @onclick="LoadDevicesAsync">Manage devices</button>
+                @if (devices is not null)
+                {
+                    <div class="device-list">
+                    @foreach (var device in devices.OrderByDescending(d => d.IsLocal).ThenBy(d => d.Revoked))
+                    {
+                        <div class="device-row" @key="device.Id">
+                            <div><strong>@(device.IsLocal ? "This device" : $"Device {device.Id.ToString("N")[..8]}")</strong><small>@(device.Revoked ? "Removed" : "Approved")</small></div>
+                            @if (!device.IsLocal && !device.Revoked)
+                            { <button class="btn device-remove" disabled="@busy" @onclick="() => revokeCandidate = device.Id">Remove</button> }
+                        </div>
+                        @if (revokeCandidate == device.Id)
+                        {
+                            <div class="device-confirm" role="alert">
+                                <p>This device will stop receiving new encrypted messages. Previously downloaded messages remain on it.</p>
+                                <button class="btn device-remove" disabled="@busy" @onclick="() => RevokeAsync(device.Id)">Remove device</button>
+                                <button class="btn" disabled="@busy" @onclick="() => revokeCandidate = null">Keep device</button>
+                            </div>
+                        }
+                    }
+                    </div>
+                }
+            </details>
+        }
+        else if (State.Encryption.Status.Approved)
+        {
+            <p>Manage recovery and approve more devices from your original trusted device.</p>
+            <p class="fingerprint">Your identity fingerprint: @State.Encryption.Status.RootFingerprint</p>
+        }
+        else
+        {
+            <label>Recovery key<textarea @bind="recoveryKey" autocomplete="off" spellcheck="false" placeholder="Paste your saved recovery key"></textarea></label>
+            <button class="btn" disabled="@(busy || string.IsNullOrWhiteSpace(recoveryKey))" @onclick="RestoreAsync">Restore encrypted messages</button>
+            <details><summary>Approve from another device</summary>
+                <p>Open Yap on a trusted device, then paste this device request in Settings → Privacy → Approve another device.</p>
+                <button class="btn" disabled="@busy" @onclick="ProposeAsync">Create device request</button>
+                @if (proposal is not null) { <textarea readonly aria-label="Device request" value="@proposal"></textarea><button class="btn" @onclick="() => CopyAsync(proposal)">Copy device request</button> }
+                <label>Approval code<textarea @bind="approvalCode" autocomplete="off" spellcheck="false" placeholder="Paste the approval from your trusted device"></textarea></label>
+                <button class="btn" disabled="@(busy || string.IsNullOrWhiteSpace(approvalCode))" @onclick="AcceptAsync">Unlock this device</button>
+            </details>
+        }
+        @if (State.Encryption.Status.Approved)
+        {
+            <details>
+                <summary>Verify a person</summary>
+                <p>Compare fingerprints together or through another trusted app. Matching fingerprints confirm the encryption identity you are using.</p>
+                <label>Person<select @bind="peerId" @bind:after="ClearPeer">
+                    <option value="@Guid.Empty">Choose a person</option>
+                    @foreach (var person in Peers) { <option value="@person.Id">@person.Name</option> }
+                </select></label>
+                <button class="btn" disabled="@(busy || peerId == Guid.Empty)" @onclick="LoadFingerprintAsync">Show fingerprint</button>
+                @if (!Peers.Any()) { <p>Open a conversation first to find people to verify here.</p> }
+                @if (fingerprint is not null && fingerprint.CredentialId == peerId)
+                {
+                    <p class="fingerprint">@fingerprint.Fingerprint</p>
+                    @if (fingerprint.Verified) { <p class="verified-person">Identity verified</p> }
+                    else
+                    {
+                        <label>The fingerprint they shared<input @bind="comparison" autocomplete="off" spellcheck="false" placeholder="Paste their fingerprint" /></label>
+                        <button class="btn" disabled="@(busy || string.IsNullOrWhiteSpace(comparison))" @onclick="VerifyAsync">Verify match</button>
+                    }
+                }
+            </details>
+        }
+        @if (notice is not null) { <p role="status">@notice</p> }
+        @if (State.Encryption.BackupPending) { <p role="status">Your recovery backup is waiting to sync. Keep this device until it finishes.</p> }
+    </section>
+}
+@code {
+    private bool busy;
+    private string recoveryKey = "", deviceRequest = "", approvalCode = "";
+    private string? proposal, approval, notice;
+    private string? accountScope;
+    private List<ChatEncryption.DeviceInfo>? devices;
+    private Guid? revokeCandidate;
+    private Guid peerId;
+    private string comparison = "";
+    private ChatEncryption.FingerprintInfo? fingerprint;
+    private IEnumerable<Person> Peers => State.Conversations.SelectMany(c => c.People)
+        .Concat(State.Selected?.People ?? []).Where(p => p.Id != State.User?.CredentialId).DistinctBy(p => p.Id).OrderBy(p => p.Name);
+    protected override void OnParametersSet()
+    {
+        var scope = State.User is null ? null : OfflineStore.Scope(State.User);
+        if (scope == accountScope) return;
+        accountScope = scope; ClearPrivateUi();
+    }
+    private void ClearPrivateUi()
+    { recoveryKey = deviceRequest = approvalCode = comparison = ""; proposal = approval = notice = null; devices = null; revokeCandidate = null; fingerprint = null; peerId = Guid.Empty; }
+    private void ClearPeer() { fingerprint = null; comparison = ""; }
+    private async Task RunAsync(Func<UserSession, Task> action)
+    {
+        var user = State.User;
+        if (user is null) return;
+        var scope = OfflineStore.Scope(user);
+        busy = true; notice = null;
+        try { await action(user); }
+        catch { if (State.User is not null && OfflineStore.Scope(State.User) == scope) notice = "Could not update encryption. Check the code, fingerprint and connection, then try again."; }
+        finally { busy = false; if (State.User is null || OfflineStore.Scope(State.User) != scope) ClearPrivateUi(); }
+    }
+    private Task ShowRecoveryAsync() => RunAsync(State.Encryption.ShowRecoveryAsync);
+    private Task RestoreAsync() => RunAsync(async user => { await State.Encryption.RestoreAsync(user, recoveryKey.Trim()); recoveryKey = ""; await State.SynchronizeAsync(); notice = "This device is ready."; });
+    private Task ProposeAsync() => RunAsync(async user => proposal = await State.Encryption.ProposeAsync(user));
+    private Task ApproveAsync() => RunAsync(async user => { approval = await State.Encryption.ApproveAsync(user, deviceRequest); deviceRequest = ""; devices = null; });
+    private Task AcceptAsync() => RunAsync(async user => { await State.Encryption.AcceptApprovalAsync(user, approvalCode); approvalCode = ""; await State.SynchronizeAsync(); });
+    private Task LoadDevicesAsync() => RunAsync(async user => devices = await State.Encryption.DevicesAsync(user));
+    private Task RevokeAsync(Guid id) => RunAsync(async user => { await State.Encryption.RevokeAsync(user, id); revokeCandidate = null; devices = await State.Encryption.DevicesAsync(user); notice = "Device removed."; });
+    private Task LoadFingerprintAsync() => RunAsync(async user => fingerprint = await State.Encryption.FingerprintAsync(user, peerId));
+    private Task VerifyAsync() => RunAsync(async user => { await State.Encryption.VerifyFingerprintAsync(user, peerId, comparison.Trim()); fingerprint = await State.Encryption.FingerprintAsync(user, peerId); comparison = ""; notice = "Identity verified."; });
+    private async Task CopyAsync(string? value) { await JS.InvokeVoidAsync("navigator.clipboard.writeText", value); notice = "Copied."; }
+    public void Dispose() { State.Encryption.HideRecovery(); ClearPrivateUi(); }
+}
