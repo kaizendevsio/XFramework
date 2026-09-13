@@ -72,23 +72,35 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
             if (entry.ExpiresAt <= DateTimeOffset.UtcNow.AddSeconds(60))
             {
                 using var scope = scopes.CreateScope();
+                // Once rotation starts it must finish and persist even if the browser crashes
+                // and aborts its request. Otherwise the next request reuses the spent token.
+                using var refreshTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                 var identity = scope.ServiceProvider.GetRequiredService<IIdentityServerServiceWrapper>();
                 var response = await identity.RefreshToken(new RefreshTokenRequest
                 {
                     AccessToken = entry.AccessToken, RefreshToken = entry.RefreshToken, SessionId = entry.SessionId,
                     Metadata = new RequestMetadata { RequestedTenantId = entry.TenantId, RequestId = Guid.NewGuid() }
-                }, ct);
-                if (!response.IsSuccess || response.Response is not { } tokens ||
+                }, refreshTimeout.Token);
+                if (!response.IsSuccess)
+                {
+                    if (response.HttpStatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+                    {
+                        await cache.RemoveAsync(CacheKey(key), CancellationToken.None);
+                        throw new UnauthorizedAccessException("Your session ended. Please sign in again.");
+                    }
+                    // A timeout, rate limit or upstream outage must not destroy the refresh session.
+                    throw new HttpRequestException("Session refresh is temporarily unavailable.");
+                }
+                if (response.Response is not { } tokens ||
                     tokens.SessionId != entry.SessionId || string.IsNullOrWhiteSpace(tokens.AccessToken) ||
                     string.IsNullOrWhiteSpace(tokens.RefreshToken) || tokens.ExpiresIn <= 0)
                 {
-                    await cache.RemoveAsync(CacheKey(key), ct);
-                    throw new UnauthorizedAccessException("Your session ended. Please sign in again.");
+                    throw new HttpRequestException("Session refresh returned an incomplete response.");
                 }
                 entry.AccessToken = tokens.AccessToken;
                 entry.RefreshToken = tokens.RefreshToken;
                 entry.ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(tokens.ExpiresIn);
-                await WriteAsync(key, entry, ct);
+                await WriteAsync(key, entry, CancellationToken.None);
             }
             return new CommunicationsChatActor(entry.TenantId, entry.CredentialId, key, entry.AccessToken);
         }

@@ -98,7 +98,7 @@ public static class YapAuth
                 return Redirect(context, "/login?error=credentials");
             var principal = await sessions.CreateAsync(response.Response, ct);
             await context.SignInAsync(Scheme, principal,
-                new AuthenticationProperties { ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8) });
+                new AuthenticationProperties { IsPersistent = true, ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8) });
             return Redirect(context, "/");
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }

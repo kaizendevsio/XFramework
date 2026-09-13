@@ -81,8 +81,10 @@ button,a,label,nav,.avatar,.appbar,.bottomnav{-webkit-user-select:none;user-sele
 .message-media audio{width:min(72vw,320px);height:44px}
 .media-open{display:flex;align-items:center;gap:8px;background:var(--surface2);padding:12px;border-radius:16px;text-align:left}.media-open span{overflow-wrap:anywhere}.media-open small{white-space:nowrap;color:var(--dim)}
 .message-window{gap:0;overflow-anchor:none;scroll-behavior:auto}
-.message-window>[data-window-row]{display:flow-root;flex:none;min-width:0;width:100%}
-.message-window>[data-window-top],.message-window>[data-window-bottom],.message-window>[data-window-lead]{flex:none;min-height:0}
+.message-window>[data-window-canvas]{position:relative;flex:none;min-height:0;width:100%;overflow:clip}
+.message-window [data-window-row]{position:absolute;left:0;display:flow-root;min-width:0;width:100%}
+.message-window [data-window-row]:not([data-positioned]){visibility:hidden}
+.message-window>[data-window-lead]{flex:none;min-height:0}
 .history-loader{display:block;margin:0 auto 12px;padding:8px 16px;color:var(--dim);font-size:12px}
 @media(prefers-reduced-motion:reduce){.typing-dots i,.recording-dot{animation:none}.composer-action,.composer-action .sendbtn,.composer-action .voicebtn{transition:none}}
 

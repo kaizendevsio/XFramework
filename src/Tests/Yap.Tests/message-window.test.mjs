@@ -6,7 +6,7 @@ import vm from 'node:vm';
 function fixture() {
     const events = new Map(), frames = new Map(); let nextFrame = 0, resize;
     const ids = Array.from({ length: 30 }, (_, i) => `m${i}`);
-    const rows = ids.map(id => ({ dataset: { windowRow: id }, isConnected: true, height: 100, getBoundingClientRect() { return { height: this.height }; } }));
+    const rows = ids.map(id => ({ dataset: { windowRow: id }, style: {}, isConnected: true, height: 100, getBoundingClientRect() { return { height: this.height }; } }));
     let scrollTop = 0;
     const element = { clientHeight: 500, scrollHeight: 3000, isConnected: true,
         get scrollTop() { return scrollTop; }, set scrollTop(value) { scrollTop = Math.max(0, Math.min(value, this.scrollHeight - this.clientHeight)); },
@@ -14,7 +14,7 @@ function fixture() {
         querySelectorAll: () => rows,
         addEventListener: (name, handler) => events.set(name, handler), removeEventListener: name => events.delete(name)
     };
-    const context = { window: { yap: {} }, getComputedStyle: () => ({ paddingTop: '0' }),
+    const context = { window: { yap: {} }, document: { addEventListener() {}, removeEventListener() {} }, getComputedStyle: () => ({ paddingTop: '0' }),
         requestAnimationFrame: callback => { frames.set(++nextFrame, callback); return nextFrame; }, cancelAnimationFrame: id => frames.delete(id),
         ResizeObserver: class { constructor(callback) { resize = callback; } observe() {} unobserve() {} disconnect() {} }
     };
@@ -53,4 +53,27 @@ test('touch history keeps its anchor when older messages are prepended and repin
     f.ids.push('new'); f.element.scrollHeight += 100; f.sync();
     assert.equal(f.element.scrollTop, 2700);
     f.api.dispose(f.element); assert.equal(f.events.size, 0);
+});
+
+test('rapid upward scrolling before a coalesced scroll event survives render and composer resize', () => {
+    const f = fixture();
+    f.events.get('wheel')({ deltaY: -400 });
+    // Browsers update scrollTop before delivering the next scroll event. Blazor or
+    // ResizeObserver can run in between, particularly during touch momentum.
+    for (let i = 0; i < 12; i++) {
+        const target = f.element.scrollTop - 60;
+        f.element.scrollTop = target;
+        f.sync(); f.api.resize(f.element);
+        assert.equal(f.element.scrollTop, target, `render ${i} must not restore a stale anchor`);
+    }
+});
+
+test('late image above the viewport adjusts once without undoing subsequent upward input', () => {
+    const f = fixture();
+    f.events.get('wheel')({ deltaY: -500 }); f.element.scrollTop = 1800; f.events.get('scroll')();
+    f.rows[2].height += 300; f.element.scrollHeight += 300; f.resize();
+    assert.equal(f.element.scrollTop, 2100);
+    f.element.scrollTop -= 80;
+    f.resize(); f.sync();
+    assert.equal(f.element.scrollTop, 2020);
 });

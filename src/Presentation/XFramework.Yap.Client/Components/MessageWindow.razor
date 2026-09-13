@@ -4,10 +4,10 @@
     <div data-window-lead>@Header
 
     @if (start == 0 && HasMore) { <button class="history-loader" disabled="@loading" @onclick="LoadEarlier">@(loading ? "Loading earlier messages…" : "Earlier messages")</button> }
-    </div><div data-window-top aria-hidden="true"></div>
+    </div><div data-window-canvas>
     @foreach (var message in Items.Skip(start).Take(count))
     { <div data-window-row="@message.Id" @key="message.Id">@ChildContent(message)</div> }
-    <div data-window-bottom aria-hidden="true"></div>
+    </div>
     @if (Items.Count == 0) { <p class="empty">Say hello. This is the beginning of your conversation.</p> }
 </div>
 @code {
@@ -15,6 +15,7 @@
     [Parameter, EditorRequired] public RenderFragment<ChatMessage> ChildContent { get; set; } = default!;
     [Parameter] public RenderFragment? Header { get; set; }
     [Parameter] public EventCallback Earlier { get; set; }
+    [Parameter] public EventCallback Visible { get; set; }
     [Parameter] public bool HasMore { get; set; }
     private ElementReference element;
     private DotNetObjectReference<MessageWindow>? reference;
@@ -37,5 +38,6 @@
     { start = Math.Clamp(index, 0, Math.Max(0, Items.Count - 1)); count = Math.Clamp(length, 1, 80); first = Items.Skip(start).FirstOrDefault()?.Id; return InvokeAsync(StateHasChanged); }
     [JSInvokable] public async Task LoadEarlier()
     { if (loading || !HasMore) return; loading = true; try { await Earlier.InvokeAsync(); } finally { loading = false; await InvokeAsync(StateHasChanged); } }
+    [JSInvokable] public Task ReadVisible() => Visible.InvokeAsync();
     public async ValueTask DisposeAsync() { await JS.InvokeVoidAsync("yap.messageWindow.dispose", element); reference?.Dispose(); }
 }

@@ -20,6 +20,45 @@ namespace Yap.Tests;
 [TestFixture]
 public sealed class YapSessionsTests
 {
+    [TestCase(HttpStatusCode.ServiceUnavailable)]
+    [TestCase(HttpStatusCode.TooManyRequests)]
+    [TestCase(HttpStatusCode.InternalServerError)]
+    [TestCase(HttpStatusCode.Unauthorized)]
+    public async Task RefreshFailure_OnlyConfirmedRejectionRemovesSession(HttpStatusCode status)
+    {
+        var response = Session(); response.ExpiresIn = 1;
+        var identity = new Mock<IIdentityServerServiceWrapper>();
+        identity.Setup(i => i.RefreshToken(It.IsAny<RefreshTokenRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new QueryResponse<RefreshTokenResponse> { HttpStatusCode = status });
+        using var provider = new ServiceCollection().AddSingleton(identity.Object).BuildServiceProvider();
+        var (sessions, _) = Build(provider); var user = await sessions.CreateAsync(response);
+        if (status == HttpStatusCode.Unauthorized)
+            Assert.ThrowsAsync<UnauthorizedAccessException>(async () => await sessions.GetActorAsync(user, default));
+        else Assert.ThrowsAsync<HttpRequestException>(async () => await sessions.GetActorAsync(user, default));
+        Assert.That(await sessions.ContainsAsync(user), Is.EqualTo(status != HttpStatusCode.Unauthorized));
+    }
+
+    [Test]
+    public async Task BrowserDisconnectDuringRefresh_PersistsRotatedTokensForRecovery()
+    {
+        using var browser = new CancellationTokenSource();
+        var response = Session(); response.ExpiresIn = 1;
+        var identity = new Mock<IIdentityServerServiceWrapper>();
+        identity.Setup(i => i.RefreshToken(It.IsAny<RefreshTokenRequest>(), It.IsAny<CancellationToken>()))
+            .Returns((RefreshTokenRequest _, CancellationToken refresh) =>
+            {
+                browser.Cancel();
+                Assert.That(refresh.IsCancellationRequested, Is.False, "Browser crash must not cancel token persistence");
+                return Task.FromResult(ChatFixture.Ok(new RefreshTokenResponse
+                { SessionId = response.SessionId!.Value, AccessToken = "rotated", RefreshToken = "rotated-refresh", ExpiresIn = 1800 }));
+            });
+        using var provider = new ServiceCollection().AddSingleton(identity.Object).BuildServiceProvider();
+        var (sessions, _) = Build(provider); var user = await sessions.CreateAsync(response);
+        await sessions.GetActorAsync(user, browser.Token);
+        Assert.That((await sessions.GetActorAsync(user, default)).AccessToken, Is.EqualTo("rotated"));
+        identity.Verify(i => i.RefreshToken(It.IsAny<RefreshTokenRequest>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     [Test]
     public async Task Create_TwoUsers_KeepActorTokensIsolatedAndOutOfCookieClaims()
     {

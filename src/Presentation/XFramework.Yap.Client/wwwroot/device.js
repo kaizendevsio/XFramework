@@ -33,6 +33,17 @@
             });
         },
         online: () => navigator.onLine,
+        visibleMessages(thread, parent) {
+            const route = parent ? `/thread/${thread}/${parent}` : `/chat/${thread}`;
+            if (document.hidden || location.pathname.toLowerCase() !== route.toLowerCase()) return [];
+            const list = document.querySelector('[data-messages]');
+            if (!list) return [];
+            const box = list.getBoundingClientRect(), style = getComputedStyle(list);
+            const top = box.top + (parseFloat(style.paddingTop) || 0), bottom = box.bottom - (parseFloat(style.paddingBottom) || 0);
+            return [...list.querySelectorAll('[data-window-row]')].filter(row => {
+                const rect = row.getBoundingClientRect(); return rect.bottom > top && rect.top < bottom;
+            }).map(row => row.dataset.windowRow);
+        },
         watch: dotnet => { listener = dotnet; },
         events(scope, thread) {
             if (account === scope && activeThread === thread && events) return;
