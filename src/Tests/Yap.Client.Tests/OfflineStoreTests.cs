@@ -9,6 +9,26 @@ namespace Yap.Client.Tests;
 public sealed class OfflineStoreTests
 {
     [Test]
+    public async Task CompleteEncryptedUpload_PreservesVerifiedMetadataForSenderPreview()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var message = fixture.Message();
+        message.EncryptedEnvelope = "opaque signed envelope";
+        message.LocalFileKey = "local-upload";
+        message.HasAttachments = true;
+        var attachment = new ChatAttachment(Guid.NewGuid(), "photo.jpg", "image/jpeg", 7000000, Guid.NewGuid(), 3);
+        message.Attachments = [attachment];
+        var queued = new QueuedMessage { Scope = "a", Id = message.Id, ThreadId = message.ThreadId, FileKey = message.LocalFileKey };
+        await fixture.Store.QueueAsync(queued, message, "draft");
+        await fixture.Store.CompleteQueueAsync(queued);
+        var saved = await fixture.Store.MessageAsync("a", message.Id);
+        Assert.That(saved!.Attachments, Is.EqualTo(new[] { attachment }));
+        Assert.That(saved.LocalFileKey, Is.Null);
+        Assert.That(saved.Delivery, Is.EqualTo("Sent"));
+        Assert.That(await fixture.Store.PendingAsync("a"), Is.Empty);
+    }
+
+    [Test]
     public async Task HistoryWindow_AnchorsAcrossNewArrivals_AndKeepsEqualTimestampOrder()
     {
         await using var fixture = await StoreFixture.CreateAsync();
@@ -164,6 +184,47 @@ public sealed class OfflineStoreTests
         await fixture.Store.CompleteQueueAsync(queued);
         Assert.That(await fixture.Store.PendingAsync("account-a"), Is.Empty);
         Assert.That((await fixture.Store.MessagesAsync("account-a", message.ThreadId)).Single().Delivery, Is.EqualTo("Sent"));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ReplaceEncryptedWindow_PreservesPendingBody_OrFreshVerifiedAttachmentMetadata(bool pending)
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var old = fixture.Message(); old.EncryptedEnvelope = "old signed envelope"; old.HasAttachments = true;
+        old.LocalFileKey = pending ? "old-local-file" : null;
+        old.Attachments = [new(Guid.NewGuid(), "old.png", "image/png", 42, Guid.NewGuid(), 1)];
+        if (pending) await fixture.Store.QueueAsync(fixture.Queue(old), old, "main");
+        else await fixture.Store.SaveMessagesAsync("account-a", [old]);
+        var verified = fixture.Message(old.ThreadId); verified.Id = old.Id;
+        verified.EncryptedEnvelope = "new signed envelope"; verified.HasAttachments = true;
+        var replacement = new ChatAttachment(Guid.NewGuid(), "new.png", "image/png", 100, Guid.NewGuid(), 2);
+        verified.Attachments = [replacement];
+        await fixture.Store.ReplaceWindowAsync("account-a", old.ThreadId, [verified], true);
+        var saved = (await fixture.Store.MessageAsync("account-a", old.Id))!;
+        Assert.That(saved.EncryptedEnvelope, Is.EqualTo(pending ? old.EncryptedEnvelope : verified.EncryptedEnvelope));
+        Assert.That(saved.Attachments.Single(), Is.EqualTo(pending ? old.Attachments[0] : replacement));
+        Assert.That(saved.LocalFileKey, Is.EqualTo(pending ? old.LocalFileKey : null));
+    }
+
+    [TestCase(null)]
+    [TestCase("untrusted replacement envelope")]
+    public async Task ReplaceWindow_PendingMessageCannotBeRewrittenByRemoteRefresh(string? remoteEnvelope)
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var local = fixture.Message(); local.Text = "What the user wrote"; local.EncryptedEnvelope = "persisted randomized ciphertext";
+        local.EncryptionSenderDeviceId = Guid.NewGuid(); local.AcceptedSenderDirectoryRevision = 3;
+        await fixture.Store.QueueAsync(fixture.Queue(local), local, "main");
+        var remote = fixture.Message(local.ThreadId); remote.Id = local.Id; remote.Text = "Text the user never wrote";
+        remote.EncryptedEnvelope = remoteEnvelope;
+        remote.EncryptionSenderDeviceId = Guid.NewGuid(); remote.AcceptedSenderDirectoryRevision = 9;
+        await fixture.Store.ReplaceWindowAsync("account-a", local.ThreadId, [remote], true);
+        var saved = (await fixture.Store.MessageAsync("account-a", local.Id))!;
+        Assert.That(saved.Text, Is.EqualTo(local.Text));
+        Assert.That(saved.EncryptedEnvelope, Is.EqualTo(local.EncryptedEnvelope));
+        Assert.That(saved.EncryptionSenderDeviceId, Is.EqualTo(local.EncryptionSenderDeviceId));
+        Assert.That(saved.AcceptedSenderDirectoryRevision, Is.EqualTo(local.AcceptedSenderDirectoryRevision));
+        Assert.That((await fixture.Store.PendingAsync("account-a")).Single().Text, Is.EqualTo(local.Text));
     }
 
     [Test]

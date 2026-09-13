@@ -28,6 +28,9 @@ public sealed class EncryptionFixtureEndpointTests
         var clients = new[] { a, b, c };
         var ids = clients.Select(x => x.User.CredentialId).ToList();
         Assert.That(ids.Distinct().Count(), Is.EqualTo(3));
+        var chats = (await a.Http.GetFromJsonAsync<ChatPage<Conversation>>("api/chat/conversations"))!;
+        Assert.That(chats.Items, Has.Count.EqualTo(1));
+        var thread = chats.Items[0].Id;
         var devices = ids.ToDictionary(x => x, _ => Guid.NewGuid());
         foreach (var client in clients)
         {
@@ -38,15 +41,15 @@ public sealed class EncryptionFixtureEndpointTests
             Assert.That(published.CredentialId, Is.EqualTo(client.User.CredentialId));
             Assert.That(published.Revision, Is.EqualTo(1));
             Assert.That((await client.Http.PostAsJsonAsync("api/chat/encryption/directory", request)).StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
+            if (client == b)
+                Assert.That((await a.Http.GetAsync($"api/chat/conversations/{thread}/encryption")).StatusCode,
+                    Is.EqualTo(HttpStatusCode.PreconditionRequired), "An unenrolled third recipient must block encryption without silently dropping them.");
         }
         await PostAsync<EncryptionRecoveryResponse>(a.Http, "api/chat/encryption/recovery", new PutEncryptionRecoveryRequest { Archive = "opaque recovery A" });
         Assert.That((await b.Http.GetFromJsonAsync<EncryptionRecoveryResponse>("api/chat/encryption/recovery"))!.Archive, Is.Null);
         Assert.That((await a.Http.GetFromJsonAsync<EncryptionRecoveryResponse>("api/chat/encryption/recovery"))!.Archive, Is.EqualTo("opaque recovery A"));
         Assert.That((await a.Http.PostAsJsonAsync("api/chat/encryption/recovery", new PutEncryptionRecoveryRequest { Archive = "stale" })).StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
 
-        var chats = (await a.Http.GetFromJsonAsync<ChatPage<Conversation>>("api/chat/conversations"))!;
-        Assert.That(chats.Items, Has.Count.EqualTo(1));
-        var thread = chats.Items[0].Id;
         var publicDirectories = (await c.Http.GetFromJsonAsync<EncryptionDirectoryResponse[]>($"api/chat/conversations/{thread}/encryption"))!;
         Assert.That(publicDirectories.Select(x => x.CredentialId), Is.EquivalentTo(ids));
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
