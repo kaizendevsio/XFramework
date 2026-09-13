@@ -13,7 +13,7 @@ public sealed partial class YapCallGateway
     private readonly bool groupLifecycleEnabled;
     private readonly Dictionary<Guid, GroupRoom> groups = [];
 
-    // The production constructor disables admission until encrypted group audio is verified.
+    // Admission requires the explicit encrypted-group configuration and approved devices.
     internal async Task<YapGroupCall> StartGroupAsync(ClaimsPrincipal user, Guid thread, IReadOnlyCollection<Guid> recipients, CancellationToken ct = default, Guid deviceId = default)
     {
         RequireGroupLifecycle();

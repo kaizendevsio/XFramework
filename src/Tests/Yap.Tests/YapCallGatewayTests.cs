@@ -147,11 +147,33 @@ public sealed class YapCallGatewayTests
     }
 
     [Test]
-    public async Task GroupAdmission_ProductionConstructor_RemainsDisabled()
+    public async Task GroupAdmission_ProductionConstructor_DefaultsToDisabled()
     {
         await using var f = await Fixture.CreateAsync();
         var error = Assert.ThrowsAsync<YapApiException>(() => f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId, f.CharlieId], deviceId: f.AliceDevice));
         Assert.That(error!.Status, Is.EqualTo(503));
+    }
+
+    [TestCase(false, true, "EndToEndEncrypted", false)]
+    [TestCase(true, false, "TrustedServerTls", false)]
+    [TestCase(true, true, "EndToEndEncrypted", true)]
+    public void EncryptedGroups_RequireBothExplicitGateAndCallsEnabled(bool enabled, bool groups, string mode, bool expected)
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        { ["Yap:Calls:Enabled"] = enabled.ToString(), ["Yap:Calls:EncryptedGroups"] = groups.ToString(), ["Yap:Calls:SecurityMode"] = mode }).Build();
+        using var gateway = new YapCallGateway(config, services.GetRequiredService<IServiceScopeFactory>(), NullLogger<BoltServer>.Instance);
+        Assert.That(gateway.EncryptedGroupsEnabled, Is.EqualTo(expected));
+    }
+
+    [TestCase(null)]
+    [TestCase("TrustedServerTls")]
+    public void EncryptedGroups_RejectMissingOrTransportOnlySecurityMode(string? mode)
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        { ["Yap:Calls:Enabled"] = "true", ["Yap:Calls:EncryptedGroups"] = "true", ["Yap:Calls:SecurityMode"] = mode }).Build();
+        Assert.Throws<InvalidOperationException>(() => new YapCallGateway(config, services.GetRequiredService<IServiceScopeFactory>(), NullLogger<BoltServer>.Instance));
     }
 
     [Test]
@@ -364,7 +386,7 @@ public sealed class YapCallGatewayTests
         {
             var fixture = new Fixture();
             var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-            { ["Yap:Calls:Enabled"] = "true", ["Yap:Calls:SecurityMode"] = groupLifecycle ? "EndToEndEncrypted" : "TrustedServerTls" }).Build();
+            { ["Yap:Calls:Enabled"] = "true", ["Yap:Calls:EncryptedGroups"] = groupLifecycle.ToString(), ["Yap:Calls:SecurityMode"] = groupLifecycle ? "EndToEndEncrypted" : "TrustedServerTls" }).Build();
             var wrapper = new Mock<ICommunicationsServiceWrapper>();
             wrapper.Setup(x => x.GetThreadAsync(It.IsAny<GetThreadRequest>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(() => new QueryResponse<GetThreadResponse> { HttpStatusCode = HttpStatusCode.OK,
@@ -397,9 +419,7 @@ public sealed class YapCallGatewayTests
             fixture.Members.Add(new() { CredentialId = alice.Credential.Id });
             fixture.Members.Add(new() { CredentialId = bob.Credential.Id });
             fixture.Members.Add(new() { CredentialId = charlie.Credential.Id });
-            fixture.Gateway = groupLifecycle
-                ? new(configuration, fixture.provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<BoltServer>.Instance, enableGroupLifecycle: true)
-                : new(configuration, fixture.provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<BoltServer>.Instance);
+            fixture.Gateway = new(configuration, fixture.provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<BoltServer>.Instance);
             return fixture;
         }
         public async ValueTask DisposeAsync() { Gateway.Dispose(); await provider.DisposeAsync(); }

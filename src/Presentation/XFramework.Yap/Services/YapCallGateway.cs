@@ -10,7 +10,7 @@ using Yap.Contracts;
 
 namespace Yap.Services;
 
-/// <summary>One Yap instance, trusted-server TLS relay. This is explicitly not end-to-end encryption.</summary>
+/// <summary>Authenticated Yap voice admission and media relay; encrypted groups forward client-encrypted SFrame audio.</summary>
 public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCallAuthorizer, IDisposable
 {
     private readonly object gate = new();
@@ -24,9 +24,9 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
     public BoltServer Server { get; }
 
     public YapCallGateway(IConfiguration configuration, IServiceScopeFactory scopes, ILogger<BoltServer> logger)
-        : this(configuration, scopes, logger, enableGroupLifecycle: false) { }
+        : this(configuration, scopes, logger, configuration.GetValue<bool>("Yap:Calls:EncryptedGroups")) { }
 
-    // No configuration or public endpoint enables this path until the shared E2EE implementation is verified.
+    // Kept explicit for disposable fixtures; production uses the default-false configuration gate.
     internal YapCallGateway(IConfiguration configuration, IServiceScopeFactory scopes, ILogger<BoltServer> logger, bool enableGroupLifecycle)
     {
         this.scopes = scopes;
