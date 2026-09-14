@@ -116,10 +116,11 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js)
             return true;
     });
 
-    public async Task<JsonElement[]> RecipientsAsync(UserSession user, Guid thread)
+    public async Task<JsonElement[]> RecipientsAsync(UserSession user, Guid thread, bool allowPending = false, List<Guid>? audience = null)
     {
         var operation = Begin(user);
-        var directories = await GetAsync<JsonElement[]>(operation, $"api/chat/conversations/{thread}/encryption");
+        var directories = await GetAsync<JsonElement[]>(operation, $"api/chat/conversations/{thread}/encryption?allowPending={allowPending.ToString().ToLowerInvariant()}");
+        if (audience is { Count: > 0 }) directories = directories.Where(x => audience.Contains(x.GetProperty("credentialId").GetGuid())).ToArray();
         foreach (var directory in directories)
             await JsVoidAsync(operation, "acceptDirectory", directory);
         Status = await JsAsync<EncryptionStatus>(operation, "status");
@@ -152,6 +153,10 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js)
             {
                 try
                 {
+                    if (message.EncryptionPending)
+                    {
+                        Lock(message); message.Text = "Waiting for secure delivery"; continue;
+                    }
                     if (!directories.TryGetValue(message.SenderId, out var sender))
                         directories[message.SenderId] = sender = await GetAsync<JsonElement>(operation, $"api/chat/encryption/people/{message.SenderId}");
                     var payload = await JsAsync<EncryptedMessageContent>(operation, "decrypt",

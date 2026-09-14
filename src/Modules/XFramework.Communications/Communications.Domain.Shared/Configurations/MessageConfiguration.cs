@@ -31,6 +31,13 @@ public class MessageConfiguration : IEntityTypeConfiguration<Message>
             .HasColumnType("jsonb")
             .HasDefaultValueSql("'{}'::jsonb");
         entity.Property(e => e.Text).HasColumnType("character varying");
+        entity.Property(e => e.EncryptionAudienceJson).HasColumnType("jsonb").HasDefaultValueSql("'[]'::jsonb");
+        entity.Property(e => e.PendingEncryptionMembersJson).HasColumnType("jsonb").HasDefaultValueSql("'[]'::jsonb");
+        entity.Property(e => e.PendingEncryptionCount).HasDefaultValue(0);
+        entity.Property(e => e.EncryptionOriginalEnvelopeHash).HasMaxLength(64);
+        entity.HasIndex(e => new { e.TenantId, e.MessageThreadMemberId, e.CreatedAt, e.Id })
+            .HasFilter("\"PendingEncryptionCount\" > 0 AND NOT \"IsDeleted\" AND \"IsEnabled\"")
+            .HasDatabaseName("IX_Message_PendingEncryption");
 
         entity.HasIndex(e => new { e.MessageThreadId, e.CreatedAt, e.Id })
             .HasDatabaseName("IX_Message_Thread_CreatedAt_Id");

@@ -92,6 +92,9 @@ public interface ICommunicationsServiceWrapper : IServiceWrapper
     Task<QueryResponse<CreateThreadMessageResponse>> CreateThreadMessageAsync(
         CreateThreadMessageRequest request,
         CancellationToken ct = default);
+    Task<QueryResponse<DeferredEncryptionResponse>> GetDeferredEncryptionAsync(GetDeferredEncryptionRequest request, CancellationToken ct = default);
+    Task<CmdResponse> CompleteDeferredEncryptionAsync(CompleteDeferredEncryptionRequest request, CancellationToken ct = default);
+
     Task<QueryResponse<GetThreadMessagesResponse>> GetThreadMessagesAsync(
         GetThreadMessagesRequest request,
         CancellationToken ct = default);
@@ -464,6 +467,11 @@ public sealed record CommunicationsServiceWrapper(
         ct.ThrowIfCancellationRequested();
         return SendAsync<CreateThreadMessageRequest, CreateThreadMessageResponse>(request, ct);
     }
+
+    public Task<QueryResponse<DeferredEncryptionResponse>> GetDeferredEncryptionAsync(GetDeferredEncryptionRequest request, CancellationToken ct = default) =>
+        SendAsync<GetDeferredEncryptionRequest, DeferredEncryptionResponse>(request, ct);
+    public Task<CmdResponse> CompleteDeferredEncryptionAsync(CompleteDeferredEncryptionRequest request, CancellationToken ct = default) =>
+        SendVoidAsync(request, ct);
 
     public Task<QueryResponse<GetThreadMessagesResponse>> GetThreadMessagesAsync(
         GetThreadMessagesRequest request,

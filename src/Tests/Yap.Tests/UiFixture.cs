@@ -272,9 +272,10 @@ internal static partial class UiFixture
             .ReturnsAsync((UpdateThreadRequest request, CancellationToken _) => { var chat = conversations.First(c => c.Id == request.ThreadId); if(request.Name is not null) { chat.Name = request.Name; chat.HasCustomName = true; } if (request.PhotoStorageFileId is { } photo) chat.PhotoStorageFileId = photo; features = request.Features ?? features; if (request.NicknameMemberId.HasValue) fixtureMembers.First(m => m.Id == request.NicknameMemberId).Alias = request.Nickname ?? ""; return Success(); });
         fixture.Session.Setup(s => s.UpdateMemberRoleAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Guid thread, Guid member, string role, CancellationToken _) => { fixtureMembers.First(m => m.Id == member).Role = role; return Success(); });
-        var encryption = encryptionFixture ? new EncryptionFixture(fixture, identity, directory, fixtureMembers, conversations, messages, attachments, mediaLinks, stored, third) : null;
-        configureIdentity?.Invoke(identity);
         var callMembership = new Mock<ICommunicationsServiceWrapper>();
+        callMembership.Setup(x => x.GetDeferredEncryptionAsync(It.IsAny<GetDeferredEncryptionRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(ChatFixture.Ok(new DeferredEncryptionResponse()));
+        var encryption = encryptionFixture ? new EncryptionFixture(fixture, identity, directory, fixtureMembers, conversations, messages, attachments, mediaLinks, stored, third, callMembership) : null;
+        configureIdentity?.Invoke(identity);
         callMembership.Setup(c => c.GetThreadAsync(It.IsAny<GetThreadRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((GetThreadRequest request, CancellationToken _) => request.Id == fixture.Thread
                 ? ChatFixture.Ok(new GetThreadResponse { Id = fixture.Thread, Name = "Fixture voice conversation", IsDirect = !encryptionFixture, Members = fixtureMembers })

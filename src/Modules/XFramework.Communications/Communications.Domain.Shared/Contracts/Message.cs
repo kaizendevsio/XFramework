@@ -64,4 +64,13 @@ public partial class Message : BaseModel
     public long? AcceptedSenderDirectoryRevision { get; set; }
     [MemoryPackOrder(19)]
     public Guid? EncryptionSenderDeviceId { get; set; }
+    // Membership IDs freeze the original audience, including members not yet enrolled.
+    [MemoryPackOrder(20)]
+    public string EncryptionAudienceJson { get; set; } = "[]";
+    [MemoryPackOrder(21)]
+    public string PendingEncryptionMembersJson { get; set; } = "[]";
+    [MemoryPackOrder(22)]
+    public int PendingEncryptionCount { get; set; }
+    [MemoryPackOrder(23)]
+    public string? EncryptionOriginalEnvelopeHash { get; set; }
 }

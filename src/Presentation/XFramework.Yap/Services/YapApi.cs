@@ -91,6 +91,8 @@ public static class YapApi
                     ? people.FirstOrDefault(p => p.Id == x.SenderCredentialId)?.Name ?? "Workspace member" : x.SenderAlias,
                 Text = x.Text, CreatedAt = x.CreatedAt, Mine = x.SenderCredentialId == session.CredentialId,
                 EncryptedEnvelope = x.EncryptedEnvelope,
+                EncryptionPending = x.EncryptionPending, PendingEncryptionCount = x.PendingEncryptionCount,
+                EncryptionAudienceCredentialIds = x.EncryptionAudienceCredentialIds,
                 AcceptedSenderDirectoryRevision = x.AcceptedSenderDirectoryRevision, EncryptionSenderDeviceId = x.EncryptionSenderDeviceId,
                 HasAttachments = x.HasAttachments, AttachmentLinksReady = x.HasAttachments, IsThreadReply = x.IsThreadReply,
                 DeliveredCount = x.DeliveredCount, ReadCount = x.ReadCount,

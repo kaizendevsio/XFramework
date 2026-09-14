@@ -165,7 +165,8 @@
             const handle = await (await directory()).getFileHandle(encryptedKey, { create: true });
             const sink = await handle.createWritable();
             try {
-                const ciphertext = await yap.encryption.encryptStream(scope, context, source.stream(), recipients);
+                const encrypted = await yap.encryption.encryptAttachment(scope, context, source.stream(), recipients);
+                const ciphertext = encrypted.stream;
                 await ciphertext.pipeTo(sink);
                 const file = await handle.getFile();
                 if (file.size > maximumCiphertextBytes) return { status: 413, id: emptyGuid };
@@ -185,7 +186,7 @@
                     }
                     const complete = await fetch(`/api/chat/uploads/session/${ticket.uploadId}/complete`, { method: 'POST', headers });
                     if (!complete.ok) throw Object.assign(new Error('Encrypted upload did not finish.'), { status: complete.status });
-                    return { status: complete.status, id: (await complete.json()).id };
+                    return { status: complete.status, id: (await complete.json()).id, key: encrypted.key };
                 } catch (error) {
                     await fetch(`/api/chat/uploads/session/${ticket.uploadId}/abort`, { method: 'POST', headers }).catch(() => {});
                     if (error.status) return { status: error.status, id: emptyGuid };
@@ -195,7 +196,7 @@
             finally { activeTemporaryFiles.delete(encryptedKey); await (await directory()).removeEntry(encryptedKey).catch(() => {}); }
         },
         hasVerifiedFile,
-        async decryptFile(key, path, scope, online, context, senderDirectory) {
+        async decryptFile(key, path, scope, online, context, senderDirectory, attachmentKey = null) {
             const expected = await verificationContext(key, scope, context);
             if (await hasVerifiedFile(key, scope, context)) return;
             const operationKey = `${key}:${expected.context}`;
@@ -225,7 +226,7 @@
                         catch (error) { await final.abort().catch(() => {}); await dir.removeEntry(key).catch(() => {}); throw error; }
                     },
                     abort: () => sink.abort().catch(() => {})
-                });
+                }, attachmentKey);
             } finally { activeTemporaryFiles.delete(temporary); await dir.removeEntry(temporary).catch(() => {}); }
             })();
             encryptedDownloads.set(operationKey, operation);
