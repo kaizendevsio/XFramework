@@ -108,6 +108,8 @@ public sealed class BoltGroupCallLifecycleTests
         var aStream = await f.Config("a");
         var cStream = await f.Config("c");
         await f.Send("a", aStream);
+        // Processing the sender only queues delivery; observe it before disconnect drops pending frames.
+        Assert.That(() => f.Peers["c"].Count(FrameType.MediaFrame), Is.EqualTo(1).After(3000, 10));
         if (disconnect)
         {
             await f.Peers["c"].DisposeAsync();
