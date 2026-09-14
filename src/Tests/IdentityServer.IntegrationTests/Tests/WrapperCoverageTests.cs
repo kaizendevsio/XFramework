@@ -30,6 +30,27 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
     public void ResetWorkflowFailureInjection() => IdentityServerWorkflowFailureInjection.Reset();
 
     [Test]
+    public async Task UploadOwnAvatar_ThroughActorWrapper_PersistsTheAuthenticatedUsersPhoto()
+    {
+        var auth = await AuthenticateThroughWrapper();
+        var owner = auth.Response!.Credential!.Id;
+        using var actor = IntegrationTestFixture.UseActorAccessToken(auth.Response.AccessToken!);
+        var result = await IntegrationTestFixture.ServiceWrapper.UploadOwnAvatar(new UploadOwnAvatarRequest
+        {
+            FileName = "photo.jpg", ContentType = "image/jpeg",
+            FileBytes = [0xff, 0xd8, 0xff, 0xe0, 0, 16, 74, 70, 73, 70, 0, 1], Metadata = CreateMetadata()
+        });
+        result.IsSuccess.Should().BeTrue(result.Message);
+        result.Response!.CredentialId.Should().Be(owner);
+        await using var db = CreateDbContext();
+        var credential = await db.Set<IdentityCredential>().IgnoreQueryFilters().SingleAsync(x => x.Id == owner);
+        credential.AvatarStorageFileId.Should().Be(result.Response.StorageFileId);
+        var file = await db.Set<StorageFile>().IgnoreQueryFilters().SingleAsync(x => x.Id == credential.AvatarStorageFileId);
+        file.Identifier.Should().Be(owner);
+        file.UnclaimedUntil.Should().BeNull("the saved avatar is claimed after persistence");
+    }
+
+    [Test]
     public async Task UploadOwnAvatar_ThroughActorWrapper_RejectsEmptyImage()
     {
         var auth = await AuthenticateThroughWrapper();

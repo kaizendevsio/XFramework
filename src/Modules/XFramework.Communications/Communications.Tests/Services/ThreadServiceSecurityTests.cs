@@ -1011,6 +1011,7 @@ public sealed partial class ThreadServiceSecurityTests
 
     private sealed class TestStorageServiceWrapper : IStorageServiceWrapper
     {
+        public Task<QueryResponse<StorageFileResponse>> UploadOwnAvatarFile(UploadOwnAvatarFileRequest request, CancellationToken ct = default) => throw new NotSupportedException();
         public int ChatUploadCalls { get; private set; }
         public int ChatDownloadCalls { get; private set; }
         public bool DenyChatAttachment { get; init; }

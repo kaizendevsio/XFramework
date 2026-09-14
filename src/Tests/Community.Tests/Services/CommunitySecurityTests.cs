@@ -322,6 +322,7 @@ public sealed class CommunitySecurityTests
 
     private sealed class ThrowingStorageServiceWrapper : IStorageServiceWrapper
     {
+        public Task<QueryResponse<StorageFileResponse>> UploadOwnAvatarFile(UploadOwnAvatarFileRequest request, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<QueryResponse<StorageUploadSessionResponse>> CreateChatStorageUploadSession(CreateChatStorageUploadSessionRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Chat Storage operation is not used by this test fixture.");
 

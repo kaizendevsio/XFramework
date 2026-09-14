@@ -17,7 +17,7 @@
                 </div>
             }
             else if (IsVideo(file)) {
-                <video src="@url" controls playsinline preload="metadata" aria-label="@file.Name" @onerror="() => playbackFailed.Add(file.Id)" @oncontextmenu="() => OnActions.InvokeAsync()" @oncontextmenu:preventDefault></video>
+                <VideoPreview @key="url" Url="@url" Name="@file.Name" OnError="() => playbackFailed.Add(file.Id)" OnActions="OnActions" />
                 @if (playbackFailed.Contains(file.Id)) { <button class="media-open" @onclick="() => State.OpenFileAsync(Message, file)"><Icon Name="download" Size="20" /><span>This video cannot play here. Download to watch.</span></button> }
             }
             else { <audio src="@url" controls preload="metadata" aria-label="Voice message"></audio> }
