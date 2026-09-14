@@ -22,10 +22,14 @@
             }
             else { <audio src="@url" controls preload="metadata" aria-label="Voice message"></audio> }
         }
-        else if (IsImage(file) || IsVideo(file)) { @if (!failed) { <div class="photo-skeleton" role="status" aria-label="@(IsVideo(file) ? "Loading video" : "Loading photo")"><span class="spinner"></span></div> } }
+        else if (IsImage(file) || IsVideo(file)) {
+            @if (waitingForConnection) { <div class="photo-skeleton" role="status"><span>Available when you’re back online</span></div> }
+            else if (!failed) { <div class="photo-skeleton" role="status" aria-label="@(IsVideo(file) ? "Loading video" : "Loading photo")"><span class="spinner"></span></div> }
+        }
         else { <button class="media-open" disabled="@(loading || WaitingForLinks)" @onclick="() => OpenAsync(file)"><Icon Name="@(file.ContentType.StartsWith("audio/") ? "mic" : "file")" Size="20" /><span>@file.Name</span><small>@(file.Size / 1024) KB</small></button> }
     }
     @if (loading && Message.Attachments.Count == 0) { <span class="spinner" role="status" aria-label="Loading attachment"></span> }
+    @if (waitingForConnection && Message.Attachments.Count == 0) { <span>Attachment available when you’re back online</span> }
     @if (failed) { <button class="media-open" @onclick="LoadAsync">Attachment unavailable · retry</button> }
     </div>
 }
@@ -42,7 +46,7 @@
     private readonly HashSet<Guid> ready = [];
     private readonly HashSet<Guid> playbackFailed = [];
     private string PhotoId(ChatAttachment file) => $"photo-{Message.Id}-{file.Id}";
-    private bool loading, failed, disposed;
+    private bool loading, failed, disposed, waitingForConnection;
     private bool WaitingForLinks => Message.EncryptedEnvelope is not null && Message.LocalFileKey is null && !Message.AttachmentLinksReady;
     private string? loaded;
     private int version;
@@ -54,22 +58,24 @@
     {
         var key = $"{Message.Id}:{Message.LocalFileKey}:{Message.HasAttachments}:{Message.AttachmentLinksReady}:{string.Join(',', Message.Attachments.Select(f => f.Id))}";
         if (key != loaded) { loaded = key; await LoadAsync(); }
+        else if (waitingForConnection && State.Online && !loading) await LoadAsync();
     }
     private async Task LoadAsync()
     {
         if (disposed || !Message.HasAttachments && Message.Attachments.Count == 0) return;
         var request = ++version;
         var message = Message;
-        loading = true; failed = false;
+        loading = true; failed = false; waitingForConnection = false;
         try
         {
             await ReleaseAsync();
             if (WaitingForLinks) return;
+            if (message.Attachments.Count == 0 && !State.Online) { waitingForConnection = true; return; }
             if (message.Attachments.Count == 0) { await State.LoadAttachmentMetadataAsync(message); await MetadataLoaded.InvokeAsync(); }
             if (request != version || disposed) return;
             foreach (var file in message.Attachments.Where(f => IsImage(f) || IsVideo(f) || message.LocalFileKey is not null && f.ContentType.StartsWith("audio/"))) await OpenAsync(message, file, request);
         }
-        catch (Exception ex) { if (request == version) failed = true; await LogFailureAsync("attachment-metadata", ex); }
+        catch (Exception ex) { await FailedAsync("attachment-metadata", ex, request); }
         finally { if (request == version) loading = false; }
     }
     private Task OpenAsync(ChatAttachment file) => OpenAsync(Message, file, version);
@@ -88,7 +94,15 @@
             if (disposed || request != version) await JS.InvokeVoidAsync("yap.device.releaseMedia", url);
             else { if (urls.Remove(file.Id, out var old)) await JS.InvokeVoidAsync("yap.device.releaseMedia", old); urls[file.Id] = url; }
         }
-        catch (Exception ex) { if (request == version) failed = true; await LogFailureAsync(phase, ex); }
+        catch (Exception ex) { await FailedAsync(phase, ex, request); }
+    }
+    private async Task FailedAsync(string phase, Exception error, int request)
+    {
+        if (disposed || request != version) return;
+        if (ChatState.IsConnectionFailure(error)) State.Report(error);
+        if (!State.Online) { waitingForConnection = true; return; }
+        failed = true;
+        await LogFailureAsync(phase, error);
     }
     private async Task LogFailureAsync(string phase, Exception? error = null)
     {

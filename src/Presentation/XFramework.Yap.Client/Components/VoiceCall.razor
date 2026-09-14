@@ -24,10 +24,24 @@
                     }
                 </div>
             }
+            @if (outputOpen && !Voice.Incoming)
+            {
+                <div class="call-audio-output">
+                    @if (outputs is { Supported: true })
+                    {
+                        <label>Audio output<select aria-label="Audio output" disabled="@outputBusy" value="@outputs.DeviceId" @onchange="ChangeOutputAsync">
+                            @foreach (var device in outputs.Devices) { <option value="@device.Id">@device.Label</option> }
+                        </select></label>
+                        <p>Connect your Bluetooth device or headset to see it here. System default follows your device’s audio settings.</p>
+                    }
+                    else { <p>Choose your audio output in your phone or computer’s audio controls. Speaker, earpiece and Bluetooth options depend on your device; this browser cannot switch them directly.</p> }
+                    @if (outputError is not null) { <p role="status">@outputError</p> }
+                </div>
+            }
             @if(Voice.Incoming)
             { <div class="callrow2"><button class="cbtn end" @onclick="() => Voice.EndAsync()"><span class="k"><Icon Name="phone" Class="rot135" Size="26" /></span>Decline</button><button class="cbtn accept" @onclick="Voice.AcceptAsync"><span class="k"><Icon Name="phone" Size="26" /></span>Accept</button></div> }
             else
-            { <div class="callrow2"><button class="cbtn @(Voice.Muted ? "on" : "")" disabled="@(Voice.ConnectedAt is null)" aria-pressed="@Voice.Muted" @onclick="Voice.ToggleMuteAsync"><span class="k"><Icon Name="mic" Size="24" /></span>@(Voice.Muted ? "Unmute" : "Mute")</button><button class="cbtn end" @onclick="() => Voice.EndAsync()"><span class="k"><Icon Name="phone" Class="rot135" Size="26" /></span>End</button></div> }
+            { <div class="callrow2"><button class="cbtn @(Voice.Muted ? "on" : "")" disabled="@(Voice.ConnectedAt is null)" aria-pressed="@Voice.Muted" @onclick="Voice.ToggleMuteAsync"><span class="k"><Icon Name="mic" Size="24" /></span>@(Voice.Muted ? "Unmute" : "Mute")</button><button class="cbtn @(outputOpen ? "on" : "")" disabled="@(Voice.ConnectedAt is null)" aria-expanded="@outputOpen.ToString().ToLowerInvariant()" @onclick="ToggleOutputAsync"><span class="k"><Icon Name="volume" Size="24" /></span>Audio</button><button class="cbtn end" @onclick="() => Voice.EndAsync()"><span class="k"><Icon Name="phone" Class="rot135" Size="26" /></span>End</button></div> }
             <p class="call-footer">End-to-end encrypted</p>
         </div></div>
     </dialog>
@@ -39,10 +53,26 @@
     private ElementReference dialog;
     private readonly CancellationTokenSource lifetime = new();
     private bool shown;
+    private bool outputOpen, outputBusy;
+    private Bolt.Media.Browser.AudioOutputs? outputs;
+    private string? outputError;
     private string Elapsed => Voice.Status == "Connected" && Voice.ConnectedAt is { } time ? (DateTimeOffset.UtcNow - time).ToString(@"mm\:ss") : Voice.Status;
     protected override void OnInitialized(){ Voice.Changed += Changed; _ = Tick(); }
-    private void Changed() => _ = InvokeAsync(StateHasChanged);
-    private async Task Tick(){ try { while(!lifetime.IsCancellationRequested){await Task.Delay(1000,lifetime.Token);if(Voice.ConnectedAt is not null)await InvokeAsync(StateHasChanged);} }catch(OperationCanceledException){} }
+    private void Changed() => _ = InvokeAsync(() => { if (!Voice.IsCalling) { outputOpen = false; outputs = null; outputError = null; } StateHasChanged(); });
+    private async Task Tick(){ try { while(!lifetime.IsCancellationRequested){await Task.Delay(1000,lifetime.Token);if(Voice.ConnectedAt is not null)await InvokeAsync(async () => { if (outputOpen && !outputBusy) await RefreshOutputsAsync(); StateHasChanged(); });} }catch(OperationCanceledException){} }
+    private async Task ToggleOutputAsync() { outputOpen = !outputOpen; if (outputOpen) { outputError = null; await RefreshOutputsAsync(); } }
+    private async Task RefreshOutputsAsync()
+    {
+        try { outputs = await Voice.GetAudioOutputsAsync(); }
+        catch { outputError = "Audio devices could not be listed. Use your device’s audio controls."; }
+    }
+    private async Task ChangeOutputAsync(ChangeEventArgs args)
+    {
+        outputBusy = true; outputError = null;
+        try { outputs = await Voice.SetAudioOutputAsync(args.Value?.ToString() ?? ""); }
+        catch { outputError = "Could not switch audio. Check that the device is connected and try again."; await RefreshOutputsAsync(); }
+        finally { outputBusy = false; }
+    }
     protected override async Task OnAfterRenderAsync(bool firstRender)
     { if(Voice.IsCalling && !Voice.Minimized && !shown){shown=true;await JS.InvokeVoidAsync("yap.openCall",dialog);} if(!Voice.IsCalling || Voice.Minimized)shown=false; }
     private void Minimize(){Voice.Minimized=true;shown=false;}

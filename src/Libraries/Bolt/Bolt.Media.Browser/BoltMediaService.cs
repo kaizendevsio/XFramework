@@ -62,6 +62,8 @@ public sealed partial class BoltMediaService : IAsyncDisposable
 
     /// <summary>Run before creating or accepting an invitation; does not request microphone access.</summary>
     public Task<VoiceCapabilities> CheckVoiceCapabilitiesAsync() => _audio.CheckCapabilitiesAsync();
+    public Task<AudioOutputs> GetAudioOutputsAsync() => _audio.GetAudioOutputsAsync();
+    public Task<AudioOutputs> SetAudioOutputAsync(string deviceId) => _audio.SetAudioOutputAsync(deviceId);
 
     /// <summary>Invoke from Start/Accept before network requests to request the microphone
     /// and resume browser audio. Encoding waits until an answered call has a stream.</summary>

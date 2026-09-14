@@ -25,3 +25,16 @@
 }
 
 .call-participant small { opacity: .65; }
+.callrow2 { gap: clamp(16px, 6vw, 40px); }
+
+.call-audio-output {
+    width: min(100%, 380px);
+    margin: 0 auto 20px;
+    padding: 16px;
+    border-radius: 18px;
+    background: var(--surface2);
+    text-align: left;
+}
+.call-audio-output label { display: grid; gap: 8px; }
+.call-audio-output select { width: 100%; min-height: 44px; }
+.call-audio-output p { margin: 8px 0 0; font-size: 13px; line-height: 1.5; }

@@ -42,6 +42,55 @@ function fixture() {
     return { p: sandbox.pipeline, sandbox, stats, stream };
 }
 async function initialized(f) { await f.p.initEncoder(48000, 1, 128); await f.p.initDecoder(48000, 1); }
+
+test('output selection switches the playback context without restarting capture and falls back when unplugged', async () => {
+    const f = fixture(); await initialized(f);
+    const context = f.p.audioContext;
+    let devices = [
+        { kind: 'audiooutput', deviceId: 'default', label: 'Default' },
+        { kind: 'audiooutput', deviceId: 'speaker', label: 'Speaker' },
+        { kind: 'audiooutput', deviceId: 'bluetooth', label: 'Bluetooth headset' },
+        { kind: 'audioinput', deviceId: 'mic', label: 'Microphone' }
+    ];
+    f.sandbox.navigator.mediaDevices.enumerateDevices = async () => devices;
+    context.sinkId = '';
+    context.setSinkId = async id => { context.sinkId = id; };
+    await f.p.startCapture({ invokeMethodAsync: async () => {} });
+    const outputs = await f.p.getAudioOutputs();
+    assert.equal(outputs.supported, true);
+    assert.equal(outputs.devices.length, 3);
+    assert.equal((await f.p.setAudioOutput('bluetooth')).deviceId, 'bluetooth');
+    assert.equal(f.p.audioContext, context);
+    assert.equal(f.p.captureRunning, true);
+    assert.equal(f.stats.stopped, 0);
+    devices = devices.filter(d => d.deviceId !== 'bluetooth');
+    f.p.outputChanged(); await new Promise(r => setImmediate(r));
+    assert.equal(context.sinkId, '');
+    assert.equal(f.p.captureRunning, true);
+    await f.p.dispose();
+});
+
+test('unsupported output routing reports system control without inventing devices', async () => {
+    const f = fixture(); await initialized(f);
+    const outputs = await f.p.getAudioOutputs();
+    assert.equal(outputs.supported, false);
+    assert.equal(outputs.devices.length, 0);
+    await assert.rejects(f.p.setAudioOutput('earpiece'), /controlled by this device/);
+    assert.equal(f.p.audioContext.state, 'running');
+});
+
+test('denied audio output leaves the existing route and microphone working', async () => {
+    const f = fixture(); await initialized(f);
+    f.sandbox.navigator.mediaDevices.enumerateDevices = async () => [];
+    f.p.audioContext.sinkId = '';
+    f.p.audioContext.setSinkId = async () => { throw new Error('NotAllowedError'); };
+    await f.p.startCapture({ invokeMethodAsync: async () => {} });
+    await assert.rejects(f.p.setAudioOutput('speaker'), /NotAllowedError/);
+    assert.equal(f.p.audioContext.sinkId, '');
+    assert.equal(f.p.captureRunning, true);
+    await f.p.dispose();
+});
+
 function audio(stats) { return { numberOfFrames: 960, numberOfChannels: 1, sampleRate: 48000, copyTo() {}, close() { stats.closedFrames++; } }; }
 
 test('capture uses AudioWorklet without audio TrackProcessor', async () => {

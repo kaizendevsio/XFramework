@@ -1,7 +1,6 @@
 @implements IDisposable
 @inject ChatState State
-@* Connectivity, session and failure notices all surface here. The app never keeps a
-   permanent status bar: a notice appears when the state changes and leaves again. *@
+@* One dismissible connection notice per outage; retries do not create new notices. *@
 <div class="toast-host" aria-live="polite">
     @ChildContent
     @foreach (var notice in notices)
@@ -31,11 +30,8 @@
 
     protected override void OnInitialized()
     {
-        // Capture the state as it stands so the first real change is a change, not a baseline.
-        lastOnline = State.Online;
-        lastNeedsLogin = State.NeedsLogin;
-        lastError = State.Error;
         State.Changed += Changed;
+        Sync();
     }
 
     private void Changed() => _ = InvokeAsync(() =>
@@ -54,8 +50,8 @@
                 Show(new Notice(Guid.NewGuid(), Connectivity, "warn", "lock",
                     "Your session ended. Sign in to sync.", "Sign in", "/login"), null);
             else if (!State.Online)
-                Show(new Notice(Guid.NewGuid(), Connectivity, "warn", "wifi",
-                    "Offline. Messages are saved on this device.", "Retry", null), TimeSpan.FromSeconds(8));
+                Show(new Notice(Guid.NewGuid(), Connectivity, "info", "wifi",
+                    "Waiting for a connection. Saved chats are available.", "Retry", null), null);
             else if (State.PendingCount > 0)
                 Show(new Notice(Guid.NewGuid(), Connectivity, "ok", "wifi",
                     "Back online. Syncing your messages.", null, null), TimeSpan.FromSeconds(4));

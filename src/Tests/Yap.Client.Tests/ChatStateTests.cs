@@ -13,6 +13,115 @@ namespace Yap.Client.Tests;
 public sealed class ChatStateTests
 {
     [Test]
+    public async Task OpenConversation_ShowsCachedMessagesBeforeSlowBackgroundSyncFinishes()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Reader");
+        var scope = OfflineStore.Scope(user);
+        var chat = new Conversation { Id = Guid.NewGuid(), Name = "Saved conversation" };
+        var message = new ChatMessage { Id = Guid.NewGuid(), ThreadId = chat.Id, Text = "Saved message" };
+        await fixture.Store.SetSettingAsync("user", JsonSerializer.Serialize(user));
+        await fixture.Store.SaveConversationsAsync(scope, [chat]);
+        await fixture.Store.SaveMessagesAsync(scope, [message]);
+        var started = new TaskCompletionSource(); var release = new TaskCompletionSource();
+        var js = new Mock<IJSRuntime>();
+        js.Setup(x => x.InvokeAsync<bool>("yap.device.online", It.IsAny<object?[]?>())).ReturnsAsync(true);
+        using var http = new HttpClient(new Handler(async _ => { started.TrySetResult(); await release.Task; throw new HttpRequestException("Connection lost"); })) { BaseAddress = new("https://yap.test/") };
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), js.Object);
+        await state.InitializeAsync(); await started.Task;
+        var displayed = new TaskCompletionSource();
+        state.Changed += () => { if (state.Selected?.Id == chat.Id) displayed.TrySetResult(); };
+        var selection = state.SelectAsync(chat.Id);
+        try
+        {
+            await displayed.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            Assert.That(release.Task.IsCompleted, Is.False);
+            Assert.That(state.Selected!.Name, Is.EqualTo(chat.Name));
+            Assert.That(state.Selected.Messages.Single().Text, Is.EqualTo(message.Text));
+        }
+        finally { release.TrySetResult(); await selection; }
+    }
+
+    [TestCase("transport")]
+    [TestCase("timeout")]
+    [TestCase("unavailable")]
+    public async Task OfflineRetries_StayQuietDespiteBrowserOnlineHints_AndReconnectSendsQueue(string failure)
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Reader");
+        var scope = OfflineStore.Scope(user); var thread = Guid.NewGuid();
+        await fixture.Store.SetSettingAsync("user", JsonSerializer.Serialize(user));
+        var browserOnline = false; var reachable = false; var sends = 0;
+        var js = new Mock<IJSRuntime>();
+        js.Setup(x => x.InvokeAsync<bool>("yap.device.online", It.IsAny<object?[]?>())).Returns(() => ValueTask.FromResult(browserOnline));
+        using var http = new HttpClient(new Handler(async request =>
+        {
+            if (!reachable)
+            {
+                if (failure == "transport") throw new HttpRequestException("Network unavailable");
+                if (failure == "timeout") throw new TaskCanceledException("Timed out");
+                return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+            }
+            var path = request.RequestUri!.AbsolutePath;
+            if (path == "/api/session") return Json(new SessionResponse(user, "token"));
+            if (path.EndsWith("initialize")) return Json(new ChatDefaults(Guid.NewGuid(), []));
+            if (path.EndsWith("messages"))
+            {
+                sends++;
+                return Json(new MessageReceipt((await request.Content!.ReadFromJsonAsync<SendMessage>())!.Id));
+            }
+            return Json(new ChatPage<Conversation>([], 0));
+        })) { BaseAddress = new("https://yap.test/") };
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), js.Object);
+        await state.InitializeAsync();
+        await state.SendAsync(thread, "Queued while offline", null, "main");
+        await fixture.Store.SaveDraftAsync(scope, "main", "Still writing");
+        var observed = new List<(bool Online, string? Error)>();
+        state.Changed += () => observed.Add((state.Online, state.Error));
+        browserOnline = true;
+        for (var i = 0; i < 3; i++)
+        {
+            await state.ConnectivityChanged(true);
+            await state.SynchronizeAsync();
+            state.Report(new HttpRequestException("Attachment fetch failed"));
+        }
+        Assert.That(observed, Has.All.EqualTo((false, (string?)null)), "No false reconnects or repeated error notifications.");
+        Assert.That(state.User, Is.EqualTo(user));
+        Assert.That(state.NeedsLogin, Is.False);
+        Assert.That(await fixture.Store.DraftAsync(scope, "main"), Is.EqualTo("Still writing"));
+        Assert.That(await fixture.Store.PendingAsync(scope), Has.Count.EqualTo(1));
+        reachable = true;
+        await state.ConnectivityChanged(true);
+        await state.SynchronizeAsync();
+        Assert.That(state.Online, Is.True);
+        Assert.That(state.Error, Is.Null);
+        Assert.That(sends, Is.EqualTo(1));
+        Assert.That(await fixture.Store.PendingAsync(scope), Is.Empty);
+        state.Report(new InvalidOperationException("Storage failed"));
+        Assert.That(state.Error, Is.Not.Null, "Real failures must remain visible.");
+    }
+
+    [Test]
+    public async Task OfflineEncryptedAttachments_UseVerifiedCacheWithoutRequestingSenderKeys()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Reader");
+        await fixture.Store.SetSettingAsync("user", JsonSerializer.Serialize(user));
+        var cached = true;
+        var js = new Mock<IJSRuntime>();
+        js.Setup(x => x.InvokeAsync<bool>("yap.device.hasVerifiedFile", It.IsAny<object?[]?>())).Returns(() => ValueTask.FromResult(cached));
+        using var http = new HttpClient(new Handler(_ => throw new AssertionException("Offline attachments must not make requests"))) { BaseAddress = new("https://yap.test/") };
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), js.Object);
+        await state.InitializeAsync();
+        var message = new ChatMessage { Id = Guid.NewGuid(), ThreadId = Guid.NewGuid(), SenderId = user.CredentialId, EncryptedEnvelope = "encrypted" };
+        var file = new ChatAttachment(Guid.NewGuid(), "photo.jpg", "image/jpeg", 100);
+        Assert.That(await state.PrepareEncryptedFileAsync(message, file), Does.EndWith(".verified"));
+        cached = false;
+        Assert.ThrowsAsync<HttpRequestException>(() => state.PrepareEncryptedFileAsync(message, file));
+        Assert.That(state.Error, Is.Null);
+    }
+
+    [Test]
     public async Task InboxPreview_DecryptsWithoutOpeningHistory_ReusesCacheAndRefreshesEditedCiphertext()
     {
         await using var fixture = await StoreFixture.CreateAsync();

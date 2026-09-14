@@ -78,8 +78,12 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         Notify();
     }
     public void DismissError() { Error = null; Notify(); }
+    public static bool IsConnectionFailure(Exception ex) => ex is HttpRequestException or TaskCanceledException
+        || ex is ChatApiException { Status: 408 or 429 or >= 500 };
+    private void SetOffline() { Online = false; typing.Clear(); }
     public void Report(Exception ex)
     {
+        if (IsConnectionFailure(ex)) { SetOffline(); Notify(); return; }
         Console.Error.WriteLine($"Yap action failed: {ex}");
         _ = RecordErrorAsync(ex);
         Error = ex is ChatApiException ? ex.Message : "Could not finish this action. Check your connection and available device storage, then try again.";
@@ -127,7 +131,11 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     }
 
     [JSInvokable] public async Task ConnectivityChanged(bool online)
-    { Online = online; if (!online) typing.Clear(); Notify(); if (online) await SynchronizeAsync(); }
+    {
+        // Browser connectivity is only a hint; the server must answer before we reconnect.
+        if (online) await SynchronizeAsync();
+        else { SetOffline(); Notify(); }
+    }
     [JSInvokable] public Task RefreshHint()
     {
         refreshPending = true;
@@ -202,7 +210,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
 
     public async Task SynchronizeAsync()
     {
-        if (!await js.InvokeAsync<bool>("yap.device.online")) { Online = false; Notify(); return; }
+        if (!await js.InvokeAsync<bool>("yap.device.online")) { SetOffline(); Notify(); return; }
         await sync.WaitAsync(lifetime.Token);
         Busy = true;
         try
@@ -250,8 +258,8 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             await WatchEventsAsync();
         }
         catch (ChatApiException ex) { await HandleApiFailureAsync(ex); }
-        catch (HttpRequestException) { Online = false; Error = "Cannot reach chat. Your messages are saved and will retry."; }
-        catch (TaskCanceledException) when (!lifetime.IsCancellationRequested) { Online = false; Error = "Chat took too long to respond. Saved messages will retry."; }
+        catch (HttpRequestException) { SetOffline(); }
+        catch (TaskCanceledException) when (!lifetime.IsCancellationRequested) { SetOffline(); }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex) { Report(ex); }
         finally
@@ -265,30 +273,40 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     {
         viewedConversation = id;
         var version = ++selectionVersion;
-        await sync.WaitAsync();
+        var scope = Scope;
         try
         {
-            if (version != selectionVersion) return;
+            // Local storage has its own gate. Never wait for a slow network sync
+            // before showing the conversation and its bounded cached history.
+            var messages = await store.MessagesAsync(scope, id, limit: HistoryWindowSize);
+            var count = await store.MessageCountAsync(scope, id);
+            if (version != selectionVersion || Scope != scope) return;
             pages = 1; historyOffset = 0; replyParent = null;
             foreach (var old in Conversations) old.Messages.Clear();
             typing.Clear();
             acknowledged.Clear();
             var conversation = Conversations.FirstOrDefault(x => x.Id == id) ?? new Conversation { Id = id };
-            conversation.Messages = await store.MessagesAsync(Scope, id, limit: HistoryWindowSize);
-            var count = await store.MessageCountAsync(Scope, id);
-            if (version != selectionVersion) return;
+            conversation.Messages = messages;
             Selected = conversation; cachedCount = count;
             ComposeReplies(conversation.Messages);
             Notify();
-            if (Online && !NeedsLogin) await RefreshSelectedAsync(id);
-            if (Online && !NeedsLogin) await WatchEventsAsync();
+            await sync.WaitAsync(lifetime.Token);
+            try
+            {
+                if (version != selectionVersion || Scope != scope) return;
+                if (Online && !NeedsLogin) await RefreshSelectedAsync(id);
+                if (Online && !NeedsLogin) await WatchEventsAsync();
+            }
+            finally { sync.Release(); }
         }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex) { Report(ex); }
-        finally { sync.Release(); Notify(); }
+        finally { Notify(); }
     }
 
     private async Task HandleApiFailureAsync(ChatApiException error)
     {
+        if (IsConnectionFailure(error)) { SetOffline(); return; }
         Error = error.Message;
         if (error.Status != 401) return;
         try
@@ -297,12 +315,12 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             var session = await api.GetAsync<SessionResponse>("api/session", lifetime.Token);
             NeedsLogin = session.User is null || User is null || OfflineStore.Scope(session.User) != Scope;
             api.Token = session.AntiforgeryToken;
-            if (!NeedsLogin) Error = "Chat connection interrupted. Your sign-in is saved; reconnecting will retry.";
+            if (!NeedsLogin) { Error = null; SetOffline(); }
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or ChatApiException)
         {
             // If session validation itself is unavailable, retain the last known state.
-            Error = "Cannot check your connection yet. Your saved sign-in has been kept.";
+            Error = null; SetOffline();
         }
     }
 
@@ -764,7 +782,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     public async Task RetryAsync()
     {
         foreach (var item in await store.PendingAsync(Scope)) { item.Paused = false; item.Error = null; await store.SaveQueueAsync(item); }
-        Online = await js.InvokeAsync<bool>("yap.device.online"); await SynchronizeAsync();
+        await SynchronizeAsync();
     }
 
     public async Task ActionAsync(ChatMessage message, string action, string? text = null, string? emoji = null)
@@ -860,6 +878,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             EncryptionSenderDeviceId = file.EncryptionSenderDeviceId ?? message.EncryptionSenderDeviceId,
             AcceptedSenderDirectoryRevision = file.SenderDirectoryRevision ?? message.AcceptedSenderDirectoryRevision }, "attachment");
         if (await js.InvokeAsync<bool>("yap.device.hasVerifiedFile", key, Scope, context)) return key;
+        if (!Online) throw new HttpRequestException("This attachment is not saved on this device yet.");
         var directory = await api.GetAsync<JsonElement>(ChatEncryption.SenderDirectoryPath(message.SenderId, file.EncryptionSenderDeviceId ?? message.EncryptionSenderDeviceId));
         await js.InvokeVoidAsync("yap.device.decryptFile", key,
             $"api/chat/conversations/{message.ThreadId}/messages/{message.Id}/attachments/{file.Id}?storageId=true", Scope,
