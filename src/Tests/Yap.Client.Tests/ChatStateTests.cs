@@ -12,6 +12,102 @@ namespace Yap.Client.Tests;
 
 public sealed class ChatStateTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task SendWithLiveSession_PostsDirectly_AndRevalidatesRejectedSession(bool reject)
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Sender");
+        var scope = OfflineStore.Scope(user);
+        await fixture.Store.SetSettingAsync("user", JsonSerializer.Serialize(user));
+        var online = false; var sessions = 0; var posted = new TaskCompletionSource();
+        var js = new Mock<IJSRuntime>();
+        js.Setup(x => x.InvokeAsync<bool>("yap.device.online", It.IsAny<object?[]?>())).Returns(() => ValueTask.FromResult(online));
+        using var http = new HttpClient(new Handler(request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path == "/api/session") return Task.FromResult(Json(new SessionResponse(++sessions > 1 && reject ? null : user, "token")));
+            if (path.EndsWith("initialize")) return Task.FromResult(Json(new ChatDefaults(Guid.NewGuid(), [])));
+            if (path.EndsWith("messages"))
+            {
+                Assert.That(request.Headers.GetValues("X-Yap-Account"), Is.EqualTo(new[] { scope }));
+                Assert.That(request.Headers.GetValues("RequestVerificationToken"), Is.EqualTo(new[] { "token" }));
+                posted.TrySetResult();
+                return Task.FromResult(new HttpResponseMessage(reject ? HttpStatusCode.Unauthorized : HttpStatusCode.ServiceUnavailable));
+            }
+            return Task.FromResult(Json(new ChatPage<Conversation>([], 0)));
+        })) { BaseAddress = new("https://yap.test/") };
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), js.Object);
+        await state.InitializeAsync(); online = true;
+        await state.SynchronizeAsync();
+        await state.SendAsync(Guid.NewGuid(), "Keep this queued on rejection", null, "main");
+        await posted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        for (var i = 0; i < 100 && !state.NeedsLogin && state.Online; i++) await Task.Delay(10);
+        Assert.That(sessions, Is.EqualTo(reject ? 2 : 1), "Only a rejected session needs another probe; ordinary sending bypasses full sync.");
+        Assert.That(state.NeedsLogin, Is.EqualTo(reject));
+        Assert.That(await fixture.Store.PendingAsync(scope), Has.Count.EqualTo(1));
+        if (!reject) Assert.That(state.Error, Is.Null, "Transient delivery failure is quiet and remains queued.");
+    }
+
+    [Test]
+    public async Task SendBurst_QueuesWithoutWaitingForNetwork_AndDrainsNewMessagesInTheSameSync()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Sender");
+        var scope = OfflineStore.Scope(user); var thread = Guid.NewGuid();
+        await fixture.Store.SetSettingAsync("user", JsonSerializer.Serialize(user));
+        var online = false; var sessions = 0;
+        var firstPost = new TaskCompletionSource(); var release = new TaskCompletionSource();
+        var posted = new List<string>(); var ids = new HashSet<Guid>();
+        var js = new Mock<IJSRuntime>();
+        js.Setup(x => x.InvokeAsync<bool>("yap.device.online", It.IsAny<object?[]?>())).Returns(() => ValueTask.FromResult(online));
+        using var http = new HttpClient(new Handler(async request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path == "/api/session") { sessions++; return Json(new SessionResponse(user, "token")); }
+            if (path.EndsWith("initialize")) return Json(new ChatDefaults(Guid.NewGuid(), []));
+            if (path.EndsWith("messages"))
+            {
+                var message = (await request.Content!.ReadFromJsonAsync<SendMessage>())!;
+                if (posted.Count == 0) { firstPost.TrySetResult(); await release.Task; }
+                posted.Add(message.Text); ids.Add(message.Id);
+                return Json(new MessageReceipt(message.Id));
+            }
+            return Json(new ChatPage<Conversation>([], 0));
+        })) { BaseAddress = new("https://yap.test/") };
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), js.Object);
+        await state.InitializeAsync(); online = true;
+        await state.SendAsync(thread, "Message 0", null, "main"); await firstPost.Task;
+        try
+        {
+            for (var i = 1; i < 12; i++) await state.SendAsync(thread, $"Message {i}", null, "main").WaitAsync(TimeSpan.FromSeconds(1));
+            Assert.That(await fixture.Store.PendingAsync(scope), Has.Count.EqualTo(12));
+            Assert.That(release.Task.IsCompleted, Is.False, "All local sends complete while the first network send is still stalled.");
+            Assert.That(sessions, Is.EqualTo(1));
+        }
+        finally { release.TrySetResult(); }
+        await state.SynchronizeAsync();
+        Assert.That(posted, Is.EqualTo(Enumerable.Range(0, 12).Select(i => $"Message {i}")));
+        Assert.That(ids, Has.Count.EqualTo(12));
+        Assert.That(sessions, Is.EqualTo(2), "One burst sync plus the explicit verification sync, not one full sync per send.");
+        Assert.That(await fixture.Store.PendingAsync(scope), Is.Empty);
+    }
+
+    [Test]
+    public async Task QueueingPreviousMessage_DoesNotEraseNewDraft()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Sender");
+        var scope = OfflineStore.Scope(user);
+        await fixture.Store.SetSettingAsync("user", JsonSerializer.Serialize(user));
+        await fixture.Store.SaveDraftAsync(scope, "main", "Next message already being typed");
+        using var http = new HttpClient(new Handler(_ => throw new AssertionException("Offline"))) { BaseAddress = new("https://yap.test/") };
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), Mock.Of<IJSRuntime>());
+        await state.InitializeAsync();
+        await state.SendAsync(Guid.NewGuid(), "Previous message", null, "main");
+        Assert.That(await fixture.Store.DraftAsync(scope, "main"), Is.EqualTo("Next message already being typed"));
+    }
+
     [Test]
     public async Task OpenConversation_ShowsCachedMessagesBeforeSlowBackgroundSyncFinishes()
     {

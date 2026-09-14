@@ -11,6 +11,9 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     public ChatEncryption Encryption { get; } = new(api, js);
     public bool EncryptionEnabled { get; private set; }
     private readonly SemaphoreSlim sync = new(1, 1);
+    private readonly SemaphoreSlim localChanges = new(1, 1);
+    private Task? sending;
+    private bool sendRequested;
     private readonly SemaphoreSlim typingPublish = new(1, 1);
     private readonly SemaphoreSlim readReceipts = new(1, 1);
     private readonly HashSet<Guid> activeActions = [];
@@ -565,131 +568,180 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
 
     public async Task SendAsync(Guid thread, string text, Guid? parent, string draftKey, PickedFile? file = null, bool threadReply = false)
     {
-        await sync.WaitAsync();
+        await localChanges.WaitAsync(lifetime.Token);
         try
         {
-        if (User is null) throw new InvalidOperationException("Sign in before sending a message.");
-        if (EncryptionEnabled && !Encryption.Status.Approved) throw new InvalidOperationException("Unlock this device in Settings before sending encrypted messages.");
-        var id = Guid.NewGuid();
-        var content = string.IsNullOrWhiteSpace(text) ? file?.Name ?? "" : text.Trim();
-        if (content.Length is 0 or > 4000) throw new InvalidOperationException("Write a message up to 4,000 characters.");
-        var message = new ChatMessage { Id = id, ThreadId = thread, SenderId = User.CredentialId,
-            Text = content, CreatedAt = DateTime.UtcNow, Mine = true, ParentId = parent, Delivery = "Queued",
-            LocalFileKey = file?.Key, HasAttachments = file is not null, IsThreadReply = threadReply,
-            Attachments = file is null ? [] : [new ChatAttachment(id, file.Name, file.ContentType, file.Size)] };
-        await store.QueueAsync(new QueuedMessage { Scope = Scope, Id = id, ThreadId = thread, Text = content,
-            ParentId = parent, CreatedTicks = message.CreatedAt.Ticks, FileKey = file?.Key, FileName = file?.Name,
-            ContentType = file?.ContentType, FileSize = file?.Size ?? 0, UploadId = file?.UploadId }, message, draftKey);
-        if (Selected?.Id == thread && historyOffset == 0) { Selected.Messages.Add(message); if (Selected.Messages.Count > HistoryWindowSize) Selected.Messages.RemoveAt(0); ComposeReplies(Selected.Messages); }
-        PendingCount++; Notify();
+            if (User is null) throw new InvalidOperationException("Sign in before sending a message.");
+            if (Encryption.Status.ResetHistoryPending) throw new InvalidOperationException("Wait for encryption setup to finish before sending.");
+            if (EncryptionEnabled && !Encryption.Status.Approved) throw new InvalidOperationException("Unlock this device in Settings before sending encrypted messages.");
+            var id = Guid.NewGuid();
+            var content = string.IsNullOrWhiteSpace(text) ? file?.Name ?? "" : text.Trim();
+            if (content.Length is 0 or > 4000) throw new InvalidOperationException("Write a message up to 4,000 characters.");
+            var message = new ChatMessage { Id = id, ThreadId = thread, SenderId = User.CredentialId,
+                Text = content, CreatedAt = DateTime.UtcNow, Mine = true, ParentId = parent, Delivery = "Queued",
+                LocalFileKey = file?.Key, HasAttachments = file is not null, IsThreadReply = threadReply,
+                Attachments = file is null ? [] : [new ChatAttachment(id, file.Name, file.ContentType, file.Size)] };
+            await store.QueueAsync(new QueuedMessage { Scope = Scope, Id = id, ThreadId = thread, Text = content,
+                ParentId = parent, CreatedTicks = message.CreatedAt.Ticks, FileKey = file?.Key, FileName = file?.Name,
+                ContentType = file?.ContentType, FileSize = file?.Size ?? 0, UploadId = file?.UploadId }, message, draftKey, expectedDraft: text);
+            if (Selected?.Id == thread && historyOffset == 0) { Selected.Messages.Add(message); if (Selected.Messages.Count > HistoryWindowSize) Selected.Messages.RemoveAt(0); ComposeReplies(Selected.Messages); }
+            PendingCount++; Notify();
         }
-        finally { sync.Release(); }
-        _ = SynchronizeAsync();
+        finally { localChanges.Release(); }
+        sendRequested = true;
+        if (sending is not { IsCompleted: false }) sending = SynchronizeSendsAsync();
+    }
+
+    private async Task SynchronizeSendsAsync()
+    {
+        try
+        {
+            do
+            {
+                sendRequested = false;
+                await FlushSendsAsync();
+            } while (sendRequested && PendingCount > 0 && Online && !NeedsLogin);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) { Report(ex); }
+    }
+
+    private async Task FlushSendsAsync()
+    {
+        // A live session already has its account binding, CSRF token and encryption
+        // identity. Sending only needs to drain the outbox; normal sync/SSE updates
+        // inbox summaries and receipts independently.
+        var requiresSync = false;
+        await sync.WaitAsync(lifetime.Token);
+        try
+        {
+            requiresSync = !Online || NeedsLogin || User is null || api.Account != Scope
+                || string.IsNullOrEmpty(api.Token) || Defaults is null
+                || EncryptionEnabled && !Encryption.Status.Approved;
+            if (!requiresSync) await FlushAsync();
+        }
+        catch (ChatApiException ex) { await HandleApiFailureAsync(ex); }
+        catch (Exception ex) when (IsConnectionFailure(ex)) { SetOffline(); }
+        finally { sync.Release(); Notify(); }
+        if (requiresSync) await SynchronizeAsync();
     }
 
     private async Task FlushAsync(bool allowRosterRetry = true)
     {
         var rosterChanged = false;
-        foreach (var item in await store.PendingAsync(Scope))
+        var attempted = new HashSet<Guid>();
+        var stop = false;
+        while (!stop)
         {
-            // Older clients paused an attachment if its successful response was lost.
-            // The same stored-file link can now be retried idempotently.
-            if (item.Paused && item.MessageConfirmed && item.StorageId.HasValue &&
-                item.Error == "This change conflicts with a message already saved. Review it before retrying.")
-            { item.Paused = false; item.Error = null; await store.SaveQueueAsync(item); }
-                if (item.Paused) continue;
-            try
+            var batch = (await store.PendingAsync(Scope)).Where(item => !attempted.Contains(item.Id)).ToList();
+            if (batch.Count == 0) break;
+            foreach (var item in batch)
             {
-                if (!item.MessageConfirmed)
+                attempted.Add(item.Id);
+                // Older clients paused an attachment if its successful response was lost.
+                // The same stored-file link can now be retried idempotently.
+                if (item.Paused && item.MessageConfirmed && item.StorageId.HasValue &&
+                    item.Error == "This change conflicts with a message already saved. Review it before retrying.")
+                { item.Paused = false; item.Error = null; await store.SaveQueueAsync(item); }
+                if (item.Paused) continue;
+                try
                 {
-                    var message = await store.MessageAsync(Scope, item.Id) ?? throw new InvalidOperationException("Saved message is unavailable.");
-                    List<Guid>? recipients = null;
-                    if (EncryptionEnabled)
+                    if (!item.MessageConfirmed)
                     {
-                        if (!Encryption.Status.Approved) break;
-                        var directories = await Encryption.RecipientsAsync(User!, item.ThreadId, allowPending: true);
-                        recipients = directories.Select(x => x.GetProperty("credentialId").GetGuid()).ToList();
-                        if (message.EncryptedEnvelope is null)
+                        var message = await store.MessageAsync(Scope, item.Id) ?? throw new InvalidOperationException("Saved message is unavailable.");
+                        List<Guid>? recipients = null;
+                        if (EncryptionEnabled)
                         {
-                            if (message.AcceptedSenderDirectoryRevision.HasValue && (message.AcceptedSenderDirectoryRevision != Encryption.Status.DirectoryRevision
-                                || !message.RecipientDirectoryRevisions.OrderBy(x => x.Key).SequenceEqual(directories
-                                    .Select(x => new KeyValuePair<Guid, long>(x.GetProperty("credentialId").GetGuid(), x.GetProperty("revision").GetInt64())).OrderBy(x => x.Key))))
+                            if (!Encryption.Status.Approved) { stop = true; break; }
+                            var directories = await Encryption.RecipientsAsync(User!, item.ThreadId, allowPending: true);
+                            recipients = directories.Select(x => x.GetProperty("credentialId").GetGuid()).ToList();
+                            if (message.EncryptedEnvelope is null)
                             {
-                                // No envelope has been posted yet. Re-encrypt the file if its original
-                                // signed device revision changed during an interrupted upload.
-                                item.StorageId = null; await store.SaveQueueAsync(item);
+                                if (message.AcceptedSenderDirectoryRevision.HasValue && (message.AcceptedSenderDirectoryRevision != Encryption.Status.DirectoryRevision
+                                    || !message.RecipientDirectoryRevisions.OrderBy(x => x.Key).SequenceEqual(directories
+                                        .Select(x => new KeyValuePair<Guid, long>(x.GetProperty("credentialId").GetGuid(), x.GetProperty("revision").GetInt64())).OrderBy(x => x.Key))))
+                                {
+                                    // No envelope has been posted yet. Re-encrypt the file if its original
+                                    // signed device revision changed during an interrupted upload.
+                                    item.StorageId = null; await store.SaveQueueAsync(item);
+                                }
+                                message.EncryptionSenderDeviceId = Encryption.Status.DeviceId;
+                                message.AcceptedSenderDirectoryRevision = Encryption.Status.DirectoryRevision;
+                                message.RecipientDirectoryRevisions = directories.ToDictionary(x => x.GetProperty("credentialId").GetGuid(), x => x.GetProperty("revision").GetInt64());
+                                await store.SaveMessagesAsync(Scope, [message]);
                             }
-                            message.EncryptionSenderDeviceId = Encryption.Status.DeviceId;
-                            message.AcceptedSenderDirectoryRevision = Encryption.Status.DirectoryRevision;
-                            message.RecipientDirectoryRevisions = directories.ToDictionary(x => x.GetProperty("credentialId").GetGuid(), x => x.GetProperty("revision").GetInt64());
-                            await store.SaveMessagesAsync(Scope, [message]);
+                            if (item.FileKey is not null && item.StorageId is null)
+                                await UploadEncryptedAttachmentAsync(item, message, directories);
+                            if (item.StorageId is { } encryptedFile)
+                                message.Attachments = [new(encryptedFile, item.FileName!, item.ContentType!, item.FileSize,
+                                    message.Attachments.FirstOrDefault(x => x.Id == encryptedFile)?.EncryptionSenderDeviceId ?? message.EncryptionSenderDeviceId,
+                                    message.Attachments.FirstOrDefault(x => x.Id == encryptedFile)?.SenderDirectoryRevision ?? message.AcceptedSenderDirectoryRevision,
+                                    message.Attachments.FirstOrDefault(x => x.Id == encryptedFile)?.Key)];
+                            if (message.EncryptedEnvelope is null)
+                            {
+                                message.EncryptedEnvelope = await Encryption.EncryptAsync(User!, message, directories);
+                                // Persist randomized ciphertext before the request: response loss must not create a different retry.
+                                await store.SaveMessagesAsync(Scope, [message]);
+                            }
                         }
-                        if (item.FileKey is not null && item.StorageId is null)
-                            await UploadEncryptedAttachmentAsync(item, message, directories);
-                        if (item.StorageId is { } encryptedFile)
-                            message.Attachments = [new(encryptedFile, item.FileName!, item.ContentType!, item.FileSize,
-                                message.Attachments.FirstOrDefault(x => x.Id == encryptedFile)?.EncryptionSenderDeviceId ?? message.EncryptionSenderDeviceId,
-                                message.Attachments.FirstOrDefault(x => x.Id == encryptedFile)?.SenderDirectoryRevision ?? message.AcceptedSenderDirectoryRevision,
-                                message.Attachments.FirstOrDefault(x => x.Id == encryptedFile)?.Key)];
-                        if (message.EncryptedEnvelope is null)
+                        var receipt = await api.PostAsync<MessageReceipt>("api/chat/messages", new SendMessage(item.Id, item.ThreadId,
+                            message.EncryptedEnvelope is null ? item.Text : "Encrypted message", item.ParentId, message.IsThreadReply,
+                            message.EncryptedEnvelope, message.EncryptedEnvelope is null ? recipients : message.RecipientDirectoryRevisions.Keys.ToList(), message.EncryptionSenderDeviceId, message.AcceptedSenderDirectoryRevision, message.RecipientDirectoryRevisions));
+                        if (receipt?.MessageId != item.Id) throw new InvalidOperationException("Message receipt did not match.");
+                        item.MessageConfirmed = true; await store.SaveQueueAsync(item);
+                    }
+                    if (item.FileKey is not null && item.StorageId is null)
+                    {
+                        if (item.UploadId is { } session)
                         {
-                            message.EncryptedEnvelope = await Encryption.EncryptAsync(User!, message, directories);
-                            // Persist randomized ciphertext before the request: response loss must not create a different retry.
-                            await store.SaveMessagesAsync(Scope, [message]);
+                            // A streamed attachment already has every part in the bucket; only sealing remains.
+                            var stored = await api.PostAsync<StoredFile>($"api/chat/uploads/session/{session}/complete");
+                            item.StorageId = stored!.Id;
                         }
+                        else
+                        {
+                            var upload = await js.InvokeAsync<UploadReceipt>("yap.device.upload", item.FileKey, item.FileName,
+                                item.ThreadId, api.Token, Scope, item.ContentType);
+                            if (upload.Status is < 200 or >= 300) throw new ChatApiException(upload.Status);
+                            item.StorageId = upload.Id;
+                        }
+                        await store.SaveQueueAsync(item);
                     }
-                    var receipt = await api.PostAsync<MessageReceipt>("api/chat/messages", new SendMessage(item.Id, item.ThreadId,
-                        message.EncryptedEnvelope is null ? item.Text : "Encrypted message", item.ParentId, message.IsThreadReply,
-                        message.EncryptedEnvelope, message.EncryptedEnvelope is null ? recipients : message.RecipientDirectoryRevisions.Keys.ToList(), message.EncryptionSenderDeviceId, message.AcceptedSenderDirectoryRevision, message.RecipientDirectoryRevisions));
-                    if (receipt?.MessageId != item.Id) throw new InvalidOperationException("Message receipt did not match.");
-                    item.MessageConfirmed = true; await store.SaveQueueAsync(item);
+                    if (item.StorageId is { } storage)
+                        await api.PostAsync("api/chat/attachments", new AttachMessageFile(item.ThreadId, item.Id, storage));
+                    await store.CompleteQueueAsync(item);
+                    if (Selected?.Messages.FirstOrDefault(message => message.Id == item.Id) is { } visible) visible.Delivery = "Sent";
+                    PendingCount = Math.Max(0, PendingCount - 1);
+                    Notify();
+                    if (item.FileKey is not null) await js.InvokeVoidAsync("yap.device.removeFile", item.FileKey);
                 }
-                if (item.FileKey is not null && item.StorageId is null)
+                catch (ChatApiException ex) when (ex.Status == 428 && !item.MessageConfirmed)
                 {
-                    if (item.UploadId is { } session)
-                    {
-                        // A streamed attachment already has every part in the bucket; only sealing remains.
-                        var stored = await api.PostAsync<StoredFile>($"api/chat/uploads/session/{session}/complete");
-                        item.StorageId = stored!.Id;
-                    }
-                    else
-                    {
-                        var upload = await js.InvokeAsync<UploadReceipt>("yap.device.upload", item.FileKey, item.FileName,
-                            item.ThreadId, api.Token, Scope, item.ContentType);
-                        if (upload.Status is < 200 or >= 300) throw new ChatApiException(upload.Status);
-                        item.StorageId = upload.Id;
-                    }
+                    // A recipient who has not opened the encrypted app yet has no public keys.
+                    // Keep retrying this conversation without blocking the rest of the outbox.
+                    item.Error = "Waiting for encrypted setup";
                     await store.SaveQueueAsync(item);
                 }
-                if (item.StorageId is { } storage)
-                    await api.PostAsync("api/chat/attachments", new AttachMessageFile(item.ThreadId, item.Id, storage));
-                await store.CompleteQueueAsync(item);
-                if (item.FileKey is not null) await js.InvokeVoidAsync("yap.device.removeFile", item.FileKey);
-            }
-            catch (ChatApiException ex) when (ex.Status == 428 && !item.MessageConfirmed)
-            {
-                // A recipient who has not opened the encrypted app yet has no public keys.
-                // Keep retrying this conversation without blocking the rest of the outbox.
-                item.Error = "Waiting for encrypted setup";
-                await store.SaveQueueAsync(item);
-            }
-            catch (ChatApiException ex) when (ex.Status == 412 && !item.MessageConfirmed)
-            {
-                // The server returns 412 only after finding no previously accepted message ID.
-                // Refresh the roster and retry once immediately, without duplicating a send.
-                var pending = await store.MessageAsync(Scope, item.Id);
-                if (pending is not null) { pending.EncryptedEnvelope = null; await store.SaveMessagesAsync(Scope, [pending]); }
-                rosterChanged = true;
-            }
-            catch (ChatApiException ex) when (ex.Status is >= 400 and < 500 && ex.Status is not (401 or 408 or 428 or 429))
-            { item.Paused = true; item.Error = ex.Message; await store.SaveQueueAsync(item); Error = ex.Message; }
-            catch (Exception ex) when (Transient(ex))
-            {
-                // The message stays queued and its own bubble already says so. A backend
-                // blip that the next sync clears is not worth interrupting the reader,
-                // and the rest of the queue is behind this one anyway.
-                Console.Error.WriteLine($"Yap send will retry: {ex.Message}");
-                break;
+                catch (ChatApiException ex) when (ex.Status == 412 && !item.MessageConfirmed)
+                {
+                    // The server returns 412 only after finding no previously accepted message ID.
+                    // Refresh the roster and retry once immediately, without duplicating a send.
+                    var pending = await store.MessageAsync(Scope, item.Id);
+                    if (pending is not null) { pending.EncryptedEnvelope = null; await store.SaveMessagesAsync(Scope, [pending]); }
+                    rosterChanged = true;
+                }
+                catch (ChatApiException ex) when (ex.Status is >= 400 and < 500 && ex.Status is not (401 or 408 or 428 or 429))
+                { item.Paused = true; item.Error = ex.Message; await store.SaveQueueAsync(item); Error = ex.Message; }
+                catch (Exception ex) when (Transient(ex))
+                {
+                    // The message stays queued and its own bubble already says so. A backend
+                    // blip that the next sync clears is not worth interrupting the reader,
+                    // and the rest of the queue is behind this one anyway.
+                    Console.Error.WriteLine($"Yap send will retry: {ex.Message}");
+                    if (ex is HttpRequestException or TaskCanceledException) SetOffline();
+                    stop = true;
+                    break;
+                }
             }
         }
         if (rosterChanged && allowRosterRetry) await FlushAsync(allowRosterRetry: false);
@@ -889,6 +941,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     public async Task LogoutAsync()
     {
         await sync.WaitAsync();
+        await localChanges.WaitAsync();
         try
         {
             Encryption.Reset(); EncryptionEnabled = false;
@@ -900,12 +953,12 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             await js.InvokeVoidAsync("yap.device.events", "");
             await js.InvokeVoidAsync("yap.device.clearFiles");
         }
-        finally { sync.Release(); Notify(); }
+        finally { localChanges.Release(); sync.Release(); Notify(); }
         await SynchronizeAsync();
     }
 
     public async ValueTask DisposeAsync()
-    { lifetime.Cancel(); if (polling is not null) await polling; reference?.Dispose(); lifetime.Dispose(); }
+    { lifetime.Cancel(); if (polling is not null) await polling; if (sending is not null) await sending; reference?.Dispose(); lifetime.Dispose(); }
     public sealed record PickedFile(string Key, string Name, string ContentType, long Size, bool Staged = true, Guid? UploadId = null);
     private sealed record UploadReceipt(int Status, Guid Id, EncryptedAttachmentKey? Key = null);
     private sealed record CreatedConversation(Guid Id);
