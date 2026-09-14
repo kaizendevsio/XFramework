@@ -146,9 +146,9 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js)
     {
         var operation = Begin(user);
         var encrypted = messages.Where(x => x.EncryptedEnvelope is not null).ToList();
+        var directories = new Dictionary<Guid, JsonElement>();
         foreach (var group in encrypted.GroupBy(x => x.ThreadId))
         {
-            var directories = new Dictionary<Guid, JsonElement>();
             foreach (var message in group)
             {
                 try
@@ -307,5 +307,5 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js)
         public long DirectoryRevision { get; set; }
         public bool CanApproveDevices { get; set; }
     }
-    private sealed record EncryptedMessageContent(string Text, List<ChatAttachment> Attachments);
+    internal sealed record EncryptedMessageContent(string Text, List<ChatAttachment> Attachments);
 }

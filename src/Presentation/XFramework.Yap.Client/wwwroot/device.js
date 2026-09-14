@@ -212,18 +212,27 @@
             if (await hasVerifiedFile(key, scope, context)) return;
             const operationKey = `${key}:${expected.context}`;
             if (encryptedDownloads.has(operationKey)) return encryptedDownloads.get(operationKey);
+            let phase = 'attachment-fetch', status;
             const operation = (async () => {
             if (!online) throw new Error('Connect to download this encrypted attachment.');
             const response = await fetch(path, { headers: { 'X-Yap-Account': scope }, cache: 'no-store' });
+            status = response.status;
             if (!response.ok || !response.body) throw new Error('Encrypted attachment unavailable.');
+            phase = 'attachment-store';
             const temporary = `${key}.${crypto.randomUUID()}.unverified`, dir = await directory();
             activeTemporaryFiles.add(temporary);
             await dir.removeEntry(`${key}.ready`).catch(error => { if (error.name !== 'NotFoundError') throw error; });
             const handle = await dir.getFileHandle(temporary, { create: true }), sink = await handle.createWritable();
             try {
+                phase = 'attachment-decrypt';
                 await yap.encryption.decryptStream(scope, context, response.body, senderDirectory, {
-                    write: chunk => sink.write(chunk),
+                    async write(chunk) {
+                        phase = 'attachment-store';
+                        await sink.write(chunk);
+                        phase = 'attachment-decrypt';
+                    },
                     async commit() {
+                        phase = 'attachment-commit';
                         await sink.close();
                         // OPFS streams copy without materializing the whole attachment in JS memory.
                         const final = await (await dir.getFileHandle(key, { create: true })).createWritable();
@@ -242,6 +251,10 @@
             })();
             encryptedDownloads.set(operationKey, operation);
             try { return await operation; }
+            catch (error) {
+                window.yap.diagnostics?.record('attachment.failed', { phase, status, type: error.name });
+                throw error;
+            }
             finally { encryptedDownloads.delete(operationKey); }
         },
         async openFile(key, name, path, scope, online) {

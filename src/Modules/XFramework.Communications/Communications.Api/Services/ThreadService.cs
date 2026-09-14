@@ -391,6 +391,11 @@ public sealed partial class ThreadService(
                 .GroupBy(m => m.MessageThreadId)
                 .ToDictionary(g => g.Key, g => g.First());
 
+            var senderIds = lastMessageMap.Values.Where(m => m.EncryptedEnvelope != null)
+                .Select(m => m.MessageThreadMemberId).Distinct().ToList();
+            var previewSenders = await dataContext.Query<MessageThreadMember>()
+                .Where(m => m.TenantId == caller.TenantId && senderIds.Contains(m.Id)).ToListAsync(ct);
+
             var unreadMap = await GetUnreadCountMapAsync(caller.TenantId, caller.CredentialId, threadIds, ct);
             var membershipMap = memberships
                 .GroupBy(m => m.MessageThreadId)
@@ -417,6 +422,16 @@ public sealed partial class ThreadService(
                         ? lastMsg.Text[..100] + "..."
                         : lastMsg?.Text,
                     LastMessageAt = lastMsg?.CreatedAt,
+                    EncryptedLastMessage = lastMsg?.EncryptedEnvelope is not null ? new ThreadMessageItemResponse
+                    {
+                        Id = lastMsg.Id, Text = "Encrypted message", CreatedAt = lastMsg.CreatedAt,
+                        SenderCredentialId = previewSenders.FirstOrDefault(m => m.Id == lastMsg.MessageThreadMemberId)?.CredentialId ?? Guid.Empty,
+                        ParentMessageId = lastMsg.ParentMessageId, IsThreadReply = lastMsg.IsThreadReply,
+                        EncryptedEnvelope = lastMsg.EncryptedEnvelope,
+                        AcceptedSenderDirectoryRevision = lastMsg.AcceptedSenderDirectoryRevision,
+                        EncryptionSenderDeviceId = lastMsg.EncryptionSenderDeviceId,
+                        EncryptionPending = membership is null || EncryptionPendingFor(lastMsg, membership.Id)
+                    } : null,
                     UnreadCount = unreadCount,
                     IsMuted = membership?.IsMuted == true,
                     IsArchived = membership?.IsArchived == true,

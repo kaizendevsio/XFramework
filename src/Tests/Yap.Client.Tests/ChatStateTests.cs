@@ -13,6 +13,40 @@ namespace Yap.Client.Tests;
 public sealed class ChatStateTests
 {
     [Test]
+    public async Task InboxPreview_DecryptsWithoutOpeningHistory_ReusesCacheAndRefreshesEditedCiphertext()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Reader");
+        var thread = Guid.NewGuid(); var id = Guid.NewGuid(); var envelope = "first-ciphertext";
+        var online = false;
+        var js = new Mock<IJSRuntime>();
+        js.Setup(x => x.InvokeAsync<bool>("yap.device.online", It.IsAny<object?[]?>())).Returns(() => ValueTask.FromResult(online));
+        js.Setup(x => x.InvokeAsync<ChatEncryption.EncryptedMessageContent>("yap.encryption.decrypt", It.IsAny<object?[]?>()))
+            .Returns(() => ValueTask.FromResult(new ChatEncryption.EncryptedMessageContent(envelope == "first-ciphertext" ? "Hello" : "Edited", [])));
+        using var http = new HttpClient(new Handler(request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            Assert.That(path.EndsWith("/messages"), Is.False, "Inbox must not download message history.");
+            if (path == "/api/session") return Task.FromResult(Json(new SessionResponse(user, "token")));
+            if (path.EndsWith("initialize")) return Task.FromResult(Json(new ChatDefaults(Guid.NewGuid(), [])));
+            if (path.Contains("/encryption/people/")) return Task.FromResult(Json(new { credentialId = user.CredentialId }));
+            return Task.FromResult(Json(new ChatPage<Conversation>([new() { Id = thread, Preview = "Encrypted message",
+                LastMessage = new() { Id = id, ThreadId = thread, SenderId = user.CredentialId, EncryptedEnvelope = envelope } }], 1)));
+        })) { BaseAddress = new("https://yap.test/") };
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), js.Object);
+        await state.InitializeAsync(); online = true;
+        await state.SynchronizeAsync();
+        Assert.That(state.Conversations.Single().Preview, Is.EqualTo("Hello"));
+        await state.SynchronizeAsync();
+        js.Verify(x => x.InvokeAsync<ChatEncryption.EncryptedMessageContent>("yap.encryption.decrypt", It.IsAny<object?[]?>()), Times.Once);
+        envelope = "edited-ciphertext";
+        await state.SynchronizeAsync();
+        Assert.That(state.Conversations.Single().Preview, Is.EqualTo("Edited"));
+        Assert.That((await fixture.Store.ConversationsAsync(OfflineStore.Scope(user))).Single().Preview, Is.EqualTo("Edited"));
+        js.Verify(x => x.InvokeAsync<ChatEncryption.EncryptedMessageContent>("yap.encryption.decrypt", It.IsAny<object?[]?>()), Times.Exactly(2));
+    }
+
+    [Test]
     public async Task ReplyHistory_StaysBoundedAndKeepsItsAnchorAcrossRefresh()
     {
         await using var fixture = await StoreFixture.CreateAsync();
