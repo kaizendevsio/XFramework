@@ -25,7 +25,7 @@ else
 @if (!Filtered.Any()) { <p class="empty">No conversations yet. Start one with your people.</p> }
 @if (search.Length >= 2)
 {
-    <div class="sectionhead">@(State.Online ? "Messages" : "Saved messages on this device")</div>
+    <div class="sectionhead">@(State.Online && !State.EncryptionEnabled ? "Messages" : "Saved messages on this device")</div>
     @foreach (var hit in hits) { <a class="row" href="@($"/chat/{hit.ThreadId}?message={hit.MessageId}")"><Icon Name="search" /><span class="mid"><span class="t1">@State.Conversations.FirstOrDefault(x => x.Id == hit.ThreadId)?.Name</span><span class="t2">@hit.Text</span></span></a> }
 }
 @if (State.HasMoreConversations) { <button class="btn ghost" disabled="@(!State.Online || State.Busy)" @onclick="State.LoadMoreConversationsAsync">Load more conversations</button> }

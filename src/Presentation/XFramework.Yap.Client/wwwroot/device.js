@@ -150,7 +150,7 @@
                 headers: { RequestVerificationToken: token, 'X-Yap-Account': scope } });
             return { status: response.status, id: response.ok ? (await response.json()).id : '00000000-0000-0000-0000-000000000000' };
         },
-        async uploadEncrypted(key, thread, token, scope, context, recipients) {
+        async uploadEncrypted(key, thread, token, scope, context, recipients, voice = false) {
             let source;
             try { source = await read(key); }
             catch (error) { if (error.name === 'NotFoundError') return { status: 410, id: emptyGuid }; throw error; }
@@ -164,10 +164,11 @@
                 await ciphertext.pipeTo(sink);
                 const file = await handle.getFile();
                 if (file.size > maximumCiphertextBytes) return { status: 413, id: emptyGuid };
-                // Opaque names and types keep image names and formats inside the signed message.
+                // Only the voice/attachment category is public, for conversation feature controls.
+                // Original names and formats remain inside the signed message.
                 const headers = { RequestVerificationToken: token, 'X-Yap-Account': scope, 'Content-Type': 'application/json' };
                 const started = await fetch(`/api/chat/uploads/${thread}/session`, { method: 'POST', headers,
-                    body: JSON.stringify({ fileName: 'attachment.pgp', contentType: 'application/octet-stream', totalBytes: file.size }) });
+                    body: JSON.stringify({ fileName: voice ? 'voice.pgp' : 'attachment.pgp', contentType: 'application/octet-stream', totalBytes: file.size }) });
                 if (!started.ok) return { status: started.status, id: emptyGuid };
                 const ticket = await started.json();
                 try {

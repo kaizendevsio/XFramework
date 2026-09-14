@@ -36,4 +36,7 @@ public partial class MessageThread : BaseModel
 
     [MemoryPackOrder(9)]
     public Guid? PhotoStorageFileId { get; set; }
+
+    [MemoryPackOrder(10)]
+    public bool EncryptionRequired { get; set; }
 }

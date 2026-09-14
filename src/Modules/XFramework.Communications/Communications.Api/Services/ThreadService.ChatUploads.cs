@@ -34,7 +34,7 @@ public sealed partial class ThreadService
             .Where(x => x.Id == request.ThreadId && x.TenantId == caller.TenantId && !x.IsDeleted && x.IsEnabled)
             .AnyAsync(ct);
         if (!activeThread) return Result<StorageUploadSessionResponse>.NotFound("Thread not found");
-        var feature = request.ContentType?.StartsWith("audio/", StringComparison.OrdinalIgnoreCase) == true
+        var feature = EncryptedMessages.IsVoiceFile(request.FileName, request.ContentType)
             ? ConversationFeatures.Voice : ConversationFeatures.Attachments;
         if (!await FeatureEnabledAsync(caller.TenantId, request.ThreadId, feature, ct))
             return Result<StorageUploadSessionResponse>.Forbidden("This attachment type is disabled for this conversation");

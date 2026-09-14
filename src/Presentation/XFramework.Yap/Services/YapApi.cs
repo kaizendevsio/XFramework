@@ -16,7 +16,7 @@ public static class YapApi
 {
     public static void MapYapApi(this WebApplication app)
     {
-        app.MapGet("/api/session", async (HttpContext context, IAntiforgery antiforgery, IChatDirectory directory, CancellationToken ct) =>
+        app.MapGet("/api/session", async (HttpContext context, IAntiforgery antiforgery, IChatDirectory directory, IConfiguration configuration, CancellationToken ct) =>
         {
             context.Response.Headers.CacheControl = "no-store";
             var user = context.User.Identity?.IsAuthenticated == true
@@ -28,11 +28,12 @@ public static class YapApi
                 try { user = user with { AvatarUrl = (await directory.ResolveAsync([user.CredentialId], ct)).FirstOrDefault()?.AvatarUrl }; }
                 catch { /* A directory outage must not invalidate a saved sign-in. */ }
             }
-            return Results.Ok(new SessionResponse(user, antiforgery.GetAndStoreTokens(context).RequestToken!));
+            return Results.Ok(new SessionResponse(user, antiforgery.GetAndStoreTokens(context).RequestToken!, configuration.GetValue("Yap:Encryption:Enabled", true)));
         });
 
         var api = app.MapGroup("/api/chat").RequireAuthorization().AddEndpointFilter<YapApiFilter>();
         api.MapYapProfile();
+        api.MapYapEncryption();
         api.MapPost("/initialize", async (ICommunicationsChatClient client, CancellationToken ct) =>
         {
             var session = await client.ForCurrentActorAsync(ct: ct);
@@ -89,7 +90,9 @@ public static class YapApi
                 Sender = x.SenderCredentialId == session.CredentialId ? "You" : string.IsNullOrWhiteSpace(x.SenderAlias)
                     ? people.FirstOrDefault(p => p.Id == x.SenderCredentialId)?.Name ?? "Workspace member" : x.SenderAlias,
                 Text = x.Text, CreatedAt = x.CreatedAt, Mine = x.SenderCredentialId == session.CredentialId,
-                HasAttachments = x.HasAttachments, IsThreadReply = x.IsThreadReply,
+                EncryptedEnvelope = x.EncryptedEnvelope,
+                AcceptedSenderDirectoryRevision = x.AcceptedSenderDirectoryRevision, EncryptionSenderDeviceId = x.EncryptionSenderDeviceId,
+                HasAttachments = x.HasAttachments, AttachmentLinksReady = x.HasAttachments, IsThreadReply = x.IsThreadReply,
                 DeliveredCount = x.DeliveredCount, ReadCount = x.ReadCount,
                 Readers = x.ReadCredentialIds.Select(id => { var person = people.FirstOrDefault(p => p.Id == id); return new Person(id, person?.Name ?? "Workspace member", person?.UserName ?? "", person?.AvatarUrl); }).ToList(),
                 AvatarUrl = people.FirstOrDefault(p => p.Id == x.SenderCredentialId)?.AvatarUrl,
@@ -118,13 +121,18 @@ public static class YapApi
             Require(await session.ArchiveThreadAsync(data.ThreadId, false, ct));
             return new { Id = data.ThreadId };
         });
-        api.MapPost("/messages", async (SendMessage request, ICommunicationsChatClient client, CancellationToken ct) =>
+        api.MapPost("/messages", async (SendMessage request, ICommunicationsChatClient client, IConfiguration configuration, CancellationToken ct) =>
         {
+            if (configuration.GetValue("Yap:Encryption:Enabled", true) && request.EncryptedEnvelope is null)
+                throw new YapApiException(409, "Update Yap and unlock encryption before sending.");
             if (request.Id == Guid.Empty || request.ThreadId == Guid.Empty || string.IsNullOrWhiteSpace(request.Text) || request.Text.Length > 4000)
                 throw new YapApiException(400, "Write a message up to 4,000 characters.");
             var session = await client.ForCurrentActorAsync(ct: ct);
             var data = Require(await session.SendMessageAsync(new CreateThreadMessageRequest
-            { ThreadId = request.ThreadId, Text = request.Text, ParentMessageId = request.ParentId, ClientMessageId = request.Id, IsThreadReply = request.IsThreadReply }, ct));
+            { ThreadId = request.ThreadId, Text = request.Text, ParentMessageId = request.ParentId, ClientMessageId = request.Id,
+                IsThreadReply = request.IsThreadReply, EncryptedEnvelope = request.EncryptedEnvelope,
+                RecipientCredentialIds = request.RecipientCredentialIds ?? [], EncryptionSenderDeviceId = request.EncryptionSenderDeviceId,
+                SenderDirectoryRevision = request.SenderDirectoryRevision, RecipientDirectoryRevisions = request.RecipientDirectoryRevisions ?? [] }, ct));
             return new MessageReceipt(data.MessageId);
         });
         api.MapPost("/conversation-settings", async (ConversationUpdate request, ICommunicationsChatClient client, CancellationToken ct) =>
@@ -151,6 +159,10 @@ public static class YapApi
             var session = await client.ForCurrentActorAsync(ct: ct);
             var response = request.Action switch
             {
+                "edit" when request.EncryptedEnvelope is not null => await session.EditMessageAsync(new Communications.Domain.Shared.Contracts.Requests.Edit.EditThreadMessageRequest
+                { ThreadId = request.ThreadId, MessageId = request.MessageId, Text = request.Text ?? "", EncryptedEnvelope = request.EncryptedEnvelope,
+                    EncryptionSenderDeviceId = request.EncryptionSenderDeviceId, SenderDirectoryRevision = request.SenderDirectoryRevision,
+                    RecipientDirectoryRevisions = request.RecipientDirectoryRevisions ?? [] }, ct),
                 "edit" => await session.EditMessageAsync(request.ThreadId, request.MessageId, request.Text ?? "", ct),
                 "delete" => await session.DeleteMessageAsync(request.ThreadId, request.MessageId, ct),
                 "pin" => await session.PinMessageAsync(request.ThreadId, request.MessageId, ct),
@@ -225,6 +237,14 @@ public static class YapApi
             async (Guid thread, Guid message, Guid file, HttpContext context, ICommunicationsChatClient client, IHttpClientFactory http, IConfiguration configuration, CancellationToken ct) =>
             {
                 var session = await client.ForCurrentActorAsync(ct: ct);
+                if (context.Request.Query["storageId"] == "true")
+                {
+                    // Encrypted metadata is signed before the message's attachment link exists.
+                    // Resolve its storage ID only within this authorized message's links.
+                    var links = Require(await session.GetFilesAsync(thread, message, pageSize: 100, ct: ct));
+                    file = links.Items.SingleOrDefault(x => x.StorageFileId == file)?.Id
+                        ?? throw new YapApiException(404, "Attachment not found.");
+                }
                 // The URL is minted by the authorized SDK; the browser cannot supply a proxy target.
                 var download = Require(await session.GetAttachmentDownloadUrlAsync(thread, message, file, ct));
                 using var request = CreateAttachmentDownloadRequest(download.Url, configuration);
