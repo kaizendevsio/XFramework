@@ -17,6 +17,57 @@ namespace Bolt.Tests;
 public sealed class BoltAuthenticatedMediaModeTests
 {
     [Test]
+    public void EncryptedPayloadMode_WithoutAuthenticatedHost_CannotStart()
+    {
+        var create = () => new BoltServer(NullLogger<BoltServer>.Instance,
+            new BoltServerOptions { RequireEncryptedMedia = true });
+        create.Should().Throw<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task EncryptedPayloadMode_StampsOwnerAndRejectsPlaintextBeforeFanout()
+    {
+        using var server = new BoltServer(NullLogger<BoltServer>.Instance,
+            new BoltServerOptions { MediaEnabled = true, AuthenticatedMediaOnly = true,
+                RequireSecureTransport = true, RequireEncryptedMedia = true, CallAuthorizer = new Policy() });
+        await using var alice = new Peer(); await using var bob = new Peer();
+        var first = server.HandleConnectionAsync(alice, Principal("alice"), CancellationToken.None, true);
+        var second = server.HandleConnectionAsync(bob, Principal("bob"), CancellationToken.None, true);
+        try
+        {
+            alice.Push(Frame(w => BoltCodec.WriteRegister(w,"alice","Alice")));
+            bob.Push(Frame(w => BoltCodec.WriteRegister(w,"bob","Bob")));
+            await WaitAsync(() => alice.Has(FrameType.RegisterAck) && bob.Has(FrameType.RegisterAck));
+            var call = Guid.NewGuid(); var payload = new byte[4];
+            BinaryPrimitives.WriteInt32LittleEndian(payload,BoltCodec.Fnv1aHash("bob"));
+            alice.Push(Frame(w => BoltCodec.WriteCallSignal(w,call,SignalType.Initiate,payload)));
+            await WaitAsync(() => bob.HasSignal(SignalType.Initiate));
+            bob.Push(Frame(w => BoltCodec.WriteCallSignal(w,call,SignalType.Answer,[])));
+            await WaitAsync(() => alice.HasSignal(SignalType.Answer));
+            var stream = Guid.NewGuid();
+            alice.Push(Frame(w => BoltCodec.WriteMediaConfig(w,stream,call,MediaType.Audio,CodecId.Opus,48000,1,128,0,[])));
+            alice.Push(Frame(w => BoltCodec.WriteMediaConfig(w,stream,call,MediaType.Audio,CodecId.Opus,48000,1,128,0x10,"SFR1:mallory"u8)));
+            await WaitAsync(() => bob.Has(FrameType.MediaConfig));
+            var configFrame = bob.Sent.Single(x => x[0] == (byte)FrameType.MediaConfig);
+            BoltCodec.TryReadMediaConfig(configFrame,out var config).Should().BeTrue();
+            System.Text.Encoding.UTF8.GetString(configFrame,config.ExtensionOffset,config.ExtensionLength).Should().Be("SFR1:alice");
+            alice.Push(Frame(w => BoltCodec.WriteMediaFrame(w,stream,1,960,0,[1,2,3])));
+            alice.Push(Frame(w => BoltCodec.WriteMediaFrame(w,stream,2,1920,0x10,new byte[5156])));
+            alice.Push(Frame(w => BoltCodec.WriteMediaFrame(w,stream,3,2880,0x10,[7,8,9])));
+            await WaitAsync(() => bob.Has(FrameType.MediaFrame));
+            var forwarded = bob.Sent.Where(x => x[0] == (byte)FrameType.MediaFrame).ToArray();
+            forwarded.Should().HaveCount(1);
+            BoltCodec.TryReadMediaFrame(forwarded[0],out var header).Should().BeTrue();
+            header.SequenceNumber.Should().Be(3);
+        }
+        finally
+        {
+            await alice.DisposeAsync(); await bob.DisposeAsync();
+            await Task.WhenAll(first,second).WaitAsync(TimeSpan.FromSeconds(3));
+        }
+    }
+
+    [Test]
     public void DedicatedMode_WithoutSecureTransportRequirement_CannotStart()
     {
         var create = () => new BoltServer(NullLogger<BoltServer>.Instance,

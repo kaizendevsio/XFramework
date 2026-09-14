@@ -38,6 +38,7 @@ public sealed class ChatApiException(int status) : Exception(status switch
     409 => "This change conflicts with a message already saved. Review it before retrying.",
     410 => "Re-attach this file. A large upload cannot resume after the app reloads.",
     413 => "This attachment is larger than Yap accepts.",
+    428 => "Waiting for everyone in this conversation to open Yap and set up encrypted messages.",
     429 => "Too many requests. Your messages will retry shortly.",
     >= 500 => "Chat is temporarily unavailable. Your messages remain on this device.",
     _ => "The request could not be completed. Check the message and try again."

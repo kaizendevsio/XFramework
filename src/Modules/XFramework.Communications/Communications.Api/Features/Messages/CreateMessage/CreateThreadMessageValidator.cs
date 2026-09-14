@@ -26,5 +26,12 @@ public sealed class CreateThreadMessageValidator : AbstractValidator<CreateThrea
         RuleFor(x => x.TemplateKey)
             .MaximumLength(128).WithMessage("Template key cannot exceed 128 characters")
             .When(x => !string.IsNullOrWhiteSpace(x.TemplateKey));
+
+        RuleFor(x => x).Must(x => Communications.Domain.Shared.Contracts.EncryptedMessages.ValidEnvelope(x.EncryptedEnvelope)
+            && x.Text == Communications.Domain.Shared.Contracts.EncryptedMessages.Preview
+            && x.ClientMessageId.HasValue && x.TemplateId is null && x.TemplateKey is null
+            && x.MentionedCredentialIds.Count == 0 && x.RecipientCredentialIds.Count is > 0 and <= 101)
+            .When(x => x.EncryptedEnvelope is not null)
+            .WithMessage("Encrypted messages require a bounded envelope and recipient roster, without plaintext content.");
     }
 }

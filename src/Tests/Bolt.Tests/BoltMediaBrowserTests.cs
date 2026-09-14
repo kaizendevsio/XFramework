@@ -62,7 +62,7 @@ public class BoltMediaBrowserTests
     {
         var options = new MediaServiceOptions();
 
-        options.AudioBitrateKbps.Should().Be(64);
+        options.AudioBitrateKbps.Should().Be(128);
         options.AudioSampleRate.Should().Be(48_000);
         options.AudioChannels.Should().Be(1);
         options.VideoWidth.Should().Be(1280);
@@ -152,6 +152,7 @@ public class BoltMediaBrowserTests
     {
         using var sender = new ManagedOpusCodec();
         using var receiver = new ManagedOpusCodec();
+        sender.BitrateKbps.Should().Be(128);
         var pcm = new byte[1920];
         for (var i = 0; i < 960; i++)
             BinaryPrimitives.WriteInt16LittleEndian(pcm.AsSpan(i * 2), (short)(Math.Sin(2 * Math.PI * 440 * i / 48000) * 12000));
@@ -176,5 +177,63 @@ public class BoltMediaBrowserTests
         encode.Should().Throw<ArgumentException>();
         decode.Should().Throw<ArgumentException>();
         empty.Should().Throw<ArgumentException>();
+    }
+
+    [Test]
+    public void ManagedOpusDecoder_InterleavedSpeakersRetainIndependentHistory()
+    {
+        using var alice = new ManagedOpusCodec();
+        using var bob = new ManagedOpusCodec();
+        using var aliceReceiver = new ManagedOpusDecoder();
+        using var bobReceiver = new ManagedOpusDecoder();
+        using var aliceReference = new ManagedOpusDecoder();
+        using var bobReference = new ManagedOpusDecoder();
+        var alicePcm = new byte[1920];
+        var bobPcm = new byte[1920];
+        for (var frame = 0; frame < 20; frame++)
+        {
+            for (var sample = 0; sample < 960; sample++)
+            {
+                var time = (frame * 960 + sample) / 48000d;
+                BinaryPrimitives.WriteInt16LittleEndian(alicePcm.AsSpan(sample * 2), (short)(Math.Sin(2 * Math.PI * 440 * time) * 12000));
+                BinaryPrimitives.WriteInt16LittleEndian(bobPcm.AsSpan(sample * 2), (short)(Math.Sin(2 * Math.PI * 880 * time) * 9000));
+            }
+            var alicePacket = alice.Encode(alicePcm);
+            var bobPacket = bob.Encode(bobPcm);
+            aliceReceiver.Decode(alicePacket).Should().Equal(aliceReference.Decode(alicePacket));
+            bobReceiver.Decode(bobPacket).Should().Equal(bobReference.Decode(bobPacket));
+        }
+    }
+
+    [Test]
+    public async Task AudioPipeline_ManagedGroupRoutesIndependentPcmAndBoundsReceivers()
+    {
+        var js = Substitute.For<IJSRuntime>();
+        var module = Substitute.For<IJSObjectReference>();
+        var browser = Substitute.For<IJSObjectReference>();
+        js.InvokeAsync<IJSObjectReference>("import", Arg.Any<object?[]>()).Returns(module);
+        module.InvokeAsync<IJSObjectReference>("createAudioPipeline", Arg.Any<object?[]>()).Returns(browser);
+        module.InvokeAsync<VoiceCapabilities>("checkVoiceCapabilities", Arg.Any<object?[]>())
+            .Returns(new VoiceCapabilities(true, null, false));
+        await using var pipeline = new BoltAudioPipeline(js, NullLogger<BoltAudioPipeline>.Instance);
+        await pipeline.InitializeAsync();
+        using var sender = new ManagedOpusCodec();
+        using var reference = new ManagedOpusDecoder();
+        var packet = sender.Encode(new byte[1920]);
+        var expected = reference.Decode(packet);
+        var streamIds = Enumerable.Range(0, 9).Select(_ => Guid.NewGuid()).ToArray();
+
+        foreach (var streamId in streamIds) await pipeline.DecodeFrameAsync(streamId, packet, 0);
+
+        var playCalls = browser.ReceivedCalls().Where(call => Equals(call.GetArguments()[0], "playPcm")).ToArray();
+        playCalls.Should().HaveCount(8);
+        foreach (var call in playCalls)
+        {
+            var arguments = (object?[])call.GetArguments()[1]!;
+            ((byte[])arguments[0]!).Should().Equal(expected);
+        }
+        await pipeline.ReleaseRemoteStreamAsync(streamIds[0]);
+        await pipeline.DecodeFrameAsync(streamIds[8], packet, 0);
+        browser.ReceivedCalls().Count(call => Equals(call.GetArguments()[0], "playPcm")).Should().Be(9);
     }
 }

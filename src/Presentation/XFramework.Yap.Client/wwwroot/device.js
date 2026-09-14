@@ -6,6 +6,12 @@
     // They do not survive a reload, which is why they also require a connection.
     const pending = new Map();
     const previews = new Map();
+    const encryptedDownloads = new Map();
+    const activeTemporaryFiles = new Set();
+    const emptyGuid = '00000000-0000-0000-0000-000000000000';
+    const maximumPlaintextBytes = 4 * 1024 * 1024 * 1024;
+    const maximumCiphertextBytes = maximumPlaintextBytes + 16 * 1024 * 1024;
+    let startupCleanup;
     const directory = async () => (await navigator.storage.getDirectory()).getDirectoryHandle('yap-files', { create: true });
     const write = async (key, blob) => {
         const handle = await (await directory()).getFileHandle(key, { create: true });
@@ -14,6 +20,32 @@
         catch (error) { await stream.abort().catch(() => {}); throw error; }
     };
     const read = async key => pending.get(key) ?? (await (await directory()).getFileHandle(key)).getFile();
+    const canonical = value => JSON.stringify((function sorted(v) {
+        if (Array.isArray(v)) return v.map(sorted);
+        if (v && typeof v === 'object') return Object.fromEntries(Object.keys(v).sort().map(k => [k, sorted(v[k])]));
+        return v;
+    })(value));
+    const verificationContext = async (key, scope, context) => {
+        if (!/^[0-9a-f]{32}:[0-9a-f]{32}$/i.test(scope) || !key.startsWith(`${scope.replace(':', '-')}-`)
+            || context.tenantId.replaceAll('-', '').toLowerCase() !== scope.split(':')[0].toLowerCase()) throw new Error('Attachment account mismatch.');
+        const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical(context))));
+        return { version: 1, scope, context: Array.from(digest, n => n.toString(16).padStart(2, '0')).join('') };
+    };
+    const hasVerifiedFile = async (key, scope, context) => {
+        const expected = await verificationContext(key, scope, context);
+        try {
+            const marker = JSON.parse(await (await read(`${key}.ready`)).text());
+            const file = await read(key);
+            return marker.version === expected.version && marker.scope === expected.scope && marker.context === expected.context
+                && Number.isSafeInteger(marker.size) && marker.size >= 0 && marker.size === file.size;
+        } catch (error) { if (error.name === 'NotFoundError' || error instanceof SyntaxError) return false; throw error; }
+    };
+    const cleanupUnverified = async () => {
+        const dir = await directory();
+        for await (const [name, handle] of dir.entries()) {
+            if (handle.kind === 'file' && (name.endsWith('.unverified') || name.endsWith('.encrypted')) && !activeTemporaryFiles.has(name)) await dir.removeEntry(name).catch(() => {});
+        }
+    };
     const notify = () => listener?.invokeMethodAsync('ConnectivityChanged', navigator.onLine).catch(() => {});
     addEventListener('online', notify);
     addEventListener('offline', notify);
@@ -21,6 +53,23 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden) notify(); });
     addEventListener('beforeinstallprompt', event => { event.preventDefault(); installPrompt = event; });
     window.yap.device = {
+        async uploadPhoto(input, path, scope, token) {
+            const file = input.files?.[0];
+            if (!file || file.size > 20 * 1024 * 1024) throw new Error('Choose a photo up to 20 MB.');
+            const jpeg = await yap.imagePreviews.jpeg(file, yap.imagePreviews.isHeif(file.type, file.name));
+            const bitmap = await createImageBitmap(jpeg);
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = 512;
+            let bytes;
+            try {
+                const size = Math.min(bitmap.width, bitmap.height);
+                canvas.getContext('2d').drawImage(bitmap, (bitmap.width - size) / 2, (bitmap.height - size) / 2, size, size, 0, 0, 512, 512);
+                bytes = canvas.toDataURL('image/jpeg', .86).split(',')[1];
+            } finally { bitmap.close(); canvas.width = canvas.height = 1; }
+            const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Yap-Account': scope, 'RequestVerificationToken': token }, body: JSON.stringify({ bytes }) });
+            input.value = '';
+            return response.status;
+        },
         acquireDatabase() {
             // Keep one document in charge of SQLite. A waiting navigation also evicts
             // a previous document from the back/forward cache before opening OPFS.
@@ -44,7 +93,7 @@
                 const rect = row.getBoundingClientRect(); return rect.bottom > top && rect.top < bottom;
             }).map(row => row.dataset.windowRow);
         },
-        watch: dotnet => { listener = dotnet; },
+        watch: async dotnet => { listener = dotnet; await (startupCleanup ??= cleanupUnverified()); },
         events(scope, thread) {
             if (account === scope && activeThread === thread && events) return;
             events?.close(); events = null; account = scope; activeThread = thread;
@@ -75,6 +124,7 @@
             await (await directory()).removeEntry(key).catch(error => { if (error.name !== 'NotFoundError') throw error; });
             await (await directory()).removeEntry(`${key}.preview-v1.jpg`).catch(error => { if (error.name !== 'NotFoundError') throw error; });
             await (await directory()).removeEntry(`${key}.preview-v2.jpg`).catch(error => { if (error.name !== 'NotFoundError') throw error; });
+            await (await directory()).removeEntry(`${key}.ready`).catch(error => { if (error.name !== 'NotFoundError') throw error; });
         },
         // Slices a held File straight into the resumable endpoints. One part is in flight
         // at a time, so peak memory is the part size rather than the file size.
@@ -100,6 +150,83 @@
                 headers: { RequestVerificationToken: token, 'X-Yap-Account': scope } });
             return { status: response.status, id: response.ok ? (await response.json()).id : '00000000-0000-0000-0000-000000000000' };
         },
+        async uploadEncrypted(key, thread, token, scope, context, recipients, voice = false) {
+            let source;
+            try { source = await read(key); }
+            catch (error) { if (error.name === 'NotFoundError') return { status: 410, id: emptyGuid }; throw error; }
+            if (source.size <= 0 || source.size > maximumPlaintextBytes) return { status: 413, id: emptyGuid };
+            const encryptedKey = `${key}.${crypto.randomUUID()}.encrypted`;
+            activeTemporaryFiles.add(encryptedKey);
+            const handle = await (await directory()).getFileHandle(encryptedKey, { create: true });
+            const sink = await handle.createWritable();
+            try {
+                const ciphertext = await yap.encryption.encryptStream(scope, context, source.stream(), recipients);
+                await ciphertext.pipeTo(sink);
+                const file = await handle.getFile();
+                if (file.size > maximumCiphertextBytes) return { status: 413, id: emptyGuid };
+                // Only the voice/attachment category is public, for conversation feature controls.
+                // Original names and formats remain inside the signed message.
+                const headers = { RequestVerificationToken: token, 'X-Yap-Account': scope, 'Content-Type': 'application/json' };
+                const started = await fetch(`/api/chat/uploads/${thread}/session`, { method: 'POST', headers,
+                    body: JSON.stringify({ fileName: voice ? 'voice.pgp' : 'attachment.pgp', contentType: 'application/octet-stream', totalBytes: file.size }) });
+                if (!started.ok) return { status: started.status, id: emptyGuid };
+                const ticket = await started.json();
+                try {
+                    for (let part = 1; part <= ticket.totalParts; part++) {
+                        const offset = (part - 1) * ticket.chunkSizeBytes;
+                        const response = await fetch(`/api/chat/uploads/session/${ticket.uploadId}/parts/${part}?offset=${offset}`, {
+                            method: 'POST', headers: { ...headers, 'Content-Type': 'application/octet-stream' }, body: file.slice(offset, offset + ticket.chunkSizeBytes) });
+                        if (!response.ok) throw Object.assign(new Error('Encrypted upload failed.'), { status: response.status });
+                    }
+                    const complete = await fetch(`/api/chat/uploads/session/${ticket.uploadId}/complete`, { method: 'POST', headers });
+                    if (!complete.ok) throw Object.assign(new Error('Encrypted upload did not finish.'), { status: complete.status });
+                    return { status: complete.status, id: (await complete.json()).id };
+                } catch (error) {
+                    await fetch(`/api/chat/uploads/session/${ticket.uploadId}/abort`, { method: 'POST', headers }).catch(() => {});
+                    if (error.status) return { status: error.status, id: emptyGuid };
+                    throw error;
+                }
+            } catch (error) { await sink.abort().catch(() => {}); throw error; }
+            finally { activeTemporaryFiles.delete(encryptedKey); await (await directory()).removeEntry(encryptedKey).catch(() => {}); }
+        },
+        hasVerifiedFile,
+        async decryptFile(key, path, scope, online, context, senderDirectory) {
+            const expected = await verificationContext(key, scope, context);
+            if (await hasVerifiedFile(key, scope, context)) return;
+            const operationKey = `${key}:${expected.context}`;
+            if (encryptedDownloads.has(operationKey)) return encryptedDownloads.get(operationKey);
+            const operation = (async () => {
+            if (!online) throw new Error('Connect to download this encrypted attachment.');
+            const response = await fetch(path, { headers: { 'X-Yap-Account': scope }, cache: 'no-store' });
+            if (!response.ok || !response.body) throw new Error('Encrypted attachment unavailable.');
+            const temporary = `${key}.${crypto.randomUUID()}.unverified`, dir = await directory();
+            activeTemporaryFiles.add(temporary);
+            await dir.removeEntry(`${key}.ready`).catch(error => { if (error.name !== 'NotFoundError') throw error; });
+            const handle = await dir.getFileHandle(temporary, { create: true }), sink = await handle.createWritable();
+            try {
+                await yap.encryption.decryptStream(scope, context, response.body, senderDirectory, {
+                    write: chunk => sink.write(chunk),
+                    async commit() {
+                        await sink.close();
+                        // OPFS streams copy without materializing the whole attachment in JS memory.
+                        const final = await (await dir.getFileHandle(key, { create: true })).createWritable();
+                        try {
+                            const verified = await handle.getFile();
+                            await verified.stream().pipeTo(final);
+                            // The marker is written after the final writable closes. A crash
+                            // during either copy leaves no valid marker and forces a retry.
+                            await write(`${key}.ready`, new Blob([JSON.stringify({ ...expected, size: verified.size })]));
+                        }
+                        catch (error) { await final.abort().catch(() => {}); await dir.removeEntry(key).catch(() => {}); throw error; }
+                    },
+                    abort: () => sink.abort().catch(() => {})
+                });
+            } finally { activeTemporaryFiles.delete(temporary); await dir.removeEntry(temporary).catch(() => {}); }
+            })();
+            encryptedDownloads.set(operationKey, operation);
+            try { return await operation; }
+            finally { encryptedDownloads.delete(operationKey); }
+        },
         async openFile(key, name, path, scope, online) {
             let file;
             try { file = await read(key); }
@@ -118,6 +245,14 @@
         async mediaUrl(key, path, scope, online, contentType, local, name = '') {
             const heif = yap.imagePreviews.isHeif(contentType, name);
             if (!heif && !/^(image\/(png|jpeg|gif|webp|avif)|video\/(mp4|webm|quicktime)|audio\/(mp4|mpeg|ogg|webm|wav|x-wav|aac))$/i.test(contentType.split(';')[0])) return null;
+            // Let the browser range-stream received videos. Reading a multi-GB video
+            // into a Blob before showing a player exhausts mobile browser memory.
+            if (!local && online && contentType.startsWith('video/')) {
+                const stream = new URL(path, document.baseURI);
+                stream.searchParams.set('account', scope);
+                stream.searchParams.set('mediaType', contentType);
+                return stream.pathname + stream.search;
+            }
             let file;
             try { file = await read(key); }
             catch (error) {

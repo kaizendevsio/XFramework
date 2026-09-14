@@ -1,0 +1,23 @@
+[package]
+name = "bolt-sframe"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+sframe = "=2.0.0"
+wasm-bindgen = "=0.2.100"
+zeroize = "=1.8.2"
+
+[dev-dependencies]
+wasm-bindgen-test = "=0.3.50"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"

@@ -11,6 +11,7 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton(options);
         services.AddScoped<BoltCryptoInterop>();
+        services.AddScoped<BoltSFrameInterop>();
         services.AddScoped<BoltAudioPipeline>();
         services.AddScoped<BoltVideoPipeline>();
         services.AddScoped<BoltDeviceManager>();

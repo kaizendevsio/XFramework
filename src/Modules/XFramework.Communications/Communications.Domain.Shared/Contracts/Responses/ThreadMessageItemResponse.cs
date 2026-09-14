@@ -19,4 +19,7 @@ public partial record ThreadMessageItemResponse
     public int DeliveredCount { get; set; }
     public int ReadCount { get; set; }
     public List<Guid> ReadCredentialIds { get; set; } = [];
+    public string? EncryptedEnvelope { get; set; }
+    public long? AcceptedSenderDirectoryRevision { get; set; }
+    public Guid? EncryptionSenderDeviceId { get; set; }
 }

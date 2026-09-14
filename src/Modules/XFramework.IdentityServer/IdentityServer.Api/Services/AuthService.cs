@@ -1147,9 +1147,24 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
 
     #region Credential Avatars
 
-    public async Task<Result<CredentialAvatarResponse>> UploadCredentialAvatarAsync(
+    public Task<Result<CredentialAvatarResponse>> UploadOwnAvatarAsync(UploadOwnAvatarRequest request, CancellationToken ct = default)
+    {
+        var context = _trustedInvocationContextAccessor.Current;
+        if (context?.Actor is not { } actor || actor.CredentialId == Guid.Empty || context.EffectiveTenantId is null)
+            return Task.FromResult(Result<CredentialAvatarResponse>.Failure("An authenticated user is required", 401));
+        return UploadAvatarAsync(new UploadCredentialAvatarRequest
+        {
+            CredentialId = actor.CredentialId, Metadata = request.Metadata,
+            FileName = request.FileName, ContentType = request.ContentType, FileBytes = request.FileBytes
+        }, true, ct);
+    }
+
+    public Task<Result<CredentialAvatarResponse>> UploadCredentialAvatarAsync(
         UploadCredentialAvatarRequest request,
-        CancellationToken ct = default)
+        CancellationToken ct = default) => UploadAvatarAsync(request, false, ct);
+
+    private async Task<Result<CredentialAvatarResponse>> UploadAvatarAsync(
+        UploadCredentialAvatarRequest request, bool allowSelf, CancellationToken ct)
     {
         Guid? completedStorageFileId = null;
         var avatarPersisted = false;
@@ -1170,7 +1185,7 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
                 tenantId,
                 request.CredentialId,
                 IdentityAuthorizationConstants.Update,
-                allowSelf: false,
+                allowSelf: allowSelf,
                 ct);
             if (!authorization.IsSuccess)
                 return Result<CredentialAvatarResponse>.Failure(authorization.Message!, authorization.StatusCode);

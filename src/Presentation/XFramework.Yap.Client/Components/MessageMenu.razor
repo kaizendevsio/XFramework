@@ -1,0 +1,19 @@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+<dialog class="message-menu-dialog" aria-label="Message options" @ref="dialog" @onclick="OnClose" @onkeydown="KeyDown">
+    <section class="message-menu-stack @(Message.Mine ? "mine" : "")" @onclick:stopPropagation @ref="stack">
+        @ChildContent
+    </section>
+</dialog>
+@code {
+    [Parameter, EditorRequired] public ChatMessage Message { get; set; } = default!;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    private ElementReference dialog, stack;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await JS.InvokeVoidAsync("yap.messageMenu.open", dialog, stack, Message.Id);
+    }
+    private Task KeyDown(KeyboardEventArgs e) => e.Key == "Escape" ? OnClose.InvokeAsync() : Task.CompletedTask;
+    public async ValueTask DisposeAsync() => await JS.InvokeVoidAsync("yap.messageMenu.close", dialog);
+}

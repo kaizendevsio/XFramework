@@ -47,8 +47,15 @@ public class BoltServerOptions
     /// bolt_media_client_id claim. Transport encryption, not end-to-end encryption.</summary>
     public bool AuthenticatedMediaOnly { get; set; }
 
+    /// <summary>Dedicated end-to-end payload mode: requires authenticated WSS, rejects plaintext/FEC,
+    /// and stamps each Opus configuration with its transport-bound sender identity.</summary>
+    public bool RequireEncryptedMedia { get; set; }
+
     /// <summary>Required for call admission. Missing policy denies calls even when media is enabled.</summary>
     public IBoltCallAuthorizer? CallAuthorizer { get; set; }
+
+    /// <summary>Optional host-managed group lifecycle. Null keeps group admission disabled; this is not an E2EE provider.</summary>
+    public IBoltGroupCallAuthorizer? GroupCallAuthorizer { get; set; }
 
     /// <summary>Maximum retained ringing and active calls across the server.</summary>
     public int MaxActiveCalls { get; set; } = 128;

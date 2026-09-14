@@ -31,7 +31,8 @@ public sealed partial class ThreadService(
     IMessageReplySummaryReader replySummaryReader,
     ILogger<ThreadService> logger,
     CommunicationsOutboxSignal outboxSignal,
-    DbContext? db
+    DbContext? db,
+    IMessageEncryptionDirectoryReader? encryptionDirectoryReader = null
 ) : IThreadService
 {
     private static readonly JsonSerializerOptions OutboxJsonOptions = new(JsonSerializerDefaults.Web);
@@ -407,6 +408,7 @@ public sealed partial class ThreadService(
                     Id = t.Id,
                     Name = t.Name,
                     HasCustomName = t.HasCustomName,
+                    PhotoStorageFileId = t.PhotoStorageFileId,
                     Description = t.Description,
                     TypeId = t.TypeId,
                     CreatedAt = t.CreatedAt,
@@ -483,6 +485,7 @@ public sealed partial class ThreadService(
                 Id = thread.Id,
                 Name = thread.Name,
                 HasCustomName = thread.HasCustomName,
+                PhotoStorageFileId = thread.PhotoStorageFileId,
                 Description = thread.Description,
                 Features = thread.Features,
                 CanManage = await CanManageThreadAsync(members.First(m => m.CredentialId == caller.CredentialId), ct),
@@ -579,6 +582,19 @@ public sealed partial class ThreadService(
 
             if (!await CanManageThreadAsync(member, ct))
                 return Result<CmdResponse>.Forbidden("Only thread admins can update this thread");
+
+            if (request.PhotoStorageFileId is { } photoId)
+            {
+                if (await dataContext.Query<MessageDirectThread>().Where(x => x.TenantId == caller.TenantId && x.MessageThreadId == thread.Id && !x.IsDeleted && x.IsEnabled).AnyAsync(ct))
+                    return Result<CmdResponse>.Failure("Only group conversations have a shared photo", 400);
+                var photo = await storageServiceWrapper.ValidateChatStorageFileReference(new ValidateChatStorageFileReferenceRequest
+                { Metadata = request.Metadata, ThreadId = thread.Id, StorageFileId = photoId }, ct);
+                if (!photo.IsSuccess || photo.Response is not { IsValid: true } image)
+                    return Result<CmdResponse>.Failure("The conversation photo is not available", photo.IsSuccess ? 400 : (int)photo.HttpStatusCode);
+                if (image.ContentType is not ("image/jpeg" or "image/png" or "image/webp") || image.ContentLengthBytes is not (> 0 and <= 5 * 1024 * 1024))
+                    return Result<CmdResponse>.Failure("Choose a JPEG, PNG or WebP photo up to 5 MB", 400);
+                thread.PhotoStorageFileId = photoId;
+            }
 
             if (request.Features is { } features)
             {
@@ -1342,6 +1358,12 @@ public sealed partial class ThreadService(
 
     public async Task<Result<CreateThreadMessageResponse>> CreateThreadMessageAsync(CreateThreadMessageRequest request, CancellationToken ct = default)
     {
+        var encrypted = request.EncryptedEnvelope is not null;
+        if (encrypted && (!EncryptedMessages.ValidEnvelope(request.EncryptedEnvelope) || request.Text != EncryptedMessages.Preview
+            || !request.ClientMessageId.HasValue || request.MentionedCredentialIds.Count != 0
+            || request.TemplateId is not null || request.TemplateKey is not null
+            || request.RecipientCredentialIds.Count is < 1 or > 101))
+            return Result<CreateThreadMessageResponse>.Failure("Invalid encrypted message envelope", 400);
         if (request.ClientMessageId == Guid.Empty ||
             (request.ClientMessageId.HasValue && HasTemplate(request.TemplateId, request.TemplateKey)))
             return Result<CreateThreadMessageResponse>.Failure("Client outbox messages require a nonempty ID and final text", 400);
@@ -1399,6 +1421,9 @@ public sealed partial class ThreadService(
                     var mentions = JsonSerializer.Deserialize<List<Guid>>(previous.MentionedCredentialIdsJson ?? "[]") ?? [];
                     if (previous.MessageThreadId != request.ThreadId || previous.MessageThreadMemberId != senderMember.Id ||
                         previous.Text != request.Text?.Trim() || previous.ParentMessageId != request.ParentMessageId ||
+                        previous.EncryptedEnvelope != request.EncryptedEnvelope ||
+                        previous.EncryptionSenderDeviceId != request.EncryptionSenderDeviceId ||
+                        previous.AcceptedSenderDirectoryRevision != request.SenderDirectoryRevision ||
                         previous.IsThreadReply != request.IsThreadReply ||
                         !mentions.ToHashSet().SetEquals(request.MentionedCredentialIds.Where(id => id != Guid.Empty)))
                         return Result<CreateThreadMessageResponse>.Failure("This client message ID has already been used", 409);
@@ -1411,6 +1436,18 @@ public sealed partial class ThreadService(
                 .Where(m => m.TenantId == caller.TenantId)
                 .Where(m => !m.IsDeleted && m.IsEnabled)
                 .ToListAsync(ct);
+
+            if (thread.EncryptionRequired && !encrypted)
+                return Result<CreateThreadMessageResponse>.Failure("This conversation requires encrypted messages. Update your app.", 409);
+            if (encrypted && !activeThreadMembers.Select(m => m.CredentialId).ToHashSet().SetEquals(request.RecipientCredentialIds))
+                return Result<CreateThreadMessageResponse>.Failure("Conversation membership changed. Refresh encryption recipients.", 412);
+
+            if (encrypted)
+            {
+                if (!await EncryptionRecipientsCurrentAsync(caller.TenantId, caller.CredentialId, request.EncryptionSenderDeviceId,
+                        request.SenderDirectoryRevision, request.RecipientDirectoryRevisions, request.RecipientCredentialIds, ct))
+                    return Result<CreateThreadMessageResponse>.Failure("Encryption recipients changed. Refresh encryption.", 412);
+            }
 
             if (activeThreadMembers.Count == 2)
             {
@@ -1474,7 +1511,9 @@ public sealed partial class ThreadService(
             if (string.IsNullOrWhiteSpace(messageText))
                 return Result<CreateThreadMessageResponse>.Failure("Message text or template is required", 400);
 
-            var moderationMatches = await moderationService.EvaluateAsync(caller.TenantId, messageText, ct);
+            // The relay cannot inspect encrypted content. Never submit ciphertext to text moderation.
+            IReadOnlyList<CommunicationsModerationRuleMatch> moderationMatches = encrypted ? []
+                : await moderationService.EvaluateAsync(caller.TenantId, messageText, ct);
             var blockingRule = moderationMatches.FirstOrDefault(match =>
                 match.Action == MessageModerationRuleActions.BlockBeforeSend);
             if (blockingRule is not null)
@@ -1487,6 +1526,9 @@ public sealed partial class ThreadService(
                 MessageThreadId = request.ThreadId,
                 MessageThreadMemberId = senderMember.Id,
                 Text = messageText,
+                EncryptedEnvelope = request.EncryptedEnvelope,
+                AcceptedSenderDirectoryRevision = encrypted ? request.SenderDirectoryRevision : null,
+                EncryptionSenderDeviceId = encrypted ? request.EncryptionSenderDeviceId : null,
                 ParentMessageId = request.ParentMessageId,
                 IsThreadReply = request.IsThreadReply,
                 MentionedCredentialIdsJson = JsonSerializer.Serialize(mentionedCredentialIds, OutboxJsonOptions),
@@ -1502,6 +1544,11 @@ public sealed partial class ThreadService(
             };
 
             dataContext.Add(message);
+            if (encrypted && !thread.EncryptionRequired)
+            {
+                thread.EncryptionRequired = true;
+                dataContext.Update(thread);
+            }
             AddOutboxEvent(
                 MessageRealtimeEvents.MessageCreated,
                 thread.TenantId,
@@ -1742,6 +1789,9 @@ public sealed partial class ThreadService(
                 {
                     Id = m.Id,
                     Text = m.Text,
+                    EncryptedEnvelope = m.EncryptedEnvelope,
+                    AcceptedSenderDirectoryRevision = m.AcceptedSenderDirectoryRevision,
+                    EncryptionSenderDeviceId = m.EncryptionSenderDeviceId,
                     SenderCredentialId = sender?.CredentialId ?? Guid.Empty,
                     SenderAlias = sender?.Alias ?? string.Empty,
                     CreatedAt = m.CreatedAt,
@@ -2000,6 +2050,24 @@ public sealed partial class ThreadService(
                 return Result<CmdResponse>.NotFound("Message not found");
 
             var canEditAsAdmin = await MemberHasAdminRoleAsync(member.TenantId, member.Id, ct);
+            var thread = await dataContext.Query<MessageThread>()
+                .Where(t => t.Id == request.ThreadId && t.TenantId == caller.TenantId)
+                .FirstOrDefaultAsync(ct);
+            if (thread?.EncryptionRequired == true && message.EncryptedEnvelope is null && request.EncryptedEnvelope is null)
+                return Result<CmdResponse>.Failure("This conversation requires encrypted messages", 409);
+            if (message.EncryptedEnvelope is not null || request.EncryptedEnvelope is not null)
+            {
+                if (message.MessageThreadMemberId != member.Id)
+                    return Result<CmdResponse>.Forbidden("Only the sender can replace an encrypted message");
+                if (!EncryptedMessages.ValidEnvelope(request.EncryptedEnvelope) || request.Text != EncryptedMessages.Preview)
+                    return Result<CmdResponse>.Failure("An encrypted message cannot be replaced with plaintext", 400);
+                var recipients = await dataContext.Query<MessageThreadMember>()
+                    .Where(x => x.TenantId == caller.TenantId && x.MessageThreadId == request.ThreadId && x.IsEnabled && !x.IsDeleted)
+                    .ToListAsync(ct);
+                if (!await EncryptionRecipientsCurrentAsync(caller.TenantId, caller.CredentialId, request.EncryptionSenderDeviceId,
+                        request.SenderDirectoryRevision, request.RecipientDirectoryRevisions, recipients.Select(x => x.CredentialId).ToArray(), ct))
+                    return Result<CmdResponse>.Failure("Encryption recipients changed. Refresh encryption.", 412);
+            }
             if (message.MessageThreadMemberId != member.Id && !canEditAsAdmin)
                 return Result<CmdResponse>.Failure("You can only edit your own messages", 403);
 
@@ -2015,9 +2083,17 @@ public sealed partial class ThreadService(
             }
 
             message.Text = request.Text;
+            message.EncryptedEnvelope = request.EncryptedEnvelope;
+            message.AcceptedSenderDirectoryRevision = request.EncryptedEnvelope is not null ? request.SenderDirectoryRevision : null;
+            message.EncryptionSenderDeviceId = request.EncryptedEnvelope is not null ? request.EncryptionSenderDeviceId : null;
             message.ModifiedAt = DateTime.UtcNow;
 
             dataContext.Update(message);
+            if (request.EncryptedEnvelope is not null && thread is { EncryptionRequired: false })
+            {
+                thread.EncryptionRequired = true;
+                dataContext.Update(thread);
+            }
             AddOutboxEvent(
                 MessageRealtimeEvents.MessageEdited,
                 message.TenantId,
@@ -2486,7 +2562,7 @@ public sealed partial class ThreadService(
                 return Result<CmdResponse>.Failure("Storage file is not available for this attachment", (int)storageFileResult.HttpStatusCode);
 
             var storageFile = storageFileResult.Response;
-            var fileFeature = storageFile.ContentType?.StartsWith("audio/", StringComparison.OrdinalIgnoreCase) == true
+            var fileFeature = EncryptedMessages.IsVoiceFile(storageFile.Name, storageFile.ContentType)
                 ? ConversationFeatures.Voice : ConversationFeatures.Attachments;
             if (!await FeatureEnabledAsync(caller.TenantId, request.ThreadId, fileFeature, ct))
                 return Result<CmdResponse>.Forbidden("This attachment type is disabled for this conversation");

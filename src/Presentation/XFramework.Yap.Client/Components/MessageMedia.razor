@@ -16,11 +16,14 @@
                     @if (Message.LocalFileKey is null) { <button class="photo-download" aria-label="Download original photo" title="Download original" @onclick="() => State.OpenFileAsync(Message, file)"><Icon Name="download" Size="20" /></button> }
                 </div>
             }
-            else if (file.ContentType.StartsWith("video/")) { <video src="@url" controls playsinline preload="metadata" aria-label="@file.Name"></video> }
+            else if (IsVideo(file)) {
+                <video src="@url" controls playsinline preload="metadata" aria-label="@file.Name" @onerror="() => playbackFailed.Add(file.Id)" @oncontextmenu="() => OnActions.InvokeAsync()" @oncontextmenu:preventDefault></video>
+                @if (playbackFailed.Contains(file.Id)) { <button class="media-open" @onclick="() => State.OpenFileAsync(Message, file)"><Icon Name="download" Size="20" /><span>This video cannot play here. Download to watch.</span></button> }
+            }
             else { <audio src="@url" controls preload="metadata" aria-label="Voice message"></audio> }
         }
-        else if (IsImage(file)) { <div class="photo-skeleton" role="status" aria-label="Loading photo"><span class="spinner"></span></div> }
-        else { <button class="media-open" disabled="@loading" @onclick="() => OpenAsync(file)"><Icon Name="@(file.ContentType.StartsWith("audio/") ? "mic" : "file")" Size="20" /><span>@file.Name</span><small>@(file.Size / 1024) KB</small></button> }
+        else if (IsImage(file) || IsVideo(file)) { <div class="photo-skeleton" role="status" aria-label="@(IsVideo(file) ? "Loading video" : "Loading photo")"><span class="spinner"></span></div> }
+        else { <button class="media-open" disabled="@(loading || WaitingForLinks)" @onclick="() => OpenAsync(file)"><Icon Name="@(file.ContentType.StartsWith("audio/") ? "mic" : "file")" Size="20" /><span>@file.Name</span><small>@(file.Size / 1024) KB</small></button> }
     }
     @if (loading && Message.Attachments.Count == 0) { <span class="spinner" role="status" aria-label="Loading attachment"></span> }
     @if (failed) { <button class="media-open" @onclick="LoadAsync">Attachment unavailable · retry</button> }
@@ -37,15 +40,19 @@
     private ChatAttachment? viewing;
     private readonly Dictionary<Guid, string> urls = [];
     private readonly HashSet<Guid> ready = [];
+    private readonly HashSet<Guid> playbackFailed = [];
     private string PhotoId(ChatAttachment file) => $"photo-{Message.Id}-{file.Id}";
     private bool loading, failed, disposed;
+    private bool WaitingForLinks => Message.EncryptedEnvelope is not null && Message.LocalFileKey is null && !Message.AttachmentLinksReady;
     private string? loaded;
     private int version;
     private static bool IsHeif(ChatAttachment file) => file.ContentType.StartsWith("image/heic", StringComparison.OrdinalIgnoreCase) || file.ContentType.StartsWith("image/heif", StringComparison.OrdinalIgnoreCase) || Path.GetExtension(file.Name).ToLowerInvariant() is ".heic" or ".heif";
     public static bool IsImage(ChatAttachment file) => IsHeif(file) || file.ContentType.Split(';')[0].ToLowerInvariant() is "image/jpeg" or "image/png" or "image/gif" or "image/webp" or "image/avif";
+    public static bool IsVideo(ChatAttachment file) => MediaType(file) is "video/mp4" or "video/quicktime" or "video/webm";
+    private static string MediaType(ChatAttachment file) => ChatMedia.ContentType(file.ContentType, file.Name);
     protected override async Task OnParametersSetAsync()
     {
-        var key = $"{Message.Id}:{Message.LocalFileKey}:{Message.HasAttachments}:{string.Join(',', Message.Attachments.Select(f => f.Id))}";
+        var key = $"{Message.Id}:{Message.LocalFileKey}:{Message.HasAttachments}:{Message.AttachmentLinksReady}:{string.Join(',', Message.Attachments.Select(f => f.Id))}";
         if (key != loaded) { loaded = key; await LoadAsync(); }
     }
     private async Task LoadAsync()
@@ -57,9 +64,10 @@
         try
         {
             await ReleaseAsync();
+            if (WaitingForLinks) return;
             if (message.Attachments.Count == 0) { await State.LoadAttachmentMetadataAsync(message); await MetadataLoaded.InvokeAsync(); }
             if (request != version || disposed) return;
-            foreach (var file in message.Attachments.Where(f => IsImage(f) || message.LocalFileKey is not null && (f.ContentType.StartsWith("audio/") || f.ContentType.StartsWith("video/")))) await OpenAsync(message, file, request);
+            foreach (var file in message.Attachments.Where(f => IsImage(f) || IsVideo(f) || message.LocalFileKey is not null && f.ContentType.StartsWith("audio/"))) await OpenAsync(message, file, request);
         }
         catch { if (request == version) failed = true; }
         finally { if (request == version) loading = false; }
@@ -69,9 +77,11 @@
     {
         try
         {
-            var url = await JS.InvokeAsync<string?>("yap.device.mediaUrl", message.LocalFileKey ?? $"{State.Scope.Replace(':', '-')}-{file.Id:N}",
+            var encrypted = message.EncryptedEnvelope is not null && message.LocalFileKey is null;
+            var key = encrypted ? await State.PrepareEncryptedFileAsync(message, file) : message.LocalFileKey ?? $"{State.Scope.Replace(':', '-')}-{file.Id:N}";
+            var url = await JS.InvokeAsync<string?>("yap.device.mediaUrl", key,
                 $"api/chat/conversations/{message.ThreadId}/messages/{message.Id}/attachments/{file.Id}", State.Scope,
-                State.Online && !State.NeedsLogin, file.ContentType, message.LocalFileKey is not null, file.Name);
+                State.Online && !State.NeedsLogin, MediaType(file), message.LocalFileKey is not null || encrypted, file.Name);
             if (url is null) { await State.OpenFileAsync(message, file); return; }
             if (disposed || request != version) await JS.InvokeVoidAsync("yap.device.releaseMedia", url);
             else { if (urls.Remove(file.Id, out var old)) await JS.InvokeVoidAsync("yap.device.releaseMedia", old); urls[file.Id] = url; }

@@ -45,6 +45,11 @@
     }
     @if (tab == "general")
     {
+    @if (Conversation.Group)
+    {
+        <div class="row"><Avatar Initials="@ChatMessage.InitialsFor(Conversation.Name)" ImageUrl="@Conversation.AvatarUrl" />
+        @if (!Locked) { <PhotoPicker Path="@($"api/chat/conversations/{Conversation.Id}/photo")" Uploaded="State.SynchronizeAsync" /> }</div>
+    }
     <label class="field"><span class="lab">Conversation name</span><span class="inp"><input aria-label="Conversation name" @bind="title" @bind:event="oninput" maxlength="100" disabled="@Locked" /></span></label>
     <button class="btn ghost" disabled="@(Locked || string.IsNullOrWhiteSpace(title))" @onclick="RenameAsync">Save name</button>
     <button class="btn ghost" disabled="@(!State.Online || State.NeedsLogin || busy)" @onclick="State.MuteAsync">@(Conversation.Muted ? "Unmute conversation" : "Mute conversation")</button>

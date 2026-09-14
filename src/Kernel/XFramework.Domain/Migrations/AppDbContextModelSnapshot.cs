@@ -744,6 +744,9 @@ namespace XFramework.Domain.Migrations
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<long?>("AcceptedSenderDirectoryRevision")
+                        .HasColumnType("bigint");
+
                     b.Property<Guid>("ConcurrencyStamp")
                         .HasColumnType("uuid");
 
@@ -754,6 +757,12 @@ namespace XFramework.Domain.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EncryptedEnvelope")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("EncryptionSenderDeviceId")
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -1926,6 +1935,9 @@ namespace XFramework.Domain.Migrations
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<bool>("EncryptionRequired")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("Features")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -1950,6 +1962,9 @@ namespace XFramework.Domain.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("character varying");
+
+                    b.Property<Guid?>("PhotoStorageFileId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -3379,6 +3394,46 @@ namespace XFramework.Domain.Migrations
                     b.HasIndex(new[] { "CredentialId" }, "IX_tbl_IdentityAuthorizationLogs_CredentialID");
 
                     b.ToTable("AuthorizationLog", "Audit");
+                });
+
+            modelBuilder.Entity("IdentityServer.Domain.Shared.Contracts.EncryptionAccount", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DevicesJson")
+                        .IsRequired()
+                        .HasMaxLength(1048576)
+                        .HasColumnType("character varying(1048576)");
+
+                    b.Property<long>("DirectoryRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("RecoveryArchive")
+                        .HasMaxLength(2097152)
+                        .HasColumnType("character varying(2097152)");
+
+                    b.Property<long>("RecoveryRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("RootPublicKey")
+                        .IsRequired()
+                        .HasMaxLength(16384)
+                        .HasColumnType("character varying(16384)");
+
+                    b.Property<string>("Roster")
+                        .IsRequired()
+                        .HasMaxLength(524288)
+                        .HasColumnType("character varying(524288)");
+
+                    b.HasKey("TenantId", "CredentialId");
+
+                    b.ToTable("EncryptionAccount", "Identity");
                 });
 
             modelBuilder.Entity("IdentityServer.Domain.Shared.Contracts.IdentityAddress", b =>

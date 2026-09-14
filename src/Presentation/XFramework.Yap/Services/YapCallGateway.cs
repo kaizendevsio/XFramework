@@ -10,8 +10,8 @@ using Yap.Contracts;
 
 namespace Yap.Services;
 
-/// <summary>One Yap instance, trusted-server TLS relay. This is explicitly not end-to-end encryption.</summary>
-public sealed class YapCallGateway : IBoltCallAuthorizer, IDisposable
+/// <summary>Authenticated Yap voice admission and media relay; encrypted groups forward client-encrypted SFrame audio.</summary>
+public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCallAuthorizer, IDisposable
 {
     private readonly object gate = new();
     private readonly Dictionary<Guid, ActiveInvite> invites = [];
@@ -20,22 +20,33 @@ public sealed class YapCallGateway : IBoltCallAuthorizer, IDisposable
     private readonly IServiceScopeFactory scopes;
     private readonly Timer cleanup;
     public bool Enabled { get; }
+    public bool EncryptedGroupsEnabled => Enabled && groupLifecycleEnabled;
     public BoltServer Server { get; }
 
     public YapCallGateway(IConfiguration configuration, IServiceScopeFactory scopes, ILogger<BoltServer> logger)
+        : this(configuration, scopes, logger, configuration.GetValue<bool>("Yap:Calls:EncryptedGroups")) { }
+
+    // Kept explicit for disposable fixtures; production uses the default-false configuration gate.
+    internal YapCallGateway(IConfiguration configuration, IServiceScopeFactory scopes, ILogger<BoltServer> logger, bool enableGroupLifecycle)
     {
         this.scopes = scopes;
+        groupLifecycleEnabled = enableGroupLifecycle;
         Enabled = configuration.GetValue<bool>("Yap:Calls:Enabled");
-        if (Enabled && configuration["Yap:Calls:SecurityMode"] != "TrustedServerTls")
-            throw new InvalidOperationException("Yap calls require the explicit TrustedServerTls security mode.");
+        var requiredMode = enableGroupLifecycle ? "EndToEndEncrypted" : "TrustedServerTls";
+        if (Enabled && configuration["Yap:Calls:SecurityMode"] != requiredMode)
+            throw new InvalidOperationException($"Yap calls require the explicit {requiredMode} security mode.");
         Server = new BoltServer(logger, new BoltServerOptions
         {
             MediaEnabled = Enabled, RequireSecureTransport = true, AuthenticatedMediaOnly = true,
+            RequireEncryptedMedia = enableGroupLifecycle,
             CallAuthorizer = this, MaxActiveCalls = 64, MaxActiveCallsPerPrincipal = 1,
-            MaxCallParticipants = 2, MaxMediaStreamsPerPrincipal = 2,
+            GroupCallAuthorizer = enableGroupLifecycle ? this : null,
+            MaxCallParticipants = enableGroupLifecycle ? 8 : 2, MaxMediaStreamsPerPrincipal = 2,
             MaxFrameBytes = 64 * 1024, SendQueueCapacity = 64, SendQueueByteCapacity = 1024 * 1024,
+            SendEnqueueTimeoutMs = enableGroupLifecycle ? 250 : 0,
             MaxConnectionsPerPrincipal = 2, MaxConnectionLifetimeSeconds = 3600
         });
+        Server.GroupParticipantRemoved += GroupParticipantRemoved;
         cleanup = new Timer(_ => Prune(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
     }
 
@@ -54,7 +65,7 @@ public sealed class YapCallGateway : IBoltCallAuthorizer, IDisposable
             user.Identity?.Name ?? "Someone", request.RecipientId, DateTimeOffset.UtcNow.AddSeconds(60));
         lock (gate)
         {
-            if (invites.Count >= 64 || invites.Values.Any(x => x.Tenant == tenant &&
+            if (invites.Count + groups.Count >= 64 || GroupMemberBusy(tenant, caller) || GroupMemberBusy(tenant, request.RecipientId) || invites.Values.Any(x => x.Tenant == tenant &&
                 (x.Invite.CallerId == caller || x.Invite.RecipientId == caller ||
                  x.Invite.CallerId == request.RecipientId || x.Invite.RecipientId == request.RecipientId)))
                 throw new YapApiException(409, "One of you is already in a call.");
@@ -128,6 +139,7 @@ public sealed class YapCallGateway : IBoltCallAuthorizer, IDisposable
             // Snapshot precedes live events: an End racing subscription must not be followed
             // by a stale incoming snapshot that reopens a finished call in the client.
             foreach (var value in pending) handler(value);
+            ReplayGroupsLocked(key.Tenant, key.User, handler);
         }
         return new Subscription(() => { lock (gate) { if (!listeners.TryGetValue(key, out var handlers)) return; handlers.Remove(handler); if (handlers.Count == 0) listeners.Remove(key); } });
     }
@@ -140,6 +152,9 @@ public sealed class YapCallGateway : IBoltCallAuthorizer, IDisposable
         if (!context.WebSockets.IsWebSocketRequest) throw new YapApiException(400, "A call connection is required.");
         var (tenant, credential) = Identity(context.User);
         var token = context.Request.Query["ticket"].ToString();
+        bool groupTicket;
+        lock (gate) groupTicket = tickets.TryGetValue(token, out var candidate) && candidate.Group;
+        if (groupTicket) { await AcceptGroupSocketAsync(context, token); return; }
         Ticket ticket;
         ActiveInvite active;
         lock (gate)
@@ -201,6 +216,12 @@ public sealed class YapCallGateway : IBoltCallAuthorizer, IDisposable
 
     private async Task VerifyMembershipAsync(ClaimsPrincipal user, Guid thread, Guid other, CancellationToken ct)
     {
+        if (!(await CurrentMembersAsync(user, thread, ct)).Contains(other))
+            throw new YapApiException(403, "Calls are available only to current conversation members.");
+    }
+
+    private async Task<HashSet<Guid>> CurrentMembersAsync(ClaimsPrincipal user, Guid thread, CancellationToken ct)
+    {
         await using var scope = scopes.CreateAsyncScope();
         var services = scope.ServiceProvider;
         var client = new CommunicationsChatClient(services.GetRequiredService<ICommunicationsServiceWrapper>(),
@@ -208,9 +229,9 @@ public sealed class YapCallGateway : IBoltCallAuthorizer, IDisposable
             services.GetRequiredService<IActorAccessTokenScope>());
         var session = await client.ForCurrentActorAsync(ct: ct);
         var response = await session.GetThreadAsync(thread, ct);
-        if (!response.IsSuccess || response.Response is null || !response.Response.Members.Any(x => x.CredentialId == session.CredentialId) ||
-            !response.Response.Members.Any(x => x.CredentialId == other))
+        if (!response.IsSuccess || response.Response is null || !response.Response.Members.Any(x => x.CredentialId == session.CredentialId))
             throw new YapApiException(403, "Calls are available only to current conversation members.");
+        return response.Response.Members.Select(x => x.CredentialId).ToHashSet();
     }
 
     public static bool HasSameOrigin(HttpRequest request) => Uri.TryCreate(request.Headers.Origin.ToString(), UriKind.Absolute, out var origin) &&
@@ -240,6 +261,7 @@ public sealed class YapCallGateway : IBoltCallAuthorizer, IDisposable
     }
     private void Prune()
     {
+        PruneGroups();
         ActiveInvite[] expired;
         lock (gate)
         {
@@ -249,8 +271,18 @@ public sealed class YapCallGateway : IBoltCallAuthorizer, IDisposable
         }
         foreach (var item in expired) { PublishBoth(item, "ended"); item.Lifetime.Cancel(); }
     }
-    public void Dispose() { cleanup.Dispose(); lock (gate) foreach (var item in invites.Values) item.Lifetime.Cancel(); Server.Dispose(); }
-    private sealed record Ticket(Guid CallId, Guid Tenant, Guid User, string Session, DateTimeOffset ExpiresAt);
+    public void Dispose()
+    {
+        cleanup.Dispose();
+        Server.GroupParticipantRemoved -= GroupParticipantRemoved;
+        lock (gate)
+        {
+            foreach (var item in invites.Values) item.Lifetime.Cancel();
+            foreach (var room in groups.Values) foreach (var member in room.Members.Values) member.Lifetime.Cancel();
+        }
+        Server.Dispose();
+    }
+    private sealed record Ticket(Guid CallId, Guid Tenant, Guid User, string Session, DateTimeOffset ExpiresAt, bool Group = false);
     private sealed class ActiveInvite(Guid tenant, YapCallInvite invite)
     {
         public Guid Tenant { get; } = tenant;
@@ -288,11 +320,29 @@ public static class YapCallEndpoints
     public static void MapYapCalls(this WebApplication app)
     {
         var api = app.MapGroup("/api/chat/calls").RequireAuthorization().AddEndpointFilter<YapApiFilter>();
-        api.MapGet("/config", (YapCallGateway gateway) => new { enabled = gateway.Enabled, securityMode = "TrustedServerTls", groupCalls = false });
+        api.MapGet("/config", (YapCallGateway gateway) => new { enabled = gateway.Enabled,
+            securityMode = gateway.EncryptedGroupsEnabled ? "EndToEndEncrypted" : "TrustedServerTls", groupCalls = gateway.EncryptedGroupsEnabled });
         api.MapPost("/", (StartYapCall request, HttpContext context, YapCallGateway gateway, CancellationToken ct) => gateway.StartAsync(context.User, request, ct));
         api.MapPost("/{id:guid}/connect", (Guid id, HttpContext context, YapCallGateway gateway, CancellationToken ct) => gateway.ConnectAsync(context.User, id, ct));
         api.MapPost("/{id:guid}/ready", (Guid id, HttpContext context, YapCallGateway gateway) => { gateway.Ready(context.User, id); return Results.NoContent(); });
         api.MapPost("/{id:guid}/end", (Guid id, HttpContext context, YapCallGateway gateway) => { gateway.End(context.User, id); return Results.NoContent(); });
+        // Admission stays disabled in the production constructor until encrypted group audio is verified.
+        api.MapPost("/groups", (StartYapGroupCall request, HttpContext context, YapCallGateway gateway, CancellationToken ct) =>
+        {
+            if (request.DeviceId == Guid.Empty || request.Recipients is null) throw new YapApiException(400, "An approved device is required.");
+            return gateway.StartGroupAsync(context.User, request.ThreadId, request.Recipients, ct, request.DeviceId);
+        });
+        api.MapGet("/groups/{id:guid}", (Guid id, HttpContext context, YapCallGateway gateway) => gateway.GroupRoster(context.User, id));
+        api.MapPost("/groups/{id:guid}/accept", (Guid id, AcceptYapGroupCall request, HttpContext context, YapCallGateway gateway, CancellationToken ct) =>
+        {
+            if (request.DeviceId == Guid.Empty) throw new YapApiException(400, "An approved device is required.");
+            return gateway.AcceptGroupAsync(context.User, id, ct, request.DeviceId);
+        });
+        api.MapPost("/groups/{id:guid}/connect", (Guid id, HttpContext context, YapCallGateway gateway, CancellationToken ct) => gateway.ConnectGroupAsync(context.User, id, ct));
+        api.MapPost("/groups/{id:guid}/ready", async (Guid id, YapGroupReady request, HttpContext context, YapCallGateway gateway, CancellationToken ct) => { await gateway.ReadyGroupAsync(context.User, id, ct, request.Revision); return Results.NoContent(); });
+        api.MapPost("/groups/{id:guid}/leave", async (Guid id, HttpContext context, YapCallGateway gateway, CancellationToken ct) => { await gateway.LeaveGroupAsync(context.User, id, ct); return Results.NoContent(); });
+        api.MapPost("/groups/{id:guid}/control", async (Guid id, YapGroupControl request, HttpContext context, YapCallGateway gateway, CancellationToken ct) => { await gateway.RelayGroupControlAsync(context.User, id, request, ct); return Results.NoContent(); });
+        api.MapPost("/groups/{id:guid}/mute", (Guid id, YapGroupMute request, HttpContext context, YapCallGateway gateway) => { gateway.MuteGroup(context.User, id, request.Muted); return Results.NoContent(); });
         // The one-use ticket and exact Origin check protect the upgrade; the cookie is still required.
         // HTTP/2 WebSockets use extended CONNECT; HTTP/1.1 upgrades use GET.
         app.MapMethods("/api/chat/calls/socket", [HttpMethods.Get, HttpMethods.Connect], async (HttpContext context, YapCallGateway gateway, ILogger<YapCallGateway> logger) =>

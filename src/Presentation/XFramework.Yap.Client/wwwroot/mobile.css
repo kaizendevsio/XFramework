@@ -186,7 +186,7 @@ button,a,label,nav,.avatar,.appbar,.bottomnav{-webkit-user-select:none;user-sele
 @media(prefers-reduced-motion:reduce){.switch-track,.switch-track:after{transition:none}.conversation-menu{animation:none}}
 .sheet:has(.conversation-settings){height:85%}
 .sheet-dialog{width:100%;height:100%;max-width:none;max-height:none;margin:0;border:0;color:var(--text)}.sheet-dialog:not([open]){display:none}.sheet-dialog::backdrop{background:transparent}
-.inbox-section{margin:16px 0 4px;font-size:13px;font-weight:650;color:var(--muted);letter-spacing:.03em}
+.inbox-section{margin:16px 0 4px;padding-inline:16px;font-size:13px;font-weight:650;color:var(--muted);letter-spacing:.03em}
 @media(pointer:coarse){.inbox-item .row{padding-right:0}.inbox-menu-trigger{display:none}}
 .selected-people{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .selected-person{display:flex;align-items:center;gap:7px;padding:5px 9px 5px 5px;border-radius:24px;background:var(--surface3);font-size:13px}

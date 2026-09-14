@@ -104,7 +104,7 @@
             var picked = await JS.InvokeAsync<ChatState.PickedFile>("yap.device.pickFile", source!.Element,
                 Guid.NewGuid().ToString("N"), ChatLimits.StagedFileBytes, ChatLimits.MaxFileBytes);
             file = picked;
-            if (!picked.Staged) await StreamAsync(picked);
+            if (!picked.Staged && !State.EncryptionEnabled) await StreamAsync(picked);
         }
         catch (Exception ex) { State.Report(ex); await RemoveFileAsync(); }
         finally { busy = false; }

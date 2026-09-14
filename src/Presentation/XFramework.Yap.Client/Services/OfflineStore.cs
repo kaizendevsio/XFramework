@@ -87,6 +87,7 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
     }, ct);
 
     public Task<int> MessageCountAsync(string scope, Guid thread) => UseAsync(db => db.Messages.CountAsync(x => x.Scope == scope && x.ThreadId == thread));
+    public Task<int> ReplyCountAsync(string scope, Guid parent) => UseAsync(db => db.Messages.CountAsync(x => x.Scope == scope && x.ParentId == parent));
 
     public Task<ChatMessage?> MessageAsync(string scope, Guid id) => UseAsync(async db =>
     {
@@ -94,15 +95,28 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         return row is null ? null : JsonSerializer.Deserialize<ChatMessage>(row.Json, Json);
     });
 
-    public Task<List<ChatMessage>> MessagesAsync(string scope, Guid thread, CancellationToken ct = default, int limit = 0) => UseAsync(async db =>
+    public Task<int> MessageOffsetAsync(string scope, Guid thread, Guid id, Guid? parent = null) => UseAsync(async db =>
+    {
+        var row = await db.Messages.AsNoTracking().SingleOrDefaultAsync(x => x.Scope == scope && x.ThreadId == thread && x.Id == id);
+        if (row is null) return 0;
+        if (parent.HasValue)
+            return await db.Database.SqlQuery<int>($"SELECT COUNT(*) AS Value FROM Messages WHERE Scope = {scope} AND ThreadId = {thread} AND ParentId = {parent.Value} AND (CreatedTicks > {row.CreatedTicks} OR (CreatedTicks = {row.CreatedTicks} AND Id > {id}))").SingleAsync();
+        return await db.Database.SqlQuery<int>($"SELECT COUNT(*) AS Value FROM Messages WHERE Scope = {scope} AND ThreadId = {thread} AND (CreatedTicks > {row.CreatedTicks} OR (CreatedTicks = {row.CreatedTicks} AND Id > {id}))").SingleAsync();
+    });
+
+    public Task<List<ChatMessage>> MessagesAsync(string scope, Guid thread, CancellationToken ct = default, int limit = 0, int skip = 0, Guid? parent = null) => UseAsync(async db =>
     {
         var query = db.Messages.AsNoTracking().Where(x => x.Scope == scope && x.ThreadId == thread).OrderByDescending(x => x.CreatedTicks).ThenByDescending(x => x.Id).AsQueryable();
+        if (parent.HasValue) query = query.Where(x => x.ParentId == parent);
+        if (skip > 0) query = query.Skip(skip);
         if (limit > 0) query = query.Take(limit);
         var messages = (await query.ToListAsync(ct)).AsEnumerable().Reverse()
             .Select(x => JsonSerializer.Deserialize<ChatMessage>(x.Json, Json)!).ToList();
-        var pending = await db.Outbox.AsNoTracking().Where(x => x.Scope == scope && x.ThreadId == thread).ToDictionaryAsync(x => x.Id, ct);
+        var ids = messages.Select(x => x.Id).ToArray();
+        var pending = await db.Outbox.AsNoTracking().Where(x => x.Scope == scope && x.ThreadId == thread && ids.Contains(x.Id)).Select(x => new { x.Id, x.Paused, x.Error }).ToDictionaryAsync(x => x.Id, ct);
         foreach (var message in messages)
-            if (pending.TryGetValue(message.Id, out var item)) message.Delivery = item.Paused ? "Needs attention · retry" : "Queued";
+            if (pending.TryGetValue(message.Id, out var item)) message.Delivery = item.Paused ? "Needs attention · retry"
+                : item.Error == "Waiting for encrypted setup" ? "Sending · waiting for recipient setup" : "Queued";
         return messages;
     }, ct);
 
@@ -116,13 +130,18 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
             && (complete || x.CreatedTicks >= oldest)).ExecuteDeleteAsync(ct);
         foreach (var message in messages)
         {
+            // The outbox owns this exact body and persisted ciphertext until completion.
+            // A remote refresh must not alter what the device signs or retries for this ID.
+            if (pending.Contains(message.Id)) continue;
             var existing = await db.Messages.FindAsync([scope, message.Id], ct);
             // Preserve already opened attachment metadata when the message listing omits files.
             if (existing is not null)
             {
                 var cached = JsonSerializer.Deserialize<ChatMessage>(existing.Json, Json)!;
-                if (cached.LocalFileKey is null && message.HasAttachments) message.Attachments = cached.Attachments;
-                if (pending.Contains(message.Id)) { message.LocalFileKey = cached.LocalFileKey; message.Attachments = cached.Attachments; }
+                // Encrypted metadata has already been verified by DecryptMessagesAsync. Never
+                // replace a freshly decrypted edit with attachment metadata from an older envelope.
+                if (message.EncryptedEnvelope is null && cached.EncryptedEnvelope is null && cached.LocalFileKey is null && message.HasAttachments)
+                    message.Attachments = cached.Attachments;
             }
             await UpsertMessageAsync(db, scope, message, ct);
         }
@@ -156,7 +175,10 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         if (cached is not null)
         {
             var message = JsonSerializer.Deserialize<ChatMessage>(cached.Json, Json)!;
-            message.Delivery = "Sent"; message.LocalFileKey = null; message.Attachments = [];
+            message.Delivery = "Sent"; message.LocalFileKey = null;
+            // Encrypted file metadata lives only in the signed envelope/local cache.
+            // The server's attachment list contains opaque container names and types.
+            if (message.EncryptedEnvelope is null) message.Attachments = [];
             cached.Json = JsonSerializer.Serialize(message, Json);
         }
         db.Outbox.Remove(item);

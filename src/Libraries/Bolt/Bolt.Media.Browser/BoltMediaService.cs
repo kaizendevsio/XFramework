@@ -15,7 +15,7 @@ namespace Bolt.Media.Browser;
 ///   var callId = await Media.StartCallAsync("recipient", video: true);
 ///   await Media.EndCallAsync(callId);
 /// </summary>
-public sealed class BoltMediaService : IAsyncDisposable
+public sealed partial class BoltMediaService : IAsyncDisposable
 {
     private readonly BoltCryptoInterop _crypto;
     private readonly BoltAudioPipeline _audio;
@@ -23,9 +23,17 @@ public sealed class BoltMediaService : IAsyncDisposable
     private readonly BoltDeviceManager _devices;
     private readonly MediaServiceOptions _options;
     private readonly ILogger<BoltMediaService> _logger;
+    private readonly BoltSFrameInterop? _sframe;
+    private string? _sframeLocalSenderId;
 
     private BoltMediaClient? _mediaClient;
-    private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _streamPlaybackTasks = new();
+    private sealed class PlaybackLoop
+    {
+        public CancellationTokenSource Cancellation { get; } = new();
+        public Task Completion { get; set; } = Task.CompletedTask;
+    }
+
+    private readonly ConcurrentDictionary<Guid, PlaybackLoop> _streamPlaybackTasks = new();
 
     private Guid _activeAudioStreamId;
     private Guid _activeVideoStreamId;
@@ -72,7 +80,8 @@ public sealed class BoltMediaService : IAsyncDisposable
         BoltVideoPipeline video,
         BoltDeviceManager devices,
         MediaServiceOptions options,
-        ILogger<BoltMediaService> logger)
+        ILogger<BoltMediaService> logger,
+        BoltSFrameInterop? sframe = null)
     {
         _crypto = crypto;
         _audio = audio;
@@ -80,6 +89,7 @@ public sealed class BoltMediaService : IAsyncDisposable
         _devices = devices;
         _options = options;
         _logger = logger;
+        _sframe = sframe;
     }
 
     /// <summary>
@@ -91,7 +101,7 @@ public sealed class BoltMediaService : IAsyncDisposable
     {
         if (_initialized) return;
 
-        if (_options.SecurityMode != MediaSecurityMode.AuthenticatedTransport)
+        if (_options.SecurityMode is not (MediaSecurityMode.AuthenticatedTransport or MediaSecurityMode.AuthenticatedSFrame))
             throw new NotSupportedException(
                 "Encrypted Bolt Media calls are disabled until key exchange is bound to authenticated peer identities.");
 
@@ -103,6 +113,11 @@ public sealed class BoltMediaService : IAsyncDisposable
 
         // Create media client and wire events
         _mediaClient = new BoltMediaClient(client, _logger);
+        if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame)
+        {
+            if (_sframe is null) throw new InvalidOperationException("SFrame browser services are not registered.");
+            _mediaClient.AuthenticatedStreamEncryptionFactory = _sframe.ForStream;
+        }
 
         _mediaClient.OnIncomingCall += async info =>
         {
@@ -136,6 +151,8 @@ public sealed class BoltMediaService : IAsyncDisposable
     {
         EnsureInitialized();
 
+        if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame)
+            throw new InvalidOperationException("Use the authenticated hosted-call and epoch APIs for SFrame.");
         _hasVideo = video;
 
         _audio.OnEncoded -= OnAudioEncodedForStream;
@@ -156,6 +173,8 @@ public sealed class BoltMediaService : IAsyncDisposable
     public async Task AnswerCallAsync(Guid callId, bool video = false)
     {
         EnsureInitialized();
+        if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame)
+            throw new InvalidOperationException("Use the authenticated hosted-call and epoch APIs for SFrame.");
 
         _hasVideo = video;
 
@@ -229,7 +248,9 @@ public sealed class BoltMediaService : IAsyncDisposable
 
         _activeAudioStreamId = Guid.NewGuid();
         var audioStream = new BoltMediaStream(conn, _activeAudioStreamId, callId, true);
-        if (_options.EnableFec) audioStream.EnableFec(_options.FecAudioGroupSize);
+        if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame)
+            audioStream.SetEncryption(_sframe!.ForStream(callId, _sframeLocalSenderId!));
+        else if (_options.EnableFec) audioStream.EnableFec(_options.FecAudioGroupSize);
         audioStream.EnableNack(128);
         // Audio is already Opus-encoded. PCM VAD/PLC must never inspect these bytes.
         audioStream.OnBitrateChanged += kbps =>
@@ -241,7 +262,8 @@ public sealed class BoltMediaService : IAsyncDisposable
         }
 
         BoltCodec.WriteMediaConfig(writer, _activeAudioStreamId, callId, MediaType.Audio, CodecId.Opus,
-            _options.AudioSampleRate, _options.AudioChannels, _options.AudioBitrateKbps, 0, ReadOnlySpan<byte>.Empty);
+            _options.AudioSampleRate, _options.AudioChannels, _options.AudioBitrateKbps,
+            _options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame ? (byte)0x10 : (byte)0, ReadOnlySpan<byte>.Empty);
         await conn.SendAsync(writer.WrittenMemory, CancellationToken.None);
         writer.Reset();
 
@@ -272,9 +294,14 @@ public sealed class BoltMediaService : IAsyncDisposable
 
     private async Task OnAudioEncodedForStream(byte[] data)
     {
+        if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame && _sframe?.IsReady != true) return;
         var stream = _mediaClient?.GetMediaStream(_activeAudioStreamId);
         if (stream is not null)
-            await stream.SendFrameAsync(data, false);
+        {
+            try { await stream.SendFrameAsync(data, false); }
+            catch (InvalidOperationException) when (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame)
+            { /* A paused epoch or full bounded crypto queue drops audio, never sends plaintext. */ }
+        }
     }
 
     private void OnVideoEncodedForStream(byte[] data, bool isKeyframe)
@@ -286,21 +313,21 @@ public sealed class BoltMediaService : IAsyncDisposable
 
     private void StartPlaybackLoop(BoltMediaStream stream)
     {
-        var cts = new CancellationTokenSource();
-        if (!_streamPlaybackTasks.TryAdd(stream.StreamId, cts))
+        var loop = new PlaybackLoop();
+        if (!_streamPlaybackTasks.TryAdd(stream.StreamId, loop))
         {
-            cts.Dispose();
+            loop.Cancellation.Dispose();
             return;
         }
 
-        _ = Task.Run(async () =>
+        loop.Completion = Task.Run(async () =>
         {
             try
             {
-                await foreach (var frame in stream.ReadFramesAsync(cts.Token))
+                await foreach (var frame in stream.ReadFramesAsync(loop.Cancellation.Token))
                 {
                     if (stream.IsAudio)
-                        await _audio.DecodeFrameAsync(frame.Data, frame.Timestamp);
+                        await _audio.DecodeFrameAsync(stream.StreamId, frame.Data, frame.Timestamp);
                     else
                         await _video.DecodeFrameAsync(frame.Data, frame.Timestamp, frame.IsKeyframe);
                 }
@@ -312,21 +339,33 @@ public sealed class BoltMediaService : IAsyncDisposable
             }
             finally
             {
-                if (_streamPlaybackTasks.TryRemove(stream.StreamId, out var removed))
-                    removed.Dispose();
+                try
+                {
+                    if (stream.IsAudio) await _audio.ReleaseRemoteStreamAsync(stream.StreamId);
+                }
+                finally
+                {
+                    if (_streamPlaybackTasks.TryRemove(stream.StreamId, out var removed))
+                        removed.Cancellation.Dispose();
+                }
             }
         });
     }
 
     private async Task StopPipelinesAsync()
     {
-        foreach (var (streamId, _) in _streamPlaybackTasks.ToArray())
+        if (_sframe is not null)
         {
-            if (!_streamPlaybackTasks.TryRemove(streamId, out var cts))
-                continue;
-            await cts.CancelAsync();
-            cts.Dispose();
+            try { await _sframe.PauseAsync(); }
+            catch (JSException) { /* Managed readiness is already false; still release microphone and playback. */ }
         }
+        var loops = _streamPlaybackTasks.Values.ToArray();
+        foreach (var loop in loops)
+        {
+            try { await loop.Cancellation.CancelAsync(); }
+            catch (ObjectDisposedException) { /* The completed loop has already released its token. */ }
+        }
+        await Task.WhenAll(loops.Select(loop => loop.Completion));
         _activeAudioStreamId = Guid.Empty;
         _activeVideoStreamId = Guid.Empty;
         _hasVideo = false;
@@ -335,6 +374,12 @@ public sealed class BoltMediaService : IAsyncDisposable
         if (_audio.IsCapturing) await _audio.StopCaptureAsync();
         await _audio.StopPlaybackAsync();
         if (_video.IsCapturing) await _video.StopCaptureAsync();
+        if (_sframe is not null)
+        {
+            try { await _sframe.EndCallAsync(); }
+            catch (JSException) { /* Browser context may already have ended; managed call keys are detached. */ }
+        }
+        _sframeLocalSenderId = null;
     }
 
     private void EnsureInitialized()

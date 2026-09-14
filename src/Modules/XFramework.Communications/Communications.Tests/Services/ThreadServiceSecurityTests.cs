@@ -955,7 +955,14 @@ public sealed partial class ThreadServiceSecurityTests
             new EmptyReactionSummaryReader(),
             new EmptyReplySummaryReader(),
             NullLogger<ThreadService>.Instance,
-            signal ?? new CommunicationsOutboxSignal(), database);
+            signal ?? new CommunicationsOutboxSignal(), database, new TestEncryptionDirectoryReader(dataContext));
+    }
+
+    private sealed class TestEncryptionDirectoryReader(IDataContext context) : IMessageEncryptionDirectoryReader
+    {
+        public async Task<List<MessageEncryptionDirectory>> ReadAsync(Guid tenant, IReadOnlyCollection<Guid> credentials, CancellationToken ct) =>
+            (await context.Query<EncryptionAccount>().Where(x => x.TenantId == tenant && credentials.Contains(x.CredentialId)).ToListAsync(ct))
+            .Select(x => new MessageEncryptionDirectory(x.CredentialId, x.DirectoryRevision, x.DevicesJson)).ToList();
     }
 
     private sealed class EmptyReplySummaryReader : IMessageReplySummaryReader

@@ -19,7 +19,7 @@ builder.Services.AddScoped<OfflineStore>();
 builder.Services.AddScoped<ChatApi>();
 builder.Services.AddScoped<ChatState>();
 builder.Services.AddScoped<VoiceState>();
-builder.Services.AddBoltMediaBrowser(options => options.SecurityMode = Bolt.Media.Browser.MediaSecurityMode.AuthenticatedTransport);
+builder.Services.AddBoltMediaBrowser(options => options.SecurityMode = Bolt.Media.Browser.MediaSecurityMode.AuthenticatedSFrame);
 var startup = new DatabaseStartup();
 builder.Services.AddSingleton(startup);
 var host = builder.Build();

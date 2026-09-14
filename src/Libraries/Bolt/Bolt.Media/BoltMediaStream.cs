@@ -303,7 +303,7 @@ public sealed class BoltMediaStream : IAsyncDisposable
                 throw new InvalidOperationException("Media encryption is required but no ready authenticated key is configured.");
 
             flags |= 0x10; // encrypted flag
-            payload = await _encryption.EncryptAsync(encodedData.ToArray(), seq, StreamId);
+            payload = await _encryption.EncryptAsync(encodedData.ToArray(), seq, ts, StreamId);
         }
         else
         {
@@ -414,7 +414,7 @@ public sealed class BoltMediaStream : IAsyncDisposable
         {
             try
             {
-                frameData = await _encryption!.DecryptAsync(data.ToArray(), seq, StreamId);
+                frameData = await _encryption!.DecryptAsync(data.ToArray(), seq, timestamp, StreamId);
             }
             catch
             {

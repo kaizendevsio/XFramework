@@ -18,6 +18,7 @@ public static class XFrameworkServiceScopes
     public const string IdentityAdmin = "identity.admin";
     public const string IdentityRegister = "identity.register";
     public const string IdentitySessionValidate = "identity.session.validate";
+    public const string IdentityProfile = "identity.profile";
     public const string InventarioAdmin = "inventario.admin";
     public const string NotificationsSend = "notifications.send";
     public const string SmsGatewayAgent = "smsgateway.agent";

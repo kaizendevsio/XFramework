@@ -44,6 +44,7 @@ public interface ICommunicationsChatClient
 
 public interface ICommunicationsChatSession
 {
+    Task<QueryResponse<StorageDownloadUrlResponse>> GetThreadPhotoDownloadUrlAsync(Guid threadId, CancellationToken ct = default);
     Task<QueryResponse<StorageUploadSessionResponse>> CreateAttachmentUploadAsync(CreateChatAttachmentUploadRequest request, CancellationToken ct = default);
     Task<QueryResponse<StorageDownloadUrlResponse>> GetAttachmentDownloadUrlAsync(Guid threadId, Guid messageId, Guid fileId, CancellationToken ct = default);
     Guid TenantId { get; }
@@ -114,6 +115,7 @@ public interface ICommunicationsChatSession
         CancellationToken ct = default);
 
     Task<CmdResponse> EditMessageAsync(Guid threadId, Guid messageId, string text, CancellationToken ct = default);
+    Task<CmdResponse> EditMessageAsync(EditThreadMessageRequest request, CancellationToken ct = default);
     Task<CmdResponse> DeleteMessageAsync(Guid threadId, Guid messageId, CancellationToken ct = default);
     Task<CmdResponse> MarkReadAsync(Guid threadId, IReadOnlyCollection<Guid> messageIds, CancellationToken ct = default);
     Task<CmdResponse> ReactAsync(Guid threadId, Guid messageId, Guid reactionTypeId, CancellationToken ct = default);
@@ -295,6 +297,9 @@ internal sealed class CommunicationsChatSession(
     public Task<CmdResponse> UpdateThreadAsync(UpdateThreadRequest request, CancellationToken ct = default) =>
         InvokeAsync(callCt => wrapper.UpdateThreadAsync(Prepare(request), callCt), ct);
 
+    public Task<QueryResponse<StorageDownloadUrlResponse>> GetThreadPhotoDownloadUrlAsync(Guid threadId, CancellationToken ct = default) =>
+        InvokeAsync(callCt => wrapper.GetThreadPhotoDownloadUrlAsync(Prepare(new GetThreadPhotoDownloadUrlRequest { ThreadId = threadId }), callCt), ct);
+
     public Task<CmdResponse> LeaveThreadAsync(Guid threadId, CancellationToken ct = default) =>
         InvokeAsync(callCt => wrapper.LeaveThreadAsync(Prepare(new LeaveThreadRequest { ThreadId = threadId }), callCt), ct);
 
@@ -386,6 +391,9 @@ internal sealed class CommunicationsChatSession(
             MessageId = messageId,
             Text = text
         }), callCt), ct);
+
+    public Task<CmdResponse> EditMessageAsync(EditThreadMessageRequest request, CancellationToken ct = default) =>
+        InvokeAsync(callCt => wrapper.EditThreadMessageAsync(Prepare(request), callCt), ct);
 
     public Task<CmdResponse> DeleteMessageAsync(Guid threadId, Guid messageId, CancellationToken ct = default) =>
         InvokeAsync(callCt => wrapper.DeleteThreadMessageAsync(Prepare(new DeleteThreadMessageRequest

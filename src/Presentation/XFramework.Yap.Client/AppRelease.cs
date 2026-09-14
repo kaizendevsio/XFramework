@@ -2,10 +2,17 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.2.0";
+    public const string Version = "1.3.0";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
-        (Version, "13 September 2026", [
+        (Version, "14 September 2026", [
+            "Protect new messages and attachments with encryption. Approve a new device or use your recovery key to bring your history with you.",
+            "Compare identity fingerprints and remove devices you no longer use in Privacy settings.",
+            "Talk together in group voice calls while continuing to chat.",
+            "Send several photos or videos together, add a profile photo, and give group conversations their own photo.",
+            "Watch supported videos inside the conversation and use clearer message and photo action menus.",
+            "Long conversations use less memory, with steadier scrolling through older messages and photos."]),
+        ("1.2.0", "13 September 2026", [
             "Call someone from your conversation, keep chatting during the call, and mute your microphone when needed.",
             "The message box expands while you write, with easier-to-reach attachment and send buttons.",
             "Favorites have their own section, and selected people stay visible when starting a group conversation.",

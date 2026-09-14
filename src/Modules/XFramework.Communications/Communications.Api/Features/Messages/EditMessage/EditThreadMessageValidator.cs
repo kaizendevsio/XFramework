@@ -16,5 +16,10 @@ public sealed class EditThreadMessageValidator : AbstractValidator<EditThreadMes
         RuleFor(x => x.Text)
             .NotEmpty().WithMessage("Text is required")
             .MaximumLength(5000).WithMessage("Text cannot exceed 5000 characters");
+
+        RuleFor(x => x).Must(x => Communications.Domain.Shared.Contracts.EncryptedMessages.ValidEnvelope(x.EncryptedEnvelope)
+            && x.Text == Communications.Domain.Shared.Contracts.EncryptedMessages.Preview)
+            .When(x => x.EncryptedEnvelope is not null)
+            .WithMessage("Encrypted edits must not contain plaintext.");
     }
 }

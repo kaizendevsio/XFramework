@@ -12,4 +12,8 @@ public partial record EditThreadMessageRequest : RequestBase,
     public Guid MessageId { get; set; }
     public Guid RequesterCredentialId { get; set; }
     public string Text { get; set; } = null!;
+    public string? EncryptedEnvelope { get; set; }
+    public Guid? EncryptionSenderDeviceId { get; set; }
+    public long? SenderDirectoryRevision { get; set; }
+    public Dictionary<Guid, long> RecipientDirectoryRevisions { get; set; } = [];
 }

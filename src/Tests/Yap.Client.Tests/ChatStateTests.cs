@@ -13,6 +13,78 @@ namespace Yap.Client.Tests;
 public sealed class ChatStateTests
 {
     [Test]
+    public async Task ReplyHistory_StaysBoundedAndKeepsItsAnchorAcrossRefresh()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Reader");
+        var chat = new Conversation { Id = Guid.NewGuid() };
+        var root = new ChatMessage { Id = Guid.NewGuid(), ThreadId = chat.Id, Text = "Root", CreatedAt = DateTime.UtcNow.Date, ReplyTotal = 250 };
+        var messages = Enumerable.Range(1, 250).Select(i => new ChatMessage { Id = Guid.NewGuid(), ThreadId = chat.Id, ParentId = root.Id, Text = $"Reply {i}", CreatedAt = root.CreatedAt.AddSeconds(i) }).ToList();
+        messages.Insert(0, root);
+        var js = new Mock<IJSRuntime>();
+        js.Setup(x => x.InvokeAsync<bool>("yap.device.online", It.IsAny<object?[]?>())).ReturnsAsync(true);
+        using var http = new HttpClient(new Handler(request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path == "/api/session") return Task.FromResult(Json(new SessionResponse(user, "token")));
+            if (path.EndsWith("initialize")) return Task.FromResult(Json(new ChatDefaults(Guid.NewGuid(), [])));
+            if (path.EndsWith("/messages"))
+            {
+                var reply = request.RequestUri.Query.Contains("parent=");
+                var page = int.Parse(request.RequestUri.Query.Split("page=")[1]);
+                var all = messages.Where(x => !reply || x.ParentId == root.Id).OrderByDescending(x => x.CreatedAt).ToList();
+                return Task.FromResult(Json(new ChatPage<ChatMessage>(all.Skip(page * 50).Take(50).ToList(), all.Count)));
+            }
+            if (path.EndsWith(chat.Id.ToString())) return Task.FromResult(Json(chat));
+            return Task.FromResult(Json(new ChatPage<Conversation>([chat], 1)));
+        })) { BaseAddress = new("https://yap.test/") };
+        await fixture.Store.SaveMessagesAsync(OfflineStore.Scope(user), messages);
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), js.Object);
+        await state.InitializeAsync(); await state.SelectAsync(chat.Id); await state.LocateAsync(root.Id);
+        var parent = state.Selected!.Messages.Single(x => x.Id == root.Id);
+        await state.LoadRepliesAsync(parent); await state.LoadRepliesAsync(parent);
+        Assert.That(parent.Replies, Has.Count.EqualTo(100));
+        var anchor = parent.Replies[^1].Id;
+        messages.Add(new() { Id = Guid.NewGuid(), ThreadId = chat.Id, ParentId = root.Id, Text = "New reply", CreatedAt = root.CreatedAt.AddSeconds(251) });
+        await state.RefreshHint();
+        parent = state.Selected!.Messages.Single(x => x.Id == root.Id);
+        Assert.That(parent.Replies, Has.Count.EqualTo(100));
+        Assert.That(parent.Replies[^1].Id, Is.EqualTo(anchor));
+        Assert.That(state.HasNewerReplies, Is.True);
+    }
+
+    [Test]
+    public async Task HistoryPaging_IsBoundedInBothDirections_AndReleasesMessagesOnLeave()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Reader");
+        var scope = OfflineStore.Scope(user); var chat = new Conversation { Id = Guid.NewGuid(), MessageTotal = 600 };
+        await fixture.Store.SetSettingAsync("user", JsonSerializer.Serialize(user));
+        await fixture.Store.SaveConversationsAsync(scope, [chat]);
+        await fixture.Store.SaveMessagesAsync(scope, Enumerable.Range(0, 600).Select(i => new ChatMessage { Id = Guid.NewGuid(), ThreadId = chat.Id, Text = $"History {i}", CreatedAt = DateTime.UtcNow.Date.AddSeconds(i) }));
+        using var http = new HttpClient(new Handler(_ => throw new InvalidOperationException("Offline history must not use the server"))) { BaseAddress = new("https://yap.test/") };
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), Mock.Of<IJSRuntime>());
+        await state.InitializeAsync(); await state.SelectAsync(chat.Id);
+        for (var i = 0; state.HasEarlierMessages && i < 20; i++)
+        { await state.LoadEarlierAsync(); Assert.That(state.Selected!.Messages.Count, Is.LessThanOrEqualTo(100)); }
+        Assert.That(state.Selected!.Messages[0].Text, Is.EqualTo("History 0"));
+        Assert.That(state.HasEarlierMessages, Is.False);
+        for (var i = 0; state.HasNewerMessages && i < 20; i++)
+        { await state.LoadNewerAsync(); Assert.That(state.Selected!.Messages.Count, Is.LessThanOrEqualTo(100)); }
+        Assert.That(state.Selected!.Messages[^1].Text, Is.EqualTo("History 599"));
+        var newest = state.Selected.Messages[^1].Id;
+        for (var i = 0; i < 5; i++) await state.LoadEarlierAsync();
+        await state.LocateAsync(newest);
+        Assert.That(state.Selected.Messages.Any(x => x.Id == newest), Is.True, "Search must reach newer cached messages from an older window.");
+        Assert.That(state.Selected.Messages.Count, Is.LessThanOrEqualTo(100));
+        var retained = state.Selected;
+        state.LeaveConversation(chat.Id);
+        Assert.That(state.Selected, Is.Null);
+        Assert.That(retained.Messages, Is.Empty);
+        Assert.That(await fixture.Store.MessageCountAsync(scope, chat.Id), Is.EqualTo(600));
+    }
+
+    [Test]
     public async Task DuplicateReactionTap_OnlySendsOneAction_AndReconcilesConflict()
     {
         await using var fixture = await StoreFixture.CreateAsync();

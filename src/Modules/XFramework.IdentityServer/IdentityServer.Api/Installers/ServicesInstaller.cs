@@ -45,6 +45,7 @@ public class ServicesInstaller : IInstaller
         services.AddScoped<IPasswordResetProcessor>(serviceProvider => serviceProvider.GetRequiredService<AuthService>());
         services.AddScoped<IIdentityAuthorizationService, IdentityAuthorizationService>();
         services.AddScoped<IIdentityAdministrationService, IdentityAdministrationService>();
+        services.AddScoped<EncryptionDirectoryService>();
         services.AddScoped<Features.Tenants.ITenantAdministrationService,
             Features.Tenants.TenantAdministrationService>();
     }

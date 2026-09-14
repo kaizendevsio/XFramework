@@ -22,7 +22,9 @@ public sealed class ChatFiles(IStorageServiceWrapper storage, ICommunicationsCha
     public async Task<ChatUploadTicket> BeginAsync(Guid threadId, string fileName, string contentType,
         long totalBytes, CancellationToken ct)
     {
-        if (totalBytes is <= 0 or > MaxFileBytes)
+        var maximum = fileName is "attachment.pgp" or "voice.pgp" && contentType == "application/octet-stream"
+            ? MaxFileBytes + 16L * 1024 * 1024 : MaxFileBytes;
+        if (totalBytes <= 0 || totalBytes > maximum)
             throw new ChatOperationException($"Choose a file between 1 byte and {MaxFileBytes / (1024 * 1024 * 1024)} GB.");
         var upload = await CreateSessionAsync(threadId, fileName, contentType, totalBytes, ct);
         var chunk = upload.ChunkSizeBytes;

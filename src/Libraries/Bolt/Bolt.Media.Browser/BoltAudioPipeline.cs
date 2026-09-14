@@ -15,6 +15,8 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
     private DotNetObjectReference<BoltAudioPipeline>? _dotNetRef;
     private bool _capturing;
     private ManagedOpusCodec? _managedCodec;
+    private readonly Dictionary<Guid, ManagedOpusDecoder> _remoteCodecs = [];
+    private const int MaxRemoteStreams = 8;
 
     /// <summary>Fires when the audio encoder produces an encoded Opus frame.</summary>
     public event Func<byte[], Task>? OnEncoded;
@@ -36,7 +38,7 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
     }
 
     /// <summary>Load JS module, initialize Opus encoder and decoder.</summary>
-    public async Task InitializeAsync(int sampleRate = 48_000, int channels = 1, int bitrateKbps = 64)
+    public async Task InitializeAsync(int sampleRate = 48_000, int channels = 1, int bitrateKbps = 128)
     {
         if (_pipeline is not null) return;
         _module ??= await _js.InvokeAsync<IJSObjectReference>(
@@ -93,12 +95,36 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
 
     /// <summary>Decode and play an incoming audio frame from the remote peer.</summary>
     public async ValueTask DecodeFrameAsync(ReadOnlyMemory<byte> data, uint timestamp)
+        => await DecodeFrameAsync(Guid.Empty, data, timestamp);
+
+    /// <summary>Each sender has independent Opus history and playback scheduling.</summary>
+    public async ValueTask DecodeFrameAsync(Guid streamId, ReadOnlyMemory<byte> data, uint timestamp)
     {
         if (_pipeline is null) return;
         if (_managedCodec is not null)
-            await _pipeline.InvokeVoidAsync("playPcm", _managedCodec.Decode(data.Span));
+        {
+            byte[] pcm;
+            lock (_remoteCodecs)
+            {
+                if (!_remoteCodecs.TryGetValue(streamId, out var codec))
+                {
+                    if (_remoteCodecs.Count >= MaxRemoteStreams) return;
+                    codec = new ManagedOpusDecoder();
+                    _remoteCodecs.Add(streamId, codec);
+                }
+                pcm = codec.Decode(data.Span);
+            }
+            await _pipeline.InvokeVoidAsync("playPcm", pcm, streamId.ToString());
+        }
         else
-            await _pipeline.InvokeVoidAsync("decodeFrame", data.ToArray(), timestamp);
+            await _pipeline.InvokeVoidAsync("decodeFrame", data.ToArray(), timestamp, streamId.ToString());
+    }
+
+    public async Task ReleaseRemoteStreamAsync(Guid streamId)
+    {
+        lock (_remoteCodecs)
+            if (_remoteCodecs.Remove(streamId, out var codec)) codec.Dispose();
+        if (_pipeline is not null) await _pipeline.InvokeVoidAsync("removeRemoteStream", streamId.ToString());
     }
 
     /// <summary>Change the encoder bitrate in response to ABR feedback.</summary>
@@ -129,6 +155,7 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
 
     public async Task StopPlaybackAsync()
     {
+        ReleaseRemoteCodecs();
         if (_pipeline is not null) await _pipeline.InvokeVoidAsync("stopPlayback");
     }
 
@@ -137,6 +164,7 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
         _capturing = false;
         _managedCodec?.Dispose();
         _managedCodec = null;
+        ReleaseRemoteCodecs();
         if (_pipeline is not null)
         {
             await _pipeline.InvokeVoidAsync("dispose");
@@ -147,5 +175,14 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
         _pipeline = null;
         _module = null;
         _dotNetRef = null;
+    }
+
+    private void ReleaseRemoteCodecs()
+    {
+        lock (_remoteCodecs)
+        {
+            foreach (var codec in _remoteCodecs.Values) codec.Dispose();
+            _remoteCodecs.Clear();
+        }
     }
 }

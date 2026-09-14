@@ -56,4 +56,12 @@ public partial class Message : BaseModel
 
     [MemoryPackOrder(16)]
     public bool IsThreadReply { get; set; }
+
+    /// <summary>Opaque client-encrypted content. Text is only a generic placeholder for these messages.</summary>
+    [MemoryPackOrder(17)]
+    public string? EncryptedEnvelope { get; set; }
+    [MemoryPackOrder(18)]
+    public long? AcceptedSenderDirectoryRevision { get; set; }
+    [MemoryPackOrder(19)]
+    public Guid? EncryptionSenderDeviceId { get; set; }
 }

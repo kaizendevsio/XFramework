@@ -3,19 +3,21 @@ using System.Text.Json.Serialization;
 namespace Yap.Contracts;
 
 // Browser-facing models contain chat data only, never service credentials or actor tokens.
-public sealed record UserSession(Guid CredentialId, Guid TenantId, string Name);
-public sealed record SessionResponse(UserSession? User, string AntiforgeryToken);
+public sealed record UserSession(Guid CredentialId, Guid TenantId, string Name, string? AvatarUrl = null);
+public sealed record SessionResponse(UserSession? User, string AntiforgeryToken, bool EncryptionRequired = false);
 public sealed record Person(Guid Id, string Name, string UserName, string? AvatarUrl = null, Guid MemberId = default, string Role = "Member", string? Nickname = null);
 public sealed record ReactionType(Guid Id, string Name, string Emoji);
 public sealed record ChatDefaults(Guid ThreadTypeId, List<ReactionType> Reactions);
 public sealed record ChatPage<T>(List<T> Items, int TotalCount);
 public sealed record MessageQuote(Guid Id, string Sender, string Text);
-public sealed record ChatAttachment(Guid Id, string Name, string ContentType, long Size);
+public sealed record ChatAttachment(Guid Id, string Name, string ContentType, long Size,
+    Guid? EncryptionSenderDeviceId = null, long? SenderDirectoryRevision = null);
 
 public sealed class Conversation
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = "Conversation";
+    public string? AvatarUrl { get; set; }
     public bool Group { get; set; }
     public int Members { get; set; }
     public int Unread { get; set; }
@@ -41,6 +43,11 @@ public sealed class ChatMessage
     public Guid SenderId { get; set; }
     public string Sender { get; set; } = "You";
     public string Text { get; set; } = "";
+    public string? EncryptedEnvelope { get; set; }
+    public long? AcceptedSenderDirectoryRevision { get; set; }
+    public Guid? EncryptionSenderDeviceId { get; set; }
+    public Dictionary<Guid, long> RecipientDirectoryRevisions { get; set; } = [];
+    public bool EncryptionLocked { get; set; }
     public DateTime CreatedAt { get; set; }
     public bool Mine { get; set; }
     public Guid? ParentId { get; set; }
@@ -54,6 +61,7 @@ public sealed class ChatMessage
     public Dictionary<string, Guid> MyReactionIds { get; set; } = [];
     public List<ChatAttachment> Attachments { get; set; } = [];
     public bool HasAttachments { get; set; }
+    public bool AttachmentLinksReady { get; set; }
     public string? AvatarUrl { get; set; }
     public string? LocalFileKey { get; set; }
     public string Delivery { get; set; } = "Sent";
@@ -67,11 +75,14 @@ public sealed class ChatMessage
         .Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(s => char.ToUpperInvariant(s[0])));
 }
 
-public sealed record SendMessage(Guid Id, Guid ThreadId, string Text, Guid? ParentId = null, bool IsThreadReply = false);
+public sealed record SendMessage(Guid Id, Guid ThreadId, string Text, Guid? ParentId = null, bool IsThreadReply = false,
+    string? EncryptedEnvelope = null, List<Guid>? RecipientCredentialIds = null, Guid? EncryptionSenderDeviceId = null, long? SenderDirectoryRevision = null,
+    Dictionary<Guid, long>? RecipientDirectoryRevisions = null);
 public sealed record MessageReceipt(Guid MessageId);
 public sealed record CreateConversation(string Name, List<Guid> Members, bool Group);
 public sealed record MessageAction(Guid ThreadId, Guid MessageId, string Action, string? Text = null,
-    Guid? ReactionTypeId = null, Guid? ReactionId = null);
+    Guid? ReactionTypeId = null, Guid? ReactionId = null, string? EncryptedEnvelope = null,
+    Guid? EncryptionSenderDeviceId = null, long? SenderDirectoryRevision = null, Dictionary<Guid, long>? RecipientDirectoryRevisions = null);
 public sealed record ReadMessages(Guid ThreadId, List<Guid> MessageIds);
 public sealed record ThreadAction(Guid ThreadId, string Action, bool Value);
 public sealed record AttachMessageFile(Guid ThreadId, Guid MessageId, Guid StorageId);

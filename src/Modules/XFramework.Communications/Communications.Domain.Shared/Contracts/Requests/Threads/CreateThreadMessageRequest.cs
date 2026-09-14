@@ -20,4 +20,9 @@ public partial record CreateThreadMessageRequest : RequestBase,
     /// <summary>Stable ID for a client outbox send. Reusing it with different content is rejected.</summary>
     public Guid? ClientMessageId { get; set; }
     public bool IsThreadReply { get; set; }
+    public string? EncryptedEnvelope { get; set; }
+    public List<Guid> RecipientCredentialIds { get; set; } = [];
+    public Guid? EncryptionSenderDeviceId { get; set; }
+    public long? SenderDirectoryRevision { get; set; }
+    public Dictionary<Guid, long> RecipientDirectoryRevisions { get; set; } = [];
 }
