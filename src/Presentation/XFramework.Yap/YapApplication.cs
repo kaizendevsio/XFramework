@@ -105,6 +105,14 @@ public static class YapApplication
         app.MapYapAuth();
         app.MapYapApi();
         app.MapYapCalls();
+        // Older workers already pass /api/ through to the network. This recovery
+        // document must remain reachable even when their cached app cannot start.
+        app.MapGet("/api/app-recovery", (HttpContext context, IWebHostEnvironment environment) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            var page = environment.WebRootFileProvider.GetFileInfo("recovery.html");
+            return page.Exists ? Results.Stream(page.CreateReadStream(), "text/html; charset=utf-8") : Results.NotFound();
+        });
         app.MapGet("/health/live", () => Results.Ok(new { status = "Healthy" }));
         app.MapGet("/health/ready", (BoltClient client, IConfiguration configuration) =>
         {

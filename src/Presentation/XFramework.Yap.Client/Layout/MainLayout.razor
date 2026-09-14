@@ -7,7 +7,7 @@
 <main class="app-shell">
     <div class="screen">@Body</div>
     <VoiceCall />
-    <ToastHost><div id="app-update" class="toast liquid-glass" role="status" hidden><GlassLayer /><Icon Name="download" Size="18" /><span class="toast-text">A new version of Yap is ready.</span><button class="toast-action" @onclick="UpdateAsync">Update</button><button class="toast-close" aria-label="Dismiss update notification" @onclick="DismissUpdateAsync"><Icon Name="close" Size="16" /></button></div></ToastHost>
+    <ToastHost><UpdateNotice /></ToastHost>
 </main>
 @code {
     private IDisposable? navigation;
@@ -19,7 +19,5 @@
     private void Changed() => _ = InvokeAsync(StateHasChanged);
     protected override async Task OnAfterRenderAsync(bool firstRender)
     { await JS.InvokeVoidAsync("yap.motion.complete"); await JS.InvokeVoidAsync("yap.device.checkUpdate"); await Voice.InitializeAsync(); }
-    private async Task UpdateAsync() { await State.SaveBeforeUpdateAsync(); await JS.InvokeVoidAsync("yap.device.update"); }
-    private async Task DismissUpdateAsync() => await JS.InvokeVoidAsync("yap.updates.dismiss");
     public void Dispose() { State.Changed -= Changed; navigation?.Dispose(); }
 }

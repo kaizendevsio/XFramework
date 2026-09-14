@@ -1,0 +1,8 @@
+.startup-recovery {
+    position: fixed;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+    inset-inline: 20px;
+    text-align: center;
+    z-index: 1;
+}
+.startup-recovery a { color: inherit; text-underline-offset: 4px; }

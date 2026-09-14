@@ -93,16 +93,30 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
 
     public async Task InitializeAsync()
     {
+        await js.InvokeVoidAsync("yap.diagnostics.record", "startup.stage", new { stage = "saved-account" });
         var saved = await store.SettingAsync("user");
         if (saved is not null) User = JsonSerializer.Deserialize<UserSession>(saved);
+        await js.InvokeVoidAsync("yap.diagnostics.record", "startup.stage", new { stage = "saved-conversations" });
         if (User is not null) Conversations = await store.ConversationsAsync(Scope);
         Online = await js.InvokeAsync<bool>("yap.device.online");
         reference = DotNetObjectReference.Create(this);
         await js.InvokeVoidAsync("yap.device.watch", reference);
         Ready = true;
         Notify();
-        await SynchronizeAsync();
-        polling = PollAsync();
+        // Opening cached conversations must not wait for network sync or key registration.
+        polling = SynchronizeAndPollAsync();
+    }
+
+    private async Task SynchronizeAndPollAsync()
+    {
+        try
+        {
+            await js.InvokeVoidAsync("yap.diagnostics.record", "startup.stage", new { stage = "background-sync" });
+            await SynchronizeAsync();
+            await PollAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) { Report(ex); }
     }
 
     private async Task PollAsync()

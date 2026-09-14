@@ -1,0 +1,12 @@
+@inject ChatState State
+@inject IJSRuntime JS
+<div id="app-update" class="toast liquid-glass" role="status" hidden><GlassLayer /><Icon Name="download" Size="18" /><span class="toast-text">A new version of Yap is ready.</span><button class="toast-action" @onclick="UpdateAsync">Update</button><button class="toast-close" aria-label="Dismiss update notification" @onclick="DismissAsync"><Icon Name="close" Size="16" /></button></div>
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender) => await JS.InvokeVoidAsync("yap.device.checkUpdate");
+    private async Task UpdateAsync()
+    {
+        if (State.Ready) await State.SaveBeforeUpdateAsync();
+        await JS.InvokeVoidAsync("yap.device.update");
+    }
+    private async Task DismissAsync() => await JS.InvokeVoidAsync("yap.updates.dismiss");
+}

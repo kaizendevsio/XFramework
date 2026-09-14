@@ -10,6 +10,21 @@ namespace Yap.Tests;
 public sealed class PwaEndpointTests
 {
     [Test]
+    public async Task Recovery_OpensWithoutAuthenticationOrTheBlazorRuntime()
+    {
+        await using var app = UiFixture.Create(0);
+        await app.StartAsync();
+        using var client = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
+        var response = await client.GetAsync("/api/app-recovery");
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.Headers.CacheControl?.NoStore, Is.True);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.That(html, Does.Contain("Update and reopen Yap").And.Contain("/startup-recovery.js").And.Not.Contain("blazor.webassembly"));
+        Assert.That((await client.GetAsync("/api/chat/conversations")).StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        await app.StopAsync();
+    }
+
+    [Test]
     public async Task AnonymousInstall_HasPublicManifestAndCorrectlySizedIcons_WithoutBypassingLogin()
     {
         await using var app = UiFixture.Create(0);

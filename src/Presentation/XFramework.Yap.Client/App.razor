@@ -4,6 +4,11 @@
 @inject ILogger<App> Logger
 @using Microsoft.EntityFrameworkCore
 @using SqliteWasmBlazor
+@if (!State.Ready || failure is not null)
+{
+    <div class="toast-host"><UpdateNotice /></div>
+    <div class="startup-recovery"><a href="/api/app-recovery" data-enhance-nav="false">Taking a while? Open recovery</a></div>
+}
 @if (failure is not null)
 {
     <main class="loading"><Brand /><h1>Device storage unavailable</h1><p>@failure</p><button class="btn" @onclick="() => Nav.NavigateTo(Nav.Uri, true)">Try again</button><a href="diagnostics.html">Open diagnostic logs</a></main>
