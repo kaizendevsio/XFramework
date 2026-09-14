@@ -736,6 +736,7 @@ services:
       Yap__TenantId: ${YAP_TENANT_ID:-00000000-0000-0000-0000-000000000000}
       Yap__RoleId: ${YAP_ROLE_ID:-00000000-0000-0000-0000-000000000000}
       Yap__AttachmentPublicEndpoint: ${STORAGE_S3_DOWNLOAD_ENDPOINT:-http://xeon-dev:9000}
+      Yap__AttachmentPublicFileEndpoint: ${STORAGE_S3_PUBLIC_BASE_URL:-http://localhost:9000}
       Yap__AttachmentInternalEndpoint: ${STORAGE_S3_ENDPOINT:-http://minio:9000}
       # Browser sessions survive a restart or rollout only while this store does.
       Yap__SessionCacheConnection: ${YAP_SESSION_CACHE_CONNECTION:-redis:6379}

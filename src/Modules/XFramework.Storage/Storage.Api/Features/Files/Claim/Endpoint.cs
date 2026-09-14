@@ -12,6 +12,11 @@ public static class ClaimStorageFileEndpoint
         TenantAccessMode = TenantAccessMode.ServiceTargetTenant,
         RequiredServiceScopes = [XFrameworkServiceScopes.StorageWrite, XFrameworkServiceScopes.TenantTarget],
         AllowedServiceCallers = [XFrameworkServiceNames.IdentityServer, XFrameworkServiceNames.Portal])]
+    public static Task<Result<StorageFileResponse>> Handle(
+        ClaimStorageFileRequest request, StorageService storageService, CancellationToken ct) =>
+        storageService.ClaimFileAsync(request, ct);
+
+    // Keep HTTP actor requirements separate from the trusted service RPC policy.
     [MapPost("/api/storage/files/{storageFileId:guid}/claim", Tags = ["Storage"],
         ActorRequirement = ActorRequirement.Required,
         TenantAccessMode = TenantAccessMode.ActorTenant,
@@ -21,7 +26,7 @@ public static class ClaimStorageFileEndpoint
         Capability = StorageAuthorizationCapabilities.ManageKey,
         Summary = "Claim storage file",
         Description = "Idempotently claims a completed file so unclaimed-file maintenance will not delete it.")]
-    public static Task<Result<StorageFileResponse>> Handle(
+    public static Task<Result<StorageFileResponse>> HandleHttp(
         ClaimStorageFileRequest request,
         StorageService storageService,
         CancellationToken ct) =>

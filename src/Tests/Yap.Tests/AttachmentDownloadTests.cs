@@ -10,6 +10,7 @@ public sealed class AttachmentDownloadTests
     private static IConfiguration Configuration() => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
     {
         ["Yap:AttachmentPublicEndpoint"] = "http://xeon-dev:9000",
+        ["Yap:AttachmentPublicFileEndpoint"] = "http://localhost:9000",
         ["Yap:AttachmentInternalEndpoint"] = "http://minio:9000"
     }).Build();
 
@@ -27,6 +28,7 @@ public sealed class AttachmentDownloadTests
     }
 
     [TestCase("https://other-storage.example/private/object?signature=test")]
+    [TestCase("http://localhost:9001/avatar.jpg")]
     [TestCase("http://xeon-dev:9001/private/object?signature=test")]
     [TestCase("https://xeon-dev:9000/private/object?signature=test")]
     public void OtherProviderOrigin_IsNeverRewritten(string url)
@@ -34,6 +36,14 @@ public sealed class AttachmentDownloadTests
         using var request = YapApi.CreateAttachmentDownloadRequest(url, Configuration());
         Assert.That(request.RequestUri, Is.EqualTo(new Uri(url)));
         Assert.That(request.Headers.Host, Is.Null);
+    }
+
+    [Test]
+    public void PublicAvatarOrigin_UsesConfiguredInternalStorageRoute()
+    {
+        using var request = YapApi.CreateAttachmentDownloadRequest("http://localhost:9000/avatars/profile.jpg", Configuration());
+        Assert.That(request.RequestUri!.ToString(), Is.EqualTo("http://minio:9000/avatars/profile.jpg"));
+        Assert.That(request.Headers.Host, Is.EqualTo("localhost:9000"));
     }
 
     [Test]
