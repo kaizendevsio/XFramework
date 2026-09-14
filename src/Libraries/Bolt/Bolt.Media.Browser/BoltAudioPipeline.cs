@@ -71,6 +71,12 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
         }
     }
 
+    public async Task<AudioOutputs> GetAudioOutputsAsync() => _pipeline is null
+        ? new(false, "", []) : await _pipeline.InvokeAsync<AudioOutputs>("getAudioOutputs");
+
+    public async Task<AudioOutputs> SetAudioOutputAsync(string deviceId) => _pipeline is null
+        ? new(false, "", []) : await _pipeline.InvokeAsync<AudioOutputs>("setAudioOutput", deviceId);
+
     /// <summary>Start capturing audio from the microphone.</summary>
     public async Task StartCaptureAsync(int? sampleRate = null, int? channels = null, bool transmit = true)
     {

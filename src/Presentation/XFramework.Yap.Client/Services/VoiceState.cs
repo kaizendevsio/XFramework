@@ -104,6 +104,12 @@ public sealed partial class VoiceState : IAsyncDisposable
         await ToggleGroupMuteAsync();
     }
 
+    public async Task<AudioOutputs> GetAudioOutputsAsync() => active?.Media is { } media
+        ? await media.GetAudioOutputsAsync() : new(false, "", []);
+
+    public async Task<AudioOutputs> SetAudioOutputAsync(string deviceId) => active?.Media is { } media
+        ? await media.SetAudioOutputAsync(deviceId) : new(false, "", []);
+
     private Task FailAsync(Attempt attempt, Exception error)
     {
         if (!Current(attempt)) return Task.CompletedTask;

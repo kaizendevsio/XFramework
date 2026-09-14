@@ -2,10 +2,15 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.9";
+    public const string Version = "1.3.10";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "14 September 2026", [
+            "Conversations open from saved history without waiting for background sync.",
+            "Choose a call audio output where your browser supports it, with guidance for devices that use system audio controls.",
+            "Connection interruptions show one quiet status instead of repeated errors. Saved chats remain available and queued messages retry automatically.",
+            "Attachments saved on your device stay available offline. Other attachments wait for a connection and load when you reconnect."]),
+        ("1.3.9", "14 September 2026", [
             "Fixed a Safari issue that damaged encrypted photo and file uploads. New attachments open correctly for you and your recipients.",
             "If an earlier attachment still says unavailable, please send it again after updating."]),
         ("1.3.8", "14 September 2026", [

@@ -21,6 +21,31 @@ class AudioPipeline {
         this.sources = new Set();
         this.playbackEnabled = true;
         this.managed = false;
+        this.outputChanged = () => { void this.getAudioOutputs().catch(() => {}); };
+        navigator.mediaDevices?.addEventListener?.('devicechange', this.outputChanged);
+    }
+
+    async getAudioOutputs() {
+        const context = this.audioContext;
+        if (!context?.setSinkId || !navigator.mediaDevices?.enumerateDevices)
+            return { supported: false, deviceId: '', devices: [] };
+        const devices = [{ id: '', label: 'System default' }];
+        for (const device of await navigator.mediaDevices.enumerateDevices()) {
+            if (device.kind === 'audiooutput' && device.deviceId && device.deviceId !== 'default' &&
+                device.label && !devices.some(item => item.id === device.deviceId))
+                devices.push({ id: device.deviceId, label: device.label });
+        }
+        if (context !== this.audioContext) return { supported: false, deviceId: '', devices: [] };
+        // An unplugged headset must not leave a call routed to a missing device.
+        if (context.sinkId && !devices.some(device => device.id === context.sinkId)) await context.setSinkId('');
+        return { supported: true, deviceId: context.sinkId || '', devices };
+    }
+
+    async setAudioOutput(deviceId) {
+        const context = this.audioContext;
+        if (!context?.setSinkId) throw new Error('Audio output is controlled by this device.');
+        await context.setSinkId(deviceId);
+        return await this.getAudioOutputs();
     }
 
     async initEncoder(sampleRate, channels, bitrate) {
@@ -221,6 +246,7 @@ class AudioPipeline {
     }
 
     async dispose() {
+        navigator.mediaDevices?.removeEventListener?.('devicechange', this.outputChanged);
         this.stopCapture();
         this.stopPlayback();
         if (this.encoder?.state !== 'closed') this.encoder?.close();
