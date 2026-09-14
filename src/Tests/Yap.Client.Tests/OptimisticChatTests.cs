@@ -31,6 +31,7 @@ public sealed class OptimisticChatTests
         var opening = state.SelectAsync(chat.Id);
         var favorite = state.ToggleFavoriteAsync(state.Selected!);
         var sends = Enumerable.Range(0, 4).Select(i => state.SendAsync(chat.Id, $"Message {i}", null, "main")).ToArray();
+        var updating = state.SaveBeforeUpdateAsync();
         try
         {
             Assert.Multiple(() =>
@@ -40,10 +41,15 @@ public sealed class OptimisticChatTests
                 Assert.That(state.Selected.IsFavorite, Is.True);
                 Assert.That(opening.IsCompleted, Is.False);
                 Assert.That(sends.All(x => !x.IsCompleted), Is.True);
+                Assert.That(updating.IsCompleted, Is.False);
+                Assert.That(state.SavingMessages, Is.True);
                 Assert.That(state.Selected.Messages.Select(x => x.Text), Is.EqualTo(Enumerable.Range(0, 4).Select(i => $"Message {i}")));
             });
         }
-        finally { release.TrySetResult(); await storage; await Task.WhenAll(sends.Append(opening).Append(favorite)); }
+        finally { release.TrySetResult(); await storage; await updating; }
+        Assert.That(await store.PendingAsync(scope), Has.Count.EqualTo(4), "Applying an update waits for the entire staged burst, not just its first write.");
+        await Task.WhenAll(sends.Append(opening).Append(favorite));
+        Assert.That(state.SavingMessages, Is.False);
         Assert.That(state.Selected!.Messages, Has.Count.EqualTo(4), "A cache read started before the sends must not erase their bubbles.");
         Assert.That(await store.PendingAsync(scope), Has.Count.EqualTo(4));
         Assert.That((await store.ConversationsAsync(scope)).Single().IsFavorite, Is.True);
