@@ -600,9 +600,10 @@ public sealed class StoragePostgresTests : StorageIntegrationTestBase
             new[] { StorageBucketPurpose.Private, StorageBucketPurpose.Public });
     }
 
-    [Test]
+    [TestCase(true)]
+    [TestCase(false)]
     [Category(TestCategories.Wrappers)]
-    public async Task Wrapper_ClaimStorageFile_IsTenantScopedAndIdempotent()
+    public async Task Wrapper_ClaimStorageFile_IsTenantScopedAndIdempotent(bool withActor)
     {
         var metadata = CreateMetadata();
         var session = await CreateCompletedSessionAsync(
@@ -610,6 +611,10 @@ public sealed class StoragePostgresTests : StorageIntegrationTestBase
             visibility: StorageFileVisibility.Public,
             requireClaim: true);
 
+        using var actor = TestInvocationActorTokenScope.Push(withActor
+            ? TestInvocationIdentityExtensions.CreateTestActorToken(StorageIntegrationTestFixture.TestTenantId,
+                StorageIntegrationTestFixture.TestCredentialId, Guid.NewGuid(), Guid.NewGuid(), [], [])
+            : string.Empty);
         var first = await ServiceWrapper.ClaimStorageFile(new ClaimStorageFileRequest
         {
             Metadata = metadata,
@@ -632,6 +637,9 @@ public sealed class StoragePostgresTests : StorageIntegrationTestBase
             .AsNoTracking()
             .SingleAsync(item => item.Id == session.StorageFileId);
         file.UnclaimedUntil.Should().BeNull();
+        var deleted = await ServiceWrapper.DeleteStorageFile(new DeleteStorageFileRequest
+        { Metadata = metadata, StorageFileId = file.Id });
+        deleted.IsSuccess.Should().BeTrue(deleted.Message);
     }
 
     [Test]

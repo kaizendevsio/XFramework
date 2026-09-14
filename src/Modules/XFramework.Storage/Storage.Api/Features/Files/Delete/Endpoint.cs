@@ -12,6 +12,11 @@ public static class DeleteStorageFileEndpoint
         TenantAccessMode = TenantAccessMode.ServiceTargetTenant,
         RequiredServiceScopes = [XFrameworkServiceScopes.StorageWrite, XFrameworkServiceScopes.TenantTarget],
         AllowedServiceCallers = [XFrameworkServiceNames.IdentityServer, XFrameworkServiceNames.Portal])]
+    public static Task<Result> Handle(
+        DeleteStorageFileRequest request, StorageService storageService, CancellationToken ct) =>
+        storageService.DeleteFileAsync(request, ct);
+
+    // Compensation runs with the service identity, even after the actor request ends.
     [MapDelete("/api/storage/files/{storageFileId:guid}", Tags = ["Storage"],
         ActorRequirement = ActorRequirement.Required,
         TenantAccessMode = TenantAccessMode.ActorTenant,
@@ -21,7 +26,7 @@ public static class DeleteStorageFileEndpoint
         Capability = StorageAuthorizationCapabilities.ManageKey,
         Summary = "Delete storage file",
         Description = "Soft-deletes storage metadata and schedules physical deletion by retention cleanup.")]
-    public static Task<Result> Handle(
+    public static Task<Result> HandleHttp(
         DeleteStorageFileRequest request,
         StorageService storageService,
         CancellationToken ct) =>

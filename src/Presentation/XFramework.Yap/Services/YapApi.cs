@@ -332,14 +332,15 @@ public static class YapApi
             throw new YapApiException(503, "This attachment cannot be opened.");
         var target = signed;
         var publicEndpoint = configuration["Yap:AttachmentPublicEndpoint"];
+        var publicFileEndpoint = configuration["Yap:AttachmentPublicFileEndpoint"];
         var internalEndpoint = configuration["Yap:AttachmentInternalEndpoint"];
-        if (!string.IsNullOrWhiteSpace(publicEndpoint) && !string.IsNullOrWhiteSpace(internalEndpoint))
+        if (!string.IsNullOrWhiteSpace(internalEndpoint))
         {
-            var external = new Uri(publicEndpoint, UriKind.Absolute);
             var local = new Uri(internalEndpoint, UriKind.Absolute);
             if (local.Scheme is not ("http" or "https") || !string.IsNullOrEmpty(local.UserInfo) || local.AbsolutePath != "/")
                 throw new InvalidOperationException("The attachment internal endpoint must be an HTTP origin.");
-            if (string.Equals(signed.GetLeftPart(UriPartial.Authority), external.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase))
+            if (new[] { publicEndpoint, publicFileEndpoint }.Where(endpoint => !string.IsNullOrWhiteSpace(endpoint))
+                .Any(endpoint => string.Equals(signed.GetLeftPart(UriPartial.Authority), new Uri(endpoint!, UriKind.Absolute).GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase)))
                 target = new UriBuilder(signed) { Scheme = local.Scheme, Host = local.Host, Port = local.Port }.Uri;
         }
         var request = new HttpRequestMessage(HttpMethod.Get, target);
