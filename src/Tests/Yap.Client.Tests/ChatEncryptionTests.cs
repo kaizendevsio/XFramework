@@ -130,11 +130,28 @@ public sealed class ChatEncryptionTests
         using var fixture = new Fixture();
         var peer = Guid.NewGuid();
         await fixture.Encryption.EnsureAsync(fixture.User);
-        fixture.Js.Setup(j => j.InvokeAsync<bool>("yap.encryption.verifyFingerprint", It.IsAny<object?[]?>())).ReturnsAsync(true);
+        fixture.Js.Setup(j => j.InvokeAsync<bool>("yap.encryption.verifyDirectory", It.IsAny<object?[]?>())).ReturnsAsync(true);
         await fixture.Encryption.VerifyFingerprintAsync(fixture.User, peer, "the compared fingerprint");
-        fixture.Js.Verify(j => j.InvokeAsync<bool>("yap.encryption.verifyFingerprint", It.Is<object?[]?>(a => a != null
-            && (string)a[0]! == OfflineStore.Scope(fixture.User) && (string)a[1]! == peer.ToString()
+        fixture.Js.Verify(j => j.InvokeAsync<bool>("yap.encryption.verifyDirectory", It.Is<object?[]?>(a => a != null
+            && (string)a[0]! == OfflineStore.Scope(fixture.User) && ((JsonElement)a[1]!).GetProperty("roster").GetString() == "signed-roster-1"
             && (string)a[2]! == "the compared fingerprint")), Times.Once);
+    }
+
+    [Test]
+    public async Task ResetIdentityAsync_LostResponseResumesConfirmationWithoutPublishingAgain()
+    {
+        using var fixture = new Fixture { LoseDirectoryResponse = true };
+        await fixture.Encryption.EnsureAsync(fixture.User);
+        var next = fixture.NewDirectory(2);
+        fixture.Js.Setup(j => j.InvokeAsync<JsonElement>("yap.encryption.prepareReset", It.IsAny<object?[]?>()))
+            .ReturnsAsync(Fixture.Json(new { directory = next, recoveryArchive = "encrypted-new-backup" }));
+        fixture.Js.Setup(j => j.InvokeAsync<bool>("yap.encryption.confirmReset", It.IsAny<object?[]?>()))
+            .Returns((string _, object?[]? args) => ValueTask.FromResult(((JsonElement)args![1]!).GetProperty("revision").GetInt64() == 2));
+        await fixture.Encryption.ResetIdentityAsync(fixture.User, "fixture");
+        await fixture.Encryption.ResetIdentityAsync(fixture.User, "fixture");
+        Assert.That(fixture.ResetPosts, Is.EqualTo(1));
+        Assert.That(fixture.Encryption.Status.Approved, Is.True);
+        Assert.That(fixture.Encryption.RecoveryKey, Is.Null);
     }
 
     private sealed class Fixture : IDisposable
@@ -148,6 +165,7 @@ public sealed class ChatEncryptionTests
         public JsonElement? Backup { get; set; }
         public int BackupPosts { get; private set; }
         public int DirectoryPosts { get; private set; }
+        public int ResetPosts { get; private set; }
         public bool LoseDirectoryResponse { get; set; }
         public bool FailBackup { get; set; }
         public bool InitiallyApproved { get; set; } = true;
@@ -172,6 +190,12 @@ public sealed class ChatEncryptionTests
         private async Task<HttpResponseMessage> Handle(HttpRequestMessage request)
         {
             var path = request.RequestUri!.AbsolutePath;
+            if (request.Method == HttpMethod.Post && path.EndsWith("/reset"))
+            {
+                ResetPosts++; Directory = NewDirectory(2);
+                if (LoseDirectoryResponse) throw new HttpRequestException("Response lost after reset");
+                return new(HttpStatusCode.OK) { Content = JsonContent.Create(Directory) };
+            }
             if (request.Method == HttpMethod.Get && (path.EndsWith("/directory") || path.Contains("/people/")))
             { if (OverrideGet is not null) return await OverrideGet(); return new(HttpStatusCode.OK) { Content = JsonContent.Create(Directory) }; }
             if (request.Method == HttpMethod.Post && path.EndsWith("/directory"))

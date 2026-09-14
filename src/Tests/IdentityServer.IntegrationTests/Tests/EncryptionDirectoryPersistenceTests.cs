@@ -7,6 +7,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
+using Moq;
+using XFramework.Core.Patterns;
 using NUnit.Framework;
 using Testcontainers.PostgreSql;
 using XFramework.Integration.Security;
@@ -56,6 +58,8 @@ public sealed class EncryptionDirectoryPersistenceTests
         var migration = new XFramework.Domain.Migrations.AddEncryptionDirectoryAndMessageEnvelopes();
         var generator = db.GetService<IMigrationsSqlGenerator>();
         foreach (var command in generator.Generate(migration.UpOperations))
+            await db.Database.ExecuteSqlRawAsync(command.CommandText);
+        foreach (var command in generator.Generate(new XFramework.Domain.Migrations.AddEncryptionIdentityPublicHistory().UpOperations))
             await db.Database.ExecuteSqlRawAsync(command.CommandText);
         Assert.That(await db.Database.SqlQueryRaw<bool>("SELECT \"EncryptionRequired\" AS \"Value\" FROM \"Communications\".\"MessageThread\"").SingleAsync(), Is.False);
         Assert.That(await db.Database.SqlQueryRaw<bool>("SELECT (\"EncryptedEnvelope\" IS NULL) AS \"Value\" FROM \"Communications\".\"Message\"").SingleAsync(), Is.True);
@@ -189,6 +193,49 @@ public sealed class EncryptionDirectoryPersistenceTests
         var archive = mutation switch { "private" => Armor("PRIVATE KEY BLOCK", "secret"), "large" => Armor("MESSAGE", new string('a', 2097152)), _ => "recovery secret" };
         await using var db = Context();
         Assert.That((await Service(db).PutEncryptionRecoveryAsync(new() { Archive = archive })).StatusCode, Is.EqualTo(400));
+    }
+
+    [Test]
+    public async Task Reset_RechecksOwnPassword_AtomicallyReplacesKeysAndBackup_PreservesPublicHistory()
+    {
+        var original = await Initialize();
+        var password = new Mock<IAuthService>();
+        password.Setup(x => x.VerifyPasswordAsync(It.Is<VerifyPasswordRequest>(r => r.CredentialId == _owner), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<bool>.Success(true));
+        var next = Directory(); next.ExpectedRevision = 1; next.RootPublicKey = Armor("PUBLIC KEY BLOCK", "new root"); next.Roster = Armor("MESSAGE", "new roster");
+        var request = new ResetEncryptionIdentityRequest { Password = "fixture-password", Directory = next, RecoveryArchive = Armor("MESSAGE", "new backup") };
+        await using var db = Context(); var service = Service(db);
+        var reset = await service.ResetEncryptionIdentityAsync(request, password.Object);
+        Assert.That(reset.IsSuccess, Is.True);
+        Assert.That(reset.Data!.Revision, Is.EqualTo(2));
+        Assert.That(reset.Data.RootPublicKey, Is.EqualTo(next.RootPublicKey));
+        Assert.That((await service.GetEncryptionRecoveryAsync(new())).Data!.Archive, Is.EqualTo(request.RecoveryArchive));
+        Assert.That((await service.ResetEncryptionIdentityAsync(request, password.Object)).Data!.Revision, Is.EqualTo(2), "Lost response retry is idempotent");
+        var peer = Service(db, credential: Guid.NewGuid());
+        var history = await peer.GetEncryptionDirectoryAsync(new() { CredentialId = _owner, SenderDeviceId = original.Devices[0].DeviceId });
+        Assert.That(history.Data!.RootPublicKey, Is.EqualTo(original.RootPublicKey));
+        Assert.That((await peer.GetEncryptionRecoveryAsync(new())).StatusCode, Is.EqualTo(404));
+        Assert.That((await Service(db, tenant: Guid.NewGuid()).GetEncryptionDirectoryAsync(new() { CredentialId = _owner, SenderDeviceId = original.Devices[0].DeviceId })).StatusCode, Is.EqualTo(404));
+        Assert.That((await service.PutEncryptionRecoveryAsync(new() { ExpectedRevision = 1, Archive = Armor("MESSAGE", "old device backup") })).StatusCode, Is.EqualTo(409));
+        original.ExpectedRevision = 2;
+        Assert.That((await service.PutEncryptionDirectoryAsync(original)).StatusCode, Is.EqualTo(409));
+        Assert.That((await service.ResetEncryptionIdentityAsync(request with { Directory = original }, password.Object)).StatusCode, Is.EqualTo(409));
+        password.Verify(x => x.VerifyPasswordAsync(It.IsAny<VerifyPasswordRequest>(), It.IsAny<CancellationToken>()), Times.Exactly(3));
+    }
+
+    [TestCase(403)][TestCase(429)]
+    public async Task Reset_FailedPasswordOrRateLimit_LeavesDirectoryAndBackupUntouched(int status)
+    {
+        var original = await Initialize();
+        var password = new Mock<IAuthService>();
+        password.Setup(x => x.VerifyPasswordAsync(It.IsAny<VerifyPasswordRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<bool>.Failure("Denied", status));
+        await using var db = Context(); var service = Service(db);
+        var request = new ResetEncryptionIdentityRequest { Password = "wrong-password", Directory = Directory(), RecoveryArchive = Armor("MESSAGE", "backup") };
+        Assert.That((await service.ResetEncryptionIdentityAsync(request, password.Object)).StatusCode, Is.EqualTo(status));
+        Assert.That((await service.GetEncryptionDirectoryAsync(new() { CredentialId = _owner })).Data!.RootPublicKey, Is.EqualTo(original.RootPublicKey));
+        Assert.That((await service.GetEncryptionRecoveryAsync(new())).Data!.Revision, Is.Zero);
+        Assert.That((await service.ResetEncryptionIdentityAsync(request with { Password = null! }, password.Object)).StatusCode, Is.EqualTo(400));
     }
 
     private async Task<PutEncryptionDirectoryRequest> Initialize()

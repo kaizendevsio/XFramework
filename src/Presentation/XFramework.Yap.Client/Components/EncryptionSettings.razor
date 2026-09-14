@@ -1,5 +1,6 @@
 @inject ChatState State
 @inject IJSRuntime JS
+@inject VoiceState Voice
 @implements IDisposable
 @if (State.User is not null && State.EncryptionEnabled)
 {
@@ -84,6 +85,7 @@
                 @if (fingerprint is not null && fingerprint.CredentialId == peerId)
                 {
                     <p class="fingerprint">@fingerprint.Fingerprint</p>
+                    @if (fingerprint.Changed) { <p role="alert">This person's encryption identity has changed. Compare this fingerprint with them before accepting their new identity.</p> }
                     @if (fingerprint.Verified) { <p class="verified-person">Identity verified</p> }
                     else
                     {
@@ -93,12 +95,23 @@
                 }
             </details>
         }
+        <details class="reset-encryption">
+            <summary>Lost your recovery key?</summary>
+            <p>Try another trusted device first. If you cannot recover your keys, you can start fresh with a new encryption identity.</p>
+            <p>Resetting removes saved messages, drafts and unsent messages from this device. Your new keys cannot unlock old encrypted messages. Other people keep their copies, and must verify your new identity. Your account stays signed in.</p>
+            @if (Voice.IsCalling) { <p>Finish your call before resetting encryption.</p> }
+            <label>Confirm your account password<input type="password" @bind="resetPassword" autocomplete="current-password" /></label>
+            <label class="reset-consent"><input type="checkbox" @bind="resetConsent" />I understand that my old encrypted messages cannot be recovered with the new keys.</label>
+            <button class="btn device-remove" disabled="@(busy || Voice.IsCalling || !State.Online || !resetConsent || string.IsNullOrEmpty(resetPassword))" @onclick="ResetAsync">Reset encryption and start fresh</button>
+        </details>
         @if (notice is not null) { <p role="status">@notice</p> }
         @if (State.Encryption.BackupPending) { <p role="status">Your recovery backup is waiting to sync. Keep this device until it finishes.</p> }
     </section>
 }
 @code {
     private bool busy;
+    private bool resetConsent;
+    private string resetPassword = "";
     private string recoveryKey = "", deviceRequest = "", approvalCode = "";
     private string? proposal, approval, notice;
     private string? accountScope;
@@ -116,7 +129,7 @@
         accountScope = scope; ClearPrivateUi();
     }
     private void ClearPrivateUi()
-    { recoveryKey = deviceRequest = approvalCode = comparison = ""; proposal = approval = notice = null; devices = null; revokeCandidate = null; fingerprint = null; peerId = Guid.Empty; }
+    { recoveryKey = deviceRequest = approvalCode = comparison = resetPassword = ""; resetConsent = false; proposal = approval = notice = null; devices = null; revokeCandidate = null; fingerprint = null; peerId = Guid.Empty; }
     private void ClearPeer() { fingerprint = null; comparison = ""; }
     private async Task RunAsync(Func<UserSession, Task> action)
     {
@@ -129,6 +142,22 @@
         finally { busy = false; if (State.User is null || OfflineStore.Scope(State.User) != scope) ClearPrivateUi(); }
     }
     private Task ShowRecoveryAsync() => RunAsync(State.Encryption.ShowRecoveryAsync);
+    private Task ResetAsync() => RunAsync(async user =>
+    {
+        if (!resetConsent || Voice.IsCalling) return;
+        try
+        {
+            await State.ResetEncryptionAsync(resetPassword);
+            ClearPrivateUi();
+            notice = "Encryption reset. Save your new recovery key under Recovery and devices. Old messages remain locked.";
+        }
+        catch (ChatApiException ex) when (ex.Status is 403 or 429)
+        {
+            notice = ex.Status == 429 ? "Too many password attempts. Wait a little before trying again."
+                : "Your password could not be confirmed. Check it and try again.";
+        }
+        finally { resetPassword = ""; resetConsent = false; }
+    });
     private Task RestoreAsync() => RunAsync(async user => { await State.Encryption.RestoreAsync(user, recoveryKey.Trim()); recoveryKey = ""; await State.SynchronizeAsync(); notice = "This device is ready."; });
     private Task ProposeAsync() => RunAsync(async user => proposal = await State.Encryption.ProposeAsync(user));
     private Task ApproveAsync() => RunAsync(async user => { approval = await State.Encryption.ApproveAsync(user, deviceRequest); deviceRequest = ""; devices = null; });

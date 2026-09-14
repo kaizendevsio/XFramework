@@ -16,6 +16,16 @@ public sealed class EncryptionDirectoryService(DbContext db, ITrustedInvocationC
             .Where(x => x.TenantId == actor.TenantId && x.CredentialId == request.CredentialId)
             .Select(x => new { x.TenantId, x.CredentialId, x.DirectoryRevision, x.RootPublicKey, x.Roster, x.DevicesJson })
             .SingleOrDefaultAsync(ct);
+        if (row is not null && request.SenderDeviceId is { } device && !ReadDevices(row.DevicesJson).Any(x => x.DeviceId == device))
+        {
+            // History belongs to the requested same-tenant sender, not necessarily the caller.
+            var json = await db.Set<EncryptionAccount>().AsNoTracking().Where(x => x.TenantId == actor.TenantId && x.CredentialId == request.CredentialId)
+                .Select(x => x.PublicHistoryJson).SingleOrDefaultAsync(ct);
+            var previous = JsonSerializer.Deserialize<List<EncryptionDirectoryResponse>>(json ?? "[]")!
+                .SingleOrDefault(x => x.Devices.Any(d => d.DeviceId == device));
+            return previous is null ? Result<EncryptionDirectoryResponse>.NotFound("Sending device not found")
+                : Result<EncryptionDirectoryResponse>.Success(previous);
+        }
         return row is null ? Result<EncryptionDirectoryResponse>.NotFound("Encryption directory not found")
             : Result<EncryptionDirectoryResponse>.Success(new()
             {
@@ -34,6 +44,9 @@ public sealed class EncryptionDirectoryService(DbContext db, ITrustedInvocationC
             return Result<EncryptionDirectoryResponse>.Failure("Encryption directory changed; refresh it before retrying", 409);
         if (row is not null && (row.RootPublicKey != request.RootPublicKey || !PreservesDevices(ReadDevices(row.DevicesJson), request.Devices)))
             return Result<EncryptionDirectoryResponse>.Failure("Existing roots, device keys and revocations cannot be replaced or removed", 409);
+        if (row is not null && JsonSerializer.Deserialize<List<EncryptionDirectoryResponse>>(row.PublicHistoryJson)!
+            .Any(h => h.Devices.Any(old => request.Devices.Any(d => d.DeviceId == old.DeviceId))))
+            return Result<EncryptionDirectoryResponse>.Failure("Devices from a previous identity must enroll with fresh keys", 409);
         if (row is null)
         {
             row = new EncryptionAccount { TenantId = actor.TenantId, CredentialId = actor.CredentialId };
@@ -49,6 +62,42 @@ public sealed class EncryptionDirectoryService(DbContext db, ITrustedInvocationC
             TenantId = actor.TenantId, CredentialId = actor.CredentialId, Revision = row.DirectoryRevision,
             RootPublicKey = row.RootPublicKey, Roster = row.Roster, Devices = ReadDevices(row.DevicesJson)
         }) : Result<EncryptionDirectoryResponse>.Failure("Encryption directory changed; refresh it before retrying", 409);
+    }
+
+    public async Task<Result<EncryptionDirectoryResponse>> ResetEncryptionIdentityAsync(ResetEncryptionIdentityRequest request, IAuthService auth, CancellationToken ct = default)
+    {
+        var actor = Actor();
+        if (actor is null) return Result<EncryptionDirectoryResponse>.Failure("An authenticated user is required", 401);
+        if (string.IsNullOrEmpty(request.Password) || request.Password.Length > 256 || request.Directory is null || !ValidDirectory(request.Directory)
+            || !Armor(request.RecoveryArchive, "MESSAGE", 2097152))
+            return Result<EncryptionDirectoryResponse>.Failure("A password, new directory and encrypted backup are required", 400);
+        var verified = await auth.VerifyPasswordAsync(new VerifyPasswordRequest
+        { CredentialId = actor.CredentialId, Password = request.Password, Metadata = request.Metadata }, ct);
+        if (verified.StatusCode == 429) return Result<EncryptionDirectoryResponse>.Failure("Too many attempts. Try again later.", 429);
+        if (!verified.IsSuccess || !verified.Data) return Result<EncryptionDirectoryResponse>.Failure("Confirm your password before resetting encryption", 403);
+        var row = await OwnAccount(actor).AsTracking().SingleOrDefaultAsync(ct);
+        if (row is null) return Result<EncryptionDirectoryResponse>.NotFound("Encryption directory not found");
+        var next = request.Directory;
+        // A retry after a lost response returns the already committed identity.
+        if (row.RootPublicKey == next.RootPublicKey && row.Roster == next.Roster)
+            return await GetEncryptionDirectoryAsync(new() { CredentialId = actor.CredentialId }, ct);
+        if (row.DirectoryRevision != next.ExpectedRevision || row.RootPublicKey == next.RootPublicKey)
+            return Result<EncryptionDirectoryResponse>.Failure("Encryption changed; refresh before resetting", 409);
+        var history = JsonSerializer.Deserialize<List<EncryptionDirectoryResponse>>(row.PublicHistoryJson)!;
+        if (row.RecoveryRevision == long.MaxValue || history.Any(h => h.RootPublicKey == next.RootPublicKey))
+            return Result<EncryptionDirectoryResponse>.Failure("Reset requires a new encryption identity", 409);
+        if (next.Devices.Any(d => ReadDevices(row.DevicesJson).Any(old => old.DeviceId == d.DeviceId)
+            || history.Any(h => h.Devices.Any(old => old.DeviceId == d.DeviceId))))
+            return Result<EncryptionDirectoryResponse>.Failure("Reset requires fresh device identities", 400);
+        history.Add(new() { TenantId = actor.TenantId, CredentialId = actor.CredentialId,
+            Revision = row.DirectoryRevision, RootPublicKey = row.RootPublicKey, Roster = row.Roster, Devices = ReadDevices(row.DevicesJson) });
+        row.PublicHistoryJson = JsonSerializer.Serialize(history);
+        row.DirectoryRevision++; row.RecoveryRevision++;
+        row.RootPublicKey = next.RootPublicKey; row.Roster = next.Roster; row.DevicesJson = JsonSerializer.Serialize(next.Devices);
+        row.RecoveryArchive = request.RecoveryArchive;
+        return await SaveAsync(row, ct)
+            ? await GetEncryptionDirectoryAsync(new() { CredentialId = actor.CredentialId }, ct)
+            : Result<EncryptionDirectoryResponse>.Failure("Encryption changed; refresh before resetting", 409);
     }
 
     public async Task<Result<EncryptionRecoveryResponse>> GetEncryptionRecoveryAsync(GetEncryptionRecoveryRequest request, CancellationToken ct = default)
@@ -71,6 +120,8 @@ public sealed class EncryptionDirectoryService(DbContext db, ITrustedInvocationC
         if (row is null) return Result<EncryptionRecoveryResponse>.NotFound("Encryption directory not found");
         if (row.RecoveryRevision != request.ExpectedRevision)
             return Result<EncryptionRecoveryResponse>.Failure("Recovery archive changed; refresh it before retrying", 409);
+        if (request.RootPublicKey != row.RootPublicKey && (request.RootPublicKey is not null || row.PublicHistoryJson != "[]"))
+            return Result<EncryptionRecoveryResponse>.Failure("Encryption identity changed; refresh before backing up", 409);
         row.RecoveryRevision++;
         row.RecoveryArchive = request.Archive;
         return await SaveAsync(row, ct)

@@ -6,4 +6,5 @@ public partial record GetEncryptionDirectoryRequest : RequestBase,
     IBoltRequest<GetEncryptionDirectoryRequest, QueryResponse<EncryptionDirectoryResponse>>
 {
     public Guid CredentialId { get; set; }
+    public Guid? SenderDeviceId { get; set; }
 }

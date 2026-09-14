@@ -357,6 +357,13 @@
             pending.clear(); previews.clear();
             await (await navigator.storage.getDirectory()).removeEntry('yap-files', { recursive: true }).catch(error => { if (error.name !== 'NotFoundError') throw error; });
         },
+        async clearAccountFiles(scope, keys) {
+            if (!/^[0-9a-f]{32}:[0-9a-f]{32}$/i.test(scope)) throw new Error('Invalid account scope.');
+            const prefix = `${scope.replace(':', '-')}-`, owned = new Set(keys), dir = await directory();
+            for (const key of owned) { pending.delete(key); previews.delete(key); }
+            for await (const [name] of dir.entries())
+                if (name.startsWith(prefix) || [...owned].some(key => name === key || name.startsWith(`${key}.`))) await dir.removeEntry(name);
+        },
         persist: async () => navigator.storage.persist ? await navigator.storage.persist() : false,
         canInstall: () => installPrompt !== undefined && installPrompt !== null,
         isInstalled: () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true,

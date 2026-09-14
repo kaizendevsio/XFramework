@@ -112,7 +112,7 @@ async function signDirectory(directory, rootPrivateKey) {
     return d;
 }
 function publicStatus(state) {
-    return { enrolled: !!state?.device, approved: !!state?.approved, deviceId: state?.device?.deviceId ?? null, rootFingerprint: state?.rootFingerprint ?? null, directoryRevision: state?.directory?.revision ?? 0, canApproveDevices: !!state?.rootPrivateKey && !!state?.approved, verifiedContacts: Object.entries(state?.pins ?? {}).filter(([, p]) => p.verified).map(([credentialId]) => credentialId) };
+    return { enrolled: !!state?.device, approved: !!state?.approved, deviceId: state?.device?.deviceId ?? null, rootFingerprint: state?.rootFingerprint ?? null, directoryRevision: state?.directory?.revision ?? 0, resetHistoryPending: !!state?.resetHistoryPending, canApproveDevices: !!state?.rootPrivateKey && !!state?.approved, verifiedContacts: Object.entries(state?.pins ?? {}).filter(([, p]) => p.verified).map(([credentialId]) => credentialId) };
 }
 
 // Keys are isolated by signed-in tenant/account. IndexedDB is origin-local; an
@@ -173,7 +173,7 @@ export function createEncryption(store = indexedDbStore()) {
     async function archive(state, s) {
         const recoveryKey = state.recoveryKey ??= Array.from(crypto.getRandomValues(new Uint8Array(32)), x => x.toString(16).padStart(2, '0')).join('');
         check(state.rootPrivateKey, 'Only an account owner device can export recovery.');
-        const payload = { v: 1, kind: 'account-recovery', ...s, rootFingerprint: state.rootFingerprint, rootPrivateKey: state.rootPrivateKey, rootPublicKey: state.rootPublicKey, decryptionKeys: [...new Set([state.device.encryptionPrivateKey, ...(state.historyKeys ?? [])])], pins: state.pins };
+        const payload = { v: 1, kind: 'account-recovery', ...s, rootFingerprint: state.rootFingerprint, rootPrivateKey: state.rootPrivateKey, rootPublicKey: state.rootPublicKey, decryptionKeys: [...new Set([state.device.encryptionPrivateKey, ...(state.historyKeys ?? [])])], pins: state.pins, historicalPins: state.historicalPins ?? {} };
         const recoveryArchive = await pgp.encrypt({ message: await pgp.createMessage({ binary: encoder.encode(canonical(payload)) }), passwords: [recoveryKey], signingKeys: await readPrivate(state.rootPrivateKey), format: 'armored', config });
         return { recoveryArchive, recoveryKey };
     }
@@ -237,7 +237,10 @@ export function createEncryption(store = indexedDbStore()) {
     }
     async function prepareDecryption(s, key, context, senderDirectory) {
         const state = await requireState(key), c = contextOf(s, context);
-        const { directory: d, revisions } = await validateDirectory(s, senderDirectory, state.pins);
+        const root = await fingerprint(senderDirectory.rootPublicKey), senderId = guid(senderDirectory.credentialId);
+        const previous = state.historicalPins?.[senderId]?.[root];
+        // Retired roots verify history only. They never become the active recipient identity again.
+        const { directory: d, revisions } = await validateDirectory(s, senderDirectory, previous ? { [senderId]: previous } : state.pins);
         check(d.credentialId === c.senderId, 'Unexpected sender directory.');
         await store.put(key, state);
         return { s, c, d, revisions, decryptionKeys: await Promise.all([...new Set([state.device.encryptionPrivateKey, ...(state.historyKeys ?? [])])].map(readPrivate)), verificationKeys: await Promise.all(d.devices.map(device => readPublic(device.signingPublicKey))) };
@@ -316,6 +319,62 @@ export function createEncryption(store = indexedDbStore()) {
     }
     const api = {
         status: scope => locked(scope, async (_s, key) => publicStatus(await store.get(key))),
+        observeOwnDirectory: (scope, directory) => locked(scope, async (s, key) => {
+            const state = await store.get(key);
+            if (!state?.rootFingerprint) return false;
+            if (directory.rootPublicKey === state.rootPublicKey) return false;
+            const result = await validateDirectory(s, directory, {});
+            check(result.directory.credentialId === s.credentialId, 'Wrong account directory.');
+            if (result.rootFingerprint === state.rootFingerprint) return false;
+            check(result.directory.revision > (state.directory?.revision ?? 0), 'An older account identity was returned.');
+            // Keep old keys until the owner explicitly recovers or approves this device.
+            state.identityChanged = true; state.approved = false; await store.put(key, state); return true;
+        }),
+        prepareReset: (scope, directory) => locked(scope, async (s, key) => {
+            const old = directoryShape(directory);
+            check(old.tenantId === s.tenantId && old.credentialId === s.credentialId, 'Reset belongs to another account.');
+            const state = await requireState(key);
+            if (state.pendingReset?.expectedRevision === old.revision) return state.pendingReset.result;
+            const revision = old.revision + 1, root = await keyPair(`Yap account ${s.credentialId}`, true), device = await newDevice();
+            const next = await signDirectory({ ...s, revision, rootPublicKey: root.publicKey, devices: [await approveRecord(s, device, revision, root.privateKey)] }, root.privateKey);
+            const pins = { ...state.pins }; delete pins[s.credentialId];
+            const fresh = { device, rootPrivateKey: root.privateKey, rootPublicKey: root.publicKey, rootFingerprint: await fingerprint(root.publicKey),
+                pins, historicalPins: state.historicalPins ?? {}, historyKeys: [], approved: false, directory: null, pendingDirectory: next, resetHistoryPending: true };
+            const result = { directory: next, ...await archive(fresh, s) };
+            state.pendingReset = { expectedRevision: old.revision, fresh, result };
+            await store.put(key, state); return result;
+        }),
+        confirmReset: (scope, directory) => locked(scope, async (s, key) => {
+            const state = await store.get(key), pending = state?.pendingReset;
+            if (state?.resetHistoryPending && state.rootPublicKey === directory.rootPublicKey) {
+                await accept(s, state, directory); await store.put(key, state); return true;
+            }
+            if (!pending || pending.result.directory.rootPublicKey !== directory.rootPublicKey || pending.result.directory.roster !== directory.roster) return false;
+            await accept(s, pending.fresh, directory);
+            await store.put(key, pending.fresh); return true;
+        }),
+        acknowledgeReset: scope => locked(scope, async (_s, key) => {
+            const state = await requireState(key); state.resetHistoryPending = false; await store.put(key, state);
+        }),
+        inspectDirectory: (scope, directory) => locked(scope, async (s, key) => {
+            const state = await requireState(key), result = await validateDirectory(s, directory, {});
+            const pin = state.pins[result.directory.credentialId];
+            return { fingerprint: result.rootFingerprint, verified: !!pin?.verified && pin.rootFingerprint === result.rootFingerprint,
+                changed: !!pin && pin.rootFingerprint !== result.rootFingerprint };
+        }),
+        verifyDirectory: (scope, directory, expectedFingerprint) => locked(scope, async (s, key) => {
+            const state = await requireState(key), pins = {}, result = await validateDirectory(s, directory, pins);
+            const id = result.directory.credentialId;
+            check(id !== s.credentialId && result.rootFingerprint === String(expectedFingerprint).toLowerCase().replaceAll(' ', ''), 'The fingerprint does not match.');
+            const previous = state.pins[id];
+            if (previous && previous.rootFingerprint !== result.rootFingerprint) {
+                check(result.directory.revision > previous.revision, 'An older identity was returned.');
+                check(!state.historicalPins?.[id]?.[result.rootFingerprint], 'A retired identity was returned.');
+                state.historicalPins ??= {}; state.historicalPins[id] ??= {};
+                state.historicalPins[id][previous.rootFingerprint] = previous;
+            } else await validateDirectory(s, directory, state.pins);
+            state.pins[id] = { ...pins[id], verified: true }; await store.put(key, state); return true;
+        }),
         initialize: scope => locked(scope, async (s, key) => {
             let state = await store.get(key);
             if (!state?.device) {
@@ -375,6 +434,11 @@ export function createEncryption(store = indexedDbStore()) {
         proposeDevice: scope => locked(scope, async (s, key) => {
             let state = await store.get(key);
             if (!state?.device) { state = { device: await newDevice(), rootPrivateKey: null, rootPublicKey: null, rootFingerprint: null, pins: {}, historyKeys: [], approved: false, directory: null }; await store.put(key, state); }
+            if (state.identityChanged) {
+                state.pendingRejoinDevice ??= await newDevice(); await store.put(key, state);
+                const device = state.pendingRejoinDevice;
+                return { v: 1, kind: 'device-proposal', ...s, deviceId: device.deviceId, signingPublicKey: device.signingPublicKey, encryptionPublicKey: device.encryptionPublicKey };
+            }
             check(!state.approved && !state.rootPrivateKey, 'This device already owns an account identity.');
             return { v: 1, kind: 'device-proposal', ...s, deviceId: state.device.deviceId, signingPublicKey: state.device.signingPublicKey, encryptionPublicKey: state.device.encryptionPublicKey };
         }),
@@ -420,8 +484,13 @@ export function createEncryption(store = indexedDbStore()) {
             return result;
         }),
         importApproval: (scope, approval, directory) => locked(scope, async (s, key) => {
-            const state = await requireState(key);
+            let state = await requireState(key);
             check(!state.approved, 'This device is already approved.');
+            if (state.identityChanged) {
+                check(state.pendingRejoinDevice && directory.revision > (state.directory?.revision ?? 0), 'Create a fresh device request first.');
+                const pins = { ...state.pins }; delete pins[s.credentialId];
+                state = { device: state.pendingRejoinDevice, pins, historicalPins: state.historicalPins ?? {}, approved: false, resetHistoryPending: true };
+            }
             const expectedRootFingerprint = approval.rootFingerprint;
             check(guid(approval.deviceId) === state.device.deviceId, 'This approval belongs to another device.');
             check(await fingerprint(directory.rootPublicKey) === expectedRootFingerprint, 'The account fingerprint does not match the approving device.');
@@ -464,6 +533,10 @@ export function createEncryption(store = indexedDbStore()) {
             check(data.v === 1 && data.kind === 'account-recovery' && data.tenantId === s.tenantId && data.credentialId === s.credentialId && data.rootPublicKey === d.rootPublicKey && data.rootFingerprint === await fingerprint(d.rootPublicKey), 'Recovery belongs to another account or security key.');
             check((await readPrivate(data.rootPrivateKey)).getFingerprint() === data.rootFingerprint, 'Invalid recovered account key.');
             const pins = { ...(data.pins ?? {}), ...(existing?.pins ?? {}) };
+            if (existing?.identityChanged) {
+                check(d.revision > (existing.directory?.revision ?? 0), 'An older account identity was returned.');
+                delete pins[s.credentialId];
+            }
             await validateDirectory(s, d, pins);
             check(d.devices.length < MAX_DIRECTORY_DEVICES && Array.isArray(data.decryptionKeys) && data.decryptionKeys.length <= MAX_DIRECTORY_DEVICES, 'Recovery device limit reached.');
             for (const privateKey of data.decryptionKeys) await readPrivate(privateKey);
@@ -474,7 +547,7 @@ export function createEncryption(store = indexedDbStore()) {
             }
             const device = await newDevice();
             const updated = await signDirectory({ ...d, revision: d.revision + 1, devices: [...d.devices, await approveRecord(s, device, d.revision + 1, data.rootPrivateKey)] }, data.rootPrivateKey);
-            const state = { device, rootPrivateKey: data.rootPrivateKey, rootPublicKey: d.rootPublicKey, rootFingerprint: data.rootFingerprint, recoveryKey, pins, historyKeys: data.decryptionKeys, approved: false, directory: d, pendingDirectory: updated };
+            const state = { device, rootPrivateKey: data.rootPrivateKey, rootPublicKey: d.rootPublicKey, rootFingerprint: data.rootFingerprint, recoveryKey, pins, historicalPins: data.historicalPins ?? {}, historyKeys: data.decryptionKeys, approved: false, directory: d, pendingDirectory: updated, resetHistoryPending: !!existing?.identityChanged };
             await store.put(key, state);
             return { expectedRevision: d.revision, directory: updated, ...await archive(state, s) };
         })

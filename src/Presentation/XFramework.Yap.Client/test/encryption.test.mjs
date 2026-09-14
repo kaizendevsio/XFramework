@@ -260,3 +260,70 @@ test('late enrollment opens the original 7 MB attachment through an encrypted me
     const wrongKey = { ...upload.key, data: '00'.repeat(32) };
     await assert.rejects(ready.api.decryptStream(ready.scope, ctx, streamOf(ciphertext), sender.directory, quarantine().sink, wrongKey));
 });
+
+test('reset is staged until confirmation, retries safely, and fresh keys cannot decrypt old messages', async () => {
+    const a = await account(), b = await account(), ctx = context(b);
+    const encrypted = await b.api.encrypt(b.scope, ctx, { text: 'Before reset' }, [a.directory, b.directory]);
+    const pending = await a.api.prepareReset(a.scope, a.directory);
+    assert.deepEqual(await a.api.prepareReset(a.scope, a.directory), pending);
+    assert.equal((await a.api.decrypt(a.scope, ctx, encrypted, b.directory)).text, 'Before reset');
+    assert.equal(await a.api.confirmReset(a.scope, a.directory), false);
+    assert.equal(await a.api.confirmReset(a.scope, pending.directory), true);
+    assert.equal(await a.api.confirmReset(a.scope, pending.directory), true, 'cleanup retry must not create another identity');
+    assert.equal((await a.api.status(a.scope)).resetHistoryPending, true);
+    await assert.rejects(a.api.decrypt(a.scope, ctx, encrypted, b.directory));
+    assert.notEqual(pending.directory.rootPublicKey, a.directory.rootPublicKey);
+    assert.equal(pending.directory.revision, a.directory.revision + 1);
+    assert.notEqual(pending.recoveryKey, a.recoveryKey);
+    const fresh = client();
+    await assert.rejects(fresh.api.recovery(a.scope, a.recoveryKey, pending.recoveryArchive, pending.directory));
+    const restored = await fresh.api.recovery(a.scope, pending.recoveryKey, pending.recoveryArchive, pending.directory);
+    assert.equal(restored.directory.rootPublicKey, pending.directory.rootPublicKey);
+    await a.api.acknowledgeReset(a.scope);
+    assert.equal((await a.api.status(a.scope)).resetHistoryPending, false);
+});
+
+test('contacts must verify a replacement identity, retain old message verification and never downgrade the current pin', async () => {
+    const a = await account(), b = await account(), ctx = context(a);
+    const old = await a.api.encrypt(a.scope, ctx, { text: 'Old message' }, [a.directory, b.directory]);
+    await b.api.decrypt(b.scope, ctx, old, a.directory);
+    const next = await a.api.prepareReset(a.scope, a.directory);
+    await a.api.confirmReset(a.scope, next.directory);
+    const inspected = await b.api.inspectDirectory(b.scope, next.directory);
+    assert.equal(inspected.changed, true); assert.equal(inspected.verified, false);
+    await assert.rejects(b.api.acceptDirectory(b.scope, next.directory), /key changed/);
+    await assert.rejects(b.api.verifyDirectory(b.scope, next.directory, '0'.repeat(40)), /does not match/);
+    await b.api.verifyDirectory(b.scope, next.directory, inspected.fingerprint);
+    assert.equal((await b.api.decrypt(b.scope, ctx, old, a.directory)).text, 'Old message');
+    assert.equal(stored(b).pins[a.scope.credentialId].rootFingerprint, inspected.fingerprint);
+    await assert.rejects(b.api.acceptDirectory(b.scope, a.directory), /key changed/);
+    const current = context(a), envelope = await a.api.encrypt(a.scope, current, { text: 'New message' }, [next.directory, b.directory]);
+    assert.equal((await b.api.decrypt(b.scope, current, envelope, next.directory)).text, 'New message');
+    await assert.rejects(b.api.prepareReset(b.scope, next.directory), /another account/);
+});
+
+test('a former device stays locked after reset and can rejoin with the new recovery key or explicit approval', async () => {
+    for (const method of ['recovery', 'approval']) {
+        const old = await account(), fresh = client();
+        await fresh.api.proposeDevice(old.scope);
+        const next = await fresh.api.prepareReset(old.scope, old.directory);
+        await fresh.api.confirmReset(old.scope, next.directory);
+        assert.equal(await old.api.observeOwnDirectory(old.scope, next.directory), true);
+        assert.equal((await old.api.status(old.scope)).approved, false);
+        assert.equal(stored(old).rootPublicKey, old.directory.rootPublicKey, 'observation must retain old keys');
+        if (method === 'recovery') {
+            await assert.rejects(old.api.recovery(old.scope, old.recoveryKey, next.recoveryArchive, next.directory));
+            const result = await old.api.recovery(old.scope, next.recoveryKey, next.recoveryArchive, next.directory);
+            await old.api.acceptDirectory(old.scope, result.directory);
+        } else {
+            const proposal = await old.api.proposeDevice(old.scope);
+            assert.notEqual(proposal.deviceId, old.directory.devices[0].deviceId);
+            assert.deepEqual(await old.api.proposeDevice(old.scope), proposal);
+            const result = await fresh.api.approveDevice(old.scope, proposal, next.directory);
+            await old.api.importApproval(old.scope, result.approval, result.directory);
+        }
+        assert.equal((await old.api.status(old.scope)).approved, true);
+        assert.equal((await old.api.status(old.scope)).resetHistoryPending, true);
+        assert.equal(stored(old).rootPublicKey, next.directory.rootPublicKey);
+    }
+});

@@ -197,6 +197,28 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         return await db.SaveChangesAsync(ct);
     }, ct);
 
+    public Task<string[]> EncryptionResetFilesAsync(string scope) => UseAsync(async db =>
+        (await db.Outbox.Where(x => x.Scope == scope && x.FileKey != null).Select(x => x.FileKey!).ToListAsync())
+        .Concat(await db.Attachments.Where(x => x.Scope == scope).Select(x => x.FileKey).ToListAsync()).Distinct().ToArray());
+
+    public Task ClearEncryptionHistoryAsync(string scope) => UseAsync(async db =>
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        await db.Outbox.Where(x => x.Scope == scope).ExecuteDeleteAsync();
+        await db.Messages.Where(x => x.Scope == scope).ExecuteDeleteAsync();
+        foreach (var row in await db.Conversations.Where(x => x.Scope == scope).ToListAsync())
+        {
+            var conversation = JsonSerializer.Deserialize<Conversation>(row.Json, Json)!;
+            conversation.LastMessage = null; conversation.Preview = "Start a conversation";
+            conversation.LastMessageAt = null; conversation.MessageTotal = 0;
+            row.Json = JsonSerializer.Serialize(conversation, Json);
+        }
+        await db.Drafts.Where(x => x.Scope == scope).ExecuteDeleteAsync();
+        await db.Attachments.Where(x => x.Scope == scope).ExecuteDeleteAsync();
+        await db.SaveChangesAsync();
+        await transaction.CommitAsync(); return true;
+    });
+
     public Task ClearPrivateAsync(CancellationToken ct = default) => UseAsync(async db =>
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);

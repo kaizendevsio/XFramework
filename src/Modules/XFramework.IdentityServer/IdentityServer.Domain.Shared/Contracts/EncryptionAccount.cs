@@ -11,4 +11,5 @@ public sealed class EncryptionAccount : IHasTenantId
     public string DevicesJson { get; set; } = "[]";
     public long RecoveryRevision { get; set; }
     public string? RecoveryArchive { get; set; }
+    public string PublicHistoryJson { get; set; } = "[]";
 }

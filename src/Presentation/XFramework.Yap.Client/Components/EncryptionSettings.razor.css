@@ -14,3 +14,6 @@ select, input { display: block; width: 100%; margin: 8px 0; padding: 12px; borde
 .device-remove { color: var(--danger, #e57777); }
 .device-confirm { padding: 8px 12px; border-radius: 12px; background: var(--surface); }
 .verified-person { color: var(--accent); }
+.reset-encryption { border-top: 1px solid var(--border); }
+.reset-consent { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; }
+.reset-consent input { appearance: auto; -webkit-appearance: checkbox; width: 20px; height: 20px; flex: 0 0 20px; margin: 0; padding: 0; accent-color: var(--accent); }
