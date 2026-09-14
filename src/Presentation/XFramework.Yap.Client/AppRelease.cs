@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.10";
+    public const string Version = "1.3.11";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "14 September 2026", [
+            "Keep typing with the keyboard open after sending. New messages appear from the local queue without waiting for the network.",
+            "Send a burst of messages smoothly while Yap delivers them in the background, without restarting sync for every message."]),
+        ("1.3.10", "14 September 2026", [
             "Conversations open from saved history without waiting for background sync.",
             "Choose a call audio output where your browser supports it, with guidance for devices that use system audio controls.",
             "Connection interruptions show one quiet status instead of repeated errors. Saved chats remain available and queued messages retry automatically.",

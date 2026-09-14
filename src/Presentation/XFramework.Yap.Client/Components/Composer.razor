@@ -20,7 +20,7 @@
     @if (recording) { <div class="recording-bar" role="status"><span class="recording-dot"></span>Recording voice message<button type="button" @onclick="FinishRecordingAsync">Stop and preview</button><button type="button" aria-label="Cancel recording" @onclick="CancelRecordingAsync"><Icon Name="close" Size="18" /></button></div> }
     <div class="inputrow liquid-glass @(CanSend ? "has-send" : "")"><GlassLayer />
         @if (State.Selected?.Allows(ChatFeature.Attachments) != false) { <button type="button" class="iconbtn attach-open" aria-label="Attach" @onpointerdown:preventDefault disabled="@(busy || recording || uploading)" @onclick="() => attaching = true"><Icon Name="plus" /></button> }
-        <div class="inputbox"><textarea @ref="editor" rows="1" aria-label="@(ParentId.HasValue ? "Reply in thread" : "Message")" placeholder="@(ParentId.HasValue ? "Reply in thread" : "Message")" @bind="draft" @bind:event="oninput" @bind:after="SaveDraftAsync" @onblur="StopTypingAsync" disabled="@(busy || recording)" maxlength="4000" autocomplete="off"></textarea><button type="button" aria-label="Add smile emoji" @onpointerdown:preventDefault @onclick="AddEmojiAsync">☺</button></div>
+        <div class="inputbox"><textarea @ref="editor" rows="1" aria-label="@(ParentId.HasValue ? "Reply in thread" : "Message")" placeholder="@(ParentId.HasValue ? "Reply in thread" : "Message")" @bind="draft" @bind:event="oninput" @bind:after="SaveDraftAsync" @onblur="StopTypingAsync" disabled="@recording" maxlength="4000" autocomplete="off"></textarea><button type="button" aria-label="Add smile emoji" @onpointerdown:preventDefault @onclick="AddEmojiAsync">☺</button></div>
         <div class="composer-action">
             <button type="submit" class="sendbtn" aria-label="Send message" @onpointerdown:preventDefault tabindex="@(CanSend ? 0 : -1)" disabled="@(busy || !CanSend || recording)"><Icon Name="send" Size="20" /></button>
             @if (State.Selected?.Allows(ChatFeature.Voice) != false) { <button type="button" class="voicebtn iconbtn" aria-label="Record voice message" @onpointerdown:preventDefault tabindex="@(CanSend ? -1 : 0)" disabled="@(busy || recording || CanSend)" @onclick="StartRecordingAsync"><Icon Name="mic" Size="20" /></button> }
@@ -165,16 +165,25 @@
 
     private async Task SendAsync()
     {
+        if (busy || recording || !CanSend) return;
+        var text = draft;
+        var attachment = file;
         busy = true;
+        draft = ""; file = null;
         try
         {
             _ = StopTypingAsync();
-            await State.SendAsync(ThreadId, draft, ParentId ?? Reply?.Id, Key, file, ParentId.HasValue);
+            await State.SendAsync(ThreadId, text, ParentId ?? Reply?.Id, Key, attachment, ParentId.HasValue);
             // The outbox owns the attachment from here, so this must not abort it.
-            draft = ""; file = null;
             await Cancel.InvokeAsync(); await Sent.InvokeAsync();
         }
-        catch (Exception ex) { State.Report(ex); }
+        catch (Exception ex)
+        {
+            draft = string.IsNullOrEmpty(draft) ? text : text + "\n" + draft;
+            file = attachment;
+            State.Report(ex);
+            await SaveDraftAsync();
+        }
         finally { busy = false; }
     }
 

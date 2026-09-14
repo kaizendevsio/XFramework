@@ -150,13 +150,13 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         return true;
     }, ct);
 
-    public Task QueueAsync(QueuedMessage item, ChatMessage message, string draftKey, CancellationToken ct = default) => UseAsync(async db =>
+    public Task QueueAsync(QueuedMessage item, ChatMessage message, string draftKey, CancellationToken ct = default, string? expectedDraft = null) => UseAsync(async db =>
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         db.Outbox.Add(item);
         await UpsertMessageAsync(db, item.Scope, message, ct);
         var draft = await db.Drafts.FindAsync([item.Scope, draftKey], ct);
-        if (draft is not null) db.Drafts.Remove(draft);
+        if (draft is not null && (expectedDraft is null || draft.Text == expectedDraft)) db.Drafts.Remove(draft);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return true;

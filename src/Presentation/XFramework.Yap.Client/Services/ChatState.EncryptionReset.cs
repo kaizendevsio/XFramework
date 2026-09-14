@@ -10,7 +10,9 @@ public sealed partial class ChatState
         try
         {
             if (User is null || NeedsLogin || !Online) throw new InvalidOperationException("Sign in and connect before resetting encryption.");
-            await Encryption.ResetIdentityAsync(User, password);
+            await localChanges.WaitAsync(lifetime.Token);
+            try { await Encryption.ResetIdentityAsync(User, password); }
+            finally { localChanges.Release(); }
             await FinishEncryptionResetAsync();
         }
         finally { sync.Release(); Notify(); }
@@ -20,11 +22,16 @@ public sealed partial class ChatState
     private async Task FinishEncryptionResetAsync()
     {
         if (User is null || !Encryption.Status.ResetHistoryPending) return;
-        // The identity and backup are already committed. Cleanup is retryable after a crash.
-        var files = await store.EncryptionResetFilesAsync(Scope);
-        await js.InvokeVoidAsync("yap.device.clearAccountFiles", Scope, files);
-        await store.ClearEncryptionHistoryAsync(Scope);
-        Selected = null; Conversations = []; PendingCount = 0;
-        await Encryption.AcknowledgeResetAsync(User);
+        await localChanges.WaitAsync(lifetime.Token);
+        try
+        {
+            // The identity and backup are already committed. Cleanup is retryable after a crash.
+            var files = await store.EncryptionResetFilesAsync(Scope);
+            await js.InvokeVoidAsync("yap.device.clearAccountFiles", Scope, files);
+            await store.ClearEncryptionHistoryAsync(Scope);
+            Selected = null; Conversations = []; PendingCount = 0;
+            await Encryption.AcknowledgeResetAsync(User);
+        }
+        finally { localChanges.Release(); }
     }
 }
