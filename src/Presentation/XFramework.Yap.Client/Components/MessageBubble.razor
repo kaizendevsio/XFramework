@@ -28,6 +28,7 @@
     private bool ShowText => !Message.HasAttachments && Message.Attachments.Count == 0 || Message.Attachments.Count > 0 && !Message.Attachments.Any(f => f.Name == Message.Text);
     private string DeliveryLabel => Message.Delivery switch
     {
+        "Sending · waiting for recipient setup" => Message.Delivery,
         "Queued" or "Sending" => !State.Online ? "Sending · offline" : State.NeedsLogin ? "Sending · sign in" : "Sending",
         "Sent" when State.Selected?.Allows(ChatFeature.ReadReceipts) != false && Message.ReadCount > 0 => "Read",
         "Sent" when Message.DeliveredCount > 0 => State.Selected?.Group == true ? $"Delivered to {Message.DeliveredCount}" : "Delivered",
