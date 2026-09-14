@@ -22,4 +22,7 @@ public partial record ThreadMessageItemResponse
     public string? EncryptedEnvelope { get; set; }
     public long? AcceptedSenderDirectoryRevision { get; set; }
     public Guid? EncryptionSenderDeviceId { get; set; }
+    public int PendingEncryptionCount { get; set; }
+    public bool EncryptionPending { get; set; }
+    public List<Guid> EncryptionAudienceCredentialIds { get; set; } = [];
 }

@@ -11,7 +11,12 @@ public sealed record ChatDefaults(Guid ThreadTypeId, List<ReactionType> Reaction
 public sealed record ChatPage<T>(List<T> Items, int TotalCount);
 public sealed record MessageQuote(Guid Id, string Sender, string Text);
 public sealed record ChatAttachment(Guid Id, string Name, string ContentType, long Size,
-    Guid? EncryptionSenderDeviceId = null, long? SenderDirectoryRevision = null);
+    Guid? EncryptionSenderDeviceId = null, long? SenderDirectoryRevision = null, EncryptedAttachmentKey? Key = null);
+
+// This key travels only inside the signed, encrypted message payload.
+public sealed record EncryptedAttachmentKey(string Algorithm, string Data);
+public sealed record DeferredDeliveryPage(List<DeferredDelivery> Items, int TotalCount);
+public sealed record DeferredDelivery(ChatMessage Message, string EnvelopeHash, List<Guid> PendingCredentialIds);
 
 public sealed class Conversation
 {
@@ -48,6 +53,9 @@ public sealed class ChatMessage
     public Guid? EncryptionSenderDeviceId { get; set; }
     public Dictionary<Guid, long> RecipientDirectoryRevisions { get; set; } = [];
     public bool EncryptionLocked { get; set; }
+    public bool EncryptionPending { get; set; }
+    public int PendingEncryptionCount { get; set; }
+    public List<Guid> EncryptionAudienceCredentialIds { get; set; } = [];
     public DateTime CreatedAt { get; set; }
     public bool Mine { get; set; }
     public Guid? ParentId { get; set; }

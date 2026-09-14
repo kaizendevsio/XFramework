@@ -234,6 +234,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
             if (EncryptionEnabled) await Encryption.EnsureAsync(User);
             await SynchronizeDeletedConversationsAsync();
             await FlushAsync();
+            await CompleteDeferredDeliveriesAsync();
             for (var page = 0; page < inboxPages; page++)
             {
                 var list = await api.GetAsync<ChatPage<Conversation>>($"api/chat/conversations?page={page}");
@@ -353,7 +354,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
             var visible = await js.InvokeAsync<Guid[]>("yap.device.visibleMessages", id, parent);
             if (version != selectionVersion || viewedConversation != id) return;
             var messages = parent is { } root ? conversation.Messages.FirstOrDefault(x => x.Id == root)?.Replies ?? [] : conversation.Messages;
-            var unread = messages.Where(x => !x.Mine && visible.Contains(x.Id) && !acknowledged.Contains(x.Id)).Select(x => x.Id).Take(100).ToList();
+            var unread = messages.Where(x => !x.Mine && !x.EncryptionPending && !x.EncryptionLocked && visible.Contains(x.Id) && !acknowledged.Contains(x.Id)).Select(x => x.Id).Take(100).ToList();
             if (unread.Count == 0) return;
             await api.PostAsync("api/chat/read", new ReadMessages(id, unread), lifetime.Token);
             acknowledged.UnionWith(unread);
@@ -584,7 +585,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
                     if (EncryptionEnabled)
                     {
                         if (!Encryption.Status.Approved) break;
-                        var directories = await Encryption.RecipientsAsync(User!, item.ThreadId);
+                        var directories = await Encryption.RecipientsAsync(User!, item.ThreadId, allowPending: true);
                         recipients = directories.Select(x => x.GetProperty("credentialId").GetGuid()).ToList();
                         if (message.EncryptedEnvelope is null)
                         {
@@ -605,7 +606,9 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
                             await UploadEncryptedAttachmentAsync(item, message, directories);
                         if (item.StorageId is { } encryptedFile)
                             message.Attachments = [new(encryptedFile, item.FileName!, item.ContentType!, item.FileSize,
-                                message.EncryptionSenderDeviceId, message.AcceptedSenderDirectoryRevision)];
+                                message.Attachments.FirstOrDefault(x => x.Id == encryptedFile)?.EncryptionSenderDeviceId ?? message.EncryptionSenderDeviceId,
+                                message.Attachments.FirstOrDefault(x => x.Id == encryptedFile)?.SenderDirectoryRevision ?? message.AcceptedSenderDirectoryRevision,
+                                message.Attachments.FirstOrDefault(x => x.Id == encryptedFile)?.Key)];
                         if (message.EncryptedEnvelope is null)
                         {
                             message.EncryptedEnvelope = await Encryption.EncryptAsync(User!, message, directories);
@@ -615,7 +618,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
                     }
                     var receipt = await api.PostAsync<MessageReceipt>("api/chat/messages", new SendMessage(item.Id, item.ThreadId,
                         message.EncryptedEnvelope is null ? item.Text : "Encrypted message", item.ParentId, message.IsThreadReply,
-                        message.EncryptedEnvelope, recipients, message.EncryptionSenderDeviceId, message.AcceptedSenderDirectoryRevision, message.RecipientDirectoryRevisions));
+                        message.EncryptedEnvelope, message.EncryptedEnvelope is null ? recipients : message.RecipientDirectoryRevisions.Keys.ToList(), message.EncryptionSenderDeviceId, message.AcceptedSenderDirectoryRevision, message.RecipientDirectoryRevisions));
                     if (receipt?.MessageId != item.Id) throw new InvalidOperationException("Message receipt did not match.");
                     item.MessageConfirmed = true; await store.SaveQueueAsync(item);
                 }
@@ -670,6 +673,45 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         if (rosterChanged && allowRosterRetry) await FlushAsync(allowRosterRetry: false);
     }
 
+    private int deferredDeliveryPage;
+    private async Task CompleteDeferredDeliveriesAsync()
+    {
+        if (!EncryptionEnabled || User is null || !Encryption.Status.Approved) return;
+        try
+        {
+            var pending = await api.GetAsync<DeferredDeliveryPage>($"api/chat/encryption/pending?page={deferredDeliveryPage}");
+            deferredDeliveryPage = (deferredDeliveryPage + 1) * 20 >= pending.TotalCount ? 0 : deferredDeliveryPage + 1;
+            var threadDirectories = new Dictionary<Guid, JsonElement[]>();
+            foreach (var item in pending.Items)
+            {
+                try
+                {
+                    var message = item.Message;
+                    if (!threadDirectories.TryGetValue(message.ThreadId, out var current))
+                        threadDirectories[message.ThreadId] = current = await Encryption.RecipientsAsync(User, message.ThreadId, allowPending: true);
+                    var directories = current.Where(x => message.EncryptionAudienceCredentialIds.Contains(x.GetProperty("credentialId").GetGuid())).ToArray();
+                    var ready = directories.Select(x => x.GetProperty("credentialId").GetGuid()).ToHashSet();
+                    if (item.PendingCredentialIds.Count == message.PendingEncryptionCount && !item.PendingCredentialIds.Any(ready.Contains)) continue;
+                    await Encryption.DecryptAsync(User, [message]);
+                    if (message.EncryptionLocked) continue;
+                    message.EncryptionSenderDeviceId = Encryption.Status.DeviceId;
+                    message.AcceptedSenderDirectoryRevision = Encryption.Status.DirectoryRevision;
+                    var envelope = await Encryption.EncryptAsync(User, message, directories);
+                    await api.PostAsync("api/chat/encryption/complete", new
+                    {
+                        threadId = message.ThreadId, messageId = message.Id, expectedEnvelopeHash = item.EnvelopeHash,
+                        encryptedEnvelope = envelope, encryptionSenderDeviceId = message.EncryptionSenderDeviceId,
+                        senderDirectoryRevision = message.AcceptedSenderDirectoryRevision,
+                        recipientDirectoryRevisions = directories.ToDictionary(x => x.GetProperty("credentialId").GetGuid(), x => x.GetProperty("revision").GetInt64())
+                    });
+                }
+                catch (ChatApiException ex) when (ex.Status is 403 or 404 or 409 or 412) { /* Membership/edit changed; refresh next sync. */ }
+            }
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) { await RecordErrorAsync(ex); } // Catch-up must never block sending or opening the inbox.
+    }
+
     private async Task DecryptMessagesAsync(List<ChatMessage> messages)
     {
         if (User is null) return;
@@ -682,7 +724,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         var pending = new List<ChatMessage>();
         foreach (var message in encrypted)
         {
-            if (cached.TryGetValue(message.Id, out var prior) && !prior.EncryptionLocked && prior.EncryptedEnvelope == message.EncryptedEnvelope
+            if (!message.EncryptionPending && cached.TryGetValue(message.Id, out var prior) && !prior.EncryptionLocked && prior.EncryptedEnvelope == message.EncryptedEnvelope
                 && (!prior.HasAttachments || prior.Attachments.Count > 0)
                 && prior.AcceptedSenderDirectoryRevision == message.AcceptedSenderDirectoryRevision && prior.EncryptionSenderDeviceId == message.EncryptionSenderDeviceId
                 && prior.SenderId == message.SenderId && prior.ThreadId == message.ThreadId && prior.ParentId == message.ParentId && prior.IsThreadReply == message.IsThreadReply)
@@ -699,6 +741,9 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
             api.Token, Scope, ChatEncryption.Context(User!, message, "attachment"), directories,
             item.ContentType?.StartsWith("audio/", StringComparison.OrdinalIgnoreCase) == true);
         if (upload.Status is < 200 or >= 300) throw new ChatApiException(upload.Status);
+        message.Attachments = [new(upload.Id, item.FileName!, item.ContentType!, item.FileSize,
+            message.EncryptionSenderDeviceId, message.AcceptedSenderDirectoryRevision, upload.Key)];
+        await store.SaveMessagesAsync(Scope, [message]);
         item.StorageId = upload.Id;
         await store.SaveQueueAsync(item);
     }
@@ -729,7 +774,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
             if (action == "react" && mine.HasValue && mine.Value != Guid.Empty) action = "unreact";
             if (action == "edit" && (EncryptionEnabled || message.EncryptedEnvelope is not null))
             {
-                var directories = await Encryption.RecipientsAsync(User!, message.ThreadId);
+                var directories = await Encryption.RecipientsAsync(User!, message.ThreadId, message.EncryptionAudienceCredentialIds.Count > 0, message.EncryptionAudienceCredentialIds);
                 var edited = new ChatMessage { Id = message.Id, ThreadId = message.ThreadId, SenderId = message.SenderId,
                     ParentId = message.ParentId, IsThreadReply = message.IsThreadReply, Text = text ?? "", Attachments = message.Attachments,
                     EncryptionSenderDeviceId = Encryption.Status.DeviceId, AcceptedSenderDirectoryRevision = Encryption.Status.DirectoryRevision };
@@ -814,7 +859,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         var directory = await api.GetAsync<JsonElement>($"api/chat/encryption/people/{message.SenderId}");
         await js.InvokeVoidAsync("yap.device.decryptFile", key,
             $"api/chat/conversations/{message.ThreadId}/messages/{message.Id}/attachments/{file.Id}?storageId=true", Scope,
-            Online && !NeedsLogin, context, directory);
+            Online && !NeedsLogin, context, directory, file.Key);
         return key;
     }
 
@@ -839,6 +884,6 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
     public async ValueTask DisposeAsync()
     { lifetime.Cancel(); if (polling is not null) await polling; reference?.Dispose(); lifetime.Dispose(); }
     public sealed record PickedFile(string Key, string Name, string ContentType, long Size, bool Staged = true, Guid? UploadId = null);
-    private sealed record UploadReceipt(int Status, Guid Id);
+    private sealed record UploadReceipt(int Status, Guid Id, EncryptedAttachmentKey? Key = null);
     private sealed record CreatedConversation(Guid Id);
 }

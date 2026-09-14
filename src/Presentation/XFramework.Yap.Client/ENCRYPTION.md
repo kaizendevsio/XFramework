@@ -115,6 +115,41 @@ The server also checks the recipient account set and directory revisions on a
 new send. Persist ciphertext and its attachment contexts before a request; a
 response-loss retry must not replace an already accepted randomized envelope.
 
+### Deferred recipients (1.3.5)
+
+New messages freeze their audience as membership IDs. The server requires every
+currently configured member in the submitted recipient directory snapshot; only
+members without active devices may be deferred. Accepted ciphertext is `Sent`;
+the sender sees the remaining setup count separately. A deferred member cannot
+produce Delivered or Read receipts until access has been completed.
+
+An approved sender device checks up to 20 pending messages per synchronization,
+across its active conversations, rotating pages. When original members enroll,
+it decrypts and re-encrypts the message for ready members of that original
+audience. Newly added or removed-and-readded memberships are excluded. Directory
+revisions are revalidated; membership/create/edit/delete/catch-up decisions share
+the conversation's PostgreSQL advisory lock. Catch-up also compares a hash of
+the current envelope to reject stale work after an edit. The initial accepted
+hash remains available to acknowledge a lost-response create retry.
+
+Catch-up requires a sender device that can decrypt the message to reconnect
+after enrollment. The recipient need not be online simultaneously. The relay
+cannot complete this itself and does not hold private keys. Catch-up is an
+authorized sender operation; as with encrypted edits, the relay cannot inspect
+or verify equality of the plaintext inside replacement ciphertext.
+
+`encryptAttachment(scope,context,source,directories)` returns `{stream,key}`.
+The AES-256 session key (`{algorithm:'aes256',data:<64 hex digits>}`) is stored
+**only inside the signed encrypted message attachment descriptor**, with the
+original file's sender device and directory revision. Never include this key in
+upload metadata, HTTP logs, the API's plaintext file model or server storage.
+`decryptStream(...,sink,attachmentKey)` can use that authenticated descriptor key
+to open the original file for a late recipient. This bypasses only the file
+header's original recipient-list check: the original device signature, accepted
+revision, exact message/file context, full-stream integrity and quarantine commit
+remain mandatory. No attachment re-upload is needed for catch-up. Ordinary
+message and call-control decryption never accepts an attachment key.
+
 Encrypted attachment objects use `application/octet-stream` and an opaque
 `attachment.pgp` filename. Voice recordings instead use `voice.pgp` so the server
 can enforce the conversation's voice-message switch independently of its file

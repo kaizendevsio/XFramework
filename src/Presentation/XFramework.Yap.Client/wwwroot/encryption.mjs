@@ -252,7 +252,7 @@ export function createEncryption(store = indexedDbStore()) {
         await verifyHeader(prepared, result, header);
         return bytes;
     }
-    async function verifyHeader({ s, c, d, revisions }, result, header) {
+    async function verifyHeader({ s, c, d, revisions, sessionKeys }, result, header) {
         check(header.v === 1 && canonical(header.context) === canonical(c), 'This encrypted content belongs to another message or conversation.');
         const sender = d.devices.find(device => device.deviceId === header.senderDeviceId);
         check(sender, 'Unknown sending device.');
@@ -263,7 +263,7 @@ export function createEncryption(store = indexedDbStore()) {
         const revision = revisions.get(sender.deviceId);
         if (c.expectedSenderDirectoryRevision !== undefined) check(c.expectedSenderDirectoryRevision === header.senderDirectoryRevision, 'The accepted sender roster revision does not match.');
         check(Number.isSafeInteger(header.senderDirectoryRevision) && header.senderDirectoryRevision >= revision.approvedRevision && header.senderDirectoryRevision <= d.revision && (!revision.revokedRevision || header.senderDirectoryRevision < revision.revokedRevision), 'The sending device was not approved for this message.');
-        check(Array.isArray(header.recipients) && header.recipients.some(r => r.credentialId === s.credentialId && Array.isArray(r.deviceIds) && r.deviceIds.length > 0), 'This account is not an encrypted recipient.');
+        check(sessionKeys || Array.isArray(header.recipients) && header.recipients.some(r => r.credentialId === s.credentialId && Array.isArray(r.deviceIds) && r.deviceIds.length > 0), 'This account is not an encrypted recipient.');
     }
     function boundedStream(source, maximum, prefix = null) {
         check(source instanceof ReadableStream, 'A readable byte stream is required.');
@@ -286,7 +286,7 @@ export function createEncryption(store = indexedDbStore()) {
         check(sink && typeof sink.write === 'function' && typeof sink.commit === 'function' && typeof sink.abort === 'function', 'A quarantined output sink is required.');
         let reader, result;
         try {
-            result = await pgp.decrypt({ message: await pgp.readMessage({ binaryMessage: boundedStream(source, MAX_STREAM_BYTES + 16 * 1024 * 1024) }), decryptionKeys: prepared.decryptionKeys, verificationKeys: prepared.verificationKeys, expectSigned: true, format: 'binary', config });
+            result = await pgp.decrypt({ message: await pgp.readMessage({ binaryMessage: boundedStream(source, MAX_STREAM_BYTES + 16 * 1024 * 1024) }), decryptionKeys: prepared.decryptionKeys, sessionKeys: prepared.sessionKeys, verificationKeys: prepared.verificationKeys, expectSigned: true, format: 'binary', config });
             // Signature completion depends on consuming the stream. Its bytes
             // remain quarantined until the final signature/context barrier below.
             for (const signature of result.signatures) signature.verified.catch(() => {});
@@ -348,9 +348,26 @@ export function createEncryption(store = indexedDbStore()) {
             const { header, encryptionKeys, signingKeys } = await prepareEncryption(s, key, context, directories);
             return pgp.encrypt({ message: await pgp.createMessage({ binary: boundedStream(source, MAX_STREAM_BYTES, pack(header, new Uint8Array())) }), encryptionKeys, signingKeys, format: 'binary', config });
         }),
-        decryptStream: async (scope, context, source, directory, sink) => {
+        encryptAttachment: (scope, context, source, directories) => locked(scope, async (s, key) => {
+            check(context.kind === 'attachment', 'Attachment context is required.');
+            const { header, encryptionKeys, signingKeys } = await prepareEncryption(s, key, context, directories);
+            const sessionKey = { algorithm: 'aes256', data: crypto.getRandomValues(new Uint8Array(32)) };
+            const stream = await pgp.encrypt({ message: await pgp.createMessage({ binary: boundedStream(source, MAX_STREAM_BYTES, pack(header, new Uint8Array())) }),
+                encryptionKeys, signingKeys, sessionKey, format: 'binary', config });
+            return { stream, key: { algorithm: sessionKey.algorithm, data: Array.from(sessionKey.data, v => v.toString(16).padStart(2, '0')).join('') } };
+        }),
+        decryptStream: async (scope, context, source, directory, sink, attachmentKey = null) => {
             let prepared;
-            try { prepared = await locked(scope, (s, key) => prepareDecryption(s, key, context, directory)); }
+            try {
+                prepared = await locked(scope, (s, key) => prepareDecryption(s, key, context, directory));
+                if (attachmentKey) {
+                    // The caller obtained this key from the authenticated encrypted message.
+                    // The original file signature, device approval, context and AEAD still must verify.
+                    check(prepared.c.kind === 'attachment' && attachmentKey.algorithm === 'aes256'
+                        && typeof attachmentKey.data === 'string' && /^[0-9a-f]{64}$/.test(attachmentKey.data), 'Invalid attachment key.');
+                    prepared.sessionKeys = [{ algorithm: 'aes256', data: Uint8Array.from(attachmentKey.data.match(/../g), x => parseInt(x, 16)) }];
+                }
+            }
             catch (error) { await Promise.resolve().then(() => sink?.abort?.()).catch(() => {}); throw error; }
             return decryptToSink(prepared, source, sink);
         },

@@ -1,3 +1,6 @@
+using Communications.Integration.Drivers;
+using System.Security.Cryptography;
+using System.Text;
 using System.Net;
 using System.Security.Claims;
 using System.Text.Json;
@@ -48,7 +51,7 @@ internal static partial class UiFixture
             Mock<IChatDirectory> directory, List<ThreadMemberResponse> members,
             List<ThreadListItemResponse> conversations, List<ThreadMessageItemResponse> messages,
             List<MessageFileResponse> attachments, Dictionary<Guid, Guid> mediaLinks,
-            Dictionary<Guid, (string Name, string Type, MemoryStream Data)> stored, Guid third)
+            Dictionary<Guid, (string Name, string Type, MemoryStream Data)> stored, Guid third, Mock<ICommunicationsServiceWrapper> communications)
         {
             this.fixture = fixture;
             this.stored = stored;
@@ -127,9 +130,13 @@ internal static partial class UiFixture
             fixture.Session.Setup(x => x.GetMessagesAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((Guid thread, int page, int size, CancellationToken _) =>
                 {
-                    Actor();
-                    lock (gate) return ChatFixture.Ok(new GetThreadMessagesResponse
-                    { Items = Clone(messages.OrderByDescending(x => x.CreatedAt).Skip(page * size).Take(size).ToList()), TotalCount = messages.Count });
+                    var actor = Actor();
+                    lock (gate)
+                    {
+                        var items = Clone(messages.OrderByDescending(x => x.CreatedAt).Skip(page * size).Take(size).ToList());
+                        foreach (var message in items) message.EncryptionPending = pendingRecipients.GetValueOrDefault(message.Id)?.Contains(actor) == true;
+                        return ChatFixture.Ok(new GetThreadMessagesResponse { Items = items, TotalCount = messages.Count });
+                    }
                 });
             fixture.Session.Setup(x => x.SendMessageAsync(It.IsAny<CreateThreadMessageRequest>(), It.IsAny<CancellationToken>()))
                 .Returns(async (CreateThreadMessageRequest request, CancellationToken _) =>
@@ -145,12 +152,13 @@ internal static partial class UiFixture
                                 ? ChatFixture.Ok(new CreateThreadMessageResponse { MessageId = id }) : Conflict<CreateThreadMessageResponse>();
                         if (!directories.TryGetValue(actor, out var sender) || request.SenderDirectoryRevision != sender.Revision
                             || request.EncryptionSenderDeviceId is not { } device || !sender.Devices.Any(x => x.DeviceId == device && x.Revocation is null)
-                            || !accounts.SetEquals(request.RecipientCredentialIds)
-                            || accounts.Any(x => !directories.TryGetValue(x, out var recipient)
+                            || !directories.Keys.ToHashSet().SetEquals(request.RecipientCredentialIds)
+                            || directories.Keys.Any(x => !directories.TryGetValue(x, out var recipient)
                                 || request.RecipientDirectoryRevisions.GetValueOrDefault(x) != recipient.Revision))
                             return Conflict<CreateThreadMessageResponse>();
                         var saved = Clone(request); saved.SenderCredentialId = actor; acceptedRequests[id] = saved;
-                        messages.Add(new() { Id = id, Text = request.Text ?? "", ParentMessageId = request.ParentMessageId,
+                        pendingRecipients[id] = accounts.Except(request.RecipientCredentialIds).ToList();
+                        messages.Add(new() { Id = id, PendingEncryptionCount = pendingRecipients[id].Count, EncryptionAudienceCredentialIds = accounts.ToList(), Text = request.Text ?? "", ParentMessageId = request.ParentMessageId,
                             SenderCredentialId = actor, SenderAlias = members.Single(x => x.CredentialId == actor).Alias,
                             EncryptedEnvelope = request.EncryptedEnvelope, AcceptedSenderDirectoryRevision = sender.Revision,
                             EncryptionSenderDeviceId = request.EncryptionSenderDeviceId, IsThreadReply = request.IsThreadReply, CreatedAt = DateTime.UtcNow });
@@ -159,6 +167,37 @@ internal static partial class UiFixture
                     }
                     await PublishAsync(actor);
                     return ChatFixture.Ok(new CreateThreadMessageResponse { MessageId = id });
+                });
+            communications.Setup(x => x.GetDeferredEncryptionAsync(It.IsAny<GetDeferredEncryptionRequest>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((GetDeferredEncryptionRequest request, CancellationToken _) =>
+                {
+                    var actor = Actor();
+                    lock (gate)
+                    {
+                        var pending = messages.Where(m => m.SenderCredentialId == actor && m.PendingEncryptionCount > 0).ToList();
+                        return ChatFixture.Ok(new DeferredEncryptionResponse { TotalCount = pending.Count, Items = pending.Skip(request.PageIndex * 20).Take(20)
+                            .Select(m => new DeferredEncryptedMessage { ThreadId = fixture.Thread, Message = Clone(m),
+                                EnvelopeHash = Hash(m.EncryptedEnvelope!), PendingCredentialIds = pendingRecipients[m.Id].ToList() }).ToList() });
+                    }
+                });
+            communications.Setup(x => x.CompleteDeferredEncryptionAsync(It.IsAny<CompleteDeferredEncryptionRequest>(), It.IsAny<CancellationToken>()))
+                .Returns(async (CompleteDeferredEncryptionRequest request, CancellationToken _) =>
+                {
+                    var actor = Actor();
+                    lock (gate)
+                    {
+                        var message = messages.Single(x => x.Id == request.MessageId);
+                        if (message.SenderCredentialId != actor) return new CmdResponse { HttpStatusCode = HttpStatusCode.Forbidden };
+                        if (Hash(message.EncryptedEnvelope!) != request.ExpectedEnvelopeHash) return new CmdResponse { HttpStatusCode = HttpStatusCode.Conflict };
+                        if (!directories.Keys.ToHashSet().SetEquals(request.RecipientDirectoryRevisions.Keys)) return new CmdResponse { HttpStatusCode = HttpStatusCode.PreconditionFailed };
+                        message.EncryptedEnvelope = request.EncryptedEnvelope;
+                        message.EncryptionSenderDeviceId = request.EncryptionSenderDeviceId;
+                        message.AcceptedSenderDirectoryRevision = request.SenderDirectoryRevision;
+                        pendingRecipients[message.Id] = accounts.Except(request.RecipientDirectoryRevisions.Keys).ToList();
+                        message.PendingEncryptionCount = pendingRecipients[message.Id].Count;
+                    }
+                    await PublishAsync(actor);
+                    return Success();
                 });
             fixture.Session.Setup(x => x.EditMessageAsync(It.IsAny<EditThreadMessageRequest>(), It.IsAny<CancellationToken>()))
                 .Returns(async (EditThreadMessageRequest request, CancellationToken _) =>
@@ -174,7 +213,7 @@ internal static partial class UiFixture
                         if (!directories.TryGetValue(actor, out var sender) || sender.Revision != request.SenderDirectoryRevision
                             || !sender.Devices.Any(x => x.DeviceId == request.EncryptionSenderDeviceId && x.Revocation is null)
                             || !accounts.SetEquals(request.RecipientDirectoryRevisions.Keys)
-                            || accounts.Any(x => !directories.TryGetValue(x, out var recipient) || recipient.Revision != request.RecipientDirectoryRevisions[x]))
+                            || directories.Keys.Any(x => !directories.TryGetValue(x, out var recipient) || recipient.Revision != request.RecipientDirectoryRevisions[x]))
                             return new CmdResponse { HttpStatusCode = HttpStatusCode.PreconditionFailed };
                         message.Text = request.Text;
                         message.EncryptedEnvelope = request.EncryptedEnvelope;
@@ -221,6 +260,8 @@ internal static partial class UiFixture
                 });
         }
 
+        private readonly Dictionary<Guid, List<Guid>> pendingRecipients = [];
+        private static string Hash(string value) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
         private Guid Actor()
         {
             // Gateway lease revalidation runs outside HTTP, with an explicit authenticated actor token scope.

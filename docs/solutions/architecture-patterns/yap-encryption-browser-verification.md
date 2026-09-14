@@ -99,3 +99,28 @@ for the envelopes carrying call keys.
 See the [architecture decision](yap-encrypted-recovery-decision.md) and
 [client API contract](../../../src/Presentation/XFramework.Yap.Client/ENCRYPTION.md)
 for trust boundaries, recovery behavior and deployment gates.
+
+
+## Deferred recipient verification ? 14 September 2026 (1.3.5)
+
+Using the real HTTPS Yap host/browser code with isolated Chrome profiles and
+three fixture accounts, two accounts enrolled while the third had no directory.
+The sender sent text and a 7,080,834-byte JPEG. Both displayed `Sent`, with a
+separate one-member setup indicator. The ready recipient read the text and
+rendered the decrypted 1440 ? 1080 image before the third account signed in.
+After the third account's first sign-in automatically enrolled it, the sender's
+background catch-up cleared the pending count; the third account read the text
+and rendered the same image. Local screenshots are retained under
+`artifacts/yap/deferred-ready-before-enrollment.png` and
+`artifacts/yap/deferred-late-received.png`. These are fixtures, not real-user sends
+or physical iOS/Android validation.
+
+A real OpenPGP streaming test separately verified a 7 MiB encrypted attachment:
+the late account failed without the protected attachment key, then opened the
+unchanged ciphertext using the key from a signed encrypted message. Corrupt
+ciphertext, wrong context and wrong keys failed without committing plaintext.
+A PostgreSQL test ran catch-up concurrently on independent connections and
+verified one success, one conflict, and one outbox event. Service tests cover
+omitted ready recipients, frozen original audience, sender-only catch-up,
+create-response-loss retries, stale catch-up after editing, and suppression of
+Delivered/Read receipts for deferred members.

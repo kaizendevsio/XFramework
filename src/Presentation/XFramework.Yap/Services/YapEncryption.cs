@@ -1,3 +1,6 @@
+using Communications.Integration.Drivers;
+using Communications.Domain.Shared.Contracts.Requests.Threads;
+using Yap.Contracts;
 using Communications.Integration.Clients;
 using IdentityServer.Domain.Shared.Contracts.Requests;
 using IdentityServer.Domain.Shared.Contracts.Responses;
@@ -39,7 +42,7 @@ public static class YapEncryption
             request.Metadata = Metadata(actor.TenantId);
             return YapApi.Require(await identity.PutEncryptionDirectory(request, ct));
         });
-        api.MapGet("/conversations/{id:guid}/encryption", async (Guid id,
+        api.MapGet("/conversations/{id:guid}/encryption", async (Guid id, bool? allowPending,
             ICommunicationsChatClient chat, IIdentityServerServiceWrapper identity,
             ICommunicationsChatActorProvider actors, IActorAccessTokenScope tokens, CancellationToken ct) =>
         {
@@ -48,16 +51,49 @@ public static class YapEncryption
             var actor = await actors.GetCurrentActorAsync(ct) ?? throw new UnauthorizedAccessException();
             using var token = tokens.Push(actor.AccessToken!);
             var directories = new List<EncryptionDirectoryResponse>();
-            // An absent device directory fails the whole operation; never drop a recipient or downgrade.
+            // Messages may defer unconfigured members; calls keep the strict directory requirement.
             foreach (var member in thread.Members)
             {
                 var result = await identity.GetEncryptionDirectory(new GetEncryptionDirectoryRequest
                 { CredentialId = member.CredentialId, Metadata = Metadata(actor.TenantId) }, ct);
                 if ((int)result.HttpStatusCode == 404)
+                {
+                    if (allowPending == true) continue;
                     throw new YapApiException(428, "Waiting for everyone to set up encrypted messages.");
-                directories.Add(YapApi.Require(result));
+                }
+                var directory = YapApi.Require(result);
+                if (allowPending == true && !directory.Devices.Any(d => d.Revocation is null)) continue;
+                directories.Add(directory);
             }
             return directories;
+        });
+        api.MapGet("/encryption/pending", async (int? page, ICommunicationsServiceWrapper communications,
+            ICommunicationsChatActorProvider actors, IActorAccessTokenScope tokens, CancellationToken ct) =>
+        {
+            var actor = await actors.GetCurrentActorAsync(ct) ?? throw new UnauthorizedAccessException();
+            using var token = tokens.Push(actor.AccessToken!);
+            var result = YapApi.Require(await communications.GetDeferredEncryptionAsync(new GetDeferredEncryptionRequest
+            { PageIndex = Math.Max(0, page ?? 0), Metadata = Metadata(actor.TenantId) }, ct));
+            return new DeferredDeliveryPage(result.Items.Select(x => new DeferredDelivery(new ChatMessage
+            {
+                Id = x.Message.Id, ThreadId = x.ThreadId, SenderId = x.Message.SenderCredentialId, Mine = true,
+                Text = x.Message.Text, EncryptedEnvelope = x.Message.EncryptedEnvelope,
+                ParentId = x.Message.ParentMessageId, IsThreadReply = x.Message.IsThreadReply, CreatedAt = x.Message.CreatedAt,
+                EncryptionSenderDeviceId = x.Message.EncryptionSenderDeviceId,
+                AcceptedSenderDirectoryRevision = x.Message.AcceptedSenderDirectoryRevision,
+                PendingEncryptionCount = x.Message.PendingEncryptionCount,
+                EncryptionAudienceCredentialIds = x.Message.EncryptionAudienceCredentialIds
+            }, x.EnvelopeHash, x.PendingCredentialIds)).ToList(), result.TotalCount);
+        });
+        api.MapPost("/encryption/complete", async (CompleteDeferredEncryptionRequest request,
+            ICommunicationsServiceWrapper communications, ICommunicationsChatActorProvider actors,
+            IActorAccessTokenScope tokens, CancellationToken ct) =>
+        {
+            var actor = await actors.GetCurrentActorAsync(ct) ?? throw new UnauthorizedAccessException();
+            using var token = tokens.Push(actor.AccessToken!);
+            request.Metadata = Metadata(actor.TenantId);
+            YapApi.Require(await communications.CompleteDeferredEncryptionAsync(request, ct));
+            return Results.Ok();
         });
         api.MapGet("/encryption/recovery", async (IIdentityServerServiceWrapper identity,
             ICommunicationsChatActorProvider actors, IActorAccessTokenScope tokens, CancellationToken ct) =>

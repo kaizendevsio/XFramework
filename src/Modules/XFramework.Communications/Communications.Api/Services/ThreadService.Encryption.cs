@@ -6,6 +6,37 @@ namespace Communications.Api.Services;
 
 public sealed partial class ThreadService
 {
+    private static List<Guid> EncryptionMemberIds(string json) => JsonSerializer.Deserialize<List<Guid>>(json) ?? [];
+    private static bool EncryptionPendingFor(Message message, Guid memberId) => EncryptionMemberIds(message.PendingEncryptionMembersJson).Contains(memberId);
+    private static bool EncryptionReadyFor(Message message, Guid memberId)
+    {
+        var audience = EncryptionMemberIds(message.EncryptionAudienceJson);
+        return !EncryptionPendingFor(message, memberId) && (audience.Count == 0 || audience.Contains(memberId));
+    }
+    private static void SetPendingEncryption(Message message, IEnumerable<MessageThreadMember> audience, ICollection<Guid> ready)
+    {
+        var pending = audience.Where(m => !ready.Contains(m.CredentialId)).Select(m => m.Id).ToList();
+        message.PendingEncryptionMembersJson = JsonSerializer.Serialize(pending);
+        message.PendingEncryptionCount = pending.Count;
+    }
+
+    private async Task<bool> ReadyEncryptionRecipientsCurrentAsync(Guid tenant, Guid sender, Guid? deviceId, long? senderRevision,
+        Dictionary<Guid, long> revisions, IReadOnlyCollection<Guid> audience, CancellationToken ct)
+    {
+        if (deviceId is null || senderRevision is null || audience.Count is < 1 or > 101
+            || revisions is null || revisions.Count is < 1 or > 101 || !revisions.ContainsKey(sender) || encryptionDirectoryReader is null) return false;
+        var directories = await encryptionDirectoryReader.ReadAsync(tenant, audience.Distinct().ToArray(), ct);
+        var ready = directories.Where(x => JsonSerializer.Deserialize<List<EncryptionDevice>>(x.DevicesJson, OutboxJsonOptions)
+            ?.Any(d => d.Revocation is null) == true).ToList();
+        // Omission is allowed only for accounts without usable keys. Never silently skip a ready member.
+        if (!ready.Select(x => x.CredentialId).ToHashSet().SetEquals(revisions.Keys)
+            || ready.Any(x => x.Revision != revisions[x.CredentialId])) return false;
+        var own = ready.SingleOrDefault(x => x.CredentialId == sender);
+        return own is not null && own.Revision == senderRevision &&
+            JsonSerializer.Deserialize<List<EncryptionDevice>>(own.DevicesJson, OutboxJsonOptions)!
+                .Any(d => d.DeviceId == deviceId && d.Revocation is null);
+    }
+
     private async Task<bool> EncryptionRecipientsCurrentAsync(Guid tenant, Guid sender, Guid? deviceId, long? senderRevision,
         Dictionary<Guid, long> revisions, IReadOnlyCollection<Guid> recipients, CancellationToken ct)
     {

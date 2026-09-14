@@ -1374,6 +1374,7 @@ public sealed partial class ThreadService(
                 return CallerFailure<CreateThreadMessageResponse>(callerResult);
 
             var caller = callerResult.Data!;
+            await using var mutationLock = await ConversationMutationLock.AcquireAsync(db, caller.TenantId, request.ThreadId, ct);
             var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
             var rateLimit = rateLimiter.Check(
                 caller.TenantId,
@@ -1421,9 +1422,11 @@ public sealed partial class ThreadService(
                     var mentions = JsonSerializer.Deserialize<List<Guid>>(previous.MentionedCredentialIdsJson ?? "[]") ?? [];
                     if (previous.MessageThreadId != request.ThreadId || previous.MessageThreadMemberId != senderMember.Id ||
                         previous.Text != request.Text?.Trim() || previous.ParentMessageId != request.ParentMessageId ||
-                        previous.EncryptedEnvelope != request.EncryptedEnvelope ||
-                        previous.EncryptionSenderDeviceId != request.EncryptionSenderDeviceId ||
-                        previous.AcceptedSenderDirectoryRevision != request.SenderDirectoryRevision ||
+                        (previous.EncryptionOriginalEnvelopeHash is not null && request.EncryptedEnvelope is not null
+                            ? previous.EncryptionOriginalEnvelopeHash != EnvelopeHash(request.EncryptedEnvelope)
+                            : previous.EncryptedEnvelope != request.EncryptedEnvelope ||
+                              previous.EncryptionSenderDeviceId != request.EncryptionSenderDeviceId ||
+                              previous.AcceptedSenderDirectoryRevision != request.SenderDirectoryRevision) ||
                         previous.IsThreadReply != request.IsThreadReply ||
                         !mentions.ToHashSet().SetEquals(request.MentionedCredentialIds.Where(id => id != Guid.Empty)))
                         return Result<CreateThreadMessageResponse>.Failure("This client message ID has already been used", 409);
@@ -1439,13 +1442,13 @@ public sealed partial class ThreadService(
 
             if (thread.EncryptionRequired && !encrypted)
                 return Result<CreateThreadMessageResponse>.Failure("This conversation requires encrypted messages. Update your app.", 409);
-            if (encrypted && !activeThreadMembers.Select(m => m.CredentialId).ToHashSet().SetEquals(request.RecipientCredentialIds))
+            if (encrypted && !request.RecipientDirectoryRevisions.Keys.ToHashSet().SetEquals(request.RecipientCredentialIds))
                 return Result<CreateThreadMessageResponse>.Failure("Conversation membership changed. Refresh encryption recipients.", 412);
 
             if (encrypted)
             {
-                if (!await EncryptionRecipientsCurrentAsync(caller.TenantId, caller.CredentialId, request.EncryptionSenderDeviceId,
-                        request.SenderDirectoryRevision, request.RecipientDirectoryRevisions, request.RecipientCredentialIds, ct))
+                if (!await ReadyEncryptionRecipientsCurrentAsync(caller.TenantId, caller.CredentialId, request.EncryptionSenderDeviceId,
+                        request.SenderDirectoryRevision, request.RecipientDirectoryRevisions, activeThreadMembers.Select(m => m.CredentialId).ToArray(), ct))
                     return Result<CreateThreadMessageResponse>.Failure("Encryption recipients changed. Refresh encryption.", 412);
             }
 
@@ -1543,6 +1546,12 @@ public sealed partial class ThreadService(
                 ConcurrencyStamp = Guid.NewGuid()
             };
 
+            if (encrypted)
+            {
+                message.EncryptionAudienceJson = JsonSerializer.Serialize(activeThreadMembers.Select(m => m.Id));
+                message.EncryptionOriginalEnvelopeHash = EnvelopeHash(request.EncryptedEnvelope!);
+                SetPendingEncryption(message, activeThreadMembers, request.RecipientDirectoryRevisions.Keys);
+            }
             dataContext.Add(message);
             if (encrypted && !thread.EncryptionRequired)
             {
@@ -1691,7 +1700,7 @@ public sealed partial class ThreadService(
                 .ToListAsync(ct);
 
             // Auto-create "Delivered" records for messages this member hasn't seen
-            var fetchedMessageIds = messages.Select(m => m.Id).ToList();
+            var fetchedMessageIds = messages.Where(m => EncryptionReadyFor(m, requesterMember.Id)).Select(m => m.Id).ToList();
             var existingDeliveries = await dataContext.Query<MessageDelivery>()
                 .Where(d => d.MessageThreadMemberId == requesterMember.Id)
                 .Where(d => d.TenantId == caller.TenantId)
@@ -1731,7 +1740,7 @@ public sealed partial class ThreadService(
             // Get the member info for senders
             var memberIds = messages.Select(m => m.MessageThreadMemberId).Distinct().ToList();
             var members = await dataContext.Query<MessageThreadMember>()
-                .Where(m => memberIds.Contains(m.Id))
+                .Where(m => m.MessageThreadId == request.ThreadId)
                 .Where(m => m.TenantId == caller.TenantId)
                 .ToListAsync(ct);
 
@@ -1792,6 +1801,9 @@ public sealed partial class ThreadService(
                     EncryptedEnvelope = m.EncryptedEnvelope,
                     AcceptedSenderDirectoryRevision = m.AcceptedSenderDirectoryRevision,
                     EncryptionSenderDeviceId = m.EncryptionSenderDeviceId,
+                    PendingEncryptionCount = m.PendingEncryptionCount,
+                    EncryptionPending = EncryptionPendingFor(m, requesterMember.Id),
+                    EncryptionAudienceCredentialIds = members.Where(x => x.IsEnabled && !x.IsDeleted && EncryptionMemberIds(m.EncryptionAudienceJson).Contains(x.Id)).Select(x => x.CredentialId).ToList(),
                     SenderCredentialId = sender?.CredentialId ?? Guid.Empty,
                     SenderAlias = sender?.Alias ?? string.Empty,
                     CreatedAt = m.CreatedAt,
@@ -1925,6 +1937,7 @@ public sealed partial class ThreadService(
                 return CallerFailure<CmdResponse>(callerResult);
 
             var caller = callerResult.Data!;
+            await using var mutationLock = await ConversationMutationLock.AcquireAsync(db, caller.TenantId, request.ThreadId, ct);
             var member = await dataContext.Query<MessageThreadMember>()
                 .Where(m => m.MessageThreadId == request.ThreadId)
                 .Where(m => m.CredentialId == caller.CredentialId)
@@ -2029,6 +2042,7 @@ public sealed partial class ThreadService(
                 return CallerFailure<CmdResponse>(callerResult);
 
             var caller = callerResult.Data!;
+            await using var mutationLock = await ConversationMutationLock.AcquireAsync(db, caller.TenantId, request.ThreadId, ct);
             var member = await dataContext.Query<MessageThreadMember>()
                 .Where(m => m.MessageThreadId == request.ThreadId)
                 .Where(m => m.CredentialId == caller.CredentialId)
@@ -2064,9 +2078,15 @@ public sealed partial class ThreadService(
                 var recipients = await dataContext.Query<MessageThreadMember>()
                     .Where(x => x.TenantId == caller.TenantId && x.MessageThreadId == request.ThreadId && x.IsEnabled && !x.IsDeleted)
                     .ToListAsync(ct);
-                if (!await EncryptionRecipientsCurrentAsync(caller.TenantId, caller.CredentialId, request.EncryptionSenderDeviceId,
-                        request.SenderDirectoryRevision, request.RecipientDirectoryRevisions, recipients.Select(x => x.CredentialId).ToArray(), ct))
-                    return Result<CmdResponse>.Failure("Encryption recipients changed. Refresh encryption.", 412);
+                var original = EncryptionMemberIds(message.EncryptionAudienceJson);
+                if (original.Count > 0) recipients = recipients.Where(x => original.Contains(x.Id)).ToList();
+                var valid = original.Count > 0
+                    ? await ReadyEncryptionRecipientsCurrentAsync(caller.TenantId, caller.CredentialId, request.EncryptionSenderDeviceId,
+                        request.SenderDirectoryRevision, request.RecipientDirectoryRevisions, recipients.Select(x => x.CredentialId).ToArray(), ct)
+                    : await EncryptionRecipientsCurrentAsync(caller.TenantId, caller.CredentialId, request.EncryptionSenderDeviceId,
+                        request.SenderDirectoryRevision, request.RecipientDirectoryRevisions, recipients.Select(x => x.CredentialId).ToArray(), ct);
+                if (!valid) return Result<CmdResponse>.Failure("Encryption recipients changed. Refresh encryption.", 412);
+                if (original.Count > 0) SetPendingEncryption(message, recipients, request.RecipientDirectoryRevisions.Keys);
             }
             if (message.MessageThreadMemberId != member.Id && !canEditAsAdmin)
                 return Result<CmdResponse>.Failure("You can only edit your own messages", 403);
@@ -3035,6 +3055,8 @@ public sealed partial class ThreadService(
                 if (!await CanAccessMessageAsync(caller.TenantId, member, message, ct))
                     return Result<CmdResponse>.NotFound("One or more messages were not found in this thread");
             }
+
+            requestedMessageIds = threadMessages.Where(m => EncryptionReadyFor(m, member.Id)).Select(m => m.Id).ToList();
 
             var existingDeliveries = await dataContext.Query<MessageDelivery>()
                 .Where(d => d.MessageThreadMemberId == member.Id)

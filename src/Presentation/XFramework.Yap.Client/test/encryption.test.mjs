@@ -230,3 +230,33 @@ test('attachments larger than buffered limit stream with bounded chunks and no a
     assert.equal(bytes, 80 * 1024 * 1024); assert.ok(maximumChunk <= 1024 * 1024);
     assert.equal(actual.digest('hex'), expected.digest('hex')); assert.equal(committed, true);
 });
+
+
+test('late enrollment opens the original 7 MB attachment through an encrypted message key without reupload', async () => {
+    const sender = await account(), ready = await account();
+    const ctx = context(sender, { kind: 'attachment' });
+    const bytes = new Uint8Array(7 * 1024 * 1024); for (let n = 0; n < bytes.length; n++) bytes[n] = n % 251;
+    const upload = await sender.api.encryptAttachment(sender.scope, ctx, streamOf(bytes), [sender.directory, ready.directory]);
+    const ciphertext = await collect(upload.stream), originalHash = createHash('sha256').update(ciphertext).digest('hex');
+    const late = await account();
+    await assert.rejects(late.api.decryptStream(late.scope, ctx, streamOf(ciphertext), sender.directory, quarantine().sink));
+    const messageContext = { ...ctx, kind: 'message' }, payload = { text: '', attachments: [{ key: upload.key }] };
+    const envelope = await sender.api.encrypt(sender.scope, messageContext, payload, [sender.directory, ready.directory, late.directory]);
+    assert.ok(!envelope.includes(upload.key.data));
+    const received = await late.api.decrypt(late.scope, messageContext, envelope, sender.directory);
+    const sink = quarantine();
+    assert.deepEqual(await late.api.decryptStream(late.scope, ctx, streamOf(ciphertext), sender.directory, sink.sink, received.attachments[0].key), bytes);
+    assert.equal(sink.calls.commit, 1);
+    assert.equal(createHash('sha256').update(ciphertext).digest('hex'), originalHash);
+    for (const badContext of [{ ...ctx, messageId: crypto.randomUUID() }, { ...ctx, kind: 'message' }]) {
+        const fail = quarantine();
+        await assert.rejects(late.api.decryptStream(late.scope, badContext, streamOf(ciphertext), sender.directory, fail.sink, upload.key));
+        assert.equal(fail.calls.commit, 0); assert.equal(fail.calls.abort, 1);
+    }
+    const corrupted = ciphertext.slice(); corrupted[corrupted.length - 12] ^= 1;
+    const fail = quarantine();
+    await assert.rejects(late.api.decryptStream(late.scope, ctx, streamOf(corrupted), sender.directory, fail.sink, upload.key));
+    assert.equal(fail.calls.commit, 0); assert.equal(fail.calls.abort, 1);
+    const wrongKey = { ...upload.key, data: '00'.repeat(32) };
+    await assert.rejects(ready.api.decryptStream(ready.scope, ctx, streamOf(ciphertext), sender.directory, quarantine().sink, wrongKey));
+});

@@ -34,6 +34,8 @@ public interface IThreadService
     Task<Result<CmdResponse>> UpdateThreadMemberRoleAsync(UpdateThreadMemberRoleRequest request, CancellationToken ct = default);
     Task<Result<CreateThreadMessageResponse>> CreateThreadMessageAsync(CreateThreadMessageRequest request, CancellationToken ct = default);
     Task<Result<GetThreadMessagesResponse>> GetThreadMessagesAsync(GetThreadMessagesRequest request, CancellationToken ct = default);
+    Task<Result<DeferredEncryptionResponse>> GetDeferredEncryptionAsync(GetDeferredEncryptionRequest request, CancellationToken ct = default);
+    Task<Result<CmdResponse>> CompleteDeferredEncryptionAsync(CompleteDeferredEncryptionRequest request, CancellationToken ct = default);
     Task<Result<SearchMessagesResponse>> SearchMessagesAsync(SearchMessagesRequest request, CancellationToken ct = default);
 
     // Round 2: Delete, Edit, Attachments, Reactions
