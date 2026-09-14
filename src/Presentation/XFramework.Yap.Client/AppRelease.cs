@@ -2,10 +2,14 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.13";
+    public const string Version = "1.3.14";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "15 September 2026", [
+            "Call audio recovers when Android pauses playback, with a tap-to-resume option when the browser needs your permission.",
+            "See who is active in conversation headers. Choose whether to share your own status under Conversation settings → General.",
+            "The app now uses ahead-of-time compilation and Brotli-compressed runtime downloads."]),
+        ("1.3.13", "15 September 2026", [
             "Only the latest message shows its time in the conversation. Open any message's options to see its full date and time, with date separators through history.",
             "Notifications appear below the header, away from the keyboard and message composer."]),
         ("1.3.12", "15 September 2026", [

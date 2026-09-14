@@ -2,7 +2,7 @@
 @inject NavigationManager Nav
 <div class="picker conversation-settings">
     <h2>@Conversation.Name</h2>
-    <p class="muted">@(Conversation.CanManage ? "Admins manage features and members for everyone in this conversation." : "Only conversation admins can change these settings.")</p>
+    <p class="muted">Admins manage shared features and members. Your personal preferences are under General.</p>
     <div class="conversation-tabs" role="tablist" aria-label="Conversation settings">
         @foreach (var item in new[] { ("features", "Features"), ("members", "Members"), ("general", "General") })
         { <button role="tab" aria-selected="@((tab == item.Item1).ToString().ToLowerInvariant())" @onclick="() => tab = item.Item1">@item.Item2</button> }
@@ -21,7 +21,7 @@
     @foreach (var person in Conversation.People)
     {
         <div class="conversation-member" @key="person.Id">
-            <div class="row"><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" ImageUrl="@person.AvatarUrl" Size="a34" /><span class="mid"><b>@person.Name</b><small>@(person.Role is "Admin" or "Owner" ? "Admin" : "Member")</small></span>
+            <div class="row"><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" ImageUrl="@person.AvatarUrl" Size="a34" /><span class="mid"><b>@person.Name</b><small>@(person.Role is "Admin" or "Owner" ? "Admin" : "Member")@(State.IsActive(person) ? " · Active now" : "")</small></span>
             @if (!Locked) { <button class="iconbtn" aria-label="@($"Edit {person.Name}")" @onclick="() => Edit(person)"><Icon Name="edit" Size="18" /></button> }</div>
             @if (editing == person.Id)
             {
@@ -45,6 +45,8 @@
     }
     @if (tab == "general")
     {
+    <label class="setting-toggle"><span>Share my active status</span><input type="checkbox" role="switch" checked="@Conversation.ShareActiveStatus" disabled="@(!State.Online || State.NeedsLogin || busy)" @onchange="e => RunAsync(() => State.SetActiveStatusAsync(Conversation.Id, e.Value is true))" /><span class="switch-track" aria-hidden="true"></span></label>
+    <p class="muted">Let people in this conversation see when you’re active in Yap.</p>
     @if (Conversation.Group)
     {
         <div class="row"><Avatar Initials="@ChatMessage.InitialsFor(Conversation.Name)" ImageUrl="@Conversation.AvatarUrl" />

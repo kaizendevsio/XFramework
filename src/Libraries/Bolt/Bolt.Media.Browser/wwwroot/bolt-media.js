@@ -21,8 +21,47 @@ class AudioPipeline {
         this.sources = new Set();
         this.playbackEnabled = true;
         this.managed = false;
-        this.outputChanged = () => { void this.getAudioOutputs().catch(() => {}); };
+        this.resumePending = null;
+        this.lastResumeAttempt = -Infinity;
+        this.resumeOnInteraction = () => { if (this.playbackEnabled) void this.resumePlayback(); };
+        this.visibilityChanged = () => { if (!globalThis.document?.hidden) this.resumeOnInteraction(); };
+        globalThis.document?.addEventListener('pointerdown', this.resumeOnInteraction, true);
+        globalThis.document?.addEventListener('keydown', this.resumeOnInteraction, true);
+        globalThis.document?.addEventListener('visibilitychange', this.visibilityChanged);
+        this.outputChanged = () => { void this.getAudioOutputs().then(() => this.resumePlayback()).catch(() => {}); };
         navigator.mediaDevices?.addEventListener?.('devicechange', this.outputChanged);
+    }
+
+    createPlaybackContext(sampleRate) {
+        if (this.audioContext) return;
+        const context = this.audioContext = new AudioContext({ sampleRate, latencyHint: 'interactive' });
+        context.onstatechange = () => {
+            if (context !== this.audioContext) return;
+            globalThis.window?.yap?.diagnostics?.record('audio.state', { phase: context.state });
+            if (context.state !== 'running' && this.playbackEnabled) void this.resumePlayback(false);
+        };
+    }
+
+    getPlaybackState() { return this.audioContext?.state ?? 'closed'; }
+
+    async resumePlayback(userAction = true) {
+        const context = this.audioContext;
+        if (!context || context.state === 'closed' || !this.playbackEnabled) return false;
+        if (context.state === 'running') return true;
+        if (this.resumePending) {
+            // Chrome can leave an autoplay-blocked resume promise pending. A new
+            // user gesture must still call resume synchronously to unlock it.
+            if (userAction) void context.resume().catch(() => {});
+            return this.resumePending;
+        }
+        if (!userAction && Date.now() - this.lastResumeAttempt < 1000) return false;
+        this.lastResumeAttempt = Date.now();
+        this.resumePending = (async () => {
+            try { await context.resume(); return context === this.audioContext && context.state === 'running'; }
+            catch { return false; } // The call UI offers a gesture if autoplay blocks recovery.
+            finally { this.resumePending = null; }
+        })();
+        return this.resumePending;
     }
 
     async getAudioOutputs() {
@@ -45,6 +84,7 @@ class AudioPipeline {
         const context = this.audioContext;
         if (!context?.setSinkId) throw new Error('Audio output is controlled by this device.');
         await context.setSinkId(deviceId);
+        await this.resumePlayback();
         return await this.getAudioOutputs();
     }
 
@@ -87,25 +127,28 @@ class AudioPipeline {
         const config = { codec: 'opus', sampleRate, numberOfChannels: channels };
         if (!(await AudioDecoder.isConfigSupported(config)).supported)
             throw new Error('Opus audio decoding is unavailable in this browser.');
-        this.audioContext ??= new AudioContext({ sampleRate, latencyHint: 'interactive' });
+        this.createPlaybackContext(sampleRate);
         this.decoderConfig = config;
     }
 
     initManaged() {
         this.managed = true;
-        this.audioContext ??= new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
+        this.createPlaybackContext(48000);
     }
 
     async startCapture(dotNetRef, constraints, transmit = true) {
         if (this.captureRunning) {
+            void this.resumePlayback();
             this.transmitting = transmit;
-            return true;
+            return this.captureRunning;
         }
         if ((!this.encoder && !this.managed) || !this.audioContext?.audioWorklet)
             throw new Error('AudioWorklet capture is unavailable in this browser.');
         const generation = ++this.captureGeneration;
         try {
-            await this.audioContext.resume();
+            // Do not wait for autoplay permission before requesting the microphone:
+            // capture permission itself can unlock audio on mobile Chrome.
+            void this.resumePlayback();
             const stream = await navigator.mediaDevices.getUserMedia({ audio: {
                 sampleRate: 48000, channelCount: 1, echoCancellation: true,
                 noiseSuppression: true, autoGainControl: true
@@ -116,6 +159,9 @@ class AudioPipeline {
             }
             this.mediaStream = stream;
             await this.audioContext.audioWorklet.addModule(new URL('./bolt-audio-capture.js', import.meta.url));
+            // Android may suspend or interrupt output while microphone permission
+            // or the communication audio route changes. Resume after that change.
+            void this.resumePlayback();
             if (generation !== this.captureGeneration) return false;
             this.sourceNode = this.audioContext.createMediaStreamSource(stream);
             this.captureNode = new AudioWorkletNode(this.audioContext, 'bolt-audio-capture', { numberOfOutputs: 0 });
@@ -216,6 +262,7 @@ class AudioPipeline {
     _playAudioData(data, streamId = 'default', receiver = this.receiver(streamId)) {
         try {
             const context = this.audioContext;
+            if (context && context.state !== 'running' && this.playbackEnabled) { void this.resumePlayback(false); return; }
             // Do not accumulate delayed playback during suspension or a slow renderer.
             if (!this.playbackEnabled || !receiver?.active || context?.state !== 'running' ||
                 receiver.nextPlayTime - context.currentTime > 0.2 || receiver.sources.size >= 16) return;
@@ -246,10 +293,14 @@ class AudioPipeline {
     }
 
     async dispose() {
+        globalThis.document?.removeEventListener('pointerdown', this.resumeOnInteraction, true);
+        globalThis.document?.removeEventListener('keydown', this.resumeOnInteraction, true);
+        globalThis.document?.removeEventListener('visibilitychange', this.visibilityChanged);
         navigator.mediaDevices?.removeEventListener?.('devicechange', this.outputChanged);
         this.stopCapture();
         this.stopPlayback();
         if (this.encoder?.state !== 'closed') this.encoder?.close();
+        if (this.audioContext) this.audioContext.onstatechange = null;
         if (this.audioContext?.state !== 'closed') await this.audioContext?.close();
         this.encoder = this.audioContext = null;
     }

@@ -63,4 +63,7 @@ public partial class MessageThreadMember : BaseModel
 
     [MemoryPackOrder(18)]
     public string Role { get; set; } = global::Communications.Domain.Shared.MessageThreadMemberRoles.Member;
+
+    [MemoryPackOrder(19)]
+    public bool HideActiveStatus { get; set; }
 }

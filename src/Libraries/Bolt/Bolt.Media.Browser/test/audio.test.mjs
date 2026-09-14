@@ -6,6 +6,7 @@ import vm from 'node:vm';
 const source = readFileSync(new URL('../wwwroot/bolt-media.js', import.meta.url), 'utf8')
     .replaceAll('export ', '').replaceAll('import.meta.url', "'https://example.test/bolt-media.js'");
 function fixture() {
+    const listeners = new Map();
     const stats = { stopped: 0, encoded: [], decoded: [], closedFrames: 0, played: [] };
     class Encoder {
         static async isConfigSupported() { return { supported: true }; }
@@ -31,6 +32,8 @@ function fixture() {
     }
     const stream = { getTracks: () => [{ stop() { stats.stopped++; } }] };
     const sandbox = {
+        document: { hidden: false, addEventListener: (name, handler) => listeners.set(name, handler),
+            removeEventListener: name => listeners.delete(name) },
         console, URL, Uint8Array, Float32Array, isSecureContext: true, AudioEncoder: Encoder, AudioDecoder: Decoder, AudioContext: Context,
         AudioData: class { constructor(data) { Object.assign(this, data); } close() { stats.closedFrames++; } },
         EncodedAudioChunk: class { constructor(data) { Object.assign(this, data); } },
@@ -39,9 +42,56 @@ function fixture() {
     };
     vm.createContext(sandbox);
     vm.runInContext(source + '\nthis.pipeline = createAudioPipeline(); this.check = checkVoiceCapabilities;', sandbox);
-    return { p: sandbox.pipeline, sandbox, stats, stream };
+    return { p: sandbox.pipeline, sandbox, stats, stream, listeners };
 }
 async function initialized(f) { await f.p.initEncoder(48000, 1, 128); await f.p.initDecoder(48000, 1); }
+
+test('mobile autoplay cannot prevent asking for microphone permission', { timeout: 1000 }, async () => {
+    const f = fixture(); await initialized(f);
+    let permitted = false, unlock;
+    f.p.audioContext.state = 'suspended';
+    f.p.audioContext.resume = () => {
+        if (!permitted) return new Promise(resolve => { unlock = resolve; });
+        f.p.audioContext.state = 'running'; unlock?.(); return Promise.resolve();
+    };
+    f.sandbox.navigator.mediaDevices.getUserMedia = async () => { permitted = true; return f.stream; };
+    assert.equal(await f.p.startCapture({}), true);
+    assert.equal(permitted, true); assert.equal(f.p.getPlaybackState(), 'running');
+    await f.p.dispose();
+});
+
+test('microphone route interruption resumes playback after permission', async () => {
+    const f = fixture(); await initialized(f);
+    f.sandbox.navigator.mediaDevices.getUserMedia = async () => { f.p.audioContext.state = 'interrupted'; return f.stream; };
+    await f.p.startCapture({});
+    assert.equal(f.p.getPlaybackState(), 'running');
+    f.p._playAudioData(audio(f.stats)); assert.equal(f.stats.played.length, 1);
+    await f.p.dispose();
+});
+
+test('suspended receive frames trigger one recovery without retaining decoded audio', async () => {
+    const f = fixture(); await initialized(f); let resumes = 0, unlock;
+    f.p.audioContext.state = 'suspended';
+    f.p.audioContext.resume = () => { resumes++; return new Promise(resolve => { unlock = () => { f.p.audioContext.state = 'running'; resolve(); }; }); };
+    for (let i = 0; i < 30; i++) f.p._playAudioData(audio(f.stats));
+    assert.equal(resumes, 1); assert.equal(f.stats.closedFrames, 30); assert.equal(f.stats.played.length, 0);
+    unlock(); await new Promise(resolve => setImmediate(resolve));
+    f.p._playAudioData(audio(f.stats)); assert.equal(f.stats.played.length, 1);
+    await f.p.dispose();
+});
+
+test('a real interaction retries an autoplay-blocked resume and disposal removes listeners', async () => {
+    const f = fixture(); await initialized(f); let resumes = 0, unlock;
+    f.p.audioContext.state = 'suspended';
+    f.p.audioContext.resume = () => {
+        if (++resumes === 1) return new Promise(resolve => { unlock = resolve; });
+        f.p.audioContext.state = 'running'; unlock(); return Promise.resolve();
+    };
+    const pending = f.p.resumePlayback(false);
+    f.listeners.get('pointerdown')();
+    assert.equal(await pending, true); assert.equal(resumes, 2);
+    await f.p.dispose(); assert.equal(f.listeners.size, 0);
+});
 
 test('output selection switches the playback context without restarting capture and falls back when unplugged', async () => {
     const f = fixture(); await initialized(f);

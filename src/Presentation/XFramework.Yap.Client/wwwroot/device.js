@@ -63,6 +63,7 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden) notify(); });
     addEventListener('beforeinstallprompt', event => { event.preventDefault(); installPrompt = event; });
     window.yap.device = {
+        visible: () => !document.hidden,
         async uploadPhoto(input, path, scope, token) {
             const file = input.files?.[0];
             if (!file || file.size > 20 * 1024 * 1024) throw new Error('Choose a photo up to 20 MB.');

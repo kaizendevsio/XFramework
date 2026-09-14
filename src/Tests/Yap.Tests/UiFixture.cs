@@ -88,6 +88,12 @@ internal static partial class UiFixture
                 Id = id, Name = conversations.First(c => c.Id == id).Name, IsDirect = conversations.First(c => c.Id == id).IsDirect, HasCustomName = conversations.First(c => c.Id == id).HasCustomName, PhotoStorageFileId = conversations.First(c => c.Id == id).PhotoStorageFileId, CanManage = true, Features = features,
                 Members = fixtureMembers.ToList()
             }));
+        fixture.Session.Setup(s => s.SetThreadActiveStatusAsync(It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid id, bool share, CancellationToken _) =>
+            {
+                fixtureMembers.Single(member => member.CredentialId == fixture.Session.Object.CredentialId).HideActiveStatus = !share;
+                return new CmdResponse { HttpStatusCode = HttpStatusCode.OK };
+            });
         fixture.Session.Setup(s => s.GetMessagesAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Guid thread, int page, int size, CancellationToken _) => ChatFixture.Ok(new GetThreadMessagesResponse { Items = messages.OrderByDescending(m => m.CreatedAt).Skip(page * size).Take(size).ToList(), TotalCount = messages.Count }));
         foreach (var conversation in conversations) conversation.IsDirect = conversation.MemberCount == 2;

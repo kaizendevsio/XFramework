@@ -5,7 +5,7 @@ namespace Yap.Contracts;
 // Browser-facing models contain chat data only, never service credentials or actor tokens.
 public sealed record UserSession(Guid CredentialId, Guid TenantId, string Name, string? AvatarUrl = null);
 public sealed record SessionResponse(UserSession? User, string AntiforgeryToken, bool EncryptionRequired = false);
-public sealed record Person(Guid Id, string Name, string UserName, string? AvatarUrl = null, Guid MemberId = default, string Role = "Member", string? Nickname = null);
+public sealed record Person(Guid Id, string Name, string UserName, string? AvatarUrl = null, Guid MemberId = default, string Role = "Member", string? Nickname = null, DateTime? ActiveUntil = null);
 public sealed record ReactionType(Guid Id, string Name, string Emoji);
 public sealed record ChatDefaults(Guid ThreadTypeId, List<ReactionType> Reactions);
 public sealed record ChatPage<T>(List<T> Items, int TotalCount);
@@ -37,6 +37,7 @@ public sealed class Conversation
     public int MessageTotal { get; set; }
     public int Features { get; set; } = 127;
     public bool CanManage { get; set; }
+    public bool ShareActiveStatus { get; set; } = true;
     public bool Allows(ChatFeature feature) => (Features & (int)feature) != 0;
     public string Initials => ChatMessage.InitialsFor(Name);
     public string Color => Group ? "g3" : "g1";

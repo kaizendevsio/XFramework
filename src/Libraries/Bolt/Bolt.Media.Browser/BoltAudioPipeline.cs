@@ -22,6 +22,10 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
     public event Func<byte[], Task>? OnEncoded;
 
     public bool IsCapturing => _capturing;
+    public async Task<string> GetPlaybackStateAsync() => _pipeline is null ? "closed"
+        : await _pipeline.InvokeAsync<string>("getPlaybackState");
+    public async Task<bool> ResumePlaybackAsync() => _pipeline is not null
+        && await _pipeline.InvokeAsync<bool>("resumePlayback");
 
     /// <summary>Checks codec support without opening the microphone or starting a call.</summary>
     public async Task<VoiceCapabilities> CheckCapabilitiesAsync()

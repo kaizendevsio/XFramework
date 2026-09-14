@@ -9,4 +9,5 @@ public partial record ThreadMemberResponse
     public short Status { get; set; }
     public DateTime JoinedAt { get; set; }
     public string Role { get; set; } = "Member";
+    public bool HideActiveStatus { get; set; }
 }

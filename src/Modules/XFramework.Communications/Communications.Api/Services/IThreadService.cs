@@ -12,6 +12,7 @@ namespace Communications.Api.Services;
 
 public interface IThreadService
 {
+    Task<Result<CmdResponse>> SetThreadActiveStatusAsync(SetThreadActiveStatusRequest request, CancellationToken ct = default);
     Task<Result<Storage.Domain.Shared.Contracts.Responses.StorageUploadSessionResponse>> CreateChatAttachmentUploadAsync(CreateChatAttachmentUploadRequest request, CancellationToken ct = default);
     Task<Result<Storage.Domain.Shared.Contracts.Responses.StorageDownloadUrlResponse>> GetChatAttachmentDownloadUrlAsync(GetChatAttachmentDownloadUrlRequest request, CancellationToken ct = default);
     Task<Result<Storage.Domain.Shared.Contracts.Responses.StorageDownloadUrlResponse>> GetThreadPhotoDownloadUrlAsync(GetThreadPhotoDownloadUrlRequest request, CancellationToken ct = default);

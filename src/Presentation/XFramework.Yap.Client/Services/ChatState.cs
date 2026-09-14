@@ -241,6 +241,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             EncryptionEnabled = session.EncryptionRequired;
             api.Account = Scope;
             NeedsLogin = false;
+            await PublishPresenceAsync();
             await store.SetSettingAsync("user", JsonSerializer.Serialize(User));
             Defaults ??= await api.PostAsync<ChatDefaults>("api/chat/initialize");
             if (EncryptionEnabled) await Encryption.EnsureAsync(User);

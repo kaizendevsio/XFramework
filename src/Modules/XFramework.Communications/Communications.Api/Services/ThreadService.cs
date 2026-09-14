@@ -514,7 +514,8 @@ public sealed partial class ThreadService(
                     Alias = m.Alias,
                     Status = m.Status,
                     JoinedAt = m.CreatedAt,
-                    Role = m.Role
+                    Role = m.Role,
+                    HideActiveStatus = m.HideActiveStatus
                 }).ToList()
             });
         }
