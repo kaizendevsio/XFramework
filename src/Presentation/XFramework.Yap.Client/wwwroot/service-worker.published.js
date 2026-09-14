@@ -1,7 +1,12 @@
 self.importScripts('./service-worker-assets.js');
 const prefix = 'yap-shell-';
 const name = prefix + self.assetsManifest.version;
-const assets = self.assetsManifest.assets.filter(asset => !/^(?:api|auth|health)\//.test(asset.url) && !/^service-worker/.test(asset.url));
+// Static-file middleware does not serve hidden or extensionless package metadata.
+// Including it in addAll would reject the whole update and leave the old app active.
+const assets = self.assetsManifest.assets.filter(asset => !/^(?:api|auth|health)\//.test(asset.url)
+    && !/^service-worker/.test(asset.url)
+    && !asset.url.split('/').some(part => part.startsWith('.'))
+    && asset.url.split('/').at(-1).includes('.'));
 const known = new Set(assets.map(asset => new URL(asset.url, self.location).href));
 self.addEventListener('install', event => event.waitUntil((async () => {
     const cache = await caches.open(name);
