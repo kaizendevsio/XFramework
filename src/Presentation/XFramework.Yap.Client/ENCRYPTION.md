@@ -182,15 +182,19 @@ revokes former devices. Actual browser encrypted upload/download of an 80 MiB
 `3A947FE28882D03D4D8948E94D4A870BF4ACB1809B4D9D78090CDBF323FD1AAC`.
 The 4 GiB limit has not thereby been stress-tested.
 
-The [encrypted group audio report](../../../artifacts/group-audio-encryption-verification.md)
+The lasting [browser verification report](../../../docs/solutions/architecture-patterns/yap-encryption-browser-verification.md)
 records actual three-party SFrame frame counts, 128,000 bits/s encoder settings,
 nonzero decoded audio and old-device removal after recovery. Both retained peers
 activated a new two-party epoch and continued audio while the revoked device's
-counters stayed fixed. The [earlier browser report](../../../artifacts/group-audio-browser-verification.md)
-records mute/unmute and departure behavior.
+counters stayed fixed. The same report records mute/unmute and departure behavior.
 
-Encrypted edit and delayed-file-link browser checks are still pending and are
-not implied by the send/media results. Public WSS deployment, final release-build
+Encrypted edits now also passed across all three accounts. A deliberate
+three-second file-link delay displayed the recipient skeleton first and then
+automatically showed the preview on all three clients. Raw server content stayed
+generic plus the armored envelope. The final focused regression run passed 173
+tests: 49 client .NET, 103 host .NET and 21 JavaScript.
+
+Public WSS deployment, final release-build
 configuration and physical iOS/Android testing also remain gates. A mobile
 viewport in desktop Chrome is not a physical Safari or Android test, and these
 fixture runs are not an independent security audit.

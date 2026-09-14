@@ -173,6 +173,10 @@ Completed desktop Chrome fixture proofs on 14 September 2026 include:
 - Three independent accounts exchanged encrypted messages through the actual
   client/BFF path. A 7 MB JPEG reached every recipient and opened in the photo
   viewer; an encrypted MOV attachment played in the browser.
+- Encrypted edits updated plaintext across all three accounts. With file links
+  delayed three seconds, a recipient skeleton appeared before links, then all
+  three clients displayed the preview automatically. Raw server content remained
+  a generic placeholder plus the armored envelope.
 - Additional-device approval rotated the owner's device identity and transferred
   readable history. Recovery created a fresh device and revoked old devices.
 - An **80 MiB (83,886,080-byte)** file completed actual browser encrypted upload,
@@ -191,18 +195,17 @@ Completed desktop Chrome fixture proofs on 14 September 2026 include:
   device's counters stayed fixed during the follow-up observation; neither
   remaining browser reported a crypto failure.
 
-The [runtime encrypted audio report](../../../artifacts/group-audio-encryption-verification.md)
-records frame counters, bitrate and recovery revocation. The earlier
-[group voice report](../../../artifacts/group-audio-browser-verification.md)
-records mute, unmute and departure. These were disposable HTTPS fixtures with
-isolated desktop Chrome profiles, not a public deployment or physical phones.
+The lasting [browser verification report](yap-encryption-browser-verification.md)
+records the message/media checks, frame counters, bitrate, mute/departure and
+recovery revocation. The final focused suite passed 173 tests: 49 client .NET,
+103 host .NET and 21 JavaScript. These were disposable HTTPS fixtures with isolated
+desktop Chrome profiles, not a public deployment or physical phones.
 
 Before enabling the prepared release, the owner task must still:
 
 - Apply and verify Identity/Communications migrations and authorization/CAS tests.
-- Finish encrypted-edit and delayed-file-link browser checks; these are not
-  claimed by the completed send/media proofs. Retain lost-response and
-  stale-directory outbox regression coverage.
+- Preserve the completed encrypted-edit and delayed-file-link browser behavior
+  and retain lost-response and stale-directory outbox regression coverage.
 - Preserve the recorded encrypted group-voice proofs when changing the gateway,
   key exchange or media pipeline. Verify release configuration, fallback codec
   behavior and teardown for the shipped build; primitive replay/tamper tests and
