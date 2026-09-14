@@ -21,10 +21,6 @@ body{display:block;padding:0;margin:0;background:var(--surface)}
 .bottomnav button,.bottomnav a{border-radius:19px;width:72px;min-height:46px;display:flex;align-items:center;justify-content:center;color:var(--dim);padding:0}
 .bottomnav a.on,.bottomnav button.on{color:var(--text);background:color-mix(in srgb,var(--accent) 28%,transparent);box-shadow:inset 0 1px 0 var(--glass-edge)}
 .fab{bottom:calc(var(--chrome-bottom) + 76px)}
-/* A notice must not sit underneath the compose button. */
-.fab{transition:bottom .22s cubic-bezier(.2,.8,.2,1)}
-.app-shell:has(.toast-host .toast:not([hidden])) .fab{bottom:calc(var(--chrome-bottom) + var(--yap-footer,64px) + 74px)}
-@media(prefers-reduced-motion:reduce){.fab{transition:none}}
 .appbar{padding-top:12px}.appbar .mid{flex:1;min-width:0}
 input,textarea,select,.inputbox input,.searchbar input{font-size:16px!important}
 .inputbox input{min-height:44px}
@@ -88,8 +84,8 @@ button,a,label,nav,.avatar,.appbar,.bottomnav{-webkit-user-select:none;user-sele
 .history-loader{display:block;margin:0 auto 12px;padding:8px 16px;color:var(--dim);font-size:12px}
 @media(prefers-reduced-motion:reduce){.typing-dots i,.recording-dot{animation:none}.composer-action,.composer-action .sendbtn,.composer-action .voicebtn{transition:none}}
 
-/* Toasts float above the bottom chrome, whose height app.js measures into --yap-footer. */
-.toast-host{position:absolute;left:0;right:0;bottom:calc(var(--chrome-bottom) + var(--yap-footer,64px) + 8px);z-index:120;display:flex;flex-direction:column;gap:8px;padding:0 12px;pointer-events:none}
+/* Keep notifications just below the measured header, including iOS safe areas. */
+.toast-host{position:absolute;left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));top:calc(var(--safe-top) + var(--yap-header,0px) + 8px);bottom:auto;z-index:120;display:flex;flex-direction:column;gap:8px;padding:0;pointer-events:none}
 .toast{pointer-events:auto;position:static;left:auto;right:auto;bottom:auto;display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:18px;font-size:13.5px;line-height:1.35;color:var(--text);background:transparent;box-shadow:var(--glass-shadow);animation:toast-in .22s cubic-bezier(.2,.8,.2,1)}
 .toast .toast-text{flex:1;min-width:0}
 .toast .toast-icon{color:var(--dim)}
@@ -98,7 +94,7 @@ button,a,label,nav,.avatar,.appbar,.bottomnav{-webkit-user-select:none;user-sele
 .toast.ok .toast-icon{color:var(--ok)}
 .toast .toast-action{flex:none;font-weight:700;color:var(--accent-ink);padding:6px 10px;border-radius:12px;background:color-mix(in srgb,var(--accent) 30%,transparent);text-decoration:none}
 .toast .toast-close{flex:none;float:none;margin:0;width:28px;height:28px;display:grid;place-items:center;border-radius:50%;color:var(--dim)}
-@keyframes toast-in{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
+@keyframes toast-in{from{transform:translateY(-10px);opacity:0}to{transform:none;opacity:1}}
 @media(prefers-reduced-motion:reduce){.toast{animation:none}}
 
 /* Settings: a grouped mobile list, not a stack of full-width buttons. */
@@ -204,3 +200,5 @@ button,a,label,nav,.avatar,.appbar,.bottomnav{-webkit-user-select:none;user-sele
 .voice-dialog .call-top{display:flex;align-items:center;width:100%;gap:12px}.voice-dialog .call-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .voice-dialog .call-footer{font-size:11px;opacity:.65;margin-top:28px}.voice-dialog .callbg{background:var(--surface)}.voice-dialog .callbg:after{background:transparent}.voice-dialog .callscreen{color:var(--text)}.voice-dialog .callstate,.voice-dialog .callenc,.voice-dialog .cbtn{color:inherit}
 .active-call{position:fixed;top:calc(8px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:200;display:flex;gap:8px;padding:10px 18px;border-radius:24px;background:var(--accent);color:var(--on-accent)}
+
+.message-date{display:flex;align-items:center;gap:12px;margin:20px 0 16px;color:var(--dim);font-size:12px;text-align:center}.message-date::before,.message-date::after{content:"";height:1px;flex:1;background:var(--border)}.message-date time{max-width:75%}.menu-message-time{display:block;text-align:center;color:var(--dim);font-size:12px;line-height:1.4;padding:0 12px}

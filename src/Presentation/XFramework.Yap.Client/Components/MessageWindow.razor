@@ -5,8 +5,16 @@
 
     @if (start == 0 && HasMore) { <button class="history-loader" disabled="@loading" @onclick="LoadEarlier">@(loading ? "Loading earlier messages…" : "Earlier messages")</button> }
     </div><div data-window-canvas>
-    @foreach (var message in Items.Skip(start).Take(count))
-    { <div data-window-row="@message.Id" @key="message.Id">@ChildContent(message)</div> }
+    @for (var index = start; index < Math.Min(Items.Count, start + count); index++)
+    {
+        var message = Items[index];
+        var date = message.CreatedAt.ToLocalTime().Date;
+        <div data-window-row="@message.Id" @key="message.Id">
+            @if (index == 0 || Items[index - 1].CreatedAt.ToLocalTime().Date != date)
+            { <div class="message-date"><time datetime="@date.ToString("yyyy-MM-dd")">@DateLabel(date)</time></div> }
+            @ChildContent(message)
+        </div>
+    }
     </div>
     @if (HasNewer) { <button class="history-loader" disabled="@loading" @onclick="LoadNewer">Newer messages</button> }
     @if (Items.Count == 0) { <p class="empty">Say hello. This is the beginning of your conversation.</p> }
@@ -25,6 +33,8 @@
     private int start, count = 40;
     private Guid? first;
     private bool initialized, loading;
+    private static string DateLabel(DateTime date) => date == DateTime.Today ? "Today"
+        : date == DateTime.Today.AddDays(-1) ? "Yesterday" : date.ToString("D");
     protected override void OnParametersSet()
     {
         if (!initialized) { initialized = true; start = Math.Max(0, Items.Count - count); }

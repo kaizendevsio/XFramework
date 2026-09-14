@@ -77,7 +77,12 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
 // Measure overlay chrome without fixed assumptions about composer/header height.
 document.addEventListener('DOMContentLoaded', () => {
     const watched = new Set();
-    let footerHeight = null;
+    let headerHeight = null;
+    const publishHeader = height => {
+        if (headerHeight === height) return;
+        headerHeight = height;
+        requestAnimationFrame(() => document.documentElement.style.setProperty('--yap-header', `${headerHeight}px`));
+    };
     const pinned = new WeakMap();
     const rememberPosition = event => {
         const list = event.target;
@@ -95,13 +100,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const height = target.getBoundingClientRect().height;
                 const header = target.hasAttribute('data-scroll-header');
                 surface.style.setProperty(header ? '--scroll-top' : '--scroll-bottom', `${height}px`);
-                // Toasts live outside the surface, so the footer height is published
-                // globally, but never from inside the callback: writing to the document
-                // there can start an observer loop and stall other observers.
-                if (!header && footerHeight !== height) {
-                    footerHeight = height;
-                    requestAnimationFrame(() => document.documentElement.style.setProperty('--yap-footer', `${footerHeight}px`));
-                }
+                // Toasts live outside the surface. Publish its header height in a
+                // frame to avoid a ResizeObserver loop when writing to the document.
+                if (header) publishHeader(height);
                 const list = surface.querySelector('[data-messages]');
                 if (list?.classList.contains('message-window')) yap.messageWindow.resize(list);
                 else if (list && pinned.get(list)) list.scrollTop = list.scrollHeight;
@@ -109,6 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     const sync = () => {
+        if (!document.querySelector('[data-scroll-header]')) publishHeader(0);
         for (const element of watched) if (!element.isConnected) { resize.unobserve(element); element.removeEventListener('scroll', rememberPosition); watched.delete(element); }
         for (const element of document.querySelectorAll('[data-scroll-header],[data-scroll-footer],[data-messages]')) if (!watched.has(element)) {
             watched.add(element);

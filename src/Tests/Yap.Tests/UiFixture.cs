@@ -62,8 +62,8 @@ internal static partial class UiFixture
         var fixtureMembers = new List<ThreadMemberResponse> { new() { Id = Guid.NewGuid(), CredentialId = fixture.Credential, Alias = "Jamie Davis", Role = "Admin" }, new() { Id = Guid.NewGuid(), CredentialId = friend, Alias = "Sarah Mensah", Role = "Admin" } };
         var messages = new List<ThreadMessageItemResponse>
         {
-            new() { Id = Guid.NewGuid(), SenderCredentialId = friend, SenderAlias = "Sarah Mensah", Text = "Hey! Are you around? 👀", CreatedAt = DateTime.UtcNow.AddMinutes(-25) },
-            new() { Id = Guid.NewGuid(), SenderCredentialId = friend, SenderAlias = "Sarah Mensah", Text = "Can you take a look at the onboarding flow? I pushed the new screens last night.", CreatedAt = DateTime.UtcNow.AddMinutes(-24) },
+            new() { Id = Guid.NewGuid(), SenderCredentialId = friend, SenderAlias = "Sarah Mensah", Text = "Hey! Are you around? 👀", CreatedAt = DateTime.UtcNow.AddDays(-2) },
+            new() { Id = Guid.NewGuid(), SenderCredentialId = friend, SenderAlias = "Sarah Mensah", Text = "Can you take a look at the onboarding flow? I pushed the new screens last night.", CreatedAt = DateTime.UtcNow.AddDays(-1) },
             new() { Id = Guid.NewGuid(), SenderCredentialId = fixture.Credential, Text = "Just opened it — the empty state is so much better now.", CreatedAt = DateTime.UtcNow.AddMinutes(-18) },
             new() { Id = Guid.NewGuid(), SenderCredentialId = friend, SenderAlias = "Sarah Mensah", Text = "That's the one! I'll clean up the spacing today.", CreatedAt = DateTime.UtcNow.AddMinutes(-14) },
             new() { Id = Guid.NewGuid(), SenderCredentialId = fixture.Credential, Text = "Perfect. Let's also sort the copy on step 3.", CreatedAt = DateTime.UtcNow.AddMinutes(-12) },
