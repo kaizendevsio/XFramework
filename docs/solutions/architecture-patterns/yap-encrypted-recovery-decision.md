@@ -1,7 +1,8 @@
 # Yap encrypted messaging, recovery and group voice
 
-Decision date: 14 September 2026. Status: the in-house implementation is present
-and undergoing integration verification. This document describes the prepared
+Decision date: 14 September 2026. Status: the in-house implementation has passed
+the desktop browser proofs listed below; remaining integration checks continue.
+This document describes the prepared
 release; it does not claim deployment, physical mobile verification or an
 independent security audit. Production encrypted group calling remains gated
 until the checks below pass. The previous trusted-server voice slice is a
@@ -167,16 +168,45 @@ response loss and backup repair. SFrame tests cover official vectors, replay,
 context/epoch isolation and lifecycle bounds. These are implementation evidence,
 not an independent cryptographic audit.
 
-Before enabling the prepared release, the owner task must:
+Completed desktop Chrome fixture proofs on 14 September 2026 include:
+
+- Three independent accounts exchanged encrypted messages through the actual
+  client/BFF path. A 7 MB JPEG reached every recipient and opened in the photo
+  viewer; an encrypted MOV attachment played in the browser.
+- Additional-device approval rotated the owner's device identity and transferred
+  readable history. Recovery created a fresh device and revoked old devices.
+- An **80 MiB (83,886,080-byte)** file completed actual browser encrypted upload,
+  download and verification. Original and recovered files both have SHA-256
+  `3A947FE28882D03D4D8948E94D4A870BF4ACB1809B4D9D78090CDBF323FD1AAC`.
+  This is browser-path evidence beyond the bounded-stream unit test, not a
+  completed 4 GiB stress test.
+- Three-party voice produced nonzero decoded audio from both peers on every
+  participant. Runtime probes observed 128,000 bits/s Opus encoder configuration
+  and real SFrame encryption/decryption in shared epoch 3. Muting stopped that
+  sender's received-frame growth while another sender continued; unmuting and
+  leaving preserved audio among the remaining participants.
+- Recovering an account during a call revoked its old device. The authorization
+  lease removed that device, and the two remaining browsers activated epoch 4
+  with a new matching roster binding and continued nonzero audio. The removed
+  device's counters stayed fixed during the follow-up observation; neither
+  remaining browser reported a crypto failure.
+
+The [runtime encrypted audio report](../../../artifacts/group-audio-encryption-verification.md)
+records frame counters, bitrate and recovery revocation. The earlier
+[group voice report](../../../artifacts/group-audio-browser-verification.md)
+records mute, unmute and departure. These were disposable HTTPS fixtures with
+isolated desktop Chrome profiles, not a public deployment or physical phones.
+
+Before enabling the prepared release, the owner task must still:
 
 - Apply and verify Identity/Communications migrations and authorization/CAS tests.
-- Exercise enrollment, encrypted send/read, edits, attachments, restore and
-  additional-device approval through the real client/BFF path, including lost
-  responses and stale-directory outbox retries.
-- Verify three independently authenticated browser participants exchange decoded
-  encrypted audio, including fallback codecs, mute, join/leave, epoch rotation,
-  replay/tamper rejection and complete teardown. Two-party trusted-TLS evidence
-  does not satisfy this gate.
+- Finish encrypted-edit and delayed-file-link browser checks; these are not
+  claimed by the completed send/media proofs. Retain lost-response and
+  stale-directory outbox regression coverage.
+- Preserve the recorded encrypted group-voice proofs when changing the gateway,
+  key exchange or media pipeline. Verify release configuration, fallback codec
+  behavior and teardown for the shipped build; primitive replay/tamper tests and
+  earlier trusted-TLS runs do not substitute for encrypted browser-path evidence.
 - Confirm production configuration and constructor wiring select the explicit
   encrypted mode only after those checks. Keep shared Hub media and legacy ECDH
   disabled, and confirm the public same-origin Funnel/WSS route.

@@ -142,9 +142,10 @@ change and acknowledgment by all current members before a fresh epoch transmits.
 There is no silent trusted-server fallback. The prepared group path is bounded
 to eight participants with a 128 kbps Opus encoder target; WebCodecs and the
 managed Concentus fallback share the audio lifecycle. Legacy experimental ECDH
-remains unavailable. End-to-end encrypted three-browser exchange, participant
-changes and teardown must pass through the real client/gateway before enabling
-the production group path.
+remains unavailable. The desktop fixture has demonstrated three-browser SFrame
+exchange at the configured 128 kbps target, mute/unmute, departure and recovery
+revocation with a continuing two-party epoch. Public deployment and physical
+mobile validation remain separate from these client/gateway proofs.
 
 ## Security and verification limits
 
@@ -171,6 +172,25 @@ stream integrity/quarantine and an 80 MiB stream with bounded output chunks.
 These tests are not an external security audit or a real iOS/Android UI test.
 Also run `node --test src/Presentation/XFramework.Yap.Client/test/encrypted-files.test.mjs`
 for OPFS verification markers, interrupted writes, offline reads and account
-isolation. Actual BFF enrollment, send/edit, attachments, approval, recovery and
-public WSS group audio remain integration/deployment gates; a mobile viewport in
-desktop Chrome is not a physical Safari or Android test.
+isolation.
+
+Completed desktop Chrome integration proofs include encrypted exchange among
+three accounts, a 7 MB JPEG received by all participants and opened in the viewer,
+MOV playback, additional-device approval with owner rotation, and recovery that
+revokes former devices. Actual browser encrypted upload/download of an 80 MiB
+(83,886,080-byte) file produced matching SHA-256 hashes:
+`3A947FE28882D03D4D8948E94D4A870BF4ACB1809B4D9D78090CDBF323FD1AAC`.
+The 4 GiB limit has not thereby been stress-tested.
+
+The [encrypted group audio report](../../../artifacts/group-audio-encryption-verification.md)
+records actual three-party SFrame frame counts, 128,000 bits/s encoder settings,
+nonzero decoded audio and old-device removal after recovery. Both retained peers
+activated a new two-party epoch and continued audio while the revoked device's
+counters stayed fixed. The [earlier browser report](../../../artifacts/group-audio-browser-verification.md)
+records mute/unmute and departure behavior.
+
+Encrypted edit and delayed-file-link browser checks are still pending and are
+not implied by the send/media results. Public WSS deployment, final release-build
+configuration and physical iOS/Android testing also remain gates. A mobile
+viewport in desktop Chrome is not a physical Safari or Android test, and these
+fixture runs are not an independent security audit.
