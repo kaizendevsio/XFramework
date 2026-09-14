@@ -3,13 +3,14 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { webcrypto } from 'node:crypto';
+import { createEncryption } from '../wwwroot/encryption.mjs';
 
 const source = await readFile(new URL('../wwwroot/device.js', import.meta.url), 'utf8');
 const tenant = crypto.randomUUID(), user = crypto.randomUUID();
 const scope = `${tenant.replaceAll('-', '')}:${user.replaceAll('-', '')}`;
 const key = `${scope.replace(':', '-')}-${crypto.randomUUID().replaceAll('-', '')}.verified`;
 const context = { tenantId: tenant, threadId: crypto.randomUUID(), messageId: crypto.randomUUID(), senderId: user, kind: 'attachment', parentId: null };
-function setup() {
+function setup({ wholeBufferWrites = false } = {}) {
     const files = new Map(), state = { fetches: 0, decrypts: 0, failSignature: false, failMarker: false, committed: false };
     const missing = () => Object.assign(new Error('Missing'), { name: 'NotFoundError' });
     const directory = {
@@ -20,7 +21,11 @@ function setup() {
                 async createWritable() {
                     const chunks = [];
                     const writable = new WritableStream({
-                        write(chunk) { if (state.failMarker && name.endsWith('.ready')) throw new Error('Disk full'); chunks.push(chunk); },
+                        write(chunk) {
+                            if (state.failMarker && name.endsWith('.ready')) throw new Error('Disk full');
+                            // WebKit's file sink uses the backing buffer span for typed-array views.
+                            chunks.push(wholeBufferWrites && ArrayBuffer.isView(chunk) ? chunk.buffer : chunk);
+                        },
                         close() { files.set(name, new Blob(chunks)); }, abort() { chunks.length = 0; }
                     });
                     // FileSystemWritableFileStream also exposes convenience methods.
@@ -59,6 +64,37 @@ test('only committed plaintext gets a ready marker; verified offline cache needs
     assert.equal(state.fetches, 1); assert.equal(state.decrypts, 1);
 });
 
+test('encrypted uploads and downloaded plaintext survive a file writer that ignores typed-array bounds', async () => {
+    const { api, files, sandbox } = setup({ wholeBufferWrites: true });
+    const data = new Map();
+    const encryption = createEncryption({ get: async k => structuredClone(data.get(k)), put: async (k, v) => data.set(k, structuredClone(v)) });
+    sandbox.yap.encryption = encryption;
+    const initial = await encryption.initialize(scope);
+    await encryption.acceptDirectory(scope, initial.directory);
+    const recipientScope = `${tenant.replaceAll('-', '')}:${crypto.randomUUID().replaceAll('-', '')}`;
+    const recipient = await encryption.initialize(recipientScope);
+    await encryption.acceptDirectory(recipientScope, recipient.directory);
+    // An uneven size exercises OpenPGP's partial packet views and the decrypted context subarray.
+    const bytes = Uint8Array.from({ length: 1399531 }, (_, i) => i % 251);
+    files.set('upload', new Blob([bytes]));
+    let ciphertext;
+    sandbox.fetch = async (path, options) => {
+        if (path.endsWith('/session')) return { ok: true, json: async () => ({ uploadId: 'fixture', chunkSizeBytes: 8 * 1024 * 1024, totalParts: 1 }) };
+        if (path.includes('/parts/')) { ciphertext = options.body; return { ok: true }; }
+        if (path.endsWith('/complete')) return { ok: true, status: 200, json: async () => ({ id: crypto.randomUUID() }) };
+        return { ok: true, status: 200, body: ciphertext.stream() };
+    };
+    const uploaded = await api.uploadEncrypted('upload', context.threadId, 'fixture-token', scope, context, [initial.directory, recipient.directory]);
+    assert.equal(uploaded.status, 200);
+    await api.decryptFile(key, '/file', scope, true, context, initial.directory, uploaded.key);
+    assert.deepEqual(new Uint8Array(await files.get(key).arrayBuffer()), bytes);
+    assert.equal(await api.hasVerifiedFile(key, scope, context), true);
+    const recipientKey = `${recipientScope.replace(':', '-')}-${crypto.randomUUID().replaceAll('-', '')}.verified`;
+    await api.decryptFile(recipientKey, '/file', recipientScope, true, context, initial.directory, uploaded.key);
+    assert.deepEqual(new Uint8Array(await files.get(recipientKey).arrayBuffer()), bytes);
+    assert.equal([...files.keys()].some(k => /\.(encrypted|unverified)$/.test(k)), false);
+});
+
 test('signature failure and marker write failure never produce a usable verified cache', async () => {
     for (const failure of ['failSignature', 'failMarker']) {
         const { api, files, state } = setup(); state[failure] = true;
@@ -75,6 +111,17 @@ test('crashed partial final file without ready marker and resized final file are
     await api.decryptFile(key, '/file', scope, true, context, {});
     files.set(key, new Blob(['truncated']));
     assert.equal(await api.hasVerifiedFile(key, scope, context), false);
+});
+
+test('legacy verified caches are downloaded again after the Safari byte-range fix', async () => {
+    const { api, files, state } = setup();
+    await api.decryptFile(key, '/file', scope, true, context, {});
+    const marker = JSON.parse(await files.get(`${key}.ready`).text());
+    files.set(`${key}.ready`, new Blob([JSON.stringify({ ...marker, version: 1 })]));
+    assert.equal(await api.hasVerifiedFile(key, scope, context), false);
+    await api.decryptFile(key, '/file', scope, true, context, {});
+    assert.equal(state.fetches, 2);
+    assert.equal(await api.hasVerifiedFile(key, scope, context), true);
 });
 
 test('failed attachment logs identify the failing step without contents or keys', async () => {

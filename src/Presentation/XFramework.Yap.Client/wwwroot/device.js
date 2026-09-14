@@ -20,6 +20,14 @@
         catch (error) { await stream.abort().catch(() => {}); throw error; }
     };
     const read = async key => pending.get(key) ?? (await (await directory()).getFileHandle(key)).getFile();
+    // WebKit's file sink can write a view's entire backing ArrayBuffer. OpenPGP
+    // emits subarrays, so snapshot exactly the selected bytes before handing them
+    // to OPFS. Keep stream backpressure: only one chunk is copied at a time.
+    const pipeToFile = (source, sink) => source.pipeTo(new WritableStream({
+        write: chunk => sink.write(new Blob([chunk])),
+        close: () => sink.close(),
+        abort: reason => sink.abort(reason)
+    }));
     const canonical = value => JSON.stringify((function sorted(v) {
         if (Array.isArray(v)) return v.map(sorted);
         if (v && typeof v === 'object') return Object.fromEntries(Object.keys(v).sort().map(k => [k, sorted(v[k])]));
@@ -29,7 +37,9 @@
         if (!/^[0-9a-f]{32}:[0-9a-f]{32}$/i.test(scope) || !key.startsWith(`${scope.replace(':', '-')}-`)
             || context.tenantId.replaceAll('-', '').toLowerCase() !== scope.split(':')[0].toLowerCase()) throw new Error('Attachment account mismatch.');
         const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical(context))));
-        return { version: 1, scope, context: Array.from(digest, n => n.toString(16).padStart(2, '0')).join('') };
+        // Version 1 could mark a file verified before WebKit expanded a subarray
+        // during storage. Re-download those caches using the exact-byte writer.
+        return { version: 2, scope, context: Array.from(digest, n => n.toString(16).padStart(2, '0')).join('') };
     };
     const hasVerifiedFile = async (key, scope, context) => {
         const expected = await verificationContext(key, scope, context);
@@ -178,7 +188,7 @@
             try {
                 const encrypted = await yap.encryption.encryptAttachment(scope, context, source.stream(), recipients);
                 const ciphertext = encrypted.stream;
-                await ciphertext.pipeTo(sink);
+                await pipeToFile(ciphertext, sink);
                 const file = await handle.getFile();
                 if (file.size > maximumCiphertextBytes) return { status: 413, id: emptyGuid };
                 // Only the voice/attachment category is public, for conversation feature controls.
@@ -228,7 +238,7 @@
                 await yap.encryption.decryptStream(scope, context, response.body, senderDirectory, {
                     async write(chunk) {
                         phase = 'attachment-store';
-                        await sink.write(chunk);
+                        await sink.write(new Blob([chunk]));
                         phase = 'attachment-decrypt';
                     },
                     async commit() {
@@ -238,7 +248,7 @@
                         const final = await (await dir.getFileHandle(key, { create: true })).createWritable();
                         try {
                             const verified = await handle.getFile();
-                            await verified.stream().pipeTo(final);
+                            await pipeToFile(verified.stream(), final);
                             // The marker is written after the final writable closes. A crash
                             // during either copy leaves no valid marker and forces a retry.
                             await write(`${key}.ready`, new Blob([JSON.stringify({ ...expected, size: verified.size })]));

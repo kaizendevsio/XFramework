@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.8";
+    public const string Version = "1.3.9";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "14 September 2026", [
+            "Fixed a Safari issue that damaged encrypted photo and file uploads. New attachments open correctly for you and your recipients.",
+            "If an earlier attachment still says unavailable, please send it again after updating."]),
+        ("1.3.8", "14 September 2026", [
             "Lost your recovery key and all trusted devices? Start fresh from Privacy settings after confirming your password. Old encrypted messages cannot be recovered with your new keys.",
             "Switch reliably between signing in and creating an account."]),
         ("1.3.7", "14 September 2026", [

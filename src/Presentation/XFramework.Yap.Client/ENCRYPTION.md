@@ -139,6 +139,15 @@ authorized sender operation; as with encrypted edits, the relay cannot inspect
 or verify equality of the plaintext inside replacement ciphertext.
 
 `encryptAttachment(scope,context,source,directories)` returns `{stream,key}`.
+OPFS writes must snapshot each typed-array chunk as `new Blob([chunk])`, including
+the decrypted quarantine sink and final cache copy. WebKit's
+[file sink](https://github.com/WebKit/WebKit/blob/main/Source/WebCore/Modules/filesystem/FileSystemWritableFileStreamSink.cpp)
+can use the entire backing buffer of an ArrayBufferView. OpenPGP emits views
+smaller than their buffers; writing those directly inserts extra bytes and
+corrupts packet framing. Keep stream backpressure rather than buffering the full
+attachment. `encrypted-files.test.mjs` models that sink behavior and verifies a
+real encrypted upload/download round trip for sender and recipient.
+
 The AES-256 session key (`{algorithm:'aes256',data:<64 hex digits>}`) is stored
 **only inside the signed encrypted message attachment descriptor**, with the
 original file's sender device and directory revision. Never include this key in
