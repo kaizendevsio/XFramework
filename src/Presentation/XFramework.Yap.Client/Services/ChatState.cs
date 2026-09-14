@@ -93,10 +93,10 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
 
     public async Task InitializeAsync()
     {
-        await js.InvokeVoidAsync("yap.diagnostics.record", "startup.stage", new { stage = "saved-account" });
+        await js.InvokeVoidAsync("yap.diagnostics.record", "startup.stage", new { phase = "saved-account" });
         var saved = await store.SettingAsync("user");
         if (saved is not null) User = JsonSerializer.Deserialize<UserSession>(saved);
-        await js.InvokeVoidAsync("yap.diagnostics.record", "startup.stage", new { stage = "saved-conversations" });
+        await js.InvokeVoidAsync("yap.diagnostics.record", "startup.stage", new { phase = "saved-conversations" });
         if (User is not null) Conversations = await store.ConversationsAsync(Scope);
         Online = await js.InvokeAsync<bool>("yap.device.online");
         reference = DotNetObjectReference.Create(this);
@@ -111,7 +111,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
     {
         try
         {
-            await js.InvokeVoidAsync("yap.diagnostics.record", "startup.stage", new { stage = "background-sync" });
+            await js.InvokeVoidAsync("yap.diagnostics.record", "startup.stage", new { phase = "background-sync" });
             await SynchronizeAsync();
             await PollAsync();
         }
