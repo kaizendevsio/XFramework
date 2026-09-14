@@ -69,6 +69,7 @@ public interface ICommunicationsServiceWrapper : IServiceWrapper
     Task<CmdResponse> MuteThreadAsync(
         MuteThreadRequest request,
         CancellationToken ct = default);
+    Task<CmdResponse> SetThreadActiveStatusAsync(SetThreadActiveStatusRequest request, CancellationToken ct = default);
     Task<CmdResponse> ArchiveThreadAsync(
         ArchiveThreadRequest request,
         CancellationToken ct = default);
@@ -408,6 +409,8 @@ public sealed record CommunicationsServiceWrapper(
         ct.ThrowIfCancellationRequested();
         return SendVoidAsync(request, ct);
     }
+
+    public Task<CmdResponse> SetThreadActiveStatusAsync(SetThreadActiveStatusRequest request, CancellationToken ct = default) => SendVoidAsync(request, ct);
 
     public Task<CmdResponse> ArchiveThreadAsync(
         ArchiveThreadRequest request,

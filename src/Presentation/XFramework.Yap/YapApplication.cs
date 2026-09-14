@@ -75,6 +75,8 @@ public static class YapApplication
         builder.Services.AddCommunicationsWrapperServices();
         builder.Services.AddStorageWrapperServices();
         builder.Services.AddSingleton<YapSessions>();
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<YapPresence>();
         builder.Services.AddScoped<ICommunicationsChatActorProvider, YapActorProvider>();
         builder.Services.AddScoped<IChatDirectory, ChatDirectory>();
         builder.Services.AddScoped<ChatFiles>();

@@ -106,6 +106,9 @@ public sealed partial class VoiceState : IAsyncDisposable
 
     public async Task<AudioOutputs> GetAudioOutputsAsync() => active?.Media is { } media
         ? await media.GetAudioOutputsAsync() : new(false, "", []);
+    public async Task<string> GetPlaybackStateAsync() => active?.Media is { } media
+        ? await media.GetPlaybackStateAsync() : "closed";
+    public async Task<bool> ResumePlaybackAsync() => active?.Media is { } media && await media.ResumePlaybackAsync();
 
     public async Task<AudioOutputs> SetAudioOutputAsync(string deviceId) => active?.Media is { } media
         ? await media.SetAudioOutputAsync(deviceId) : new(false, "", []);

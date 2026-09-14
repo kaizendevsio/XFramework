@@ -12,7 +12,7 @@ else
 {
     <ScrollSurface><Header><div class="appbar liquid-glass"><GlassLayer /><a class="iconbtn" href="@(ParentId.HasValue ? $"/chat/{Id}" : "/")" aria-label="Go back"><Icon Name="back" /></a>
         @if (!ParentId.HasValue) { <Avatar Initials="@chat.Initials" ImageUrl="@chat.AvatarUrl" Color="@chat.Color" /> }
-        <button class="mid conversation-title" aria-label="Conversation settings" @onclick='() => mode = "details"'><h1 style="font-size:16px">@(ParentId.HasValue ? "Thread" : chat.Name)</h1><span class="muted" style="font-size:12px">@(ParentId.HasValue ? $"{chat.Name} · {Parent?.ReplyTotal ?? 0} replies" : chat.Group ? $"{chat.Members} members" : "Direct conversation")</span></button>
+        <button class="mid conversation-title" aria-label="Conversation settings" @onclick='() => mode = "details"'><h1 style="font-size:16px">@(ParentId.HasValue ? "Thread" : chat.Name)</h1><span class="muted" style="font-size:12px">@(ParentId.HasValue ? $"{chat.Name} · {Parent?.ReplyTotal ?? 0} replies" : State.ConversationSubtitle(chat))</span></button>
         <button class="iconbtn" aria-label="Search messages" @onclick='() => mode = "search"'><Icon Name="search" /></button>
         @if(Voice.Enabled){<button class="iconbtn" aria-label="Start voice call" disabled="@(!State.Online || State.NeedsLogin || Voice.IsCalling)" @onclick="CallAsync"><Icon Name="phone" /></button>}
     </div></Header>

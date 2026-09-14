@@ -81,6 +81,7 @@ public interface ICommunicationsChatSession
     Task<CmdResponse> UpdateThreadAsync(UpdateThreadRequest request, CancellationToken ct = default);
     Task<CmdResponse> LeaveThreadAsync(Guid threadId, CancellationToken ct = default);
     Task<CmdResponse> MuteThreadAsync(Guid threadId, bool isMuted, CancellationToken ct = default);
+    Task<CmdResponse> SetThreadActiveStatusAsync(Guid threadId, bool share, CancellationToken ct = default);
     Task<CmdResponse> ArchiveThreadAsync(Guid threadId, bool isArchived, CancellationToken ct = default);
     Task<CmdResponse> DeleteThreadAsync(Guid threadId, CancellationToken ct = default);
     Task<QueryResponse<GetDeletedThreadsResponse>> GetDeletedThreadsAsync(int pageIndex = 0, CancellationToken ct = default);
@@ -305,6 +306,9 @@ internal sealed class CommunicationsChatSession(
 
     public Task<CmdResponse> MuteThreadAsync(Guid threadId, bool isMuted, CancellationToken ct = default) =>
         InvokeAsync(callCt => wrapper.MuteThreadAsync(Prepare(new MuteThreadRequest { ThreadId = threadId, IsMuted = isMuted }), callCt), ct);
+
+    public Task<CmdResponse> SetThreadActiveStatusAsync(Guid threadId, bool share, CancellationToken ct = default) =>
+        InvokeAsync(callCt => wrapper.SetThreadActiveStatusAsync(Prepare(new SetThreadActiveStatusRequest { ThreadId = threadId, ShareActiveStatus = share }), callCt), ct);
 
     public Task<CmdResponse> ArchiveThreadAsync(Guid threadId, bool isArchived, CancellationToken ct = default) =>
         InvokeAsync(callCt => wrapper.ArchiveThreadAsync(Prepare(new ArchiveThreadRequest { ThreadId = threadId, IsArchived = isArchived }), callCt), ct);

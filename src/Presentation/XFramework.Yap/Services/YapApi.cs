@@ -32,6 +32,12 @@ public static class YapApi
         });
 
         var api = app.MapGroup("/api/chat").RequireAuthorization().AddEndpointFilter<YapApiFilter>();
+        api.MapPost("/presence", async (ICommunicationsChatClient client, YapPresence presence, CancellationToken ct) =>
+        {
+            var session = await client.ForCurrentActorAsync(ct: ct);
+            await presence.TouchAsync(session.TenantId, session.CredentialId, ct);
+            return Results.NoContent();
+        });
         api.MapYapProfile();
         api.MapYapEncryption();
         api.MapPost("/initialize", async (ICommunicationsChatClient client, CancellationToken ct) =>
@@ -70,7 +76,7 @@ public static class YapApi
                 } : null
             }).ToList(), data.TotalCount);
         });
-        api.MapGet("/conversations/{id:guid}", async (Guid id, ICommunicationsChatClient client, IChatDirectory directory, CancellationToken ct) =>
+        api.MapGet("/conversations/{id:guid}", async (Guid id, ICommunicationsChatClient client, IChatDirectory directory, YapPresence presence, CancellationToken ct) =>
         {
             var session = await client.ForCurrentActorAsync(ct: ct);
             var data = Require(await session.GetThreadAsync(id, ct));
@@ -80,9 +86,15 @@ public static class YapApi
                 return new Person(x.CredentialId, string.IsNullOrWhiteSpace(x.Alias) ? person?.Name ?? "Workspace member" : x.Alias,
                     person?.UserName ?? "", person?.AvatarUrl, x.Id, x.Role, x.Alias);
             }).ToList();
+            // Only an authorized conversation member can query this snapshot. Never reveal
+            // heartbeat data for members who have opted out in this conversation.
+            // Redis multiplexes these reads; a large group must not serialize cache round trips.
+            members = (await Task.WhenAll(members.Select(async (member, index) => data.Members[index].HideActiveStatus
+                ? member : member with { ActiveUntil = await presence.ActiveUntilAsync(session.TenantId, member.Id, ct) }))).ToList();
             return new Conversation { Id = id, Name = data.IsDirect && !data.HasCustomName ? members.FirstOrDefault(x => x.Id != session.CredentialId)?.Name ?? "Direct message" : data.Name,
                 Group = !data.IsDirect, AvatarUrl = data.IsDirect ? members.FirstOrDefault(x => x.Id != session.CredentialId)?.AvatarUrl : YapProfile.GroupPhoto(id, data.PhotoStorageFileId, session.TenantId, session.CredentialId),
-                Members = members.Count, People = members, Features = (int)data.Features, CanManage = data.CanManage };
+                Members = members.Count, People = members, Features = (int)data.Features, CanManage = data.CanManage,
+                ShareActiveStatus = !data.Members.First(x => x.CredentialId == session.CredentialId).HideActiveStatus };
         });
         api.MapGet("/conversations/{id:guid}/messages", async (Guid id, int? page, Guid? parent,
             ICommunicationsChatClient client, IChatDirectory directory, CancellationToken ct) =>
@@ -203,6 +215,7 @@ public static class YapApi
             switch (request.Action)
             {
                 case "mute": Require(await session.MuteThreadAsync(request.ThreadId, request.Value, ct)); break;
+                case "active-status": Require(await session.SetThreadActiveStatusAsync(request.ThreadId, request.Value, ct)); break;
                 case "delete-for-me": Require(await session.ArchiveThreadAsync(request.ThreadId, true, ct)); break;
                 case "delete-for-everyone": Require(await session.DeleteThreadAsync(request.ThreadId, ct)); break;
                 case "typing": await session.PublishTypingAsync(request.ThreadId, request.Value, ct); break;
