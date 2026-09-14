@@ -22,7 +22,7 @@
             }
             else { <audio src="@url" controls preload="metadata" aria-label="Voice message"></audio> }
         }
-        else if (IsImage(file) || IsVideo(file)) { <div class="photo-skeleton" role="status" aria-label="@(IsVideo(file) ? "Loading video" : "Loading photo")"><span class="spinner"></span></div> }
+        else if (IsImage(file) || IsVideo(file)) { @if (!failed) { <div class="photo-skeleton" role="status" aria-label="@(IsVideo(file) ? "Loading video" : "Loading photo")"><span class="spinner"></span></div> } }
         else { <button class="media-open" disabled="@(loading || WaitingForLinks)" @onclick="() => OpenAsync(file)"><Icon Name="@(file.ContentType.StartsWith("audio/") ? "mic" : "file")" Size="20" /><span>@file.Name</span><small>@(file.Size / 1024) KB</small></button> }
     }
     @if (loading && Message.Attachments.Count == 0) { <span class="spinner" role="status" aria-label="Loading attachment"></span> }
@@ -69,16 +69,18 @@
             if (request != version || disposed) return;
             foreach (var file in message.Attachments.Where(f => IsImage(f) || IsVideo(f) || message.LocalFileKey is not null && f.ContentType.StartsWith("audio/"))) await OpenAsync(message, file, request);
         }
-        catch { if (request == version) failed = true; }
+        catch (Exception ex) { if (request == version) failed = true; await LogFailureAsync("attachment-metadata", ex); }
         finally { if (request == version) loading = false; }
     }
     private Task OpenAsync(ChatAttachment file) => OpenAsync(Message, file, version);
     private async Task OpenAsync(ChatMessage message, ChatAttachment file, int request)
     {
+        var phase = "attachment-prepare";
         try
         {
             var encrypted = message.EncryptedEnvelope is not null && message.LocalFileKey is null;
             var key = encrypted ? await State.PrepareEncryptedFileAsync(message, file) : message.LocalFileKey ?? $"{State.Scope.Replace(':', '-')}-{file.Id:N}";
+            phase = "attachment-preview";
             var url = await JS.InvokeAsync<string?>("yap.device.mediaUrl", key,
                 $"api/chat/conversations/{message.ThreadId}/messages/{message.Id}/attachments/{file.Id}", State.Scope,
                 State.Online && !State.NeedsLogin, MediaType(file), message.LocalFileKey is not null || encrypted, file.Name);
@@ -86,12 +88,17 @@
             if (disposed || request != version) await JS.InvokeVoidAsync("yap.device.releaseMedia", url);
             else { if (urls.Remove(file.Id, out var old)) await JS.InvokeVoidAsync("yap.device.releaseMedia", old); urls[file.Id] = url; }
         }
-        catch { if (request == version) failed = true; }
+        catch (Exception ex) { if (request == version) failed = true; await LogFailureAsync(phase, ex); }
+    }
+    private async Task LogFailureAsync(string phase, Exception? error = null)
+    {
+        try { await JS.InvokeVoidAsync("yap.diagnostics.record", "attachment.failed", new { phase, type = error?.GetType().Name ?? "ImageDecodeError" }); }
+        catch { /* Diagnostics must not prevent retry or disposal. */ }
     }
     private async Task ImageFailedAsync(ChatAttachment file, string url)
     {
         if (urls.TryGetValue(file.Id, out var current) && current == url)
-        { urls.Remove(file.Id); failed = true; await JS.InvokeVoidAsync("yap.device.releaseMedia", url); }
+        { urls.Remove(file.Id); failed = true; await LogFailureAsync("image-decode"); await JS.InvokeVoidAsync("yap.device.releaseMedia", url); }
     }
     private async Task ReleaseAsync() { var previous = urls.Values.ToArray(); urls.Clear(); ready.Clear(); foreach (var url in previous) await JS.InvokeVoidAsync("yap.device.releaseMedia", url); }
     public async ValueTask DisposeAsync() { disposed = true; await ReleaseAsync(); }

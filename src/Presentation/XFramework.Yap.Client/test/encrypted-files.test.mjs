@@ -39,7 +39,7 @@ function setup() {
             if (state.failSignature) { await sink.abort(); throw new Error('Invalid signature'); }
             state.committed = true; return sink.commit();
         },
-        async encryptStream(_scope, _context, input) { return input; }
+        async encryptAttachment(_scope, _context, input) { return { stream: input, key: {} }; }
     } };
     const sandbox = { window: { yap }, yap, navigator: { storage: { getDirectory: async () => ({ getDirectoryHandle: async () => directory }) }, onLine: true },
         crypto: webcrypto, TextEncoder, Blob, URL, Set, Map, Uint8Array, SyntaxError, JSON, Promise, ReadableStream, WritableStream,
@@ -77,6 +77,21 @@ test('crashed partial final file without ready marker and resized final file are
     assert.equal(await api.hasVerifiedFile(key, scope, context), false);
 });
 
+test('failed attachment logs identify the failing step without contents or keys', async () => {
+    for (const [failure, phase] of [['failSignature', 'attachment-decrypt'], ['failMarker', 'attachment-commit'], ['fetch', 'attachment-fetch']]) {
+        const { api, state, sandbox } = setup(); const events = [];
+        sandbox.yap.diagnostics = { record: (event, details) => events.push({ event, ...details }) };
+        if (failure === 'fetch') sandbox.fetch = async () => ({ ok: false, status: 403 });
+        else state[failure] = true;
+        await assert.rejects(api.decryptFile(key, '/private-file', scope, true, context, {}));
+        assert.equal(events.length, 1); assert.equal(events[0].phase, phase);
+        assert.equal(events[0].event, 'attachment.failed');
+        assert.deepEqual(Object.keys(events[0]).sort(), ['event', 'phase', 'status', 'type']);
+        if (failure === 'fetch') assert.equal(events[0].status, 403);
+        assert.equal(JSON.stringify(events).includes(key), false);
+    }
+});
+
 test('verified cache binds account and exact signed message context', async () => {
     const { api, state } = setup(); await api.decryptFile(key, '/file', scope, true, context, {});
     assert.equal(await api.hasVerifiedFile(key, scope, { ...context, messageId: crypto.randomUUID() }), false);
@@ -89,6 +104,8 @@ test('verified cache binds account and exact signed message context', async () =
 test('startup removes abandoned quarantine/ciphertext but keeps verified caches', async () => {
     const { api, files } = setup(); files.set('crashed.unverified', new Blob(['secret'])); files.set('crashed.encrypted', new Blob(['cipher'])); files.set(key, new Blob(['saved']));
     await api.watch(null);
+    // Housekeeping runs in the background and must not delay opening chats.
+    await new Promise(resolve => setImmediate(resolve));
     assert.equal(files.has('crashed.unverified'), false); assert.equal(files.has('crashed.encrypted'), false); assert.equal(files.has(key), true);
 });
 

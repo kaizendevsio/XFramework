@@ -224,6 +224,29 @@ public sealed class YapCallGatewayTests
         Assert.That(Assert.ThrowsAsync<YapApiException>(() => f.Gateway.AcceptSocketAsync(Context(f.Bob, ticket.Url)))!.Status, Is.EqualTo(403));
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task TwoPersonCall_HangupEndsRoomForBothParticipants(bool callerLeaves)
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        var room = await f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId], deviceId: f.AliceDevice);
+        await f.Gateway.AcceptGroupAsync(f.Bob, room.Id, deviceId: f.BobDevice);
+        await f.Gateway.LeaveGroupAsync(callerLeaves ? f.Alice : f.Bob, room.Id);
+        Assert.Throws<YapApiException>(() => f.Gateway.GroupRoster(f.Alice, room.Id));
+        Assert.Throws<YapApiException>(() => f.Gateway.GroupRoster(f.Bob, room.Id));
+        // Neither person remains busy in an already-ended call.
+        await f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId], deviceId: f.AliceDevice);
+    }
+
+    [Test]
+    public async Task DecliningOnlyInvite_EndsRoomInsteadOfRingingForever()
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        var room = await f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId], deviceId: f.AliceDevice);
+        await f.Gateway.LeaveGroupAsync(f.Bob, room.Id);
+        Assert.Throws<YapApiException>(() => f.Gateway.GroupRoster(f.Alice, room.Id));
+    }
+
     [Test]
     public async Task GroupAccept_IsBoundToTheAcceptingSession()
     {

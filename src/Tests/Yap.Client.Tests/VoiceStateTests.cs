@@ -106,6 +106,28 @@ public sealed class VoiceStateTests
         Assert.That(fixture.Voice.IsCalling, Is.False);
     }
 
+    [Test]
+    public async Task EndedEventBeforeInvitation_DoesNotAllowLateIncomingReplay()
+    {
+        await using var fixture = new Fixture();
+        var incoming = fixture.GroupEvent(fixture.Invite());
+        await fixture.DeliverAsync(incoming with { Type = "group-ended" });
+        await fixture.DeliverAsync(incoming);
+        Assert.That(fixture.Voice.IsCalling, Is.False);
+    }
+
+    [Test]
+    public async Task RemoteHangup_ClosesIncomingUi_AndIgnoresStaleReplay()
+    {
+        await using var fixture = new Fixture();
+        var incoming = fixture.GroupEvent(fixture.Invite());
+        await fixture.DeliverAsync(incoming);
+        await fixture.DeliverAsync(incoming with { Type = "group-ended" });
+        await fixture.DeliverAsync(incoming);
+        Assert.That(fixture.Voice.IsCalling, Is.False);
+        Assert.That(fixture.Voice.Incoming, Is.False);
+    }
+
     private sealed class Fixture : IAsyncDisposable
     {
         private readonly ServiceProvider provider;

@@ -6,7 +6,7 @@ using Yap.Contracts;
 
 namespace Yap.Client.Services;
 
-public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : IAsyncDisposable
+public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : IAsyncDisposable
 {
     public ChatEncryption Encryption { get; } = new(api, js);
     public bool EncryptionEnabled { get; private set; }
@@ -151,6 +151,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
                     {
                         var list = await api.GetAsync<ChatPage<Conversation>>($"api/chat/conversations?page={page}", lifetime.Token);
                         ConversationTotal = list.TotalCount;
+                        await ResolvePreviewsAsync(list.Items);
                         await store.SaveConversationsAsync(Scope, list.Items);
                         if ((page + 1) * 30 >= list.TotalCount) break;
                     }
@@ -239,6 +240,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
             {
                 var list = await api.GetAsync<ChatPage<Conversation>>($"api/chat/conversations?page={page}");
                 ConversationTotal = list.TotalCount;
+                await ResolvePreviewsAsync(list.Items);
                 await store.SaveConversationsAsync(Scope, list.Items);
                 if ((page + 1) * 30 >= list.TotalCount) break;
             }
@@ -312,6 +314,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         var summary = Conversations.FirstOrDefault(x => x.Id == id);
         conversation.LastMessageAt = summary?.LastMessageAt;
         conversation.Preview = summary?.Preview ?? "Start a conversation";
+        conversation.LastMessage = summary?.LastMessage;
         conversation.Muted = summary?.Muted ?? false;
         var fetched = new List<ChatMessage>();
         var result = await api.GetAsync<ChatPage<ChatMessage>>($"api/chat/conversations/{id}/messages?page=0");

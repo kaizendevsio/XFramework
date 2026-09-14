@@ -1,6 +1,6 @@
 @inject IJSRuntime JS
 <div class="set-stack diagnostics">
-    <label class="setting-toggle"><span>Enable diagnostic logging</span><input type="checkbox" role="switch" checked="@enabled" @onchange="ToggleAsync" /></label>
+    <label class="setting-toggle"><span>Enable diagnostic logging</span><input type="checkbox" role="switch" checked="@enabled" @onchange="ToggleAsync" /><span class="switch-track" aria-hidden="true"></span></label>
     <p>Logs stay on this device and survive a reload. They include app errors, connection status and image sizes, without messages, passwords or photo contents.</p>
     <div class="row"><button class="btn ghost" @onclick="CopyAsync">Copy logs</button><button class="btn ghost" @onclick="ClearAsync">Clear logs</button></div>
     @if (notice is not null) { <p role="status">@notice</p> }

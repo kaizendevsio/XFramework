@@ -31,6 +31,7 @@ public sealed class Conversation
     public bool Removed { get; set; }
     public string Preview { get; set; } = "Start a conversation";
     public DateTime? LastMessageAt { get; set; }
+    public ChatMessage? LastMessage { get; set; }
     public List<Person> People { get; set; } = [];
     [JsonIgnore] public List<ChatMessage> Messages { get; set; } = [];
     public int MessageTotal { get; set; }

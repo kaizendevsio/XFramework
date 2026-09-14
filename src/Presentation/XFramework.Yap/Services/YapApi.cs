@@ -59,7 +59,15 @@ public static class YapApi
                 Group = !x.IsDirect, Members = x.MemberCount, Unread = x.UnreadCount,
                 AvatarUrl = x.IsDirect ? people.FirstOrDefault(p => p.Id == x.OtherCredentialId)?.AvatarUrl : YapProfile.GroupPhoto(x.Id, x.PhotoStorageFileId, session.TenantId, session.CredentialId),
                 Muted = x.IsMuted, Removed = x.IsArchived,
-                Preview = x.LastMessagePreview ?? "Start a conversation", LastMessageAt = x.LastMessageAt
+                Preview = x.LastMessagePreview ?? "Start a conversation", LastMessageAt = x.LastMessageAt,
+                LastMessage = x.EncryptedLastMessage is { } message ? new ChatMessage
+                {
+                    Id = message.Id, ThreadId = x.Id, SenderId = message.SenderCredentialId,
+                    CreatedAt = message.CreatedAt, ParentId = message.ParentMessageId, IsThreadReply = message.IsThreadReply,
+                    EncryptedEnvelope = message.EncryptedEnvelope, EncryptionPending = message.EncryptionPending,
+                    AcceptedSenderDirectoryRevision = message.AcceptedSenderDirectoryRevision,
+                    EncryptionSenderDeviceId = message.EncryptionSenderDeviceId
+                } : null
             }).ToList(), data.TotalCount);
         });
         api.MapGet("/conversations/{id:guid}", async (Guid id, ICommunicationsChatClient client, IChatDirectory directory, CancellationToken ct) =>

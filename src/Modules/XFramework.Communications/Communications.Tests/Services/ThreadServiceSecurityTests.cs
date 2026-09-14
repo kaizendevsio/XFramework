@@ -839,6 +839,44 @@ public sealed partial class ThreadServiceSecurityTests
         Assert.That(result.Data.Items.Single(x => x.Id == group.Id).OtherCredentialId, Is.Null);
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task GetThreadListAsync_ReturnsLatestVisibleCiphertextWithSenderContext(bool pending)
+    {
+        var tenant = Guid.NewGuid(); var actor = Guid.NewGuid();
+        var thread = Thread(Guid.NewGuid(), tenant);
+        var member = Member(Guid.NewGuid(), thread.Id, actor, tenant);
+        var sender = Member(Guid.NewGuid(), thread.Id, Guid.NewGuid(), tenant);
+        var message = Message(Guid.NewGuid(), thread.Id, sender.Id, tenant, "Encrypted message");
+        message.EncryptedEnvelope = "ciphertext-only";
+        message.EncryptionSenderDeviceId = Guid.NewGuid();
+        message.AcceptedSenderDirectoryRevision = 4;
+        message.ParentMessageId = Guid.NewGuid(); message.IsThreadReply = true;
+        message.PendingEncryptionMembersJson = pending ? $"[\"{member.Id}\"]" : "[]";
+        var hidden = Message(Guid.NewGuid(), thread.Id, sender.Id, tenant, "hidden");
+        hidden.CreatedAt = message.CreatedAt.AddMinutes(1); hidden.EncryptedEnvelope = "hidden-ciphertext";
+        var otherThread = Thread(Guid.NewGuid(), tenant);
+        var context = new InMemoryDataContext();
+        context.Seed(thread, otherThread, member, sender, message, hidden,
+            new MessageHidden { Id = Guid.NewGuid(), TenantId = tenant, IsEnabled = true,
+                MessageThreadMemberId = member.Id, MessageId = hidden.Id });
+        var result = await CreateService(context).GetThreadListAsync(new GetThreadListRequest { Metadata = Metadata(actor, tenant) });
+        Assert.That(result.IsSuccess, Is.True, result.Message);
+        Assert.That(result.Data!.Items, Has.Count.EqualTo(1), "Nonmember conversations must not appear.");
+        var preview = result.Data.Items.Single().EncryptedLastMessage!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(preview.Id, Is.EqualTo(message.Id));
+            Assert.That(preview.EncryptedEnvelope, Is.EqualTo(message.EncryptedEnvelope));
+            Assert.That(preview.SenderCredentialId, Is.EqualTo(sender.CredentialId));
+            Assert.That(preview.EncryptionSenderDeviceId, Is.EqualTo(message.EncryptionSenderDeviceId));
+            Assert.That(preview.AcceptedSenderDirectoryRevision, Is.EqualTo(4));
+            Assert.That(preview.ParentMessageId, Is.EqualTo(message.ParentMessageId));
+            Assert.That(preview.IsThreadReply, Is.True);
+            Assert.That(preview.EncryptionPending, Is.EqualTo(pending));
+        });
+    }
+
     [TestCase("member", 201)]
     [TestCase("nonmember", 403)]
     [TestCase("disabled", 403)]

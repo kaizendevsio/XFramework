@@ -102,6 +102,12 @@ public sealed partial class VoiceState
         {
             var self = group.Participants.SingleOrDefault(x => x.CredentialId == chat.User!.CredentialId);
             if (self is null) return;
+            if (item.Type == "group-ended" || self.Left)
+            {
+                RememberEnded(group.Id);
+                if (attempt?.Group?.Id == group.Id) await EndAttemptAsync(attempt, false);
+                return;
+            }
             if (attempt is null && item.Type == "group-incoming" && !self.Left && !self.Accepted &&
                 !endedInvites.Contains(group.Id) && group.ExpiresAt > DateTimeOffset.UtcNow)
             {

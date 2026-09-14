@@ -192,7 +192,7 @@ public sealed partial class YapCallGateway
             PublishGroupLocked(room, "group-roster");
             RemoveGroupTickets(room.Id, credential);
             cancel = [member];
-            if (!room.Members.Values.Any(x => x.Accepted && !x.Left))
+            if (!CanContinueGroup(room))
             {
                 groups.Remove(room.Id);
                 cancel = room.Members.Values.ToArray();
@@ -220,7 +220,7 @@ public sealed partial class YapCallGateway
             PublishGroupLocked(room, "group-roster");
             RemoveGroupTickets(call, credential);
             cancel = [removed];
-            if (!room.Members.Values.Any(x => x.Accepted && !x.Left))
+            if (!CanContinueGroup(room))
             {
                 groups.Remove(call);
                 cancel = room.Members.Values.ToArray();
@@ -236,7 +236,7 @@ public sealed partial class YapCallGateway
         GroupRoom[] expired;
         lock (gate)
         {
-            expired = groups.Values.Where(x => x.Expires <= DateTimeOffset.UtcNow || (!x.Started && x.InviteExpires <= DateTimeOffset.UtcNow)).ToArray();
+            expired = groups.Values.Where(x => x.Expires <= DateTimeOffset.UtcNow || (!x.Started && x.InviteExpires <= DateTimeOffset.UtcNow) || !CanContinueGroup(x)).ToArray();
             foreach (var room in expired)
             {
                 groups.Remove(room.Id);
@@ -256,6 +256,13 @@ public sealed partial class YapCallGateway
             }
         }
         foreach (var room in expired) foreach (var member in room.Members.Values) member.Lifetime.Cancel();
+    }
+
+    private static bool CanContinueGroup(GroupRoom room)
+    {
+        var accepted = room.Members.Values.Count(x => x.Accepted && !x.Left);
+        return accepted >= 2 || accepted == 1 && room.InviteExpires > DateTimeOffset.UtcNow &&
+            room.Members.Values.Any(x => !x.Accepted && !x.Left);
     }
 
     private void RequireGroupLifecycle()

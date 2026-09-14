@@ -18,4 +18,6 @@ public partial record ThreadListItemResponse
     public bool HasCustomName { get; set; }
     public Guid? OtherCredentialId { get; set; }
     public Guid? PhotoStorageFileId { get; set; }
+    // Opaque content and its verification context; only a recipient device can make a preview.
+    public ThreadMessageItemResponse? EncryptedLastMessage { get; set; }
 }

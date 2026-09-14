@@ -138,6 +138,23 @@ internal static partial class UiFixture
                         return ChatFixture.Ok(new GetThreadMessagesResponse { Items = items, TotalCount = messages.Count });
                     }
                 });
+            fixture.Session.Setup(x => x.GetThreadsAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((int page, int size, CancellationToken _) =>
+                {
+                    var actor = Actor();
+                    lock (gate)
+                    {
+                        var items = Clone(conversations.Skip(page * size).Take(size).ToList());
+                        foreach (var conversation in items)
+                        {
+                            var latest = messages.OrderByDescending(m => m.CreatedAt).FirstOrDefault();
+                            if (latest is null) continue;
+                            conversation.EncryptedLastMessage = Clone(latest);
+                            conversation.EncryptedLastMessage.EncryptionPending = pendingRecipients.GetValueOrDefault(latest.Id)?.Contains(actor) == true;
+                        }
+                        return ChatFixture.Ok(new GetThreadListResponse { Items = items, TotalCount = conversations.Count });
+                    }
+                });
             fixture.Session.Setup(x => x.SendMessageAsync(It.IsAny<CreateThreadMessageRequest>(), It.IsAny<CancellationToken>()))
                 .Returns(async (CreateThreadMessageRequest request, CancellationToken _) =>
                 {
