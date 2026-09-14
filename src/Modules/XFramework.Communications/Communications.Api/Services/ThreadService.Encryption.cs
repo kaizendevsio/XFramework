@@ -8,6 +8,11 @@ public sealed partial class ThreadService
 {
     private static List<Guid> EncryptionMemberIds(string json) => JsonSerializer.Deserialize<List<Guid>>(json) ?? [];
     private static bool EncryptionPendingFor(Message message, Guid memberId) => EncryptionMemberIds(message.PendingEncryptionMembersJson).Contains(memberId);
+    private static bool EncryptionReadyFor(Message message, Guid memberId)
+    {
+        var audience = EncryptionMemberIds(message.EncryptionAudienceJson);
+        return !EncryptionPendingFor(message, memberId) && (audience.Count == 0 || audience.Contains(memberId));
+    }
     private static void SetPendingEncryption(Message message, IEnumerable<MessageThreadMember> audience, ICollection<Guid> ready)
     {
         var pending = audience.Where(m => !ready.Contains(m.CredentialId)).Select(m => m.Id).ToList();

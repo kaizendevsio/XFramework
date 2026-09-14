@@ -1700,7 +1700,7 @@ public sealed partial class ThreadService(
                 .ToListAsync(ct);
 
             // Auto-create "Delivered" records for messages this member hasn't seen
-            var fetchedMessageIds = messages.Where(m => !EncryptionPendingFor(m, requesterMember.Id)).Select(m => m.Id).ToList();
+            var fetchedMessageIds = messages.Where(m => EncryptionReadyFor(m, requesterMember.Id)).Select(m => m.Id).ToList();
             var existingDeliveries = await dataContext.Query<MessageDelivery>()
                 .Where(d => d.MessageThreadMemberId == requesterMember.Id)
                 .Where(d => d.TenantId == caller.TenantId)
@@ -3056,7 +3056,7 @@ public sealed partial class ThreadService(
                     return Result<CmdResponse>.NotFound("One or more messages were not found in this thread");
             }
 
-            requestedMessageIds = threadMessages.Where(m => !EncryptionPendingFor(m, member.Id)).Select(m => m.Id).ToList();
+            requestedMessageIds = threadMessages.Where(m => EncryptionReadyFor(m, member.Id)).Select(m => m.Id).ToList();
 
             var existingDeliveries = await dataContext.Query<MessageDelivery>()
                 .Where(d => d.MessageThreadMemberId == member.Id)

@@ -97,6 +97,29 @@ public sealed partial class ThreadServiceSecurityTests
         Assert.That(read.IsSuccess, Is.True, read.Message);
         Assert.That(context.Set<MessageDelivery>().Any(x => x.MessageThreadMemberId == late.Id), Is.False);
     }
+    [Test]
+    public async Task DeferredEncryption_ReaddedMembershipDoesNotReceiveHistoricalKeysOrReceipts()
+    {
+        var (context, send, sender, _) = EncryptionScenario();
+        var late = Member(Guid.NewGuid(), send.ThreadId, Guid.NewGuid(), sender.TenantId);
+        context.Seed(late);
+        var service = CreateService(context); send.Metadata = Metadata(sender.CredentialId, sender.TenantId);
+        Assert.That((await service.CreateThreadMessageAsync(send)).IsSuccess, Is.True);
+        late.IsDeleted = true;
+        var rejoined = Member(Guid.NewGuid(), send.ThreadId, late.CredentialId, late.TenantId);
+        context.Seed(rejoined, new EncryptionAccount { TenantId = late.TenantId, CredentialId = late.CredentialId, DirectoryRevision = 1, DevicesJson = Devices(Guid.NewGuid()) });
+        var pending = (await service.GetDeferredEncryptionAsync(new() { Metadata = send.Metadata })).Data!.Items.Single();
+        Assert.That(pending.PendingCredentialIds, Is.Empty);
+        Assert.That(pending.Message.EncryptionAudienceCredentialIds, Does.Not.Contain(late.CredentialId));
+        Assert.That((await service.CompleteDeferredEncryptionAsync(new() { Metadata = send.Metadata, ThreadId = send.ThreadId,
+            MessageId = pending.Message.Id, ExpectedEnvelopeHash = pending.EnvelopeHash, EncryptedEnvelope = Envelope('d'),
+            EncryptionSenderDeviceId = send.EncryptionSenderDeviceId!.Value, SenderDirectoryRevision = 1,
+            RecipientDirectoryRevisions = send.RecipientDirectoryRevisions })).IsSuccess, Is.True);
+        Assert.That(context.Set<Message>().Single().PendingEncryptionCount, Is.Zero);
+        Assert.That((await service.GetThreadMessagesAsync(new() { ThreadId = send.ThreadId, Metadata = Metadata(late.CredentialId, late.TenantId) })).IsSuccess, Is.True);
+        Assert.That(context.Set<MessageDelivery>().Any(d => d.MessageThreadMemberId == rejoined.Id), Is.False);
+    }
+
     [Test, Category("Kind:Integration")]
     public async Task DeferredEncryption_ConcurrentCatchupAcrossConnections_OnlyOneEnvelopeWins()
     {
