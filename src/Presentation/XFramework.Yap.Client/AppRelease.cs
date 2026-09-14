@@ -2,10 +2,12 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.0";
+    public const string Version = "1.3.1";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "14 September 2026", [
+            "App updates now finish downloading reliably and show the update notification."]),
+        ("1.3.0", "14 September 2026", [
             "Protect new messages and attachments with encryption. Approve a new device or use your recovery key to bring your history with you.",
             "Compare identity fingerprints and remove devices you no longer use in Privacy settings.",
             "Talk together in group voice calls while continuing to chat.",
