@@ -100,13 +100,15 @@
         enabled ? Conversation.Features | (int)feature : Conversation.Features & ~(int)feature)));
     private Task SaveNicknameAsync(Person person) => RunAsync(() => State.UpdateConversationAsync(new(Conversation.Id, NicknameMemberId: person.MemberId, Nickname: nickname)));
     private Task MemberAsync(Person person, string action, string? role = null) => RunAsync(() => State.ChangeMemberAsync(new(Conversation.Id, person.Id, person.MemberId, action, role)));
-    private async Task RunAsync(Func<Task> action) { busy = true; try { await action(); editing = removing = null; } catch (Exception ex) { State.Report(ex); } finally { busy = false; } }
+    private async Task RunAsync(Func<Task> action) { busy = true; editing = removing = null; try { await action(); } catch (Exception ex) { State.Report(ex); } finally { busy = false; } }
     private async Task SearchAsync() { var query = search; try { var people = await State.SearchPeopleAsync(query); if (query == search) results = people; } catch (Exception ex) { State.Report(ex); } }
     private async Task DeleteAsync()
     {
         busy = true; deleteError = null;
-        try { await State.DeleteConversationAsync(Conversation.Id, deleteEveryone); Nav.NavigateTo("/"); }
-        catch (Exception ex) { deleteError = ex is InvalidOperationException or ChatApiException ? ex.Message : "Could not remove this conversation. Try again."; }
+        var id = Conversation.Id;
+        Nav.NavigateTo("/");
+        try { await State.DeleteConversationAsync(id, deleteEveryone); }
+        catch (Exception ex) { State.Report(ex); }
         finally { busy = false; }
     }
 }

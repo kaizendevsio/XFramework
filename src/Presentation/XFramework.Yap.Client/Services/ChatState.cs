@@ -36,6 +36,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     private readonly HashSet<Guid> acknowledged = [];
     private Guid? viewedConversation;
     private long selectionVersion;
+    public bool OpeningConversation { get; private set; }
     private DateTime lastTyping;
     private Guid? publishingThread;
     public string? TypingText
@@ -258,6 +259,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
                 if ((page + 1) * 30 >= list.TotalCount) break;
             }
             Conversations = await store.ConversationsAsync(Scope);
+            ApplyOptimisticConversations();
             if (Selected is not null) await RefreshSelectedAsync(Selected.Id);
             await WatchEventsAsync();
         }
@@ -278,6 +280,13 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         viewedConversation = id;
         var version = ++selectionVersion;
         var scope = Scope;
+        pages = 1; historyOffset = 0; replyParent = null; cachedCount = 0;
+        foreach (var old in Conversations) old.Messages.Clear();
+        typing.Clear(); acknowledged.Clear();
+        var conversation = Conversations.FirstOrDefault(x => x.Id == id) ?? new Conversation { Id = id };
+        Selected = conversation;
+        OpeningConversation = true;
+        Notify();
         try
         {
             // Local storage has its own gate. Never wait for a slow network sync
@@ -285,14 +294,14 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             var messages = await store.MessagesAsync(scope, id, limit: HistoryWindowSize);
             var count = await store.MessageCountAsync(scope, id);
             if (version != selectionVersion || Scope != scope) return;
-            pages = 1; historyOffset = 0; replyParent = null;
-            foreach (var old in Conversations) old.Messages.Clear();
-            typing.Clear();
-            acknowledged.Clear();
-            var conversation = Conversations.FirstOrDefault(x => x.Id == id) ?? new Conversation { Id = id };
-            conversation.Messages = messages;
+            // A send can finish saving while this older cache read is in flight.
+            var queued = conversation.Messages.Where(x => x.Delivery == "Queued" && messages.All(m => m.Id != x.Id)).ToList();
+            conversation.Messages = messages.Concat(queued).OrderBy(x => x.CreatedAt).TakeLast(HistoryWindowSize).ToList();
+            MergeStaging(conversation);
             Selected = conversation; cachedCount = count;
+            if (messages.Count > 0) OpeningConversation = false;
             ComposeReplies(conversation.Messages);
+            ApplyOptimisticMessages(conversation);
             Notify();
             await sync.WaitAsync(lifetime.Token);
             try
@@ -305,7 +314,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex) { Report(ex); }
-        finally { Notify(); }
+        finally { if (version == selectionVersion) OpeningConversation = false; Notify(); }
     }
 
     private async Task HandleApiFailureAsync(ChatApiException error)
@@ -331,6 +340,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     private async Task RefreshSelectedAsync(Guid id)
     {
         var version = selectionVersion;
+        var mutationVersion = messageMutationVersion;
         Conversation conversation;
         try { conversation = await api.GetAsync<Conversation>($"api/chat/conversations/{id}"); }
         catch (ChatApiException ex) when (ex.Status is 403 or 404) { Report(ex); return; }
@@ -351,10 +361,13 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         ComposeReplies(conversation.Messages);
         await RestoreReplyWindowAsync(conversation);
         await store.SaveConversationsAsync(Scope, [conversation]);
-        if (version != selectionVersion || viewedConversation != id) return;
+        if (version != selectionVersion || viewedConversation != id || mutationVersion != messageMutationVersion) return;
+        MergeStaging(conversation);
+        ApplyOptimisticMessages(conversation);
         Selected = conversation;
         var index = Conversations.FindIndex(x => x.Id == id);
         if (index >= 0) Conversations[index] = conversation;
+        ApplyOptimisticConversations();
         Notify();
     }
 
@@ -362,6 +375,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     {
         if (viewedConversation != id) return;
         viewedConversation = null;
+        OpeningConversation = false;
         selectionVersion++;
         Selected?.Messages.Clear();
         foreach (var conversation in Conversations) conversation.Messages.Clear();
@@ -409,6 +423,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             historyOffset = Math.Min(historyOffset + 50, Math.Max(0, cachedCount - HistoryWindowSize));
             conversation.Messages = await store.MessagesAsync(Scope, conversation.Id, limit: HistoryWindowSize, skip: historyOffset);
             ComposeReplies(conversation.Messages);
+            ApplyOptimisticMessages(conversation);
         }
         catch (Exception ex) { Report(ex); }
         finally { sync.Release(); Notify(); }
@@ -422,6 +437,8 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             historyOffset = Math.Max(0, historyOffset - 50);
             conversation.Messages = await store.MessagesAsync(Scope, conversation.Id, limit: HistoryWindowSize, skip: historyOffset);
             ComposeReplies(conversation.Messages);
+            MergeStaging(conversation);
+            ApplyOptimisticMessages(conversation);
         }
         catch (Exception ex) { Report(ex); }
         finally { sync.Release(); Notify(); }
@@ -468,7 +485,9 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     public async Task MuteAsync()
     {
         if (Selected is not { } conversation || !Online || NeedsLogin) return;
-        try { await api.PostAsync("api/chat/thread-actions", new ThreadAction(conversation.Id, "mute", !conversation.Muted)); await SynchronizeAsync(); }
+        var muted = conversation.Muted;
+        try { await ChangeConversationAsync(conversation.Id, "mute", x => x.Muted = !muted, x => x.Muted = muted,
+            async () => { await api.PostAsync("api/chat/thread-actions", new ThreadAction(conversation.Id, "mute", !muted)); await SynchronizeAsync(); }); }
         catch (Exception ex) { Report(ex); }
     }
 
@@ -495,6 +514,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             if (newer) replyOffset = Math.Max(0, replyOffset - 50);
             else if (!first) replyOffset = Math.Min(replyOffset + 50, Math.Max(0, replyCached - HistoryWindowSize));
             parent.Replies = await store.MessagesAsync(Scope, parent.ThreadId, limit: HistoryWindowSize, skip: replyOffset, parent: parent.Id);
+            if (Selected is not null) ApplyOptimisticMessages(Selected);
         }
         catch (Exception ex) { Report(ex); }
         finally { sync.Release(); Notify(); }
@@ -554,41 +574,61 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     public async Task DeleteConversationAsync(Guid thread, bool everyone = false)
     {
         if (!Online || NeedsLogin) throw new InvalidOperationException("Connect and sign in before removing a conversation.");
-        await sync.WaitAsync(lifetime.Token);
-        try
+        if (stagingMessages.Values.Any(x => x.Scope == Scope && x.Message.ThreadId == thread))
+            throw new InvalidOperationException("Wait for this conversation's messages to finish saving before removing it.");
+        await ChangeConversationAsync(thread, "delete", x => x.Removed = true, x => x.Removed = false, async () =>
         {
-            if ((await store.PendingAsync(Scope)).Any(x => x.ThreadId == thread))
-                throw new InvalidOperationException("Wait for this conversation's messages to finish sending before removing it.");
-            await api.PostAsync("api/chat/thread-actions", new ThreadAction(thread, everyone ? "delete-for-everyone" : "delete-for-me", true));
-            await store.RemoveConversationAsync(Scope, thread, lifetime.Token);
-            Conversations.RemoveAll(x => x.Id == thread);
-            if (Selected?.Id == thread) { Selected = null; typing.Clear(); await WatchEventsAsync(); }
-        }
-        finally { sync.Release(); Notify(); }
+            await sync.WaitAsync(lifetime.Token);
+            try
+            {
+                if ((await store.PendingAsync(Scope)).Any(x => x.ThreadId == thread))
+                    throw new InvalidOperationException("Wait for this conversation's messages to finish sending before removing it.");
+                await api.PostAsync("api/chat/thread-actions", new ThreadAction(thread, everyone ? "delete-for-everyone" : "delete-for-me", true));
+                await store.RemoveConversationAsync(Scope, thread, lifetime.Token);
+                Conversations.RemoveAll(x => x.Id == thread);
+                if (Selected?.Id == thread) { Selected = null; typing.Clear(); await WatchEventsAsync(); }
+            }
+            finally { sync.Release(); Notify(); }
+            });
     }
 
     public async Task SendAsync(Guid thread, string text, Guid? parent, string draftKey, PickedFile? file = null, bool threadReply = false)
     {
-        await localChanges.WaitAsync(lifetime.Token);
+        if (User is null) throw new InvalidOperationException("Sign in before sending a message.");
+        if (Encryption.Status.ResetHistoryPending) throw new InvalidOperationException("Wait for encryption setup to finish before sending.");
+        if (EncryptionEnabled && !Encryption.Status.Approved) throw new InvalidOperationException("Unlock this device in Settings before sending encrypted messages.");
+        var id = Guid.NewGuid();
+        var content = string.IsNullOrWhiteSpace(text) ? file?.Name ?? "" : text.Trim();
+        if (content.Length is 0 or > 4000) throw new InvalidOperationException("Write a message up to 4,000 characters.");
+        var message = new ChatMessage { Id = id, ThreadId = thread, SenderId = User.CredentialId,
+            Text = content, CreatedAt = DateTime.UtcNow, Mine = true, ParentId = parent, Delivery = "Queued", IsLatestOwnMessage = true,
+            LocalFileKey = file?.Key, HasAttachments = file is not null, IsThreadReply = threadReply,
+            Attachments = file is null ? [] : [new ChatAttachment(id, file.Name, file.ContentType, file.Size)] };
+        var scope = Scope;
+        stagingMessages[id] = (scope, message);
+        messageMutationVersion++;
+        if (Selected?.Id == thread && historyOffset == 0) { MergeStaging(Selected); ComposeReplies(Selected.Messages); }
+        PendingCount++; Notify();
+        var entered = false;
         try
         {
-            if (User is null) throw new InvalidOperationException("Sign in before sending a message.");
-            if (Encryption.Status.ResetHistoryPending) throw new InvalidOperationException("Wait for encryption setup to finish before sending.");
-            if (EncryptionEnabled && !Encryption.Status.Approved) throw new InvalidOperationException("Unlock this device in Settings before sending encrypted messages.");
-            var id = Guid.NewGuid();
-            var content = string.IsNullOrWhiteSpace(text) ? file?.Name ?? "" : text.Trim();
-            if (content.Length is 0 or > 4000) throw new InvalidOperationException("Write a message up to 4,000 characters.");
-            var message = new ChatMessage { Id = id, ThreadId = thread, SenderId = User.CredentialId,
-                Text = content, CreatedAt = DateTime.UtcNow, Mine = true, ParentId = parent, Delivery = "Queued", IsLatestOwnMessage = true,
-                LocalFileKey = file?.Key, HasAttachments = file is not null, IsThreadReply = threadReply,
-                Attachments = file is null ? [] : [new ChatAttachment(id, file.Name, file.ContentType, file.Size)] };
-            await store.QueueAsync(new QueuedMessage { Scope = Scope, Id = id, ThreadId = thread, Text = content,
+            await localChanges.WaitAsync(lifetime.Token); entered = true;
+            if (Scope != scope) throw new InvalidOperationException("The signed-in account changed before this message could be saved.");
+            await store.QueueAsync(new QueuedMessage { Scope = scope, Id = id, ThreadId = thread, Text = content,
                 ParentId = parent, CreatedTicks = message.CreatedAt.Ticks, FileKey = file?.Key, FileName = file?.Name,
                 ContentType = file?.ContentType, FileSize = file?.Size ?? 0, UploadId = file?.UploadId }, message, draftKey, expectedDraft: text);
-            if (Selected?.Id == thread && historyOffset == 0) { Selected.Messages.Add(message); if (Selected.Messages.Count > HistoryWindowSize) Selected.Messages.RemoveAt(0); ComposeReplies(Selected.Messages); }
-            PendingCount++; Notify();
         }
-        finally { localChanges.Release(); }
+        catch
+        {
+            if (Scope == scope)
+            {
+                Selected?.Messages.RemoveAll(x => x.Id == id);
+                if (Selected is not null) ComposeReplies(Selected.Messages);
+                PendingCount = Math.Max(0, PendingCount - 1);
+            }
+            throw;
+        }
+        finally { stagingMessages.Remove(id); messageMutationVersion++; if (entered) localChanges.Release(); Notify(); }
         sendRequested = true;
         if (sending is not { IsCompleted: false }) sending = SynchronizeSendsAsync();
     }
@@ -842,11 +882,13 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     {
         if (!Online || NeedsLogin) { Error = "Connect and sign in to change a message."; Notify(); return; }
         if (!activeActions.Add(message.Id)) return;
+        Action? rollback = null;
         try
         {
             var reaction = Defaults?.Reactions.FirstOrDefault(x => x.Emoji == emoji);
             var mine = emoji is null ? (Guid?)null : message.MyReactionIds.GetValueOrDefault(emoji);
             if (action == "react" && mine.HasValue && mine.Value != Guid.Empty) action = "unreact";
+            rollback = BeginOptimisticMessage(message, action, text, emoji);
             if (action == "edit" && (EncryptionEnabled || message.EncryptedEnvelope is not null))
             {
                 var directories = await Encryption.RecipientsAsync(User!, message.ThreadId, message.EncryptionAudienceCredentialIds.Count > 0, message.EncryptionAudienceCredentialIds);
@@ -859,11 +901,13 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
                     RecipientDirectoryRevisions: directories.ToDictionary(x => x.GetProperty("credentialId").GetGuid(), x => x.GetProperty("revision").GetInt64())));
             }
             else await api.PostAsync("api/chat/message-actions", new MessageAction(message.ThreadId, message.Id, action, text, reaction?.Id, mine));
+            optimisticMessages.Remove(message.Id); messageMutationVersion++;
             await SynchronizeAsync();
         }
-        catch (ChatApiException ex) when (ex.Status == 409 && action is "react" or "unreact" or "pin" or "unpin" or "save" or "unsave") { await SynchronizeAsync(); }
-        catch (Exception ex) { Report(ex); }
-        finally { activeActions.Remove(message.Id); }
+        catch (ChatApiException ex) when (ex.Status == 409 && action is "react" or "unreact" or "pin" or "unpin" or "save" or "unsave")
+        { optimisticMessages.Remove(message.Id); messageMutationVersion++; await SynchronizeAsync(); }
+        catch (Exception ex) { optimisticMessages.Remove(message.Id); messageMutationVersion++; rollback?.Invoke(); Report(ex); }
+        finally { optimisticMessages.Remove(message.Id); activeActions.Remove(message.Id); Notify(); }
     }
 
     public async Task<List<Person>> SearchPeopleAsync(string text) => !Online || text.Trim().Length < 2 ? []
@@ -874,18 +918,24 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         await SynchronizeAsync(); return result!.Id;
     }
 
-    public async Task ToggleFavoriteAsync(Conversation conversation)
+    public Task ToggleFavoriteAsync(Conversation conversation)
     {
         var favorite = !conversation.IsFavorite;
-        await store.SetFavoriteAsync(Scope, conversation.Id, favorite);
-        conversation.IsFavorite = favorite;
-        Changed?.Invoke();
+        return ChangeConversationAsync(conversation.Id, "favorite", x => x.IsFavorite = favorite, x => x.IsFavorite = !favorite,
+            () => store.SetFavoriteAsync(Scope, conversation.Id, favorite));
     }
 
     public Task<Conversation> ConversationDetailsAsync(Guid id) => api.GetAsync<Conversation>($"api/chat/conversations/{id}");
 
     public async Task UpdateConversationAsync(ConversationUpdate update)
-    { await api.PostAsync("api/chat/conversation-settings", update); await SynchronizeAsync(); }
+    {
+        var current = Selected?.Id == update.ThreadId ? Selected : Conversations.FirstOrDefault(x => x.Id == update.ThreadId);
+        var name = current?.Name; var features = current?.Features;
+        await ChangeConversationAsync(update.ThreadId, "settings",
+            x => { if (update.Name is not null) x.Name = update.Name; if (update.Features is { } value) x.Features = value; },
+            x => { if (update.Name is not null && name is not null) x.Name = name; if (update.Features.HasValue && features.HasValue) x.Features = features.Value; },
+            async () => { await api.PostAsync("api/chat/conversation-settings", update); await SynchronizeAsync(); });
+    }
     public async Task ChangeMemberAsync(ConversationMemberAction action)
     { await api.PostAsync("api/chat/conversation-members", action); await SynchronizeAsync(); }
 

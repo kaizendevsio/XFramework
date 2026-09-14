@@ -7,9 +7,9 @@
 @inject VoiceState Voice
 <PageTitle>@(ParentId.HasValue ? "Thread" : State.Selected?.Name ?? "Conversation") · Yap</PageTitle>
 @if (State.User is null) { <div class="body"><p>Sign in to open this conversation.</p><a class="btn" href="/login">Sign in</a></div> }
-else if (State.Selected is not { } chat || chat.Id != Id) { <div class="empty">Opening conversation…</div> }
 else
 {
+    var chat = State.Selected?.Id == Id ? State.Selected : State.Conversations.FirstOrDefault(x => x.Id == Id) ?? new Conversation { Id = Id };
     <ScrollSurface><Header><div class="appbar liquid-glass"><GlassLayer /><a class="iconbtn" href="@(ParentId.HasValue ? $"/chat/{Id}" : "/")" aria-label="Go back"><Icon Name="back" /></a>
         @if (!ParentId.HasValue) { <Avatar Initials="@chat.Initials" ImageUrl="@chat.AvatarUrl" Color="@chat.Color" /> }
         <button class="mid conversation-title" aria-label="Conversation settings" @onclick='() => mode = "details"'><h1 style="font-size:16px">@(ParentId.HasValue ? "Thread" : chat.Name)</h1><span class="muted" style="font-size:12px">@(ParentId.HasValue ? $"{chat.Name} · {Parent?.ReplyTotal ?? 0} replies" : State.ConversationSubtitle(chat))</span></button>
@@ -26,15 +26,16 @@ else
                 <ChildContent Context="message"><MessageBubble Message="message" Latest="MessageReceipts.IsLatest(message, parent.Replies)" ShowTime="@(!State.HasNewerReplies && parent.Replies.LastOrDefault()?.Id == message.Id)" Readers="MessageReceipts.Readers(message, parent.Replies)" ShowSender="true" OnSelect="Select" OnReply="ReplyTo" OnThread="OpenThreadAsync" OnReact='emoji => State.ActionAsync(message, "react", emoji: emoji)' /></ChildContent>
             </MessageWindow>
         }
+        else if (State.OpeningConversation) { <MessageSkeleton /> }
         else { <p class="empty">This message is not saved on this device.</p> }
     }
     else
     {
-        <MessageWindow @key="Id" Items="chat.Messages" Visible="() => State.ReadVisibleAsync(Id)" HasMore="State.HasEarlierMessages" Earlier="State.LoadEarlierAsync" HasNewer="State.HasNewerMessages" Newer="State.LoadNewerAsync">
+        <MessageWindow @key="Id" Items="chat.Messages" Opening="State.OpeningConversation" Visible="() => State.ReadVisibleAsync(Id)" HasMore="State.HasEarlierMessages" Earlier="State.LoadEarlierAsync" HasNewer="State.HasNewerMessages" Newer="State.LoadNewerAsync">
             <ChildContent Context="message"><MessageBubble Message="message" Latest="MessageReceipts.IsLatest(message, chat.Messages)" ShowTime="@(!State.HasNewerMessages && chat.Messages.LastOrDefault()?.Id == message.Id)" Readers="MessageReceipts.Readers(message, chat.Messages)" ShowSender="chat.Group" OnSelect="Select" OnReply="ReplyTo" OnThread="OpenThreadAsync" OnReact='emoji => State.ActionAsync(message, "react", emoji: emoji)' /></ChildContent>
         </MessageWindow>
     }
-    </ChildContent><Footer><Composer @key="@(ParentId ?? Id)" ThreadId="Id" ParentId="ParentId" Reply="reply" Cancel="() => reply = null" /></Footer></ScrollSurface>
+    </ChildContent><Footer><Composer @key="@(ParentId ?? Id)" ThreadId="Id" ParentId="ParentId" Reply="reply" Cancel="() => reply = null" RestoreReply="message => reply ??= message" /></Footer></ScrollSurface>
 }
 @if (mode == "message" && selected is not null)
 {
@@ -113,13 +114,13 @@ else if (mode == "search")
     private void Select(ChatMessage message) { selected = message; moreActions = false; mode = "message"; }
     private void ReplyTo(ChatMessage message) { if (State.Selected?.Allows(ChatFeature.Replies) == false) return; reply = message; mode = null; }
     private Task OpenThreadAsync(ChatMessage message) { if (State.Selected?.Allows(ChatFeature.Threads) != false) { mode = null; Nav.NavigateTo($"/thread/{Id}/{message.Id}"); } return Task.CompletedTask; }
-    private async Task CopyAsync() { try { await JS.InvokeVoidAsync("yap.copy", selected!.Text); mode = null; } catch (Exception ex) { State.Report(ex); } }
-    private async Task FilesAsync() { await State.OpenAttachmentsAsync(selected!); mode = "files"; }
-    private async Task ReactAsync(string emoji) { await State.ActionAsync(selected!, "react", emoji: emoji); mode = null; }
-    private async Task ActionAsync(string action, string? text = null) { await State.ActionAsync(selected!, action, text); mode = null; }
-    private async Task ForwardAsync(Guid target) { try { await State.SendAsync(target, selected!.Text, null, $"forward:{Guid.NewGuid()}"); mode = null; Nav.NavigateTo($"/chat/{target}"); } catch (Exception ex) { State.Report(ex); } }
+    private async Task CopyAsync() { mode = null; try { await JS.InvokeVoidAsync("yap.copy", selected!.Text); } catch (Exception ex) { State.Report(ex); } }
+    private async Task FilesAsync() { mode = "files"; try { await State.OpenAttachmentsAsync(selected!); } catch (Exception ex) { State.Report(ex); } }
+    private Task ReactAsync(string emoji) { mode = null; return State.ActionAsync(selected!, "react", emoji: emoji); }
+    private Task ActionAsync(string action, string? text = null) { mode = null; return State.ActionAsync(selected!, action, text); }
+    private async Task ForwardAsync(Guid target) { var text = selected!.Text; mode = null; Nav.NavigateTo($"/chat/{target}"); try { await State.SendAsync(target, text, null, $"forward:{Guid.NewGuid()}"); } catch (Exception ex) { State.Report(ex); } }
     private async Task SearchAsync() { var text = query; searching = text.Trim().Length >= 2; try { await Task.Delay(200); if(text != query) return; var result = await State.SearchAsync(text, Id); if (text == query) hits = result; } catch (Exception ex) { State.Report(ex); } finally { if(text == query) searching = false; } }
-    private async Task ShowHitAsync(Guid id) { await State.LocateAsync(id); mode = null; focus = id; }
+    private async Task ShowHitAsync(Guid id) { mode = null; await State.LocateAsync(id); focus = id; }
     private async Task CallAsync()
     {
         if (State.Selected is not { } conversation) return;

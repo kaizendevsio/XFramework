@@ -126,7 +126,7 @@ public sealed class ChatStateTests
         await using var state = new ChatState(fixture.Store, new ChatApi(http), js.Object);
         await state.InitializeAsync(); await started.Task;
         var displayed = new TaskCompletionSource();
-        state.Changed += () => { if (state.Selected?.Id == chat.Id) displayed.TrySetResult(); };
+        state.Changed += () => { if (state.Selected?.Id == chat.Id && state.Selected.Messages.Count > 0) displayed.TrySetResult(); };
         var selection = state.SelectAsync(chat.Id);
         try
         {

@@ -46,8 +46,10 @@
     [Parameter] public ChatMessage? Reply { get; set; }
     [Parameter] public EventCallback Cancel { get; set; }
     [Parameter] public EventCallback Sent { get; set; }
+    [Parameter] public EventCallback<ChatMessage> RestoreReply { get; set; }
     private string Key => $"{ThreadId:N}:{ParentId?.ToString("N") ?? "main"}";
     private string draft = "", loaded = "";
+    private long draftRevision;
     private bool busy, recording, attaching, uploading;
     private int progress;
     private ElementReference editor;
@@ -58,9 +60,18 @@
     protected override void OnInitialized() => State.Changed += Changed;
     private void Changed() => _ = InvokeAsync(StateHasChanged);
     protected override async Task OnParametersSetAsync()
-    { if (loaded != Key) { loaded = Key; draft = await State.DraftAsync(Key); await RemoveFileAsync(); } }
+    {
+        if (loaded == Key) return;
+        var key = loaded = Key;
+        var revision = ++draftRevision;
+        draft = "";
+        await RemoveFileAsync();
+        var saved = await State.DraftAsync(key);
+        if (loaded == key && draftRevision == revision) draft = saved;
+    }
     private async Task SaveDraftAsync()
     {
+        draftRevision++;
         _ = State.PublishTypingAsync(ThreadId, !string.IsNullOrWhiteSpace(draft));
         try { await State.SaveDraftAsync(Key, draft); } catch (Exception ex) { State.Report(ex); }
     }
@@ -168,23 +179,39 @@
         if (busy || recording || !CanSend) return;
         var text = draft;
         var attachment = file;
-        busy = true;
+        var repliedTo = Reply;
+        var key = Key;
+        var account = State.Scope;
+        draftRevision++;
+        // Keep attachment ownership exclusive until it is durable, but let text
+        // sends continue while previous messages are being saved.
+        busy = attachment is not null;
         draft = ""; file = null;
         try
         {
             _ = StopTypingAsync();
-            await State.SendAsync(ThreadId, text, ParentId ?? Reply?.Id, Key, attachment, ParentId.HasValue);
-            // The outbox owns the attachment from here, so this must not abort it.
+            var saving = State.SendAsync(ThreadId, text, ParentId ?? Reply?.Id, key, attachment, ParentId.HasValue);
             await Cancel.InvokeAsync(); await Sent.InvokeAsync();
+            await saving;
         }
         catch (Exception ex)
         {
-            draft = string.IsNullOrEmpty(draft) ? text : text + "\n" + draft;
-            file = attachment;
             State.Report(ex);
-            await SaveDraftAsync();
+            if (State.Scope != account) return;
+            if (Key == key)
+            {
+                draft = string.IsNullOrEmpty(draft) ? text : text + "\n" + draft;
+                if (attachment is not null) file = attachment;
+                if (repliedTo is not null) await RestoreReply.InvokeAsync(repliedTo);
+                await SaveDraftAsync();
+            }
+            else
+            {
+                var previous = await State.DraftAsync(key);
+                await State.SaveDraftAsync(key, string.IsNullOrEmpty(previous) ? text : text + "\n" + previous);
+            }
         }
-        finally { busy = false; }
+        finally { if (attachment is not null) busy = false; }
     }
 
     private string Describe(ChatState.PickedFile picked) => uploading

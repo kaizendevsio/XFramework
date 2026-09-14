@@ -1,0 +1,18 @@
+@implements IDisposable
+@if (visible)
+{
+    <div class="message-skeletons" role="status" aria-label="Loading messages">
+        @for (var index = 0; index < 6; index++)
+        { <div class="message-skeleton @(index % 3 == 2 ? "mine" : "")" aria-hidden="true"><span></span><span></span></div> }
+    </div>
+}
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private bool visible;
+    protected override async Task OnInitializedAsync()
+    {
+        try { await Task.Delay(TimeSpan.FromSeconds(2), lifetime.Token); visible = true; }
+        catch (OperationCanceledException) { }
+    }
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.14";
+    public const string Version = "1.3.15";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "15 September 2026", [
+            "Conversations open immediately with the header and composer. Message placeholders appear only when loading takes more than two seconds.",
+            "Sending, reactions, edits and conversation preferences update immediately while saving continues. Failed changes are restored without losing your draft."]),
+        ("1.3.14", "15 September 2026", [
             "Call audio recovers when Android pauses playback, with a tap-to-resume option when the browser needs your permission.",
             "See who is active in conversation headers. Choose whether to share your own status under Conversation settings → General.",
             "The app now uses ahead-of-time compilation and Brotli-compressed runtime downloads."]),
