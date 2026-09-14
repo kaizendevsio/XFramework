@@ -1,0 +1,29 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+<div class="video-preview">
+    <video @ref="video" src="@Url" controls playsinline preload="none" aria-label="@Name"
+           @onerror="() => OnError.InvokeAsync()" @oncontextmenu="() => OnActions.InvokeAsync()" @oncontextmenu:preventDefault></video>
+</div>
+@code {
+    [Parameter, EditorRequired] public string Url { get; set; } = "";
+    [Parameter] public string Name { get; set; } = "Video";
+    [Parameter] public EventCallback OnError { get; set; }
+    [Parameter] public EventCallback OnActions { get; set; }
+    private ElementReference video;
+    private IJSObjectReference? module;
+    private string? loaded;
+    private bool disposed;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./video-previews.js");
+        if (disposed) { await module.DisposeAsync(); return; }
+        if (loaded != Url) { loaded = Url; await module.InvokeVoidAsync("mount", video); }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        disposed = true;
+        if (module is null) return;
+        await module.InvokeVoidAsync("release", video);
+        await module.DisposeAsync();
+    }
+}

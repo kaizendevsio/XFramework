@@ -24,6 +24,51 @@ namespace Storage.IntegrationTests;
 public sealed class ChatStorageUploadTests : StorageIntegrationTestBase
 {
     [Test]
+    public async Task OwnAvatar_IdentityCallerWithoutStorageCapabilities_UploadsOnlyForActor()
+    {
+        var owner = Guid.NewGuid();
+        await SeedRegularActorAsync(owner);
+        await using var db = CreateDbContext();
+        var result = await Service(db, owner, caller: XFrameworkServiceNames.IdentityServer).UploadOwnAvatarFileAsync(new()
+        {
+            Metadata = CreateMetadata(), Bytes = [0xff, 0xd8, 0xff, 0xe0, 0, 16, 74, 70, 73, 70, 0, 1, 0xff, 0xd9]
+        });
+        result.IsSuccess.Should().BeTrue(result.Message);
+        result.Data!.Identifier.Should().Be(owner);
+        result.Data.TenantId.Should().Be(StorageIntegrationTestFixture.TestTenantId);
+        result.Data.Visibility.Should().Be(StorageFileVisibility.Public);
+        result.Data.Status.Should().Be(StorageFileStatus.Available);
+        result.Data.StorageFileIdentifierName.Should().Be("IdentityCredentialAvatar");
+    }
+
+    [Test]
+    public async Task OwnAvatar_OtherServiceCaller_CannotUseAvatarPrivilege()
+    {
+        using var actor = ActorScope(StorageIntegrationTestFixture.TestCredentialId);
+        var result = await ServiceWrapper.UploadOwnAvatarFile(new UploadOwnAvatarFileRequest
+        {
+            Metadata = CreateMetadata(), Bytes = [0xff, 0xd8, 0xff, 0xe0, 0, 16, 74, 70, 73, 70, 0, 1]
+        });
+        result.IsSuccess.Should().BeFalse();
+        result.HttpStatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Test]
+    public async Task OwnAvatar_RejectsNonImageAndCrossTenantUploads()
+    {
+        await using var db = CreateDbContext();
+        var service = Service(db, Guid.NewGuid(), caller: XFrameworkServiceNames.IdentityServer);
+        var result = await service.UploadOwnAvatarFileAsync(new() { Metadata = CreateMetadata(), Bytes = new byte[16] });
+        result.StatusCode.Should().Be(400);
+        var metadata = CreateMetadata(); metadata.RequestedTenantId = Guid.NewGuid();
+        result = await service.UploadOwnAvatarFileAsync(new()
+        {
+            Metadata = metadata, Bytes = [0xff, 0xd8, 0xff, 0xe0, 0, 16, 74, 70, 73, 70, 0, 1]
+        });
+        result.StatusCode.Should().Be(403);
+    }
+
+    [Test]
     public async Task CompleteChatUpload_Multipart_WakesVerifierWithoutWaitingForPoll()
     {
         var owner = Guid.NewGuid();
@@ -304,7 +349,7 @@ public sealed class ChatStorageUploadTests : StorageIntegrationTestBase
             IdentityAuthorizationConstants.Manage)).Data.Should().BeFalse();
     }
 
-    private static StorageService Service(XFramework.Domain.Contexts.AppDbContext db, Guid owner, Guid? tenant = null, StorageMaintenanceSignal? signal = null) =>
+    private static StorageService Service(XFramework.Domain.Contexts.AppDbContext db, Guid owner, Guid? tenant = null, StorageMaintenanceSignal? signal = null, string caller = XFrameworkServiceNames.Communications) =>
         new(db, new IntegrationStorageProviderFactory(StorageIntegrationTestFixture.Provider),
             Options.Create(new StorageOptions
             {
@@ -314,9 +359,9 @@ public sealed class ChatStorageUploadTests : StorageIntegrationTestBase
             }),
             new ContextAccessor(new TrustedInvocationContext(
                 new TrustedActorIdentity(owner, Guid.NewGuid(), tenant ?? StorageIntegrationTestFixture.TestTenantId,
-                    Guid.NewGuid(), new HashSet<string>(), new HashSet<string> { StorageAuthorizationCapabilities.Create, StorageAuthorizationCapabilities.View },
+                    Guid.NewGuid(), new HashSet<string>(), caller == XFrameworkServiceNames.IdentityServer ? [] : new HashSet<string> { StorageAuthorizationCapabilities.Create, StorageAuthorizationCapabilities.View },
                     "test", DateTimeOffset.UtcNow.AddMinutes(5)),
-                new TrustedServiceIdentity(XFrameworkServiceNames.Communications, XFrameworkServiceNames.Storage,
+                new TrustedServiceIdentity(caller, XFrameworkServiceNames.Storage,
                     new HashSet<string> { XFrameworkServiceScopes.StorageRead, XFrameworkServiceScopes.StorageWrite }, "test"),
                 tenant ?? StorageIntegrationTestFixture.TestTenantId, null, Guid.NewGuid())),
             NullLogger<StorageService>.Instance, signal ?? new StorageMaintenanceSignal());

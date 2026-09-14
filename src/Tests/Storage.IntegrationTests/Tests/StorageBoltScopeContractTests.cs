@@ -43,7 +43,7 @@ public sealed class StorageBoltScopeContractTests
             .Where(item => item.Attribute is not null)
             .ToList();
 
-        handlers.Should().HaveCount(21);
+        handlers.Should().HaveCount(22);
         foreach (var handler in handlers)
         {
             var expectedScope = ReadHandlers.Contains(handler.Type.Name)
@@ -54,6 +54,16 @@ public sealed class StorageBoltScopeContractTests
                 : [expectedScope];
             handler.Attribute!.RequiredServiceScopes.Should().Equal(expectedScopes);
         }
+    }
+
+    [Test]
+    public void OwnAvatar_RequiresIdentityCallerButNoStorageManagementCapability()
+    {
+        var attribute = typeof(Storage.Api.Features.Avatars.UploadOwn.UploadOwnAvatarFileEndpoint)
+            .GetMethod("Handle")!.GetCustomAttribute<BoltHandlerAttribute>()!;
+        attribute.AllowedServiceCallers.Should().Equal(XFrameworkServiceNames.IdentityServer);
+        attribute.RequiredActorCapabilities.Should().BeEmpty();
+        attribute.ActorRequirement.Should().Be(XFramework.Integration.Security.ActorRequirement.Required);
     }
 
     [Test]

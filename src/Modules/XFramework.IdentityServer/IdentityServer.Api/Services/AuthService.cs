@@ -1196,29 +1196,43 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
                 return Result<CredentialAvatarResponse>.NotFound("Credential not found");
             }
 
-            var contentType = CredentialAvatarPolicy.NormalizeContentType(request.ContentType)!;
-            var metadata = await _storageServiceWrapper.EnsureStorageUploadMetadata(
-                new EnsureStorageUploadMetadataRequest
-                {
-                    Metadata = request.Metadata,
-                    ContentType = contentType,
-                    IdentifierGroupName = CredentialAvatarPolicy.StorageIdentifierGroupName,
-                    IdentifierName = CredentialAvatarPolicy.StorageFileIdentifierName,
-                    IdentifierDescription = "Identity credential avatar image"
-                }, ct);
-            if (!metadata.IsSuccess || metadata.Response is null)
+            Result<StorageFileResponse> uploadResult;
+            if (allowSelf)
             {
-                return Result<CredentialAvatarResponse>.Failure(
-                    metadata.Message ?? "Avatar storage metadata could not be prepared",
-                    ToStatusCode(metadata.HttpStatusCode));
+                var upload = await _storageServiceWrapper.UploadOwnAvatarFile(new UploadOwnAvatarFileRequest
+                {
+                    Metadata = request.Metadata, Bytes = request.FileBytes!
+                }, ct);
+                uploadResult = upload.IsSuccess && upload.Response is not null
+                    ? Result<StorageFileResponse>.Success(upload.Response)
+                    : Result<StorageFileResponse>.Failure(upload.Message, ToStatusCode(upload.HttpStatusCode));
             }
+            else
+            {
+                var contentType = CredentialAvatarPolicy.NormalizeContentType(request.ContentType)!;
+                var metadata = await _storageServiceWrapper.EnsureStorageUploadMetadata(
+                    new EnsureStorageUploadMetadataRequest
+                    {
+                        Metadata = request.Metadata,
+                        ContentType = contentType,
+                        IdentifierGroupName = CredentialAvatarPolicy.StorageIdentifierGroupName,
+                        IdentifierName = CredentialAvatarPolicy.StorageFileIdentifierName,
+                        IdentifierDescription = "Identity credential avatar image"
+                    }, ct);
+                if (!metadata.IsSuccess || metadata.Response is null)
+                {
+                    return Result<CredentialAvatarResponse>.Failure(
+                        metadata.Message ?? "Avatar storage metadata could not be prepared",
+                        ToStatusCode(metadata.HttpStatusCode));
+                }
 
-            var uploadResult = await UploadCredentialAvatarToStorageAsync(
-                request,
-                credential,
-                metadata.Response,
-                contentType,
-                ct);
+                uploadResult = await UploadCredentialAvatarToStorageAsync(
+                    request,
+                    credential,
+                    metadata.Response,
+                    contentType,
+                    ct);
+            }
 
             if (!uploadResult.IsSuccess || uploadResult.Data is null)
             {
