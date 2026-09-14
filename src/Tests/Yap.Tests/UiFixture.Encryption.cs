@@ -4,6 +4,7 @@ using System.Text.Json;
 using Bolt.Server;
 using Communications.Domain.Shared.Contracts.Realtime;
 using Communications.Domain.Shared.Contracts.Requests.Threads;
+using Communications.Domain.Shared.Contracts.Requests.Edit;
 using Communications.Domain.Shared.Contracts.Responses;
 using IdentityServer.Domain.Shared.Contracts.Requests;
 using IdentityServer.Domain.Shared.Contracts.Responses;
@@ -40,6 +41,8 @@ internal static partial class UiFixture
         private readonly IIdentityServerServiceWrapper identity;
         private readonly Dictionary<string, Guid> tokens;
         private IActorAccessTokenProvider? actorTokens;
+        private readonly int linkDelayMs = int.TryParse(Environment.GetEnvironmentVariable("YAP_FIXTURE_LINK_DELAY_MS"), out var delay)
+            ? Math.Clamp(delay, 0, 5000) : 0;
 
         public EncryptionFixture(ChatFixture fixture, Mock<IIdentityServerServiceWrapper> identity,
             Mock<IChatDirectory> directory, List<ThreadMemberResponse> members,
@@ -157,10 +160,45 @@ internal static partial class UiFixture
                     await PublishAsync(actor);
                     return ChatFixture.Ok(new CreateThreadMessageResponse { MessageId = id });
                 });
-            fixture.Session.Setup(x => x.AttachFileAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-                .Returns(async (Guid thread, Guid message, Guid storageId, CancellationToken _) =>
+            fixture.Session.Setup(x => x.EditMessageAsync(It.IsAny<EditThreadMessageRequest>(), It.IsAny<CancellationToken>()))
+                .Returns(async (EditThreadMessageRequest request, CancellationToken _) =>
                 {
                     var actor = Actor();
+                    lock (gate)
+                    {
+                        var message = messages.SingleOrDefault(x => x.Id == request.MessageId);
+                        if (message is null || request.ThreadId != fixture.Thread) return new CmdResponse { HttpStatusCode = HttpStatusCode.NotFound };
+                        if (message.SenderCredentialId != actor) return new CmdResponse { HttpStatusCode = HttpStatusCode.Forbidden };
+                        if (request.EncryptedEnvelope is null || request.Text != "Encrypted message")
+                            return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest };
+                        if (!directories.TryGetValue(actor, out var sender) || sender.Revision != request.SenderDirectoryRevision
+                            || !sender.Devices.Any(x => x.DeviceId == request.EncryptionSenderDeviceId && x.Revocation is null)
+                            || !accounts.SetEquals(request.RecipientDirectoryRevisions.Keys)
+                            || accounts.Any(x => !directories.TryGetValue(x, out var recipient) || recipient.Revision != request.RecipientDirectoryRevisions[x]))
+                            return new CmdResponse { HttpStatusCode = HttpStatusCode.PreconditionFailed };
+                        message.Text = request.Text;
+                        message.EncryptedEnvelope = request.EncryptedEnvelope;
+                        message.EncryptionSenderDeviceId = request.EncryptionSenderDeviceId;
+                        message.AcceptedSenderDirectoryRevision = sender.Revision;
+                        if (acceptedRequests.TryGetValue(request.MessageId, out var accepted))
+                        {
+                            accepted.EncryptedEnvelope = request.EncryptedEnvelope;
+                            accepted.EncryptionSenderDeviceId = request.EncryptionSenderDeviceId;
+                            accepted.SenderDirectoryRevision = sender.Revision;
+                        }
+                    }
+                    await PublishAsync(actor);
+                    return Success();
+                });
+            fixture.Session.Setup(x => x.EditMessageAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Encrypted messages cannot be replaced with plaintext." });
+            fixture.Session.Setup(x => x.AttachFileAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .Returns(async (Guid thread, Guid message, Guid storageId, CancellationToken ct) =>
+                {
+                    var actor = Actor();
+                    // Optional deterministic browser reproduction: the encrypted message arrives
+                    // first; only the later link event may make its signed storage ID downloadable.
+                    if (linkDelayMs > 0) await Task.Delay(linkDelayMs, ct);
                     lock (gate)
                     {
                         if (messages.Single(x => x.Id == message).SenderCredentialId != actor) return new CmdResponse { HttpStatusCode = HttpStatusCode.Forbidden };

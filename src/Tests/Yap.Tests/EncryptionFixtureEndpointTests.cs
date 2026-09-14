@@ -73,6 +73,7 @@ public sealed class EncryptionFixtureEndpointTests
             Assert.That(page.Items.Single().SenderId, Is.EqualTo(a.User.CredentialId));
             Assert.That(page.Items.Single().EncryptionSenderDeviceId, Is.EqualTo(devices[a.User.CredentialId]));
             Assert.That(page.Items.Single().AcceptedSenderDirectoryRevision, Is.EqualTo(1));
+            Assert.That(page.Items.Single().AttachmentLinksReady, Is.False, "An encrypted envelope does not imply its later attachment link exists yet.");
         }
         // Idempotent replay preserves the stored envelope, but a changed recipient snapshot is rejected.
         await PostAsync<MessageReceipt>(a.Http, "api/chat/messages", message);
@@ -101,6 +102,28 @@ public sealed class EncryptionFixtureEndpointTests
         downloaded.EnsureSuccessStatusCode();
         await using var bytes = await downloaded.Content.ReadAsStreamAsync();
         Assert.That(await SHA256.HashDataAsync(bytes), Is.EqualTo(expectedHash.GetHashAndReset()));
+        var linked = (await c.Http.GetFromJsonAsync<ChatPage<ChatMessage>>($"api/chat/conversations/{thread}/messages"))!.Items.Single();
+        Assert.That(linked.AttachmentLinksReady, Is.True, "The later link notification can now release the recipient's skeleton.");
+
+        var ownDirectory = (await a.Http.GetFromJsonAsync<EncryptionDirectoryResponse>("api/chat/encryption/directory"))!;
+        var newDevice = Guid.NewGuid();
+        ownDirectory.Devices.Add(new() { DeviceId = newDevice, SigningPublicKey = "new sign", EncryptionPublicKey = "new encrypt", Approval = "approved" });
+        await PostAsync<EncryptionDirectoryResponse>(a.Http, "api/chat/encryption/directory", new PutEncryptionDirectoryRequest
+        { ExpectedRevision = 1, RootPublicKey = ownDirectory.RootPublicKey, Roster = "updated signed roster", Devices = ownDirectory.Devices });
+        var edit = new MessageAction(thread, messageId, "edit", "Encrypted message", EncryptedEnvelope: "edited opaque signed envelope",
+            EncryptionSenderDeviceId: newDevice, SenderDirectoryRevision: 2,
+            RecipientDirectoryRevisions: ids.ToDictionary(x => x, x => x == a.User.CredentialId ? 2L : 1L));
+        Assert.That((await a.Http.PostAsJsonAsync("api/chat/message-actions", edit with { SenderDirectoryRevision = 1 })).StatusCode, Is.EqualTo(HttpStatusCode.PreconditionFailed));
+        (await a.Http.PostAsJsonAsync("api/chat/message-actions", edit)).EnsureSuccessStatusCode();
+        Assert.That((await b.Http.PostAsJsonAsync("api/chat/message-actions", edit)).StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
+        Assert.That((await a.Http.PostAsJsonAsync("api/chat/message-actions", edit with { EncryptedEnvelope = null, Text = "plaintext replacement" })).StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        var edited = (await b.Http.GetFromJsonAsync<ChatPage<ChatMessage>>($"api/chat/conversations/{thread}/messages"))!.Items.Single();
+        Assert.That(edited.EncryptedEnvelope, Is.EqualTo(edit.EncryptedEnvelope));
+        Assert.That(edited.Text, Is.EqualTo("Encrypted message"));
+        Assert.That(edited.EncryptionSenderDeviceId, Is.EqualTo(newDevice));
+        Assert.That(edited.AcceptedSenderDirectoryRevision, Is.EqualTo(2));
+        Assert.That((await a.Http.PostAsJsonAsync("api/chat/messages", message)).StatusCode, Is.EqualTo(HttpStatusCode.Conflict),
+            "Replaying pre-edit ciphertext cannot overwrite the message's accepted edit.");
         bEvents.Dispose(); cEvents.Dispose(); timeout.Cancel();
         await app.StopAsync();
     }
