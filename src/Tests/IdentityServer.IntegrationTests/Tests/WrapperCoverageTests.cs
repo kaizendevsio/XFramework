@@ -30,6 +30,70 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
     public void ResetWorkflowFailureInjection() => IdentityServerWorkflowFailureInjection.Reset();
 
     [Test]
+    public async Task UploadOwnAvatar_ThroughActorWrapper_RejectsEmptyImage()
+    {
+        var auth = await AuthenticateThroughWrapper();
+        using var actor = IntegrationTestFixture.UseActorAccessToken(auth.Response!.AccessToken!);
+        var result = await IntegrationTestFixture.ServiceWrapper.UploadOwnAvatar(new UploadOwnAvatarRequest
+        { FileName = "avatar.jpg", ContentType = "image/jpeg", FileBytes = [], Metadata = CreateMetadata() });
+        result.HttpStatusCode.Should().Be(HttpStatusCode.BadRequest, result.Message);
+        result.IsSuccess.Should().BeFalse();
+    }
+
+    [Test]
+    public async Task EncryptionDirectoryAndRecovery_ThroughActorWrapper_RoundTripAndRejectStaleWrites()
+    {
+        var auth = await AuthenticateThroughWrapper();
+        var credential = auth.Response!.Credential!.Id;
+        using var actor = IntegrationTestFixture.UseActorAccessToken(auth.Response.AccessToken!);
+        var missing = await IntegrationTestFixture.ServiceWrapper.GetEncryptionDirectory(new GetEncryptionDirectoryRequest
+        { CredentialId = credential, Metadata = CreateMetadata() });
+        missing.HttpStatusCode.Should().Be(HttpStatusCode.NotFound, missing.Message);
+
+        // Persistence accepts opaque armor. Browser protocol tests verify real OpenPGP signatures.
+        static string Armor(string type, string payload) => $"-----BEGIN PGP {type}-----\n{payload}\n-----END PGP {type}-----";
+        var deviceId = Guid.NewGuid();
+        var write = new PutEncryptionDirectoryRequest
+        {
+            ExpectedRevision = 0, RootPublicKey = Armor("PUBLIC KEY BLOCK", "root"), Roster = Armor("MESSAGE", "signed-roster"),
+            Devices = [new() { DeviceId = deviceId, SigningPublicKey = Armor("PUBLIC KEY BLOCK", "signing"),
+                EncryptionPublicKey = Armor("PUBLIC KEY BLOCK", "encryption"), Approval = Armor("MESSAGE", "signed-approval") }],
+            Metadata = CreateMetadata()
+        };
+        var saved = await IntegrationTestFixture.ServiceWrapper.PutEncryptionDirectory(write);
+        saved.HttpStatusCode.Should().Be(HttpStatusCode.OK, saved.Message);
+        saved.Response!.CredentialId.Should().Be(credential);
+        saved.Response.TenantId.Should().Be(IntegrationTestFixture.TestTenantId);
+        saved.Response.Revision.Should().Be(1);
+        var directory = await IntegrationTestFixture.ServiceWrapper.GetEncryptionDirectory(new GetEncryptionDirectoryRequest
+        { CredentialId = credential, Metadata = CreateMetadata() });
+        directory.HttpStatusCode.Should().Be(HttpStatusCode.OK, directory.Message);
+        directory.Response!.Devices.Single().DeviceId.Should().Be(deviceId);
+        directory.Response.Roster.Should().Be(write.Roster);
+        (await IntegrationTestFixture.ServiceWrapper.PutEncryptionDirectory(write)).HttpStatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        var recoveryWrite = new PutEncryptionRecoveryRequest { ExpectedRevision = 0, Archive = Armor("MESSAGE", "opaque-encrypted-archive"), Metadata = CreateMetadata() };
+        var recoverySaved = await IntegrationTestFixture.ServiceWrapper.PutEncryptionRecovery(recoveryWrite);
+        recoverySaved.HttpStatusCode.Should().Be(HttpStatusCode.OK, recoverySaved.Message);
+        recoverySaved.Response!.Revision.Should().Be(1);
+        var recovery = await IntegrationTestFixture.ServiceWrapper.GetEncryptionRecovery(new GetEncryptionRecoveryRequest { Metadata = CreateMetadata() });
+        recovery.HttpStatusCode.Should().Be(HttpStatusCode.OK, recovery.Message);
+        recovery.Response!.Archive.Should().Be(recoveryWrite.Archive);
+        (await IntegrationTestFixture.ServiceWrapper.PutEncryptionRecovery(recoveryWrite)).HttpStatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Test]
+    public async Task EncryptionDirectoryAndRecovery_ServiceIdentityWithoutActor_IsDenied()
+    {
+        using var noActor = IntegrationTestFixture.SuppressActorAccessToken();
+        (await IntegrationTestFixture.ServiceWrapper.GetEncryptionDirectory(new GetEncryptionDirectoryRequest
+        { CredentialId = IntegrationTestFixture.TestCredentialId, Metadata = CreateMetadata() })).HttpStatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await IntegrationTestFixture.ServiceWrapper.PutEncryptionDirectory(new PutEncryptionDirectoryRequest { Metadata = CreateMetadata() })).HttpStatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await IntegrationTestFixture.ServiceWrapper.GetEncryptionRecovery(new GetEncryptionRecoveryRequest { Metadata = CreateMetadata() })).HttpStatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await IntegrationTestFixture.ServiceWrapper.PutEncryptionRecovery(new PutEncryptionRecoveryRequest { Metadata = CreateMetadata() })).HttpStatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Test]
     public async Task ServiceSigningKeys_ThroughAuthorizedWrapper_SupportQueryRotationAndRetirement()
     {
         using var actorSuppression = IntegrationTestFixture.SuppressActorAccessToken();

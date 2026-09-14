@@ -360,6 +360,7 @@ public class IntegrationTestFixture
         builder.Services.AddHostedService<StorageCleanupOutboxDispatcher>();
         builder.Services.AddHostedService<StorageClaimOutboxDispatcher>();
         builder.Services.AddScoped<AuthService>();
+        builder.Services.AddScoped<EncryptionDirectoryService>();
         builder.Services.AddScoped<IdentityServer.Api.Features.Auth.Register.RegistrationService>();
         builder.Services.AddScoped<IAuthService>(serviceProvider => serviceProvider.GetRequiredService<AuthService>());
         builder.Services.AddScoped<IPasswordResetProcessor>(serviceProvider =>
@@ -428,7 +429,7 @@ public class IntegrationTestFixture
         var clientUrl = registration ? GetAvailableLoopbackUrl() : TestClientUrl;
         string[] scopes = registration
             ? [XFrameworkServiceScopes.BoltService, XFrameworkServiceScopes.IdentityRegister, XFrameworkServiceScopes.TenantTarget]
-            : [XFrameworkServiceScopes.BoltService, XFrameworkServiceScopes.IdentityAdmin, XFrameworkServiceScopes.DataContextQuery,
+            : [XFrameworkServiceScopes.BoltService, XFrameworkServiceScopes.IdentityAdmin, XFrameworkServiceScopes.IdentityProfile, XFrameworkServiceScopes.DataContextQuery,
                 XFrameworkServiceScopes.DataContextMutate, XFrameworkServiceScopes.IdentitySessionValidate, XFrameworkServiceScopes.TenantTarget];
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -632,6 +633,7 @@ public class IntegrationTestFixture
             ["ServiceIdentity:Clients:0:AllowedScopes"] = string.Join(',',
                 XFrameworkServiceScopes.BoltService,
                 XFrameworkServiceScopes.IdentityAdmin,
+                XFrameworkServiceScopes.IdentityProfile,
                 XFrameworkServiceScopes.IdentitySessionValidate,
                 XFrameworkServiceScopes.DataContextQuery,
                 XFrameworkServiceScopes.DataContextQueryAllTenants,
