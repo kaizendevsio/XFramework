@@ -2,10 +2,12 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.15";
+    public const string Version = "1.3.16";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "15 September 2026", [
+            "Applying an app update waits for every message in a rapid send burst to finish saving on your device."]),
+        ("1.3.15", "15 September 2026", [
             "Conversations open immediately with the header and composer. Message placeholders appear only when loading takes more than two seconds.",
             "Sending, reactions, edits and conversation preferences update immediately while saving continues. Failed changes are restored without losing your draft."]),
         ("1.3.14", "15 September 2026", [

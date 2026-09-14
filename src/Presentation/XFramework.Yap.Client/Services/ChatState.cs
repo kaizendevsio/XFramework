@@ -543,7 +543,13 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
 
     public Task<string> DraftAsync(string key) => store.DraftAsync(Scope, key);
     public Task SaveDraftAsync(string key, string text) => store.SaveDraftAsync(Scope, key, text);
-    public Task SaveBeforeUpdateAsync() => store.UseAsync(_ => Task.FromResult(true));
+    public async Task SaveBeforeUpdateAsync()
+    {
+        // Drain sends waiting for the outbox gate too, not only the current SQLite write.
+        await localChanges.WaitAsync(lifetime.Token);
+        try { await store.UseAsync(_ => Task.FromResult(true), lifetime.Token); }
+        finally { localChanges.Release(); }
+    }
 
     private async Task SynchronizeDeletedConversationsAsync()
     {

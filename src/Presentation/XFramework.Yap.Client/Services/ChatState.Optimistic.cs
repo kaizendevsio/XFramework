@@ -9,6 +9,7 @@ public sealed partial class ChatState
     private readonly Dictionary<Guid, (string Scope, ChatMessage Message)> stagingMessages = [];
     private readonly Dictionary<Guid, (string Scope, Action<ChatMessage> Apply, bool Delete)> optimisticMessages = [];
     private readonly Dictionary<(Guid Id, string Field), (string Scope, Action<Conversation> Apply)> optimisticConversations = [];
+    public bool SavingMessages => stagingMessages.Values.Any(x => x.Scope == Scope);
 
     private void ApplyOptimisticConversations()
     {
