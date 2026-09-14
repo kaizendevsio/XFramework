@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.12";
+    public const string Version = "1.3.13";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "15 September 2026", [
+            "Only the latest message shows its time in the conversation. Open any message's options to see its full date and time, with date separators through history.",
+            "Notifications appear below the header, away from the keyboard and message composer."]),
+        ("1.3.12", "15 September 2026", [
             "Encryption and encrypted attachment processing run in a background worker to keep conversations responsive.",
             "Sending appears only after five seconds. Sent and delivered appear on your latest message, and each person's read receipt follows the last message they saw."]),
         ("1.3.11", "14 September 2026", [
