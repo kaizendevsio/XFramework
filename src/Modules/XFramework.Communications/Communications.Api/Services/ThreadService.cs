@@ -2050,6 +2050,11 @@ public sealed partial class ThreadService(
                 return Result<CmdResponse>.NotFound("Message not found");
 
             var canEditAsAdmin = await MemberHasAdminRoleAsync(member.TenantId, member.Id, ct);
+            var thread = await dataContext.Query<MessageThread>()
+                .Where(t => t.Id == request.ThreadId && t.TenantId == caller.TenantId)
+                .FirstOrDefaultAsync(ct);
+            if (thread?.EncryptionRequired == true && message.EncryptedEnvelope is null && request.EncryptedEnvelope is null)
+                return Result<CmdResponse>.Failure("This conversation requires encrypted messages", 409);
             if (message.EncryptedEnvelope is not null || request.EncryptedEnvelope is not null)
             {
                 if (message.MessageThreadMemberId != member.Id)
@@ -2084,6 +2089,11 @@ public sealed partial class ThreadService(
             message.ModifiedAt = DateTime.UtcNow;
 
             dataContext.Update(message);
+            if (request.EncryptedEnvelope is not null && thread is { EncryptionRequired: false })
+            {
+                thread.EncryptionRequired = true;
+                dataContext.Update(thread);
+            }
             AddOutboxEvent(
                 MessageRealtimeEvents.MessageEdited,
                 message.TenantId,

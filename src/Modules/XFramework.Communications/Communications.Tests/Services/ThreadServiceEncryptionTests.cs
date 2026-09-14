@@ -124,6 +124,56 @@ public sealed partial class ThreadServiceSecurityTests
         Assert.That(saved.EncryptionSenderDeviceId, Is.EqualTo(replacementDevice));
     }
 
+    [TestCase(false, 200)]
+    [TestCase(true, 409)]
+    public async Task LegacyPlaintextEdit_RespectsConversationEncryptionRequirement(bool encryptionRequired, int expectedStatus)
+    {
+        var (context, request, sender, _) = EncryptionScenario();
+        var thread = context.Set<MessageThread>().Single();
+        thread.EncryptionRequired = encryptionRequired;
+        var member = context.Set<MessageThreadMember>().Single(x => x.CredentialId == sender.CredentialId);
+        var message = Message(Guid.NewGuid(), thread.Id, member.Id, sender.TenantId, "historical plaintext");
+        context.Seed(message);
+        var service = CreateService(context);
+        var result = await service.EditThreadMessageAsync(new EditThreadMessageRequest
+        {
+            ThreadId = request.ThreadId, MessageId = message.Id, Text = "new plaintext",
+            Metadata = Metadata(sender.CredentialId, sender.TenantId)
+        });
+        Assert.That(result.StatusCode, Is.EqualTo(expectedStatus), result.Message);
+        Assert.That(message.Text, Is.EqualTo(encryptionRequired ? "historical plaintext" : "new plaintext"));
+        Assert.That(message.EncryptedEnvelope, Is.Null);
+    }
+
+    [Test]
+    public async Task EncryptedEdit_UpgradesLegacyMessage_AndPreventsLaterPlaintextWrites()
+    {
+        var (context, request, sender, _) = EncryptionScenario();
+        var thread = context.Set<MessageThread>().Single();
+        var member = context.Set<MessageThreadMember>().Single(x => x.CredentialId == sender.CredentialId);
+        var first = Message(Guid.NewGuid(), thread.Id, member.Id, sender.TenantId, "first historical plaintext");
+        var second = Message(Guid.NewGuid(), thread.Id, member.Id, sender.TenantId, "second historical plaintext");
+        context.Seed(first, second);
+        var service = CreateService(context);
+        var edit = new EditThreadMessageRequest
+        {
+            ThreadId = thread.Id, MessageId = first.Id, Text = EncryptedMessages.Preview,
+            EncryptedEnvelope = request.EncryptedEnvelope, EncryptionSenderDeviceId = request.EncryptionSenderDeviceId,
+            SenderDirectoryRevision = request.SenderDirectoryRevision, RecipientDirectoryRevisions = request.RecipientDirectoryRevisions,
+            Metadata = Metadata(sender.CredentialId, sender.TenantId)
+        };
+        Assert.That((await service.EditThreadMessageAsync(edit)).IsSuccess, Is.True);
+        Assert.That(thread.EncryptionRequired, Is.True);
+        Assert.That(first.EncryptedEnvelope, Is.EqualTo(request.EncryptedEnvelope));
+        Assert.That(first.EncryptionSenderDeviceId, Is.EqualTo(request.EncryptionSenderDeviceId));
+        edit.MessageId = second.Id; edit.Text = "new plaintext"; edit.EncryptedEnvelope = null;
+        Assert.That((await service.EditThreadMessageAsync(edit)).StatusCode, Is.EqualTo(409));
+        Assert.That(second.Text, Is.EqualTo("second historical plaintext"));
+        request.EncryptedEnvelope = null; request.Text = "new plaintext";
+        request.EncryptionSenderDeviceId = null; request.SenderDirectoryRevision = null;
+        Assert.That((await service.CreateThreadMessageAsync(request)).StatusCode, Is.EqualTo(409));
+    }
+
     private static (InMemoryDataContext Context, CreateThreadMessageRequest Request, EncryptionAccount Sender, EncryptionAccount Recipient) EncryptionScenario()
     {
         var tenant = Guid.NewGuid(); var actor = Guid.NewGuid(); var peer = Guid.NewGuid(); var thread = Guid.NewGuid(); var device = Guid.NewGuid();

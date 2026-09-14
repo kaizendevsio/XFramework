@@ -31,6 +31,34 @@ public sealed class EncryptionFixtureEndpointTests
         var chats = (await a.Http.GetFromJsonAsync<ChatPage<Conversation>>("api/chat/conversations"))!;
         Assert.That(chats.Items, Has.Count.EqualTo(1));
         var thread = chats.Items[0].Id;
+        foreach (var (fileName, contentType, allowed) in new[]
+        {
+            ("photo.jpg", "image/jpeg", false),
+            ("photo.jpg", "application/octet-stream", false),
+            ("attachment.pgp", "image/jpeg", false),
+            ("attachment.pgp", "application/octet-stream", true),
+            ("voice.pgp", "application/octet-stream", true)
+        })
+        {
+            using var multipart = new MultipartFormDataContent();
+            var uploadContent = new ByteArrayContent([1, 2, 3]);
+            uploadContent.Headers.ContentType = new(contentType);
+            multipart.Add(uploadContent, "file", fileName);
+            using var direct = await a.Http.PostAsync($"api/chat/uploads/{thread}", multipart);
+            Assert.That(direct.StatusCode, Is.EqualTo(allowed ? HttpStatusCode.OK : HttpStatusCode.Conflict), fileName + " direct upload");
+            using var session = await a.Http.PostAsJsonAsync($"api/chat/uploads/{thread}/session", new BeginUpload(fileName, contentType, 3));
+            Assert.That(session.StatusCode, Is.EqualTo(allowed ? HttpStatusCode.OK : HttpStatusCode.Conflict), fileName + " resumable upload");
+            if (allowed)
+            {
+                var ticket = (await session.Content.ReadFromJsonAsync<UploadTicket>())!;
+                using var part = new ByteArrayContent([1, 2, 3]);
+                (await a.Http.PostAsync($"api/chat/uploads/session/{ticket.UploadId}/parts/1?offset=0", part)).EnsureSuccessStatusCode();
+                (await a.Http.PostAsJsonAsync($"api/chat/uploads/session/{ticket.UploadId}/complete", new { })).EnsureSuccessStatusCode();
+            }
+        }
+        Assert.That((await a.Http.PostAsJsonAsync("api/chat/message-actions",
+            new MessageAction(thread, Guid.NewGuid(), "edit", "stale client plaintext edit"))).StatusCode,
+            Is.EqualTo(HttpStatusCode.Conflict), "Encryption-enabled Yap rejects plaintext edits before forwarding them, regardless of legacy message state.");
         var devices = ids.ToDictionary(x => x, _ => Guid.NewGuid());
         foreach (var client in clients)
         {
@@ -116,7 +144,7 @@ public sealed class EncryptionFixtureEndpointTests
         Assert.That((await a.Http.PostAsJsonAsync("api/chat/message-actions", edit with { SenderDirectoryRevision = 1 })).StatusCode, Is.EqualTo(HttpStatusCode.PreconditionFailed));
         (await a.Http.PostAsJsonAsync("api/chat/message-actions", edit)).EnsureSuccessStatusCode();
         Assert.That((await b.Http.PostAsJsonAsync("api/chat/message-actions", edit)).StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
-        Assert.That((await a.Http.PostAsJsonAsync("api/chat/message-actions", edit with { EncryptedEnvelope = null, Text = "plaintext replacement" })).StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That((await a.Http.PostAsJsonAsync("api/chat/message-actions", edit with { EncryptedEnvelope = null, Text = "plaintext replacement" })).StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
         var edited = (await b.Http.GetFromJsonAsync<ChatPage<ChatMessage>>($"api/chat/conversations/{thread}/messages"))!.Items.Single();
         Assert.That(edited.EncryptedEnvelope, Is.EqualTo(edit.EncryptedEnvelope));
         Assert.That(edited.Text, Is.EqualTo("Encrypted message"));

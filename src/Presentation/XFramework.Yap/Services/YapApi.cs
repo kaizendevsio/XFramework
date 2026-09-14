@@ -154,8 +154,10 @@ public static class YapApi
             });
             return Results.NoContent();
         });
-        api.MapPost("/message-actions", async (MessageAction request, ICommunicationsChatClient client, CancellationToken ct) =>
+        api.MapPost("/message-actions", async (MessageAction request, ICommunicationsChatClient client, IConfiguration configuration, CancellationToken ct) =>
         {
+            if (request.Action == "edit" && configuration.GetValue("Yap:Encryption:Enabled", true) && request.EncryptedEnvelope is null)
+                throw new YapApiException(409, "Update Yap and unlock encryption before editing.");
             var session = await client.ForCurrentActorAsync(ct: ct);
             var response = request.Action switch
             {
@@ -197,18 +199,22 @@ public static class YapApi
             return Results.NoContent();
         });
         api.MapGet("/events", StreamEventsAsync);
-        api.MapPost("/uploads/{thread:guid}", async (Guid thread, HttpContext context, ChatFiles files, CancellationToken ct) =>
+        api.MapPost("/uploads/{thread:guid}", async (Guid thread, HttpContext context, ChatFiles files, IConfiguration configuration, CancellationToken ct) =>
         {
             var form = await context.Request.ReadFormAsync(ct);
             if (form.Files.Count != 1) throw new YapApiException(400, "Choose one attachment.");
+            RequireEncryptedChatUpload(configuration, form.Files[0].FileName, form.Files[0].ContentType);
             var id = await files.UploadAsync(new UploadedFile(form.Files[0]), thread, null, ct);
             return Results.Ok(new { Id = id });
         }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(ChatFiles.StagedFileBytes + 65536));
 
         // Resumable path for attachments too large to buffer in one request. The browser
         // slices the file and posts parts; only one part is ever held in this process.
-        api.MapPost("/uploads/{thread:guid}/session", async (Guid thread, BeginUpload request, ChatFiles files, CancellationToken ct) =>
-            Results.Ok(await files.BeginAsync(thread, request.FileName, request.ContentType, request.TotalBytes, ct)));
+        api.MapPost("/uploads/{thread:guid}/session", async (Guid thread, BeginUpload request, ChatFiles files, IConfiguration configuration, CancellationToken ct) =>
+        {
+            RequireEncryptedChatUpload(configuration, request.FileName, request.ContentType);
+            return Results.Ok(await files.BeginAsync(thread, request.FileName, request.ContentType, request.TotalBytes, ct));
+        });
         api.MapPost("/uploads/session/{upload:guid}/parts/{part:int}", async (Guid upload, int part, long offset, HttpContext context, ChatFiles files, CancellationToken ct) =>
         {
             if (part < 1) throw new YapApiException(400, "Part numbers start at one.");
@@ -341,6 +347,14 @@ public static class YapApi
         // retain the signed authority, object path and query on the wire.
         if (target != signed) request.Headers.Host = signed.Authority;
         return request;
+    }
+
+    private static void RequireEncryptedChatUpload(IConfiguration configuration, string fileName, string contentType)
+    {
+        // The server enforces the opaque upload contract; only recipients can verify the ciphertext.
+        if (configuration.GetValue("Yap:Encryption:Enabled", true) &&
+            (fileName is not ("attachment.pgp" or "voice.pgp") || contentType != "application/octet-stream"))
+            throw new YapApiException(409, "Update Yap and unlock encryption before uploading attachments.");
     }
 
     private static int Page(int? page) => Math.Clamp(page ?? 0, 0, 10000);
