@@ -181,6 +181,7 @@
         var attachment = file;
         var repliedTo = Reply;
         var key = Key;
+        var account = State.Scope;
         draftRevision++;
         // Keep attachment ownership exclusive until it is durable, but let text
         // sends continue while previous messages are being saved.
@@ -196,6 +197,7 @@
         catch (Exception ex)
         {
             State.Report(ex);
+            if (State.Scope != account) return;
             if (Key == key)
             {
                 draft = string.IsNullOrEmpty(draft) ? text : text + "\n" + draft;
