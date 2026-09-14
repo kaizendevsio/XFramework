@@ -25,4 +25,6 @@ public partial record ThreadMessageItemResponse
     public int PendingEncryptionCount { get; set; }
     public bool EncryptionPending { get; set; }
     public List<Guid> EncryptionAudienceCredentialIds { get; set; } = [];
+    public bool IsLatestOwnMessage { get; set; }
+    public List<Guid> LatestReadCredentialIds { get; set; } = [];
 }

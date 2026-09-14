@@ -556,4 +556,3 @@ export function createEncryption(store = indexedDbStore()) {
 }
 
 export const encryption = createEncryption();
-if (typeof window !== 'undefined') { window.yap ??= {}; window.yap.encryption = encryption; }

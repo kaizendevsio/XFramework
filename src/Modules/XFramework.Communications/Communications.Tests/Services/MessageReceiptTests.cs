@@ -7,6 +7,35 @@ namespace Communications.Tests.Services;
 
 public sealed partial class ThreadServiceSecurityTests
 {
+    [Test]
+    public async Task ReceiptPositions_UseWholeHistory_AndReadersAdvanceIndependently()
+    {
+        var tenant = Guid.NewGuid(); var thread = Thread(Guid.NewGuid(), tenant);
+        var sender = Member(Guid.NewGuid(), thread.Id, Guid.NewGuid(), tenant);
+        var a = Member(Guid.NewGuid(), thread.Id, Guid.NewGuid(), tenant);
+        var b = Member(Guid.NewGuid(), thread.Id, Guid.NewGuid(), tenant);
+        var messages = Enumerable.Range(0, 3).Select(i => {
+            var message = Message(Guid.NewGuid(), thread.Id, sender.Id, tenant, $"Message {i}");
+            message.CreatedAt = DateTime.UtcNow.Date.AddMinutes(i); return message;
+        }).ToArray();
+        var read = new MessageDeliveryType { Id = Guid.NewGuid(), TenantId = tenant, SystemReferenceId = MessageDeliveryTypes.Read, IsEnabled = true };
+        var delivered = new MessageDeliveryType { Id = Guid.NewGuid(), TenantId = tenant, SystemReferenceId = MessageDeliveryTypes.Delivered, IsEnabled = true };
+        var context = new InMemoryDataContext(); context.Seed(thread, sender, a, b, read, delivered); context.Seed(messages);
+        context.Seed(Delivery(Guid.NewGuid(), a.Id, messages[0].Id, tenant, read.Id),
+            Delivery(Guid.NewGuid(), a.Id, messages[2].Id, tenant, read.Id),
+            Delivery(Guid.NewGuid(), b.Id, messages[0].Id, tenant, read.Id),
+            Delivery(Guid.NewGuid(), b.Id, messages[1].Id, tenant, read.Id));
+        var service = CreateService(context);
+        for (var page = 0; page < 3; page++)
+        {
+            var response = await service.GetThreadMessagesAsync(new() { ThreadId = thread.Id, PageIndex = page, PageSize = 1, Metadata = Metadata(sender.CredentialId, tenant) });
+            Assert.That(response.IsSuccess, Is.True, response.Message);
+            var message = response.Data!.Items.Single();
+            Assert.That(message.IsLatestOwnMessage, Is.EqualTo(page == 0));
+            Assert.That(message.LatestReadCredentialIds, Is.EqualTo(page == 0 ? new[] { a.CredentialId } : page == 1 ? new[] { b.CredentialId } : Array.Empty<Guid>()));
+        }
+    }
+
     [TestCase(true)]
     [TestCase(false)]
     public async Task MessageReceipts_CountRecipients_NotSenderOrForeignTenant_RespectReadSetting(bool readEnabled)
@@ -33,6 +62,7 @@ public sealed partial class ThreadServiceSecurityTests
         Assert.That(result.Data!.Items.Single().DeliveredCount, Is.EqualTo(2));
         Assert.That(result.Data.Items.Single().ReadCount, Is.EqualTo(readEnabled ? 1 : 0));
         Assert.That(result.Data.Items.Single().ReadCredentialIds, Is.EqualTo(readEnabled ? new[] { recipient.CredentialId } : Array.Empty<Guid>()));
+        Assert.That(result.Data.Items.Single().LatestReadCredentialIds, Is.EqualTo(readEnabled ? new[] { recipient.CredentialId } : Array.Empty<Guid>()));
     }
 
     [Test]

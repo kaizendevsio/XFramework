@@ -105,6 +105,8 @@ public static class YapApi
                 HasAttachments = x.HasAttachments, AttachmentLinksReady = x.HasAttachments, IsThreadReply = x.IsThreadReply,
                 DeliveredCount = x.DeliveredCount, ReadCount = x.ReadCount,
                 Readers = x.ReadCredentialIds.Select(id => { var person = people.FirstOrDefault(p => p.Id == id); return new Person(id, person?.Name ?? "Workspace member", person?.UserName ?? "", person?.AvatarUrl); }).ToList(),
+                LatestReaders = x.LatestReadCredentialIds.Select(id => { var person = people.FirstOrDefault(p => p.Id == id); return new Person(id, person?.Name ?? "Workspace member", person?.UserName ?? "", person?.AvatarUrl); }).ToList(),
+                IsLatestOwnMessage = x.IsLatestOwnMessage,
                 AvatarUrl = people.FirstOrDefault(p => p.Id == x.SenderCredentialId)?.AvatarUrl,
                 ParentId = x.ParentMessageId, Pinned = x.IsPinned, Saved = x.IsSaved, ReplyTotal = x.ReplyCount,
                 Reactions = x.Reactions.ToDictionary(r => r.Emoji, r => r.Count),

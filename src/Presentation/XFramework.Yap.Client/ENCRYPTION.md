@@ -1,7 +1,16 @@
 # Browser encryption integration
 
-`wwwroot/encryption.mjs` exports `encryption` and installs the same object at
-`window.yap.encryption`. Import it as a module. The vendored OpenPGP.js 6.3.1
+`wwwroot/encryption.mjs` exports `encryption`. The interop facade at
+`window.yap.encryption` starts a dedicated module worker, which owns OpenPGP,
+key derivation, signing, verification and the existing IndexedDB key store.
+`crypto-rpc.mjs` transfers streams through pull-based MessagePorts for mobile
+compatibility; only one chunk per read is in flight. Attachment sinks remain
+quarantined until signature verification commits them. Worker failures reject
+pending work; later calls recreate the worker using the existing keys, with no
+plaintext or main-thread crypto fallback. Blazor rendering stays on the UI
+thread; this does not enable the experimental .NET WASM threads runtime.
+
+The vendored OpenPGP.js 6.3.1
 bundle is unmodified; its npm SHA-512 integrity was checked before copying.
 It uses RFC 9580 authenticated encryption and signatures, with 256 KiB AEAD
 chunks. No plaintext fallback exists in this library.
