@@ -121,3 +121,14 @@ test('simultaneous readers share one decryption and failures return serializable
     assert.equal(denied.status, 413); assert.equal(denied.id, '00000000-0000-0000-0000-000000000000');
     assert.equal([...files.keys()].some(k => k.endsWith('.encrypted')), false);
 });
+
+test('reset removes only the selected account files, including queued previews and verification markers', async () => {
+    const { api, files } = setup();
+    const queued = crypto.randomUUID();
+    for (const name of [key, `${key}.ready`, queued, `${queued}.preview-v2.jpg`, 'another-account-file']) files.set(name, new Blob(['data']));
+    await assert.rejects(api.clearAccountFiles('', [queued]));
+    assert.equal(files.size, 5);
+    await api.clearAccountFiles(scope, [queued]);
+    assert.deepEqual([...files.keys()], ['another-account-file']);
+    await api.clearAccountFiles(scope, [queued]);
+});

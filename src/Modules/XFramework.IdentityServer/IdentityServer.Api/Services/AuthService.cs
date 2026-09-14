@@ -413,6 +413,11 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
                 return Result<bool>.NotFound("User not found");
             }
 
+            var rateLimitDecision = await AcquireSecurityRateLimitAsync(
+                StrictSecurityRateLimitPolicyMap.PasswordReset, request.Metadata,
+                $"{tenantId:D}:{request.CredentialId:D}", "password confirmation", ct);
+            if (!rateLimitDecision.IsAllowed) return Result<bool>.Failure("Too many attempts. Try again later.", 429);
+
             // Verify password using BCrypt - SECURITY CRITICAL
             var isPasswordValid = VerifyPasswordHash(request.Password, user.PasswordByte);
 

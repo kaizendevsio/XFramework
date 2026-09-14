@@ -233,6 +233,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             await store.SetSettingAsync("user", JsonSerializer.Serialize(User));
             Defaults ??= await api.PostAsync<ChatDefaults>("api/chat/initialize");
             if (EncryptionEnabled) await Encryption.EnsureAsync(User);
+            await FinishEncryptionResetAsync();
             await SynchronizeDeletedConversationsAsync();
             await FlushAsync();
             await CompleteDeferredDeliveriesAsync();
@@ -859,7 +860,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             EncryptionSenderDeviceId = file.EncryptionSenderDeviceId ?? message.EncryptionSenderDeviceId,
             AcceptedSenderDirectoryRevision = file.SenderDirectoryRevision ?? message.AcceptedSenderDirectoryRevision }, "attachment");
         if (await js.InvokeAsync<bool>("yap.device.hasVerifiedFile", key, Scope, context)) return key;
-        var directory = await api.GetAsync<JsonElement>($"api/chat/encryption/people/{message.SenderId}");
+        var directory = await api.GetAsync<JsonElement>(ChatEncryption.SenderDirectoryPath(message.SenderId, file.EncryptionSenderDeviceId ?? message.EncryptionSenderDeviceId));
         await js.InvokeVoidAsync("yap.device.decryptFile", key,
             $"api/chat/conversations/{message.ThreadId}/messages/{message.Id}/attachments/{file.Id}?storageId=true", Scope,
             Online && !NeedsLogin, context, directory, file.Key);

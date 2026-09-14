@@ -94,6 +94,12 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js)
                 directory = await PublishDirectoryAsync(operation, enrollment.GetProperty("directory"));
                 await JsVoidAsync(operation, "acceptDirectory", directory);
             }
+            await JsAsync<bool>(operation, "confirmReset", directory);
+            if (await JsAsync<bool>(operation, "observeOwnDirectory", directory))
+            {
+                Status = await JsAsync<EncryptionStatus>(operation, "status");
+                HideRecovery(); return true;
+            }
             var local = await JsAsync<EncryptionStatus>(operation, "status");
             if (!local.Enrolled)
             {
@@ -146,7 +152,7 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js)
     {
         var operation = Begin(user);
         var encrypted = messages.Where(x => x.EncryptedEnvelope is not null).ToList();
-        var directories = new Dictionary<Guid, JsonElement>();
+        var directories = new Dictionary<(Guid, Guid?), JsonElement>();
         foreach (var group in encrypted.GroupBy(x => x.ThreadId))
         {
             foreach (var message in group)
@@ -157,8 +163,9 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js)
                     {
                         Lock(message); message.Text = "Waiting for secure delivery"; continue;
                     }
-                    if (!directories.TryGetValue(message.SenderId, out var sender))
-                        directories[message.SenderId] = sender = await GetAsync<JsonElement>(operation, $"api/chat/encryption/people/{message.SenderId}");
+                    var senderKey = (message.SenderId, message.EncryptionSenderDeviceId);
+                    if (!directories.TryGetValue(senderKey, out var sender))
+                        directories[senderKey] = sender = await GetAsync<JsonElement>(operation, SenderDirectoryPath(message.SenderId, message.EncryptionSenderDeviceId));
                     var payload = await JsAsync<EncryptedMessageContent>(operation, "decrypt",
                         Context(user, message), message.EncryptedEnvelope, sender);
                     message.Text = payload.Text; message.Attachments = payload.Attachments;
@@ -174,7 +181,8 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js)
     {
         var directory = await GetAsync<JsonElement>(operation, "api/chat/encryption/directory");
         var local = await JsAsync<EncryptionStatus>(operation, "status");
-        if (local.Enrolled && local.RootFingerprint is not null)
+        var changed = await JsAsync<bool>(operation, "observeOwnDirectory", directory);
+        if (!changed && local.Enrolled && local.RootFingerprint is not null)
         {
             // A previous restore may have published its roster before this tab
             // lost the response. Accept its persisted fresh identity, not another.
@@ -209,8 +217,10 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js)
         long revision = 0;
         try { revision = (await GetAsync<JsonElement>(operation, "api/chat/encryption/recovery")).GetProperty("revision").GetInt64(); }
         catch (ChatApiException ex) when (ex.Status == 404) { }
+        var directory = await GetAsync<JsonElement>(operation, "api/chat/encryption/directory");
+        await JsVoidAsync(operation, "acceptDirectory", directory);
         await PostAsync<object>(operation, "api/chat/encryption/recovery", new { expectedRevision = revision,
-            archive = recovery.GetProperty("recoveryArchive").GetString() });
+            archive = recovery.GetProperty("recoveryArchive").GetString(), rootPublicKey = directory.GetProperty("rootPublicKey").GetString() });
         if (reveal && revealRequest == revealGeneration) RecoveryKey = recovery.GetProperty("recoveryKey").GetString();
         backedUpRevision = Status.DirectoryRevision; BackupPending = false;
     }
@@ -261,15 +271,14 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js)
     public Task<FingerprintInfo> FingerprintAsync(UserSession user, Guid credentialId) => ChangeAsync(user, async operation =>
     {
         var directory = await GetAsync<JsonElement>(operation, $"api/chat/encryption/people/{credentialId}");
-        var pin = await JsAsync<JsonElement>(operation, "acceptDirectory", directory);
-        return new FingerprintInfo(credentialId, pin.GetProperty("fingerprint").GetString()!, pin.GetProperty("verified").GetBoolean());
+        var pin = await JsAsync<JsonElement>(operation, "inspectDirectory", directory);
+        return new FingerprintInfo(credentialId, pin.GetProperty("fingerprint").GetString()!, pin.GetProperty("verified").GetBoolean(), pin.GetProperty("changed").GetBoolean());
     });
     public Task VerifyFingerprintAsync(UserSession user, Guid credentialId, string fingerprint) => ChangeAsync(user, async operation =>
     {
         // Recheck the signed server roster before marking the compared pin verified.
         var directory = await GetAsync<JsonElement>(operation, $"api/chat/encryption/people/{credentialId}");
-        await JsVoidAsync(operation, "acceptDirectory", directory);
-        await JsAsync<bool>(operation, "verifyFingerprint", credentialId.ToString(), fingerprint);
+        await JsAsync<bool>(operation, "verifyDirectory", directory, fingerprint);
         return true;
     });
     private async Task<JsonElement> PublishDirectoryAsync(Operation operation, JsonElement directory)
@@ -291,7 +300,36 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js)
         }
     }
     public sealed record DeviceInfo(Guid Id, bool IsLocal, bool Revoked);
-    public sealed record FingerprintInfo(Guid CredentialId, string Fingerprint, bool Verified);
+    public sealed record FingerprintInfo(Guid CredentialId, string Fingerprint, bool Verified, bool Changed = false);
+    public static string SenderDirectoryPath(Guid sender, Guid? device) => $"api/chat/encryption/people/{sender}" + (device is null ? "" : $"?senderDeviceId={device}");
+
+    public Task ResetIdentityAsync(UserSession user, string password) => ChangeAsync(user, async operation =>
+    {
+        var current = await GetAsync<JsonElement>(operation, "api/chat/encryption/directory");
+        if (!await JsAsync<bool>(operation, "confirmReset", current))
+        {
+            var pending = await JsAsync<JsonElement>(operation, "prepareReset", current);
+            var directory = pending.GetProperty("directory");
+            try
+            {
+                current = await PostAsync<JsonElement>(operation, "api/chat/encryption/reset", new { password,
+                    directory = new { expectedRevision = directory.GetProperty("revision").GetInt64() - 1,
+                        rootPublicKey = directory.GetProperty("rootPublicKey").GetString(), roster = directory.GetProperty("roster").GetString(), devices = directory.GetProperty("devices") },
+                    recoveryArchive = pending.GetProperty("recoveryArchive").GetString() });
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException || ex is ChatApiException { Status: 409 or >= 500 })
+            {
+                current = await GetAsync<JsonElement>(operation, "api/chat/encryption/directory");
+                if (current.GetProperty("rootPublicKey").GetString() != directory.GetProperty("rootPublicKey").GetString()) throw;
+            }
+            if (!await JsAsync<bool>(operation, "confirmReset", current)) throw new InvalidOperationException("Reset was not confirmed.");
+        }
+        HideRecovery(); backedUpRevision = -1;
+        Status = await JsAsync<EncryptionStatus>(operation, "status");
+        return true;
+    });
+    public Task AcknowledgeResetAsync(UserSession user) => ChangeAsync(user, async operation =>
+    { await JsVoidAsync(operation, "acknowledgeReset"); Status = await JsAsync<EncryptionStatus>(operation, "status"); return true; });
 
     private static void Lock(ChatMessage message)
     {
@@ -306,6 +344,7 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js)
         public string? RootFingerprint { get; set; }
         public long DirectoryRevision { get; set; }
         public bool CanApproveDevices { get; set; }
+        public bool ResetHistoryPending { get; set; }
     }
     internal sealed record EncryptedMessageContent(string Text, List<ChatAttachment> Attachments);
 }

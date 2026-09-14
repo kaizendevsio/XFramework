@@ -7,4 +7,5 @@ public partial record PutEncryptionRecoveryRequest : RequestBase,
 {
     public long ExpectedRevision { get; set; }
     public string Archive { get; set; } = "";
+    public string? RootPublicKey { get; set; }
 }

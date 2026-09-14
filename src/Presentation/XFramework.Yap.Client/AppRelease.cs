@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.7";
+    public const string Version = "1.3.8";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "14 September 2026", [
+            "Lost your recovery key and all trusted devices? Start fresh from Privacy settings after confirming your password. Old encrypted messages cannot be recovered with your new keys.",
+            "Switch reliably between signing in and creating an account."]),
+        ("1.3.7", "14 September 2026", [
             "See message previews and photo or video labels in your inbox while keeping messages encrypted.",
             "Two-person calls end for both people, and ended calls no longer reappear as incoming calls.",
             "The diagnostic logging switch is visible again. Attachment errors now leave more useful troubleshooting logs."]),

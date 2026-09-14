@@ -36,6 +36,7 @@ internal static partial class UiFixture
         private readonly object gate = new();
         private readonly ChatFixture fixture;
         private readonly Dictionary<Guid, EncryptionDirectoryResponse> directories = [];
+        private readonly List<EncryptionDirectoryResponse> publicHistory = [];
         private readonly Dictionary<Guid, EncryptionRecoveryResponse> recovery = [];
         private readonly Dictionary<Guid, CreateThreadMessageRequest> acceptedRequests = [];
         private readonly List<(Func<CommunicationsRealtimeEvent, Task> Handler, CancellationToken Token)> listeners = [];
@@ -81,8 +82,13 @@ internal static partial class UiFixture
                 .ReturnsAsync((GetEncryptionDirectoryRequest request, CancellationToken _) =>
                 {
                     Actor();
-                    lock (gate) return directories.TryGetValue(request.CredentialId, out var value)
-                        ? ChatFixture.Ok(Clone(value)) : Missing<EncryptionDirectoryResponse>();
+                    lock (gate)
+                    {
+                        var value = directories.GetValueOrDefault(request.CredentialId);
+                        if (request.SenderDeviceId is { } device && value?.Devices.Any(x => x.DeviceId == device) != true)
+                            value = publicHistory.SingleOrDefault(x => x.CredentialId == request.CredentialId && x.Devices.Any(d => d.DeviceId == device));
+                        return value is not null ? ChatFixture.Ok(Clone(value)) : Missing<EncryptionDirectoryResponse>();
+                    }
                 });
             identity.Setup(x => x.PutEncryptionDirectory(It.IsAny<PutEncryptionDirectoryRequest>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((PutEncryptionDirectoryRequest request, CancellationToken _) =>
@@ -97,6 +103,26 @@ internal static partial class UiFixture
                             Revision = request.ExpectedRevision + 1, RootPublicKey = request.RootPublicKey,
                             Roster = request.Roster, Devices = Clone(request.Devices) };
                         directories[actor] = value;
+                        return ChatFixture.Ok(Clone(value));
+                    }
+                });
+            identity.Setup(x => x.ResetEncryptionIdentity(It.IsAny<ResetEncryptionIdentityRequest>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((ResetEncryptionIdentityRequest request, CancellationToken _) =>
+                {
+                    var actor = Actor();
+                    lock (gate)
+                    {
+                        if (request.Password != "fixture") return new QueryResponse<EncryptionDirectoryResponse> { HttpStatusCode = HttpStatusCode.Forbidden };
+                        var old = directories.GetValueOrDefault(actor);
+                        if (old is null) return Missing<EncryptionDirectoryResponse>();
+                        var next = request.Directory;
+                        if (old.RootPublicKey == next.RootPublicKey && old.Roster == next.Roster) return ChatFixture.Ok(Clone(old));
+                        if (old.Revision != next.ExpectedRevision) return Conflict<EncryptionDirectoryResponse>();
+                        publicHistory.Add(Clone(old));
+                        var value = new EncryptionDirectoryResponse { TenantId = fixture.Tenant, CredentialId = actor,
+                            Revision = next.ExpectedRevision + 1, RootPublicKey = next.RootPublicKey, Roster = next.Roster, Devices = Clone(next.Devices) };
+                        directories[actor] = value;
+                        recovery[actor] = new() { Revision = (recovery.GetValueOrDefault(actor)?.Revision ?? 0) + 1, Archive = request.RecoveryArchive };
                         return ChatFixture.Ok(Clone(value));
                     }
                 });

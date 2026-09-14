@@ -16,13 +16,13 @@ public static class YapEncryption
     {
         // Public keys remain readable for historical senders who have since left a conversation.
         // Identity enforces same-tenant directory access; this endpoint never returns private keys.
-        api.MapGet("/encryption/people/{id:guid}", async (Guid id, IIdentityServerServiceWrapper identity,
+        api.MapGet("/encryption/people/{id:guid}", async (Guid id, Guid? senderDeviceId, IIdentityServerServiceWrapper identity,
             ICommunicationsChatActorProvider actors, IActorAccessTokenScope tokens, CancellationToken ct) =>
         {
             var actor = await actors.GetCurrentActorAsync(ct) ?? throw new UnauthorizedAccessException();
             using var token = tokens.Push(actor.AccessToken!);
             return YapApi.Require(await identity.GetEncryptionDirectory(new GetEncryptionDirectoryRequest
-            { CredentialId = id, Metadata = Metadata(actor.TenantId) }, ct));
+            { CredentialId = id, SenderDeviceId = senderDeviceId, Metadata = Metadata(actor.TenantId) }, ct));
         });
         api.MapGet("/encryption/directory", async (IIdentityServerServiceWrapper identity,
             ICommunicationsChatActorProvider actors, IActorAccessTokenScope tokens, CancellationToken ct) =>
@@ -94,6 +94,14 @@ public static class YapEncryption
             request.Metadata = Metadata(actor.TenantId);
             YapApi.Require(await communications.CompleteDeferredEncryptionAsync(request, ct));
             return Results.Ok();
+        });
+        api.MapPost("/encryption/reset", async (ResetEncryptionIdentityRequest request,
+            IIdentityServerServiceWrapper identity, ICommunicationsChatActorProvider actors, IActorAccessTokenScope tokens, CancellationToken ct) =>
+        {
+            var actor = await actors.GetCurrentActorAsync(ct) ?? throw new UnauthorizedAccessException();
+            using var token = tokens.Push(actor.AccessToken!);
+            request.Metadata = Metadata(actor.TenantId);
+            return YapApi.Require(await identity.ResetEncryptionIdentity(request, ct));
         });
         api.MapGet("/encryption/recovery", async (IIdentityServerServiceWrapper identity,
             ICommunicationsChatActorProvider actors, IActorAccessTokenScope tokens, CancellationToken ct) =>

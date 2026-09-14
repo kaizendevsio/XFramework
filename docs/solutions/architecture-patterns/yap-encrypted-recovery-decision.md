@@ -14,7 +14,7 @@ Yap keeps its existing XFramework modules and Bolt transport. There is no Matrix
 backend or new encryption service. Persistence follows the single physical
 PostgreSQL database with schema-per-module boundaries.
 
-- IdentityServer owns immutable account root public keys, signed device rosters,
+- IdentityServer owns account root public keys (immutable within an identity), signed device rosters,
   device approval/revocation records and opaque encrypted recovery archives.
   Bounded whole-roster changes use compare-and-swap revisions. The server enforces
   authorization and immutable records; browsers independently verify signatures.
@@ -222,3 +222,37 @@ not deployment evidence. The earlier
 [trusted-server relay decision](yap-voice-trusted-server-relay.md) remains historical
 context for the prior mode. The [client integration contract](../../../src/Presentation/XFramework.Yap.Client/ENCRYPTION.md)
 contains the exact browser API and bounds.
+
+## Lost-key identity reset (Yap 1.3.8)
+
+Reset is distinct from recovery: it creates a new account root and device keys,
+with no old private decryption material. Identity rechecks the authenticated
+owner's password through the existing password-confirmation service (with the
+shared security rate limiter). It atomically archives the prior **public**
+directory, increments directory and recovery revisions, and replaces the current
+public directory and encrypted recovery archive. Normal directory writes still
+cannot replace roots. Retired roots and device IDs cannot be reused by reset.
+Recovery writes bind to the current public root after the first reset, preventing
+an old device from overwriting the new backup.
+
+The browser stages fresh keys and the encrypted backup before requesting reset;
+it keeps existing keys until it confirms the exact signed replacement. A durable
+cleanup flag resumes account-scoped cache, draft, outbox and attachment cleanup
+after an interrupted response or reload. Sign-in and favorites are retained.
+Server ciphertext is not deleted: the new keys cannot open it, and other people
+retain their own copies. This is not secure erasure of another device or a means
+to retract messages already delivered.
+
+A contact's changed root never replaces a pinned identity automatically. Settings
+shows the new fingerprint for comparison through a trusted channel, and explicit
+verification accepts the newer identity. The prior trusted public pin is kept
+only for checking old messages. Sender-directory lookup can select an archived
+public roster by sender device ID, within the same tenant. Decrypting history must
+not downgrade the current recipient pin. New sends and calls use only the current
+directory; archived public rosters do not authorize new sends.
+
+The login password is currently received by the Identity service for BCrypt
+verification. It is **not** a recovery wrapping key. A future one-password design
+would require a vetted password-authenticated key-exchange design and migration;
+a short PIN or hashing the existing server-received password does not provide that
+boundary. Password confirmation authorizes starting fresh, not access to old keys.

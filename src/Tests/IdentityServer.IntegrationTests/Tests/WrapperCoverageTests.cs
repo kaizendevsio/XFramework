@@ -101,6 +101,25 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
         recovery.HttpStatusCode.Should().Be(HttpStatusCode.OK, recovery.Message);
         recovery.Response!.Archive.Should().Be(recoveryWrite.Archive);
         (await IntegrationTestFixture.ServiceWrapper.PutEncryptionRecovery(recoveryWrite)).HttpStatusCode.Should().Be(HttpStatusCode.Conflict);
+        var replacement = write with { ExpectedRevision = 1, RootPublicKey = Armor("PUBLIC KEY BLOCK", "replacement-root"),
+            Roster = Armor("MESSAGE", "replacement-roster"), Devices = [new() { DeviceId = Guid.NewGuid(),
+                SigningPublicKey = Armor("PUBLIC KEY BLOCK", "replacement-signing"), EncryptionPublicKey = Armor("PUBLIC KEY BLOCK", "replacement-encryption"),
+                Approval = Armor("MESSAGE", "replacement-approval") }] };
+        var reset = new ResetEncryptionIdentityRequest { Password = "incorrect-password", Directory = replacement,
+            RecoveryArchive = Armor("MESSAGE", "replacement-backup"), Metadata = CreateMetadata() };
+        (await IntegrationTestFixture.ServiceWrapper.ResetEncryptionIdentity(reset)).HttpStatusCode.Should().Be(HttpStatusCode.Forbidden);
+        reset.Password = "ValidPassword123!";
+        var replaced = await IntegrationTestFixture.ServiceWrapper.ResetEncryptionIdentity(reset);
+        replaced.HttpStatusCode.Should().Be(HttpStatusCode.OK, replaced.Message);
+        replaced.Response!.CredentialId.Should().Be(credential);
+        replaced.Response.Revision.Should().Be(2);
+        replaced.Response.RootPublicKey.Should().Be(replacement.RootPublicKey);
+        var newBackup = await IntegrationTestFixture.ServiceWrapper.GetEncryptionRecovery(new() { Metadata = CreateMetadata() });
+        newBackup.Response!.Archive.Should().Be(reset.RecoveryArchive);
+        newBackup.Response.Revision.Should().Be(2);
+        var archived = await IntegrationTestFixture.ServiceWrapper.GetEncryptionDirectory(new()
+        { CredentialId = credential, SenderDeviceId = deviceId, Metadata = CreateMetadata() });
+        archived.Response!.RootPublicKey.Should().Be(write.RootPublicKey);
     }
 
     [Test]
@@ -112,6 +131,7 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
         (await IntegrationTestFixture.ServiceWrapper.PutEncryptionDirectory(new PutEncryptionDirectoryRequest { Metadata = CreateMetadata() })).HttpStatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await IntegrationTestFixture.ServiceWrapper.GetEncryptionRecovery(new GetEncryptionRecoveryRequest { Metadata = CreateMetadata() })).HttpStatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await IntegrationTestFixture.ServiceWrapper.PutEncryptionRecovery(new PutEncryptionRecoveryRequest { Metadata = CreateMetadata() })).HttpStatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await IntegrationTestFixture.ServiceWrapper.ResetEncryptionIdentity(new ResetEncryptionIdentityRequest { Metadata = CreateMetadata() })).HttpStatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Test]

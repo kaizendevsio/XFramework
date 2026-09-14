@@ -16,5 +16,6 @@ public sealed class EncryptionAccountConfiguration : IEntityTypeConfiguration<En
         entity.Property(x => x.Roster).HasMaxLength(524288);
         entity.Property(x => x.DevicesJson).HasMaxLength(1048576);
         entity.Property(x => x.RecoveryArchive).HasMaxLength(2097152);
+        entity.Property(x => x.PublicHistoryJson).HasColumnType("jsonb").HasDefaultValue("[]");
     }
 }

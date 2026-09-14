@@ -9,6 +9,26 @@ namespace Yap.Client.Tests;
 public sealed class OfflineStoreTests
 {
     [Test]
+    public async Task EncryptionReset_ClearsAccountHistoryAndOutbox_ButKeepsLoginFavoritesAndOtherAccounts()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var message = fixture.Message();
+        await fixture.Store.SetSettingAsync("user", "signed-in-account");
+        await fixture.Store.SaveConversationsAsync("account-a", [new() { Id = message.ThreadId, IsFavorite = true, LastMessage = message, Preview = message.Text }]);
+        await fixture.Store.QueueAsync(fixture.Queue(message), message, "draft");
+        await fixture.Store.SaveMessagesAsync("account-b", [message]);
+        await fixture.Store.ClearEncryptionHistoryAsync("account-a");
+        Assert.That(await fixture.Store.PendingAsync("account-a"), Is.Empty);
+        Assert.That(await fixture.Store.MessagesAsync("account-a", message.ThreadId), Is.Empty);
+        Assert.That(await fixture.Store.MessagesAsync("account-b", message.ThreadId), Has.Count.EqualTo(1));
+        Assert.That(await fixture.Store.SettingAsync("user"), Is.EqualTo("signed-in-account"));
+        var conversation = (await fixture.Store.ConversationsAsync("account-a")).Single();
+        Assert.That(conversation.IsFavorite, Is.True);
+        Assert.That(conversation.LastMessage, Is.Null);
+        Assert.That(conversation.Preview, Is.EqualTo("Start a conversation"));
+    }
+
+    [Test]
     public async Task CompleteEncryptedUpload_PreservesVerifiedMetadataForSenderPreview()
     {
         await using var fixture = await StoreFixture.CreateAsync();

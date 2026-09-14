@@ -1,6 +1,7 @@
 @page "/login"
 @page "/register"
 @page "/signup"
+@implements IDisposable
 @inject ChatApi Api
 @inject ChatState State
 @inject NavigationManager Nav
@@ -25,6 +26,21 @@
     private string name = "", username = "", password = "", confirm = "";
     private bool busy, registered;
     private string? error;
+    protected override void OnInitialized()
+    {
+        registered = new Uri(Nav.Uri).Query.Contains("registered=true", StringComparison.Ordinal);
+        Nav.LocationChanged += LocationChanged;
+    }
+    private void LocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args)
+    {
+        _ = InvokeAsync(() =>
+        {
+            password = confirm = ""; error = null;
+            registered = new Uri(args.Location).Query.Contains("registered=true", StringComparison.Ordinal);
+            StateHasChanged();
+        });
+    }
+    public void Dispose() => Nav.LocationChanged -= LocationChanged;
     private async Task SubmitAsync()
     {
         busy = true; error = null;
