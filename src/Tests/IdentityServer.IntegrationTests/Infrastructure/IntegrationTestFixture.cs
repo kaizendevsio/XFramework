@@ -1022,8 +1022,29 @@ public static class TestData
 
 internal sealed class TestStorageServiceWrapper(
     DbContext db,
-    IServiceScopeFactory scopeFactory) : IStorageServiceWrapper
+    IServiceScopeFactory scopeFactory,
+    ITrustedInvocationContextAccessor trusted) : IStorageServiceWrapper
 {
+    public async Task<QueryResponse<StorageFileResponse>> UploadOwnAvatarFile(UploadOwnAvatarFileRequest request, CancellationToken ct = default)
+    {
+        var metadata = await EnsureStorageUploadMetadata(new()
+        {
+            Metadata = request.Metadata, ContentType = "image/jpeg",
+            IdentifierGroupName = "IdentityServer", IdentifierName = "IdentityCredentialAvatar"
+        }, ct);
+        var session = await CreateStorageUploadSession(new()
+        {
+            Metadata = request.Metadata, FileName = "profile.jpg", ContentType = "image/jpeg",
+            TypeId = metadata.Response!.TypeId, StorageFileIdentifierId = metadata.Response.StorageFileIdentifierId,
+            Identifier = trusted.Current!.Actor!.CredentialId, TotalSizeBytes = request.Bytes.Length,
+            ChunkSizeBytes = request.Bytes.Length, Visibility = StorageFileVisibility.Public, RequireClaim = true
+        }, ct);
+        return await CompleteStorageUploadSession(new()
+        {
+            Metadata = request.Metadata, UploadSessionId = session.Response!.Id
+        }, ct);
+    }
+
     private readonly Dictionary<Guid, StorageUploadSessionResponse> _sessions = new();
     public Task<QueryResponse<StorageUploadSessionResponse>> CreateChatStorageUploadSession(CreateChatStorageUploadSessionRequest request, CancellationToken ct = default) =>
         throw new NotSupportedException("Chat Storage operation is not used by this test fixture.");
