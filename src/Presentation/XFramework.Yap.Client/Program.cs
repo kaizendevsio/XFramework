@@ -20,20 +20,7 @@ builder.Services.AddScoped<ChatApi>();
 builder.Services.AddScoped<ChatState>();
 builder.Services.AddScoped<VoiceState>();
 builder.Services.AddBoltMediaBrowser(options => options.SecurityMode = Bolt.Media.Browser.MediaSecurityMode.AuthenticatedSFrame);
-var startup = new DatabaseStartup();
-builder.Services.AddSingleton(startup);
+builder.Services.AddScoped<DatabaseStartup>();
 var host = builder.Build();
-try
-{
-    await host.Services.GetRequiredService<IJSRuntime>().InvokeVoidAsync("yap.diagnostics.version", AppRelease.Version);
-    await host.Services.GetRequiredService<IJSRuntime>().InvokeVoidAsync("yap.device.acquireDatabase");
-    await host.Services.InitializeSqliteWasmAsync();
-    await host.Services.InitializeSqliteWasmDatabaseAsync<OfflineDatabase>();
-    await using var db = await host.Services.GetRequiredService<IDbContextFactory<OfflineDatabase>>().CreateDbContextAsync();
-    await db.Database.EnsureCreatedAsync();
-    await OfflineDatabase.UpgradeAsync(db);
-}
-catch (Exception ex) { startup.Failed = true; host.Services.GetRequiredService<ILogger<DatabaseStartup>>().LogError(ex, "Device storage initialization failed"); }
+await host.Services.GetRequiredService<IJSRuntime>().InvokeVoidAsync("yap.diagnostics.version", AppRelease.Version);
 await host.RunAsync();
-
-public sealed class DatabaseStartup { public bool Failed { get; set; } }

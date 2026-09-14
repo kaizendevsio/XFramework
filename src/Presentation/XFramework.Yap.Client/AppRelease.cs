@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.5";
+    public const string Version = "1.3.6";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "14 September 2026", [
+            "Yap waits safely when another tab is using your conversations, then continues automatically when you close it.",
+            "Updates and recovery stay available while the app opens. Diagnostic logs now identify which startup step needs attention."]),
+        ("1.3.5", "14 September 2026", [
             "Send encrypted messages without waiting for everyone in the conversation to finish setup.",
             "Members who join secure messaging later receive pending messages, photos and videos automatically when your app reconnects."]),
         ("1.3.4", "14 September 2026", [

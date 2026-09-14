@@ -71,14 +71,25 @@
             return response.status;
         },
         acquireDatabase() {
-            // Keep one document in charge of SQLite. A waiting navigation also evicts
-            // a previous document from the back/forward cache before opening OPFS.
+            // Keep one document in charge of SQLite. A busy owner is a normal
+            // waiting state, not a storage failure. Only destruction releases it:
+            // releasing on pagehide would leave a live SQLite worker using OPFS.
             return databaseLock ??= new Promise((resolve, reject) => {
                 navigator.locks.request('yap-sqlite', { signal: AbortSignal.timeout(10000) }, async () => {
-                    resolve();
+                    window.yap.diagnostics?.record('storage.lock-acquired');
+                    resolve(true);
                     // The browser releases this lock when the document is destroyed.
                     await new Promise(() => {});
-                }).catch(reject);
+                }).catch(error => {
+                    databaseLock = undefined;
+                    if (error.name === 'TimeoutError') {
+                        window.yap.diagnostics?.record('storage.lock-waiting');
+                        resolve(false);
+                    } else {
+                        window.yap.diagnostics?.record('storage.lock-failed', { type: error.name });
+                        reject(error);
+                    }
+                });
             });
         },
         online: () => navigator.onLine,
