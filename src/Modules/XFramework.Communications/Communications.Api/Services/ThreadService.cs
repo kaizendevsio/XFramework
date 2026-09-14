@@ -32,7 +32,8 @@ public sealed partial class ThreadService(
     ILogger<ThreadService> logger,
     CommunicationsOutboxSignal outboxSignal,
     DbContext? db,
-    IMessageEncryptionDirectoryReader? encryptionDirectoryReader = null
+    IMessageEncryptionDirectoryReader? encryptionDirectoryReader = null,
+    IMessageReceiptPositionReader? receiptPositionReader = null
 ) : IThreadService
 {
     private static readonly JsonSerializerOptions OutboxJsonOptions = new(JsonSerializerDefaults.Web);
@@ -1806,6 +1807,11 @@ public sealed partial class ThreadService(
             var credentials = readers.ToDictionary(m => m.Id, m => m.CredentialId);
             var readBy = receiptRows.Where(d => allowReadReceipts && d.TypeId == readTypeId && credentials.ContainsKey(d.MessageThreadMemberId))
                 .GroupBy(d => d.MessageId).ToDictionary(g => g.Key, g => g.Select(d => credentials[d.MessageThreadMemberId]).Distinct().ToList());
+            // Compute receipt positions across the conversation, not just this page.
+            // Only one ID per reader leaves the database; history stays paginated.
+            var positions = receiptPositionReader is null ? new MessageReceiptPositions(null, [])
+                : await receiptPositionReader.ReadAsync(caller.TenantId, request.ThreadId, requesterMember.Id,
+                    request.ParentMessageId, hiddenMessageIds, readerIds, allowReadReceipts ? readTypeId : null, ct);
             var items = messages.Select(m =>
             {
                 memberMap.TryGetValue(m.MessageThreadMemberId, out var sender);
@@ -1832,7 +1838,10 @@ public sealed partial class ThreadService(
                     ReplyCount = replyCounts.GetValueOrDefault(m.Id),
                     DeliveredCount = deliveredCounts.GetValueOrDefault(m.Id),
                     ReadCount = readCounts.GetValueOrDefault(m.Id),
-                    ReadCredentialIds = readBy.GetValueOrDefault(m.Id) ?? []
+                    ReadCredentialIds = readBy.GetValueOrDefault(m.Id) ?? [],
+                    IsLatestOwnMessage = m.Id == positions.LatestOwnId,
+                    LatestReadCredentialIds = positions.LastReadByMember.Where(x => x.Value == m.Id && credentials.ContainsKey(x.Key))
+                        .Select(x => credentials[x.Key]).ToList()
                 };
             }).ToList();
 

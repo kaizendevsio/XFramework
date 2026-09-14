@@ -578,7 +578,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             var content = string.IsNullOrWhiteSpace(text) ? file?.Name ?? "" : text.Trim();
             if (content.Length is 0 or > 4000) throw new InvalidOperationException("Write a message up to 4,000 characters.");
             var message = new ChatMessage { Id = id, ThreadId = thread, SenderId = User.CredentialId,
-                Text = content, CreatedAt = DateTime.UtcNow, Mine = true, ParentId = parent, Delivery = "Queued",
+                Text = content, CreatedAt = DateTime.UtcNow, Mine = true, ParentId = parent, Delivery = "Queued", IsLatestOwnMessage = true,
                 LocalFileKey = file?.Key, HasAttachments = file is not null, IsThreadReply = threadReply,
                 Attachments = file is null ? [] : [new ChatAttachment(id, file.Name, file.ContentType, file.Size)] };
             await store.QueueAsync(new QueuedMessage { Scope = Scope, Id = id, ThreadId = thread, Text = content,

@@ -160,9 +160,31 @@ internal static partial class UiFixture
                     lock (gate)
                     {
                         var items = Clone(messages.OrderByDescending(x => x.CreatedAt).Skip(page * size).Take(size).ToList());
-                        foreach (var message in items) message.EncryptionPending = pendingRecipients.GetValueOrDefault(message.Id)?.Contains(actor) == true;
+                        var latestOwn = messages.Where(x => x.SenderCredentialId == actor && !x.IsThreadReply).OrderByDescending(x => x.CreatedAt).FirstOrDefault()?.Id;
+                        foreach (var message in items)
+                        {
+                            message.EncryptionPending = pendingRecipients.GetValueOrDefault(message.Id)?.Contains(actor) == true;
+                            message.IsLatestOwnMessage = message.Id == latestOwn;
+                            message.LatestReadCredentialIds = message.SenderCredentialId == actor ? message.ReadCredentialIds.Where(reader =>
+                                messages.Where(x => x.SenderCredentialId == actor && x.ReadCredentialIds.Contains(reader)).OrderByDescending(x => x.CreatedAt).First().Id == message.Id).ToList() : [];
+                        }
                         return ChatFixture.Ok(new GetThreadMessagesResponse { Items = items, TotalCount = messages.Count });
                     }
+                });
+            fixture.Session.Setup(x => x.MarkReadAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+                .Returns(async (Guid thread, IReadOnlyCollection<Guid> ids, CancellationToken _) =>
+                {
+                    var actor = Actor();
+                    lock (gate)
+                    {
+                        foreach (var message in messages.Where(x => ids.Contains(x.Id) && x.SenderCredentialId != actor))
+                        {
+                            if (!message.ReadCredentialIds.Contains(actor)) message.ReadCredentialIds.Add(actor);
+                            message.ReadCount = message.ReadCredentialIds.Count;
+                        }
+                    }
+                    await PublishAsync(actor);
+                    return Success();
                 });
             fixture.Session.Setup(x => x.GetThreadsAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((int page, int size, CancellationToken _) =>

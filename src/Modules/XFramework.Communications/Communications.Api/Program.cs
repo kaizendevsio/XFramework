@@ -25,6 +25,7 @@ builder.Services.AddScoped<ChatReferenceDataService>();
 builder.Services.AddScoped<IMessageReactionSummaryReader, MessageReactionSummaryReader>();
 builder.Services.AddScoped<IMessageEncryptionDirectoryReader, MessageEncryptionDirectoryReader>();
 builder.Services.AddScoped<IMessageReplySummaryReader, MessageReplySummaryReader>();
+builder.Services.AddScoped<IMessageReceiptPositionReader, MessageReceiptPositionReader>();
 builder.Services.AddScoped<ICommunicationsRequestContextResolver, CommunicationsRequestContextResolver>();
 builder.Services.AddScoped<ICommunicationsRealtimePublisher, CommunicationsRealtimePublisher>();
 builder.Services.AddScoped<ICommunicationsTransientRealtimePublisher, CommunicationsTransientRealtimePublisher>();

@@ -993,7 +993,24 @@ public sealed partial class ThreadServiceSecurityTests
             new EmptyReactionSummaryReader(),
             new EmptyReplySummaryReader(),
             NullLogger<ThreadService>.Instance,
-            signal ?? new CommunicationsOutboxSignal(), database, new TestEncryptionDirectoryReader(dataContext));
+            signal ?? new CommunicationsOutboxSignal(), database, new TestEncryptionDirectoryReader(dataContext), new TestReceiptPositionReader(dataContext));
+    }
+
+    private sealed class TestReceiptPositionReader(IDataContext context) : IMessageReceiptPositionReader
+    {
+        public async Task<MessageReceiptPositions> ReadAsync(Guid tenant, Guid thread, Guid sender, Guid? parent,
+            IReadOnlyCollection<Guid> hidden, IReadOnlyCollection<Guid> readers, Guid? readType, CancellationToken ct)
+        {
+            var messages = (await context.Query<Message>().Where(m => m.TenantId == tenant && m.MessageThreadId == thread
+                && m.MessageThreadMemberId == sender && !m.IsDeleted && m.IsEnabled).ToListAsync(ct))
+                .Where(m => !hidden.Contains(m.Id) && (parent.HasValue ? m.ParentMessageId == parent : !m.IsThreadReply))
+                .OrderByDescending(m => m.CreatedAt).ThenByDescending(m => m.Id).ToList();
+            var deliveries = await context.Query<MessageDelivery>().Where(d => d.TenantId == tenant && d.TypeId == readType
+                && d.IsEnabled && !d.IsDeleted && readers.Contains(d.MessageThreadMemberId)).ToListAsync(ct);
+            return new(messages.FirstOrDefault()?.Id, readers.Select(reader => new { Reader = reader,
+                Message = messages.FirstOrDefault(m => deliveries.Any(d => d.MessageId == m.Id && d.MessageThreadMemberId == reader)) })
+                .Where(x => x.Message is not null).ToDictionary(x => x.Reader, x => x.Message!.Id));
+        }
     }
 
     private sealed class TestEncryptionDirectoryReader(IDataContext context) : IMessageEncryptionDirectoryReader

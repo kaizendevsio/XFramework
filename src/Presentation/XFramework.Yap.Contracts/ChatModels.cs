@@ -76,6 +76,8 @@ public sealed class ChatMessage
     public string Delivery { get; set; } = "Sent";
     public int ReadCount { get; set; }
     public List<Person> Readers { get; set; } = [];
+    public List<Person> LatestReaders { get; set; } = [];
+    public bool IsLatestOwnMessage { get; set; }
     public int DeliveredCount { get; set; }
     public string Initials => InitialsFor(Sender);
     public string Color => Mine ? "g1" : "g3";
