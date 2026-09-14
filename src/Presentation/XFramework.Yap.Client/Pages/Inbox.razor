@@ -67,23 +67,24 @@ else
     private double menuX, menuY;
     private string newTitle = "";
     private bool working, deleteEveryone;
-    private async Task BeginDeleteAsync(Conversation chat) { menu = null; deleteEveryone = false; try { deleting = await State.ConversationDetailsAsync(chat.Id); } catch(Exception ex) { State.Report(ex); } }
+    private async Task BeginDeleteAsync(Conversation chat) { menu = null; deleteEveryone = false; deleting = chat; try { var detail = await State.ConversationDetailsAsync(chat.Id); if (deleting?.Id == chat.Id) deleting = detail; } catch(Exception ex) { State.Report(ex); } }
     private void OpenMenu(Conversation chat, MouseEventArgs e) { menu = chat; focusMenu = true; menuX = Math.Max(12, e.ClientX - 170); menuY = Math.Max(12, e.ClientY - 70); }
     private async Task FavoriteAsync(Conversation chat) { menu = null; try { await State.ToggleFavoriteAsync(chat); } catch(Exception ex) { State.Report(ex); } }
     private async Task BeginRenameAsync(Conversation chat)
     {
         menu = null;
-        try { var detail = await State.ConversationDetailsAsync(chat.Id); if(!detail.CanManage) { State.Report(new InvalidOperationException("Only conversation admins can rename this conversation.")); return; } newTitle = detail.Name; renaming = chat; }
+        newTitle = chat.Name; renaming = chat;
+        try { var detail = await State.ConversationDetailsAsync(chat.Id); if(!detail.CanManage && renaming?.Id == chat.Id) { renaming = null; State.Report(new InvalidOperationException("Only conversation admins can rename this conversation.")); } }
         catch(Exception ex) { State.Report(ex); }
     }
-    private async Task RenameAsync() { working = true; try { await State.UpdateConversationAsync(new(renaming!.Id, Name: newTitle)); renaming = null; } catch(Exception ex) { State.Report(ex); } finally { working = false; } }
-    private async Task DeleteAsync() { working = true; try { await State.DeleteConversationAsync(deleting!.Id, deleteEveryone); deleting = null; } catch(Exception ex) { State.Report(ex); } finally { working = false; } }
+    private async Task RenameAsync() { var chat = renaming!; var title = newTitle; renaming = null; working = true; try { await State.UpdateConversationAsync(new(chat.Id, Name: title)); } catch(Exception ex) { State.Report(ex); } finally { working = false; } }
+    private async Task DeleteAsync() { var chat = deleting!; deleting = null; working = true; try { await State.DeleteConversationAsync(chat.Id, deleteEveryone); } catch(Exception ex) { State.Report(ex); } finally { working = false; } }
     private bool searchVisible, choosing, creating;
     private List<Person> people = [];
     private List<SearchHit> hits = [];
     private readonly HashSet<Guid> members = [];
     private readonly Dictionary<Guid, string> names = [];
-    private IEnumerable<Conversation> Filtered => State.Conversations.Where(c => c.Name.Contains(search, StringComparison.OrdinalIgnoreCase)).OrderByDescending(c => c.IsFavorite).ThenByDescending(c => c.LastMessageAt);
+    private IEnumerable<Conversation> Filtered => State.Conversations.Where(c => !c.Removed && c.Name.Contains(search, StringComparison.OrdinalIgnoreCase)).OrderByDescending(c => c.IsFavorite).ThenByDescending(c => c.LastMessageAt);
     protected override void OnInitialized() => State.Changed += Changed;
     private void Changed() => _ = InvokeAsync(StateHasChanged);
     private async Task SearchAsync()

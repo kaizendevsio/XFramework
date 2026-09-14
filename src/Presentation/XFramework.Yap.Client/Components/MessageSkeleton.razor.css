@@ -1,0 +1,8 @@
+.message-skeletons{display:flex;flex-direction:column;gap:22px;padding:24px 4px}
+.message-skeleton{width:68%;padding:18px;border-radius:22px;background:var(--surface-2,#282828);animation:message-pulse 1.6s ease-in-out infinite}
+.message-skeleton:nth-child(even){width:53%}
+.message-skeleton.mine{align-self:flex-end;width:60%}
+.message-skeleton span{display:block;height:10px;border-radius:8px;background:var(--faint,#555);opacity:.3}
+.message-skeleton span+span{width:65%;margin-top:10px}
+@keyframes message-pulse{50%{opacity:.45}}
+@media(prefers-reduced-motion:reduce){.message-skeleton{animation:none}}

@@ -33,7 +33,8 @@ public sealed partial class ChatState
 
     public async Task SetActiveStatusAsync(Guid conversationId, bool share)
     {
-        await api.PostAsync("api/chat/thread-actions", new ThreadAction(conversationId, "active-status", share));
-        await SynchronizeAsync();
+        var previous = (Selected?.Id == conversationId ? Selected : Conversations.FirstOrDefault(x => x.Id == conversationId))?.ShareActiveStatus ?? !share;
+        await ChangeConversationAsync(conversationId, "active-status", x => x.ShareActiveStatus = share, x => x.ShareActiveStatus = previous,
+            async () => { await api.PostAsync("api/chat/thread-actions", new ThreadAction(conversationId, "active-status", share)); await SynchronizeAsync(); });
     }
 }

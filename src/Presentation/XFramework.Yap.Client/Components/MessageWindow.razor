@@ -17,7 +17,11 @@
     }
     </div>
     @if (HasNewer) { <button class="history-loader" disabled="@loading" @onclick="LoadNewer">Newer messages</button> }
-    @if (Items.Count == 0) { <p class="empty">Say hello. This is the beginning of your conversation.</p> }
+    @if (Items.Count == 0)
+    {
+        @if (Opening) { <MessageSkeleton /> }
+        else { <p class="empty">Say hello. This is the beginning of your conversation.</p> }
+    }
 </div>
 @code {
     [Parameter, EditorRequired] public List<ChatMessage> Items { get; set; } = [];
@@ -28,6 +32,7 @@
     [Parameter] public bool HasNewer { get; set; }
     [Parameter] public EventCallback Visible { get; set; }
     [Parameter] public bool HasMore { get; set; }
+    [Parameter] public bool Opening { get; set; }
     private ElementReference element;
     private DotNetObjectReference<MessageWindow>? reference;
     private int start, count = 40;
