@@ -46,6 +46,7 @@
     [Parameter] public ChatMessage? Reply { get; set; }
     [Parameter] public EventCallback Cancel { get; set; }
     [Parameter] public EventCallback Sent { get; set; }
+    [Parameter] public EventCallback<ChatMessage> RestoreReply { get; set; }
     private string Key => $"{ThreadId:N}:{ParentId?.ToString("N") ?? "main"}";
     private string draft = "", loaded = "";
     private long draftRevision;
@@ -178,6 +179,7 @@
         if (busy || recording || !CanSend) return;
         var text = draft;
         var attachment = file;
+        var repliedTo = Reply;
         var key = Key;
         draftRevision++;
         // Keep attachment ownership exclusive until it is durable, but let text
@@ -198,6 +200,7 @@
             {
                 draft = string.IsNullOrEmpty(draft) ? text : text + "\n" + draft;
                 if (attachment is not null) file = attachment;
+                if (repliedTo is not null) await RestoreReply.InvokeAsync(repliedTo);
                 await SaveDraftAsync();
             }
             else

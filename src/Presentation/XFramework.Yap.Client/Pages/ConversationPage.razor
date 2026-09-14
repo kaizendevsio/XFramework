@@ -35,7 +35,7 @@ else
             <ChildContent Context="message"><MessageBubble Message="message" Latest="MessageReceipts.IsLatest(message, chat.Messages)" ShowTime="@(!State.HasNewerMessages && chat.Messages.LastOrDefault()?.Id == message.Id)" Readers="MessageReceipts.Readers(message, chat.Messages)" ShowSender="chat.Group" OnSelect="Select" OnReply="ReplyTo" OnThread="OpenThreadAsync" OnReact='emoji => State.ActionAsync(message, "react", emoji: emoji)' /></ChildContent>
         </MessageWindow>
     }
-    </ChildContent><Footer><Composer @key="@(ParentId ?? Id)" ThreadId="Id" ParentId="ParentId" Reply="reply" Cancel="() => reply = null" /></Footer></ScrollSurface>
+    </ChildContent><Footer><Composer @key="@(ParentId ?? Id)" ThreadId="Id" ParentId="ParentId" Reply="reply" Cancel="() => reply = null" RestoreReply="message => reply ??= message" /></Footer></ScrollSurface>
 }
 @if (mode == "message" && selected is not null)
 {
