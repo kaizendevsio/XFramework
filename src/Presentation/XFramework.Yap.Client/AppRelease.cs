@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.3";
+    public const string Version = "1.3.4";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "14 September 2026", [
+            "Open saved conversations while Yap reconnects in the background.",
+            "Recover from a stuck loading screen and install updates without clearing your saved data."]),
+        ("1.3.3", "14 September 2026", [
             "Profile photos display correctly after upload and stay safely attached to your account."]),
         ("1.3.2", "14 September 2026", [
             "Change your profile photo without a permission error.",

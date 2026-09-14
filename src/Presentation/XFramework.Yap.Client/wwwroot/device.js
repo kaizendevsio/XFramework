@@ -93,7 +93,12 @@
                 const rect = row.getBoundingClientRect(); return rect.bottom > top && rect.top < bottom;
             }).map(row => row.dataset.windowRow);
         },
-        watch: async dotnet => { listener = dotnet; await (startupCleanup ??= cleanupUnverified()); },
+        watch(dotnet) {
+            listener = dotnet;
+            // Old temporary files are housekeeping, not a prerequisite for opening chats.
+            startupCleanup ??= cleanupUnverified().catch(error =>
+                window.yap.diagnostics?.record('storage.cleanup-failed', { name: error.name }));
+        },
         events(scope, thread) {
             if (account === scope && activeThread === thread && events) return;
             events?.close(); events = null; account = scope; activeThread = thread;
