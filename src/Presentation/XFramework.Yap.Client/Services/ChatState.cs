@@ -715,7 +715,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     private async Task FlushSendsAsync()
     {
         // A live session already has its account binding, CSRF token and encryption
-        // identity. Sending only needs to drain the outbox; normal sync/SSE updates
+        // identity. Sending only needs to drain the outbox; normal live updates
         // inbox summaries and receipts independently.
         var requiresSync = false;
         try

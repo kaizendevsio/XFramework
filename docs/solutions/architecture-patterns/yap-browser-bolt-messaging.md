@@ -40,6 +40,9 @@ connection, so multiple tabs do not share a durable subscriber cursor. The exist
 Bolt subscription protocol has no readiness acknowledgment; periodic catch-up also
 covers the initial subscription window. The legacy SSE endpoint remains temporarily
 available for clients that have not updated; new clients do not create EventSource.
+An event missed during upstream subscription setup may wait for the 20-second
+reconciliation poll. Measure the first message after reconnect separately from
+steady-state delivery; this mechanism does not provide gap-free replay.
 
 Sending has its own outbox gate, independent of background network refreshes. Local
 message/cache mutations use a short separate gate; HTTP snapshots that began before
