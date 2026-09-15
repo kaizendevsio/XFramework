@@ -207,10 +207,12 @@ else
             _blockedUserCount = summary.BlockedUserCount;
             _gridKey++;
         }
-        catch
+        catch (Exception exception)
         {
-            _error = "Communications users could not be loaded. Check service health and tenant access.";
-            ToastService.Error("Communications users could not be loaded.", "Users Unavailable");
+            _error = CommunicationsPortalErrors.Describe(
+                exception,
+                "Communications users could not be loaded. Check service health and tenant access.");
+            ToastService.Error(_error, "Users Unavailable");
         }
         finally
         {

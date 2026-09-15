@@ -315,10 +315,12 @@ else
             _pinRows = data.Pins;
             _savedRows = data.SavedMessages;
         }
-        catch
+        catch (Exception exception)
         {
-            _error = "Communications operations could not be loaded. Check service health and tenant access.";
-            ToastService.Error("Communications operations could not be loaded.", "Operations Unavailable");
+            _error = CommunicationsPortalErrors.Describe(
+                exception,
+                "Communications operations could not be loaded. Check service health and tenant access.");
+            ToastService.Error(_error, "Operations Unavailable");
         }
         finally
         {

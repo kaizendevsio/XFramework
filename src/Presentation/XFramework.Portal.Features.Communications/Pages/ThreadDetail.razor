@@ -313,10 +313,12 @@ else
             _memberRows = detail.Members;
             _messageRows = detail.Messages;
         }
-        catch
+        catch (Exception exception)
         {
-            _error = "Communications thread detail could not be loaded. Check service health and tenant access.";
-            ToastService.Error("Communications thread detail could not be loaded.", "Thread Unavailable");
+            _error = CommunicationsPortalErrors.Describe(
+                exception,
+                "Communications thread detail could not be loaded. Check service health and tenant access.");
+            ToastService.Error(_error, "Thread Unavailable");
         }
         finally
         {

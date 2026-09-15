@@ -364,10 +364,12 @@ else
             _inviteRows = detail.Invites;
             _blockRows = detail.Blocks;
         }
-        catch
+        catch (Exception exception)
         {
-            _error = "Communications user detail could not be loaded. Check service health and tenant access.";
-            ToastService.Error("Communications user detail could not be loaded.", "User Detail Unavailable");
+            _error = CommunicationsPortalErrors.Describe(
+                exception,
+                "Communications user detail could not be loaded. Check service health and tenant access.");
+            ToastService.Error(_error, "User Detail Unavailable");
         }
         finally
         {
