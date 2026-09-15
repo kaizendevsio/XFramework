@@ -44,7 +44,8 @@ public sealed class PosRequestContextResolver(
         var isTrustedInternal = invocation is { Actor: null, Service: not null };
         var isPrivilegedActor = isTrustedInternal ||
             invocation?.Actor?.Roles.Contains("Admin") == true ||
-            invocation?.Actor?.Roles.Contains("SuperAdmin") == true;
+            invocation?.Actor?.Roles.Contains("SuperAdmin") == true ||
+            invocation?.Actor?.Capabilities.Contains(XFrameworkActorCapabilities.IdentityTenantsManage) == true;
 
         if (requestCredentialId is { } targetCredentialId &&
             actorCredentialId is { } actorId &&
