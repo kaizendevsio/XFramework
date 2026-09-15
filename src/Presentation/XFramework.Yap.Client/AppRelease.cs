@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.18";
+    public const string Version = "1.3.19";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "15 September 2026", [
+            "Queued messages get a turn before inbox refreshes, and conversation reads run together to reduce delivery delay.",
+            "A brief server reconnect retries a read once instead of immediately waiting for the next background sync."]),
+        ("1.3.18", "15 September 2026", [
             "Going back from chat details immediately restores the conversation, including its draft and scroll position.",
             "Connection notices now say when Yap cannot be reached instead of claiming your internet is offline."]),
         ("1.3.17", "15 September 2026", [

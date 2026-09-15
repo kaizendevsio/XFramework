@@ -12,6 +12,60 @@ namespace Yap.Client.Tests;
 
 public sealed class ChatStateTests
 {
+    [Test]
+    public async Task RefreshHint_ReadsInParallel_AndLetsQueuedSendRunBeforeInbox()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Sender");
+        var thread = Guid.NewGuid(); var chat = new Conversation { Id = thread };
+        var block = false; var order = new List<string>();
+        var detailsStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var messagesStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var posted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var js = new Mock<IJSRuntime>();
+        js.Setup(x => x.InvokeAsync<bool>("yap.device.online", It.IsAny<object?[]?>())).ReturnsAsync(true);
+        using var http = new HttpClient(new Handler(async request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path == "/api/session") return Json(new SessionResponse(user, "token"));
+            if (path.EndsWith("initialize")) return Json(new ChatDefaults(Guid.NewGuid(), []));
+            if (request.Method == HttpMethod.Post && path.EndsWith("messages"))
+            {
+                var send = (await request.Content!.ReadFromJsonAsync<SendMessage>())!;
+                order.Add("send"); posted.TrySetResult(); return Json(new MessageReceipt(send.Id));
+            }
+            if (path.EndsWith(thread.ToString()))
+            {
+                if (block) { detailsStarted.TrySetResult(); await release.Task; }
+                return Json(chat);
+            }
+            if (path.EndsWith("messages"))
+            {
+                if (block) messagesStarted.TrySetResult();
+                return Json(new ChatPage<ChatMessage>([], 0));
+            }
+            if (block) order.Add("inbox");
+            return Json(new ChatPage<Conversation>([chat], 1));
+        })) { BaseAddress = new("https://yap.test/") };
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), js.Object);
+        await state.InitializeAsync(); await state.SelectAsync(thread);
+        block = true;
+        var refresh = state.RefreshHint();
+        try
+        {
+            await detailsStarted.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            await messagesStarted.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            await state.SendAsync(thread, "Send while refreshing", null, "main");
+            for (var i = 0; i < 100 && (await fixture.Store.PendingAsync(OfflineStore.Scope(user))).Count == 0; i++) await Task.Delay(10);
+            await Task.Delay(50); // Let the persisted send join the held network gate.
+        }
+        finally { release.TrySetResult(); }
+        await posted.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        await refresh.WaitAsync(TimeSpan.FromSeconds(3));
+        Assert.That(order.First(), Is.EqualTo("send"), "Inbox work must yield to an already queued send.");
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public async Task SendWithLiveSession_PostsDirectly_AndRevalidatesRejectedSession(bool reject)
