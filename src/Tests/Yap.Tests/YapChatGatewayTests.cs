@@ -29,6 +29,45 @@ namespace Yap.Tests;
 public sealed class YapChatGatewayTests
 {
     [Test]
+    public async Task TypingSubscription_OnlyQueuesOtherParticipantsInTheWatchedTenantAndThread()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var tenant = Guid.Parse(fixture.Alice.FindFirstValue(YapAuth.TenantClaim)!);
+        var actor = Guid.Parse(fixture.Alice.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var other = Guid.NewGuid(); var thread = Guid.NewGuid();
+        Func<CommunicationsTypingState, Task>? publish = null;
+        fixture.Wrapper.Setup(x => x.GetThreadAsync(It.IsAny<GetThreadRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ChatFixture.Ok(new GetThreadResponse { Id = thread, Members = [new() { CredentialId = actor }, new() { CredentialId = other }] }));
+        fixture.Wrapper.Setup(x => x.SubscribeTypingAsync(tenant, thread, It.IsAny<Func<CommunicationsTypingState, Task>>(),
+                It.IsAny<Func<CancellationToken, ValueTask<string?>>>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, Guid, Func<CommunicationsTypingState, Task>, Func<CancellationToken, ValueTask<string?>>, CancellationToken>(
+                (_, _, handler, _, _) => publish = handler).Returns(Task.CompletedTask);
+        using var cookies = await fixture.LoginAsync(fixture.Alice);
+        var ticket = await fixture.Gateway.CreateTicketAsync(fixture.Alice, default);
+        using var socket = fixture.Socket(cookies);
+        await socket.ConnectAsync(fixture.Url(ticket), default);
+        await RegisterAsync(socket, ticket.ClientId);
+        await ReceiveAsync(socket); // Consume initial reconciliation before watching typing.
+        Assert.That((await InvokeAsync(socket, ticket.ClientId, "watch", new { threadId = thread })).Status, Is.EqualTo(204));
+        Assert.That(publish, Is.Not.Null);
+
+        await publish!(new() { TenantId = tenant, ThreadId = thread, CredentialId = actor, IsTyping = true });
+        await publish(new() { TenantId = Guid.NewGuid(), ThreadId = thread, CredentialId = other, IsTyping = true });
+        await publish(new() { TenantId = tenant, ThreadId = Guid.NewGuid(), CredentialId = other, IsTyping = true });
+        await publish(new() { TenantId = tenant, ThreadId = thread, CredentialId = other, IsTyping = true });
+
+        var packet = await ReceiveAsync(socket);
+        Assert.That(BoltCodec.TryReadRequest(packet, out var frame, out _), Is.True);
+        var pushed = JsonSerializer.Deserialize<ChatSocketEvent>(frame.GetPayload(packet), new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        Assert.That(pushed.Kind, Is.EqualTo("typing"));
+        Assert.That(pushed.Body!.Value.Deserialize<TypingUpdate>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.CredentialId, Is.EqualTo(other));
+        // One lookup admits the watch; only the other participant's event needs a fresh
+        // authorization lookup. Self echoes never consume the message projection queue.
+        fixture.Wrapper.Verify(x => x.GetThreadAsync(It.IsAny<GetThreadRequest>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "test complete", default);
+    }
+
+    [Test]
     public async Task QueuedDuplexEvents_ShareProjectionAndDirectoryLookupWithoutLosingCreationOrReceiptOrder()
     {
         var tenant = Guid.NewGuid(); var actor = Guid.NewGuid(); var other = Guid.NewGuid(); var thread = Guid.NewGuid();

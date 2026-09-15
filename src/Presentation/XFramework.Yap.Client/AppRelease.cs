@@ -2,10 +2,12 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.24";
+    public const string Version = "1.3.25";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "15 September 2026", [
+            "Your own typing updates no longer compete with incoming messages."]),
+        ("1.3.24", "15 September 2026", [
             "Live message updates share queued lookups to reduce delays when both people send rapidly."]),
         ("1.3.23", "15 September 2026", [
             "Brief server reconnects keep messages queued and retry automatically."]),
