@@ -35,6 +35,9 @@ public sealed class OfflineDatabase(DbContextOptions<OfflineDatabase> options) :
             // Rows cached before the column existed still carry the flag inside their serialized body.
             await db.Database.ExecuteSqlRawAsync(
                 "UPDATE \"Messages\" SET \"IsThreadReply\" = 1 WHERE \"Json\" LIKE '%\"isThreadReply\":true%'", ct);
+        if (await AddColumnAsync(db, "Messages", "Saved", "INTEGER NOT NULL DEFAULT 0", ct))
+            await db.Database.ExecuteSqlRawAsync(
+                "UPDATE \"Messages\" SET \"Saved\" = 1 WHERE \"Json\" LIKE '%\"saved\":true%'", ct);
     }
 
     private static async Task<bool> AddColumnAsync(OfflineDatabase db, string table, string column, string definition, CancellationToken ct)
@@ -67,6 +70,8 @@ public sealed class CachedMessage
     public Guid? ParentId { get; set; }
     /// <summary>Queryable copy of the flag inside <see cref="Json"/>: the timeline and the thread page filter on it.</summary>
     public bool IsThreadReply { get; set; }
+    /// <summary>Queryable copy of the bookmark inside <see cref="Json"/>, so the saved list reads offline without scanning every row.</summary>
+    public bool Saved { get; set; }
     public long CreatedTicks { get; set; }
     public string Json { get; set; } = "";
 }

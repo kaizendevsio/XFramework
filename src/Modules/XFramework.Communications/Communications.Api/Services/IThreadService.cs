@@ -38,6 +38,7 @@ public interface IThreadService
     Task<Result<DeferredEncryptionResponse>> GetDeferredEncryptionAsync(GetDeferredEncryptionRequest request, CancellationToken ct = default);
     Task<Result<CmdResponse>> CompleteDeferredEncryptionAsync(CompleteDeferredEncryptionRequest request, CancellationToken ct = default);
     Task<Result<SearchMessagesResponse>> SearchMessagesAsync(SearchMessagesRequest request, CancellationToken ct = default);
+    Task<Result<GetSavedMessagesResponse>> GetSavedMessagesAsync(GetSavedMessagesRequest request, CancellationToken ct = default);
 
     // Round 2: Delete, Edit, Attachments, Reactions
     Task<Result<CmdResponse>> DeleteThreadMessageAsync(DeleteThreadMessageRequest request, CancellationToken ct = default);

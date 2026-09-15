@@ -1,4 +1,4 @@
-using Communications.Domain.Shared;
+﻿using Communications.Domain.Shared;
 using Communications.Domain.Shared.Contracts.Realtime;
 using Communications.Domain.Shared.Contracts.Requests.Attachments;
 using Communications.Domain.Shared.Contracts.Requests.Create;
@@ -115,6 +115,11 @@ public interface ICommunicationsChatSession
     Task<QueryResponse<SearchMessagesResponse>> SearchMessagesAsync(
         string query,
         Guid? threadId = null,
+        int pageIndex = 0,
+        int pageSize = 20,
+        CancellationToken ct = default);
+
+    Task<QueryResponse<GetSavedMessagesResponse>> GetSavedMessagesAsync(
         int pageIndex = 0,
         int pageSize = 20,
         CancellationToken ct = default);
@@ -403,6 +408,16 @@ internal sealed class CommunicationsChatSession(
         {
             Query = query,
             ThreadId = threadId,
+            PageIndex = pageIndex,
+            PageSize = pageSize
+        }), callCt), ct);
+
+    public Task<QueryResponse<GetSavedMessagesResponse>> GetSavedMessagesAsync(
+        int pageIndex = 0,
+        int pageSize = 20,
+        CancellationToken ct = default) =>
+        InvokeAsync(callCt => wrapper.GetSavedMessagesAsync(Prepare(new GetSavedMessagesRequest
+        {
             PageIndex = pageIndex,
             PageSize = pageSize
         }), callCt), ct);

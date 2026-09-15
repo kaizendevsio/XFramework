@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Text.Json;
 using IdentityServer.Domain.Shared;
 using Communications.Domain.Shared;
@@ -37,6 +37,8 @@ public sealed partial class ThreadService(
 ) : IThreadService
 {
     private static readonly JsonSerializerOptions OutboxJsonOptions = new(JsonSerializerDefaults.Web);
+    /// <summary>A saved list is a personal shortlist, not an archive; this bounds the unpaged save-row read.</summary>
+    private const int SavedMessageCeiling = 500;
     private bool outboxPending;
 
     private async Task SaveAndSignalAsync(CancellationToken ct)
@@ -1960,6 +1962,148 @@ public sealed partial class ThreadService(
         {
             logger.LogError(ex, "Error searching messages");
             return OperationFailure<SearchMessagesResponse>(ex, "Error searching messages");
+        }
+    }
+
+    /// <summary>
+    /// Lists the messages the requester saved, across every conversation they are still in.
+    /// Saves hang off the requester's own <see cref="MessageThreadMember"/> rows, so another
+    /// member's saves are unreachable by construction rather than by a filter that can be forgotten.
+    /// </summary>
+    public async Task<Result<GetSavedMessagesResponse>> GetSavedMessagesAsync(GetSavedMessagesRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
+            if (!callerResult.IsSuccess)
+                return CallerFailure<GetSavedMessagesResponse>(callerResult);
+
+            var caller = callerResult.Data!;
+            var pageIndex = request.PageIndex < 0 ? 0 : request.PageIndex;
+            var pageSize = request.PageSize <= 0 ? 20 : Math.Min(request.PageSize, 100);
+
+            // Leaving or being removed from a thread disables the membership, which drops every
+            // save made through it: a saved message never outlives access to its conversation.
+            var memberships = await dataContext.Query<MessageThreadMember>()
+                .Where(m => m.CredentialId == caller.CredentialId)
+                .Where(m => m.TenantId == caller.TenantId)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
+                .ToListAsync(ct);
+            if (memberships.Count == 0)
+                return Result<GetSavedMessagesResponse>.Success(new GetSavedMessagesResponse { PageIndex = pageIndex, PageSize = pageSize });
+
+            var memberIds = memberships.Select(m => m.Id).ToList();
+            var allowedThreadIds = memberships.Select(m => m.MessageThreadId).Distinct().ToList();
+            var savedRows = await dataContext.Query<MessageSaved>()
+                .Where(s => memberIds.Contains(s.MessageThreadMemberId))
+                .Where(s => s.TenantId == caller.TenantId)
+                .Where(s => !s.IsDeleted && s.IsEnabled)
+                .OrderByDescending(s => s.CreatedAt)
+                .Take(SavedMessageCeiling)
+                .ToListAsync(ct);
+            if (savedRows.Count == 0)
+                return Result<GetSavedMessagesResponse>.Success(new GetSavedMessagesResponse { PageIndex = pageIndex, PageSize = pageSize });
+
+            var savedMessageIds = savedRows.Select(s => s.MessageId).Distinct().ToList();
+            var blockedCredentialIds = await GetBlockedCredentialIdsForAsync(caller.TenantId, caller.CredentialId, ct);
+            var blockedSenderMemberIds = await GetBlockedThreadMemberIdsAsync(caller.TenantId, allowedThreadIds, blockedCredentialIds, ct);
+            var hiddenRows = await dataContext.Query<MessageHidden>()
+                .Where(h => memberIds.Contains(h.MessageThreadMemberId))
+                .Where(h => h.TenantId == caller.TenantId)
+                .Where(h => !h.IsDeleted && h.IsEnabled)
+                .ToListAsync(ct);
+            var hiddenMessageIds = hiddenRows.Select(h => h.MessageId).ToList();
+
+            // A saved message may be a timeline message or a thread reply; the list shows both,
+            // because the saver chose it. Each row carries the flag so the caller can reopen
+            // the timeline or the thread page it actually lives on.
+            var messageQuery = dataContext.Query<Message>()
+                .Where(m => savedMessageIds.Contains(m.Id))
+                .Where(m => allowedThreadIds.Contains(m.MessageThreadId))
+                .Where(m => m.TenantId == caller.TenantId)
+                .Where(m => !m.IsDeleted && m.IsEnabled);
+            if (blockedSenderMemberIds.Count > 0)
+                messageQuery = messageQuery.Where(m => !blockedSenderMemberIds.Contains(m.MessageThreadMemberId));
+            if (hiddenMessageIds.Count > 0)
+                messageQuery = messageQuery.Where(m => !hiddenMessageIds.Contains(m.Id));
+            var visible = await messageQuery.ToListAsync(ct);
+
+            // Visibility is decided against the message, not the save row, so paging happens
+            // after the filter. Without it a page of 20 could return 3 rows and a wrong total.
+            var savedAt = savedRows.GroupBy(s => s.MessageId).ToDictionary(g => g.Key, g => g.Max(s => s.CreatedAt));
+            var ordered = visible
+                .OrderByDescending(m => savedAt[m.Id])
+                .ThenByDescending(m => m.CreatedAt)
+                .ThenByDescending(m => m.Id)
+                .ToList();
+            var totalCount = ordered.Count;
+            var page = ordered.Skip(pageIndex * pageSize).Take(pageSize).ToList();
+
+            var senderIds = page.Select(m => m.MessageThreadMemberId).Distinct().ToList();
+            var senders = (await dataContext.Query<MessageThreadMember>()
+                .Where(m => senderIds.Contains(m.Id))
+                .Where(m => m.TenantId == caller.TenantId)
+                .ToListAsync(ct)).ToDictionary(m => m.Id);
+            var pageThreadIds = page.Select(m => m.MessageThreadId).Distinct().ToList();
+            var threads = (await dataContext.Query<MessageThread>()
+                .Where(t => pageThreadIds.Contains(t.Id))
+                .Where(t => t.TenantId == caller.TenantId)
+                .Where(t => !t.IsDeleted)
+                .ToListAsync(ct)).ToDictionary(t => t.Id);
+            var directThreads = await dataContext.Query<MessageDirectThread>()
+                .Where(x => pageThreadIds.Contains(x.MessageThreadId))
+                .Where(x => x.TenantId == caller.TenantId)
+                .Where(x => !x.IsDeleted && x.IsEnabled)
+                .ToListAsync(ct);
+            var directPeers = directThreads
+                .Where(x => x.FirstCredentialId == caller.CredentialId || x.SecondCredentialId == caller.CredentialId)
+                .ToDictionary(x => x.MessageThreadId, x => x.FirstCredentialId == caller.CredentialId ? x.SecondCredentialId : x.FirstCredentialId);
+            var directThreadIds = directThreads.Select(x => x.MessageThreadId).ToHashSet();
+            var pageMessageIds = page.Select(m => m.Id).ToList();
+            var attachedIds = (await dataContext.Query<MessageFile>()
+                .Where(f => f.TenantId == caller.TenantId && pageMessageIds.Contains(f.MessageId) && !f.IsDeleted && f.IsEnabled)
+                .ToListAsync(ct)).Select(f => f.MessageId).ToHashSet();
+            var membershipByThread = memberships.GroupBy(m => m.MessageThreadId).ToDictionary(g => g.Key, g => g.First());
+
+            return Result<GetSavedMessagesResponse>.Success(new GetSavedMessagesResponse
+            {
+                Items = page.Select(message =>
+                {
+                    senders.TryGetValue(message.MessageThreadMemberId, out var sender);
+                    threads.TryGetValue(message.MessageThreadId, out var thread);
+                    membershipByThread.TryGetValue(message.MessageThreadId, out var membership);
+                    return new SavedMessageItemResponse
+                    {
+                        ThreadId = message.MessageThreadId,
+                        ThreadName = thread?.Name ?? string.Empty,
+                        IsDirect = directThreadIds.Contains(message.MessageThreadId),
+                        HasCustomName = thread?.HasCustomName ?? false,
+                        ThreadPhotoStorageFileId = thread?.PhotoStorageFileId,
+                        OtherCredentialId = directPeers.TryGetValue(message.MessageThreadId, out var peer) ? peer : null,
+                        MessageId = message.Id,
+                        SenderCredentialId = sender?.CredentialId ?? Guid.Empty,
+                        SenderAlias = sender?.Alias ?? string.Empty,
+                        Text = message.Text,
+                        EncryptedEnvelope = message.EncryptedEnvelope,
+                        AcceptedSenderDirectoryRevision = message.AcceptedSenderDirectoryRevision,
+                        EncryptionSenderDeviceId = message.EncryptionSenderDeviceId,
+                        EncryptionPending = membership is null || EncryptionPendingFor(message, membership.Id),
+                        ParentMessageId = message.ParentMessageId,
+                        IsThreadReply = message.IsThreadReply,
+                        HasAttachments = attachedIds.Contains(message.Id),
+                        CreatedAt = message.CreatedAt,
+                        SavedAt = savedAt[message.Id]
+                    };
+                }).ToList(),
+                PageIndex = pageIndex,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error getting saved messages");
+            return OperationFailure<GetSavedMessagesResponse>(ex, "Error getting saved messages");
         }
     }
 

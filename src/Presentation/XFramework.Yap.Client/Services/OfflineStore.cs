@@ -91,6 +91,30 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
     public Task<int> MessageCountAsync(string scope, Guid thread) => UseAsync(db => db.Messages.CountAsync(x => x.Scope == scope && x.ThreadId == thread && !x.IsThreadReply));
     public Task<int> ReplyCountAsync(string scope, Guid parent) => UseAsync(db => db.Messages.CountAsync(x => x.Scope == scope && x.ParentId == parent && x.IsThreadReply));
 
+    // Bookmarks are read back from the device so the saved list still opens with no connection.
+    public Task<List<ChatMessage>> SavedMessagesAsync(string scope, int limit = 0, int skip = 0, CancellationToken ct = default) => UseAsync(async db =>
+    {
+        var query = db.Messages.AsNoTracking().Where(x => x.Scope == scope && x.Saved)
+            .OrderByDescending(x => x.CreatedTicks).ThenByDescending(x => x.Id).AsQueryable();
+        if (skip > 0) query = query.Skip(skip);
+        if (limit > 0) query = query.Take(limit);
+        return (await query.ToListAsync(ct)).Select(x => JsonSerializer.Deserialize<ChatMessage>(x.Json, Json)!).ToList();
+    }, ct);
+
+    public Task<int> SavedMessageCountAsync(string scope, CancellationToken ct = default) =>
+        UseAsync(db => db.Messages.CountAsync(x => x.Scope == scope && x.Saved, ct), ct);
+
+    public Task SetSavedAsync(string scope, Guid id, bool saved, CancellationToken ct = default) => UseAsync(async db =>
+    {
+        var row = await db.Messages.FindAsync([scope, id], ct);
+        if (row is null) return 0;
+        var message = JsonSerializer.Deserialize<ChatMessage>(row.Json, Json)!;
+        message.Saved = saved;
+        row.Saved = saved;
+        row.Json = JsonSerializer.Serialize(message, Json);
+        return await db.SaveChangesAsync(ct);
+    }, ct);
+
     public Task<ChatMessage?> MessageAsync(string scope, Guid id) => UseAsync(async db =>
     {
         var row = await db.Messages.AsNoTracking().SingleOrDefaultAsync(x => x.Scope == scope && x.Id == id);
@@ -250,6 +274,7 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         row.CreatedTicks = message.CreatedAt.Ticks;
         row.ParentId = message.ParentId;
         row.IsThreadReply = message.IsThreadReply;
+        row.Saved = message.Saved;
         row.Json = JsonSerializer.Serialize(message, Json);
     }
 }
