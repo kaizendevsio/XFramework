@@ -20,6 +20,9 @@ public sealed partial class ChatState
         await Encryption.DecryptAsync(User, pending);
         foreach (var conversation in conversations)
             if (conversation.LastMessage is { } message) conversation.Preview = MessagePreview(message);
+        // The summary carries a readable message, so every conversation can be
+        // acknowledged here — not only the one the reader happens to have open.
+        await AcknowledgeInboxAsync(conversations);
     }
 
     internal static string MessagePreview(ChatMessage message)

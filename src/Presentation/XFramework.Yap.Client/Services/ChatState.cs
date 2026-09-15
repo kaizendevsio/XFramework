@@ -124,7 +124,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         var saved = await store.SettingAsync("user");
         if (saved is not null) User = JsonSerializer.Deserialize<UserSession>(saved);
         await js.InvokeVoidAsync("yap.diagnostics.record", "startup.stage", new { phase = "saved-conversations" });
-        if (User is not null) Conversations = await store.ConversationsAsync(Scope);
+        if (User is not null) { Conversations = await store.ConversationsAsync(Scope); await LoadDeliveredAsync(); }
         Online = await js.InvokeAsync<bool>("yap.device.online");
         reference = DotNetObjectReference.Create(this);
         await js.InvokeVoidAsync("yap.device.watch", reference);
@@ -204,6 +204,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
                         if ((page + 1) * 30 >= list.TotalCount) break;
                     }
                     await ReloadConversationsAsync();
+                    await SweepDeliveredAsync();
                     Notify();
                 }
                 finally { sync.Release(); }
@@ -279,6 +280,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             EncryptionEnabled = session.EncryptionRequired;
             api.Account = Scope;
             NeedsLogin = false;
+            await LoadDeliveredAsync();
             await PublishPresenceAsync();
             await store.SetSettingAsync("user", JsonSerializer.Serialize(User));
             Defaults ??= await api.PostAsync<ChatDefaults>("api/chat/initialize");
@@ -297,6 +299,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             }
             await ReloadConversationsAsync();
             ApplyOptimisticConversations();
+            await SweepDeliveredAsync();
             if (Selected is not null) await RefreshSelectedAsync(Selected.Id);
             await WatchEventsAsync();
             RetryDelivered();
@@ -676,6 +679,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         foreach (var item in (await store.PendingAsync(Scope)).Where(x => x.ThreadId == thread && x.FileKey is not null))
             await js.InvokeVoidAsync("yap.device.removeFile", item.FileKey);
         await store.RemoveConversationAsync(Scope, thread, lifetime.Token, discardPending: true);
+        ForgetDelivered(thread); await SaveDeliveredAsync();
         Conversations.RemoveAll(x => x.Id == thread);
         if (Selected?.Id == thread) { Selected = null; typing.Clear(); }
         PendingCount = (await store.PendingAsync(Scope)).Count;
@@ -939,6 +943,9 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
                         senderDirectoryRevision = message.AcceptedSenderDirectoryRevision,
                         recipientDirectoryRevisions = directories.ToDictionary(x => x.GetProperty("credentialId").GetGuid(), x => x.GetProperty("revision").GetInt64())
                     });
+                    // Envelopes in this thread were just rewritten. Anything this device
+                    // could not read there is worth re-reading, and the receipt with it.
+                    DeferDelivered(message.ThreadId);
                 }
                 catch (ChatApiException ex) when (ex.Status is 403 or 404 or 409 or 412)
                 {
