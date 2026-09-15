@@ -10,12 +10,20 @@ namespace Communications.Api.Services;
 internal sealed class ConversationMutationLock(DbConnection connection, long key, bool close) : IAsyncDisposable
 {
     public static async Task<ConversationMutationLock?> AcquireAsync(DbContext? db, Guid tenant, Guid thread, CancellationToken ct)
+        => await AcquireKeyAsync(db, $"communications:members:{tenant}:{thread}", ct);
+
+    // Receipt writes from history, read and explicit delivery share a per-recipient lock.
+    // They do not block message sends or other members' receipt processing.
+    public static Task<ConversationMutationLock?> AcquireReceiptsAsync(DbContext? db, Guid tenant, Guid member, CancellationToken ct)
+        => AcquireKeyAsync(db, $"communications:receipts:{tenant}:{member}", ct);
+
+    private static async Task<ConversationMutationLock?> AcquireKeyAsync(DbContext? db, string identity, CancellationToken ct)
     {
         if (db is null || db.Database.ProviderName != "Npgsql.EntityFrameworkCore.PostgreSQL") return null;
         var connection = db.Database.GetDbConnection();
         var close = connection.State != ConnectionState.Open;
         if (close) await connection.OpenAsync(ct);
-        var key = BitConverter.ToInt64(SHA256.HashData(Encoding.UTF8.GetBytes($"communications:members:{tenant}:{thread}")));
+        var key = BitConverter.ToInt64(SHA256.HashData(Encoding.UTF8.GetBytes(identity)));
         try
         {
             await ExecuteAsync(connection, "SELECT pg_advisory_lock(@key)", key, ct);

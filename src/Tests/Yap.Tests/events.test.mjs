@@ -1,62 +1,128 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import vm from 'node:vm';
+import { createChatSocket } from '../../Presentation/XFramework.Yap.Client/wwwroot/chat-socket.mjs';
+import { fnv1aHash } from '../../Presentation/XFramework.Yap.Client/wwwroot/vendor/bolt/protocol.js';
 
+const settle = async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); };
 function fixture() {
-    const sources = [], timers = new Map(), handlers = {}, calls = [];
-    let sequence = 0;
-    class EventSource {
-        static CLOSED = 2;
-        constructor(url) { this.url = url; this.readyState = 0; sources.push(this); }
-        close() { this.readyState = 2; }
-        addEventListener() {}
+    const clients = [], requests = [], calls = [], timers = new Map();
+    const navigator = { onLine: true }, document = { hidden: false };
+    let id = 0, apply = async () => {}, failAdmission = false, admissionUrl = '/api/chat/socket?ticket=opaque';
+    class Client {
+        constructor(url, clientId, name) { Object.assign(this, { url, clientId, name, isConnected: false, invocations: [] }); clients.push(this); }
+        async connect() { this.isConnected = true; }
+        disconnect() { this.isConnected = false; this.onDisconnected?.(); }
+        async invoke(recipient, command, payload) {
+            const value = JSON.parse(new TextDecoder().decode(payload));
+            this.invocations.push(value);
+            if (value.operation === 'ack' && this.holdAck) await this.holdAck;
+            if (this.invokeFailure) throw new Error('Connection lost after send');
+            return { statusCode: 200, payload: new TextEncoder().encode(JSON.stringify({ status: 200, body: { ok: true } })) };
+        }
+        push(event) { this.onPush(fnv1aHash('yap.chat.event'), new TextEncoder().encode(JSON.stringify(event))); }
     }
-    const document = { hidden: false, addEventListener: (name, fn) => handlers[name] = fn };
-    const navigator = { onLine: true }, window = { yap: {} };
-    vm.runInNewContext(readFileSync(new URL('../../Presentation/XFramework.Yap.Client/wwwroot/device.js', import.meta.url), 'utf8'), {
-        document, navigator, window, yap: window.yap, EventSource, visualViewport: null,
-        addEventListener: (name, fn) => handlers[name] = fn,
-        requestAnimationFrame() {}, cancelAnimationFrame() {},
-        setTimeout(fn, delay) { const id = ++sequence; timers.set(id, { fn, delay }); return id; },
+    const api = createChatSocket(() => ({ async invokeMethodAsync(...args) { calls.push(args); return apply(...args); } }), {
+        Client, navigator, document, location: { href: 'https://example.test/', host: 'example.test', protocol: 'https:' },
+        timeout: () => undefined,
+        async fetch(path, options) { requests.push({ path, options }); if (failAdmission) throw new Error('Unavailable'); return { ok: true, status: 200, json: async () => ({ url: admissionUrl, clientId: 'issued-id' }) }; },
+        setTimeout(fn, delay) { timers.set(++id, { fn, delay }); return id; },
         clearTimeout(id) { timers.delete(id); }
     });
-    const api = window.yap.device;
-    api.watch({ invokeMethodAsync(...args) { calls.push(args); return Promise.resolve(); } });
-    const fail = source => { source.readyState = 2; source.onerror(); };
-    const tick = () => { const [id, timer] = timers.entries().next().value; timers.delete(id); timer.fn(); return timer.delay; };
-    return { api, sources, timers, handlers, calls, navigator, document, fail, tick };
+    return { api, clients, requests, calls, timers, navigator, document,
+        setApply(fn) { apply = fn; }, setFailure(value) { failAdmission = value; },
+        setAdmissionUrl(value) { admissionUrl = value; },
+        async tick() { const [key, timer] = timers.entries().next().value; timers.delete(key); timer.fn(); await settle(); return timer.delay; } };
 }
+const event = (sequence, eventId = `event-${sequence}`) => ({ sequence, eventId, kind: 'MessageCreated', messages: [] });
 
-test('closed event streams reconnect, reconcile on open and forward targeted metadata', () => {
-    const f = fixture(); f.api.events('account', 'thread');
-    f.api.events('account', 'thread'); assert.equal(f.sources.length, 1);
-    const first = f.sources[0]; first.onerror(); assert.equal(f.timers.size, 0, 'Native CONNECTING retries remain browser-owned');
-    f.fail(first); f.fail(first); assert.equal(f.timers.size, 1);
-    assert.equal(f.tick(), 1000); assert.equal(f.sources.length, 2);
-    const next = f.sources[1]; next.readyState = 1; next.onopen();
-    next.onmessage({ data: '{"Kind":"MessagesRead"}' });
-    assert.deepEqual(f.calls, [['RefreshHint'], ['ChatEvent', 'account', '{"Kind":"MessagesRead"}']]);
+test('admission is same-origin and token bound; watching another thread reuses the account socket', async () => {
+    const f = fixture(); f.api.watch('account', 'first', 'csrf'); await settle();
+    assert.equal(f.clients.length, 1); assert.equal(f.clients[0].name, 'yap-browser');
+    assert.equal(f.clients[0].url, 'wss://example.test/api/chat/socket?ticket=opaque');
+    assert.equal(f.requests[0].options.headers['X-Yap-Account'], 'account');
+    assert.equal(f.requests[0].options.headers.RequestVerificationToken, 'csrf');
+    f.api.watch('account', 'second', 'csrf'); await settle();
+    assert.equal(f.clients.length, 1);
+    assert.deepEqual(f.clients[0].invocations.map(x => x.body.threadId), ['first', 'second']);
 });
 
-test('repeated failures back off; offline/background clients resume without retry flooding', () => {
-    const f = fixture(); f.api.events('account', 'thread'); f.fail(f.sources[0]); f.tick();
-    f.fail(f.sources[1]); f.navigator.onLine = false;
-    assert.equal(f.tick(), 2000); assert.equal(f.sources.length, 2);
-    f.navigator.onLine = true; f.document.hidden = true; f.handlers.online();
-    assert.equal(f.sources.length, 2);
-    f.document.hidden = false; f.handlers.visibilitychange();
-    assert.equal(f.sources.length, 3); assert.equal(f.timers.size, 0);
-    const next = f.sources[2]; next.readyState = 1; next.onopen(); f.fail(next);
-    assert.equal(f.tick(), 1000, 'Successful connection resets backoff');
-    for (let i = 0; i < 8; i++) { f.fail(f.sources.at(-1)); assert.ok(f.tick() <= 30000); }
+test('delivery events ACK only after C# application completes, and replay IDs are deduplicated', async () => {
+    const f = fixture(); f.api.watch('account', null, 'csrf'); await settle();
+    let release; f.setApply(() => new Promise(resolve => release = resolve));
+    f.clients[0].push(event(1)); await settle();
+    assert.equal(f.clients[0].invocations.filter(x => x.operation === 'ack').length, 0);
+    release(); await settle();
+    assert.deepEqual(f.clients[0].invocations.at(-1), { operation: 'ack', body: { sequence: 1 } });
+    f.clients[0].disconnect(); await f.tick();
+    f.clients[1].push(event(1)); await settle();
+    assert.equal(f.calls.length, 1);
+    assert.deepEqual(f.clients[1].invocations.at(-1), { operation: 'ack', body: { sequence: 1 } });
 });
 
-test('logout cancels retries and old account callbacks cannot revive a stream', () => {
-    const f = fixture(); f.api.events('first', 'thread'); const old = f.sources[0];
-    f.fail(old); f.api.events(''); assert.equal(f.timers.size, 0);
-    old.onerror(); old.onopen(); old.onmessage({ data: 'refresh' });
-    f.handlers.online(); assert.equal(f.sources.length, 1); assert.equal(f.calls.length, 0);
-    f.api.events('second', 'thread'); old.onerror();
-    assert.equal(f.sources.length, 2); assert.equal(f.timers.size, 0);
+test('failed apply and sequence gaps reconnect without acknowledging lost events', async () => {
+    const f = fixture(); f.api.watch('account', null, 'csrf'); await settle();
+    f.setApply(async () => { throw new Error('SQLite unavailable'); });
+    f.clients[0].push(event(1)); await settle();
+    assert.equal(f.clients[0].isConnected, false);
+    assert.equal(f.clients[0].invocations.filter(x => x.operation === 'ack').length, 0);
+    await f.tick(); f.clients[1].push(event(2)); await settle();
+    assert.equal(f.clients[1].isConnected, false);
+    assert.equal(f.calls.length, 1);
+});
+
+test('slow readers have a bounded queue and account switches discard stale callbacks and IDs', async () => {
+    const f = fixture(); f.api.watch('first', null, 'csrf'); await settle();
+    let release; f.setApply(() => new Promise(resolve => release = resolve));
+    const old = f.clients[0]; old.push(event(1)); await settle();
+    for (let i = 2; i <= 131; i++) old.push(event(i));
+    assert.equal(old.isConnected, false);
+    f.api.watch('second', null, 'new-csrf'); await settle();
+    release(); await settle(); old.push(event(132)); await settle();
+    assert.equal(f.clients.length, 2); assert.equal(f.calls.length, 1);
+    f.setApply(async () => {}); f.clients[1].push(event(1)); await settle();
+    assert.equal(f.calls[1][1], 'second');
+    f.api.watch('', null, ''); old.onDisconnected();
+    assert.equal(f.timers.size, 0);
+});
+
+test('offline/background retry stays quiet and resume probes a retained socket', async () => {
+    const f = fixture(); f.setFailure(true); f.api.watch('account', null, 'csrf'); await settle();
+    assert.equal(f.requests.length, 1); f.navigator.onLine = false;
+    assert.equal(await f.tick(), 1000); assert.equal(f.requests.length, 1);
+    f.navigator.onLine = true; f.document.hidden = true; f.api.resume(); await settle();
+    assert.equal(f.requests.length, 1);
+    f.document.hidden = false; f.api.resume(); await settle();
+    assert.equal(f.requests.length, 2); assert.equal(await f.tick(), 2000);
+    f.setFailure(false); f.api.resume(); await settle();
+    assert.equal(f.clients.length, 1);
+    const before = f.clients[0].invocations.length; f.api.resume(); await settle();
+    assert.equal(f.clients[0].invocations.length, before + 1);
+});
+
+test('writes fall back only before sending; uncertain failures are never replayed in JS', async () => {
+    const f = fixture(); assert.equal(await f.api.request('account', 'send', {}), null);
+    f.api.watch('account', null, 'csrf'); await settle();
+    assert.equal(await f.api.request('other-account', 'send', {}), null);
+    const client = f.clients[0]; client.invokeFailure = true;
+    await assert.rejects(f.api.request('account', 'send', { id: 'stable-id' }), /Connection lost/);
+    assert.equal(client.invocations.filter(x => x.operation === 'send').length, 1);
+});
+
+test('slow acknowledgment round trips do not block application of newer messages', async () => {
+    const f = fixture(); f.api.watch('account', null, 'csrf'); await settle();
+    let release;
+    const client = f.clients[0]; client.holdAck = new Promise(resolve => release = resolve);
+    client.push(event(1)); await settle();
+    client.push(event(2)); client.push(event(3)); await settle();
+    assert.equal(f.calls.length, 3, 'Messages apply while the previous ACK is in flight');
+    assert.equal(client.invocations.filter(x => x.operation === 'ack').length, 1);
+    release(); await settle();
+    assert.deepEqual(client.invocations.at(-1), { operation: 'ack', body: { sequence: 3 } });
+});
+
+test('admission cannot redirect the account socket to another origin or downgrade TLS', async () => {
+    for (const url of ['wss://evil.test/api/chat/socket', 'ws://example.test/api/chat/socket']) {
+        const f = fixture(); f.setAdmissionUrl(url); f.api.watch('account', null, 'csrf'); await settle();
+        assert.equal(f.clients.length, 0); assert.equal(f.timers.size, 1);
+    }
 });

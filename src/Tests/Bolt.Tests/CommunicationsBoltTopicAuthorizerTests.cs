@@ -20,6 +20,47 @@ namespace Bolt.Tests;
 [TestFixture]
 public sealed class CommunicationsBoltTopicAuthorizerTests
 {
+    [TestCase("subscribe", true)]
+    [TestCase("unsubscribe", true)]
+    [TestCase("other-user", false)]
+    [TestCase("other-tenant", false)]
+    [TestCase("other-client", false)]
+    [TestCase("legacy-unscoped", false)]
+    [TestCase("invalid-subscriber", false)]
+    [TestCase("missing-token", false)]
+    [TestCase("disabled-actor", false)]
+    [TestCase("ack", false)]
+    [TestCase("publish", false)]
+    public async Task LiveUserTopic_OnlyActorOwnedTopicAndClientScopedTransientSubscriptionAllowed(string scenario, bool expected)
+    {
+        var tenant = Guid.NewGuid(); var credential = Guid.NewGuid();
+        var principal = new ClaimsPrincipal(new ClaimsIdentity([
+            new Claim(ClaimTypes.Name, credential.ToString("N")), new Claim("tenantId", tenant.ToString("D"))], "Test"));
+        await using var provider = await CreateDatabaseProviderAsync(principal,
+            new IdentityCredential { Id = credential, TenantId = tenant, IdentityInfoId = Guid.NewGuid(), IsEnabled = scenario != "disabled-actor" });
+        var authorizer = CreateAuthorizer(provider.GetRequiredService<IServiceScopeFactory>(), Substitute.For<IJwtService>());
+        var topicUser = scenario == "other-user" ? Guid.NewGuid() : credential;
+        var topicTenant = scenario == "other-tenant" ? Guid.NewGuid() : tenant;
+        var subscriber = scenario switch
+        {
+            "other-client" => Bolt.Protocol.BoltTransientSubscriberId.Create("other-client"),
+            "legacy-unscoped" => "client",
+            "invalid-subscriber" => "client~invalid",
+            _ => Bolt.Protocol.BoltTransientSubscriberId.Create("client")
+        };
+        var operation = scenario switch
+        {
+            "unsubscribe" => BoltTopicOperation.Unsubscribe,
+            "ack" => BoltTopicOperation.Ack,
+            "publish" => BoltTopicOperation.Publish,
+            _ => BoltTopicOperation.Subscribe
+        };
+        var context = CreateContext($"communications.tenant.{topicTenant:N}.user.{topicUser:N}",
+            operation: operation, durable: false, subscriberId: scenario == "publish" ? null : subscriber,
+            actorAccessToken: scenario == "missing-token" ? null : "actor-token", user: principal);
+        (await authorizer.AuthorizeAsync(context)).Should().Be(expected);
+    }
+
     [Test]
     public async Task UnknownNamespace_IsDeniedWithoutTokenOrDatabaseWork()
     {
@@ -379,9 +420,10 @@ public sealed class CommunicationsBoltTopicAuthorizerTests
         bool durable = false,
         string? subscriberId = null,
         string? actorAccessToken = null,
-        ClaimsPrincipal? user = null) =>
+        ClaimsPrincipal? user = null,
+        BoltTopicOperation operation = BoltTopicOperation.Subscribe) =>
         new(
-            BoltTopicOperation.Subscribe,
+            operation,
             topic,
             0,
             durable,

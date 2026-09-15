@@ -56,7 +56,8 @@ public interface ICommunicationsChatSession
     Task<QueryResponse<PaginatedResult<MessageReactionResponse>>> GetReactionsAsync(
         Guid threadId, Guid messageId, int pageIndex = 0, int pageSize = 100, CancellationToken ct = default);
     Task<QueryResponse<GetThreadMessagesResponse>> GetRepliesAsync(
-        Guid threadId, Guid parentMessageId, int pageIndex = 0, int pageSize = 20, CancellationToken ct = default);
+        Guid threadId, Guid parentMessageId, int pageIndex = 0, int pageSize = 20, CancellationToken ct = default,
+        bool suppressDeliveryAcknowledgement = false);
 
     Task<QueryResponse<CreateThreadResponse>> CreateThreadAsync(
         CreateThreadRequest request,
@@ -106,9 +107,10 @@ public interface ICommunicationsChatSession
         Guid threadId,
         int pageIndex = 0,
         int pageSize = 20,
-        CancellationToken ct = default);
+        CancellationToken ct = default, bool suppressDeliveryAcknowledgement = false);
 
     Task<QueryResponse<GetThreadMessagesResponse>> GetMessageUpdatesAsync(Guid threadId, List<Guid> messageIds, CancellationToken ct = default);
+    Task<QueryResponse<GetThreadMessagesResponse>> GetMessageProjectionsAsync(Guid threadId, List<Guid> messageIds, CancellationToken ct = default);
 
     Task<QueryResponse<SearchMessagesResponse>> SearchMessagesAsync(
         string query,
@@ -121,6 +123,7 @@ public interface ICommunicationsChatSession
     Task<CmdResponse> EditMessageAsync(EditThreadMessageRequest request, CancellationToken ct = default);
     Task<CmdResponse> DeleteMessageAsync(Guid threadId, Guid messageId, CancellationToken ct = default);
     Task<CmdResponse> MarkReadAsync(Guid threadId, IReadOnlyCollection<Guid> messageIds, CancellationToken ct = default);
+    Task<CmdResponse> MarkDeliveredAsync(Guid threadId, IReadOnlyCollection<Guid> messageIds, CancellationToken ct = default);
     Task<CmdResponse> ReactAsync(Guid threadId, Guid messageId, Guid reactionTypeId, CancellationToken ct = default);
     Task<CmdResponse> DeleteReactionAsync(Guid threadId, Guid messageId, Guid reactionId, CancellationToken ct = default);
     Task<CmdResponse> AttachFileAsync(Guid threadId, Guid messageId, Guid storageFileId, CancellationToken ct = default);
@@ -145,6 +148,9 @@ public interface ICommunicationsChatSession
         CancellationToken ct = default);
 
     Task SubscribeUserEventsAsync(
+        Func<CommunicationsRealtimeEvent, Task> handler,
+        CancellationToken ct = default);
+    Task SubscribeLiveUserEventsAsync(
         Func<CommunicationsRealtimeEvent, Task> handler,
         CancellationToken ct = default);
 
@@ -256,10 +262,12 @@ internal sealed class CommunicationsChatSession(
         }), callCt), ct);
 
     public Task<QueryResponse<GetThreadMessagesResponse>> GetRepliesAsync(
-        Guid threadId, Guid parentMessageId, int pageIndex = 0, int pageSize = 20, CancellationToken ct = default) =>
+        Guid threadId, Guid parentMessageId, int pageIndex = 0, int pageSize = 20, CancellationToken ct = default,
+        bool suppressDeliveryAcknowledgement = false) =>
         InvokeAsync(callCt => wrapper.GetThreadMessagesAsync(Prepare(new GetThreadMessagesRequest
         {
-            ThreadId = threadId, ParentMessageId = parentMessageId, PageIndex = pageIndex, PageSize = pageSize
+            ThreadId = threadId, ParentMessageId = parentMessageId, PageIndex = pageIndex, PageSize = pageSize,
+            SuppressDeliveryAcknowledgement = suppressDeliveryAcknowledgement
         }), callCt), ct);
 
     public Task<QueryResponse<CreateThreadResponse>> CreateThreadAsync(
@@ -368,17 +376,22 @@ internal sealed class CommunicationsChatSession(
         Guid threadId,
         int pageIndex = 0,
         int pageSize = 20,
-        CancellationToken ct = default) =>
+        CancellationToken ct = default, bool suppressDeliveryAcknowledgement = false) =>
         InvokeAsync(callCt => wrapper.GetThreadMessagesAsync(Prepare(new GetThreadMessagesRequest
         {
             ThreadId = threadId,
             PageIndex = pageIndex,
-            PageSize = pageSize
+            PageSize = pageSize,
+            SuppressDeliveryAcknowledgement = suppressDeliveryAcknowledgement
         }), callCt), ct);
 
     public Task<QueryResponse<GetThreadMessagesResponse>> GetMessageUpdatesAsync(Guid threadId, List<Guid> messageIds, CancellationToken ct = default) =>
         InvokeAsync(callCt => wrapper.GetThreadMessagesAsync(Prepare(new GetThreadMessagesRequest
         { ThreadId = threadId, MessageIds = messageIds.ToArray(), PageSize = 50 }), callCt), ct);
+
+    public Task<QueryResponse<GetThreadMessagesResponse>> GetMessageProjectionsAsync(Guid threadId, List<Guid> messageIds, CancellationToken ct = default) =>
+        InvokeAsync(callCt => wrapper.GetThreadMessagesAsync(Prepare(new GetThreadMessagesRequest
+        { ThreadId = threadId, MessageIds = messageIds.ToArray(), PageSize = 50, SuppressDeliveryAcknowledgement = true }), callCt), ct);
 
     public Task<QueryResponse<SearchMessagesResponse>> SearchMessagesAsync(
         string query,
@@ -418,6 +431,10 @@ internal sealed class CommunicationsChatSession(
             ThreadId = threadId,
             MessageIds = messageIds.ToList()
         }), callCt), ct);
+
+    public Task<CmdResponse> MarkDeliveredAsync(Guid threadId, IReadOnlyCollection<Guid> messageIds, CancellationToken ct = default) =>
+        InvokeAsync(callCt => wrapper.MarkMessagesDeliveredAsync(Prepare(new MarkMessagesDeliveredRequest
+        { ThreadId = threadId, MessageIds = messageIds.ToList() }), callCt), ct);
 
     public Task<CmdResponse> ReactAsync(Guid threadId, Guid messageId, Guid reactionTypeId, CancellationToken ct = default) =>
         InvokeAsync(callCt => wrapper.CreateMessageReactionAsync(Prepare(new CreateMessageReactionRequest
@@ -514,6 +531,11 @@ internal sealed class CommunicationsChatSession(
         CancellationToken ct = default) =>
         InvokeAsync(callCt => wrapper.SubscribeUserCommunicationsEventsForDeviceAsync(TenantId, CredentialId, DeviceId, handler, GetAccessTokenAsync, callCt), ct);
 
+    public Task SubscribeLiveUserEventsAsync(
+        Func<CommunicationsRealtimeEvent, Task> handler,
+        CancellationToken ct = default) =>
+        InvokeAsync(callCt => wrapper.SubscribeLiveUserCommunicationsEventsAsync(TenantId, CredentialId, handler, GetAccessTokenAsync, callCt), ct);
+
     public Task SubscribeTypingAsync(
         Guid threadId,
         Func<CommunicationsTypingState, Task> handler,
@@ -602,6 +624,9 @@ internal sealed class CommunicationsChatSession(
                 break;
             case MarkMessagesReadRequest markRead when markRead.RequesterCredentialId == Guid.Empty:
                 markRead.RequesterCredentialId = CredentialId;
+                break;
+            case MarkMessagesDeliveredRequest delivered when delivered.RequesterCredentialId == Guid.Empty:
+                delivered.RequesterCredentialId = CredentialId;
                 break;
             case CreateMessageReactionRequest createReaction when createReaction.RequesterCredentialId == Guid.Empty:
                 createReaction.RequesterCredentialId = CredentialId;

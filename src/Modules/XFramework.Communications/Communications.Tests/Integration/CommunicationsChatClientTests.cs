@@ -20,6 +20,40 @@ namespace Communications.Tests.Integration;
 public sealed class CommunicationsChatClientTests
 {
     [Test]
+    public async Task LiveUserSubscription_DerivesActorAndUsesRefreshableTokenWithoutExplicitActorSelection()
+    {
+        var tenant = Guid.NewGuid(); var credential = Guid.NewGuid();
+        using var cancellation = new CancellationTokenSource();
+        var scope = new RecordingActorAccessTokenScope();
+        var actor = new MutableActorProvider(new(tenant, credential, "same-cookie", "initial-token"));
+        var proxy = DispatchProxy.Create<ICommunicationsServiceWrapper, RecordingWrapperProxy>();
+        Func<CancellationToken, ValueTask<string?>>? tokenProvider = null;
+        ((RecordingWrapperProxy)(object)proxy).OnInvoke = (method, args) =>
+        {
+            Assert.That(method.Name, Is.EqualTo(nameof(ICommunicationsServiceWrapper.SubscribeLiveUserCommunicationsEventsAsync)));
+            Assert.That(args[0], Is.EqualTo(tenant));
+            Assert.That(args[1], Is.EqualTo(credential));
+            Assert.That(args[4], Is.EqualTo(cancellation.Token));
+            Assert.That(scope.CurrentToken, Is.EqualTo("initial-token"));
+            tokenProvider = (Func<CancellationToken, ValueTask<string?>>)args[3]!;
+            return Task.CompletedTask;
+        };
+        var client = new CommunicationsChatClient(proxy, new ConfigurationBuilder().Build(), actor, scope);
+        Assert.Throws<InvalidOperationException>(() => client.For(tenant, credential));
+        var session = await client.ForCurrentActorAsync();
+        await session.SubscribeLiveUserEventsAsync(_ => Task.CompletedTask, cancellation.Token);
+        actor.Actor = actor.Actor with { AccessToken = "refreshed-token" };
+        Assert.That(await tokenProvider!(cancellation.Token), Is.EqualTo("refreshed-token"));
+        Assert.That(scope.CurrentToken, Is.Null);
+    }
+
+    private sealed class MutableActorProvider(CommunicationsChatActor actor) : ICommunicationsChatActorProvider
+    {
+        public CommunicationsChatActor Actor { get; set; } = actor;
+        public ValueTask<CommunicationsChatActor?> GetCurrentActorAsync(CancellationToken ct = default) => ValueTask.FromResult<CommunicationsChatActor?>(Actor);
+    }
+
+    [Test]
     public async Task CurrentActorSession_PropagatesActorTokenTenantAndCancellation()
     {
         var tenantId = Guid.NewGuid();
@@ -92,6 +126,7 @@ public sealed class CommunicationsChatClientTests
                 EnsureChatDefaultsRequest or GetChatReferenceDataRequest => Task.FromResult(new QueryResponse<ChatReferenceDataResponse>()),
                 GetMessageReactionsRequest => Task.FromResult(new QueryResponse<PaginatedResult<MessageReactionResponse>>()),
                 GetThreadMessagesRequest => Task.FromResult(new QueryResponse<GetThreadMessagesResponse>()),
+                MarkMessagesDeliveredRequest => Task.FromResult(new CmdResponse()),
                 CreateChatAttachmentUploadRequest => Task.FromResult(new QueryResponse<StorageUploadSessionResponse>()),
                 GetChatAttachmentDownloadUrlRequest => Task.FromResult(new QueryResponse<StorageDownloadUrlResponse>()),
                 _ => throw new InvalidOperationException(method.Name)
@@ -119,6 +154,16 @@ public sealed class CommunicationsChatClientTests
         var replies = requests.OfType<GetThreadMessagesRequest>().Single();
         Assert.That(replies.ParentMessageId, Is.EqualTo(message));
         Assert.That(replies.ThreadId, Is.EqualTo(thread));
+        await session.GetMessageProjectionsAsync(thread, [message], cancellation.Token);
+        var projection = requests.OfType<GetThreadMessagesRequest>().Last();
+        Assert.That(projection.SuppressDeliveryAcknowledgement, Is.True);
+        Assert.That(projection.MessageIds, Is.EqualTo(new[] { message }));
+        Assert.That(projection.RequesterCredentialId, Is.EqualTo(session.CredentialId));
+        await session.MarkDeliveredAsync(thread, [message], cancellation.Token);
+        var acknowledgement = requests.OfType<MarkMessagesDeliveredRequest>().Single();
+        Assert.That(acknowledgement.ThreadId, Is.EqualTo(thread));
+        Assert.That(acknowledgement.MessageIds, Is.EqualTo(new[] { message }));
+        Assert.That(acknowledgement.RequesterCredentialId, Is.EqualTo(session.CredentialId));
         Assert.That(scope.CurrentToken, Is.Null);
     }
 

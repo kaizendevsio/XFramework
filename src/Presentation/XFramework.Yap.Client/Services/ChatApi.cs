@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using Yap.Contracts;
 
 namespace Yap.Client.Services;
@@ -7,8 +8,12 @@ public sealed class ChatApi(HttpClient http)
 {
     public string Token { get; set; } = "";
     public string Account { get; set; } = "";
+    public Func<string, object?, CancellationToken, Task<ChatSocketResponse?>>? SocketRequest { get; set; }
     public async Task<T> GetAsync<T>(string path, CancellationToken ct = default)
     {
+        var route = path.Split('?')[0];
+        if (route.StartsWith("api/chat/conversations/", StringComparison.Ordinal) && route.EndsWith("/messages", StringComparison.Ordinal))
+            path += (path.Contains('?') ? "&" : "?") + "acknowledge=false";
         var account = Account;
         try { return (await SendAsync<T>(HttpMethod.Get, path, null, ct))!; }
         catch (ChatApiException ex) when (ex.Status == 503 && !ct.IsCancellationRequested)
@@ -20,8 +25,32 @@ public sealed class ChatApi(HttpClient http)
             return (await SendAsync<T>(HttpMethod.Get, path, null, ct))!;
         }
     }
-    public Task<T?> PostAsync<T>(string path, object? body = null, CancellationToken ct = default) =>
-        SendAsync<T>(HttpMethod.Post, path, body is null ? null : JsonContent.Create(body), ct);
+    public async Task<T?> PostAsync<T>(string path, object? body = null, CancellationToken ct = default)
+    {
+        var account = Account;
+        var operation = path switch
+        {
+            "api/chat/messages" => "send",
+            "api/chat/read" => "read",
+            "api/chat/delivered" => "delivered",
+            "api/chat/thread-actions" when body is ThreadAction { Action: "typing" } => "typing",
+            _ => null
+        };
+        if (operation is not null && SocketRequest is not null)
+        {
+            // Null means no request was sent. An uncertain socket failure throws:
+            // the durable outbox retries the same message ID/ciphertext later.
+            var response = await SocketRequest(operation, body, ct);
+            if (account != Account) throw new OperationCanceledException("The signed-in account changed.");
+            if (response is not null)
+            {
+                if (response.Status is < 200 or >= 300) throw new ChatApiException(response.Status);
+                return response.Body is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) } data
+                    ? data.Deserialize<T>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) : default;
+            }
+        }
+        return await SendAsync<T>(HttpMethod.Post, path, body is null ? null : JsonContent.Create(body), ct);
+    }
     public Task PostAsync(string path, object body, CancellationToken ct = default) => PostAsync<object>(path, body, ct);
     public async Task<string> AuthenticateAsync(string action, Dictionary<string, string> fields)
     {

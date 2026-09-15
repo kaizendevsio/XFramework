@@ -107,6 +107,8 @@ public sealed partial class BoltServer : IDisposable
     private readonly int _maxActiveCallsPerPrincipal;
     private readonly int _maxCallParticipants;
     private readonly bool _authenticatedMediaOnly;
+    private readonly bool _localHandlersOnly;
+    private readonly string? _registrationClientIdClaim;
     private readonly bool _requireEncryptedMedia;
 
     // Direct handlers — when registered, server handles requests locally instead of routing
@@ -239,6 +241,8 @@ public sealed partial class BoltServer : IDisposable
         if (_groupCallAuthorizer is not null && (!options.AuthenticatedMediaOnly || !options.RequireSecureTransport))
             throw new InvalidOperationException("Host-managed groups require authenticated media-only secure transport.");
         _authenticatedMediaOnly = options.AuthenticatedMediaOnly;
+        _localHandlersOnly = options.LocalHandlersOnly;
+        _registrationClientIdClaim = options.RegistrationClientIdClaim;
         _requireEncryptedMedia = options.RequireEncryptedMedia;
         if (_requireEncryptedMedia && !_authenticatedMediaOnly)
             throw new InvalidOperationException("Encrypted media requires the authenticated media-only host.");
@@ -590,6 +594,12 @@ public sealed partial class BoltServer : IDisposable
     {
         var frameType = (FrameType)buffer[0];
 
+        if (_localHandlersOnly && frameType is not (FrameType.Register or FrameType.Request or FrameType.RequestCancel or FrameType.Batch))
+        {
+            await connection.CloseAsync(ct);
+            return;
+        }
+
         if (_authenticatedMediaOnly && frameType != FrameType.Register && !IsMediaFrame(frameType))
         {
             using var closeCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -780,7 +790,9 @@ public sealed partial class BoltServer : IDisposable
             return;
         }
 
-        if ((_authenticatedMediaOnly && !string.Equals(
+        if ((_registrationClientIdClaim is not null && (connection.User?.Identity?.IsAuthenticated != true ||
+                !string.Equals(connection.User.FindFirst(_registrationClientIdClaim)?.Value, clientId, StringComparison.Ordinal))) ||
+            (_authenticatedMediaOnly && !string.Equals(
                 connection.User?.FindFirst("bolt_media_client_id")?.Value, clientId, StringComparison.Ordinal)) ||
             !ValidateRegisterIdentity(connection, clientId, clientName))
         {
@@ -939,6 +951,14 @@ public sealed partial class BoltServer : IDisposable
             {
                 _localInvocations.TryRemove(new KeyValuePair<Guid, LocalInvocation>(frame.RequestId, invocation));
             }
+            return;
+        }
+
+        if (_localHandlersOnly)
+        {
+            var rejectedWriter = RentedBufferWriter.GetThreadLocal();
+            BoltCodec.WriteResponse(rejectedWriter, frame.RequestId, HttpStatusCode.NotFound, ReadOnlySpan<byte>.Empty);
+            await caller.SendAsync(rejectedWriter, ct);
             return;
         }
 
@@ -1153,6 +1173,19 @@ public sealed partial class BoltServer : IDisposable
     }
 
     /// <summary>Get the count of currently connected clients.</summary>
+    /// <summary>Push from an authenticated host handler to one exact registered connection.
+    /// This does not resolve client-selected peer routes or enable client push frames.</summary>
+    public async ValueTask SendPushAsync(string connectionId, string command, ReadOnlyMemory<byte> payload, CancellationToken ct = default)
+    {
+        if (payload.Length > _maxFrameBytes - BoltCodec.RequestHeaderSize)
+            throw new ArgumentOutOfRangeException(nameof(payload));
+        if (!_connectionsByStreamId.TryGetValue(connectionId, out var connection) || !connection.IsAlive)
+            throw new InvalidOperationException("The Bolt connection has closed.");
+        var writer = new ArrayBufferWriter<byte>(BoltCodec.RequestHeaderSize + payload.Length);
+        BoltCodec.WritePush(writer, Guid.NewGuid(), connection.ServiceHash, 0, GetCommandHash(command), payload.Span);
+        await connection.SendAsync(writer.WrittenMemory, ct);
+    }
+
     public int ConnectedClientCount => _connectionsByStreamId.Count;
 
     /// <summary>
