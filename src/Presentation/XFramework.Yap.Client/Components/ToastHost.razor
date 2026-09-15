@@ -51,10 +51,10 @@
                     "Your session ended. Sign in to sync.", "Sign in", "/login"), null);
             else if (!State.Online)
                 Show(new Notice(Guid.NewGuid(), Connectivity, "info", "wifi",
-                    "No internet. Reconnecting…", null, null), null);
+                    "Can’t reach Yap. Reconnecting…", null, null), null);
             else if (State.PendingCount > 0)
                 Show(new Notice(Guid.NewGuid(), Connectivity, "ok", "wifi",
-                    "Back online. Syncing your messages.", null, null), TimeSpan.FromSeconds(4));
+                    "Connected. Syncing your messages.", null, null), TimeSpan.FromSeconds(4));
             lastOnline = State.Online; lastNeedsLogin = State.NeedsLogin;
         }
 

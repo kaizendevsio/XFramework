@@ -100,7 +100,10 @@ else if (mode == "search")
     private List<SearchHit> hits = [];
     private bool searching;
     private bool moreActions;
-    protected override void OnInitialized() { State.Changed += Changed; State.ConversationRemoved += Removed; Voice.Changed += Changed; }
+    protected override void OnInitialized() { State.Changed += Changed; State.ConversationRemoved += Removed; Voice.Changed += Changed; Nav.LocationChanged += LocationChanged; }
+    // Both routes have identical component parameters. Blazor can skip their render,
+    // so changes to the URI-derived details view must explicitly invalidate it.
+    private void LocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args) => Changed();
     private void Removed(Guid id) { if (id == Id) _ = InvokeAsync(() => Nav.NavigateTo("/")); }
     protected override async Task OnParametersSetAsync()
     {
@@ -117,6 +120,7 @@ else if (mode == "search")
     private void Changed() => _ = InvokeAsync(StateHasChanged);
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        await JS.InvokeVoidAsync("yap.motion.complete");
         if (focus.HasValue) { var id = focus; focus = null; await JS.InvokeVoidAsync("yap.showMessage", id); }
     }
     private void Select(ChatMessage message) { selected = message; moreActions = false; mode = "message"; }
@@ -135,5 +139,5 @@ else if (mode == "search")
         mode = null;
         await Voice.StartGroupAsync(Id, conversation.Name, conversation.People);
     }
-    public void Dispose() { State.Changed -= Changed; State.ConversationRemoved -= Removed; Voice.Changed -= Changed; State.LeaveConversation(loaded); }
+    public void Dispose() { Nav.LocationChanged -= LocationChanged; State.Changed -= Changed; State.ConversationRemoved -= Removed; Voice.Changed -= Changed; State.LeaveConversation(loaded); }
 }
