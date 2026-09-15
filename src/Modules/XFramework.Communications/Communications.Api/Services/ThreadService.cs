@@ -1657,6 +1657,8 @@ public sealed partial class ThreadService(
     {
         try
         {
+            if (request.MessageIds is { } requestedIds && (requestedIds.Length is 0 or > 50 || requestedIds.Contains(Guid.Empty)))
+                return Result<GetThreadMessagesResponse>.Failure("Choose between 1 and 50 message IDs", 400);
             var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<GetThreadMessagesResponse>(callerResult);
@@ -1692,6 +1694,8 @@ public sealed partial class ThreadService(
                 .Where(m => m.TenantId == caller.TenantId)
                 .Where(m => !m.IsDeleted && m.IsEnabled);
 
+            if (request.MessageIds is { } selectedIds)
+                messageQuery = messageQuery.Where(m => selectedIds.Contains(m.Id));
             if (blockedSenderMemberIds.Count > 0)
                 messageQuery = messageQuery.Where(m => !blockedSenderMemberIds.Contains(m.MessageThreadMemberId));
             if (hiddenMessageIds.Count > 0)

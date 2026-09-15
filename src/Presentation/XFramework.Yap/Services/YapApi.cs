@@ -100,11 +100,14 @@ public static class YapApi
                 Members = members.Count, People = members, Features = (int)data.Features, CanManage = data.CanManage,
                 ShareActiveStatus = !data.Members.First(x => x.CredentialId == session.CredentialId).HideActiveStatus };
         });
-        api.MapGet("/conversations/{id:guid}/messages", async (Guid id, int? page, Guid? parent,
+        api.MapGet("/conversations/{id:guid}/messages", async (Guid id, int? page, Guid? parent, Guid[]? ids,
             ICommunicationsChatClient client, IChatDirectory directory, CancellationToken ct) =>
         {
             var session = await client.ForCurrentActorAsync(ct: ct);
-            var data = Require(parent.HasValue ? await session.GetRepliesAsync(id, parent.Value, Page(page), 50, ct)
+            if (ids is { Length: > 50 } || ids?.Contains(Guid.Empty) == true || ids is { Length: > 0 } && parent.HasValue)
+                throw new YapApiException(400, "Choose up to 50 message IDs without a parent filter.");
+            var data = Require(ids is { Length: > 0 } ? await session.GetMessageUpdatesAsync(id, ids.Distinct().ToList(), ct)
+                : parent.HasValue ? await session.GetRepliesAsync(id, parent.Value, Page(page), 50, ct)
                 : await session.GetMessagesAsync(id, Page(page), 50, ct));
             var people = await directory.ResolveAsync(data.Items
                 .SelectMany(x => x.ReadCredentialIds.Append(x.SenderCredentialId)).Distinct().ToArray(), ct);
@@ -329,7 +332,7 @@ public static class YapApi
                     return Task.CompletedTask;
                 }, lifetime.Token);
             }
-            await session.SubscribeUserEventsAsync(_ => { hints.Writer.TryWrite("data: refresh\n\n"); return Task.CompletedTask; }, lifetime.Token);
+            await session.SubscribeUserEventsAsync(update => { hints.Writer.TryWrite(YapRealtime.Frame(update)); return Task.CompletedTask; }, lifetime.Token);
             context.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
             context.Response.ContentType = "text/event-stream";
             context.Response.Headers.CacheControl = "no-store";

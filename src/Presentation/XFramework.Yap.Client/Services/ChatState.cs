@@ -150,12 +150,19 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     {
         try
         {
-            while (refreshPending && Online && !NeedsLogin && User is not null)
+            while ((refreshPending || messageUpdates.Count > 0) && Online && !NeedsLogin && User is not null)
             {
                 await sync.WaitAsync(lifetime.Token);
                 try
                 {
                     if (!Online || NeedsLogin || User is null) return;
+                    if (!refreshPending && messageUpdates.Count > 0)
+                    {
+                        var entry = messageUpdates.First();
+                        messageUpdates.Remove(entry.Key);
+                        if (entry.Value.Scope == Scope) await RefreshMessagesAsync(entry.Key, entry.Value.Ids.ToList(), entry.Value.Created);
+                        continue;
+                    }
                     refreshPending = false;
                     if (Selected is not null) await RefreshSelectedAsync(Selected.Id);
                 }
@@ -414,6 +421,13 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             if (unread.Count == 0) return;
             await api.PostAsync("api/chat/read", new ReadMessages(id, unread), lifetime.Token);
             acknowledged.UnionWith(unread);
+            var summary = Conversations.FirstOrDefault(c => c.Id == id);
+            if (summary is not null && summary.Unread > 0)
+            {
+                summary.Unread = Math.Max(0, summary.Unread - unread.Count);
+                await store.SaveConversationsAsync(Scope, [summary]);
+                Notify();
+            }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex) { await RecordErrorAsync(ex); }
@@ -1021,6 +1035,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             await store.SetSettingAsync("pendingLogout", "true");
             await store.ClearPrivateAsync();
             User = null; Selected = null; Conversations = []; Defaults = null; PendingCount = 0; NeedsLogin = false;
+            messageUpdates.Clear();
             typing.Clear(); publishingThread = null;
             api.Account = "";
             await js.InvokeVoidAsync("yap.device.events", "");
