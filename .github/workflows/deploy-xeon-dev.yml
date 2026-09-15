@@ -1148,6 +1148,16 @@ jobs:
           done
           REMOTE_SCRIPT
 
+      - name: Verify Portal browser runtime
+        if: env.DEPLOY_SCOPE != 'yap'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh "$DEPLOY_HOST" bash -s <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          curl -fsS --connect-timeout 3 --max-time 15 http://127.0.0.1:5000/_framework/blazor.web.js >/dev/null
+          REMOTE_SCRIPT
+
       - name: Configure and verify Yap HTTPS ingress
         if: env.DEPLOY_SCOPE != 'yap'
         shell: bash
