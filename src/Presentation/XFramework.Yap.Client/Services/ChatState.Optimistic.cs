@@ -39,7 +39,12 @@ public sealed partial class ChatState
     {
         if (historyOffset != 0) return;
         foreach (var staged in stagingMessages.Values.Where(x => x.Scope == Scope && x.Message.ThreadId == conversation.Id))
-            if (conversation.Messages.All(x => x.Id != staged.Message.Id)) conversation.Messages.Add(staged.Message);
+        {
+            // A staged thread reply shows under its parent, never in the timeline it was sent from.
+            var target = staged.Message.IsThreadReply && staged.Message.ParentId is { } parent
+                ? conversation.Messages.FirstOrDefault(x => x.Id == parent)?.Replies : conversation.Messages;
+            if (target is not null && target.All(x => x.Id != staged.Message.Id)) target.Add(staged.Message);
+        }
         conversation.Messages = conversation.Messages.OrderBy(x => x.CreatedAt).TakeLast(HistoryWindowSize).ToList();
     }
 

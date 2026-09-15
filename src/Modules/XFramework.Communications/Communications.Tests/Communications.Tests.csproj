@@ -18,6 +18,9 @@
         <PackageReference Include="NUnit" />
         <PackageReference Include="NUnit3TestAdapter" />
         <PackageReference Include="Testcontainers.PostgreSql" />
+        <!-- Relational coverage for small read models that does not need a container. -->
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+        <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
         <PackageReference Include="coverlet.collector" />
     </ItemGroup>
 

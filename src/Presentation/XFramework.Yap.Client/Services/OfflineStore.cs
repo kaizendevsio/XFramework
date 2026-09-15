@@ -87,8 +87,9 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         return true;
     }, ct);
 
-    public Task<int> MessageCountAsync(string scope, Guid thread) => UseAsync(db => db.Messages.CountAsync(x => x.Scope == scope && x.ThreadId == thread));
-    public Task<int> ReplyCountAsync(string scope, Guid parent) => UseAsync(db => db.Messages.CountAsync(x => x.Scope == scope && x.ParentId == parent));
+    // Mirrors the server: the timeline never counts thread replies, a parent counts only its own.
+    public Task<int> MessageCountAsync(string scope, Guid thread) => UseAsync(db => db.Messages.CountAsync(x => x.Scope == scope && x.ThreadId == thread && !x.IsThreadReply));
+    public Task<int> ReplyCountAsync(string scope, Guid parent) => UseAsync(db => db.Messages.CountAsync(x => x.Scope == scope && x.ParentId == parent && x.IsThreadReply));
 
     public Task<ChatMessage?> MessageAsync(string scope, Guid id) => UseAsync(async db =>
     {
@@ -101,8 +102,8 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         var row = await db.Messages.AsNoTracking().SingleOrDefaultAsync(x => x.Scope == scope && x.ThreadId == thread && x.Id == id);
         if (row is null) return 0;
         if (parent.HasValue)
-            return await db.Database.SqlQuery<int>($"SELECT COUNT(*) AS Value FROM Messages WHERE Scope = {scope} AND ThreadId = {thread} AND ParentId = {parent.Value} AND (CreatedTicks > {row.CreatedTicks} OR (CreatedTicks = {row.CreatedTicks} AND Id > {id}))").SingleAsync();
-        return await db.Database.SqlQuery<int>($"SELECT COUNT(*) AS Value FROM Messages WHERE Scope = {scope} AND ThreadId = {thread} AND (CreatedTicks > {row.CreatedTicks} OR (CreatedTicks = {row.CreatedTicks} AND Id > {id}))").SingleAsync();
+            return await db.Database.SqlQuery<int>($"SELECT COUNT(*) AS Value FROM Messages WHERE Scope = {scope} AND ThreadId = {thread} AND ParentId = {parent.Value} AND IsThreadReply = 1 AND (CreatedTicks > {row.CreatedTicks} OR (CreatedTicks = {row.CreatedTicks} AND Id > {id}))").SingleAsync();
+        return await db.Database.SqlQuery<int>($"SELECT COUNT(*) AS Value FROM Messages WHERE Scope = {scope} AND ThreadId = {thread} AND IsThreadReply = 0 AND (CreatedTicks > {row.CreatedTicks} OR (CreatedTicks = {row.CreatedTicks} AND Id > {id}))").SingleAsync();
     });
 
     public Task<List<ChatMessage>> MessageUpdatesAsync(string scope, List<Guid> ids) => UseAsync(async db =>
@@ -112,7 +113,7 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
     public Task<List<ChatMessage>> MessagesAsync(string scope, Guid thread, CancellationToken ct = default, int limit = 0, int skip = 0, Guid? parent = null) => UseAsync(async db =>
     {
         var query = db.Messages.AsNoTracking().Where(x => x.Scope == scope && x.ThreadId == thread).OrderByDescending(x => x.CreatedTicks).ThenByDescending(x => x.Id).AsQueryable();
-        if (parent.HasValue) query = query.Where(x => x.ParentId == parent);
+        query = parent.HasValue ? query.Where(x => x.ParentId == parent && x.IsThreadReply) : query.Where(x => !x.IsThreadReply);
         if (skip > 0) query = query.Skip(skip);
         if (limit > 0) query = query.Take(limit);
         var messages = (await query.ToListAsync(ct)).AsEnumerable().Reverse()
@@ -131,8 +132,9 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         var ids = messages.Select(x => x.Id).ToList();
         var pending = await db.Outbox.Where(x => x.Scope == scope).Select(x => x.Id).ToListAsync(ct);
         var oldest = messages.Count == 0 ? long.MaxValue : messages.Min(x => x.CreatedAt.Ticks);
+        // This window owns the timeline only. Thread replies arrive from their own paged fetch.
         await db.Messages.Where(x => x.Scope == scope && x.ThreadId == thread && !pending.Contains(x.Id) && !ids.Contains(x.Id)
-            && (complete || x.CreatedTicks >= oldest)).ExecuteDeleteAsync(ct);
+            && !x.IsThreadReply && (complete || x.CreatedTicks >= oldest)).ExecuteDeleteAsync(ct);
         foreach (var message in messages)
         {
             // The outbox owns this exact body and persisted ciphertext until completion.
@@ -247,6 +249,7 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         }
         row.CreatedTicks = message.CreatedAt.Ticks;
         row.ParentId = message.ParentId;
+        row.IsThreadReply = message.IsThreadReply;
         row.Json = JsonSerializer.Serialize(message, Json);
     }
 }

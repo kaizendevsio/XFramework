@@ -372,11 +372,12 @@ public sealed partial class ThreadService(
 
             var memberCountMap = memberGroups.ToDictionary(g => g.Key, g => g.Items.Count);
 
-            // Get messages for these threads to find last message per thread
+            // Get messages for these threads to find last message per thread.
+            // The inbox previews the timeline, so a thread reply is never the preview.
             var threadMessages = await dataContext.Query<Message>()
                 .Where(m => threadIds.Contains(m.MessageThreadId))
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted && m.IsEnabled)
+                .Where(m => !m.IsDeleted && m.IsEnabled && !m.IsThreadReply)
                 .OrderByDescending(m => m.CreatedAt)
                 .ToListAsync(ct);
             if (blockedSenderMemberIds.Count > 0)
@@ -1708,8 +1709,10 @@ public sealed partial class ThreadService(
                     .Where(m => m.TenantId == caller.TenantId && !m.IsDeleted && m.IsEnabled).FirstOrDefaultAsync(ct);
                 if (parent is null || !await CanAccessMessageAsync(caller.TenantId, requesterMember, parent, ct))
                     return Result<GetThreadMessagesResponse>.NotFound("Parent message not found");
-                messageQuery = messageQuery.Where(m => m.ParentMessageId == parentId);
+                messageQuery = messageQuery.Where(m => m.ParentMessageId == parentId && m.IsThreadReply);
             }
+            // An inline reply belongs to the timeline; a thread reply is reachable only through its parent.
+            else messageQuery = messageQuery.Where(m => !m.IsThreadReply);
 
             var totalCount = await messageQuery.CountAsync(ct);
 
@@ -3369,7 +3372,8 @@ public sealed partial class ThreadService(
         var messages = await dataContext.Query<Message>()
             .Where(m => threadIds.Contains(m.MessageThreadId))
             .Where(m => m.TenantId == tenantId)
-            .Where(m => !m.IsDeleted && m.IsEnabled)
+            // Thread activity has its own badge; it must not inflate the conversation's.
+            .Where(m => !m.IsDeleted && m.IsEnabled && !m.IsThreadReply)
             .ToListAsync(ct);
 
         var hiddenRows = await dataContext.Query<MessageHidden>()
