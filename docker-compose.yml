@@ -318,8 +318,8 @@ services:
       ServiceIdentity__Clients__13__ClientId: XFramework.Yap
       ServiceIdentity__Clients__13__ClientSecret: ${YAP_SERVICE_IDENTITY_SECRET:?Set YAP_SERVICE_IDENTITY_SECRET in the protected deployment env}
       ServiceIdentity__Clients__13__GenerationId: ${YAP_SERVICE_CREDENTIAL_GENERATION_ID:?Set YAP_SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
-      ServiceIdentity__Clients__13__AllowedAudiences: XFramework.Bolt.Hub,XFramework.IdentityServer,XFramework.Communications,XFramework.Storage
-      ServiceIdentity__Clients__13__AllowedScopes: bolt.service,communications.chat,identity.session.validate,identity.profile,datacontext.query,storage.read,storage.write,identity.register,tenant.target
+      ServiceIdentity__Clients__13__AllowedAudiences: XFramework.Bolt.Hub,XFramework.IdentityServer,XFramework.Communications,XFramework.Storage,XFramework.Notifications
+      ServiceIdentity__Clients__13__AllowedScopes: bolt.service,communications.chat,identity.session.validate,identity.profile,datacontext.query,storage.read,storage.write,identity.register,tenant.target,notifications.send
       SelfRegistration__Clients__0__ClientId: XFramework.Yap
       SelfRegistration__Clients__0__TenantId: ${YAP_TENANT_ID:-00000000-0000-0000-0000-000000000000}
       SelfRegistration__Clients__0__RoleId: ${YAP_ROLE_ID:-00000000-0000-0000-0000-000000000000}
@@ -403,6 +403,11 @@ services:
       ServiceIdentity__DefaultScopes__1: identity.session.validate
       ServiceIdentity__DefaultScopes__2: smsgateway.send
       ServiceIdentity__DefaultScopes__3: tenant.target
+      # RFC 8292 application server keys. Generate once, keep the private key out of the repo, and
+      # leave these unset to run with web push cleanly disabled.
+      Notifications__Push__Vapid__PublicKey: ${WEB_PUSH_VAPID_PUBLIC_KEY:-}
+      Notifications__Push__Vapid__PrivateKey: ${WEB_PUSH_VAPID_PRIVATE_KEY:-}
+      Notifications__Push__Vapid__Subject: ${WEB_PUSH_VAPID_SUBJECT:-}
       ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${NOTIFICATIONS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
@@ -746,6 +751,17 @@ services:
       ServiceIdentity__AllowInsecureHttp: true
       ServiceIdentity__ClientSecret: ${YAP_SERVICE_IDENTITY_SECRET:?Set YAP_SERVICE_IDENTITY_SECRET in the protected deployment env}
       ServiceIdentity__GenerationId: ${YAP_SERVICE_CREDENTIAL_GENERATION_ID:?Set YAP_SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
+      ServiceIdentity__DefaultScopes__0: bolt.service
+      ServiceIdentity__DefaultScopes__1: communications.chat
+      ServiceIdentity__DefaultScopes__2: identity.session.validate
+      ServiceIdentity__DefaultScopes__3: identity.profile
+      ServiceIdentity__DefaultScopes__4: datacontext.query
+      ServiceIdentity__DefaultScopes__5: storage.read
+      ServiceIdentity__DefaultScopes__6: storage.write
+      ServiceIdentity__DefaultScopes__7: identity.register
+      ServiceIdentity__DefaultScopes__8: tenant.target
+      # Only used to ring a closed device for an incoming call; message push is fanned out by Communications.
+      ServiceIdentity__DefaultScopes__9: notifications.send
     ports:
       - "127.0.0.1:5188:8080"
     volumes:

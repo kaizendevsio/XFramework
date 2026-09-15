@@ -136,11 +136,13 @@ public sealed class ServiceIdentityComposeContractTests
     {
         var root = FindRepositoryRoot().FullName;
         var compose = File.ReadAllText(Path.Combine(root, "docker-compose.yml"));
+        // notifications.send is the narrowest grant that lets Yap ring a closed device for an
+        // incoming call; call invites never pass through the Communications outbox.
         ExtractAllowedScopesForClient(compose, "XFramework.Yap").Should().BeEquivalentTo(
-            new[] { "bolt.service", "communications.chat", "identity.session.validate", "identity.profile", "datacontext.query", "storage.read", "storage.write", "identity.register", "tenant.target" });
+            new[] { "bolt.service", "communications.chat", "identity.session.validate", "identity.profile", "datacontext.query", "storage.read", "storage.write", "identity.register", "tenant.target", "notifications.send" });
         compose.Should().Contain("ServiceIdentity__Clients__13__ClientSecret: ${YAP_SERVICE_IDENTITY_SECRET:");
         compose.Should().Contain("ServiceIdentity__Clients__13__GenerationId: ${YAP_SERVICE_CREDENTIAL_GENERATION_ID:");
-        compose.Should().Contain("ServiceIdentity__Clients__13__AllowedAudiences: XFramework.Bolt.Hub,XFramework.IdentityServer,XFramework.Communications,XFramework.Storage");
+        compose.Should().Contain("ServiceIdentity__Clients__13__AllowedAudiences: XFramework.Bolt.Hub,XFramework.IdentityServer,XFramework.Communications,XFramework.Storage,XFramework.Notifications");
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "deploy-xeon-dev.yml"));
         workflow.Should().Contain("scp scripts/provision-yap-dev-secret.sh");
         workflow.Should().Contain("YAP_SERVICE_IDENTITY_SECRET: compose-validation-placeholder");

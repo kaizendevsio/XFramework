@@ -18,7 +18,11 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
     private readonly Dictionary<string, Ticket> tickets = new(StringComparer.Ordinal);
     private readonly Dictionary<(Guid Tenant, Guid User), List<Action<YapCallEvent>>> listeners = [];
     private readonly IServiceScopeFactory scopes;
+    private readonly ILogger pushLogger;
     private readonly Timer cleanup;
+
+    /// <summary>How long a ringing invite stays valid; push TTLs are matched to it.</summary>
+    internal static readonly TimeSpan InviteLifetime = TimeSpan.FromSeconds(60);
     public bool Enabled { get; }
     public bool EncryptedGroupsEnabled => Enabled && groupLifecycleEnabled;
     public BoltServer Server { get; }
@@ -30,6 +34,7 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
     internal YapCallGateway(IConfiguration configuration, IServiceScopeFactory scopes, ILogger<BoltServer> logger, bool enableGroupLifecycle)
     {
         this.scopes = scopes;
+        pushLogger = logger;
         groupLifecycleEnabled = enableGroupLifecycle;
         Enabled = configuration.GetValue<bool>("Yap:Calls:Enabled");
         var requiredMode = enableGroupLifecycle ? "EndToEndEncrypted" : "TrustedServerTls";
@@ -62,7 +67,7 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
             throw new YapApiException(400, "Choose someone in this conversation to call.");
         await VerifyMembershipAsync(user, request.ThreadId, request.RecipientId, ct);
         var invite = new YapCallInvite(Guid.NewGuid(), request.ThreadId, caller,
-            user.Identity?.Name ?? "Someone", request.RecipientId, DateTimeOffset.UtcNow.AddSeconds(60));
+            user.Identity?.Name ?? "Someone", request.RecipientId, DateTimeOffset.UtcNow.Add(InviteLifetime));
         lock (gate)
         {
             if (invites.Count + groups.Count >= 64 || GroupMemberBusy(tenant, caller) || GroupMemberBusy(tenant, request.RecipientId) || invites.Values.Any(x => x.Tenant == tenant &&
@@ -72,6 +77,8 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
             invites.Add(invite.Id, new ActiveInvite(tenant, invite));
         }
         Publish(tenant, invite.RecipientId, new("incoming", invite));
+        // A closed or backgrounded device has no live subscriber; push is the only way it rings.
+        NotifyIncomingCall(tenant, invite.ThreadId, invite.Id, [invite.RecipientId]);
         return invite;
     }
 

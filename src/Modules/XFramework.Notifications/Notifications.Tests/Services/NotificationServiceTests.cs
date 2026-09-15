@@ -23,7 +23,7 @@ public sealed class NotificationServiceTests
     [Test]
     public async Task GetPreferencesAsync_MissingPreference_ReturnsDefaultInAppPreference()
     {
-        await using var database = await TestDatabase.CreateAsync();
+        await using var database = await NotificationTestDatabase.CreateAsync();
         var credentialId = Guid.NewGuid();
         var service = CreateService(database.Context, database.TenantId);
 
@@ -32,7 +32,7 @@ public sealed class NotificationServiceTests
         result.IsSuccess.Should().BeTrue();
         result.Data.Should().NotBeNull();
         result.Data!.CredentialId.Should().Be(credentialId);
-        result.Data.EnabledChannels.Should().Be(NotificationDeliveryChannel.InApp);
+        result.Data.EnabledChannels.Should().Be(NotificationDeliveryChannel.InApp | NotificationDeliveryChannel.Push);
         result.Data.DisabledTemplateKeys.Should().BeEmpty();
         result.Data.IsDefault.Should().BeTrue();
     }
@@ -40,7 +40,7 @@ public sealed class NotificationServiceTests
     [Test]
     public async Task GetInboxAsync_DifferentTenantRows_ReturnsOnlyRequestedTenantNotifications()
     {
-        await using var database = await TestDatabase.CreateAsync();
+        await using var database = await NotificationTestDatabase.CreateAsync();
         var credentialId = Guid.NewGuid();
         var otherTenantId = Guid.NewGuid();
         var service = CreateService(database.Context, database.TenantId);
@@ -66,7 +66,7 @@ public sealed class NotificationServiceTests
     [Test]
     public async Task CreateNotificationAsync_SameCorrelationId_ReturnsExistingNotification()
     {
-        await using var database = await TestDatabase.CreateAsync();
+        await using var database = await NotificationTestDatabase.CreateAsync();
         var credentialId = Guid.NewGuid();
         var correlationId = $"communications:{Guid.NewGuid():N}";
         var service = CreateService(database.Context, database.TenantId);
@@ -99,7 +99,7 @@ public sealed class NotificationServiceTests
     [Test]
     public async Task CreateNotificationAsync_ExternalChannel_CreatesDeliveryJobAndStatus()
     {
-        await using var database = await TestDatabase.CreateAsync();
+        await using var database = await NotificationTestDatabase.CreateAsync();
         var credentialId = Guid.NewGuid();
         EnableChannels(database.Context, database.TenantId, credentialId, NotificationDeliveryChannel.Email);
         var service = CreateService(database.Context, database.TenantId);
@@ -132,7 +132,7 @@ public sealed class NotificationServiceTests
     [Test]
     public async Task DispatchDueAsync_SmsJob_EnqueuesSmsGatewayMessage()
     {
-        await using var database = await TestDatabase.CreateAsync();
+        await using var database = await NotificationTestDatabase.CreateAsync();
         var credentialId = Guid.NewGuid();
         EnableChannels(database.Context, database.TenantId, credentialId, NotificationDeliveryChannel.Sms);
         var smsGateway = new TestSmsGatewayServiceWrapper();
@@ -162,6 +162,7 @@ public sealed class NotificationServiceTests
         var dispatcher = new NotificationDeliveryDispatcher(
             database.Context,
             smsGateway,
+            NotificationTestHost.CreatePushService(database.Context, new TestInvocationContextAccessor(database.TenantId)),
             NullLogger<NotificationDeliveryDispatcher>.Instance,
             configuration);
 
@@ -181,7 +182,7 @@ public sealed class NotificationServiceTests
     [Test]
     public async Task MarkReadAsync_UnreadNotification_MarksReadAndSetsReadAt()
     {
-        await using var database = await TestDatabase.CreateAsync();
+        await using var database = await NotificationTestDatabase.CreateAsync();
         var credentialId = Guid.NewGuid();
         var item = CreateInboxItem(database.TenantId, credentialId, "Unread");
         database.Context.Set<NotificationInboxItem>().Add(item);
@@ -208,7 +209,7 @@ public sealed class NotificationServiceTests
     [Test]
     public async Task RecordDeliveryStatusAsync_ValidTransitions_AdvancesDeliveryStatus()
     {
-        await using var database = await TestDatabase.CreateAsync();
+        await using var database = await NotificationTestDatabase.CreateAsync();
         var item = CreateInboxItem(database.TenantId, Guid.NewGuid(), "Delivery");
         database.Context.Set<NotificationInboxItem>().Add(item);
         await database.Context.SaveChangesAsync();
@@ -245,7 +246,7 @@ public sealed class NotificationServiceTests
     [Test]
     public async Task RecordDeliveryStatusAsync_TerminalDeliveredToPending_ReturnsConflict()
     {
-        await using var database = await TestDatabase.CreateAsync();
+        await using var database = await NotificationTestDatabase.CreateAsync();
         var item = CreateInboxItem(database.TenantId, Guid.NewGuid(), "Terminal");
         database.Context.Set<NotificationInboxItem>().Add(item);
         database.Context.Set<NotificationDeliveryStatusRecord>().Add(new NotificationDeliveryStatusRecord
@@ -278,26 +279,7 @@ public sealed class NotificationServiceTests
     }
 
     private static NotificationService CreateService(AppDbContext db, Guid tenantId) =>
-        new(db, NullLogger<NotificationService>.Instance, new TestInvocationContextAccessor(tenantId));
-
-    private sealed class TestInvocationContextAccessor(Guid tenantId) : ITrustedInvocationContextAccessor
-    {
-        public TrustedInvocationContext Current { get; } =
-            new(
-                new TrustedActorIdentity(
-                    Guid.NewGuid(),
-                    Guid.NewGuid(),
-                    tenantId,
-                    Guid.NewGuid(),
-                    new HashSet<string>(StringComparer.Ordinal) { "notifications-test" },
-                    new HashSet<string>(StringComparer.Ordinal),
-                    "notifications-tests-g1",
-                    DateTimeOffset.UtcNow.AddHours(1)),
-                null,
-                tenantId,
-                null,
-                Guid.NewGuid());
-    }
+        NotificationTestHost.CreateNotificationService(db, new TestInvocationContextAccessor(tenantId));
 
     private static void EnableChannels(
         AppDbContext db,
@@ -348,70 +330,4 @@ public sealed class NotificationServiceTests
         ConcurrencyStamp = Guid.NewGuid(),
         IsEnabled = true
     };
-
-    private sealed class TestDatabase : IAsyncDisposable
-    {
-        private readonly SqliteConnection connection;
-
-        private TestDatabase(SqliteConnection connection, AppDbContext context, Guid tenantId)
-        {
-            this.connection = connection;
-            Context = context;
-            TenantId = tenantId;
-        }
-
-        public AppDbContext Context { get; }
-        public Guid TenantId { get; }
-
-        public static async Task<TestDatabase> CreateAsync()
-        {
-            var tenantId = Guid.NewGuid();
-            var connection = new SqliteConnection("Data Source=:memory:");
-            await connection.OpenAsync();
-            connection.CreateFunction("now", () => DateTime.UtcNow);
-            connection.CreateFunction("uuid_generate_v4", () => Guid.NewGuid());
-
-            var options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseSqlite(connection)
-                .Options;
-
-            var configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Tenant:DefaultId"] = tenantId.ToString()
-                })
-                .Build();
-
-            var context = new AppDbContext(
-                options,
-                new Microsoft.AspNetCore.Http.HttpContextAccessor(),
-                configuration,
-                new TestEffectiveTenantContextAccessor(tenantId),
-                new TestCrossTenantWriteAuthorizationAccessor());
-
-            _ = typeof(NotificationInboxItem).Assembly;
-            await context.Database.EnsureCreatedAsync();
-
-            return new TestDatabase(connection, context, tenantId);
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            await Context.DisposeAsync();
-            await connection.DisposeAsync();
-        }
-
-        private sealed class TestEffectiveTenantContextAccessor(Guid tenantId)
-            : XFramework.Domain.Shared.Security.IEffectiveTenantContextAccessor
-        {
-            public bool HasTrustedInvocation => true;
-            public Guid? EffectiveTenantId => tenantId;
-        }
-
-        private sealed class TestCrossTenantWriteAuthorizationAccessor
-            : XFramework.Domain.Shared.Security.ICrossTenantWriteAuthorizationAccessor
-        {
-            public bool IsAuthorized => true;
-        }
-    }
 }

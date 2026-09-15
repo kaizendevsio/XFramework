@@ -138,6 +138,19 @@
             </button>
         </div>
     }
+
+    @if (Section == "notifications")
+    {
+    <h3 class="set-group">Notifications</h3>
+    <div class="set-list">
+        <button type="button" class="set-row set-action" disabled="@(!PushAvailable || pushBusy)" aria-pressed="@pushSubscribed.ToString().ToLowerInvariant()" @onclick="TogglePushAsync">
+            <span class="set-key"><Icon Name="alert" Size="19" /><span class="set-label">Push notifications<small>@PushDetail</small></span></span>
+            <span class="set-value">@(pushBusy ? "…" : pushSubscribed ? "On" : "Off")</span>
+        </button>
+        @if (pushNotice is not null) { <div class="set-note" role="status">@pushNotice</div> }
+    </div>
+    <p class="set-footnote">A notification only wakes this device. Your messages stay end-to-end encrypted, so the server has nothing readable to put in one and never sends message text to Apple, Google or Mozilla.</p>
+    }
 </div>
 </ChildContent>
 <Footer>@if (Section is null) { <TabBar Current="settings" /> }</Footer>
@@ -156,6 +169,7 @@
     private string SectionTitle => Categories.FirstOrDefault(x => x.Route == Section).Title ?? "Settings";
     private static readonly (string Route, string Title, string Icon, string Description)[] Categories = [
         ("appearance", "Appearance", "moon", "Theme, colors and glass"),
+        ("notifications", "Notifications", "alert", "Alerts while Yap is closed"),
         ("privacy", "Privacy and security", "shield", "Encryption, recovery and devices"),
         ("calls", "Calls", "phone", "Ringtone and ring volume"),
         ("storage", "Storage and sync", "wifi", "Offline messages and pending sends"),
@@ -177,6 +191,7 @@
         accent = await JS.InvokeAsync<string>("yap.accentPreference");
         canInstall = await JS.InvokeAsync<bool>("yap.device.canInstall");
         installed = await JS.InvokeAsync<bool>("yap.device.isInstalled");
+        await LoadPushAsync();
         StateHasChanged();
     }
 

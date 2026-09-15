@@ -30,6 +30,22 @@ public interface INotificationsServiceWrapper : IServiceWrapper
     Task<QueryResponse<NotificationDeliveryStatusResponse>> RecordNotificationDeliveryStatus(
         RecordNotificationDeliveryStatusRequest request,
         CancellationToken ct = default);
+
+    Task<QueryResponse<PushConfigurationResponse>> GetPushConfiguration(
+        GetPushConfigurationRequest request,
+        CancellationToken ct = default);
+
+    Task<QueryResponse<PushSubscriptionResponse>> RegisterPushSubscription(
+        RegisterPushSubscriptionRequest request,
+        CancellationToken ct = default);
+
+    Task<CmdResponse> RemovePushSubscription(
+        RemovePushSubscriptionRequest request,
+        CancellationToken ct = default);
+
+    Task<QueryResponse<SendDirectPushResponse>> SendDirectPush(
+        SendDirectPushRequest request,
+        CancellationToken ct = default);
 }
 
 public sealed record NotificationsServiceWrapper(
@@ -66,6 +82,26 @@ public sealed record NotificationsServiceWrapper(
         RecordNotificationDeliveryStatusRequest request,
         CancellationToken ct = default) =>
         SendAsync<RecordNotificationDeliveryStatusRequest, NotificationDeliveryStatusResponse>(request, ct);
+
+    public Task<QueryResponse<PushConfigurationResponse>> GetPushConfiguration(
+        GetPushConfigurationRequest request,
+        CancellationToken ct = default) =>
+        SendAsync<GetPushConfigurationRequest, PushConfigurationResponse>(request, ct);
+
+    public Task<QueryResponse<PushSubscriptionResponse>> RegisterPushSubscription(
+        RegisterPushSubscriptionRequest request,
+        CancellationToken ct = default) =>
+        SendAsync<RegisterPushSubscriptionRequest, PushSubscriptionResponse>(request, ct);
+
+    public Task<CmdResponse> RemovePushSubscription(
+        RemovePushSubscriptionRequest request,
+        CancellationToken ct = default) =>
+        SendVoidAsync(request, ct);
+
+    public Task<QueryResponse<SendDirectPushResponse>> SendDirectPush(
+        SendDirectPushRequest request,
+        CancellationToken ct = default) =>
+        SendAsync<SendDirectPushRequest, SendDirectPushResponse>(request, ct);
 }
 
 public static class NotificationsServiceWrapperExtensions

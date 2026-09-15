@@ -2,6 +2,7 @@ namespace Notifications.Api.Services;
 
 public sealed class NotificationDeliveryDispatcherHostedService(
     IServiceScopeFactory scopeFactory,
+    NotificationDeliverySignal signal,
     ILogger<NotificationDeliveryDispatcherHostedService> logger,
     IConfiguration configuration) : BackgroundService
 {
@@ -27,7 +28,7 @@ public sealed class NotificationDeliveryDispatcherHostedService(
                 logger.LogError(ex, "Notification delivery dispatcher failed");
             }
 
-            await Task.Delay(_interval, stoppingToken);
+            await signal.WaitAsync(_interval, stoppingToken);
         }
     }
 }
