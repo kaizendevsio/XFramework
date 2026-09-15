@@ -17,7 +17,6 @@
         <div class="identity-summary">
         <h2>@(State.User?.Name ?? "Not signed in")</h2>
         @if (State.User is not null) { <PhotoPicker Uploaded="State.RefreshProfileAsync" /> }
-        <p role="status">@(State.User is null ? "Not signed in" : State.NeedsLogin ? "Sign-in required to sync" : !State.Online ? "Reconnecting · saved sign-in retained" : State.Error is not null ? "Signed in · last action could not finish" : "Signed in")</p>
         @if (State.User is null || State.NeedsLogin) { <a class="btn h46" href="/login">Sign in</a> }
         </div>
     </section>
