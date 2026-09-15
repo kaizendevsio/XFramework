@@ -1,23 +1,45 @@
 @inject ChatState State
 @inject NavigationManager Nav
-<div class="picker conversation-settings">
-    <h2>@Conversation.Name</h2>
-    <p class="muted">Admins manage shared features and members. Your personal preferences are under General.</p>
-    <div class="conversation-tabs" role="tablist" aria-label="Conversation settings">
-        @foreach (var item in new[] { ("features", "Features"), ("members", "Members"), ("general", "General") })
-        { <button role="tab" aria-selected="@((tab == item.Item1).ToString().ToLowerInvariant())" @onclick="() => tab = item.Item1">@item.Item2</button> }
-    </div>
-    <div role="tabpanel">
-    @if (tab == "features")
-    {
-    @foreach (var (feature, label) in Features)
-    {
-        <label class="setting-toggle"><span>@label</span><input type="checkbox" role="switch" checked="@Conversation.Allows(feature)" disabled="@Locked" @onchange="e => ToggleAsync(feature, e.Value is true)" /><span class="switch-track" aria-hidden="true"></span></label>
-    }
-    }
-    @if (tab == "members")
-    {
-    <h3>Members</h3>
+<div class="conversation-details">
+    <section class="details-identity">
+        <Avatar Initials="@Conversation.Initials" ImageUrl="@Conversation.AvatarUrl" Color="@Conversation.Color" Size="a80" />
+        <h1>@Conversation.Name</h1>
+        <p class="muted">@State.ConversationSubtitle(Conversation)</p>
+        @if (Conversation.Group && !Locked) { <PhotoPicker Path="@($"api/chat/conversations/{Conversation.Id}/photo")" Uploaded="State.SynchronizeAsync" /> }
+    </section>
+    <nav class="details-shortcuts" aria-label="Conversation shortcuts">
+        @if (CanCall) { <button @onclick="Call"><span><Icon Name="phone" /></span>Call</button> }
+        <button @onclick="Search"><span><Icon Name="search" /></span>Search</button>
+        <button disabled="@(!State.Online || State.NeedsLogin)" @onclick="State.MuteAsync"><span><Icon Name="volume" /></span>@(Conversation.Muted ? "Unmute" : "Mute")</button>
+    </nav>
+    <h2 class="set-group">Chat info</h2>
+    <div class="details-list">
+        <details class="detail-section">
+            <summary @onclick="() => mediaOpen = !mediaOpen"><Icon Name="image" /><span>Media and files</span><Icon Name="arrow" Size="17" /></summary>
+            <div class="detail-content">
+                @if (mediaOpen)
+                {
+                <div class="details-media">
+                @foreach (var message in Conversation.Messages.Where(x => x.HasAttachments).TakeLast(12))
+                { <MessageMedia @key="message.Id" Message="message" SourcePrefix="details" /> }
+                </div>
+                @if (!Conversation.Messages.Any(x => x.HasAttachments)) { <p class="muted">No media in the loaded messages.</p> }
+                @if (State.HasEarlierMessages) { <button class="btn ghost" @onclick="State.LoadEarlierAsync">Load older messages</button> }
+                }
+            </div>
+        </details>
+        <details class="detail-section">
+            <summary><Icon Name="file" /><span>Pinned messages</span><Icon Name="arrow" Size="17" /></summary>
+            <div class="detail-content">
+            @foreach (var message in Conversation.Messages.Where(x => x.Pinned))
+            { <button class="row" @onclick="() => Locate.InvokeAsync(message.Id)"><span class="mid">@(message.HasAttachments ? "Attachment" : message.Text)</span><Icon Name="arrow" Size="17" /></button> }
+            @if (!Conversation.Messages.Any(x => x.Pinned)) { <p class="muted">No pinned messages in the loaded history.</p> }
+            @if (State.HasEarlierMessages) { <button class="btn ghost" @onclick="State.LoadEarlierAsync">Load older messages</button> }
+            </div>
+        </details>
+        <details class="detail-section">
+            <summary><Icon Name="users" /><span>Members<span class="detail-count">@Conversation.Members</span></span><Icon Name="arrow" Size="17" /></summary>
+            <div class="detail-content">
     @foreach (var person in Conversation.People)
     {
         <div class="conversation-member" @key="person.Id">
@@ -42,20 +64,30 @@
         @foreach (var person in results.Where(p => Conversation.People.All(m => m.Id != p.Id)))
         { <button class="row" disabled="@Locked" @onclick='() => MemberAsync(person, "add")'><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" ImageUrl="@person.AvatarUrl" Size="a34" /><span class="mid">@person.Name</span><Icon Name="plus" Size="18" /></button> }
     }
-    }
-    @if (tab == "general")
-    {
-    <label class="setting-toggle"><span>Share my active status</span><input type="checkbox" role="switch" checked="@Conversation.ShareActiveStatus" disabled="@(!State.Online || State.NeedsLogin || busy)" @onchange="e => RunAsync(() => State.SetActiveStatusAsync(Conversation.Id, e.Value is true))" /><span class="switch-track" aria-hidden="true"></span></label>
-    <p class="muted">Let people in this conversation see when you’re active in Yap.</p>
-    @if (Conversation.Group)
-    {
-        <div class="row"><Avatar Initials="@ChatMessage.InitialsFor(Conversation.Name)" ImageUrl="@Conversation.AvatarUrl" />
-        @if (!Locked) { <PhotoPicker Path="@($"api/chat/conversations/{Conversation.Id}/photo")" Uploaded="State.SynchronizeAsync" /> }</div>
-    }
-    <label class="field"><span class="lab">Conversation name</span><span class="inp"><input aria-label="Conversation name" @bind="title" @bind:event="oninput" maxlength="100" disabled="@Locked" /></span></label>
-    <button class="btn ghost" disabled="@(Locked || string.IsNullOrWhiteSpace(title))" @onclick="RenameAsync">Save name</button>
-    <button class="btn ghost" disabled="@(!State.Online || State.NeedsLogin || busy)" @onclick="State.MuteAsync">@(Conversation.Muted ? "Unmute conversation" : "Mute conversation")</button>
-    <button class="btn ghost danger" disabled="@(!State.Online || State.NeedsLogin || busy)" @onclick="() => deleting = true"><Icon Name="trash" Size="18" />Delete conversation</button>
+
+            </div>
+        </details>
+        @if (Conversation.CanManage)
+        {
+        <details class="detail-section">
+            <summary><Icon Name="edit" /><span>Conversation name</span><Icon Name="arrow" Size="17" /></summary>
+            <div class="detail-content"><label class="field"><span class="lab">Name</span><span class="inp"><input aria-label="Conversation name" @bind="title" @bind:event="oninput" maxlength="100" disabled="@Locked" /></span></label><button class="btn ghost" disabled="@(Locked || string.IsNullOrWhiteSpace(title))" @onclick="RenameAsync">Save name</button></div>
+        </details>
+        }
+    </div>
+    <h2 class="set-group">Privacy and preferences</h2>
+    <div class="details-list">
+        <label class="setting-toggle"><span>Share active status<small>Active now and last seen in this chat</small></span><input type="checkbox" role="switch" checked="@Conversation.ShareActiveStatus" disabled="@(!State.Online || State.NeedsLogin || busy)" @onchange="e => RunAsync(() => State.SetActiveStatusAsync(Conversation.Id, e.Value is true))" /><span class="switch-track" aria-hidden="true"></span></label>
+        <details class="detail-section">
+            <summary><Icon Name="settings" /><span>Message permissions<small>@(Conversation.CanManage ? "Manage features for everyone" : "Managed by conversation admins")</small></span><Icon Name="arrow" Size="17" /></summary>
+            <div class="detail-content">
+            @foreach (var (feature, label) in Features)
+            { <label class="setting-toggle"><span>@label</span><input type="checkbox" role="switch" checked="@Conversation.Allows(feature)" disabled="@Locked" @onchange="e => ToggleAsync(feature, e.Value is true)" /><span class="switch-track" aria-hidden="true"></span></label> }
+            </div>
+        </details>
+        @if (State.EncryptionEnabled) { <div class="detail-security"><Icon Name="lock" /><span>End-to-end encryption<small>Messages are encrypted on your devices</small></span></div> }
+    </div>
+    <button class="details-delete danger" disabled="@(!State.Online || State.NeedsLogin || busy)" @onclick="() => deleting = true"><Icon Name="trash" />Delete conversation</button>
     @if (deleting)
     {
         <div class="set-note" role="group" aria-label="Confirm conversation deletion">
@@ -74,15 +106,18 @@
             <button class="btn ghost" disabled="@busy" @onclick="() => { deleting = false; deleteEveryone = false; }">Cancel</button>
         </div>
     }
-    }
-    </div>
+
 </div>
 @code {
     [Parameter, EditorRequired] public Conversation Conversation { get; set; } = default!;
-    private string tab = "features", title = "";
+    private string title = "";
+    [Parameter] public EventCallback Search { get; set; }
+    [Parameter] public EventCallback Call { get; set; }
+    [Parameter] public EventCallback<Guid> Locate { get; set; }
+    [Parameter] public bool CanCall { get; set; }
     protected override void OnInitialized() => title = Conversation.Name;
     private Task RenameAsync() => RunAsync(() => State.UpdateConversationAsync(new(Conversation.Id, Name: title)));
-    private bool busy;
+    private bool busy, mediaOpen;
     private bool deleting;
     private bool deleteEveryone;
     private string? deleteError;

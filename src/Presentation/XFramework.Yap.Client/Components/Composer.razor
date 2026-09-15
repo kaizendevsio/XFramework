@@ -11,7 +11,7 @@
         <div class="replyto liquid-glass attachment-preview"><GlassLayer />
             <Icon Name="@Glyph(file.ContentType)" Size="17" />
             <span class="mid"><span class="n">@file.Name</span><span class="p">@Describe(file)</span>
-                @if (uploading) { <span class="upload-bar" role="progressbar" aria-valuenow="@progress" aria-valuemin="0" aria-valuemax="100" aria-label="Upload progress"><i style="width:@(progress)%"></i></span> }
+                @if (uploading) { <span class="upload-bar" role="progressbar" aria-valuenow="@progress" aria-valuemin="0" aria-valuemax="100" aria-label="Upload progress"><i style="transform:scaleX(@((progress / 100d).ToString(System.Globalization.CultureInfo.InvariantCulture)))"></i></span> }
             </span>
             <button type="button" class="iconbtn" aria-label="Remove attachment" @onclick="RemoveFileAsync"><Icon Name="close" Size="16" /></button>
         </div>
@@ -34,7 +34,8 @@
            No option filters or re-encodes the chosen file. *@
         <div class="attach-picker">
             <label class="sheetitem"><Icon Name="image" Size="20" /><span class="mid"><span class="n">Photo or video</span><span class="p">Sent at original quality</span></span><InputFile @ref="mediaInput" accept="image/*,video/*" OnChange="e => PickAsync(e, mediaInput)" aria-label="Choose a photo or video" /></label>
-            <label class="sheetitem"><Icon Name="camera" Size="20" /><span class="mid"><span class="n">Camera</span><span class="p">Take a photo or video now</span></span><InputFile @ref="cameraInput" accept="image/*,video/*" capture="environment" OnChange="e => PickAsync(e, cameraInput)" aria-label="Use the camera" /></label>
+            <label class="sheetitem"><Icon Name="camera" Size="20" /><span class="mid"><span class="n">Camera</span><span class="p">Take a photo</span></span><InputFile @ref="cameraInput" accept="image/*" capture="environment" OnChange="e => PickAsync(e, cameraInput)" aria-label="Use the camera" /></label>
+            <label class="sheetitem"><Icon Name="camera" Size="20" /><span class="mid"><span class="n">Record video</span><span class="p">Open the video camera</span></span><InputFile @ref="videoInput" accept="video/*" capture="environment" OnChange="e => PickAsync(e, videoInput)" aria-label="Record a video" /></label>
             <label class="sheetitem"><Icon Name="clip" Size="20" /><span class="mid"><span class="n">File</span><span class="p">Documents, PDFs, archives, anything</span></span><InputFile @ref="fileInput" OnChange="e => PickAsync(e, fileInput)" aria-label="Choose a file" /></label>
         </div>
         <p class="attach-note">Up to @(ChatLimits.MaxFileBytes / 1073741824) GB. Files over @(ChatLimits.StagedFileBytes / 1048576) MB upload as you compose and need a connection.</p>
@@ -54,7 +55,7 @@
     private int progress;
     private ElementReference editor;
     private bool CanSend => !uploading && (!string.IsNullOrWhiteSpace(draft) || file is not null);
-    private InputFile? mediaInput, cameraInput, fileInput;
+    private InputFile? mediaInput, cameraInput, videoInput, fileInput;
     private ChatState.PickedFile? file;
     private DotNetObjectReference<Composer>? reporter;
     protected override void OnInitialized() => State.Changed += Changed;

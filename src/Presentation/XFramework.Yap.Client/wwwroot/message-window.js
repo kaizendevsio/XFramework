@@ -57,15 +57,19 @@
             state.frame = 0;
             if (!state.element.isConnected) return;
             request(state);
-            if (!state.reading) {
-                state.reading = true;
-                state.readAgain = false;
-                state.ref.invokeMethodAsync('ReadVisible').catch(() => {}).finally(() => { state.reading = false; if (state.readAgain) schedule(state); });
-            }
-            else state.readAgain = true;
+            // Scroll stays entirely in JS. Coalesce read checks rather than
+            // crossing WASM/JS (and scanning rectangles) on every animation frame.
+            if (!state.readTimer) state.readTimer = setTimeout(() => {
+                state.readTimer = 0;
+                if (state.element.isConnected && state.element.getClientRects().length && !document.hidden && !state.reading) {
+                    state.reading = true;
+                    state.ref.invokeMethodAsync('ReadVisible').catch(() => {}).finally(() => { state.reading = false; });
+                }
+            }, 250);
         });
     };
     const layout = (state, next) => {
+        if (!state.element.getClientRects().length) return;
         sample(state); // Native scrolling may already have moved before its event arrives.
         const position = state.element.scrollTop;
         const index = rowAt(state, Math.max(0, position - state.origin));
@@ -91,6 +95,27 @@
             if (current >= 0) move(state, position + state.offsets[current] - oldOffset + state.origin - oldOrigin);
         }
         schedule(state);
+    };
+    const receipts = state => {
+        const previous = state.receipts || new Map(), current = new Map();
+        const scroll = state.element.scrollTop, viewport = state.element.getBoundingClientRect();
+        const animate = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+        // Batch geometry reads before any animation writes. Coordinates include
+        // scroll offset so ordinary scrolling never animates a receipt.
+        for (const element of state.element.querySelectorAll('[data-reader-id]')) {
+            const id = element.dataset.readerId, message = element.closest('[data-message-id]').dataset.messageId;
+            const old = previous.get(id);
+            if (old?.element === element && element.getAnimations().length) { current.set(id, old); continue; }
+            const box = element.getBoundingClientRect();
+            current.set(id, { element, message, x: box.left, y: box.top + scroll, top: box.top });
+        }
+        for (const [id, to] of current) {
+            const from = previous.get(id);
+            if (!animate || !from || from.message === to.message || to.top < viewport.top || to.top > viewport.bottom || from.y - scroll < viewport.top) continue;
+            to.element.animate([{ transform: `translate(${from.x - to.x}px,${from.y - to.y}px)` }, { transform: 'none' }],
+                { duration: 320, easing: 'cubic-bezier(.22,1,.36,1)' });
+        }
+        state.receipts = current;
     };
     window.yap.messageWindow = {
         sync(element, ref, ids, start, count, hasMore, hasNewer = false) {
@@ -118,6 +143,7 @@
             for (const row of state.observed) if (!row.isConnected) { state.resize.unobserve(row); state.observed.delete(row); }
             for (const row of element.querySelectorAll('[data-window-row]')) if (!state.observed.has(row)) { state.observed.add(row); state.resize.observe(row); }
             layout(state, { ids, start, count, hasMore, hasNewer });
+            if (element.getClientRects().length) receipts(state);
         },
         bottom(element) { const state = states.get(element); if (state) { state.pinned = true; move(state, element.scrollHeight - element.clientHeight); schedule(state); } },
         show(element, id) {
@@ -128,7 +154,7 @@
         resize(element) { const state = states.get(element); if (state) layout(state); },
         dispose(element) {
             const state = states.get(element); if (!state) return;
-            state.resize.disconnect(); cancelAnimationFrame(state.frame); states.delete(element);
+            state.resize.disconnect(); cancelAnimationFrame(state.frame); clearTimeout(state.readTimer); states.delete(element);
             element.removeEventListener('scroll', state.scroll); element.removeEventListener('wheel', state.wheel);
             element.removeEventListener('touchstart', state.touchStart); element.removeEventListener('touchmove', state.touchMove);
             element.removeEventListener('keydown', state.key); document.removeEventListener('visibilitychange', state.visibility);

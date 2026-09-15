@@ -1,0 +1,31 @@
+@page "/new"
+@implements IDisposable
+@inject ChatState State
+@inject NavigationManager Nav
+<PageTitle>New message · Yap</PageTitle>
+<ScrollSurface><Header><div class="appbar plain"><a class="iconbtn" href="/" aria-label="Back to inbox"><Icon Name="back" /></a><h1>New message</h1></div></Header><ChildContent><div class="body new-message-page">
+<div class="picker"><label class="field"><span class="lab">Find people</span><span class="inp"><input aria-label="Find people" placeholder="Name or username" @bind="peopleSearch" @bind:event="oninput" @bind:after="SearchAsync" /></span></label>
+@if(members.Count > 0){<div class="selected-people" aria-label="Selected people">@foreach(var id in members){<button class="selected-person" aria-label="@($"Remove {names[id]}")" @onclick="() => Toggle(id)"><Avatar Initials="@ChatMessage.InitialsFor(names[id])" Size="a28" /><span>@names[id]</span><Icon Name="close" Size="14" /></button>}</div>}
+@foreach (var person in people) { <label class="row"><input type="checkbox" checked="@members.Contains(person.Id)" @onchange="() => Toggle(person.Id)" /><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" ImageUrl="@person.AvatarUrl" Size="a34" /><span>@person.Name <small class="muted">@person.UserName</small></span></label> }
+@if (members.Count > 1) { <label class="field"><span class="lab">Group name (optional)</span><span class="inp"><input aria-label="Group name" @bind="groupName" @bind:event="oninput" maxlength="100" /></span></label> }
+<button class="btn" disabled="@(members.Count == 0 || creating)" @onclick="CreateAsync">Start conversation</button></div></div></ChildContent></ScrollSurface>
+@code {
+    private string peopleSearch = "", groupName = "";
+    private bool creating;
+    private List<Person> people = [];
+    private readonly HashSet<Guid> members = [];
+    private readonly Dictionary<Guid, string> names = [];
+    protected override void OnInitialized() => State.Changed += Changed;
+    private void Changed() => _ = InvokeAsync(StateHasChanged);
+    private async Task SearchAsync()
+    { var query = peopleSearch; try { var result = await State.SearchPeopleAsync(query); if (query == peopleSearch) people = result.Where(x => x.Id != State.User?.CredentialId).ToList(); } catch (Exception ex) { State.Report(ex); } }
+    private void Toggle(Guid id) { if (!members.Remove(id)) members.Add(id); foreach (var person in people) names[person.Id] = person.Name; }
+    private async Task CreateAsync()
+    {
+        creating = true;
+        try { var title = members.Count > 1 ? (string.IsNullOrWhiteSpace(groupName) ? string.Join(", ", members.Select(id => names[id])) : groupName.Trim()) : names[members.Single()]; var id = await State.CreateAsync(title[..Math.Min(title.Length, 100)], members.ToList(), members.Count > 1); Nav.NavigateTo($"/chat/{id}"); }
+        catch (Exception ex) { State.Report(ex); }
+        finally { creating = false; }
+    }
+    public void Dispose() => State.Changed -= Changed;
+}

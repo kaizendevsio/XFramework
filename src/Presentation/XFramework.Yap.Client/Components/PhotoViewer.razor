@@ -1,6 +1,7 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 <dialog class="photo-viewer" aria-label="Photo viewer" @ref="dialog">
+    <div class="photo-shade" aria-hidden="true"></div>
     <div class="photo-toolbar">
         <button aria-label="Close photo" @onclick="CloseAnimatedAsync"><Icon Name="close" /></button>
         <span class="photo-viewer-title">Photo</span>

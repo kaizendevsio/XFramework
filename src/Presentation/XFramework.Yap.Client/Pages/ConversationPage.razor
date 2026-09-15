@@ -1,4 +1,5 @@
 @page "/chat/{Id:guid}"
+@page "/chat/{Id:guid}/details"
 @page "/thread/{Id:guid}/{ParentId:guid}"
 @implements IDisposable
 @inject ChatState State
@@ -10,9 +11,9 @@
 else
 {
     var chat = State.Selected?.Id == Id ? State.Selected : State.Conversations.FirstOrDefault(x => x.Id == Id) ?? new Conversation { Id = Id };
-    <ScrollSurface><Header><div class="appbar liquid-glass"><GlassLayer /><a class="iconbtn" href="@(ParentId.HasValue ? $"/chat/{Id}" : "/")" aria-label="Go back"><Icon Name="back" /></a>
-        @if (!ParentId.HasValue) { <Avatar Initials="@chat.Initials" ImageUrl="@chat.AvatarUrl" Color="@chat.Color" /> }
-        <button class="mid conversation-title" aria-label="Conversation settings" @onclick='() => mode = "details"'><h1 style="font-size:16px">@(ParentId.HasValue ? "Thread" : chat.Name)</h1><span class="muted" style="font-size:12px">@(ParentId.HasValue ? $"{chat.Name} · {Parent?.ReplyTotal ?? 0} replies" : State.ConversationSubtitle(chat))</span></button>
+    <div class="conversation-screen" hidden="@ShowingDetails"><ScrollSurface><Header><div class="appbar liquid-glass"><GlassLayer /><a class="iconbtn" href="@(ParentId.HasValue ? $"/chat/{Id}" : "/")" aria-label="Go back"><Icon Name="back" /></a>
+        @if (!ParentId.HasValue) { <button class="conversation-avatar" aria-label="Conversation details" @onclick="OpenDetails"><Avatar Initials="@chat.Initials" ImageUrl="@chat.AvatarUrl" Color="@chat.Color" /></button> }
+        <button class="mid conversation-title" aria-label="Conversation settings" @onclick="OpenDetails"><h1 style="font-size:16px">@(ParentId.HasValue ? "Thread" : chat.Name)</h1><span class="muted" style="font-size:12px">@(ParentId.HasValue ? $"{chat.Name} · {Parent?.ReplyTotal ?? 0} replies" : State.ConversationSubtitle(chat))</span></button>
         <button class="iconbtn" aria-label="Search messages" @onclick='() => mode = "search"'><Icon Name="search" /></button>
         @if(Voice.Enabled){<button class="iconbtn" aria-label="Start voice call" disabled="@(!State.Online || State.NeedsLogin || Voice.IsCalling)" @onclick="CallAsync"><Icon Name="phone" /></button>}
     </div></Header>
@@ -35,7 +36,11 @@ else
             <ChildContent Context="message"><MessageBubble Message="message" Latest="MessageReceipts.IsLatest(message, chat.Messages)" ShowTime="@(!State.HasNewerMessages && chat.Messages.LastOrDefault()?.Id == message.Id)" Readers="MessageReceipts.Readers(message, chat.Messages)" ShowSender="chat.Group" OnSelect="Select" OnReply="ReplyTo" OnThread="OpenThreadAsync" OnReact='emoji => State.ActionAsync(message, "react", emoji: emoji)' /></ChildContent>
         </MessageWindow>
     }
-    </ChildContent><Footer><Composer @key="@(ParentId ?? Id)" ThreadId="Id" ParentId="ParentId" Reply="reply" Cancel="() => reply = null" RestoreReply="message => reply ??= message" /></Footer></ScrollSurface>
+    </ChildContent><Footer><Composer @key="@(ParentId ?? Id)" ThreadId="Id" ParentId="ParentId" Reply="reply" Cancel="() => reply = null" RestoreReply="message => reply ??= message" /></Footer></ScrollSurface></div>
+    @if (ShowingDetails)
+    {
+        <ScrollSurface><Header><div class="appbar plain"><a class="iconbtn" href="@($"/chat/{Id}")" aria-label="Back to conversation"><Icon Name="back" /></a><h1>Chat details</h1></div></Header><ChildContent><div class="body details-body"><ConversationSettings Conversation="chat" Search="SearchFromDetails" Call="CallFromDetails" CanCall="@(Voice.Enabled && State.Online && !Voice.IsCalling)" Locate="LocateFromDetails" /></div></ChildContent></ScrollSurface>
+    }
 }
 @if (mode == "message" && selected is not null)
 {
@@ -69,8 +74,6 @@ else if (mode == "edit")
 { <div class="picker"><textarea aria-label="Edit message" @bind="edit" @bind:event="oninput" maxlength="4000"></textarea><button class="btn" @onclick='() => ActionAsync("edit", edit)'>Save changes</button></div> }
 else if (mode == "delete")
 { <div class="picker"><p>Delete this message for everyone?</p><button class="btn" @onclick='() => ActionAsync("delete")'>Delete message</button></div> }
-else if (mode == "details" && State.Selected is { } details)
-{ <ConversationSettings Conversation="details" /> }
 else if (mode == "forward")
 { <div class="picker">@foreach (var target in State.Conversations) { <button class="row" @onclick="() => ForwardAsync(target.Id)"><Avatar Initials="@target.Initials" Size="a34" />@target.Name</button> }</div> }
 else if (mode == "search")
@@ -84,6 +87,11 @@ else if (mode == "search")
     private ChatMessage? Parent => State.Selected?.Messages.FirstOrDefault(x => x.Id == ParentId);
     private ChatMessage? reply, selected;
     private string? mode;
+    private bool ShowingDetails => new Uri(Nav.Uri).AbsolutePath.EndsWith("/details", StringComparison.Ordinal);
+    private void OpenDetails() { mode = null; Nav.NavigateTo($"/chat/{Id}/details"); }
+    private void SearchFromDetails() { Nav.NavigateTo($"/chat/{Id}"); mode = "search"; }
+    private async Task CallFromDetails() { Nav.NavigateTo($"/chat/{Id}"); await CallAsync(); }
+    private async Task LocateFromDetails(Guid message) { Nav.NavigateTo($"/chat/{Id}"); await ShowHitAsync(message); }
     private string edit = "";
     private Guid loaded;
     private Guid? loadedParent;

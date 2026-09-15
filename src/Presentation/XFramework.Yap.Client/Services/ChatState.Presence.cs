@@ -26,9 +26,14 @@ public sealed partial class ChatState
     public string ConversationSubtitle(Conversation conversation)
     {
         var active = conversation.People.Count(person => person.Id != User?.CredentialId && IsActive(person));
-        return conversation.Group
-            ? active > 0 ? $"{conversation.Members} members · {active} active" : $"{conversation.Members} members"
-            : active > 0 ? "Active now" : "Direct conversation";
+        if (conversation.Group) return active > 0 ? $"{active} active now" : $"{conversation.Members} members";
+        if (active > 0) return "Active now";
+        var last = conversation.People.FirstOrDefault(person => person.Id != User?.CredentialId)?.LastActiveAt;
+        if (last is null || !Online || NeedsLogin) return "";
+        var age = DateTime.UtcNow - last.Value;
+        if (age < TimeSpan.FromMinutes(1)) return "Last seen just now";
+        if (age < TimeSpan.FromHours(1)) return $"Last seen {(int)age.TotalMinutes}m ago";
+        return age < TimeSpan.FromDays(1) ? $"Last seen {(int)age.TotalHours}h ago" : "";
     }
 
     public async Task SetActiveStatusAsync(Guid conversationId, bool share)

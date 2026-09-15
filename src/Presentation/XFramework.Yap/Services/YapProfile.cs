@@ -45,6 +45,9 @@ public static class YapProfile
             response.EnsureSuccessStatusCode();
             context.Response.ContentType = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
             context.Response.Headers.XContentTypeOptions = "nosniff";
+            // URLs contain the account and storage version. Only the browser may
+            // reuse the photo; shared proxies must never cache authenticated media.
+            context.Response.Headers.CacheControl = "private, max-age=86400";
             await response.Content.CopyToAsync(context.Response.Body, ct);
             return Results.Empty;
         }).WithMetadata(new MediaAccountQuery());
@@ -70,6 +73,7 @@ public static class YapProfile
             response.EnsureSuccessStatusCode();
             context.Response.ContentType = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
             context.Response.Headers.XContentTypeOptions = "nosniff";
+            context.Response.Headers.CacheControl = "private, max-age=86400";
             await response.Content.CopyToAsync(context.Response.Body, ct);
             return Results.Empty;
         }).WithMetadata(new MediaAccountQuery());

@@ -1,0 +1,38 @@
+/* Full-page, grouped settings. Keep the scrolling body free of backdrop filters. */
+.startup-splash{height:100dvh;min-height:320px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:24px;text-align:center;box-sizing:border-box}
+.startup-splash .yap-brand{font-size:40px}.startup-splash p{color:var(--dim);font-size:14px;margin:0;min-height:20px}.startup-splash .startup-help{max-width:320px;font-size:12px}
+.conversation-screen{height:100%;min-height:0}.conversation-screen[hidden]{display:none}
+.conversation-avatar{padding:0;flex:none;border-radius:50%}
+.details-body{padding-inline:20px!important}.conversation-details{max-width:620px;margin:0 auto;padding-bottom:32px}
+.details-identity{display:flex;align-items:center;flex-direction:column;gap:10px;padding:22px 0 12px;text-align:center}
+.a80{width:80px;height:80px;font-size:28px}.details-identity h1{font-size:22px;line-height:1.25;margin:4px 0 0;overflow-wrap:anywhere}
+.details-identity p{font-size:13px;margin:0;min-height:18px}
+.details-shortcuts{display:flex;justify-content:center;gap:28px;margin:12px 0 30px}
+.details-shortcuts button{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:12px;min-width:52px}
+.details-shortcuts button>span{display:grid;place-items:center;background:var(--surface2);width:48px;height:48px;border-radius:50%}
+.details-list{border-radius:18px;background:var(--surface2);overflow:hidden}
+.detail-section>summary,.detail-security{display:flex;align-items:center;gap:14px;min-height:58px;padding:14px 16px;list-style:none;cursor:pointer}
+.detail-section>summary::-webkit-details-marker{display:none}.detail-section>summary>span,.detail-security>span{flex:1;min-width:0}
+.detail-section>summary>.ic:last-child{transition:transform 180ms var(--ease-out)}.detail-section[open]>summary>.ic:last-child{transform:rotate(90deg)}
+.detail-section+.detail-section,.detail-security{border-top:1px solid var(--border)}
+.detail-count{font-size:12px;color:var(--dim);margin-left:10px}
+.detail-content{padding:0 16px 16px}.detail-content .btn{margin-top:10px}
+.conversation-details .setting-toggle{padding:14px 16px;min-height:64px;position:relative}
+.conversation-details .detail-content .setting-toggle{padding-inline:0}
+.conversation-details small{display:block;color:var(--dim);font-size:12px;line-height:1.4;margin-top:4px}
+.details-media{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.details-media .message-media{width:100%;max-width:100%}.details-media .message-media img,.details-media .message-media video{max-height:180px}
+.details-delete{display:flex;align-items:center;justify-content:center;gap:12px;min-height:54px;width:100%;margin:22px 0;color:var(--danger)}
+.settings .identity-card{background:transparent;border:0;box-shadow:none;padding:22px 8px 26px;gap:18px;border-radius:0}
+.settings .set-list,.settings-menu{background:var(--surface2);border:0;border-radius:18px;box-shadow:none;overflow:hidden}
+.settings-menu .set-row{gap:14px;padding:16px;min-height:72px}.settings-menu .set-label{flex:1}.settings-menu .set-label small{font-size:12px;line-height:1.4}
+.settings-category-icon{background:var(--accent-soft);color:var(--accent-ink);width:38px;height:38px;display:grid;place-items:center;border-radius:12px;flex:none}
+.settings-menu+.set-list{margin-top:24px}.settings .set-row{padding-block:16px}.settings .set-group{margin:18px 6px 10px}
+.new-message-page{padding-inline:20px!important}.new-message-page>.picker{max-width:620px;margin:0 auto;padding:12px 0 30px}
+.new-message-page .selected-people{padding-block:12px}.new-message-page .row{padding-inline:0;gap:12px}.new-message-page .btn{margin-top:20px}
+/* Native details still perform one layout when opened/closed; animate only the
+   resulting content's opacity and transform, never height or grid tracks. */
+@supports (transition-behavior:allow-discrete){
+    .detail-section::details-content{opacity:0;transform:translateY(-4px);transition:opacity 180ms ease,transform 180ms ease,content-visibility 180ms allow-discrete}
+    .detail-section[open]::details-content{opacity:1;transform:none}
+}

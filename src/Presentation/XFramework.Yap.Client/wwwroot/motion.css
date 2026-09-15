@@ -10,9 +10,9 @@ html[data-nav-direction=back]{--motion-enter:-32px;--motion-exit:18px}
 @keyframes yap-page-in{from{opacity:0;transform:translateX(var(--motion-enter)) scale(.985)}to{opacity:1;transform:none}}
 @keyframes yap-page-out{to{opacity:0;transform:translateX(var(--motion-exit)) scale(.99)}}
 /* Native entry transitions for newly inserted Blazor elements. */
-.msg,.treply,.row,.card,.replyto,.toast,.inbox-panel{opacity:1;transform:none;transition:opacity 220ms ease,transform 320ms var(--ease-out),background-color 160ms ease}
+.row,.card,.replyto,.toast,.inbox-panel{opacity:1;transform:none;transition:opacity 220ms ease,transform 240ms var(--ease-out)}
 @starting-style{
-    .msg,.treply,.replyto{opacity:0;transform:translateY(10px) scale(.98)}
+    .replyto{opacity:0;transform:translateY(10px) scale(.98)}
     .row,.card{opacity:0;transform:translateY(9px)}
     .toast{opacity:0;transform:translateY(-12px) scale(.98)}
     .inbox-panel{opacity:0;transform:translateX(12px)}
@@ -20,7 +20,7 @@ html[data-nav-direction=back]{--motion-enter:-32px;--motion-exit:18px}
 .row:nth-child(2),.card:nth-child(2){transition-delay:25ms}
 .row:nth-child(3),.card:nth-child(3){transition-delay:45ms}
 .row:nth-child(4),.card:nth-child(4){transition-delay:65ms}
-button,.btn,.pillbtn,.tab,.iconbtn,.react,.threadlink,.k{transition:scale 160ms var(--ease-spring),background-color 180ms ease,color 180ms ease,box-shadow 180ms ease}
+button,.btn,.pillbtn,.tab,.iconbtn,.react,.threadlink,.k{transition:scale 160ms var(--ease-out)}
 button:active,.btn:active,.pillbtn:active{scale:.96}
 .bub:active{scale:.985}
 .cbtn:active,.vbtn:active{scale:.93}
@@ -28,7 +28,6 @@ button:active,.btn:active,.pillbtn:active{scale:.96}
 @keyframes yap-react{50%{scale:1.15}}
 @media(hover:hover){.fab:hover,.sendbtn:hover{scale:1.05;box-shadow:0 12px 28px -10px #76974980}.card:hover{translate:0 -2px}.iconbtn:hover .ic{rotate:-5deg}.threadlink:hover{scale:1.025}}
 .ic{transition:rotate 180ms var(--ease-out)}
-body,.app-shell,.screen,.composer,.pagebar{transition:background-color 220ms ease,color 220ms ease,border-color 220ms ease}
 .overlay{opacity:1;transition:opacity 180ms ease;animation:yap-overlay-in 180ms ease}
 .sheet{animation:yap-sheet-in 300ms var(--ease-out);translate:0 var(--sheet-drag,0px);transition:translate 260ms var(--ease-out)}
 @keyframes yap-overlay-in{from{opacity:0}}
@@ -50,8 +49,20 @@ body,.app-shell,.screen,.composer,.pagebar{transition:background-color 220ms eas
 @keyframes yap-fallback-in{from{opacity:.5;transform:translateY(7px)}to{opacity:1;transform:none}}
 .call-center .avatar{animation:yap-avatar-in 420ms var(--ease-out)}
 @keyframes yap-avatar-in{from{opacity:0;scale:.92}to{opacity:1;scale:1}}
-.cbtn .k,.vbtn .k{transition:background-color 200ms ease,color 200ms ease,scale 200ms var(--ease-spring)}
+.cbtn .k,.vbtn .k{transition:scale 200ms var(--ease-spring)}
 .cbtn.on .k,.vbtn.on .k{scale:1.04}
+.reader-motion{display:inline-flex;position:relative;z-index:2}
+/* Recycled rows must appear at their measured position without replaying entry.
+   Never promote the whole history to GPU layers; only active animations get one. */
+.message-window .msg,.message-window .treply{opacity:1;transform:none}
+.message-window .row{transition:none}
+[data-exit-ghost]{pointer-events:none!important;z-index:190!important;animation:none!important}
+[data-exit-ghost] *{animation:none!important;transition:none!important;pointer-events:none!important}
+[data-exit-ghost].message-menu-dialog,[data-exit-ghost].sheet-dialog{position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;border:0}
+[data-exit-ghost].message-menu-dialog{display:block;background:transparent}
+[data-exit-ghost].sheet-dialog{display:flex}
+.exit-backdrop{position:absolute;inset:0;background:#0005;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+[data-exit-ghost] .sheet{z-index:1}
 @media(prefers-reduced-motion:reduce){
     *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
     ::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}

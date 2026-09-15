@@ -1,5 +1,5 @@
 <button class="reader-avatars" aria-label="@($"Seen by {People.Count} people. Show readers")" @onclick="() => open = true">
-    @foreach (var person in People.Take(3)) { <Avatar Initials="@ChatMessage.InitialsFor(person.Name)" ImageUrl="@person.AvatarUrl" Size="a20" /> }
+    @foreach (var person in People.Take(3)) { <span class="reader-motion" data-reader-id="@person.Id" @key="person.Id"><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" ImageUrl="@person.AvatarUrl" Size="a20" /></span> }
     @if (People.Count > 3) { <span class="reader-extra">+@(People.Count - 3)</span> }
 </button>
 @if (open)

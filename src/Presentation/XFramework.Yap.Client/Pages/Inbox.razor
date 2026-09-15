@@ -30,15 +30,7 @@ else
 }
 @if (State.HasMoreConversations) { <button class="btn ghost" disabled="@(!State.Online || State.Busy)" @onclick="State.LoadMoreConversationsAsync">Load more conversations</button> }
 </div></ChildContent><Footer><TabBar Current="inbox" /></Footer></ScrollSurface>
-<button class="fab liquid-glass" aria-label="New conversation" disabled="@(!State.Online || State.NeedsLogin)" @onclick="() => choosing = true"><GlassLayer /><Icon Name="edit" /></button>
-}
-@if (choosing)
-{
-<BottomSheet Title="New conversation" OnClose="() => choosing = false"><div class="picker"><label class="field"><span class="lab">Find people</span><span class="inp"><input aria-label="Find people" placeholder="Name or username" @bind="peopleSearch" @bind:event="oninput" @bind:after="SearchAsync" /></span></label>
-@if(members.Count > 0){<div class="selected-people" aria-label="Selected people">@foreach(var id in members){<button class="selected-person" aria-label="@($"Remove {names[id]}")" @onclick="() => Toggle(id)"><Avatar Initials="@ChatMessage.InitialsFor(names[id])" Size="a28" /><span>@names[id]</span><Icon Name="close" Size="14" /></button>}</div>}
-@foreach (var person in people) { <label class="row"><input type="checkbox" checked="@members.Contains(person.Id)" @onchange="() => Toggle(person.Id)" /><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" ImageUrl="@person.AvatarUrl" Size="a34" /><span>@person.Name <small class="muted">@person.UserName</small></span></label> }
-@if (members.Count > 1) { <label class="field"><span class="lab">Group name (optional)</span><span class="inp"><input aria-label="Group name" @bind="groupName" @bind:event="oninput" maxlength="100" /></span></label> }
-<button class="btn" disabled="@(members.Count == 0 || creating)" @onclick="CreateAsync">Start conversation</button></div></BottomSheet>
+<button class="fab liquid-glass" aria-label="New conversation" disabled="@(!State.Online || State.NeedsLogin)" @onclick='() => Nav.NavigateTo("/new")'><GlassLayer /><Icon Name="edit" /></button>
 }
 @if (menu is { } chosen)
 {
@@ -58,7 +50,7 @@ else
     <BottomSheet Title="Delete conversation" OnClose="() => deleting = null"><div class="picker"><p>@(deleteEveryone ? "Delete this conversation for everyone? This cannot be undone." : $"Remove {remove.Name} from your list? Other members keep their conversation.")</p><button class="btn danger" disabled="@working" @onclick="DeleteAsync">@(deleteEveryone ? "Confirm delete for everyone" : "Delete for me")</button>@if(remove.CanManage && !deleteEveryone){<button class="btn ghost danger" @onclick="() => deleteEveryone = true">Delete for everyone</button>}</div></BottomSheet>
 }
 @code {
-    private string search = "", peopleSearch = "", groupName = "";
+    private string search = "";
     private void MenuKeyDown(KeyboardEventArgs e) { if (e.Key == "Escape") menu = null; }
     private ElementReference menuElement;
     private bool focusMenu;
@@ -79,25 +71,12 @@ else
     }
     private async Task RenameAsync() { var chat = renaming!; var title = newTitle; renaming = null; working = true; try { await State.UpdateConversationAsync(new(chat.Id, Name: title)); } catch(Exception ex) { State.Report(ex); } finally { working = false; } }
     private async Task DeleteAsync() { var chat = deleting!; deleting = null; working = true; try { await State.DeleteConversationAsync(chat.Id, deleteEveryone); } catch(Exception ex) { State.Report(ex); } finally { working = false; } }
-    private bool searchVisible, choosing, creating;
-    private List<Person> people = [];
+    private bool searchVisible;
     private List<SearchHit> hits = [];
-    private readonly HashSet<Guid> members = [];
-    private readonly Dictionary<Guid, string> names = [];
     private IEnumerable<Conversation> Filtered => State.Conversations.Where(c => !c.Removed && c.Name.Contains(search, StringComparison.OrdinalIgnoreCase)).OrderByDescending(c => c.IsFavorite).ThenByDescending(c => c.LastMessageAt);
     protected override void OnInitialized() => State.Changed += Changed;
     private void Changed() => _ = InvokeAsync(StateHasChanged);
-    private async Task SearchAsync()
-    { var query = peopleSearch; try { var result = await State.SearchPeopleAsync(query); if (query == peopleSearch) people = result.Where(x => x.Id != State.User?.CredentialId).ToList(); } catch (Exception ex) { State.Report(ex); } }
     private async Task SearchMessagesAsync()
     { var query = search; try { var result = await State.SearchAsync(query); if (query == search) hits = result; } catch (Exception ex) { State.Report(ex); } }
-    private void Toggle(Guid id) { if (!members.Remove(id)) members.Add(id); foreach (var person in people) names[person.Id] = person.Name; }
-    private async Task CreateAsync()
-    {
-        creating = true;
-        try { var title = members.Count > 1 ? (string.IsNullOrWhiteSpace(groupName) ? string.Join(", ", members.Select(id => names[id])) : groupName.Trim()) : names[members.Single()]; var id = await State.CreateAsync(title[..Math.Min(title.Length, 100)], members.ToList(), members.Count > 1); Nav.NavigateTo($"/chat/{id}"); }
-        catch (Exception ex) { State.Report(ex); }
-        finally { creating = false; }
-    }
     public void Dispose() => State.Changed -= Changed;
 }

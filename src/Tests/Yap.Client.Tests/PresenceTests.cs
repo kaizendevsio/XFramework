@@ -37,9 +37,11 @@ public sealed class PresenceTests
         var chat = new Conversation { People = [peer], Members = 2 };
         Assert.That(state.ConversationSubtitle(chat), Is.EqualTo("Active now"));
         chat.People = [peer with { ActiveUntil = DateTime.UtcNow.AddSeconds(-1) }];
-        Assert.That(state.ConversationSubtitle(chat), Is.EqualTo("Direct conversation"));
+        Assert.That(state.ConversationSubtitle(chat), Is.EqualTo(""));
+        chat.People = [peer with { ActiveUntil = null, LastActiveAt = DateTime.UtcNow.AddMinutes(-5) }];
+        Assert.That(state.ConversationSubtitle(chat), Is.EqualTo("Last seen 5m ago"));
         chat.People = [peer]; chat.Group = true;
-        Assert.That(state.ConversationSubtitle(chat), Is.EqualTo("2 members · 1 active"));
+        Assert.That(state.ConversationSubtitle(chat), Is.EqualTo("1 active now"));
         await state.ConnectivityChanged(false);
         Assert.That(state.IsActive(peer), Is.False, "Cached heartbeats must not show online when this device is offline");
     }
