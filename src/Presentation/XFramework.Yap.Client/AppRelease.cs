@@ -2,10 +2,12 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.29";
+    public const string Version = "1.3.30";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "15 September 2026", [
+            "Delivered now appears as soon as the other device receives and saves your message, not when they open the conversation."]),
+        ("1.3.29", "15 September 2026", [
             "Messages you send and receive now animate into the conversation.",
             "The message list rubber-bands when you reach either end.",
             "Tapping beside a message's action menu now closes it.",
@@ -56,7 +58,7 @@ public static class AppRelease
             "Sending, reactions, edits and conversation preferences update immediately while saving continues. Failed changes are restored without losing your draft."]),
         ("1.3.14", "15 September 2026", [
             "Call audio recovers when Android pauses playback, with a tap-to-resume option when the browser needs your permission.",
-            "See who is active in conversation headers. Choose whether to share your own status under Conversation settings Ã¢â€ â€™ General.",
+            "See who is active in conversation headers. Choose whether to share your own status under Conversation settings ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ General.",
             "The app now uses ahead-of-time compilation and Brotli-compressed runtime downloads."]),
         ("1.3.13", "15 September 2026", [
             "Only the latest message shows its time in the conversation. Open any message's options to see its full date and time, with date separators through history.",
