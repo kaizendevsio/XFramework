@@ -66,4 +66,27 @@ public sealed class BrowserApiTests
         Assert.That((await client.PostAsJsonAsync("api/chat/initialize", new { })).StatusCode, Is.EqualTo(HttpStatusCode.OK));
         await app.StopAsync();
     }
+
+    [Test]
+    public async Task Search_NamesTheSenderOfEveryHit()
+    {
+        await using var app = UiFixture.Create(0); await app.StartAsync();
+        using var handler = new HttpClientHandler { CookieContainer = new() };
+        using var client = new HttpClient(handler) { BaseAddress = new Uri(app.Urls.Single()) };
+        var session = (await client.GetFromJsonAsync<SessionResponse>("api/session"))!;
+        client.DefaultRequestHeaders.Add("RequestVerificationToken", session.AntiforgeryToken);
+        await client.PostAsync("api/auth/login", new FormUrlEncodedContent(new Dictionary<string, string> { ["username"] = "fixture", ["password"] = "fixture" }));
+        session = (await client.GetFromJsonAsync<SessionResponse>("api/session"))!;
+        client.DefaultRequestHeaders.Add("X-Yap-Account", $"{session.User!.TenantId:N}:{session.User.CredentialId:N}");
+
+        var hits = (await client.GetFromJsonAsync<ChatPage<SearchHit>>("api/chat/search?query=the"))!.Items;
+
+        // A result row shows who spoke, so the host resolves senders rather than leaving the browser to guess.
+        Assert.That(hits, Is.Not.Empty);
+        Assert.That(hits.Where(x => x.Mine).Select(x => x.Sender), Is.All.EqualTo("You"));
+        var theirs = hits.First(x => !x.Mine);
+        Assert.That(theirs.Sender, Is.EqualTo("Sarah Mensah"));
+        Assert.That(theirs.AvatarUrl, Is.EqualTo("/yap-app-v2-192.png"));
+        await app.StopAsync();
+    }
 }

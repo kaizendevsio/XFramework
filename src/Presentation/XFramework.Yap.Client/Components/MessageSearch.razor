@@ -1,0 +1,119 @@
+@implements IDisposable
+@inject ChatState State
+@* One results surface for both search entry points, so a hit reads the same wherever it was found. *@
+<div class="msearch">
+    <p class="msearch-live" role="status">@Announcement</p>
+    @if (Trimmed.Length == 0)
+    {
+        @if (FullScreen)
+        {
+            <div class="msearch-state">
+                <span class="msearch-glyph"><Icon Name="search" Size="24" /></span>
+                <p class="msearch-lead">@(Thread.HasValue ? "Search this conversation" : "Search your messages")</p>
+                <p class="msearch-sub">@(Coverage.Length > 0 ? Coverage : "Find a message by something that was said in it.")</p>
+            </div>
+        }
+    }
+    else if (Trimmed.Length < 2)
+    {
+        <p class="msearch-hint">Keep typing — two characters or more.</p>
+    }
+    else if (hits.Count == 0 && working)
+    {
+        <div class="msearch-ghosts" aria-hidden="true">
+            @for (var index = 0; index < 3; index++)
+            { <div class="msearch-ghost"><span class="g-avatar"></span><span class="g-mid"><span class="g-line"></span><span class="g-line"></span></span></div> }
+        </div>
+    }
+    else if (hits.Count == 0)
+    {
+        <div class="msearch-state">
+            <span class="msearch-glyph"><Icon Name="search" Size="24" /></span>
+            <p class="msearch-lead">No messages match &#8220;@Trimmed&#8221;</p>
+            <p class="msearch-sub">@(Coverage.Length > 0 ? Coverage : "Try a shorter word, or a different spelling.")</p>
+        </div>
+    }
+    else
+    {
+        <div class="msearch-count @(working ? "busy" : "")">@Summary</div>
+        @foreach (var hit in hits)
+        {
+            <button type="button" class="msearch-hit" @key="hit.MessageId" @onclick="() => OnOpen.InvokeAsync(hit)">
+                <Avatar Initials="@ChatMessage.InitialsFor(Who(hit))" ImageUrl="@hit.AvatarUrl" Color="@(hit.Mine ? "g1" : "g3")" Size="a34" />
+                <span class="msearch-mid">
+                    <span class="msearch-head">
+                        <span class="msearch-who">@Who(hit)</span>
+                        @if (!Thread.HasValue) { <span class="msearch-in">@Where(hit)</span> }
+                        <time class="msearch-when" datetime="@hit.CreatedAt.ToUniversalTime().ToString("O")">@Stamp(hit.CreatedAt)</time>
+                    </span>
+                    <span class="msearch-text">@foreach (var part in SearchSnippet.Build(hit.Text, found)) { if (part.Match) { <mark>@part.Text</mark> } else { @part.Text } }</span>
+                </span>
+            </button>
+        }
+        @if (Coverage.Length > 0) { <p class="msearch-foot"><Icon Name="lock" Size="13" />@Coverage</p> }
+    }
+</div>
+@code {
+    /// <summary>Debounce before a keystroke reaches the store; the cached scan walks every conversation.</summary>
+    public const int DebounceMs = 200;
+    [Parameter] public string Query { get; set; } = "";
+    /// <summary>Scopes the search to one conversation; null searches everything cached or visible.</summary>
+    [Parameter] public Guid? Thread { get; set; }
+    /// <summary>The search owns the whole screen, so it also carries the idle state.</summary>
+    [Parameter] public bool FullScreen { get; set; }
+    [Parameter] public EventCallback<SearchHit> OnOpen { get; set; }
+    private List<SearchHit> hits = [];
+    /// <summary>The query the current hits came from: rows kept during a re-search stay highlighted.</summary>
+    private string found = "";
+    private bool working;
+    private string current = "";
+    private CancellationTokenSource pending = new();
+    private string Trimmed => (Query ?? "").Trim();
+    private string Coverage => !State.SearchesCachedHistoryOnly ? ""
+        : Thread.HasValue ? "Only messages saved on this device are searched. Scroll up in the conversation to load older ones."
+        : "Only messages saved on this device are searched.";
+    private string Summary => hits.Count == 1 ? "1 message" : $"{hits.Count} messages";
+    private string Announcement => Trimmed.Length == 0 ? ""
+        : Trimmed.Length < 2 ? "Type at least two characters to search."
+        : working && hits.Count == 0 ? "Searching messages."
+        : hits.Count == 0 ? $"No messages match {Trimmed}."
+        : $"{Summary} found.";
+    private string Who(SearchHit hit) => hit.Sender.Length > 0 ? hit.Sender
+        : State.Conversations.FirstOrDefault(x => x.Id == hit.ThreadId)?.Name ?? "Message";
+    private string Where(SearchHit hit) => State.Conversations.FirstOrDefault(x => x.Id == hit.ThreadId)?.Name ?? "";
+    // Dates read as a person would say them; a same-day hit only needs a clock time.
+    private static string Stamp(DateTime value)
+    {
+        var local = value.ToLocalTime();
+        var days = (DateTime.Now.Date - local.Date).Days;
+        return days == 0 ? local.ToString("HH:mm") : days == 1 ? "Yesterday"
+            : days < 7 ? local.ToString("ddd") : local.Year == DateTime.Now.Year ? local.ToString("MMM d") : local.ToString("MMM yyyy");
+    }
+    protected override void OnParametersSet()
+    {
+        if ((Query ?? "") == current) return;
+        current = Query ?? "";
+        // A superseded keystroke abandons its scan rather than queueing behind the next one.
+        pending.Cancel();
+        pending = new();
+        _ = RunAsync(current, pending.Token);
+    }
+    private async Task RunAsync(string text, CancellationToken ct)
+    {
+        working = text.Trim().Length >= 2;
+        if (!working) { hits = []; found = ""; }
+        _ = InvokeAsync(StateHasChanged);
+        try
+        {
+            await Task.Delay(DebounceMs, ct);
+            var result = await State.SearchAsync(text, Thread, ct);
+            if (ct.IsCancellationRequested) return;
+            hits = result;
+            found = text.Trim();
+        }
+        catch (OperationCanceledException) { return; }
+        catch (Exception ex) { State.Report(ex); }
+        finally { if (!ct.IsCancellationRequested) { working = false; _ = InvokeAsync(StateHasChanged); } }
+    }
+    public void Dispose() { pending.Cancel(); pending.Dispose(); }
+}

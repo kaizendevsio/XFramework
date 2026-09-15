@@ -11,10 +11,10 @@
 else
 {
     var chat = State.Selected?.Id == Id ? State.Selected : State.Conversations.FirstOrDefault(x => x.Id == Id) ?? new Conversation { Id = Id };
-    <div class="conversation-screen" hidden="@ShowingDetails"><ScrollSurface><Header><div class="appbar liquid-glass"><GlassLayer /><a class="iconbtn" href="@(ParentId.HasValue ? $"/chat/{Id}" : "/")" aria-label="Go back"><Icon Name="back" /></a>
+    <div class="conversation-screen" hidden="@(ShowingDetails || Searching)"><ScrollSurface><Header><div class="appbar liquid-glass"><GlassLayer /><a class="iconbtn" href="@(ParentId.HasValue ? $"/chat/{Id}" : "/")" aria-label="Go back"><Icon Name="back" /></a>
         @if (!ParentId.HasValue) { <button class="conversation-avatar" aria-label="Conversation details" @onclick="OpenDetails"><Avatar Initials="@chat.Initials" ImageUrl="@chat.AvatarUrl" Color="@chat.Color" /></button> }
         <button class="mid conversation-title" aria-label="Conversation settings" @onclick="OpenDetails"><h1 style="font-size:16px">@(ParentId.HasValue ? "Thread" : chat.Name)</h1><span class="muted" style="font-size:12px">@(ParentId.HasValue ? $"{chat.Name} · {Parent?.ReplyTotal ?? 0} replies" : State.ConversationSubtitle(chat))</span></button>
-        <button class="iconbtn" aria-label="Search messages" @onclick='() => mode = "search"'><Icon Name="search" /></button>
+        <button class="iconbtn" aria-label="Search messages" @onclick="OpenSearch"><Icon Name="search" /></button>
         @if(Voice.Enabled){<button class="iconbtn" aria-label="Start voice call" disabled="@(!State.Online || State.NeedsLogin || Voice.IsCalling)" @onclick="CallAsync"><Icon Name="phone" /></button>}
     </div></Header>
     <ChildContent>
@@ -37,6 +37,14 @@ else
         </MessageWindow>
     }
     </ChildContent><Footer><Composer @key="@(ParentId ?? Id)" ThreadId="Id" ParentId="ParentId" Reply="reply" Cancel="() => reply = null" RestoreReply="message => reply ??= message" /></Footer></ScrollSurface></div>
+    @if (Searching)
+    {
+        @* Search is a screen of its own, not a sheet: a sheet leaves a phone keyboard barely two results of room. *@
+        <ScrollSurface><Header><div class="appbar liquid-glass search-appbar"><GlassLayer /><button class="iconbtn" aria-label="Close search" @onclick="CloseSearch"><Icon Name="back" /></button>
+            <label class="searchbar liquid-glass search-field"><GlassLayer /><Icon Name="search" Size="18" /><input @ref="searchInput" type="search" enterkeyhint="search" autocomplete="off" aria-label="Search messages" placeholder="Search this conversation" @bind="query" @bind:event="oninput" @onkeydown="SearchKeyDown" />
+            @if (query.Length > 0) { <button class="iconbtn search-clear" aria-label="Clear search" @onclick="ClearSearch"><Icon Name="close" Size="16" /></button> }</label>
+        </div></Header><ChildContent><div class="body"><MessageSearch Query="@query" Thread="Id" FullScreen="true" OnOpen="hit => ShowHitAsync(hit.MessageId)" /></div></ChildContent></ScrollSurface>
+    }
     @if (ShowingDetails)
     {
         <ScrollSurface><Header><div class="appbar plain"><a class="iconbtn" href="@($"/chat/{Id}")" aria-label="Back to conversation"><Icon Name="back" /></a><h1>Chat details</h1></div></Header><ChildContent><div class="body details-body"><ConversationSettings Conversation="chat" Search="SearchFromDetails" Call="CallFromDetails" CanCall="@(Voice.Enabled && State.Online && !Voice.IsCalling)" Locate="LocateFromDetails" /></div></ChildContent></ScrollSurface>
@@ -65,7 +73,7 @@ else
     </div>
 </MessageMenu>
 }
-@if (mode is not null && mode != "message")
+@if (mode is not null && mode is not ("message" or "search"))
 {
 <BottomSheet Title="@(mode == "details" ? "Conversation" : mode == "files" ? "Attachments" : mode == "edit" ? "Edit message" : "Message actions")" OnClose="() => mode = null">
 @if (mode == "files" && selected is not null)
@@ -76,8 +84,6 @@ else if (mode == "delete")
 { <div class="picker"><p>Delete this message for everyone?</p><button class="btn" @onclick='() => ActionAsync("delete")'>Delete message</button></div> }
 else if (mode == "forward")
 { <div class="picker">@foreach (var target in State.Conversations) { <button class="row" @onclick="() => ForwardAsync(target.Id)"><Avatar Initials="@target.Initials" Size="a34" />@target.Name</button> }</div> }
-else if (mode == "search")
-{ <div class="picker"><label class="field"><span class="lab">Search messages</span><span class="inp"><input aria-label="Search messages" placeholder="@(State.EncryptionEnabled ? "Search saved messages" : "Search this conversation")" @bind="query" @bind:event="oninput" @bind:after="SearchAsync" /></span></label>@if (State.EncryptionEnabled) { <p class="muted">Search covers messages downloaded on this device. Scroll back to load older messages.</p> }<p class="muted" role="status">@(searching ? "Searching..." : query.Trim().Length < 2 ? "Type at least two characters." : hits.Count == 0 ? "No matching messages." : $"{hits.Count} matching messages")</p>@foreach (var hit in hits) { <button class="row search-hit" @onclick="() => ShowHitAsync(hit.MessageId)"><span>@hit.Text</span><small>@hit.CreatedAt.ToLocalTime().ToString("MMM d, HH:mm")</small></button> }</div> }
 </BottomSheet>
 }
 @code {
@@ -89,7 +95,12 @@ else if (mode == "search")
     private string? mode;
     private bool ShowingDetails => new Uri(Nav.Uri).AbsolutePath.EndsWith("/details", StringComparison.Ordinal);
     private void OpenDetails() { mode = null; Nav.NavigateTo($"/chat/{Id}/details"); }
-    private void SearchFromDetails() { Nav.NavigateTo($"/chat/{Id}"); mode = "search"; }
+    private bool Searching => mode == "search";
+    private void OpenSearch() { mode = "search"; query = ""; focusSearch = true; }
+    private void CloseSearch() { mode = null; query = ""; }
+    private void ClearSearch() { query = ""; focusSearch = true; }
+    private void SearchKeyDown(KeyboardEventArgs e) { if (e.Key == "Escape") CloseSearch(); }
+    private void SearchFromDetails() { Nav.NavigateTo($"/chat/{Id}"); OpenSearch(); }
     private async Task CallFromDetails() { Nav.NavigateTo($"/chat/{Id}"); await CallAsync(); }
     private async Task LocateFromDetails(Guid message) { Nav.NavigateTo($"/chat/{Id}"); await ShowHitAsync(message); }
     private string edit = "";
@@ -97,8 +108,8 @@ else if (mode == "search")
     private Guid? loadedParent;
     private Guid? focus;
     private string query = "";
-    private List<SearchHit> hits = [];
-    private bool searching;
+    private ElementReference searchInput;
+    private bool focusSearch;
     private bool moreActions;
     protected override void OnInitialized() { State.Changed += Changed; State.ConversationRemoved += Removed; Voice.Changed += Changed; Nav.LocationChanged += LocationChanged; }
     // Both routes have identical component parameters. Blazor can skip their render,
@@ -121,6 +132,8 @@ else if (mode == "search")
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await JS.InvokeVoidAsync("yap.motion.complete");
+        // Opening search should land on a live keyboard, the way a native search screen does.
+        if (focusSearch && Searching) { focusSearch = false; try { await searchInput.FocusAsync(); } catch (Exception ex) { State.Report(ex); } }
         if (focus.HasValue) { var id = focus; focus = null; await JS.InvokeVoidAsync("yap.showMessage", id); }
     }
     private void Select(ChatMessage message) { selected = message; moreActions = false; mode = "message"; _ = ExpireEditAsync(message); }
@@ -142,8 +155,7 @@ else if (mode == "search")
     private Task ReactAsync(string emoji) { mode = null; return State.ActionAsync(selected!, "react", emoji: emoji); }
     private Task ActionAsync(string action, string? text = null) { mode = null; return State.ActionAsync(selected!, action, text); }
     private async Task ForwardAsync(Guid target) { var text = selected!.Text; mode = null; Nav.NavigateTo($"/chat/{target}"); try { await State.SendAsync(target, text, null, $"forward:{Guid.NewGuid()}"); } catch (Exception ex) { State.Report(ex); } }
-    private async Task SearchAsync() { var text = query; searching = text.Trim().Length >= 2; try { await Task.Delay(200); if(text != query) return; var result = await State.SearchAsync(text, Id); if (text == query) hits = result; } catch (Exception ex) { State.Report(ex); } finally { if(text == query) searching = false; } }
-    private async Task ShowHitAsync(Guid id) { mode = null; await State.LocateAsync(id); focus = id; }
+    private async Task ShowHitAsync(Guid id) { mode = null; query = ""; await State.LocateAsync(id); focus = id; }
     private async Task CallAsync()
     {
         if (State.Selected is not { } conversation) return;

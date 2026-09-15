@@ -7,13 +7,14 @@
 @if (State.User is null) { <div class="authbody"><div class="authbrand"><Brand /><p>A little closer.</p></div><h1>Good conversations start here.</h1><p>Your people, one conversation away.</p><a class="btn" href="/login">Sign in</a><a class="btn ghost" href="/register">Create an account</a></div> }
 else
 {
-<ScrollSurface><Header><div class="appbar plain liquid-glass inbox-header"><GlassLayer /><Brand /><span class="sp"></span><button class="iconbtn" aria-label="Search conversations" @onclick="() => searchVisible = !searchVisible"><Icon Name="search" /></button></div>
-@if (searchVisible) { <label class="searchbar liquid-glass"><GlassLayer /><Icon Name="search" Size="18" /><input aria-label="Search conversations and messages" placeholder="Search conversations and messages" @bind="search" @bind:event="oninput" @bind:after="SearchMessagesAsync" /></label> }
+<ScrollSurface><Header><div class="appbar plain liquid-glass inbox-header"><GlassLayer /><Brand /><span class="sp"></span><button class="iconbtn" aria-label="Search conversations" aria-expanded="@searchVisible.ToString().ToLowerInvariant()" @onclick="ToggleSearch"><Icon Name="search" /></button></div>
+@if (searchVisible) { <label class="searchbar liquid-glass search-field"><GlassLayer /><Icon Name="search" Size="18" /><input @ref="searchInput" type="search" enterkeyhint="search" autocomplete="off" aria-label="Search conversations and messages" placeholder="Search conversations and messages" @bind="search" @bind:event="oninput" @onkeydown="SearchKeyDown" />@if (search.Length > 0) { <button class="iconbtn search-clear" aria-label="Clear search" @onclick="ClearSearch"><Icon Name="close" Size="16" /></button> }</label> }
 
 </Header><ChildContent><div class="body inbox-panel" aria-label="Conversations">
-@foreach (var section in Filtered.GroupBy(chat => chat.IsFavorite))
+@* While searching, favourites stop being a useful split: everything on screen is a match. *@
+@foreach (var section in Filtered.GroupBy(chat => search.Length == 0 && chat.IsFavorite))
 {
-<h2 class="inbox-section">@(section.Key ? "Favorites" : "Messages")</h2>
+<h2 class="inbox-section">@(search.Length > 0 ? "Conversations" : section.Key ? "Favorites" : "Messages")</h2>
 @foreach (var chat in section)
 {
     <div class="inbox-item" data-conversation-menu @oncontextmenu="e => OpenMenu(chat, e)" @oncontextmenu:preventDefault>
@@ -22,12 +23,8 @@ else
     </div>
 }
 }
-@if (!Filtered.Any()) { <p class="empty">No conversations yet. Start one with your people.</p> }
-@if (search.Length >= 2)
-{
-    <div class="sectionhead">@(State.Online && !State.EncryptionEnabled ? "Messages" : "Saved messages on this device")</div>
-    @foreach (var hit in hits) { <a class="row" href="@($"/chat/{hit.ThreadId}?message={hit.MessageId}")"><Icon Name="search" /><span class="mid"><span class="t1">@State.Conversations.FirstOrDefault(x => x.Id == hit.ThreadId)?.Name</span><span class="t2">@hit.Text</span></span></a> }
-}
+@if (!Filtered.Any() && search.Length == 0) { <p class="empty">No conversations yet. Start one with your people.</p> }
+<MessageSearch Query="@search" OnOpen="OpenHit" />
 @if (State.HasMoreConversations) { <button class="btn ghost" disabled="@(!State.Online || State.Busy)" @onclick="State.LoadMoreConversationsAsync">Load more conversations</button> }
 </div></ChildContent><Footer><TabBar Current="inbox" /></Footer></ScrollSurface>
 <button class="fab liquid-glass" aria-label="New conversation" disabled="@(!State.Online || State.NeedsLogin)" @onclick='() => Nav.NavigateTo("/new")'><GlassLayer /><Icon Name="edit" /></button>
@@ -54,7 +51,12 @@ else
     private void MenuKeyDown(KeyboardEventArgs e) { if (e.Key == "Escape") menu = null; }
     private ElementReference menuElement;
     private bool focusMenu;
-    protected override async Task OnAfterRenderAsync(bool firstRender) { if (focusMenu && menu is not null) { focusMenu = false; await JS.InvokeVoidAsync("yap.focusSheet", menuElement); } }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (focusMenu && menu is not null) { focusMenu = false; await JS.InvokeVoidAsync("yap.focusSheet", menuElement); }
+        // Revealing the field should also raise the keyboard, or the tap costs two gestures.
+        if (focusSearch && searchVisible) { focusSearch = false; try { await searchInput.FocusAsync(); } catch (Exception ex) { State.Report(ex); } }
+    }
     private Conversation? menu, renaming, deleting;
     private double menuX, menuY;
     private string newTitle = "";
@@ -72,11 +74,14 @@ else
     private async Task RenameAsync() { var chat = renaming!; var title = newTitle; renaming = null; working = true; try { await State.UpdateConversationAsync(new(chat.Id, Name: title)); } catch(Exception ex) { State.Report(ex); } finally { working = false; } }
     private async Task DeleteAsync() { var chat = deleting!; deleting = null; working = true; try { await State.DeleteConversationAsync(chat.Id, deleteEveryone); } catch(Exception ex) { State.Report(ex); } finally { working = false; } }
     private bool searchVisible;
-    private List<SearchHit> hits = [];
+    private ElementReference searchInput;
+    private bool focusSearch;
+    private void ToggleSearch() { searchVisible = !searchVisible; search = ""; focusSearch = searchVisible; }
+    private void ClearSearch() { search = ""; focusSearch = true; }
+    private void SearchKeyDown(KeyboardEventArgs e) { if (e.Key == "Escape") ToggleSearch(); }
+    private void OpenHit(SearchHit hit) => Nav.NavigateTo($"/chat/{hit.ThreadId}?message={hit.MessageId}");
     private IEnumerable<Conversation> Filtered => State.Conversations.Where(c => !c.Removed && c.Name.Contains(search, StringComparison.OrdinalIgnoreCase)).OrderByDescending(c => c.IsFavorite).ThenByDescending(c => c.LastMessageAt);
     protected override void OnInitialized() => State.Changed += Changed;
     private void Changed() => _ = InvokeAsync(StateHasChanged);
-    private async Task SearchMessagesAsync()
-    { var query = search; try { var result = await State.SearchAsync(query); if (query == search) hits = result; } catch (Exception ex) { State.Report(ex); } }
     public void Dispose() => State.Changed -= Changed;
 }

@@ -194,7 +194,15 @@ button,a,label,nav,.avatar,.appbar,.bottomnav{-webkit-user-select:none;user-sele
 .selected-people{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .selected-person{display:flex;align-items:center;gap:7px;padding:5px 9px 5px 5px;border-radius:24px;background:var(--surface3);font-size:13px}
 .identity-card{flex-direction:row;text-align:left;gap:16px}.identity-summary{min-width:0}.identity-summary h2{font-size:19px}
-.search-hit{flex-direction:column;align-items:flex-start;gap:4px;text-align:left}.search-hit small{color:var(--dim)}
+/* One search field for both entry points: inline under the inbox header, and inside the conversation search bar. */
+.search-field{flex:1;min-width:0}
+.search-field input{color:var(--text)}
+.search-field input::placeholder{color:var(--faint)}
+.search-field input::-webkit-search-cancel-button{display:none}
+.search-clear{width:28px;height:28px;flex:none;border-radius:50%;margin-right:-4px}
+/* The conversation bar is the whole app bar, so the field sits in the row rather than below it. */
+.search-appbar{gap:8px;padding-inline:12px}
+.search-appbar .search-field{margin:0;height:42px}
 .inputrow{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;grid-template-rows:minmax(44px,auto) 0px;gap:0;padding:5px 7px;border-radius:29px;transition:none;isolation:isolate}
 .inputrow .inputbox{grid-column:2;grid-row:1;background:transparent;border:0;box-shadow:none;border-radius:0;padding:0 3px}
 .inputrow .attach-open{grid-column:1;grid-row:1;align-self:end}.inputrow .composer-action{grid-column:3;grid-row:1;align-self:end}
