@@ -49,15 +49,6 @@ message/cache mutations use a short separate gate; HTTP snapshots that began bef
 a newer push cannot replace it. Reconnection remains quiet and does not claim that
 a DNS/server outage means the device has no internet.
 
-Sending rosters are preloaded when opening a conversation and reused for at most
-15 seconds in an account-scoped cache of eight entries. Only signature-verified
-public directories are cached; simultaneous sends share a pending lookup. Account
-and own-key changes, reconnect reconciliation and stale-roster rejection invalidate
-the cache. The backend still reads current membership and directory revisions before
-every new encrypted message commit. A 412 response forces a fresh roster and one
-retry of an unconfirmed message. Calls, edits and receive-side sender verification
-continue to fetch their directories normally.
-
 ## Validation
 
 Tests cover ticket replay and origin/account/session isolation, forbidden Bolt
