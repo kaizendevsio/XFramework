@@ -22,6 +22,48 @@ fi
 if ! grep -q '^YAP_ROLE_ID=' "$target"; then
     printf '\nYAP_ROLE_ID=633a467c-53a8-4c51-8f19-f655d5391f22\n' >> "$target"
 fi
+# RFC 8292 application server keys for web push. Generated once on this host and never
+# rotated implicitly: new keys silently invalidate every push subscription already stored
+# on every device, and each one only recovers when that browser resubscribes.
+if ! grep -q '^WEB_PUSH_VAPID_PRIVATE_KEY=' "$target"; then
+    python3 - "$target" <<'PY'
+import base64
+import os
+import re
+import subprocess
+import sys
+import tempfile
+
+with tempfile.TemporaryDirectory() as work:
+    pem = os.path.join(work, 'vapid.pem')
+    subprocess.run(['openssl', 'ecparam', '-name', 'prime256v1', '-genkey', '-noout', '-out', pem], check=True)
+    os.chmod(pem, 0o600)
+    text = subprocess.run(['openssl', 'ec', '-in', pem, '-text', '-noout'],
+                          check=True, capture_output=True, text=True).stdout
+
+def field(name):
+    match = re.search(r'^' + name + r':\n((?:\s+[0-9a-f:]+\n)+)', text, re.MULTILINE)
+    if not match:
+        raise SystemExit('openssl did not report the ' + name + ' key')
+    return bytes.fromhex(''.join(match.group(1).split()).replace(':', ''))
+
+# openssl pads the scalar with a leading zero byte whenever the high bit is set.
+private, public = field('priv')[-32:], field('pub')
+if len(private) != 32 or len(public) != 65 or public[0] != 0x04:
+    raise SystemExit('Generated VAPID key pair has an unexpected shape')
+
+def encode(raw):
+    return base64.urlsafe_b64encode(raw).decode().rstrip('=')
+
+with open(sys.argv[1], 'a', encoding='utf-8') as env:
+    env.write('\nWEB_PUSH_VAPID_PUBLIC_KEY=' + encode(public) + '\n')
+    env.write('WEB_PUSH_VAPID_PRIVATE_KEY=' + encode(private) + '\n')
+PY
+fi
+# Contact of record for the push services. Deliberately not a personal address.
+if ! grep -q '^WEB_PUSH_VAPID_SUBJECT=' "$target"; then
+    printf '\nWEB_PUSH_VAPID_SUBJECT=%s\n' 'https://xeon-dev.tailed40e.ts.net:5188' >> "$target"
+fi
 # Protected configuration handoff for local Yap development.
 install -d -m 700 /opt/xframework/client-config
 python3 - "$target" /opt/xframework/client-config/yap.service-identity.json <<'PY'
