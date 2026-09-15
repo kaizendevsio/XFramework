@@ -208,10 +208,12 @@ public sealed class YapChatGateway : IDisposable
                 !connection.Registered.Task.IsCompletedSuccessfully || connection.Registered.Task.Result != context.ConnectionId ||
                 !await sessions.ContainsAsync(connection.User, ct))
                 throw new YapApiException(401, "Sign in again.");
-            var request = JsonSerializer.Deserialize<ChatSocketRequest>(payload.Span, Json) ?? throw new YapApiException(400, "Choose a chat operation.");
+            var request = ParseRequest(payload);
             if (request.Operation == "ack")
             {
-                var sequence = request.Body.GetProperty("sequence").GetInt64();
+                if (!request.Body.TryGetProperty("sequence", out var acknowledgment) ||
+                    acknowledgment.ValueKind != JsonValueKind.Number || !acknowledgment.TryGetInt64(out var sequence))
+                    throw new YapApiException(400, "Invalid event acknowledgment.");
                 if (sequence < 0 || sequence > Interlocked.Read(ref connection.Sequence)) throw new YapApiException(400, "Invalid event acknowledgment.");
                 long previous;
                 do { previous = Interlocked.Read(ref connection.Acknowledged); if (sequence <= previous) break; }
@@ -237,7 +239,10 @@ public sealed class YapChatGateway : IDisposable
                     await YapChatCommands.TypingAsync(Body<ThreadAction>(request), session, ct);
                     break;
                 case "watch":
-                    var thread = request.Body.GetProperty("threadId");
+                    if (!request.Body.TryGetProperty("threadId", out var thread) ||
+                        (thread.ValueKind != JsonValueKind.Null &&
+                         (thread.ValueKind != JsonValueKind.String || !thread.TryGetGuid(out _))))
+                        throw new YapApiException(400, "Choose a conversation.");
                     await WatchAsync(connection, await connection.SessionReady.Task.WaitAsync(ct),
                         thread.ValueKind == JsonValueKind.Null ? null : thread.GetGuid(), ct);
                     break;
@@ -247,8 +252,13 @@ public sealed class YapChatGateway : IDisposable
         }
         catch (YapApiException error) { return Response(error.Status, new { title = error.Message }); }
         catch (UnauthorizedAccessException) { return Response(401, new { title = "Sign in again." }); }
-        catch (Exception error) when (error is JsonException or InvalidOperationException or FormatException or KeyNotFoundException)
-        { return Response(400, new { title = "The chat request is invalid." }); }
+        catch (Exception error) when (!ct.IsCancellationRequested)
+        {
+            // Backend transport failures must keep the durable outbox retryable. Never
+            // classify an execution exception as malformed input or log its payload.
+            logger.LogInformation("Chat command temporarily unavailable. FailureType={FailureType}", error.GetType().Name);
+            return Response(503, new { title = "Messages will retry when the connection is restored." });
+        }
     }
 
     private async Task WatchAsync(Connection connection, ICommunicationsChatSession session, Guid? thread, CancellationToken ct)
@@ -289,7 +299,23 @@ public sealed class YapChatGateway : IDisposable
             if (!await sessions.ContainsAsync(connection.User, connection.Token)) return;
     }
 
-    private static T Body<T>(ChatSocketRequest request) => request.Body.Deserialize<T>(Json) ?? throw new YapApiException(400, "The chat request is invalid.");
+    private static ChatSocketRequest ParseRequest(ReadOnlyMemory<byte> payload)
+    {
+        try
+        {
+            var request = JsonSerializer.Deserialize<ChatSocketRequest>(payload.Span, Json);
+            if (request is null || request.Body.ValueKind != JsonValueKind.Object)
+                throw new YapApiException(400, "The chat request is invalid.");
+            return request;
+        }
+        catch (JsonException) { throw new YapApiException(400, "The chat request is invalid."); }
+    }
+
+    private static T Body<T>(ChatSocketRequest request)
+    {
+        try { return request.Body.Deserialize<T>(Json) ?? throw new YapApiException(400, "The chat request is invalid."); }
+        catch (JsonException) { throw new YapApiException(400, "The chat request is invalid."); }
+    }
     internal static TimeSpan SubscriptionLifetime(string? accessToken, DateTimeOffset now)
     {
         var maximum = TimeSpan.FromMinutes(5);

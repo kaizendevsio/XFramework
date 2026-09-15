@@ -7,6 +7,7 @@ using System.Threading.Channels;
 using Bolt.Protocol;
 using Communications.Integration.Drivers;
 using Communications.Domain.Shared.Contracts.Realtime;
+using Communications.Domain.Shared.Contracts.Requests.Threads;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -86,6 +87,46 @@ public sealed class YapChatGatewayTests
     }
 
     [Test]
+    public async Task Send_BackendConnectionLostReturnsRetryableStatus()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        fixture.Wrapper.Setup(x => x.CreateThreadMessageAsync(It.IsAny<CreateThreadMessageRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Connection lost"));
+        using var cookies = await fixture.LoginAsync(fixture.Alice);
+        var ticket = await fixture.Gateway.CreateTicketAsync(fixture.Alice, default);
+        using var socket = fixture.Socket(cookies);
+        await socket.ConnectAsync(fixture.Url(ticket), default);
+        await RegisterAsync(socket, ticket.ClientId);
+
+        var response = await InvokeAsync(socket, ticket.ClientId, "send", new SendMessage(Guid.NewGuid(), Guid.NewGuid(), "test"));
+
+        Assert.That(response.Status, Is.EqualTo(503));
+        fixture.Wrapper.Verify(x => x.CreateThreadMessageAsync(It.IsAny<CreateThreadMessageRequest>(), It.IsAny<CancellationToken>()), Times.Once);
+        await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "test complete", default);
+    }
+
+    [TestCase("send", "[]")]
+    [TestCase("send", "{\"id\":42}")]
+    [TestCase("ack", "{}")]
+    [TestCase("ack", "{\"sequence\":\"1\"}")]
+    [TestCase("ack", "{\"sequence\":1.5}")]
+    [TestCase("watch", "{}")]
+    [TestCase("watch", "{\"threadId\":42}")]
+    [TestCase("watch", "{\"threadId\":\"invalid\"}")]
+    public async Task MalformedCommand_RemainsBadRequest(string operation, string json)
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var cookies = await fixture.LoginAsync(fixture.Alice);
+        var ticket = await fixture.Gateway.CreateTicketAsync(fixture.Alice, default);
+        using var socket = fixture.Socket(cookies);
+        await socket.ConnectAsync(fixture.Url(ticket), default);
+        await RegisterAsync(socket, ticket.ClientId);
+
+        Assert.That((await InvokeAsync(socket, ticket.ClientId, operation, JsonSerializer.Deserialize<JsonElement>(json))).Status, Is.EqualTo(400));
+        await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "test complete", default);
+    }
+
+    [Test]
     public async Task RevokedSessionDuringPush_EndsSocketWithoutEscapingIntoHttpErrorHandling()
     {
         await using var fixture = await Fixture.CreateAsync();
@@ -152,12 +193,12 @@ public sealed class YapChatGatewayTests
         Assert.That(accepted, Is.True);
     }
 
-    private static async Task<ChatSocketResponse> InvokeAsync(ClientWebSocket socket, string clientId, string operation)
+    private static async Task<ChatSocketResponse> InvokeAsync(ClientWebSocket socket, string clientId, string operation, object? body = null)
     {
         var id = Guid.NewGuid();
         var writer = new ArrayBufferWriter<byte>();
         BoltCodec.WriteRequest(writer, id, BoltCodec.Fnv1aHash("yap"), BoltCodec.Fnv1aHash(clientId), BoltCodec.Fnv1aHash("yap.chat"),
-            JsonSerializer.SerializeToUtf8Bytes(new { operation, body = new { } }));
+            JsonSerializer.SerializeToUtf8Bytes(new { operation, body = body ?? new { } }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
         await socket.SendAsync(writer.WrittenMemory, WebSocketMessageType.Binary, true, default);
         while (true)
         {
@@ -187,6 +228,7 @@ public sealed class YapChatGatewayTests
         public ClaimsPrincipal Alice { get; private set; } = null!;
         public ClaimsPrincipal Bob { get; private set; } = null!;
         public YapChatGateway Gateway => app.Services.GetRequiredService<YapChatGateway>();
+        public Mock<ICommunicationsServiceWrapper> Wrapper { get; private set; } = null!;
         public Channel<Func<CommunicationsRealtimeEvent, Task>> Subscriptions { get; } = Channel.CreateUnbounded<Func<CommunicationsRealtimeEvent, Task>>();
         public Channel<bool> CompletedUpgrades { get; } = Channel.CreateUnbounded<bool>();
         private Uri origin = null!;
@@ -195,6 +237,7 @@ public sealed class YapChatGatewayTests
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
             builder.WebHost.UseUrls("http://127.0.0.1:0");
             builder.Logging.ClearProviders();
+            builder.Configuration["Yap:Encryption:Enabled"] = "false";
             builder.Services.AddAuthentication(YapAuth.Scheme).AddCookie(YapAuth.Scheme);
             builder.Services.AddAuthorization();
             builder.Services.AddDistributedMemoryCache();
@@ -206,7 +249,7 @@ public sealed class YapChatGatewayTests
             builder.Services.AddSingleton<YapCallGateway>();
             builder.Services.AddSingleton<YapChatGateway>();
             var app = builder.Build();
-            var fixture = new Fixture(app);
+            var fixture = new Fixture(app) { Wrapper = wrapper };
             wrapper.Setup(x => x.SubscribeLiveUserCommunicationsEventsAsync(It.IsAny<Guid>(), It.IsAny<Guid>(),
                 It.IsAny<Func<CommunicationsRealtimeEvent, Task>>(), It.IsAny<Func<CancellationToken, ValueTask<string?>>>(), It.IsAny<CancellationToken>()))
                 .Callback<Guid, Guid, Func<CommunicationsRealtimeEvent, Task>, Func<CancellationToken, ValueTask<string?>>, CancellationToken>(
