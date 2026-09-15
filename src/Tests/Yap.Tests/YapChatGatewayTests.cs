@@ -8,6 +8,8 @@ using Bolt.Protocol;
 using Communications.Integration.Drivers;
 using Communications.Domain.Shared.Contracts.Realtime;
 using Communications.Domain.Shared.Contracts.Requests.Threads;
+using Communications.Domain.Shared.Contracts.Responses;
+using Communications.Integration.Clients;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -26,6 +28,122 @@ namespace Yap.Tests;
 [TestFixture, CancelAfter(30000)]
 public sealed class YapChatGatewayTests
 {
+    [Test]
+    public async Task QueuedDuplexEvents_ShareProjectionAndDirectoryLookupWithoutLosingCreationOrReceiptOrder()
+    {
+        var tenant = Guid.NewGuid(); var actor = Guid.NewGuid(); var other = Guid.NewGuid(); var thread = Guid.NewGuid();
+        var own = Guid.NewGuid(); var incoming = Guid.NewGuid(); var nextOwn = Guid.NewGuid();
+        var first = MessageEvent(tenant, thread, actor, "MessageCreated", own);
+        var queued = new[]
+        {
+            MessageEvent(tenant, thread, other, "MessageCreated", incoming),
+            MessageEvent(tenant, thread, other, "MessagesDelivered", own),
+            MessageEvent(tenant, thread, actor, "MessageCreated", nextOwn),
+            MessageEvent(tenant, thread, other, "MessagesRead", own)
+        };
+        var session = new Mock<ICommunicationsChatSession>();
+        session.SetupGet(x => x.CredentialId).Returns(actor);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var queries = new List<List<Guid>>();
+        session.Setup(x => x.GetMessageProjectionsAsync(thread, It.IsAny<List<Guid>>(), It.IsAny<CancellationToken>()))
+            .Returns(async (Guid _, List<Guid> ids, CancellationToken ct) =>
+            {
+                queries.Add(ids.ToList());
+                if (queries.Count == 1) { entered.SetResult(); await release.Task.WaitAsync(ct); }
+                return ChatFixture.Ok(new GetThreadMessagesResponse { Items = ids.Select(id => new ThreadMessageItemResponse
+                    { Id = id, SenderCredentialId = id == incoming ? other : actor, Text = "ciphertext", DeliveredCount = 1, ReadCount = 1 }).ToList() });
+            });
+        var directory = new Mock<IChatDirectory>();
+        directory.Setup(x => x.ResolveAsync(It.IsAny<Guid[]>(), It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<ChatPerson>());
+        var pending = Channel.CreateUnbounded<YapChatGateway.PendingEvent>();
+
+        var firstProjection = YapChatGateway.ProjectMessageBatchAsync([(first, YapRealtime.Hint(first)!)], session.Object, directory.Object, default);
+        await entered.Task;
+        foreach (var update in queued) pending.Writer.TryWrite(new(update, 10));
+        release.SetResult();
+        await firstProjection;
+        var head = (CommunicationsRealtimeEvent)(await pending.Reader.ReadAsync()).Value;
+        var batch = YapChatGateway.TakeMessageBatch(head, YapRealtime.Hint(head)!, pending.Reader, tenant, actor, thread.ToString("N"), out var bytes);
+        var pushed = await YapChatGateway.ProjectMessageBatchAsync(batch, session.Object, directory.Object, default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(queries, Has.Count.EqualTo(2));
+            Assert.That(queries[1], Is.EquivalentTo(new[] { incoming, own, nextOwn }));
+            Assert.That(bytes, Is.EqualTo(30));
+            Assert.That(pushed.Select(x => x.EventId), Is.EqualTo(queued.Select(x => x.EventId)));
+            Assert.That(pushed.Select(x => x.Kind), Is.EqualTo(new[] { "MessageCreated", "MessageUpdated", "MessageCreated", "MessageUpdated" }));
+            Assert.That(pushed.Select(x => x.ActorId), Is.EqualTo(new Guid?[] { other, null, actor, null }));
+            Assert.That(pushed.Select(x => x.Messages!.Single().Id), Is.EqualTo(new[] { incoming, own, nextOwn, own }));
+        });
+        directory.Verify(x => x.ResolveAsync(It.IsAny<Guid[]>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    [TestCase("typing")]
+    [TestCase("call")]
+    [TestCase("refresh")]
+    [TestCase("other-thread")]
+    [TestCase("other-tenant")]
+    public void MessageBatch_DoesNotCrossOrderingOrAuthorizationBarriers(string kind)
+    {
+        var tenant = Guid.NewGuid(); var actor = Guid.NewGuid(); var thread = Guid.NewGuid();
+        var first = MessageEvent(tenant, thread, actor, "MessageCreated", Guid.NewGuid());
+        object barrier = kind switch
+        {
+            "other-thread" => MessageEvent(tenant, Guid.NewGuid(), actor, "MessageCreated", Guid.NewGuid()),
+            "other-tenant" => MessageEvent(Guid.NewGuid(), thread, actor, "MessageCreated", Guid.NewGuid()),
+            _ => new ChatSocketEvent(Guid.NewGuid(), 0, kind)
+        };
+        var pending = Channel.CreateUnbounded<YapChatGateway.PendingEvent>();
+        pending.Writer.TryWrite(new(barrier, 10));
+        pending.Writer.TryWrite(new(MessageEvent(tenant, thread, actor, "MessageCreated", Guid.NewGuid()), 10));
+
+        var batch = YapChatGateway.TakeMessageBatch(first, YapRealtime.Hint(first)!, pending.Reader, tenant, actor, null, out var bytes);
+
+        Assert.Multiple(() => { Assert.That(batch, Has.Count.EqualTo(1)); Assert.That(bytes, Is.Zero); Assert.That(pending.Reader.TryPeek(out var remaining) && ReferenceEquals(remaining.Value, barrier), Is.True); });
+    }
+
+    [TestCase(1, 32)]
+    [TestCase(3, 16)]
+    public void MessageBatch_BoundsEventAndDistinctMessageCounts(int idsPerEvent, int expectedEvents)
+    {
+        var tenant = Guid.NewGuid(); var actor = Guid.NewGuid(); var thread = Guid.NewGuid();
+        CommunicationsRealtimeEvent Create() => MessageEvent(tenant, thread, actor, "MessagesRead", Enumerable.Range(0, idsPerEvent).Select(_ => Guid.NewGuid()).ToArray());
+        var first = Create(); var pending = Channel.CreateUnbounded<YapChatGateway.PendingEvent>();
+        for (var i = 0; i < 40; i++) pending.Writer.TryWrite(new(Create(), 10));
+
+        var batch = YapChatGateway.TakeMessageBatch(first, YapRealtime.Hint(first)!, pending.Reader, tenant, actor, null, out _);
+
+        Assert.That(batch, Has.Count.EqualTo(expectedEvents));
+        Assert.That(pending.Reader.TryPeek(out _), Is.True);
+    }
+
+    [Test]
+    public async Task MessageBatch_MissingAndReplyProjectionsReconcileOnlyAffectedEvents()
+    {
+        var tenant = Guid.NewGuid(); var actor = Guid.NewGuid(); var thread = Guid.NewGuid();
+        var valid = Guid.NewGuid(); var missing = Guid.NewGuid(); var reply = Guid.NewGuid();
+        var events = new[] { valid, missing, reply }.Select(id => MessageEvent(tenant, thread, actor, "MessageCreated", id)).ToArray();
+        var session = new Mock<ICommunicationsChatSession>();
+        session.SetupGet(x => x.CredentialId).Returns(actor);
+        session.Setup(x => x.GetMessageProjectionsAsync(thread, It.IsAny<List<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ChatFixture.Ok(new GetThreadMessagesResponse { Items = [new() { Id = valid }, new() { Id = reply, IsThreadReply = true }] }));
+        var directory = new Mock<IChatDirectory>();
+        directory.Setup(x => x.ResolveAsync(It.IsAny<Guid[]>(), It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<ChatPerson>());
+
+        var pushed = await YapChatGateway.ProjectMessageBatchAsync(events.Select(x => (x, YapRealtime.Hint(x)!)).ToList(), session.Object, directory.Object, default);
+
+        Assert.That(pushed.Select(x => x.Kind), Is.EqualTo(new[] { "MessageCreated", "refresh", "refresh" }));
+        Assert.That(pushed.Skip(1).All(x => x.Messages is null && x.ActorId is null), Is.True);
+    }
+
+    private static CommunicationsRealtimeEvent MessageEvent(Guid tenant, Guid thread, Guid actor, string kind, params Guid[] ids) => new()
+    {
+        EventId = Guid.NewGuid(), TenantId = tenant, ThreadId = thread, ActorCredentialId = actor,
+        EventType = kind, PayloadJson = JsonSerializer.Serialize(new { messageIds = ids })
+    };
+
     [TestCase(3600, 300)]
     [TestCase(80, 65)]
     [TestCase(10, 0)]

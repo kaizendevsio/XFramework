@@ -150,52 +150,92 @@ public sealed class YapChatGateway : IDisposable
             Interlocked.Add(ref connection.PendingBytes, -queued.Bytes);
             var item = queued.Value;
             if (!await sessions.ContainsAsync(connection.User, connection.Token)) throw new YapApiException(401, "Sign in again.");
-            var value = item as ChatSocketEvent;
+            IReadOnlyList<ChatSocketEvent> values = item is ChatSocketEvent direct ? [direct] : [];
             if (item is CommunicationsRealtimeEvent update)
             {
                 if (update.TenantId != session.TenantId) continue;
                 // Topic permission alone is insufficient: resolve every message using current
                 // membership, visibility and encryption audience checks, without marking delivery.
                 var hint = YapRealtime.Hint(update);
-                if (hint is null) value = new(update.EventId, 0, "refresh");
+                if (hint is null) values = [new(update.EventId, 0, "refresh")];
                 else
                 {
                     // The active device already applied its own receipts optimistically. Avoid
                     // querying/projecting them back through the critical incoming-message queue.
                     if (hint.Kind is "MessagesRead" or "MessagesDelivered" && hint.ActorId == session.CredentialId &&
                         Volatile.Read(ref connection.WatchedThread) == hint.ThreadId.ToString("N")) continue;
-                    try
-                    {
-                        var data = YapApi.Require(await session.GetMessageProjectionsAsync(hint.ThreadId, hint.MessageIds, connection.Token));
-                        if (data.Items.Count != hint.MessageIds.Count || data.Items.Any(x => x.IsThreadReply))
-                            value = new(update.EventId, 0, "refresh");
-                        else
-                        {
-                            var messages = await YapApi.MapMessagesAsync(hint.ThreadId, data, session, directory, connection.Token);
-                            var privateReceipt = hint.Kind is "MessagesRead" or "MessagesDelivered" && hint.ActorId != session.CredentialId;
-                            value = new(update.EventId, 0, privateReceipt ? "MessageUpdated" : hint.Kind, hint.ThreadId,
-                                privateReceipt ? null : hint.ActorId, hint.MessageIds, messages.Items);
-                        }
-                    }
-                    catch (YapApiException error) when (error.Status is 403 or 404)
-                    { value = new(update.EventId, 0, "refresh"); }
+                    var batch = TakeMessageBatch(update, hint, connection.Pending.Reader, session.TenantId,
+                        session.CredentialId, Volatile.Read(ref connection.WatchedThread), out var drainedBytes);
+                    Interlocked.Add(ref connection.PendingBytes, -drainedBytes);
+                    values = await ProjectMessageBatchAsync(batch, session, directory, connection.Token);
                 }
             }
-            if (value is null) continue;
-            if (value.Kind == "typing" && value.ThreadId is { } typingThread)
+            foreach (var value in values)
             {
-                var current = await session.GetThreadAsync(typingThread, connection.Token);
-                if (!current.IsSuccess || current.Response is null ||
-                    !current.Response.Members.Any(x => x.CredentialId == session.CredentialId) ||
-                    ((int)current.Response.Features & (int)ChatFeature.Typing) == 0) continue;
+                if (value.Kind == "typing" && value.ThreadId is { } typingThread)
+                {
+                    var current = await session.GetThreadAsync(typingThread, connection.Token);
+                    if (!current.IsSuccess || current.Response is null ||
+                        !current.Response.Members.Any(x => x.CredentialId == session.CredentialId) ||
+                        ((int)current.Response.Features & (int)ChatFeature.Typing) == 0) continue;
+                }
+                if (!await sessions.ContainsAsync(connection.User, connection.Token)) throw new YapApiException(401, "Sign in again.");
+                var sequence = Interlocked.Increment(ref connection.Sequence);
+                if (sequence - Interlocked.Read(ref connection.Acknowledged) > 128)
+                    throw new YapApiException(409, "Reconnect to synchronize messages.");
+                var payload = JsonSerializer.SerializeToUtf8Bytes(value with { Sequence = sequence }, Json);
+                await server.SendPushAsync(connectionId, "yap.chat.event", payload, connection.Token);
             }
-            if (!await sessions.ContainsAsync(connection.User, connection.Token)) throw new YapApiException(401, "Sign in again.");
-            var sequence = Interlocked.Increment(ref connection.Sequence);
-            if (sequence - Interlocked.Read(ref connection.Acknowledged) > 128)
-                throw new YapApiException(409, "Reconnect to synchronize messages.");
-            var payload = JsonSerializer.SerializeToUtf8Bytes(value with { Sequence = sequence }, Json);
-            await server.SendPushAsync(connectionId, "yap.chat.event", payload, connection.Token);
         }
+    }
+
+    internal static List<(CommunicationsRealtimeEvent Event, ChatUpdateHint Hint)> TakeMessageBatch(
+        CommunicationsRealtimeEvent first, ChatUpdateHint hint, ChannelReader<PendingEvent> reader,
+        Guid tenant, Guid credential, string? watchedThread, out long drainedBytes)
+    {
+        List<(CommunicationsRealtimeEvent Event, ChatUpdateHint Hint)> batch = [(first, hint)];
+        var ids = hint.MessageIds.ToHashSet();
+        drainedBytes = 0;
+        // Drain only work already waiting. Different threads, typing, calls and refreshes
+        // remain ordering barriers; no batching timer delays an otherwise idle connection.
+        for (var count = 1; count < 32 && reader.TryPeek(out var queued); count++)
+        {
+            if (queued.Value is not CommunicationsRealtimeEvent next || next.TenantId != tenant ||
+                YapRealtime.Hint(next) is not { } nextHint || nextHint.ThreadId != hint.ThreadId ||
+                ids.Union(nextHint.MessageIds).Count() > 50) break;
+            if (!reader.TryRead(out _)) break;
+            drainedBytes += queued.Bytes;
+            if (nextHint.Kind is "MessagesRead" or "MessagesDelivered" && nextHint.ActorId == credential &&
+                watchedThread == nextHint.ThreadId.ToString("N")) continue;
+            ids.UnionWith(nextHint.MessageIds);
+            batch.Add((next, nextHint));
+        }
+        return batch;
+    }
+
+    internal static async Task<IReadOnlyList<ChatSocketEvent>> ProjectMessageBatchAsync(
+        IReadOnlyList<(CommunicationsRealtimeEvent Event, ChatUpdateHint Hint)> batch,
+        ICommunicationsChatSession session, IChatDirectory directory, CancellationToken ct)
+    {
+        var thread = batch[0].Hint.ThreadId;
+        var ids = batch.SelectMany(x => x.Hint.MessageIds).Distinct().ToList();
+        try
+        {
+            var data = YapApi.Require(await session.GetMessageProjectionsAsync(thread, ids, ct));
+            var mapped = await YapApi.MapMessagesAsync(thread, data, session, directory, ct);
+            var messages = mapped.Items.ToDictionary(x => x.Id);
+            return batch.Select(item =>
+            {
+                var (update, hint) = item;
+                if (hint.MessageIds.Any(id => !messages.TryGetValue(id, out var message) || message.IsThreadReply))
+                    return new ChatSocketEvent(update.EventId, 0, "refresh");
+                var privateReceipt = hint.Kind is "MessagesRead" or "MessagesDelivered" && hint.ActorId != session.CredentialId;
+                return new ChatSocketEvent(update.EventId, 0, privateReceipt ? "MessageUpdated" : hint.Kind, thread,
+                    privateReceipt ? null : hint.ActorId, hint.MessageIds, hint.MessageIds.Select(id => messages[id]).ToList());
+            }).ToList();
+        }
+        catch (YapApiException error) when (error.Status is 403 or 404)
+        { return batch.Select(x => new ChatSocketEvent(x.Event.EventId, 0, "refresh")).ToList(); }
     }
 
     private async Task<(HttpStatusCode, ReadOnlyMemory<byte>)> CommandAsync(BoltRequestContext context,
@@ -343,7 +383,7 @@ public sealed class YapChatGateway : IDisposable
     private sealed class FixedActor(YapSessions sessions, ClaimsPrincipal user) : ICommunicationsChatActorProvider
     { public async ValueTask<CommunicationsChatActor?> GetCurrentActorAsync(CancellationToken ct = default) => await sessions.GetActorAsync(user, ct); }
 
-    private sealed record PendingEvent(object Value, int Bytes);
+    internal sealed record PendingEvent(object Value, int Bytes);
     private sealed class Connection : IDisposable
     {
         public Connection(ClaimsPrincipal user, CancellationToken aborted)
