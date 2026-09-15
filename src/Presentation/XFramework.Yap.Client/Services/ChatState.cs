@@ -241,6 +241,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     {
         if (!await js.InvokeAsync<bool>("yap.device.online")) { SetOffline(); Notify(); return; }
         await sync.WaitAsync(lifetime.Token);
+        string? flushScope = null;
         Busy = true;
         try
         {
@@ -273,7 +274,6 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             if (EncryptionEnabled) await Encryption.EnsureAsync(User);
             await FinishEncryptionResetAsync();
             await SynchronizeDeletedConversationsAsync();
-            await FlushAsync();
             await CompleteDeferredDeliveriesAsync();
             for (var page = 0; page < inboxPages; page++)
             {
@@ -289,6 +289,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             if (Selected is not null) await RefreshSelectedAsync(Selected.Id);
             await WatchEventsAsync();
             RetryDelivered();
+            flushScope = Scope;
         }
         catch (ChatApiException ex) { await HandleApiFailureAsync(ex); }
         catch (HttpRequestException) { SetOffline(); }
@@ -299,6 +300,32 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         {
             if (User is not null) PendingCount = (await store.PendingAsync(Scope)).Count;
             Busy = false; sync.Release(); Notify();
+        }
+        if (flushScope is null) return;
+        // A continuous send burst can hold sendGate for many seconds. Reconciliation
+        // must release sync before joining that drain, so a reconnect's initial
+        // refresh can finish and acknowledge incoming events during the burst.
+        try
+        {
+            await sendGate.WaitAsync(lifetime.Token);
+            try
+            {
+                if (Scope == flushScope && Online && !NeedsLogin && User is not null
+                    && api.Account == Scope && Defaults is not null
+                    && (!EncryptionEnabled || Encryption.Status.Approved))
+                    await FlushCoreAsync();
+            }
+            finally { sendGate.Release(); }
+        }
+        catch (ChatApiException ex) { await HandleApiFailureAsync(ex); }
+        catch (HttpRequestException) { SetOffline(); }
+        catch (TaskCanceledException) when (!lifetime.IsCancellationRequested) { SetOffline(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) { Report(ex); }
+        finally
+        {
+            if (Scope == flushScope && User is not null) PendingCount = (await store.PendingAsync(Scope)).Count;
+            Notify();
         }
     }
 
@@ -314,6 +341,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         Selected = conversation;
         OpeningConversation = true;
         Notify();
+        _ = PreloadRecipientsAsync(scope, id);
         try
         {
             // Local storage has its own gate. Never wait for a slow network sync
@@ -349,6 +377,14 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex) { Report(ex); }
         finally { if (version == selectionVersion) OpeningConversation = false; Notify(); }
+    }
+
+    private async Task PreloadRecipientsAsync(string scope, Guid thread)
+    {
+        await Task.Yield(); // Let the conversation shell render before starting network work.
+        if (Scope != scope || User is not { } user || !Online || NeedsLogin || !EncryptionEnabled || !Encryption.Status.Approved) return;
+        try { await Encryption.RecipientsAsync(user, thread, allowPending: true); }
+        catch { /* Optional preload: the durable send path owns retries and user-facing errors. */ }
     }
 
     private async Task HandleApiFailureAsync(ChatApiException error)
@@ -838,6 +874,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
                 {
                     // The server returns 412 only after finding no previously accepted message ID.
                     // Refresh the roster and retry once immediately, without duplicating a send.
+                    Encryption.InvalidateRecipients(item.ThreadId);
                     var pending = await store.MessageAsync(Scope, item.Id);
                     if (pending is not null) { pending.EncryptedEnvelope = null; await store.SaveMessagesAsync(Scope, [pending]); }
                     rosterChanged = true;
@@ -891,7 +928,12 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
                         recipientDirectoryRevisions = directories.ToDictionary(x => x.GetProperty("credentialId").GetGuid(), x => x.GetProperty("revision").GetInt64())
                     });
                 }
-                catch (ChatApiException ex) when (ex.Status is 403 or 404 or 409 or 412) { /* Membership/edit changed; refresh next sync. */ }
+                catch (ChatApiException ex) when (ex.Status is 403 or 404 or 409 or 412)
+                {
+                    Encryption.InvalidateRecipients(item.Message.ThreadId);
+                    threadDirectories.Remove(item.Message.ThreadId);
+                    // Membership/edit changed; refresh next sync.
+                }
             }
         }
         catch (OperationCanceledException) { throw; }

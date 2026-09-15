@@ -14,6 +14,7 @@ public sealed partial class ChatState
 
     private async Task ReconcileSocketAsync(string scope)
     {
+        Encryption.InvalidateRecipients();
         var failures = reconciliationFailures;
         await RefreshHint();
         if (!Online || NeedsLogin || Scope != scope || failures != reconciliationFailures)
