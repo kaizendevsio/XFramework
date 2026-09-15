@@ -94,16 +94,16 @@ internal static partial class UiFixture
                 fixtureMembers.Single(member => member.CredentialId == fixture.Session.Object.CredentialId).HideActiveStatus = !share;
                 return new CmdResponse { HttpStatusCode = HttpStatusCode.OK };
             });
-        fixture.Session.Setup(s => s.GetMessagesAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Returns(async (Guid thread, int page, int size, CancellationToken ct) =>
+        fixture.Session.Setup(s => s.GetMessagesAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Returns(async (Guid thread, int page, int size, CancellationToken ct, bool suppressDeliveryAcknowledgement) =>
             {
                 if (int.TryParse(Environment.GetEnvironmentVariable("YAP_FIXTURE_MESSAGE_DELAY_MS"), out var delay))
                     await Task.Delay(Math.Clamp(delay, 0, 10000), ct);
                 return ChatFixture.Ok(new GetThreadMessagesResponse { Items = messages.OrderByDescending(m => m.CreatedAt).Skip(page * size).Take(size).ToList(), TotalCount = messages.Count });
             });
         foreach (var conversation in conversations) conversation.IsDirect = conversation.MemberCount == 2;
-        fixture.Session.Setup(s => s.GetRepliesAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Guid thread, Guid parent, int page, int size, CancellationToken _) =>
+        fixture.Session.Setup(s => s.GetRepliesAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .ReturnsAsync((Guid thread, Guid parent, int page, int size, CancellationToken _, bool suppressDeliveryAcknowledgement) =>
             {
                 var replies = messages.Where(m => m.ParentMessageId == parent).OrderByDescending(m => m.CreatedAt).ToArray();
                 return ChatFixture.Ok(new GetThreadMessagesResponse { Items = replies.Skip(page * size).Take(size).ToList(), TotalCount = replies.Length });

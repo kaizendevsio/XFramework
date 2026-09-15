@@ -153,8 +153,8 @@ internal static partial class UiFixture
                     lock (gate) { listeners.RemoveAll(x => x.Token.IsCancellationRequested); listeners.Add((handler, token)); }
                     return Task.CompletedTask;
                 });
-            fixture.Session.Setup(x => x.GetMessagesAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync((Guid thread, int page, int size, CancellationToken _) =>
+            fixture.Session.Setup(x => x.GetMessagesAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+                .ReturnsAsync((Guid thread, int page, int size, CancellationToken _, bool suppressDeliveryAcknowledgement) =>
                 {
                     var actor = Actor();
                     lock (gate)

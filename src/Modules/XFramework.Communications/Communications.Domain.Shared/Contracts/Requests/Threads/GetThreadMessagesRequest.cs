@@ -14,4 +14,6 @@ public partial record GetThreadMessagesRequest : RequestBase,
     public int PageSize { get; set; } = 20;
     public Guid? ParentMessageId { get; set; }
     public Guid[]? MessageIds { get; set; }
+    // Server-side push projection is not proof that the recipient received the message.
+    public bool SuppressDeliveryAcknowledgement { get; set; }
 }

@@ -11,6 +11,9 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     public ChatEncryption Encryption { get; } = new(api, js);
     public bool EncryptionEnabled { get; private set; }
     private readonly SemaphoreSlim sync = new(1, 1);
+    private readonly SemaphoreSlim sendGate = new(1, 1);
+    private readonly SemaphoreSlim messageChanges = new(1, 1);
+    private long socketMessageVersion;
     private readonly SemaphoreSlim localChanges = new(1, 1);
     private Task? sending;
     private bool sendRequested;
@@ -101,6 +104,11 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
 
     public async Task InitializeAsync()
     {
+        api.SocketRequest = async (operation, body, ct) =>
+        {
+            try { return await js.InvokeAsync<ChatSocketResponse?>("yap.device.chatRequest", ct, Scope, operation, body); }
+            catch (JSException ex) { throw new HttpRequestException("The live connection was interrupted.", ex); }
+        };
         await js.InvokeVoidAsync("yap.diagnostics.record", "startup.stage", new { phase = "saved-account" });
         var saved = await store.SettingAsync("user");
         if (saved is not null) User = JsonSerializer.Deserialize<UserSession>(saved);
@@ -177,21 +185,22 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
                     await SynchronizeDeletedConversationsAsync();
                     for (var page = 0; page < inboxPages; page++)
                     {
-                        var list = await api.GetAsync<ChatPage<Conversation>>($"api/chat/conversations?page={page}", lifetime.Token);
+                        var inboxVersion = socketMessageVersion;
+                var list = await api.GetAsync<ChatPage<Conversation>>($"api/chat/conversations?page={page}", lifetime.Token);
                         ConversationTotal = list.TotalCount;
                         await ResolvePreviewsAsync(list.Items);
-                        await store.SaveConversationsAsync(Scope, list.Items);
+                        await SaveInboxSnapshotAsync(list.Items, inboxVersion);
                         if ((page + 1) * 30 >= list.TotalCount) break;
                     }
-                    Conversations = await store.ConversationsAsync(Scope);
+                    await ReloadConversationsAsync();
                     Notify();
                 }
                 finally { sync.Release(); }
             }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
-        catch (ChatApiException ex) { await HandleApiFailureAsync(ex); Notify(); }
-        catch (Exception ex) { Report(ex); }
+        catch (ChatApiException ex) { reconciliationFailures++; await HandleApiFailureAsync(ex); Notify(); }
+        catch (Exception ex) { reconciliationFailures++; Report(ex); }
     }
 
     [JSInvokable] public void TypingChanged(Guid thread, Guid credential, bool active)
@@ -226,7 +235,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         finally { typingPublish.Release(); }
     }
 
-    private ValueTask WatchEventsAsync() => js.InvokeVoidAsync("yap.device.events", Scope, Selected?.Id);
+    private ValueTask WatchEventsAsync() => js.InvokeVoidAsync("yap.device.events", Scope, Selected?.Id, api.Token);
 
     public async Task SynchronizeAsync()
     {
@@ -268,16 +277,18 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             await CompleteDeferredDeliveriesAsync();
             for (var page = 0; page < inboxPages; page++)
             {
+                var inboxVersion = socketMessageVersion;
                 var list = await api.GetAsync<ChatPage<Conversation>>($"api/chat/conversations?page={page}");
                 ConversationTotal = list.TotalCount;
                 await ResolvePreviewsAsync(list.Items);
-                await store.SaveConversationsAsync(Scope, list.Items);
+                await SaveInboxSnapshotAsync(list.Items, inboxVersion);
                 if ((page + 1) * 30 >= list.TotalCount) break;
             }
-            Conversations = await store.ConversationsAsync(Scope);
+            await ReloadConversationsAsync();
             ApplyOptimisticConversations();
             if (Selected is not null) await RefreshSelectedAsync(Selected.Id);
             await WatchEventsAsync();
+            RetryDelivered();
         }
         catch (ChatApiException ex) { await HandleApiFailureAsync(ex); }
         catch (HttpRequestException) { SetOffline(); }
@@ -307,18 +318,25 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         {
             // Local storage has its own gate. Never wait for a slow network sync
             // before showing the conversation and its bounded cached history.
-            var messages = await store.MessagesAsync(scope, id, limit: HistoryWindowSize);
-            var count = await store.MessageCountAsync(scope, id);
-            if (version != selectionVersion || Scope != scope) return;
-            // A send can finish saving while this older cache read is in flight.
-            var queued = conversation.Messages.Where(x => x.Delivery == "Queued" && messages.All(m => m.Id != x.Id)).ToList();
-            conversation.Messages = messages.Concat(queued).OrderBy(x => x.CreatedAt).TakeLast(HistoryWindowSize).ToList();
-            MergeStaging(conversation);
-            Selected = conversation; cachedCount = count;
-            if (messages.Count > 0) OpeningConversation = false;
-            ComposeReplies(conversation.Messages);
-            ApplyOptimisticMessages(conversation);
-            Notify();
+            await messageChanges.WaitAsync(lifetime.Token);
+            try
+            {
+                if (version != selectionVersion || Scope != scope) return;
+                var messages = await store.MessagesAsync(scope, id, limit: HistoryWindowSize);
+                var count = await store.MessageCountAsync(scope, id);
+                if (version != selectionVersion || Scope != scope) return;
+                conversation = Conversations.FirstOrDefault(x => x.Id == id) ?? conversation;
+                // A send can finish saving while this older cache read is in flight.
+                var queued = conversation.Messages.Where(x => x.Delivery == "Queued" && messages.All(m => m.Id != x.Id)).ToList();
+                conversation.Messages = messages.Concat(queued).OrderBy(x => x.CreatedAt).TakeLast(HistoryWindowSize).ToList();
+                MergeStaging(conversation);
+                Selected = conversation; cachedCount = count;
+                if (messages.Count > 0) OpeningConversation = false;
+                ComposeReplies(conversation.Messages);
+                ApplyOptimisticMessages(conversation);
+                Notify();
+            }
+            finally { messageChanges.Release(); }
             await sync.WaitAsync(lifetime.Token);
             try
             {
@@ -357,6 +375,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     {
         var version = selectionVersion;
         var mutationVersion = messageMutationVersion;
+        var socketVersion = socketMessageVersion;
         Conversation conversation;
         ChatPage<ChatMessage> result;
         try
@@ -376,22 +395,31 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         var fetched = new List<ChatMessage>();
         fetched.AddRange(result.Items); conversation.MessageTotal = result.TotalCount;
         await DecryptMessagesAsync(fetched);
-        await store.ReplaceWindowAsync(Scope, id, fetched, fetched.Count >= conversation.MessageTotal);
-        if (historyOffset > 0 && Selected?.Messages.LastOrDefault() is { } anchor)
-            historyOffset = await store.MessageOffsetAsync(Scope, id, anchor.Id);
-        conversation.Messages = await store.MessagesAsync(Scope, id, limit: HistoryWindowSize, skip: historyOffset);
-        cachedCount = await store.MessageCountAsync(Scope, id);
-        ComposeReplies(conversation.Messages);
-        await RestoreReplyWindowAsync(conversation);
-        await store.SaveConversationsAsync(Scope, [conversation]);
-        if (version != selectionVersion || viewedConversation != id || mutationVersion != messageMutationVersion) return;
-        MergeStaging(conversation);
-        ApplyOptimisticMessages(conversation);
-        Selected = conversation;
-        var index = Conversations.FindIndex(x => x.Id == id);
-        if (index >= 0) Conversations[index] = conversation;
-        ApplyOptimisticConversations();
-        Notify();
+        await messageChanges.WaitAsync(lifetime.Token);
+        try
+        {
+            // A newer push owns the live state. Do not replace it with an HTTP snapshot
+            // that started before that push; reconcile once more after the burst.
+            if (socketVersion != socketMessageVersion) { refreshPending = true; return; }
+            await store.ReplaceWindowAsync(Scope, id, fetched, fetched.Count >= conversation.MessageTotal);
+            if (historyOffset > 0 && Selected?.Messages.LastOrDefault() is { } anchor)
+                historyOffset = await store.MessageOffsetAsync(Scope, id, anchor.Id);
+            conversation.Messages = await store.MessagesAsync(Scope, id, limit: HistoryWindowSize, skip: historyOffset);
+            cachedCount = await store.MessageCountAsync(Scope, id);
+            ComposeReplies(conversation.Messages);
+            await RestoreReplyWindowAsync(conversation);
+            await store.SaveConversationsAsync(Scope, [conversation]);
+            if (version != selectionVersion || viewedConversation != id || mutationVersion != messageMutationVersion) return;
+            MergeStaging(conversation);
+            ApplyOptimisticMessages(conversation);
+            Selected = conversation;
+            var index = Conversations.FindIndex(x => x.Id == id);
+            if (index >= 0) Conversations[index] = conversation;
+            ApplyOptimisticConversations();
+            Notify();
+            QueueDelivered(id, fetched);
+        }
+        finally { messageChanges.Release(); }
     }
 
     public void LeaveConversation(Guid id)
@@ -445,7 +473,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
                 // Reply/search caches may contain gaps: row count is not a server page cursor.
                 var result = await api.GetAsync<ChatPage<ChatMessage>>($"api/chat/conversations/{conversation.Id}/messages?page={pages}");
                 await DecryptMessagesAsync(result.Items);
-                await store.SaveMessagesAsync(Scope, result.Items); conversation.MessageTotal = result.TotalCount;
+                await store.SaveMessagesAsync(Scope, result.Items); QueueDelivered(conversation.Id, result.Items); conversation.MessageTotal = result.TotalCount;
                 pages++;
                 cachedCount = await store.MessageCountAsync(Scope, conversation.Id);
             }
@@ -535,6 +563,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
                 var result = await api.GetAsync<ChatPage<ChatMessage>>($"api/chat/conversations/{parent.ThreadId}/messages?parent={parent.Id}&page={replyPages}");
                 await DecryptMessagesAsync(result.Items);
                 await store.SaveMessagesAsync(Scope, result.Items);
+                QueueDelivered(parent.ThreadId, result.Items);
                 parent.ReplyTotal = result.TotalCount; replyPages++;
                 replyCached = await store.ReplyCountAsync(Scope, parent.Id);
                 if (first) break;
@@ -686,10 +715,9 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     private async Task FlushSendsAsync()
     {
         // A live session already has its account binding, CSRF token and encryption
-        // identity. Sending only needs to drain the outbox; normal sync/SSE updates
+        // identity. Sending only needs to drain the outbox; normal live updates
         // inbox summaries and receipts independently.
         var requiresSync = false;
-        await sync.WaitAsync(lifetime.Token);
         try
         {
             requiresSync = !Online || NeedsLogin || User is null || api.Account != Scope
@@ -699,11 +727,18 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         }
         catch (ChatApiException ex) { await HandleApiFailureAsync(ex); }
         catch (Exception ex) when (IsConnectionFailure(ex)) { SetOffline(); }
-        finally { sync.Release(); Notify(); }
+        finally { Notify(); }
         if (requiresSync) await SynchronizeAsync();
     }
 
-    private async Task FlushAsync(bool allowRosterRetry = true)
+    private async Task FlushAsync()
+    {
+        await sendGate.WaitAsync(lifetime.Token);
+        try { await FlushCoreAsync(); }
+        finally { sendGate.Release(); }
+    }
+
+    private async Task FlushCoreAsync(bool allowRosterRetry = true)
     {
         var rosterChanged = false;
         var attempted = new HashSet<Guid>();
@@ -821,7 +856,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
                 }
             }
         }
-        if (rosterChanged && allowRosterRetry) await FlushAsync(allowRosterRetry: false);
+        if (rosterChanged && allowRosterRetry) await FlushCoreAsync(allowRosterRetry: false);
     }
 
     private int deferredDeliveryPage;
@@ -1028,6 +1063,8 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     public async Task LogoutAsync()
     {
         await sync.WaitAsync();
+        await sendGate.WaitAsync();
+        await messageChanges.WaitAsync();
         await localChanges.WaitAsync();
         try
         {
@@ -1035,13 +1072,13 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             await store.SetSettingAsync("pendingLogout", "true");
             await store.ClearPrivateAsync();
             User = null; Selected = null; Conversations = []; Defaults = null; PendingCount = 0; NeedsLogin = false;
-            messageUpdates.Clear();
+            messageUpdates.Clear(); deliveredPending.Clear();
             typing.Clear(); publishingThread = null;
             api.Account = "";
             await js.InvokeVoidAsync("yap.device.events", "");
             await js.InvokeVoidAsync("yap.device.clearFiles");
         }
-        finally { localChanges.Release(); sync.Release(); Notify(); }
+        finally { localChanges.Release(); messageChanges.Release(); sendGate.Release(); sync.Release(); Notify(); }
         await SynchronizeAsync();
     }
 

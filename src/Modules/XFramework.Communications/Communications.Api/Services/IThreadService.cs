@@ -56,6 +56,7 @@ public interface IThreadService
 
     // Round 3: Read Receipts
     Task<Result<CmdResponse>> MarkMessagesReadAsync(MarkMessagesReadRequest request, CancellationToken ct = default);
+    Task<Result<CmdResponse>> MarkMessagesDeliveredAsync(MarkMessagesDeliveredRequest request, CancellationToken ct = default);
     Task<Result<CmdResponse>> PublishTypingAsync(PublishCommunicationsTypingRequest request, CancellationToken ct = default);
     Task<Result<CmdResponse>> PublishPresenceAsync(PublishCommunicationsPresenceRequest request, CancellationToken ct = default);
 }

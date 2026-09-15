@@ -32,6 +32,10 @@ public static class YapApi
         });
 
         var api = app.MapGroup("/api/chat").RequireAuthorization().AddEndpointFilter<YapApiFilter>();
+        api.MapPost("/socket/session", (HttpContext context, YapChatGateway gateway, CancellationToken ct) =>
+            gateway.CreateTicketAsync(context.User, ct));
+        api.MapGet("/socket", (HttpContext context, YapChatGateway gateway) => gateway.AcceptSocketAsync(context))
+            .WithMetadata(new MediaAccountQuery());
         api.MapPost("/presence", async (ICommunicationsChatClient client, YapPresence presence, CancellationToken ct) =>
         {
             var session = await client.ForCurrentActorAsync(ct: ct);
@@ -100,37 +104,18 @@ public static class YapApi
                 Members = members.Count, People = members, Features = (int)data.Features, CanManage = data.CanManage,
                 ShareActiveStatus = !data.Members.First(x => x.CredentialId == session.CredentialId).HideActiveStatus };
         });
-        api.MapGet("/conversations/{id:guid}/messages", async (Guid id, int? page, Guid? parent, Guid[]? ids,
+        api.MapGet("/conversations/{id:guid}/messages", async (Guid id, int? page, Guid? parent, Guid[]? ids, bool? acknowledge,
             ICommunicationsChatClient client, IChatDirectory directory, CancellationToken ct) =>
         {
             var session = await client.ForCurrentActorAsync(ct: ct);
             if (ids is { Length: > 50 } || ids?.Contains(Guid.Empty) == true || ids is { Length: > 0 } && parent.HasValue)
                 throw new YapApiException(400, "Choose up to 50 message IDs without a parent filter.");
-            var data = Require(ids is { Length: > 0 } ? await session.GetMessageUpdatesAsync(id, ids.Distinct().ToList(), ct)
-                : parent.HasValue ? await session.GetRepliesAsync(id, parent.Value, Page(page), 50, ct)
-                : await session.GetMessagesAsync(id, Page(page), 50, ct));
-            var people = await directory.ResolveAsync(data.Items
-                .SelectMany(x => x.ReadCredentialIds.Append(x.SenderCredentialId)).Distinct().ToArray(), ct);
-            return new ChatPage<ApiMessage>(data.Items.Select(x => new ApiMessage
-            {
-                Id = x.Id, ThreadId = id, SenderId = x.SenderCredentialId,
-                Sender = x.SenderCredentialId == session.CredentialId ? "You" : string.IsNullOrWhiteSpace(x.SenderAlias)
-                    ? people.FirstOrDefault(p => p.Id == x.SenderCredentialId)?.Name ?? "Workspace member" : x.SenderAlias,
-                Text = x.Text, CreatedAt = x.CreatedAt, Mine = x.SenderCredentialId == session.CredentialId,
-                EncryptedEnvelope = x.EncryptedEnvelope,
-                EncryptionPending = x.EncryptionPending, PendingEncryptionCount = x.PendingEncryptionCount,
-                EncryptionAudienceCredentialIds = x.EncryptionAudienceCredentialIds,
-                AcceptedSenderDirectoryRevision = x.AcceptedSenderDirectoryRevision, EncryptionSenderDeviceId = x.EncryptionSenderDeviceId,
-                HasAttachments = x.HasAttachments, AttachmentLinksReady = x.HasAttachments, IsThreadReply = x.IsThreadReply,
-                DeliveredCount = x.DeliveredCount, ReadCount = x.ReadCount,
-                Readers = x.ReadCredentialIds.Select(id => { var person = people.FirstOrDefault(p => p.Id == id); return new Person(id, person?.Name ?? "Workspace member", person?.UserName ?? "", person?.AvatarUrl); }).ToList(),
-                LatestReaders = x.LatestReadCredentialIds.Select(id => { var person = people.FirstOrDefault(p => p.Id == id); return new Person(id, person?.Name ?? "Workspace member", person?.UserName ?? "", person?.AvatarUrl); }).ToList(),
-                IsLatestOwnMessage = x.IsLatestOwnMessage,
-                AvatarUrl = people.FirstOrDefault(p => p.Id == x.SenderCredentialId)?.AvatarUrl,
-                ParentId = x.ParentMessageId, Pinned = x.IsPinned, Saved = x.IsSaved, ReplyTotal = x.ReplyCount,
-                Reactions = x.Reactions.ToDictionary(r => r.Emoji, r => r.Count),
-                MyReactionIds = x.Reactions.Where(r => r.MyReactionId.HasValue).ToDictionary(r => r.Emoji, r => r.MyReactionId!.Value)
-            }).ToList(), data.TotalCount);
+            var data = Require(ids is { Length: > 0 }
+                ? acknowledge == false ? await session.GetMessageProjectionsAsync(id, ids.Distinct().ToList(), ct)
+                    : await session.GetMessageUpdatesAsync(id, ids.Distinct().ToList(), ct)
+                : parent.HasValue ? await session.GetRepliesAsync(id, parent.Value, Page(page), 50, ct, suppressDeliveryAcknowledgement: acknowledge == false)
+                : await session.GetMessagesAsync(id, Page(page), 50, ct, suppressDeliveryAcknowledgement: acknowledge == false));
+            return await MapMessagesAsync(id, data, session, directory, ct);
         });
         api.MapGet("/people", async (string search, IChatDirectory directory, CancellationToken ct) =>
             (await directory.SearchAsync(search, ct)).Select(x => new Person(x.Id, x.Name, x.UserName, x.AvatarUrl)));
@@ -154,17 +139,8 @@ public static class YapApi
         });
         api.MapPost("/messages", async (SendMessage request, ICommunicationsChatClient client, IConfiguration configuration, CancellationToken ct) =>
         {
-            if (configuration.GetValue("Yap:Encryption:Enabled", true) && request.EncryptedEnvelope is null)
-                throw new YapApiException(409, "Update Yap and unlock encryption before sending.");
-            if (request.Id == Guid.Empty || request.ThreadId == Guid.Empty || string.IsNullOrWhiteSpace(request.Text) || request.Text.Length > 4000)
-                throw new YapApiException(400, "Write a message up to 4,000 characters.");
             var session = await client.ForCurrentActorAsync(ct: ct);
-            var data = Require(await session.SendMessageAsync(new CreateThreadMessageRequest
-            { ThreadId = request.ThreadId, Text = request.Text, ParentMessageId = request.ParentId, ClientMessageId = request.Id,
-                IsThreadReply = request.IsThreadReply, EncryptedEnvelope = request.EncryptedEnvelope,
-                RecipientCredentialIds = request.RecipientCredentialIds ?? [], EncryptionSenderDeviceId = request.EncryptionSenderDeviceId,
-                SenderDirectoryRevision = request.SenderDirectoryRevision, RecipientDirectoryRevisions = request.RecipientDirectoryRevisions ?? [] }, ct));
-            return new MessageReceipt(data.MessageId);
+            return await YapChatCommands.SendAsync(request, session, configuration.GetValue("Yap:Encryption:Enabled", true), ct);
         });
         api.MapPost("/conversation-settings", async (ConversationUpdate request, ICommunicationsChatClient client, CancellationToken ct) =>
         {
@@ -211,9 +187,14 @@ public static class YapApi
         });
         api.MapPost("/read", async (ReadMessages request, ICommunicationsChatClient client, CancellationToken ct) =>
         {
-            if (request.MessageIds.Count > 100) throw new YapApiException(400, "Too many messages.");
             var session = await client.ForCurrentActorAsync(ct: ct);
-            Require(await session.MarkReadAsync(request.ThreadId, request.MessageIds, ct));
+            await YapChatCommands.ReadAsync(request, session, ct);
+            return Results.NoContent();
+        });
+        api.MapPost("/delivered", async (ReadMessages request, ICommunicationsChatClient client, CancellationToken ct) =>
+        {
+            var session = await client.ForCurrentActorAsync(ct: ct);
+            Require(await session.MarkDeliveredAsync(request.ThreadId, request.MessageIds, ct));
             return Results.NoContent();
         });
         api.MapPost("/thread-actions", async (ThreadAction request, ICommunicationsChatClient client, CancellationToken ct) =>
@@ -225,7 +206,7 @@ public static class YapApi
                 case "active-status": Require(await session.SetThreadActiveStatusAsync(request.ThreadId, request.Value, ct)); break;
                 case "delete-for-me": Require(await session.ArchiveThreadAsync(request.ThreadId, true, ct)); break;
                 case "delete-for-everyone": Require(await session.DeleteThreadAsync(request.ThreadId, ct)); break;
-                case "typing": await session.PublishTypingAsync(request.ThreadId, request.Value, ct); break;
+                case "typing": await YapChatCommands.TypingAsync(request, session, ct); break;
                 default: throw new YapApiException(400, "Choose a supported conversation action.");
             }
             return Results.NoContent();
@@ -388,6 +369,33 @@ public static class YapApi
         if (configuration.GetValue("Yap:Encryption:Enabled", true) &&
             (fileName is not ("attachment.pgp" or "voice.pgp") || contentType != "application/octet-stream"))
             throw new YapApiException(409, "Update Yap and unlock encryption before uploading attachments.");
+    }
+
+    internal static async Task<ChatPage<ApiMessage>> MapMessagesAsync(Guid id, Communications.Domain.Shared.Contracts.Responses.GetThreadMessagesResponse data,
+        ICommunicationsChatSession session, IChatDirectory directory, CancellationToken ct)
+    {
+            var people = await directory.ResolveAsync(data.Items
+                .SelectMany(x => x.ReadCredentialIds.Append(x.SenderCredentialId)).Distinct().ToArray(), ct);
+            return new ChatPage<ApiMessage>(data.Items.Select(x => new ApiMessage
+            {
+                Id = x.Id, ThreadId = id, SenderId = x.SenderCredentialId,
+                Sender = x.SenderCredentialId == session.CredentialId ? "You" : string.IsNullOrWhiteSpace(x.SenderAlias)
+                    ? people.FirstOrDefault(p => p.Id == x.SenderCredentialId)?.Name ?? "Workspace member" : x.SenderAlias,
+                Text = x.Text, CreatedAt = x.CreatedAt, Mine = x.SenderCredentialId == session.CredentialId,
+                EncryptedEnvelope = x.EncryptedEnvelope,
+                EncryptionPending = x.EncryptionPending, PendingEncryptionCount = x.PendingEncryptionCount,
+                EncryptionAudienceCredentialIds = x.EncryptionAudienceCredentialIds,
+                AcceptedSenderDirectoryRevision = x.AcceptedSenderDirectoryRevision, EncryptionSenderDeviceId = x.EncryptionSenderDeviceId,
+                HasAttachments = x.HasAttachments, AttachmentLinksReady = x.HasAttachments, IsThreadReply = x.IsThreadReply,
+                DeliveredCount = x.DeliveredCount, ReadCount = x.ReadCount,
+                Readers = x.ReadCredentialIds.Select(id => { var person = people.FirstOrDefault(p => p.Id == id); return new Person(id, person?.Name ?? "Workspace member", person?.UserName ?? "", person?.AvatarUrl); }).ToList(),
+                LatestReaders = x.LatestReadCredentialIds.Select(id => { var person = people.FirstOrDefault(p => p.Id == id); return new Person(id, person?.Name ?? "Workspace member", person?.UserName ?? "", person?.AvatarUrl); }).ToList(),
+                IsLatestOwnMessage = x.IsLatestOwnMessage,
+                AvatarUrl = people.FirstOrDefault(p => p.Id == x.SenderCredentialId)?.AvatarUrl,
+                ParentId = x.ParentMessageId, Pinned = x.IsPinned, Saved = x.IsSaved, ReplyTotal = x.ReplyCount,
+                Reactions = x.Reactions.ToDictionary(r => r.Emoji, r => r.Count),
+                MyReactionIds = x.Reactions.Where(r => r.MyReactionId.HasValue).ToDictionary(r => r.Emoji, r => r.MyReactionId!.Value)
+            }).ToList(), data.TotalCount);
     }
 
     private static int Page(int? page) => Math.Clamp(page ?? 0, 0, 10000);

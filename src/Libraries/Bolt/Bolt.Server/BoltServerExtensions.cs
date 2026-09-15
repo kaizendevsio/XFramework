@@ -40,6 +40,14 @@ public class BoltServerOptions
     /// <summary>Require the Bolt endpoint to use a secure transport.</summary>
     public bool RequireSecureTransport { get; set; }
 
+    /// <summary>Accept only registration and RPCs implemented by this host. Disables peer routing,
+    /// client push, pub/sub, streams and media for application-facing gateways.</summary>
+    public bool LocalHandlersOnly { get; set; }
+
+    /// <summary>When set, registration requires an authenticated principal whose named claim
+    /// exactly matches the requested client ID. The host must issue the claim itself.</summary>
+    public string? RegistrationClientIdClaim { get; set; }
+
     /// <summary>Enable Bolt media signaling and frame routing. Disabled unless a host explicitly opts in.</summary>
     public bool MediaEnabled { get; set; }
 

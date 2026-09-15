@@ -123,6 +123,9 @@ public interface ICommunicationsServiceWrapper : IServiceWrapper
     Task<CmdResponse> MarkMessagesReadAsync(
         MarkMessagesReadRequest request,
         CancellationToken ct = default);
+    Task<CmdResponse> MarkMessagesDeliveredAsync(
+        MarkMessagesDeliveredRequest request,
+        CancellationToken ct = default);
     Task<CmdResponse> CreateMessageReactionAsync(
         CreateMessageReactionRequest request,
         CancellationToken ct = default);
@@ -246,6 +249,12 @@ public interface ICommunicationsServiceWrapper : IServiceWrapper
         Guid tenantId,
         Guid credentialId,
         Func<CommunicationsRealtimeEvent, Task> handler,
+        CancellationToken ct = default);
+    Task SubscribeLiveUserCommunicationsEventsAsync(
+        Guid tenantId,
+        Guid credentialId,
+        Func<CommunicationsRealtimeEvent, Task> handler,
+        Func<CancellationToken, ValueTask<string?>> actorAccessTokenProvider,
         CancellationToken ct = default);
     Task SubscribeUserCommunicationsEventsForDeviceAsync(
         Guid tenantId,
@@ -543,6 +552,13 @@ public sealed record CommunicationsServiceWrapper(
     public Task<CmdResponse> MarkMessagesReadAsync(
         MarkMessagesReadRequest request,
         CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return SendVoidAsync(request, ct);
+    }
+
+    public Task<CmdResponse> MarkMessagesDeliveredAsync(
+        MarkMessagesDeliveredRequest request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         return SendVoidAsync(request, ct);
@@ -879,6 +895,16 @@ public sealed record CommunicationsServiceWrapper(
     {
         return SubscribeUserCommunicationsEventsForDeviceAsync(tenantId, credentialId, "user", handler, ct);
     }
+
+    // Each live browser connection gets a transient subscriber. Catch-up comes from
+    // authorized message history, rather than a persistent cursor per browser tab.
+    public Task SubscribeLiveUserCommunicationsEventsAsync(
+        Guid tenantId,
+        Guid credentialId,
+        Func<CommunicationsRealtimeEvent, Task> handler,
+        Func<CancellationToken, ValueTask<string?>> actorAccessTokenProvider,
+        CancellationToken ct = default) =>
+        Bus.SubscribeAsync(MessageRealtimeTopics.User(tenantId, credentialId), handler, actorAccessTokenProvider, ct);
 
     public Task SubscribeUserCommunicationsEventsForDeviceAsync(
         Guid tenantId,

@@ -45,7 +45,8 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
             {
                 var saved = JsonSerializer.Deserialize<Conversation>(row.Json, Json)!;
                 conversation.People = saved.People; conversation.Features = saved.Features;
-                conversation.CanManage = saved.CanManage; conversation.MessageTotal = saved.MessageTotal;
+                conversation.CanManage = saved.CanManage;
+                conversation.MessageTotal = Math.Max(conversation.MessageTotal, saved.MessageTotal);
             }
             var json = JsonSerializer.Serialize(conversation, Json);
             if (row is null) db.Conversations.Add(new() { Scope = scope, Id = conversation.Id, Json = json });

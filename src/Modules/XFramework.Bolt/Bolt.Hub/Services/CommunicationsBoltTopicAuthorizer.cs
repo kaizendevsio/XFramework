@@ -69,9 +69,10 @@ public sealed class CommunicationsBoltTopicAuthorizer(
         {
             BoltTopicOperation.Subscribe or BoltTopicOperation.Unsubscribe => segments[3] switch
             {
-                "user" => context.Durable &&
-                    AuthorizeUserTopic(segments, credentialId) &&
-                    AuthorizeUserSubscriberId(context.SubscriberId, topicTenantId, credentialId),
+                "user" => AuthorizeUserTopic(segments, credentialId) &&
+                    (context.Durable
+                        ? AuthorizeUserSubscriberId(context.SubscriberId, topicTenantId, credentialId)
+                        : BoltTransientSubscriberId.IsScopedToClient(context.SubscriberId, context.ClientId)),
                 "presence" => !context.Durable,
                 "thread" => !context.Durable && await AuthorizeThreadTopicAsync(db, segments, topicTenantId, credentialId, ct),
                 _ => false
@@ -219,8 +220,10 @@ public sealed class CommunicationsBoltTopicAuthorizer(
         {
             BoltTopicOperation.Publish => context.SubscriberId is null,
             BoltTopicOperation.Subscribe or BoltTopicOperation.Unsubscribe =>
-                context.Durable == (segments[3] == "user") &&
-                (context.Durable ? HasValidSubscriberGrammar(context.SubscriberId) : HasValidTransientSubscriber(context)),
+                context.Durable
+                    ? segments[3] == "user" && HasValidSubscriberGrammar(context.SubscriberId)
+                    : HasValidTransientSubscriber(context) && (segments[3] != "user" ||
+                        BoltTransientSubscriberId.IsScopedToClient(context.SubscriberId, context.ClientId)),
             BoltTopicOperation.Ack =>
                 context.Durable && segments[3] == "user" && HasValidSubscriberGrammar(context.SubscriberId),
             _ => false

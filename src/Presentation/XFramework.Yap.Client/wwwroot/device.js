@@ -1,7 +1,7 @@
 // Files stay in OPFS. SQLite owns conversations, drafts and upload receipts.
 (() => {
-    let listener, events, account, activeThread, installPrompt, databaseLock;
-    let reconnectTimer, reconnectDelay = 1000;
+    let listener, installPrompt, databaseLock, chatTransport, chatLoading;
+    const chat = () => chatLoading ??= import('./chat-socket.mjs').then(module => chatTransport = module.createChatSocket(() => listener));
     const urls = new Set();
     // Attachments too large to copy into OPFS are held as live File handles instead.
     // They do not survive a reload, which is why they also require a connection.
@@ -122,40 +122,12 @@
             startupCleanup ??= cleanupUnverified().catch(error =>
                 window.yap.diagnostics?.record('storage.cleanup-failed', { name: error.name }));
         },
-        events(scope, thread) {
-            if (account === scope && activeThread === thread && events && events.readyState !== EventSource.CLOSED) return;
-            clearTimeout(reconnectTimer); reconnectTimer = null;
-            if (account !== scope || activeThread !== thread) reconnectDelay = 1000;
-            events?.close(); events = null; account = scope; activeThread = thread;
-            if (!scope) return;
-            const source = events = new EventSource(`/api/chat/events?account=${encodeURIComponent(scope)}${thread ? `&thread=${thread}` : ''}`);
-            events.onmessage = event => {
-                if (account !== scope || activeThread !== thread) return;
-                listener?.invokeMethodAsync('ChatEvent', scope, event.data).catch(() => {});
-            };
-            events.onopen = () => {
-                if (source !== events) return;
-                reconnectDelay = 1000;
-                if (account === scope && activeThread === thread) listener?.invokeMethodAsync('RefreshHint').catch(() => {});
-            };
-            // Browsers retry interrupted streams, but a failed HTTP reconnect can
-            // leave EventSource permanently CLOSED. Recover without a page reload.
-            events.onerror = () => {
-                if (source !== events || source.readyState !== EventSource.CLOSED || reconnectTimer) return;
-                reconnectTimer = setTimeout(() => {
-                    reconnectTimer = null;
-                    if (source !== events) return;
-                    if (!navigator.onLine || document.hidden) { source.onerror(); return; }
-                    window.yap.device.events(scope, thread);
-                }, reconnectDelay);
-                reconnectDelay = Math.min(30000, reconnectDelay * 2);
-            };
-            events.addEventListener('call', event => listener?.invokeMethodAsync('VoiceEvent', event.data).catch(() => {}));
-            events.addEventListener('typing', event => {
-                if (account !== scope || activeThread !== thread) return;
-                const state = JSON.parse(event.data);
-                listener?.invokeMethodAsync('TypingChanged', state.ThreadId, state.CredentialId, state.IsTyping).catch(() => {});
-            });
+        events(scope, thread, token) {
+            // Loading the transport module must not delay rendering or account restore.
+            void chat().then(transport => transport.watch(scope, thread, token)).catch(() => { chatLoading = undefined; });
+        },
+        chatRequest(scope, operation, body) {
+            return chatTransport?.request(scope, operation, body) ?? null;
         },
         async pickFile(input, key, stageLimit, maxBytes) {
             const file = input.files[0];
@@ -405,10 +377,7 @@
         checkUpdate() { window.yap.updates.notice(); }
     };
 
-    const resumeEvents = () => {
-        if (account && navigator.onLine && !document.hidden && events?.readyState === EventSource.CLOSED)
-            window.yap.device.events(account, activeThread);
-    };
+    const resumeEvents = () => chatTransport?.resume();
     addEventListener('online', resumeEvents);
     document.addEventListener('visibilitychange', resumeEvents);
 

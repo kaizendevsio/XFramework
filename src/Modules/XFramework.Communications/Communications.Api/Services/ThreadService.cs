@@ -1392,14 +1392,6 @@ public sealed partial class ThreadService(
 
             var caller = callerResult.Data!;
             await using var mutationLock = await ConversationMutationLock.AcquireAsync(db, caller.TenantId, request.ThreadId, ct);
-            var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
-            var rateLimit = rateLimiter.Check(
-                caller.TenantId,
-                caller.CredentialId,
-                CommunicationsRateLimitActions.MessageCreate,
-                policy.MessageCreatePerMinute);
-            if (!rateLimit.IsSuccess)
-                return RateLimitFailure<CreateThreadMessageResponse>(rateLimit);
 
             // Validate thread exists
             var thread = await dataContext.Query<MessageThread>()
@@ -1450,6 +1442,13 @@ public sealed partial class ThreadService(
                     return Result<CreateThreadMessageResponse>.Success(new CreateThreadMessageResponse { MessageId = clientMessageId });
                 }
             }
+
+            // A retry of an already accepted, identical message consumes no new-message permit.
+            // Membership and payload ownership above still apply before returning its receipt.
+            var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
+            var rateLimit = rateLimiter.Check(caller.TenantId, caller.CredentialId,
+                CommunicationsRateLimitActions.MessageCreate, policy.MessageCreatePerMinute);
+            if (!rateLimit.IsSuccess) return RateLimitFailure<CreateThreadMessageResponse>(rateLimit);
 
             var activeThreadMembers = await dataContext.Query<MessageThreadMember>()
                 .Where(m => m.MessageThreadId == request.ThreadId)
@@ -1720,42 +1719,46 @@ public sealed partial class ThreadService(
                 .Take(pageSize)
                 .ToListAsync(ct);
 
-            // Auto-create "Delivered" records for messages this member hasn't seen
-            var fetchedMessageIds = messages.Where(m => EncryptionReadyFor(m, requesterMember.Id)).Select(m => m.Id).ToList();
-            var existingDeliveries = await dataContext.Query<MessageDelivery>()
-                .Where(d => d.MessageThreadMemberId == requesterMember.Id)
-                .Where(d => d.TenantId == caller.TenantId)
-                .Where(d => fetchedMessageIds.Contains(d.MessageId))
-                .Where(d => !d.IsDeleted)
-                .ToListAsync(ct);
-            var existingDeliveryMessageIds = existingDeliveries.Select(d => d.MessageId).ToList();
-
-            var undeliveredIds = fetchedMessageIds.Except(existingDeliveryMessageIds).ToList();
-            if (undeliveredIds.Count > 0)
+            if (!request.SuppressDeliveryAcknowledgement)
             {
-                var deliveredTypeId = await ResolveDeliveryTypeIdAsync(caller.TenantId, MessageDeliveryTypes.Delivered, ct);
-                if (deliveredTypeId is null)
-                    return Result<GetThreadMessagesResponse>.NotFound("Initialize chat defaults before using chat");
-                foreach (var msgId in undeliveredIds)
+                await using var receiptLock = await ConversationMutationLock.AcquireReceiptsAsync(db, caller.TenantId, requesterMember.Id, ct);
+                // Auto-create "Delivered" records for messages this member hasn't seen
+                var fetchedMessageIds = messages.Where(m => EncryptionReadyFor(m, requesterMember.Id)).Select(m => m.Id).ToList();
+                var existingDeliveries = await dataContext.Query<MessageDelivery>()
+                    .Where(d => d.MessageThreadMemberId == requesterMember.Id)
+                    .Where(d => d.TenantId == caller.TenantId)
+                    .Where(d => fetchedMessageIds.Contains(d.MessageId))
+                    .Where(d => !d.IsDeleted)
+                    .ToListAsync(ct);
+                var existingDeliveryMessageIds = existingDeliveries.Select(d => d.MessageId).ToList();
+
+                var undeliveredIds = fetchedMessageIds.Except(existingDeliveryMessageIds).ToList();
+                if (undeliveredIds.Count > 0)
                 {
-                    dataContext.Add(new MessageDelivery
+                    var deliveredTypeId = await ResolveDeliveryTypeIdAsync(caller.TenantId, MessageDeliveryTypes.Delivered, ct);
+                    if (deliveredTypeId is null)
+                        return Result<GetThreadMessagesResponse>.NotFound("Initialize chat defaults before using chat");
+                    foreach (var msgId in undeliveredIds)
                     {
-                        Id = Guid.NewGuid(),
-                        TenantId = requesterMember.TenantId,
-                        MessageThreadMemberId = requesterMember.Id,
-                        MessageId = msgId,
-                        TypeId = deliveredTypeId.Value,
-                        IsEnabled = true,
-                        CreatedAt = DateTime.UtcNow,
-                        ConcurrencyStamp = Guid.NewGuid()
-                    });
+                        dataContext.Add(new MessageDelivery
+                        {
+                            Id = Guid.NewGuid(),
+                            TenantId = requesterMember.TenantId,
+                            MessageThreadMemberId = requesterMember.Id,
+                            MessageId = msgId,
+                            TypeId = deliveredTypeId.Value,
+                            IsEnabled = true,
+                            CreatedAt = DateTime.UtcNow,
+                            ConcurrencyStamp = Guid.NewGuid()
+                        });
+                    }
+                    var receivedIds = messages.Where(m => m.MessageThreadMemberId != requesterMember.Id && undeliveredIds.Contains(m.Id)).Select(m => m.Id).ToList();
+                    if (receivedIds.Count > 0)
+                        AddOutboxEvent(MessageRealtimeEvents.MessagesDelivered, caller.TenantId, request.ThreadId,
+                            requesterMember.Id, nameof(MessageDelivery), caller.CredentialId,
+                            new { request.ThreadId, MessageIds = receivedIds });
+                    await SaveAndSignalAsync(ct);
                 }
-                var receivedIds = messages.Where(m => m.MessageThreadMemberId != requesterMember.Id && undeliveredIds.Contains(m.Id)).Select(m => m.Id).ToList();
-                if (receivedIds.Count > 0)
-                    AddOutboxEvent(MessageRealtimeEvents.MessagesDelivered, caller.TenantId, request.ThreadId,
-                        requesterMember.Id, nameof(MessageDelivery), caller.CredentialId,
-                        new { request.ThreadId, MessageIds = receivedIds });
-                await SaveAndSignalAsync(ct);
             }
 
             // Get the member info for senders
@@ -3086,6 +3089,7 @@ public sealed partial class ThreadService(
             }
 
             requestedMessageIds = threadMessages.Where(m => EncryptionReadyFor(m, member.Id)).Select(m => m.Id).ToList();
+            await using var receiptLock = await ConversationMutationLock.AcquireReceiptsAsync(db, caller.TenantId, member.Id, ct);
 
             var existingDeliveries = await dataContext.Query<MessageDelivery>()
                 .Where(d => d.MessageThreadMemberId == member.Id)
