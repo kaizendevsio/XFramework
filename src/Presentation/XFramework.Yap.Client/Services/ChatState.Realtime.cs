@@ -8,8 +8,6 @@ public sealed partial class ChatState
 {
     private readonly Dictionary<Guid, (string Scope, HashSet<Guid> Ids, HashSet<Guid> Created)> messageUpdates = [];
     private static readonly JsonSerializerOptions SocketJson = new(JsonSerializerDefaults.Web);
-    private readonly Dictionary<Guid, HashSet<Guid>> deliveredPending = [];
-    private Task? delivering;
     private long reconciliationFailures;
 
     private async Task ReconcileSocketAsync(string scope)
@@ -67,7 +65,12 @@ public sealed partial class ChatState
             || messages.Count != ids.Distinct().Count() || messages.Any(m => m.ThreadId != thread || !ids.Contains(m.Id)))
             throw new InvalidOperationException("Invalid message update.");
         if (!Conversations.Any(c => c.Id == thread) || messages.Any(m => m.IsThreadReply))
-        { await ReconcileSocketAsync(scope); return; }
+        {
+            // This payload is not safe to apply here, but the messages did arrive. Owe
+            // the read so catch-up acknowledges them instead of dropping the receipt.
+            if (item.Kind == "MessageCreated") { DeferDelivered(thread, ids); await SaveDeliveredAsync(); }
+            await ReconcileSocketAsync(scope); return;
+        }
         var created = item.Kind == "MessageCreated" ? ids.ToHashSet() : [];
         await DecryptMessagesAsync(messages);
         await messageChanges.WaitAsync(lifetime.Token);
@@ -78,40 +81,6 @@ public sealed partial class ChatState
             await ApplyMessageUpdatesAsync(thread, ids, created, messages);
         }
         finally { messageChanges.Release(); }
-    }
-
-    private void QueueDelivered(Guid thread, IEnumerable<ChatMessage> messages)
-    {
-        var ids = messages.Where(m => !m.Mine && !m.EncryptionLocked && !m.EncryptionPending).Select(m => m.Id).ToList();
-        if (ids.Count == 0) return;
-        if (!deliveredPending.TryGetValue(thread, out var pending)) deliveredPending[thread] = pending = [];
-        pending.UnionWith(ids);
-        RetryDelivered();
-    }
-
-    private void RetryDelivered()
-    {
-        if (deliveredPending.Count > 0 && delivering is not { IsCompleted: false }) delivering = DeliverPendingAsync(Scope);
-    }
-
-    private async Task DeliverPendingAsync(string scope)
-    {
-        try
-        {
-            // Coalesce acknowledgments without delaying the next incoming message.
-            await Task.Delay(30, lifetime.Token);
-            while (scope == Scope && deliveredPending.Count > 0)
-            {
-                var entry = deliveredPending.First();
-                var ids = entry.Value.Take(50).ToList();
-                await api.PostAsync("api/chat/delivered", new ReadMessages(entry.Key, ids), lifetime.Token);
-                if (scope != Scope) return;
-                entry.Value.ExceptWith(ids);
-                if (entry.Value.Count == 0) deliveredPending.Remove(entry.Key);
-            }
-        }
-        catch (OperationCanceledException) { }
-        catch (Exception ex) { await RecordErrorAsync(ex); } // Reconnect/catch-up retries the watermark quietly.
     }
 
     [JSInvokable] public Task ChatEvent(string scope, string json)
@@ -127,13 +96,22 @@ public sealed partial class ChatState
         // action already updates local unread state; other participants still fetch.
         if (hint.ActorId == User.CredentialId && hint.Kind is "MessagesRead" or "MessagesDelivered")
             return hint.Kind == "MessagesRead" && Selected?.Id != hint.ThreadId ? RefreshHint() : Task.CompletedTask;
-        if (!Conversations.Any(c => c.Id == hint.ThreadId)) return RefreshHint();
+        // A hint we cannot project still means messages reached this device's socket.
+        if (!Conversations.Any(c => c.Id == hint.ThreadId))
+        {
+            if (hint.Kind == "MessageCreated") DeferDelivered(hint.ThreadId, hint.MessageIds);
+            return RefreshHint();
+        }
         if (!messageUpdates.TryGetValue(hint.ThreadId, out var pending))
             messageUpdates[hint.ThreadId] = pending = (scope, [], []);
         pending.Ids.UnionWith(hint.MessageIds);
         if (hint.Kind == "MessageCreated") pending.Created.UnionWith(hint.MessageIds);
         if (pending.Ids.Count > 50 || messageUpdates.Count > 20)
-        { messageUpdates.Clear(); return RefreshHint(); }
+        {
+            foreach (var (id, queued) in messageUpdates.Where(x => x.Value.Created.Count > 0))
+                DeferDelivered(id, queued.Created);
+            messageUpdates.Clear(); return RefreshHint();
+        }
         return refreshing is { IsCompleted: false } ? refreshing : refreshing = RefreshEventsAsync();
     }
 
