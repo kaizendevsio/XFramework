@@ -804,6 +804,32 @@ public sealed class ChatStateTests
         Assert.That(messages.Single(x => x.Id == root.Id).Replies, Is.Empty, "The timeline never carries a thread's replies.");
     }
 
+    // 15 = the tenant default, 0 = editing disabled, admin = the server-side window bypass.
+    [TestCase(15, false, 5, true)]
+    [TestCase(15, false, 40, false)]
+    [TestCase(0, false, 1, false)]
+    [TestCase(0, true, 4000, true)]
+    public async Task EditWindow_OffersEditOnlyWhileTheServerWouldAcceptIt(int window, bool admin, int ageMinutes, bool expected)
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Sender");
+        var js = new Mock<IJSRuntime>();
+        js.Setup(x => x.InvokeAsync<bool>("yap.device.online", It.IsAny<object?[]?>())).ReturnsAsync(true);
+        using var http = new HttpClient(new Handler(request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path == "/api/session") return Task.FromResult(Json(new SessionResponse(user, "token")));
+            if (path.EndsWith("initialize")) return Task.FromResult(Json(new ChatDefaults(Guid.NewGuid(), [], window, admin)));
+            return Task.FromResult(Json(new ChatPage<Conversation>([], 0)));
+        })) { BaseAddress = new("https://yap.test/") };
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), js.Object);
+        var message = new ChatMessage { Id = Guid.NewGuid(), Mine = true, CreatedAt = DateTime.UtcNow.AddMinutes(-ageMinutes) };
+        Assert.That(state.CanEditMessage(message), Is.True, "Unknown rules must leave the server to decide.");
+        await state.InitializeAsync();
+        Assert.That(state.CanEditMessage(message), Is.EqualTo(expected));
+        Assert.That(state.EditExpiry(message).HasValue, Is.EqualTo(window > 0 && !admin));
+    }
+
     private static HttpResponseMessage Json<T>(T value) => new(HttpStatusCode.OK) { Content = JsonContent.Create(value) };
     private sealed class Handler(Func<HttpRequestMessage, Task<HttpResponseMessage>> handle, List<Guid>? deleted = null) : HttpMessageHandler
     {

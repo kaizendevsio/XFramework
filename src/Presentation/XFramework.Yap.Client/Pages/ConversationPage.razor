@@ -60,7 +60,7 @@ else
     <button class="sheetitem" @onclick="FilesAsync"><Icon Name="file" Size="20" />Attachments</button>
     <button class="sheetitem" @onclick='() => ActionAsync(selected.Pinned ? "unpin" : "pin")'><Icon Name="plus" Size="20" />@(selected.Pinned ? "Unpin message" : "Pin message")</button>
     <button class="sheetitem" @onclick='() => ActionAsync(selected.Saved ? "unsave" : "save")'><Icon Name="file" Size="20" />@(selected.Saved ? "Unsave message" : "Save message")</button>
-    @if (selected.Mine && !selected.HasAttachments) { <button class="sheetitem" @onclick='() => { edit = selected.Text; mode = "edit"; }'><Icon Name="edit" Size="20" />Edit message</button> }
+    @if (selected.Mine && !selected.HasAttachments && State.CanEditMessage(selected)) { <button class="sheetitem" @onclick='() => { edit = selected.Text; mode = "edit"; }'><Icon Name="edit" Size="20" />Edit message</button> }
     }
     </div>
 </MessageMenu>
@@ -123,7 +123,18 @@ else if (mode == "search")
         await JS.InvokeVoidAsync("yap.motion.complete");
         if (focus.HasValue) { var id = focus; focus = null; await JS.InvokeVoidAsync("yap.showMessage", id); }
     }
-    private void Select(ChatMessage message) { selected = message; moreActions = false; mode = "message"; }
+    private void Select(ChatMessage message) { selected = message; moreActions = false; mode = "message"; _ = ExpireEditAsync(message); }
+    // A borderline message must lose Edit while the menu is still open. One timer per
+    // selection is enough: the deadline never moves once the message exists.
+    private async Task ExpireEditAsync(ChatMessage message)
+    {
+        editExpiry?.Cancel(); editExpiry?.Dispose(); editExpiry = null;
+        if (State.EditExpiry(message) - DateTime.UtcNow is not { } left || left <= TimeSpan.Zero || left > TimeSpan.FromHours(1)) return;
+        var source = editExpiry = new CancellationTokenSource();
+        try { await Task.Delay(left + TimeSpan.FromSeconds(1), source.Token); if (selected == message) await InvokeAsync(StateHasChanged); }
+        catch (OperationCanceledException) { }
+    }
+    private CancellationTokenSource? editExpiry;
     private void ReplyTo(ChatMessage message) { if (State.Selected?.Allows(ChatFeature.Replies) == false) return; reply = message; mode = null; }
     private Task OpenThreadAsync(ChatMessage message) { if (State.Selected?.Allows(ChatFeature.Threads) != false) { mode = null; Nav.NavigateTo($"/thread/{Id}/{message.Id}"); } return Task.CompletedTask; }
     private async Task CopyAsync() { mode = null; try { await JS.InvokeVoidAsync("yap.copy", selected!.Text); } catch (Exception ex) { State.Report(ex); } }
@@ -139,5 +150,5 @@ else if (mode == "search")
         mode = null;
         await Voice.StartGroupAsync(Id, conversation.Name, conversation.People);
     }
-    public void Dispose() { Nav.LocationChanged -= LocationChanged; State.Changed -= Changed; State.ConversationRemoved -= Removed; Voice.Changed -= Changed; State.LeaveConversation(loaded); }
+    public void Dispose() { editExpiry?.Cancel(); editExpiry?.Dispose(); Nav.LocationChanged -= LocationChanged; State.Changed -= Changed; State.ConversationRemoved -= Removed; Voice.Changed -= Changed; State.LeaveConversation(loaded); }
 }

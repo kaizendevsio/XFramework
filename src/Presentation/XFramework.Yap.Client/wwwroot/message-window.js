@@ -2,6 +2,7 @@
 // never a position saved by an earlier scroll event or asynchronous render.
 (() => {
     const states = new WeakMap();
+    const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
     const prefix = state => {
         state.offsets = [0];
         for (const id of state.ids) state.offsets.push(state.offsets.at(-1) + (state.heights.get(id) || 100));
@@ -68,9 +69,50 @@
             }, 250);
         });
     };
+    // A recycled row carries an id the previous list already held, so only ids appended
+    // past the old tail were just sent or received. Prepended history and window moves
+    // never replay entry, which is the regression #496 removed the CSS animation for.
+    const entering = (state, previous) => {
+        if (!previous.length || reduced()) return;
+        const from = state.ids.indexOf(previous.at(-1));
+        if (from < 0) return;
+        const known = new Set(previous), fresh = new Set(state.ids.slice(from + 1).filter(id => !known.has(id)));
+        if (!fresh.size || fresh.size > 3) return; // a page of newer history is not an arrival
+        for (const row of state.element.querySelectorAll('[data-window-row]')) {
+            const bubble = fresh.has(row.dataset.windowRow) ? row.querySelector?.('.msg') : null;
+            if (!bubble) continue;
+            // Transform and opacity only: heights are already measured and the pinned
+            // scroll anchor above would shift if entry touched layout. Outgoing springs
+            // up out of the composer corner; incoming settles in from the sender side.
+            const out = bubble.classList.contains('out'), origin = out ? '100% 100%' : '0 100%';
+            bubble.animate([
+                { opacity: 0, transform: out ? 'translateY(18px) scale(.82)' : 'translateY(10px) scale(.94)', transformOrigin: origin },
+                { opacity: 1, transform: 'none', transformOrigin: origin }],
+                { duration: out ? 300 : 240, easing: out ? 'cubic-bezier(.2,.9,.3,1.18)' : 'cubic-bezier(.22,1,.36,1)' });
+        }
+    };
+    // Overscroll band. Translating the two in-flow children never re-measures a height,
+    // so neither the ResizeObserver nor the anchor correction sees the gesture.
+    const edge = (state, dy) => dy > 0 && state.element.scrollTop <= 0 ? 1
+        : dy < 0 && state.element.scrollHeight - state.element.scrollTop - state.element.clientHeight <= 1 ? -1 : 0;
+    const pull = (state, raw) => {
+        const offset = Math.sign(raw) * Math.min(92, Math.abs(raw) ** .82 * .9);
+        if (offset === state.band) return;
+        state.band = offset;
+        state.element.setAttribute('data-banding', '');
+        state.element.style.setProperty('--band', `${offset}px`);
+    };
+    const release = state => {
+        state.bandFrom = state.bandEdge = state.bandRaw = 0;
+        if (!state.band) return;
+        state.band = 0;
+        state.element.removeAttribute('data-banding'); // the spring back is the CSS transition
+        state.element.style.setProperty('--band', '0px');
+    };
     const layout = (state, next) => {
         if (!state.element.getClientRects().length) return;
         sample(state); // Native scrolling may already have moved before its event arrives.
+        const previous = state.ids;
         const position = state.element.scrollTop;
         const index = rowAt(state, Math.max(0, position - state.origin));
         const anchor = state.ids[index], oldOffset = state.offsets[index] || 0, oldOrigin = state.origin;
@@ -94,6 +136,7 @@
             // renders, images below them and footer resizing must not reset scrollTop.
             if (current >= 0) move(state, position + state.offsets[current] - oldOffset + state.origin - oldOrigin);
         }
+        if (next) entering(state, previous);
         schedule(state);
     };
     const receipts = state => {
@@ -124,17 +167,40 @@
                 state = { element, ref, ids: [], heights: new Map(), offsets: [0], origin: origin({ element }), lastTop: element.scrollTop, pinned: true, observed: new Set() };
                 state.scroll = () => { sample(state); schedule(state); };
                 const releaseBottom = () => { state.pinned = false; };
-                state.wheel = event => { if (event.deltaY < 0) releaseBottom(); };
-                state.touchStart = event => { state.touchY = event.touches[0]?.clientY; };
-                state.touchMove = event => { const y = event.touches[0]?.clientY; if (y > state.touchY + 1) releaseBottom(); state.touchY = y; };
+                state.wheel = event => {
+                    if (event.deltaY < 0) releaseBottom();
+                    if (reduced() || !edge(state, -event.deltaY)) { release(state); return; }
+                    event.preventDefault(); // only past an end, so ordinary wheeling stays native
+                    pull(state, state.bandRaw = Math.max(-260, Math.min(260, (state.bandRaw || 0) - event.deltaY)));
+                    clearTimeout(state.bandTimer);
+                    state.bandTimer = setTimeout(() => release(state), 140);
+                };
+                state.touchStart = event => { state.touchY = state.startY = event.touches[0]?.clientY; state.startX = event.touches[0]?.clientX; release(state); };
+                state.touchMove = event => {
+                    const y = event.touches[0]?.clientY, dy = y - state.touchY;
+                    if (y > state.touchY + 1) releaseBottom();
+                    state.touchY = y;
+                    if (reduced() || event.touches.length > 1) return;
+                    // A horizontal drag belongs to the swipe-to-reply gesture in motion.js.
+                    if (Math.abs(event.touches[0].clientX - state.startX) > Math.abs(y - state.startY)) { release(state); return; }
+                    if (!state.bandEdge) { state.bandEdge = edge(state, dy); state.bandFrom = y - dy; }
+                    if (!state.bandEdge) return;
+                    const raw = y - state.bandFrom;
+                    if (raw * state.bandEdge <= 0) { release(state); return; } // dragged back into the content
+                    event.preventDefault();
+                    pull(state, raw);
+                };
+                state.touchEnd = () => release(state);
                 state.key = event => { if (['ArrowUp', 'PageUp', 'Home'].includes(event.key)) releaseBottom(); };
                 state.pointer = event => { if (event.pointerType === 'mouse' && event.target === element) releaseBottom(); };
                 state.visibility = () => schedule(state);
                 state.resize = new ResizeObserver(() => layout(state));
                 element.addEventListener('scroll', state.scroll, { passive: true });
-                element.addEventListener('wheel', state.wheel, { passive: true });
+                element.addEventListener('wheel', state.wheel, { passive: false });
                 element.addEventListener('touchstart', state.touchStart, { passive: true });
-                element.addEventListener('touchmove', state.touchMove, { passive: true });
+                element.addEventListener('touchmove', state.touchMove, { passive: false });
+                element.addEventListener('touchend', state.touchEnd, { passive: true });
+                element.addEventListener('touchcancel', state.touchEnd, { passive: true });
                 element.addEventListener('keydown', state.key);
                 element.addEventListener('pointerdown', state.pointer);
                 document.addEventListener('visibilitychange', state.visibility);
@@ -154,9 +220,10 @@
         resize(element) { const state = states.get(element); if (state) layout(state); },
         dispose(element) {
             const state = states.get(element); if (!state) return;
-            state.resize.disconnect(); cancelAnimationFrame(state.frame); clearTimeout(state.readTimer); states.delete(element);
+            state.resize.disconnect(); cancelAnimationFrame(state.frame); clearTimeout(state.readTimer); clearTimeout(state.bandTimer); states.delete(element);
             element.removeEventListener('scroll', state.scroll); element.removeEventListener('wheel', state.wheel);
             element.removeEventListener('touchstart', state.touchStart); element.removeEventListener('touchmove', state.touchMove);
+            element.removeEventListener('touchend', state.touchEnd); element.removeEventListener('touchcancel', state.touchEnd);
             element.removeEventListener('keydown', state.key); document.removeEventListener('visibilitychange', state.visibility);
             element.removeEventListener('pointerdown', state.pointer);
         }

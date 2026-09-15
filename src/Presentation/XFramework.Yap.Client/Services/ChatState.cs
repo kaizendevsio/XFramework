@@ -67,6 +67,17 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     public List<Conversation> Conversations { get; private set; } = [];
     public Conversation? Selected { get; private set; }
     public ChatDefaults? Defaults { get; private set; }
+    // The server refuses an edit past the tenant window rather than hiding anything, so the
+    // client offers the action only while it can succeed. Unknown rules keep the button.
+    public bool CanEditMessage(ChatMessage message) => Defaults switch
+    {
+        null => true,
+        { EditAnyMessage: true } => true,
+        { EditWindowMinutes: <= 0 } => false,
+        var defaults => DateTime.UtcNow < message.CreatedAt.ToUniversalTime().AddMinutes(defaults.EditWindowMinutes)
+    };
+    public DateTime? EditExpiry(ChatMessage message) => Defaults is { EditAnyMessage: false, EditWindowMinutes: > 0 } defaults
+        ? message.CreatedAt.ToUniversalTime().AddMinutes(defaults.EditWindowMinutes) : null;
     public string Scope => User is null ? "" : OfflineStore.Scope(User);
     public event Action? Changed;
     public event Func<YapCallEvent, Task>? CallReceived;

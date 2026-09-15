@@ -1,7 +1,10 @@
 .message-menu-dialog{position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:16px;border:0;background:transparent;color:var(--text);overflow:auto}
 .message-menu-dialog:not([open]){display:none}
 .message-menu-dialog::backdrop{background:#0005;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
-.message-menu-stack{position:absolute;left:16px;right:16px;top:var(--menu-top,20%);max-width:420px;margin-right:auto;display:flex;flex-direction:column;gap:12px;animation:message-menu-in .18s ease-out;transform-origin:center}
+/* The stack is a full-width transparent column: only the visible cards may swallow a
+   tap, or the empty space beside a narrower card silently eats the dismiss. */
+.message-menu-stack{position:absolute;left:16px;right:16px;top:var(--menu-top,20%);max-width:420px;margin-right:auto;display:flex;flex-direction:column;gap:12px;animation:message-menu-in .18s ease-out;transform-origin:center;pointer-events:none}
+.message-menu-stack ::deep .menu-reactions,.message-menu-stack ::deep .menu-message-preview,.message-menu-stack ::deep .menu-actions{pointer-events:auto}
 .message-menu-stack.mine{margin-left:auto;margin-right:0}
 .message-menu-stack ::deep .menu-reactions{display:flex;justify-content:space-evenly;gap:4px;border-radius:32px;padding:8px;background:var(--surface2)}
 .message-menu-stack ::deep .menu-reactions button{font-size:28px;min-width:40px;min-height:44px}

@@ -3,14 +3,18 @@ using System.Text;
 using Communications.Domain.Shared;
 using Communications.Domain.Shared.Contracts.Requests.ReferenceData;
 using Communications.Domain.Shared.Contracts.Responses;
+using IdentityServer.Domain.Shared;
 using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.DataContext;
 
 namespace Communications.Api.Services;
 
 public sealed class ChatReferenceDataService(
     DbContext db,
     ICommunicationsRequestContextResolver contextResolver,
-    ILogger<ChatReferenceDataService> logger)
+    ILogger<ChatReferenceDataService> logger,
+    ICommunicationsPolicyService? policyService = null,
+    IDataContext? dataContext = null)
 {
     private static readonly (string Name, string Emoji)[] Reactions =
         [("Like", "👍"), ("Love", "❤️"), ("Laugh", "😂"), ("Celebrate", "🎉"), ("Surprised", "😮"), ("Sad", "😢")];
@@ -87,7 +91,7 @@ public sealed class ChatReferenceDataService(
 
                 await db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
-                return await ReadAsync(tenantId, ct);
+                return await ReadAsync(caller.Data!, ct);
             });
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
@@ -103,12 +107,13 @@ public sealed class ChatReferenceDataService(
     {
         var caller = await contextResolver.ResolveAsync(request.Metadata, ct);
         return caller.IsSuccess
-            ? await ReadAsync(caller.Data!.TenantId, ct)
+            ? await ReadAsync(caller.Data!, ct)
             : Result<ChatReferenceDataResponse>.Failure(caller.Message!, caller.StatusCode);
     }
 
-    private async Task<Result<ChatReferenceDataResponse>> ReadAsync(Guid tenantId, CancellationToken ct)
+    private async Task<Result<ChatReferenceDataResponse>> ReadAsync(CommunicationsRequestContext caller, CancellationToken ct)
     {
+        var tenantId = caller.TenantId;
         var threadType = await db.Set<MessageThreadType>().AsNoTracking()
             .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.IsEnabled)
             .Where(x => x.MessageType.TenantId == tenantId && !x.MessageType.IsDeleted && x.MessageType.IsEnabled)
@@ -123,6 +128,8 @@ public sealed class ChatReferenceDataService(
         {
             MessageTypeId = threadType.MessageTypeId,
             ThreadTypeId = threadType.Id,
+            MessageEditWindowMinutes = policyService is null ? 15 : (await policyService.GetPolicyAsync(tenantId, ct)).MessageEditWindowMinutes,
+            CanEditAnyMessage = await HasTenantAdminRoleAsync(caller, ct),
             ReactionTypes = await db.Set<MessageReactionType>().AsNoTracking()
                 .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.IsEnabled)
                 .OrderBy(x => x.Name).ThenBy(x => x.Id).Take(100)
@@ -130,4 +137,13 @@ public sealed class ChatReferenceDataService(
                 .ToListAsync(ct)
         });
     }
+
+    // ThreadService lets a member with an Admin role edit past the window, and those member
+    // roles are bound from the caller's tenant Admin roles. The client only needs that fact.
+    private async Task<bool> HasTenantAdminRoleAsync(CommunicationsRequestContext caller, CancellationToken ct) =>
+        dataContext is not null && await dataContext.Query<IdentityRole>()
+            .Where(x => x.CredentialId == caller.CredentialId && x.TenantId == caller.TenantId)
+            .Where(x => x.TypeId == IdentityConstants.RoleType.Admin)
+            .Where(x => !x.IsDeleted && x.IsEnabled)
+            .AnyAsync(ct);
 }
