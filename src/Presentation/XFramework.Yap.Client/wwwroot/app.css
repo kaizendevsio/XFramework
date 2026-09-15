@@ -253,7 +253,7 @@ input,textarea{font:inherit;color:inherit}
 .cbtn .k{width:62px;height:62px;border-radius:50%;background:rgba(255,255,255,.16);backdrop-filter:blur(8px);display:grid;place-items:center;border:1px solid rgba(255,255,255,.14)}
 .cbtn.on .k{background:#fff;color:#171a27;border-color:#fff}
 .cbtn.end .k{background:var(--danger);border-color:transparent}
-.cbtn.accept .k{background:var(--ok);border-color:transparent}
+.cbtn.accept .k{background:var(--ok);color:var(--on-accent);border-color:transparent}
 .callrow2{display:flex;gap:56px;justify-content:center;width:100%}
 
 /* video */
