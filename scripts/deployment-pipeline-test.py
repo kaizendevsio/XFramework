@@ -110,6 +110,12 @@ class BaselineTests(unittest.TestCase):
 
 
 class ContextTests(unittest.TestCase):
+    def test_restore_preserves_razor_discovery_and_publish_checks_portal_runtime(self):
+        dockerfile = (ROOT / "Dockerfile").read_text()
+        restore_inputs = dockerfile.split("AS restore-inputs", 1)[1].split("AS build", 1)[0]
+        self.assertIn("! -name '*.razor'", restore_inputs)
+        self.assertIn("test -s /app/publish/wwwroot/_framework/blazor.web.js", dockerfile)
+
     def test_cli_stages_all_compose_builds(self):
         compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
         services = [name for name, service in compose["services"].items() if "build" in service]
@@ -173,6 +179,15 @@ class WorkflowTests(unittest.TestCase):
                      "Configure and verify Tailscale Serve boundary", "Deploy IdentityServer",
                      "Deploy Bolt Hub", "Deploy Communications", "Configure and verify Yap HTTPS ingress"]:
             self.assertEqual("env.DEPLOY_SCOPE != 'yap'", self.steps[name]["if"])
+
+    def test_portal_browser_runtime_is_checked_before_release_activation(self):
+        step = self.steps["Verify Portal browser runtime"]
+        self.assertEqual("env.DEPLOY_SCOPE != 'yap'", step["if"])
+        self.assertIn("curl -fsS", step["run"])
+        self.assertIn("http://127.0.0.1:5000/_framework/blazor.web.js", step["run"])
+        names = list(self.steps)
+        self.assertLess(names.index("Deploy remaining clients"), names.index("Verify Portal browser runtime"))
+        self.assertLess(names.index("Verify Portal browser runtime"), names.index("Activate complete release"))
 
     def test_build_push_pull_are_scoped(self):
         self.assertIn('docker compose --profile phase0-verification -f "$COMPOSE_FILE_PATH" config --format json',

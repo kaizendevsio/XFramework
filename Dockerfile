@@ -3,10 +3,10 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:493fca072aac81307027cbb7b7c9a82b6e87d222af315504d05dc6530e69b519 AS restore-inputs
 WORKDIR /inputs
 COPY src/ src/
-# Preserve paths for every project/import, without making restore depend on C#/UI edits.
-# COPY --from hashes the retained files, so source-only changes reuse the restore layer.
+# Razor file discovery enables the ASP.NET browser asset pack during restore.
+# Keep those inputs alongside project/import files; C# edits still reuse restore.
 RUN find src -type f ! -name '*.csproj' ! -name '*.props' ! -name '*.targets' \
-    ! -name '*.config' ! -name 'packages.lock.json' ! -name 'global.json' -delete
+    ! -name '*.config' ! -name 'packages.lock.json' ! -name 'global.json' ! -name '*.razor' -delete
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:493fca072aac81307027cbb7b7c9a82b6e87d222af315504d05dc6530e69b519 AS build
 ARG PROJECT_PATH
@@ -34,6 +34,10 @@ RUN dotnet publish "${PROJECT_PATH}" \
     -c Release \
     -o /app/publish \
     --no-restore
+
+# A server-only health check cannot detect a missing Blazor browser runtime.
+RUN case "${PROJECT_PATH}" in *XFramework.Portal.csproj) \
+    test -s /app/publish/wwwroot/_framework/blazor.web.js ;; esac
 
 # Write the entry-point DLL name so the runtime stage can use it
 RUN basename "${PROJECT_PATH}" .csproj > /app/publish/.entrypoint
