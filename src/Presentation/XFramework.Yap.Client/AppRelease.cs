@@ -2,10 +2,14 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.26";
+    public const string Version = "1.3.27";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "15 September 2026", [
+            "Settings uses one consistent edge spacing on every page instead of drifting per section.",
+            "Your chosen accent colour now applies across the app, and the chrome no longer carries a green tint.",
+            "The sign-in status line under your photo is gone; connection notices appear as a toast."]),
+        ("1.3.26", "15 September 2026", [
             "Messages sent inside a thread stay in that thread instead of also appearing in the conversation.",
             "The replies badge, conversation preview and unread count no longer count thread messages."]),
         ("1.3.25", "15 September 2026", [
