@@ -19,7 +19,8 @@ public sealed partial class ChatState
             return RefreshHint();
         // Our own reads/deliveries do not change our outbound receipts. The read
         // action already updates local unread state; other participants still fetch.
-        if (hint.ActorId == User.CredentialId && hint.Kind is "MessagesRead" or "MessagesDelivered") return Task.CompletedTask;
+        if (hint.ActorId == User.CredentialId && hint.Kind is "MessagesRead" or "MessagesDelivered")
+            return hint.Kind == "MessagesRead" && Selected?.Id != hint.ThreadId ? RefreshHint() : Task.CompletedTask;
         if (!Conversations.Any(c => c.Id == hint.ThreadId)) return RefreshHint();
         if (!messageUpdates.TryGetValue(hint.ThreadId, out var pending))
             messageUpdates[hint.ThreadId] = pending = (scope, [], []);
