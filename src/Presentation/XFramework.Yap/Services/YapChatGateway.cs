@@ -105,8 +105,10 @@ public sealed class YapChatGateway : IDisposable
             try { await Task.WhenAll(receive, pump, validation); }
             catch (OperationCanceledException) when (connection.Token.IsCancellationRequested) { }
         }
-        catch (Exception error) when (error is not YapApiException && context.Response.HasStarted)
+        catch (Exception error) when (context.Response.HasStarted)
         {
+            // An upgraded response can only end its socket; admission errors before the
+            // upgrade still reach the API filter and retain their HTTP status.
             // No request URL, cookie, session identity, payload or ticket is logged.
             logger.LogInformation("Chat connection closed. FailureType={FailureType}", error.GetType().Name);
         }

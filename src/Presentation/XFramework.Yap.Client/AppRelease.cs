@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.21";
+    public const string Version = "1.3.22";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "15 September 2026", [
+            "Verified recipient keys are prepared when opening a conversation so rapid sends avoid repeated setup requests.",
+            "Live updates can finish reconnecting while a large send queue is still draining."]),
+        ("1.3.21", "15 September 2026", [
             "Encrypted messages arrive directly over a persistent connection, with sending independent of background refreshes.",
             "Delivery receipts confirm that the receiving device has decrypted and saved the message.",
             "Reconnecting quietly restores missed updates while keeping queued messages safe."]),

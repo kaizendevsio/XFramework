@@ -86,6 +86,28 @@ public sealed class YapChatGatewayTests
     }
 
     [Test]
+    public async Task RevokedSessionDuringPush_EndsSocketWithoutEscapingIntoHttpErrorHandling()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var cookies = await fixture.LoginAsync(fixture.Alice);
+        var ticket = await fixture.Gateway.CreateTicketAsync(fixture.Alice, default);
+        using var socket = fixture.Socket(cookies);
+        await socket.ConnectAsync(fixture.Url(ticket), default);
+        await RegisterAsync(socket, ticket.ClientId);
+        var publish = await fixture.Subscriptions.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3));
+
+        fixture.Revoke(fixture.Alice);
+        await publish(new CommunicationsRealtimeEvent
+        {
+            EventId = Guid.NewGuid(), TenantId = Guid.Parse(fixture.Alice.FindFirstValue(YapAuth.TenantClaim)!),
+            EventType = "ThreadChanged"
+        });
+
+        var escaped = await fixture.CompletedUpgrades.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.That(escaped, Is.False, "Post-upgrade failures must not reach an HTTP problem response writer.");
+    }
+
+    [Test]
     public async Task SlowConsumer_BacklogClosesConnectionAndReconnectStartsWithExplicitReconciliation()
     {
         await using var fixture = await Fixture.CreateAsync();
@@ -166,6 +188,7 @@ public sealed class YapChatGatewayTests
         public ClaimsPrincipal Bob { get; private set; } = null!;
         public YapChatGateway Gateway => app.Services.GetRequiredService<YapChatGateway>();
         public Channel<Func<CommunicationsRealtimeEvent, Task>> Subscriptions { get; } = Channel.CreateUnbounded<Func<CommunicationsRealtimeEvent, Task>>();
+        public Channel<bool> CompletedUpgrades { get; } = Channel.CreateUnbounded<bool>();
         private Uri origin = null!;
         public static async Task<Fixture> CreateAsync()
         {
@@ -201,8 +224,14 @@ public sealed class YapChatGatewayTests
                 await context.SignInAsync(YapAuth.Scheme, name == "alice" ? fixture.Alice : fixture.Bob));
             app.MapGet("/api/chat/socket", async (HttpContext context, YapChatGateway gateway) =>
             {
+                var escaped = false;
                 try { await gateway.AcceptSocketAsync(context); }
                 catch (YapApiException error) when (!context.Response.HasStarted) { context.Response.StatusCode = error.Status; }
+                catch (Exception) when (context.Response.HasStarted) { escaped = true; throw; }
+                finally
+                {
+                    if (context.Response.HasStarted) fixture.CompletedUpgrades.Writer.TryWrite(escaped);
+                }
             }).RequireAuthorization();
             await app.StartAsync();
             fixture.origin = new Uri(app.Urls.Single());

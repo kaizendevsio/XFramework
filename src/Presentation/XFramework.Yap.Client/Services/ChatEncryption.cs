@@ -7,9 +7,23 @@ using Yap.Contracts;
 namespace Yap.Client.Services;
 
 /// <summary>Moves public directories and ciphertext only. Private keys stay in the browser crypto module.</summary>
-public sealed class ChatEncryption(ChatApi api, IJSRuntime js)
+public sealed class ChatEncryption(ChatApi api, IJSRuntime js, TimeProvider? timeProvider = null)
 {
     private readonly SemaphoreSlim gate = new(1, 1);
+    private readonly object recipientsGate = new();
+    // Public, signature-verified sending rosters only. Account changes clear this instance's cache.
+    private readonly Dictionary<(Guid Thread, bool AllowPending), RecipientRoster> recipients = [];
+    private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
+    private static readonly TimeSpan RecipientRosterLifetime = TimeSpan.FromSeconds(15);
+    private long recipientVersion;
+    private sealed class RecipientRoster
+    {
+        public Task<JsonElement[]> Loading { get; set; } = null!;
+        public DateTimeOffset ExpiresAt { get; set; }
+        public bool Invalidated { get; set; }
+        public long Version { get; set; }
+    }
+    private sealed class RecipientRosterChangedException : Exception;
     private string? activeScope;
     private long generation;
     private long revealGeneration;
@@ -18,7 +32,18 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js)
     public EncryptionStatus Status { get; private set; } = new();
     public string? RecoveryKey { get; private set; }
     public Guid? LocalDeviceId => Status.DeviceId;
-    public void Reset() { generation++; activeScope = null; HideRecovery(); Status = new(); backedUpRevision = -1; BackupPending = false; }
+    public void Reset() { generation++; activeScope = null; InvalidateRecipients(); HideRecovery(); Status = new(); backedUpRevision = -1; BackupPending = false; }
+    public void InvalidateRecipients(Guid? thread = null)
+    {
+        lock (recipientsGate)
+        {
+            recipientVersion++;
+            foreach (var key in recipients.Keys.Where(x => thread is null || x.Thread == thread).ToArray())
+            { recipients[key].Invalidated = true; recipients.Remove(key); }
+            // Preserve unrelated completed entries, while fencing any evicted in-flight load.
+            foreach (var roster in recipients.Values.Where(x => x.Loading.IsCompletedSuccessfully)) roster.Version = recipientVersion;
+        }
+    }
     public void HideRecovery() { revealGeneration++; RecoveryKey = null; }
     private sealed record Operation(string Scope, long Generation);
     private Operation Begin(UserSession user)
@@ -42,7 +67,11 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js)
     private async Task JsVoidAsync(Operation operation, string method, params object?[] arguments)
     { Check(operation); await js.InvokeVoidAsync($"yap.encryption.{method}", [operation.Scope, .. arguments]); Check(operation); }
     private async Task<T> ChangeAsync<T>(UserSession user, Func<Operation, Task<T>> action)
-    { await gate.WaitAsync(); try { return await action(Begin(user)); } finally { gate.Release(); } }
+    {
+        await gate.WaitAsync();
+        try { InvalidateRecipients(); return await action(Begin(user)); }
+        finally { InvalidateRecipients(); gate.Release(); }
+    }
 
     public static string CallRosterBinding(YapGroupCall call)
     {
@@ -125,11 +154,60 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js)
     public async Task<JsonElement[]> RecipientsAsync(UserSession user, Guid thread, bool allowPending = false, List<Guid>? audience = null)
     {
         var operation = Begin(user);
+        // Call-control and edits retain their fresh-directory checks. Only message sends
+        // have the server's current-roster precondition and safe 412 retry path.
+        if (!allowPending || audience is not null)
+        {
+            return await LoadRecipientsAsync(operation, thread, allowPending, null, audience);
+        }
+        var key = (thread, allowPending);
+        while (true)
+        {
+            Check(operation);
+            RecipientRoster roster;
+            lock (recipientsGate)
+            {
+                if (!recipients.TryGetValue(key, out roster!) ||
+                    roster.Loading.IsCompleted && roster.ExpiresAt <= clock.GetUtcNow())
+                {
+                    if (recipients.Count >= 8 && !recipients.ContainsKey(key)) recipients.Remove(recipients.Keys.First());
+                    roster = new RecipientRoster { Version = recipientVersion };
+                    recipients[key] = roster;
+                    roster.Loading = LoadRecipientsAsync(operation, thread, allowPending, roster);
+                }
+            }
+            JsonElement[] directories;
+            try { directories = await roster.Loading; }
+            catch (RecipientRosterChangedException) { continue; }
+            catch
+            {
+                lock (recipientsGate)
+                    if (recipients.TryGetValue(key, out var current) && ReferenceEquals(current, roster)) recipients.Remove(key);
+                throw;
+            }
+            Check(operation);
+            lock (recipientsGate) { if (roster.Invalidated || roster.Version != recipientVersion) continue; }
+            // Never expose the cached array itself or cache a caller's restricted audience.
+            return directories.Where(x => audience is not { Count: > 0 } || audience.Contains(x.GetProperty("credentialId").GetGuid())).ToArray();
+        }
+    }
+
+    private async Task<JsonElement[]> LoadRecipientsAsync(Operation operation, Guid thread, bool allowPending, RecipientRoster? roster, List<Guid>? audience = null)
+    {
         var directories = await GetAsync<JsonElement[]>(operation, $"api/chat/conversations/{thread}/encryption?allowPending={allowPending.ToString().ToLowerInvariant()}");
         if (audience is { Count: > 0 }) directories = directories.Where(x => audience.Contains(x.GetProperty("credentialId").GetGuid())).ToArray();
         foreach (var directory in directories)
+        {
+            lock (recipientsGate) { if (roster is not null && (roster.Invalidated || roster.Version != recipientVersion)) throw new RecipientRosterChangedException(); }
             await JsVoidAsync(operation, "acceptDirectory", directory);
-        Status = await JsAsync<EncryptionStatus>(operation, "status");
+        }
+        var status = await JsAsync<EncryptionStatus>(operation, "status");
+        lock (recipientsGate)
+        {
+            if (roster is not null && (roster.Invalidated || roster.Version != recipientVersion)) throw new RecipientRosterChangedException();
+            Status = status;
+            if (roster is not null) roster.ExpiresAt = clock.GetUtcNow().Add(RecipientRosterLifetime);
+        }
         return directories;
     }
 
