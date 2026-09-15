@@ -205,6 +205,19 @@ public static class SearchMessagesEndpoint
         threadService.SearchMessagesAsync(request, ct);
 }
 
+public static class GetSavedMessagesEndpoint
+{
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
+    [MapGet("/api/communications/messages/saved", Tags = ["Messages"],
+        Summary = "List saved messages",
+        Description = "Returns the messages the requester saved across the conversations they belong to.")]
+    public static Task<Result<GetSavedMessagesResponse>> Handle(
+        GetSavedMessagesRequest request,
+        IThreadService threadService,
+        CancellationToken ct) =>
+        threadService.GetSavedMessagesAsync(request, ct);
+}
+
 public static class ReportMessageEndpoint
 {
     [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]

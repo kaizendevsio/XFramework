@@ -119,6 +119,8 @@ public static class ChatLimits
     public const long PartRequestBytes = PreferredChunkBytes + 65536;
 }
 public sealed record SearchHit(Guid ThreadId, Guid MessageId, string Text, DateTime CreatedAt);
+/// <summary>A bookmarked message plus the conversation context the saved list shows around it.</summary>
+public sealed record SavedMessage(ChatMessage Message, string ConversationName, bool Group, DateTime SavedAt, string? ConversationAvatarUrl = null);
 public sealed record TypingUpdate(Guid ThreadId, Guid CredentialId, bool IsTyping);
 public enum ChatFeature { ReadReceipts = 1, Typing = 2, Threads = 4, Reactions = 8, Replies = 16, Voice = 32, Attachments = 64 }
 public sealed record ConversationUpdate(Guid ThreadId, int? Features = null, Guid? NicknameMemberId = null, string? Nickname = null, string? Name = null);

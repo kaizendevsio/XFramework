@@ -3,6 +3,7 @@
 <nav class="bottomnav liquid-glass" aria-label="Sections">
     <GlassLayer />
     <a href="/" class="@(Current == "inbox" ? "on" : "")" aria-label="Inbox" title="Inbox" aria-current="@(Current == "inbox" ? "page" : null)"><Icon Name="chat" Size="23" /></a>
+    <a href="/saved" class="@(Current == "saved" ? "on" : "")" aria-label="Saved" title="Saved" aria-current="@(Current == "saved" ? "page" : null)"><Icon Name="bookmark" Size="23" /></a>
     <a href="/settings" class="@(Current == "settings" ? "on" : "")" aria-label="Settings" title="Settings" aria-current="@(Current == "settings" ? "page" : null)"><Icon Name="settings" Size="23" /></a>
 </nav>
 @code {

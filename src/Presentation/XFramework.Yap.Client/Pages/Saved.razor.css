@@ -1,0 +1,11 @@
+/* Mirrors the inbox row so the tab reads as its sibling, with the bookmark
+   always visible: removing a save is the one action this list owes the reader. */
+.saved-item{position:relative}
+.saved-item .row{padding-right:50px}
+.saved-remove{position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--accent-ink)}
+.saved-remove:disabled{color:var(--faint)}
+.saved-note{padding:10px 16px 0;font-size:12.5px}
+/* The preview is the point of this list, so it gets the whole row rather than the inbox's fixed cap. */
+.saved-panel .t2{gap:6px;max-width:none}
+.saved-locked{font-style:italic;color:var(--faint)}
+.saved-panel .end{gap:2px}

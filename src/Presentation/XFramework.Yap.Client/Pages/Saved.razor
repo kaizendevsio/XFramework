@@ -1,0 +1,105 @@
+@page "/saved"
+@implements IDisposable
+@inject ChatState State
+<PageTitle>Saved · Yap</PageTitle>
+@if (State.User is null) { <div class="body"><p class="empty">Sign in to see the messages you saved.</p><a class="btn" href="/login">Sign in</a></div> }
+else
+{
+<ScrollSurface>
+<Header><div class="appbar plain liquid-glass"><GlassLayer /><h1>Saved</h1><span class="sp"></span>@if (total > 0) { <span class="tag">@total</span> }</div></Header>
+<ChildContent>
+<div class="body saved-panel" aria-label="Saved messages">
+@if (loading && items.Count == 0) { <p class="empty" role="status">Loading saved messages…</p> }
+else if (items.Count == 0)
+{
+    <p class="empty">Nothing saved yet.<br />Press and hold a message, open <strong>More</strong>, then choose <strong>Save message</strong>.</p>
+}
+else
+{
+    @if (!State.Online) { <p class="muted saved-note" role="status">Offline · showing the saved messages stored on this device.</p> }
+    @foreach (var item in items)
+    {
+        var message = item.Message;
+        <div class="saved-item">
+            <a class="row" href="@Target(item)">
+                <Avatar Initials="@ChatMessage.InitialsFor(item.ConversationName)" ImageUrl="@item.ConversationAvatarUrl" Color="@(item.Group ? "g3" : "g1")" Size="a48" />
+                <span class="mid">
+                    <span class="t1">@item.ConversationName @if (message.IsThreadReply) { <span class="tag"><Icon Name="thread" Size="12" />Thread</span> }</span>
+                    <span class="t2 @(message.EncryptionLocked ? "saved-locked" : "")">
+                        @if (message.EncryptionLocked) { <Icon Name="lock" Size="14" /> }
+                        else if (message.HasAttachments) { <Icon Name="clip" Size="14" /> }
+                        @($"{message.Sender}: {Preview(message)}")
+                    </span>
+                </span>
+                <span class="end"><span class="time">@message.CreatedAt.ToLocalTime().ToString("MMM d")</span><span class="time">@message.Time</span></span>
+            </a>
+            <button class="saved-remove iconbtn" aria-label="@($"Remove {item.ConversationName} message from saved")" title="Remove from saved"
+                    disabled="@(!State.Online || State.NeedsLogin || removing.Contains(message.Id))" @onclick="() => UnsaveAsync(item)"><Icon Name="bookmark" Size="19" /></button>
+        </div>
+    }
+    @if (items.Count < total) { <button class="btn ghost" disabled="@loading" @onclick="MoreAsync">Load more saved messages</button> }
+}
+</div>
+</ChildContent>
+<Footer><TabBar Current="saved" /></Footer>
+</ScrollSurface>
+}
+@code {
+    private List<SavedMessage> items = [];
+    private readonly HashSet<Guid> removing = [];
+    private int total, page;
+    private bool loading;
+    private bool live;
+    // A cold start renders from the device cache first; the authoritative list is fetched as
+    // soon as the background sync binds the account, without the reader having to do anything.
+    private void Changed()
+    {
+        if (!live && State.Online && State.SessionReady) { live = true; _ = InvokeAsync(() => LoadAsync(reset: true)); }
+        else _ = InvokeAsync(StateHasChanged);
+    }
+    protected override Task OnInitializedAsync()
+    {
+        State.Changed += Changed;
+        live = State.Online && State.SessionReady;
+        return LoadAsync(reset: true);
+    }
+
+    private async Task LoadAsync(bool reset)
+    {
+        if (reset) { page = 0; }
+        loading = true; StateHasChanged();
+        try
+        {
+            var result = await State.SavedMessagesAsync(page);
+            total = result.TotalCount;
+            items = reset ? result.Items : items.Concat(result.Items).DistinctBy(x => x.Message.Id).ToList();
+        }
+        catch (Exception ex) { State.Report(ex); }
+        finally { loading = false; StateHasChanged(); }
+    }
+
+    private async Task MoreAsync() { page++; await LoadAsync(reset: false); }
+
+    private async Task UnsaveAsync(SavedMessage item)
+    {
+        if (!removing.Add(item.Message.Id)) return;
+        try
+        {
+            if (await State.UnsaveAsync(item.Message))
+            { items = items.Where(x => x.Message.Id != item.Message.Id).ToList(); total = Math.Max(0, total - 1); }
+        }
+        finally { removing.Remove(item.Message.Id); StateHasChanged(); }
+    }
+
+    // A thread reply lives on its own page; sending it to the timeline would search history it is not in.
+    private static string Target(SavedMessage item) => item.Message switch
+    {
+        { IsThreadReply: true, ParentId: { } parent } => $"/thread/{item.Message.ThreadId}/{parent}",
+        var message => $"/chat/{message.ThreadId}?message={message.Id}"
+    };
+
+    private static string Preview(ChatMessage message) => message.Text.Length > 0 ? message.Text
+        : message.HasAttachments ? "Attachment" : "Empty message";
+
+    public void Dispose() => State.Changed -= Changed;
+}

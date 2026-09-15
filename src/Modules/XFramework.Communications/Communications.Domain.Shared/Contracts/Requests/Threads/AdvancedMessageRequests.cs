@@ -75,3 +75,12 @@ public partial record DeleteCredentialBlockRequest : RequestBase,
 {
     public Guid CredentialId { get; set; }
 }
+
+[MemoryPackable]
+public partial record GetSavedMessagesRequest : RequestBase,
+    IQuery<QueryResponse<GetSavedMessagesResponse>>,
+    IBoltRequest<GetSavedMessagesRequest, QueryResponse<GetSavedMessagesResponse>>
+{
+    public int PageIndex { get; set; }
+    public int PageSize { get; set; } = 20;
+}

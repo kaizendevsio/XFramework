@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using Communications.Domain.Shared.Contracts.Realtime;
 using Communications.Domain.Shared.Contracts.Requests.Threads;
 using Communications.Domain.Shared.Contracts.Responses;
@@ -163,7 +163,35 @@ internal static partial class UiFixture
             .ReturnsAsync((Guid thread, Guid id, CancellationToken _) => { messages.RemoveAll(m => m.Id == id); return Success(); });
         fixture.Session.Setup(s => s.PinMessageAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Guid thread, Guid id, CancellationToken _) => { messages.First(m => m.Id == id).IsPinned = true; return Success(); });
-        fixture.Session.Setup(s => s.SaveMessageAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(Success());
+        // Saved messages are per-requester state, so the fixture keeps its own set and the
+        // saved list is served from it exactly like the real per-member join.
+        var saved = new Dictionary<Guid, DateTime> { [messages[1].Id] = DateTime.UtcNow.AddMinutes(-30), [messages[4].Id] = DateTime.UtcNow.AddMinutes(-2) };
+        foreach (var message in messages) message.IsSaved = saved.ContainsKey(message.Id);
+        fixture.Session.Setup(s => s.SaveMessageAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid thread, Guid id, CancellationToken _) =>
+            { saved[id] = DateTime.UtcNow; foreach (var m in messages.Where(m => m.Id == id)) m.IsSaved = true; return Success(); });
+        fixture.Session.Setup(s => s.UnsaveMessageAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid thread, Guid id, CancellationToken _) =>
+            { saved.Remove(id); foreach (var m in messages.Where(m => m.Id == id)) m.IsSaved = false; return Success(); });
+        fixture.Session.Setup(s => s.GetSavedMessagesAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int page, int size, CancellationToken _) =>
+            {
+                var rows = messages.Where(m => saved.ContainsKey(m.Id)).OrderByDescending(m => saved[m.Id]).ToArray();
+                return ChatFixture.Ok(new GetSavedMessagesResponse
+                {
+                    Items = rows.Skip(page * size).Take(size).Select(m => new SavedMessageItemResponse
+                    {
+                        ThreadId = fixture.Thread, ThreadName = conversations.First(c => c.Id == fixture.Thread).Name,
+                        IsDirect = true, MessageId = m.Id, SenderCredentialId = m.SenderCredentialId, SenderAlias = m.SenderAlias,
+                        OtherCredentialId = m.SenderCredentialId == fixture.Credential ? friend : m.SenderCredentialId,
+                        Text = m.Text, EncryptedEnvelope = m.EncryptedEnvelope, EncryptionSenderDeviceId = m.EncryptionSenderDeviceId,
+                        AcceptedSenderDirectoryRevision = m.AcceptedSenderDirectoryRevision, EncryptionPending = m.EncryptionPending,
+                        ParentMessageId = m.ParentMessageId, IsThreadReply = m.IsThreadReply,
+                        CreatedAt = m.CreatedAt, SavedAt = saved[m.Id]
+                    }).ToList(),
+                    TotalCount = rows.Length, PageIndex = page, PageSize = size
+                });
+            });
         fixture.Session.Setup(s => s.PublishTypingAsync(It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         Func<CommunicationsTypingState, Task>? onTyping = null;
         Guid typingThread = fixture.Thread;

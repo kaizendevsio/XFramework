@@ -1,4 +1,4 @@
-using Communications.Domain.Shared;
+﻿using Communications.Domain.Shared;
 using Communications.Domain.Shared.Contracts.Realtime;
 using Communications.Domain.Shared.Contracts.Requests.Admin;
 using Communications.Domain.Shared.Contracts.Requests.Attachments;
@@ -101,6 +101,9 @@ public interface ICommunicationsServiceWrapper : IServiceWrapper
         CancellationToken ct = default);
     Task<QueryResponse<SearchMessagesResponse>> SearchMessagesAsync(
         SearchMessagesRequest request,
+        CancellationToken ct = default);
+    Task<QueryResponse<GetSavedMessagesResponse>> GetSavedMessagesAsync(
+        GetSavedMessagesRequest request,
         CancellationToken ct = default);
     Task<CmdResponse> DeleteThreadMessageAsync(
         DeleteThreadMessageRequest request,
@@ -499,6 +502,14 @@ public sealed record CommunicationsServiceWrapper(
     {
         ct.ThrowIfCancellationRequested();
         return SendAsync<SearchMessagesRequest, SearchMessagesResponse>(request, ct);
+    }
+
+    public Task<QueryResponse<GetSavedMessagesResponse>> GetSavedMessagesAsync(
+        GetSavedMessagesRequest request,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return SendAsync<GetSavedMessagesRequest, GetSavedMessagesResponse>(request, ct);
     }
 
     public Task<CmdResponse> DeleteThreadMessageAsync(

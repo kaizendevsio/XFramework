@@ -127,6 +127,29 @@ public static class YapApi
             var data = Require(await session.SearchMessagesAsync(query, thread, Page(page), 30, ct));
             return new ChatPage<SearchHit>(data.Items.Select(x => new SearchHit(x.ThreadId, x.MessageId, x.Text, x.CreatedAt)).ToList(), data.TotalCount);
         });
+        api.MapGet("/saved", async (int? page, ICommunicationsChatClient client, IChatDirectory directory, CancellationToken ct) =>
+        {
+            var session = await client.ForCurrentActorAsync(ct: ct);
+            var data = Require(await session.GetSavedMessagesAsync(Page(page), 30, ct));
+            var people = await directory.ResolveAsync(data.Items.Select(x => x.SenderCredentialId)
+                .Concat(data.Items.Where(x => x.OtherCredentialId.HasValue).Select(x => x.OtherCredentialId!.Value)).Distinct().ToArray(), ct);
+            return new ChatPage<SavedMessage>(data.Items.Select(x => new SavedMessage(new ApiMessage
+            {
+                Id = x.MessageId, ThreadId = x.ThreadId, SenderId = x.SenderCredentialId,
+                Sender = x.SenderCredentialId == session.CredentialId ? "You" : string.IsNullOrWhiteSpace(x.SenderAlias)
+                    ? people.FirstOrDefault(p => p.Id == x.SenderCredentialId)?.Name ?? "Workspace member" : x.SenderAlias,
+                Text = x.Text, CreatedAt = x.CreatedAt, Mine = x.SenderCredentialId == session.CredentialId,
+                EncryptedEnvelope = x.EncryptedEnvelope, EncryptionPending = x.EncryptionPending,
+                AcceptedSenderDirectoryRevision = x.AcceptedSenderDirectoryRevision, EncryptionSenderDeviceId = x.EncryptionSenderDeviceId,
+                HasAttachments = x.HasAttachments, AttachmentLinksReady = x.HasAttachments,
+                ParentId = x.ParentMessageId, IsThreadReply = x.IsThreadReply, Saved = true,
+                AvatarUrl = people.FirstOrDefault(p => p.Id == x.SenderCredentialId)?.AvatarUrl
+            },
+                x.IsDirect && !x.HasCustomName ? people.FirstOrDefault(p => p.Id == x.OtherCredentialId)?.Name ?? "Direct message" : x.ThreadName,
+                !x.IsDirect, x.SavedAt,
+                x.IsDirect ? people.FirstOrDefault(p => p.Id == x.OtherCredentialId)?.AvatarUrl
+                    : YapProfile.GroupPhoto(x.ThreadId, x.ThreadPhotoStorageFileId, session.TenantId, session.CredentialId))).ToList(), data.TotalCount);
+        });
         api.MapPost("/conversations", async (CreateConversation request, ICommunicationsChatClient client, CancellationToken ct) =>
         {
             if (request.Members.Count is < 1 or > 100 || string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 100)
