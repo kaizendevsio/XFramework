@@ -121,11 +121,19 @@ public static class YapApi
         });
         api.MapGet("/people", async (string search, IChatDirectory directory, CancellationToken ct) =>
             (await directory.SearchAsync(search, ct)).Select(x => new Person(x.Id, x.Name, x.UserName, x.AvatarUrl)));
-        api.MapGet("/search", async (string query, Guid? thread, int? page, ICommunicationsChatClient client, CancellationToken ct) =>
+        api.MapGet("/search", async (string query, Guid? thread, int? page, ICommunicationsChatClient client, IChatDirectory directory, CancellationToken ct) =>
         {
             var session = await client.ForCurrentActorAsync(ct: ct);
             var data = Require(await session.SearchMessagesAsync(query, thread, Page(page), 30, ct));
-            return new ChatPage<SearchHit>(data.Items.Select(x => new SearchHit(x.ThreadId, x.MessageId, x.Text, x.CreatedAt)).ToList(), data.TotalCount);
+            // A result row names its sender, so resolve the whole page's senders in one directory call.
+            var people = await directory.ResolveAsync(data.Items.Select(x => x.SenderCredentialId).Distinct().ToArray(), ct);
+            return new ChatPage<SearchHit>(data.Items.Select(x =>
+            {
+                var person = people.FirstOrDefault(p => p.Id == x.SenderCredentialId);
+                var mine = x.SenderCredentialId == session.CredentialId;
+                return new SearchHit(x.ThreadId, x.MessageId, x.Text, x.CreatedAt,
+                    mine ? "You" : person?.Name ?? "Workspace member", mine, person?.AvatarUrl);
+            }).ToList(), data.TotalCount);
         });
         api.MapGet("/saved", async (int? page, ICommunicationsChatClient client, IChatDirectory directory, CancellationToken ct) =>
         {

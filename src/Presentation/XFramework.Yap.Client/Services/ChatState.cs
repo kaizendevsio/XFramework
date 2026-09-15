@@ -553,18 +553,25 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     }
     public async Task LoadMoreConversationsAsync() { inboxPages++; await SynchronizeAsync(); }
 
-    public async Task<List<SearchHit>> SearchAsync(string query, Guid? thread = null)
+    /// <summary>True whenever search can only see what this device already downloaded, so the UI can say so.</summary>
+    public bool SearchesCachedHistoryOnly => !Online || NeedsLogin || EncryptionEnabled;
+
+    /// <summary>The cached path walks every conversation in the store, so a superseded keystroke
+    /// must be able to abandon the scan instead of blocking the next one behind it.</summary>
+    public async Task<List<SearchHit>> SearchAsync(string query, Guid? thread = null, CancellationToken ct = default)
     {
         if (query.Trim().Length < 2) return [];
-        if (Online && !NeedsLogin && !EncryptionEnabled)
-            return (await api.GetAsync<ChatPage<SearchHit>>($"api/chat/search?query={Uri.EscapeDataString(query)}{(thread.HasValue ? $"&thread={thread}" : "")}")).Items;
+        if (!SearchesCachedHistoryOnly)
+            return (await api.GetAsync<ChatPage<SearchHit>>($"api/chat/search?query={Uri.EscapeDataString(query)}{(thread.HasValue ? $"&thread={thread}" : "")}", ct)).Items;
         var results = new List<SearchHit>();
         foreach (var conversation in Conversations.Where(x => !thread.HasValue || x.Id == thread))
         {
             for (var offset = 0; ; offset += 100)
             {
-                var batch = await store.MessagesAsync(Scope, conversation.Id, limit: 100, skip: offset);
-                results.AddRange(batch.Where(x => !x.EncryptionLocked && x.Text.Contains(query, StringComparison.OrdinalIgnoreCase)).Select(x => new SearchHit(x.ThreadId, x.Id, x.Text, x.CreatedAt)));
+                ct.ThrowIfCancellationRequested();
+                var batch = await store.MessagesAsync(Scope, conversation.Id, ct, limit: 100, skip: offset);
+                results.AddRange(batch.Where(x => !x.EncryptionLocked && x.Text.Contains(query, StringComparison.OrdinalIgnoreCase))
+                    .Select(x => new SearchHit(x.ThreadId, x.Id, x.Text, x.CreatedAt, x.Sender, x.Mine, x.AvatarUrl)));
                 results = results.OrderByDescending(x => x.CreatedAt).Take(30).ToList();
                 if (batch.Count < 100) break;
             }

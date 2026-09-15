@@ -118,7 +118,10 @@ public static class ChatLimits
     /// <summary>Ceiling for a single part request, with slack for headers.</summary>
     public const long PartRequestBytes = PreferredChunkBytes + 65536;
 }
-public sealed record SearchHit(Guid ThreadId, Guid MessageId, string Text, DateTime CreatedAt);
+/// <summary>A matched message. Sender details let a result row identify who spoke without a second lookup;
+/// they are optional because an older host may still answer without them.</summary>
+public sealed record SearchHit(Guid ThreadId, Guid MessageId, string Text, DateTime CreatedAt,
+    string Sender = "", bool Mine = false, string? AvatarUrl = null);
 /// <summary>A bookmarked message plus the conversation context the saved list shows around it.</summary>
 public sealed record SavedMessage(ChatMessage Message, string ConversationName, bool Group, DateTime SavedAt, string? ConversationAvatarUrl = null);
 public sealed record TypingUpdate(Guid ThreadId, Guid CredentialId, bool IsTyping);
