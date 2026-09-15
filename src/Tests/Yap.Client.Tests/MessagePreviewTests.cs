@@ -21,6 +21,22 @@ public sealed class MessagePreviewTests
         Assert.That(ChatState.MessagePreview(message), Is.EqualTo("2 attachments"));
     }
 
+    // A received voice message only ever reached the generic file row because its type
+    // never resolved to audio/*, so the recipient could not play it inline.
+    [TestCase("Voice message.m4a", "application/octet-stream", "audio/mp4", true)]
+    [TestCase("Voice message.ogg", "", "audio/ogg", true)]
+    [TestCase("Voice message.webm", "audio/webm;codecs=opus", "audio/webm", true)]
+    [TestCase("note.wav", "audio/wav", "audio/wav", true)]
+    [TestCase("score.mid", "audio/midi", "audio/midi", false)]
+    [TestCase("clip.mov", "application/octet-stream", "video/quicktime", false)]
+    public void VoiceAttachments_ResolveToPlayableAudio(string name, string type, string expected, bool inline)
+    {
+        Assert.That(ChatMedia.ContentType(type, name), Is.EqualTo(expected));
+        Assert.That(ChatMedia.IsInlineAudio(type, name), Is.EqualTo(inline));
+        var message = new ChatMessage { Attachments = [new(Guid.NewGuid(), name, type, 42)] };
+        Assert.That(ChatState.MessagePreview(message), Is.EqualTo(expected.StartsWith("audio/") ? "Voice message" : "Video"));
+    }
+
     [Test]
     public void LockedAndPendingMessages_DoNotRevealPreviouslyDecryptedText()
     {
