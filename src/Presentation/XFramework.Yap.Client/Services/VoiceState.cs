@@ -3,6 +3,7 @@ using Bolt.Media.Browser;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.JSInterop;
 using System.Text.RegularExpressions;
 using Yap.Contracts;
 
@@ -15,6 +16,7 @@ public sealed partial class VoiceState : IAsyncDisposable
     private readonly IServiceScopeFactory scopes;
     private readonly NavigationManager navigation;
     private readonly ILoggerFactory logs;
+    private readonly IJSRuntime js;
     private Attempt? active;
     private readonly Queue<Guid> endedInvites = new();
     private string configured = "";
@@ -32,9 +34,9 @@ public sealed partial class VoiceState : IAsyncDisposable
     public DateTimeOffset? ConnectedAt { get; private set; }
     public event Action? Changed;
 
-    public VoiceState(ChatState chat, ChatApi api, IServiceScopeFactory scopes, NavigationManager navigation, ILoggerFactory logs)
+    public VoiceState(ChatState chat, ChatApi api, IServiceScopeFactory scopes, NavigationManager navigation, ILoggerFactory logs, IJSRuntime js)
     {
-        this.chat = chat; this.api = api; this.scopes = scopes; this.navigation = navigation; this.logs = logs;
+        this.chat = chat; this.api = api; this.scopes = scopes; this.navigation = navigation; this.logs = logs; this.js = js;
         chat.CallReceived += ReceiveAsync;
         chat.Changed += AccountChanged;
     }
@@ -48,7 +50,7 @@ public sealed partial class VoiceState : IAsyncDisposable
     {
         if (active is { } attempt && !Current(attempt)) _ = EndAttemptAsync(attempt, false);
         if (chat.User is null || chat.NeedsLogin || api.Account != chat.Scope)
-        { Enabled = false; configured = ""; Changed?.Invoke(); }
+        { Enabled = false; configured = ""; Notify(); }
     }
 
     public async Task InitializeAsync()
@@ -63,7 +65,7 @@ public sealed partial class VoiceState : IAsyncDisposable
         {
             var configuration = await api.GetAsync<Configuration>("api/chat/calls/config");
             if (!disposed && chat.Scope == account && api.Account == account && !chat.NeedsLogin)
-            { Enabled = configuration.Enabled && configuration.GroupCalls && configuration.SecurityMode == "EndToEndEncrypted"; Changed?.Invoke(); }
+            { Enabled = configuration.Enabled && configuration.GroupCalls && configuration.SecurityMode == "EndToEndEncrypted"; Notify(); }
         }
         catch { if (configured == account) configured = ""; }
     }
@@ -89,7 +91,7 @@ public sealed partial class VoiceState : IAsyncDisposable
     {
         var attempt = active;
         if (attempt is null || !Incoming || attempt.Starting || !Current(attempt)) return Task.CompletedTask;
-        attempt.Starting = true; Error = null; Status = "Connecting..."; Incoming = false; Changed?.Invoke();
+        attempt.Starting = true; Error = null; Status = "Connecting..."; Incoming = false; Notify();
         return attempt.Setup = AcceptGroupCoreAsync(attempt);
     }
     private async Task ReceiveAsync(YapCallEvent item)
@@ -138,7 +140,7 @@ public sealed partial class VoiceState : IAsyncDisposable
         attempt.Lifetime.Cancel();
         if (ReferenceEquals(active, attempt))
         {
-            active = null; Incoming = false; ConnectedAt = null; Minimized = false; Muted = false; Changed?.Invoke();
+            active = null; Incoming = false; ConnectedAt = null; Minimized = false; Muted = false; Notify();
         }
         // Stop capture before network notification, including a pending microphone permission request.
         if (attempt.Media is { } media)
@@ -184,9 +186,9 @@ public sealed partial class VoiceState : IAsyncDisposable
         if (endedInvites.Count == 32) endedInvites.Dequeue();
         endedInvites.Enqueue(id);
     }
-    public void DismissError() { Error = null; Changed?.Invoke(); }
+    public void DismissError() { Error = null; Notify(); }
     public async ValueTask DisposeAsync()
-    { disposed = true; chat.CallReceived -= ReceiveAsync; chat.Changed -= AccountChanged; await EndAsync(); }
+    { disposed = true; chat.CallReceived -= ReceiveAsync; chat.Changed -= AccountChanged; await EndAsync(); StopRing(); await ringWork; }
     private sealed record Configuration(bool Enabled, bool GroupCalls = false, string SecurityMode = "");
     private sealed class Attempt(string account)
     {

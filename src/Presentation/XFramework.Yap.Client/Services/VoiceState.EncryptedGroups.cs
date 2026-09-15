@@ -20,10 +20,10 @@ public sealed partial class VoiceState
         if (!Enabled || disposed || active is not null || chat.User is null || chat.NeedsLogin || api.Account != chat.Scope)
             return Task.CompletedTask;
         var recipients = people.Where(x => x.Id != chat.User.CredentialId).Select(x => x.Id).Distinct().ToArray();
-        if (recipients.Length is < 1 or > 7) { Error = "Voice calls support up to eight people."; Changed?.Invoke(); return Task.CompletedTask; }
+        if (recipients.Length is < 1 or > 7) { Error = "Voice calls support up to eight people."; Notify(); return Task.CompletedTask; }
         var attempt = active = new Attempt(chat.Scope) { Starting = true };
         Name = name; AvatarUrl = people.Count == 1 ? people[0].AvatarUrl : null;
-        Status = "Preparing microphone..."; Incoming = false; Minimized = false; Error = null; Changed?.Invoke();
+        Status = "Preparing microphone..."; Incoming = false; Minimized = false; Error = null; Notify();
         return attempt.Setup = StartEncryptedGroupCoreAsync(attempt, thread, recipients);
     }
 
@@ -44,7 +44,7 @@ public sealed partial class VoiceState
         }
         catch (OperationCanceledException) when (!Current(attempt)) { }
         catch (Exception error) { await FailAsync(attempt, error); }
-        finally { attempt.Starting = false; if (Current(attempt)) Changed?.Invoke(); }
+        finally { attempt.Starting = false; if (Current(attempt)) Notify(); }
     }
 
     private async Task AcceptGroupCoreAsync(Attempt attempt)
@@ -60,7 +60,7 @@ public sealed partial class VoiceState
         }
         catch (OperationCanceledException) when (!Current(attempt)) { }
         catch (Exception error) { await FailAsync(attempt, error); }
-        finally { attempt.Starting = false; if (Current(attempt)) Changed?.Invoke(); }
+        finally { attempt.Starting = false; if (Current(attempt)) Notify(); }
     }
 
     private async Task ConnectEncryptedGroupAsync(Attempt attempt)
@@ -113,7 +113,7 @@ public sealed partial class VoiceState
             {
                 active = new Attempt(chat.Scope) { Invite = InviteFor(group), Group = group };
                 Name = group.CallerName; AvatarUrl = null; Incoming = true; Minimized = false;
-                Status = "Incoming encrypted voice call"; Error = null; Changed?.Invoke();
+                Status = "Incoming encrypted voice call"; Error = null; Notify();
                 return;
             }
             if (attempt?.Group?.Id != group.Id || !Current(attempt)) return;
@@ -135,7 +135,7 @@ public sealed partial class VoiceState
         if (!Current(attempt) || attempt.Group is { } prior && group.Revision < prior.Revision) return;
         var self = group.Participants.SingleOrDefault(x => x.CredentialId == chat.User!.CredentialId);
         if (self is null || self.Left) { await EndAttemptAsync(attempt, false); return; }
-        attempt.Group = group; Changed?.Invoke();
+        attempt.Group = group; Notify();
         if (!self.Accepted || !attempt.TransportReady) return;
         if (self.DeviceId != ApprovedDevice()) throw new InvalidOperationException("This call belongs to another device.");
         if (attempt.Epoch?.Revision == group.Revision) return;
@@ -150,7 +150,7 @@ public sealed partial class VoiceState
             BitConverter.ToUInt64(RandomNumberGenerator.GetBytes(8)).ToString(CultureInfo.InvariantCulture), RandomNumberGenerator.GetBytes(32));
         var epoch = attempt.Epoch = new GroupEpoch(group.Revision, ChatEncryption.CallRosterBinding(group), local,
             group.Participants.Where(x => x.Accepted && !x.Left && x.CredentialId != localId).Select(x => x.CredentialId).ToArray());
-        Status = epoch.Peers.Length == 0 ? "Ringing..." : "Securing call..."; Changed?.Invoke();
+        Status = epoch.Peers.Length == 0 ? RingingStatus : "Securing call..."; Notify();
         // Close the managed send gate synchronously, before an older media operation can finish.
         var pause = attempt.Media!.PauseSFrameAsync();
         await RunEpochMediaAsync(attempt, epoch, () => pause);
@@ -257,7 +257,7 @@ public sealed partial class VoiceState
             }
             if (!Muted && !await RunEpochMediaAsync(attempt, epoch, media.StartAudioAsync)) return;
             if (!CurrentEpoch(attempt, epoch)) return;
-            ConnectedAt ??= DateTimeOffset.UtcNow; Status = "Connected"; Changed?.Invoke();
+            ConnectedAt ??= DateTimeOffset.UtcNow; Status = "Connected"; Notify();
         }
         finally { epoch.Completion.Release(); }
     }
@@ -281,7 +281,7 @@ public sealed partial class VoiceState
         {
             if (Muted && attempt.Epoch?.Active == true) await media.StartAudioAsync(); else await media.StopAudioAsync();
             if (!Current(attempt)) { await media.StopAudioAsync(); return; }
-            Muted = !Muted; Changed?.Invoke();
+            Muted = !Muted; Notify();
             await api.PostAsync($"api/chat/calls/groups/{attempt.Group.Id}/mute", new YapGroupMute(Muted), attempt.Lifetime.Token);
         }
         catch (Exception error) { await FailAsync(attempt, error); }

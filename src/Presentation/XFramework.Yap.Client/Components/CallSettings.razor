@@ -1,0 +1,62 @@
+@inject IJSRuntime JS
+<h3 class="set-group">Ring sound</h3>
+<div class="set-list">
+    <div class="set-row">
+        <span class="set-key"><Icon Name="volume" Size="19" /><span class="set-label">Ring volume<small>Used for calls you receive and for the ringing you hear while calling</small></span></span>
+        <input class="ring-volume" type="range" min="0" max="100" step="5" aria-label="Ring volume" value="@Percent" @onchange="VolumeAsync" />
+    </div>
+    @foreach (var tone in tones)
+    {
+        <button type="button" class="set-row set-action" aria-pressed="@((tone.Id == selected).ToString().ToLowerInvariant())" @onclick="() => ChooseAsync(tone.Id)">
+            <span class="set-key"><Icon Name="@(tone.Id == selected ? "check" : "volume")" Size="19" /><span class="set-label">@tone.Label</span></span>
+            <span class="set-value">@(tone.Id == selected ? "Selected" : "Preview")</span>
+        </button>
+    }
+</div>
+<p class="set-footnote" role="status">@notice</p>
+<p class="set-footnote">Ringing is stored on this device only. Call volume during a call follows your device’s own volume buttons.</p>
+@code {
+    private RingTone[] tones = [];
+    private string selected = "classic";
+    private double volume = .7;
+    private string notice = "Pick a ringtone to hear it on this device.";
+    private int Percent => (int)Math.Round(volume * 100);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            tones = await JS.InvokeAsync<RingTone[]>("yap.ring.tones");
+            var preference = await JS.InvokeAsync<RingPreference>("yap.ring.preference");
+            selected = preference.Tone; volume = preference.Volume;
+        }
+        catch { notice = "Ring sounds are unavailable in this browser."; }
+        StateHasChanged();
+    }
+
+    // Choosing plays the tone: the tap is also the gesture that proves this device can ring.
+    private async Task ChooseAsync(string id)
+    {
+        selected = id;
+        try { await JS.InvokeVoidAsync("yap.ring.setTone", id); Describe(await JS.InvokeAsync<RingStatus>("yap.ring.preview", id)); }
+        catch { notice = "Ring sounds are unavailable in this browser."; }
+    }
+
+    private async Task VolumeAsync(ChangeEventArgs args)
+    {
+        if (!double.TryParse(args.Value?.ToString(), out var percent)) return;
+        try
+        {
+            volume = await JS.InvokeAsync<double>("yap.ring.setVolume", percent / 100);
+            Describe(await JS.InvokeAsync<RingStatus>("yap.ring.preview", selected));
+        }
+        catch { notice = "Ring sounds are unavailable in this browser."; }
+    }
+
+    private void Describe(RingStatus status) => notice = status.Audible ? "Ringing plays on this device."
+        : status.Vibrating ? "This browser blocked the sound, so Yap vibrates instead."
+        : volume == 0 ? "Ring volume is off. Incoming calls still show on screen."
+        : selected == "silent" ? "Silent ringing. Incoming calls vibrate where the device supports it."
+        : "This browser blocked the sound. Open Yap and tap once before a call arrives, or check your device’s mute switch.";
+}
