@@ -210,10 +210,12 @@ else
             _pendingOutboxCount = summary.PendingOutboxCount;
             _gridKey++;
         }
-        catch
+        catch (Exception exception)
         {
-            _error = "Communications threads could not be loaded. Check service health and tenant access.";
-            ToastService.Error("Communications threads could not be loaded.", "Threads Unavailable");
+            _error = CommunicationsPortalErrors.Describe(
+                exception,
+                "Communications threads could not be loaded. Check service health and tenant access.");
+            ToastService.Error(_error, "Threads Unavailable");
         }
         finally
         {

@@ -64,6 +64,45 @@ public sealed class CommunicationsRequestContextResolverTests
     }
 
     [Test]
+    public async Task ResolveAdminAsync_ActorWithTenantManageCapability_ReturnsAdminContext()
+    {
+        var tenantId = Guid.NewGuid();
+        var credentialId = Guid.NewGuid();
+        var resolver = Resolver(new FakeTrustedServiceInvocationResolver(
+            tenantId,
+            credentialId,
+            includeActor: true,
+            roles: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "ControlPanel Super Admin" },
+            capabilities: new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                XFrameworkActorCapabilities.IdentityTenantsManage
+            }));
+
+        var result = await resolver.ResolveAdminAsync(Metadata(tenantId));
+
+        Assert.That(result.IsSuccess, Is.True, result.Message);
+        Assert.That(result.Data!.IsAdmin, Is.True);
+        Assert.That(result.Data.TenantId, Is.EqualTo(tenantId));
+        Assert.That(result.Data.CredentialId, Is.EqualTo(credentialId));
+    }
+
+    [Test]
+    public async Task ResolveAdminAsync_ActorWithAdminRoleName_ReturnsAdminContext()
+    {
+        var tenantId = Guid.NewGuid();
+        var resolver = Resolver(new FakeTrustedServiceInvocationResolver(
+            tenantId,
+            Guid.NewGuid(),
+            includeActor: true,
+            roles: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin" }));
+
+        var result = await resolver.ResolveAdminAsync(Metadata(tenantId));
+
+        Assert.That(result.IsSuccess, Is.True, result.Message);
+        Assert.That(result.Data!.IsAdmin, Is.True);
+    }
+
+    [Test]
     public async Task ResolveTrustedInternalAsync_ActorPlusService_ReturnsForbidden()
     {
         var tenantId = Guid.NewGuid();

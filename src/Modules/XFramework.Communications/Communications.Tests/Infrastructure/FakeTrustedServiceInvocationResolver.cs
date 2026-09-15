@@ -8,7 +8,8 @@ internal sealed class FakeTrustedServiceInvocationResolver(
     Guid? credentialId = null,
     string serviceName = XFrameworkServiceNames.Portal,
     bool includeActor = false,
-    IReadOnlySet<string>? roles = null) : ITrustedInvocationContextAccessor
+    IReadOnlySet<string>? roles = null,
+    IReadOnlySet<string>? capabilities = null) : ITrustedInvocationContextAccessor
 {
     public const string ValidPortalToken = "valid-portal-token";
     public const string WrongAudienceToken = "wrong-audience-token";
@@ -24,7 +25,7 @@ internal sealed class FakeTrustedServiceInvocationResolver(
                 resolvedTenantId,
                 Guid.NewGuid(),
                 roles ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase),
-                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                capabilities ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase),
                 "test-generation",
                 DateTimeOffset.UtcNow.AddHours(1))
             : null,

@@ -102,7 +102,8 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
             credentialId is Guid id && id != Guid.Empty ? id : null,
             isTrustedInternalRequest,
             invocation?.Actor?.Roles.Contains("Admin") == true ||
-            invocation?.Actor?.Roles.Contains("SuperAdmin") == true,
+            invocation?.Actor?.Roles.Contains("SuperAdmin") == true ||
+            invocation?.Actor?.Capabilities.Contains(XFrameworkActorCapabilities.IdentityTenantsManage) == true,
             trustedServiceName));
     }
 

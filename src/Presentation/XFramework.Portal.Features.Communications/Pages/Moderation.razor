@@ -340,10 +340,12 @@ else
             _blockRows = data.Blocks;
             _policyRows = data.Policies;
         }
-        catch
+        catch (Exception exception)
         {
-            _error = "Communications moderation data could not be loaded. Check service health and tenant access.";
-            ToastService.Error("Communications moderation data could not be loaded.", "Moderation Unavailable");
+            _error = CommunicationsPortalErrors.Describe(
+                exception,
+                "Communications moderation data could not be loaded. Check service health and tenant access.");
+            ToastService.Error(_error, "Moderation Unavailable");
         }
         finally
         {
