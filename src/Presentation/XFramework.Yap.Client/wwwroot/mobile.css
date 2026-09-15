@@ -122,6 +122,7 @@ button,a,label,nav,.avatar,.appbar,.bottomnav{-webkit-user-select:none;user-sele
 .set-chevron{color:var(--faint);transform:rotate(90deg);transition:transform .18s ease}
 .set-chevron.open{transform:rotate(-90deg)}
 .set-row.danger .set-label,.set-row.danger .set-key>.ic{color:var(--danger)}
+.ring-volume{flex:none;width:42%;max-width:180px;accent-color:var(--accent)}
 .set-stack{padding:0 var(--settings-gutter) 12px}
 .set-note{padding:2px var(--settings-gutter,16px) 14px;color:var(--dim);font-size:12.8px}
 .set-note p{margin:8px 0}

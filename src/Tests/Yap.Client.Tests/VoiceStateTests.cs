@@ -128,6 +128,108 @@ public sealed class VoiceStateTests
         Assert.That(fixture.Voice.Incoming, Is.False);
     }
 
+    [Test]
+    public void RingMode_FollowsCallStateForEveryStatus()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(VoiceState.RingModeFor(true, true, "Incoming encrypted voice call"), Is.EqualTo("ringtone"));
+            Assert.That(VoiceState.RingModeFor(true, false, "Ringing..."), Is.EqualTo("ringback"));
+            Assert.That(VoiceState.RingModeFor(true, false, "Preparing microphone..."), Is.Empty);
+            Assert.That(VoiceState.RingModeFor(true, false, "Securing call..."), Is.Empty);
+            Assert.That(VoiceState.RingModeFor(true, false, "Connected"), Is.Empty);
+            Assert.That(VoiceState.RingModeFor(false, false, "Ringing..."), Is.Empty);
+            Assert.That(VoiceState.RingModeFor(false, true, "Incoming encrypted voice call"), Is.Empty);
+        });
+    }
+
+    [Test]
+    public async Task IncomingCall_RingsOnce_AndStopsWhenDeclined()
+    {
+        var js = new RingJs();
+        await using var fixture = new Fixture(js: js);
+        var invite = fixture.Invite();
+        await fixture.DeliverAsync(fixture.GroupEvent(invite));
+        Assert.That(js.Calls, Is.EqualTo(new[] { "yap.ring.start:ringtone" }));
+        // A repeated invitation for the same call must not stack a second ring.
+        await fixture.DeliverAsync(fixture.GroupEvent(invite));
+        Assert.That(js.Calls, Has.Count.EqualTo(1));
+        await fixture.Voice.EndAsync().WaitAsync(TimeSpan.FromSeconds(1));
+        Assert.That(js.Calls, Is.EqualTo(new[] { "yap.ring.start:ringtone", "yap.ring.stop" }));
+    }
+
+    [Test]
+    public async Task IncomingCall_StopsRingingOnAcceptAndOnRemoteHangup()
+    {
+        var accepted = new RingJs();
+        await using (var fixture = new Fixture(js: accepted))
+        {
+            await fixture.DeliverAsync(fixture.GroupEvent(fixture.Invite()));
+            await fixture.Voice.AcceptAsync();
+            Assert.That(accepted.Calls.Last(), Is.EqualTo("yap.ring.stop"));
+        }
+        var hungUp = new RingJs();
+        await using var remote = new Fixture(js: hungUp);
+        var incoming = remote.GroupEvent(remote.Invite());
+        await remote.DeliverAsync(incoming);
+        await remote.DeliverAsync(incoming with { Type = "group-ended" });
+        Assert.That(hungUp.Calls, Is.EqualTo(new[] { "yap.ring.start:ringtone", "yap.ring.stop" }));
+    }
+
+    [Test]
+    public async Task IncomingCall_StopsRingingWhenTheAccountChangesOrTheStateIsDisposed()
+    {
+        var switched = new RingJs();
+        await using (var fixture = new Fixture(js: switched))
+        {
+            await fixture.DeliverAsync(fixture.GroupEvent(fixture.Invite()));
+            fixture.Api.Account = "another-account";
+            fixture.Chat.Notify();
+            Assert.That(switched.Calls.Last(), Is.EqualTo("yap.ring.stop"));
+        }
+        var closed = new RingJs();
+        var disposing = new Fixture(js: closed);
+        await disposing.DeliverAsync(disposing.GroupEvent(disposing.Invite()));
+        await disposing.DisposeAsync();
+        Assert.That(closed.Calls.Last(), Is.EqualTo("yap.ring.stop"));
+    }
+
+    [Test]
+    public async Task BlockedAutoplay_OffersTheGestureThatRetriesTheRing()
+    {
+        var js = new RingJs { Audible = false };
+        await using var fixture = new Fixture(js: js);
+        await fixture.DeliverAsync(fixture.GroupEvent(fixture.Invite()));
+        Assert.That(fixture.Voice.RingSilent, Is.True);
+        js.Audible = true;
+        Assert.That(await fixture.Voice.RetryRingAsync(), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.Voice.RingSilent, Is.False);
+            Assert.That(js.Calls, Is.EqualTo(new[] { "yap.ring.start:ringtone", "yap.ring.unlock", "yap.ring.start:ringtone" }));
+        });
+        await fixture.Voice.EndAsync().WaitAsync(TimeSpan.FromSeconds(1));
+        Assert.That(fixture.Voice.RingSilent, Is.False);
+        Assert.That(await fixture.Voice.RetryRingAsync(), Is.False, "A ended call must not be able to restart its ring.");
+    }
+
+    // Records the ring calls the browser would have made; every other identifier answers with a default.
+    private sealed class RingJs : IJSRuntime
+    {
+        public List<string> Calls { get; } = [];
+        public bool Audible { get; set; } = true;
+        public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args) => Record<TValue>(identifier, args);
+        public ValueTask<TValue> InvokeAsync<TValue>(string identifier, CancellationToken cancellationToken, object?[]? args) => Record<TValue>(identifier, args);
+        private ValueTask<TValue> Record<TValue>(string identifier, object?[]? args)
+        {
+            if (identifier.StartsWith("yap.ring.")) Calls.Add(args is { Length: > 0 } ? $"{identifier}:{args[0]}" : identifier);
+            object? value = typeof(TValue) == typeof(RingStatus) ? new RingStatus(Audible, false)
+                : typeof(TValue) == typeof(bool) ? (object)true
+                : typeof(TValue).IsValueType ? Activator.CreateInstance(typeof(TValue)) : null;
+            return new((TValue)value!);
+        }
+    }
+
     private sealed class Fixture : IAsyncDisposable
     {
         private readonly ServiceProvider provider;
@@ -149,7 +251,7 @@ public sealed class VoiceStateTests
             var services = new ServiceCollection();
             services.AddLogging(); services.AddSingleton(js); services.AddBoltMediaBrowser();
             provider = services.BuildServiceProvider();
-            Voice = new VoiceState(Chat, Api, provider.GetRequiredService<IServiceScopeFactory>(), new Navigation(), NullLoggerFactory.Instance);
+            Voice = new VoiceState(Chat, Api, provider.GetRequiredService<IServiceScopeFactory>(), new Navigation(), NullLoggerFactory.Instance, js);
         }
         public YapCallInvite Invite() => new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Caller", user.CredentialId, DateTimeOffset.UtcNow.AddMinutes(1));
         public YapCallEvent GroupEvent(YapCallInvite invite) => new("group-incoming", invite, Group: new(invite.Id, invite.ThreadId,

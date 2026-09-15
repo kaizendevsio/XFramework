@@ -58,6 +58,7 @@
 
     }
     @if (Section == "privacy") { <EncryptionSettings /> }
+    @if (Section == "calls") { <CallSettings /> }
     @if (Section == "storage")
     {
     <h3 class="set-group">Storage and sync</h3>
@@ -156,6 +157,7 @@
     private static readonly (string Route, string Title, string Icon, string Description)[] Categories = [
         ("appearance", "Appearance", "moon", "Theme, colors and glass"),
         ("privacy", "Privacy and security", "shield", "Encryption, recovery and devices"),
+        ("calls", "Calls", "phone", "Ringtone and ring volume"),
         ("storage", "Storage and sync", "wifi", "Offline messages and pending sends"),
         ("app", "About Yap", "info", "Updates, installation and gestures"),
         ("help", "Help and diagnostics", "settings", "Troubleshooting and logs")];

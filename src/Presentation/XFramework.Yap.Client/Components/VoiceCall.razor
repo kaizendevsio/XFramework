@@ -38,10 +38,12 @@
                     @if (outputError is not null) { <p role="status">@outputError</p> }
                 </div>
             }
+            @if (Voice.Incoming && Voice.RingSilent)
+            { <button class="btn" @onclick="Voice.RetryRingAsync">Turn on ring sound</button> }
             @if(Voice.Incoming)
             { <div class="callrow2"><button class="cbtn end" @onclick="() => Voice.EndAsync()"><span class="k"><Icon Name="phone" Class="rot135" Size="26" /></span>Decline</button><button class="cbtn accept" @onclick="Voice.AcceptAsync"><span class="k"><Icon Name="phone" Size="26" /></span>Accept</button></div> }
             else
-            { <div class="callrow2"><button class="cbtn @(Voice.Muted ? "on" : "")" disabled="@(Voice.ConnectedAt is null)" aria-pressed="@Voice.Muted" @onclick="Voice.ToggleMuteAsync"><span class="k"><Icon Name="mic" Size="24" /></span>@(Voice.Muted ? "Unmute" : "Mute")</button><button class="cbtn @(outputOpen ? "on" : "")" disabled="@(Voice.ConnectedAt is null)" aria-expanded="@outputOpen.ToString().ToLowerInvariant()" @onclick="ToggleOutputAsync"><span class="k"><Icon Name="volume" Size="24" /></span>Audio</button><button class="cbtn end" @onclick="() => Voice.EndAsync()"><span class="k"><Icon Name="phone" Class="rot135" Size="26" /></span>End</button></div> }
+            { <div class="callrow2"><button class="cbtn @(Voice.Muted ? "on" : "")" disabled="@(Voice.ConnectedAt is null)" aria-pressed="@Voice.Muted" @onclick="Voice.ToggleMuteAsync"><span class="k"><Icon Name="mic" Size="24" /></span>@(Voice.Muted ? "Unmute" : "Mute")</button><button class="cbtn @(outputOpen ? "on" : "")" aria-expanded="@outputOpen.ToString().ToLowerInvariant()" @onclick="ToggleOutputAsync"><span class="k"><Icon Name="volume" Size="24" /></span>Audio</button><button class="cbtn end" @onclick="() => Voice.EndAsync()"><span class="k"><Icon Name="phone" Class="rot135" Size="26" /></span>End</button></div> }
             @if (playbackSuspended && Voice.ConnectedAt is not null)
             { <button class="btn" @onclick="ResumeAudioAsync">Tap to resume call audio</button> }
             <p class="call-footer">End-to-end encrypted</p>
@@ -72,7 +74,8 @@
     private string Elapsed => Voice.Status == "Connected" && Voice.ConnectedAt is { } time ? (DateTimeOffset.UtcNow - time).ToString(@"mm\:ss") : Voice.Status;
     protected override void OnInitialized(){ Voice.Changed += Changed; _ = Tick(); }
     private void Changed() => _ = InvokeAsync(() => { if (!Voice.IsCalling) { outputOpen = false; outputs = null; outputError = null; playbackSuspended = false; } StateHasChanged(); });
-    private async Task Tick(){ try { while(!lifetime.IsCancellationRequested){await Task.Delay(1000,lifetime.Token);if(Voice.ConnectedAt is not null)await InvokeAsync(async () => { if (outputOpen && !outputBusy) await RefreshOutputsAsync(); await CheckPlaybackAsync(); StateHasChanged(); });} }catch(OperationCanceledException){} }
+    // Ringing counts: the output picker is usable before the call connects, so it must refresh then too.
+    private async Task Tick(){ try { while(!lifetime.IsCancellationRequested){await Task.Delay(1000,lifetime.Token);if(Voice.IsCalling)await InvokeAsync(async () => { if (outputOpen && !outputBusy) await RefreshOutputsAsync(); await CheckPlaybackAsync(); StateHasChanged(); });} }catch(OperationCanceledException){} }
     private async Task ToggleOutputAsync() { outputOpen = !outputOpen; if (outputOpen) { outputError = null; await RefreshOutputsAsync(); } }
     private async Task RefreshOutputsAsync()
     {
