@@ -315,7 +315,8 @@ public sealed class YapChatGateway : IDisposable
             connection.TypingLifetime = lifetime;
             await session.SubscribeTypingAsync(thread.Value, value =>
             {
-                if (!lifetime.IsCancellationRequested && value.TenantId == session.TenantId && value.ThreadId == thread.Value)
+                if (!lifetime.IsCancellationRequested && value.TenantId == session.TenantId && value.ThreadId == thread.Value &&
+                    value.CredentialId != session.CredentialId)
                     connection.Enqueue(new ChatSocketEvent(Guid.NewGuid(), 0, "typing", value.ThreadId,
                     Body: JsonSerializer.SerializeToElement(new TypingUpdate(value.ThreadId, value.CredentialId, value.IsTyping), Json)));
                 return Task.CompletedTask;
