@@ -13,6 +13,8 @@ namespace Notifications.Tests.Services.Push;
 /// </summary>
 public sealed class WebPushCryptoTests
 {
+    // Published example values copied verbatim from RFC 8291 section 5. These are not credentials:
+    // they exist so a wrong key derivation fails here instead of on someone's phone.
     private const string Plaintext = "When I grow up, I want to be a watermelon";
     private const string AuthSecret = "BTBZMqHH6r4Tts7J_aSIgg";
     private const string ReceiverPublic = "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4";
