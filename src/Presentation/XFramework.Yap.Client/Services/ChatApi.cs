@@ -7,8 +7,19 @@ public sealed class ChatApi(HttpClient http)
 {
     public string Token { get; set; } = "";
     public string Account { get; set; } = "";
-    public async Task<T> GetAsync<T>(string path, CancellationToken ct = default) =>
-        (await SendAsync<T>(HttpMethod.Get, path, null, ct))!;
+    public async Task<T> GetAsync<T>(string path, CancellationToken ct = default)
+    {
+        var account = Account;
+        try { return (await SendAsync<T>(HttpMethod.Get, path, null, ct))!; }
+        catch (ChatApiException ex) when (ex.Status == 503 && !ct.IsCancellationRequested)
+        {
+            // A reconnecting upstream can briefly reject a read. Retry once before
+            // falling back to the offline poll; never replay a write here.
+            await Task.Delay(150, ct);
+            if (Account != account) throw new OperationCanceledException("The signed-in account changed.");
+            return (await SendAsync<T>(HttpMethod.Get, path, null, ct))!;
+        }
+    }
     public Task<T?> PostAsync<T>(string path, object? body = null, CancellationToken ct = default) =>
         SendAsync<T>(HttpMethod.Post, path, body is null ? null : JsonContent.Create(body), ct);
     public Task PostAsync(string path, object body, CancellationToken ct = default) => PostAsync<object>(path, body, ct);

@@ -150,14 +150,23 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     {
         try
         {
-            await sync.WaitAsync(lifetime.Token);
-            try
+            while (refreshPending && Online && !NeedsLogin && User is not null)
             {
-                while (refreshPending && Online && !NeedsLogin && User is not null)
+                await sync.WaitAsync(lifetime.Token);
+                try
                 {
+                    if (!Online || NeedsLogin || User is null) return;
                     refreshPending = false;
-                    // Show the open conversation before fetching inbox summaries.
                     if (Selected is not null) await RefreshSelectedAsync(Selected.Id);
+                }
+                finally { sync.Release(); }
+
+                // Let queued sends run before inbox maintenance. A continuous stream
+                // of receipts must not hold this gate across every refresh iteration.
+                await sync.WaitAsync(lifetime.Token);
+                try
+                {
+                    if (!Online || NeedsLogin || User is null) return;
                     await SynchronizeDeletedConversationsAsync();
                     for (var page = 0; page < inboxPages; page++)
                     {
@@ -170,8 +179,8 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
                     Conversations = await store.ConversationsAsync(Scope);
                     Notify();
                 }
+                finally { sync.Release(); }
             }
-            finally { sync.Release(); }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (ChatApiException ex) { await HandleApiFailureAsync(ex); Notify(); }
@@ -342,7 +351,15 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         var version = selectionVersion;
         var mutationVersion = messageMutationVersion;
         Conversation conversation;
-        try { conversation = await api.GetAsync<Conversation>($"api/chat/conversations/{id}"); }
+        ChatPage<ChatMessage> result;
+        try
+        {
+            var details = api.GetAsync<Conversation>($"api/chat/conversations/{id}");
+            var messages = api.GetAsync<ChatPage<ChatMessage>>($"api/chat/conversations/{id}/messages?page=0");
+            await Task.WhenAll(details, messages);
+            conversation = await details;
+            result = await messages;
+        }
         catch (ChatApiException ex) when (ex.Status is 403 or 404) { Report(ex); return; }
         var summary = Conversations.FirstOrDefault(x => x.Id == id);
         conversation.LastMessageAt = summary?.LastMessageAt;
@@ -350,7 +367,6 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         conversation.LastMessage = summary?.LastMessage;
         conversation.Muted = summary?.Muted ?? false;
         var fetched = new List<ChatMessage>();
-        var result = await api.GetAsync<ChatPage<ChatMessage>>($"api/chat/conversations/{id}/messages?page=0");
         fetched.AddRange(result.Items); conversation.MessageTotal = result.TotalCount;
         await DecryptMessagesAsync(fetched);
         await store.ReplaceWindowAsync(Scope, id, fetched, fetched.Count >= conversation.MessageTotal);
