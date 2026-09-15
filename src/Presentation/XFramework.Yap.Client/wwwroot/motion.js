@@ -60,7 +60,9 @@
     };
     const suppressClick = () => { suppressUntil = performance.now() + 650; };
     document.addEventListener('click', e => {
-        if (e.detail !== 0 && performance.now() < suppressUntil) {
+        // The window exists to eat the click that trails a long press on the page beneath.
+        // A dialog the press just opened is new DOM, reachable only by a deliberate tap.
+        if (e.detail !== 0 && performance.now() < suppressUntil && !e.target.closest?.('dialog[open]')) {
             e.preventDefault(); e.stopImmediatePropagation();
         }
     }, true);

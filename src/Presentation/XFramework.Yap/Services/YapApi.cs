@@ -49,7 +49,8 @@ public static class YapApi
             var session = await client.ForCurrentActorAsync(ct: ct);
             var data = Require(await session.EnsureChatDefaultsAsync(ct));
             return new ChatDefaults(data.ThreadTypeId,
-                data.ReactionTypes.Select(x => new ReactionType(x.Id, x.Name, x.Emoji)).ToList());
+                data.ReactionTypes.Select(x => new ReactionType(x.Id, x.Name, x.Emoji)).ToList(),
+                data.MessageEditWindowMinutes, data.CanEditAnyMessage);
         });
         api.MapGet("/conversations/deleted", async (int? page, ICommunicationsChatClient client, CancellationToken ct) =>
         {

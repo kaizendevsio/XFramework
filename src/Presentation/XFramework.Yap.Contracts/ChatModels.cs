@@ -7,7 +7,10 @@ public sealed record UserSession(Guid CredentialId, Guid TenantId, string Name, 
 public sealed record SessionResponse(UserSession? User, string AntiforgeryToken, bool EncryptionRequired = false);
 public sealed record Person(Guid Id, string Name, string UserName, string? AvatarUrl = null, Guid MemberId = default, string Role = "Member", string? Nickname = null, DateTime? ActiveUntil = null, DateTime? LastActiveAt = null);
 public sealed record ReactionType(Guid Id, string Name, string Emoji);
-public sealed record ChatDefaults(Guid ThreadTypeId, List<ReactionType> Reactions);
+// EditWindowMinutes is the tenant rule the server enforces; 0 disables editing entirely and
+// EditAnyMessage marks an admin who bypasses the window, so the client never offers a dead Edit.
+public sealed record ChatDefaults(Guid ThreadTypeId, List<ReactionType> Reactions,
+    int EditWindowMinutes = 15, bool EditAnyMessage = false);
 public sealed record ChatPage<T>(List<T> Items, int TotalCount);
 public sealed record MessageQuote(Guid Id, string Sender, string Text);
 public sealed record ChatAttachment(Guid Id, string Name, string ContentType, long Size,

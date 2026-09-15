@@ -53,7 +53,8 @@ button:active,.btn:active,.pillbtn:active{scale:.96}
 .cbtn.on .k,.vbtn.on .k{scale:1.04}
 .reader-motion{display:inline-flex;position:relative;z-index:2}
 /* Recycled rows must appear at their measured position without replaying entry.
-   Never promote the whole history to GPU layers; only active animations get one. */
+   Never promote the whole history to GPU layers; only active animations get one.
+   message-window.js animates the few genuinely new ids over these resting values. */
 .message-window .msg,.message-window .treply{opacity:1;transform:none}
 .message-window .row{transition:none}
 [data-exit-ghost]{pointer-events:none!important;z-index:190!important;animation:none!important}

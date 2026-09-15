@@ -4,16 +4,22 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 function fixture(ref = { invokeMethodAsync: async () => {} }) {
-    const readers = [];
+    const readers = [], animations = [], attributes = new Map(), styles = new Map();
     const events = new Map(), frames = new Map(), timers = new Map(); let nextFrame = 0, resize;
     const ids = Array.from({ length: 30 }, (_, i) => `m${i}`);
-    const rows = ids.map(id => ({ dataset: { windowRow: id }, style: {}, isConnected: true, height: 100, getBoundingClientRect() { return { height: this.height }; } }));
+    const bubble = (id, out) => ({ classList: { contains: name => name === (out ? 'out' : 'in') },
+        animate: (keyframes, options) => animations.push({ id, keyframes, options }) });
+    const row = (id, out = false) => ({ dataset: { windowRow: id }, style: {}, isConnected: true, height: 100,
+        getBoundingClientRect() { return { height: this.height }; }, querySelector: () => bubble(id, out) });
+    const rows = ids.map(id => row(id));
     let scrollTop = 0;
     const element = { clientHeight: 500, scrollHeight: 3000, isConnected: true,
         get scrollTop() { return scrollTop; }, set scrollTop(value) { scrollTop = Math.max(0, Math.min(value, this.scrollHeight - this.clientHeight)); },
         querySelector(selector) { return selector === '[data-window-lead]' ? { getBoundingClientRect: () => ({ height: 0 }) } : { style: {} }; },
         querySelectorAll: selector => selector === '[data-reader-id]' ? readers : rows,
         getClientRects: () => [1], getBoundingClientRect: () => ({ top: 0, bottom: 500 }),
+        style: { setProperty: (name, value) => styles.set(name, value) },
+        setAttribute: (name, value) => attributes.set(name, value), removeAttribute: name => attributes.delete(name),
         addEventListener: (name, handler) => events.set(name, handler), removeEventListener: name => events.delete(name)
     };
     const context = { window: { yap: {} }, document: { addEventListener() {}, removeEventListener() {} }, getComputedStyle: () => ({ paddingTop: '0' }),
@@ -25,8 +31,10 @@ function fixture(ref = { invokeMethodAsync: async () => {} }) {
     const api = context.window.yap.messageWindow;
     const sync = () => api.sync(element, ref, ids, 0, ids.length, true);
     const flush = () => { const pending = [...frames.values()]; frames.clear(); pending.forEach(callback => callback()); };
+    const append = (id, out) => { ids.push(id); rows.push(row(id, out)); element.scrollHeight += 100; };
     sync(); flush();
-    return { api, element, ids, rows, readers, events, sync, flush, timers, resize: () => resize() };
+    return { api, element, ids, rows, readers, events, sync, flush, timers, resize: () => resize(),
+        animations, attributes, styles, row, append };
 }
 
 test('a burst of scroll frames schedules one delayed read check instead of interop each frame', async () => {
@@ -127,4 +135,81 @@ test('read receipt moves from its previous message and does not animate ordinary
     assert.equal(animations[0][0].transform, 'translate(0px,-150px)');
     f.readers[0] = reader('m29', 250); f.sync();
     assert.equal(animations.length, 1);
+});
+
+test('a sent bubble springs out of the composer and a row recycled back never replays it', () => {
+    const f = fixture();
+    f.append('sent', true); f.sync();
+    assert.equal(f.animations.length, 1);
+    assert.equal(f.animations[0].id, 'sent');
+    assert.equal(f.animations[0].keyframes[0].transform, 'translateY(18px) scale(.82)');
+    assert.equal(f.animations[0].keyframes[0].transformOrigin, '100% 100%');
+    assert.equal(f.animations[0].options.easing, 'cubic-bezier(.2,.9,.3,1.18)');
+    f.sync();
+    assert.equal(f.animations.length, 1, 'a repeated render must not replay entry');
+    f.rows.splice(0, 5); f.sync();
+    f.rows.unshift(...f.ids.slice(0, 5).map(id => f.row(id)));
+    f.sync();
+    assert.equal(f.animations.length, 1, 'a recycled row must not replay entry');
+});
+
+test('an incoming bubble settles in from the sender side rather than the composer', () => {
+    const f = fixture();
+    f.append('received', false); f.sync();
+    assert.equal(f.animations.length, 1);
+    assert.equal(f.animations[0].keyframes[0].transform, 'translateY(10px) scale(.94)');
+    assert.equal(f.animations[0].keyframes[0].transformOrigin, '0 100%');
+    assert.equal(f.animations[0].options.easing, 'cubic-bezier(.22,1,.36,1)');
+    assert.ok(f.animations[0].keyframes.every(frame => !('height' in frame) && !('top' in frame)));
+});
+
+test('prepended history and a page of newer messages never animate', () => {
+    const f = fixture();
+    f.ids.unshift('older'); f.rows.unshift(f.row('older')); f.element.scrollHeight += 100; f.sync();
+    assert.equal(f.animations.length, 0, 'earlier history is not an arrival');
+    for (let i = 0; i < 5; i++) f.append(`page${i}`, false);
+    f.sync();
+    assert.equal(f.animations.length, 0, 'a page of newer history is not an arrival');
+});
+
+test('overscrolling the top bands the content and springs back when the finger lifts', () => {
+    const f = fixture();
+    f.element.scrollTop = 0; f.events.get('scroll')(); f.flush();
+    let prevented = 0;
+    const touch = y => ({ touches: [{ clientY: y, clientX: 40 }], preventDefault: () => prevented++ });
+    f.events.get('touchstart')(touch(100));
+    f.events.get('touchmove')(touch(140));
+    f.events.get('touchmove')(touch(200));
+    assert.equal(prevented, 2);
+    assert.ok(f.attributes.has('data-banding'));
+    assert.ok(parseFloat(f.styles.get('--band')) > 0);
+    assert.equal(f.element.scrollTop, 0, 'the band must never move the scroller');
+    f.events.get('touchend')();
+    assert.equal(f.styles.get('--band'), '0px');
+    assert.equal(f.attributes.has('data-banding'), false);
+});
+
+test('a horizontal drag at an end belongs to swipe-to-reply, not to the band', () => {
+    const f = fixture();
+    f.element.scrollTop = 0; f.events.get('scroll')(); f.flush();
+    let prevented = 0;
+    const touch = (y, x) => ({ touches: [{ clientY: y, clientX: x }], preventDefault: () => prevented++ });
+    f.events.get('touchstart')(touch(100, 40));
+    f.events.get('touchmove')(touch(106, 120));
+    assert.equal(prevented, 0);
+    assert.equal(f.styles.has('--band'), false);
+});
+
+test('wheeling past the bottom bands, and wheeling inside the history stays native', () => {
+    const f = fixture(); // the fixture opens pinned to the latest message
+    let prevented = 0;
+    const wheel = deltaY => ({ deltaY, preventDefault: () => prevented++ });
+    f.events.get('wheel')(wheel(120));
+    assert.equal(prevented, 1);
+    assert.ok(parseFloat(f.styles.get('--band')) < 0);
+    f.element.scrollTop = 1200;
+    f.events.get('wheel')(wheel(120));
+    assert.equal(prevented, 1, 'ordinary wheeling must not be swallowed');
+    assert.equal(f.styles.get('--band'), '0px');
+    f.api.dispose(f.element); assert.equal(f.events.size, 0);
 });
