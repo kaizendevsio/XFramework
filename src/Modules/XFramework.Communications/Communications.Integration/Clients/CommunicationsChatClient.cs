@@ -108,6 +108,8 @@ public interface ICommunicationsChatSession
         int pageSize = 20,
         CancellationToken ct = default);
 
+    Task<QueryResponse<GetThreadMessagesResponse>> GetMessageUpdatesAsync(Guid threadId, List<Guid> messageIds, CancellationToken ct = default);
+
     Task<QueryResponse<SearchMessagesResponse>> SearchMessagesAsync(
         string query,
         Guid? threadId = null,
@@ -373,6 +375,10 @@ internal sealed class CommunicationsChatSession(
             PageIndex = pageIndex,
             PageSize = pageSize
         }), callCt), ct);
+
+    public Task<QueryResponse<GetThreadMessagesResponse>> GetMessageUpdatesAsync(Guid threadId, List<Guid> messageIds, CancellationToken ct = default) =>
+        InvokeAsync(callCt => wrapper.GetThreadMessagesAsync(Prepare(new GetThreadMessagesRequest
+        { ThreadId = threadId, MessageIds = messageIds.ToArray(), PageSize = 50 }), callCt), ct);
 
     public Task<QueryResponse<SearchMessagesResponse>> SearchMessagesAsync(
         string query,

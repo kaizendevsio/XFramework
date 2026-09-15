@@ -104,6 +104,10 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         return await db.Database.SqlQuery<int>($"SELECT COUNT(*) AS Value FROM Messages WHERE Scope = {scope} AND ThreadId = {thread} AND (CreatedTicks > {row.CreatedTicks} OR (CreatedTicks = {row.CreatedTicks} AND Id > {id}))").SingleAsync();
     });
 
+    public Task<List<ChatMessage>> MessageUpdatesAsync(string scope, List<Guid> ids) => UseAsync(async db =>
+        (await db.Messages.AsNoTracking().Where(x => x.Scope == scope && ids.Contains(x.Id)).ToListAsync())
+        .Select(x => JsonSerializer.Deserialize<ChatMessage>(x.Json, Json)!).ToList());
+
     public Task<List<ChatMessage>> MessagesAsync(string scope, Guid thread, CancellationToken ct = default, int limit = 0, int skip = 0, Guid? parent = null) => UseAsync(async db =>
     {
         var query = db.Messages.AsNoTracking().Where(x => x.Scope == scope && x.ThreadId == thread).OrderByDescending(x => x.CreatedTicks).ThenByDescending(x => x.Id).AsQueryable();

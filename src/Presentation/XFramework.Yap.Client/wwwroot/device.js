@@ -126,8 +126,13 @@
             events?.close(); events = null; account = scope; activeThread = thread;
             if (!scope) return;
             events = new EventSource(`/api/chat/events?account=${encodeURIComponent(scope)}${thread ? `&thread=${thread}` : ''}`);
-            events.onmessage = () => listener?.invokeMethodAsync('RefreshHint').catch(() => {});
-            events.onopen = events.onmessage;
+            events.onmessage = event => {
+                if (account !== scope || activeThread !== thread) return;
+                listener?.invokeMethodAsync('ChatEvent', scope, event.data).catch(() => {});
+            };
+            events.onopen = () => {
+                if (account === scope && activeThread === thread) listener?.invokeMethodAsync('RefreshHint').catch(() => {});
+            };
             events.addEventListener('call', event => listener?.invokeMethodAsync('VoiceEvent', event.data).catch(() => {}));
             events.addEventListener('typing', event => {
                 if (account !== scope || activeThread !== thread) return;

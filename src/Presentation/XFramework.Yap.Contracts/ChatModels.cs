@@ -91,6 +91,7 @@ public sealed record SendMessage(Guid Id, Guid ThreadId, string Text, Guid? Pare
     string? EncryptedEnvelope = null, List<Guid>? RecipientCredentialIds = null, Guid? EncryptionSenderDeviceId = null, long? SenderDirectoryRevision = null,
     Dictionary<Guid, long>? RecipientDirectoryRevisions = null);
 public sealed record MessageReceipt(Guid MessageId);
+public sealed record ChatUpdateHint(Guid ThreadId, string Kind, Guid? ActorId, List<Guid> MessageIds);
 public sealed record CreateConversation(string Name, List<Guid> Members, bool Group);
 public sealed record MessageAction(Guid ThreadId, Guid MessageId, string Action, string? Text = null,
     Guid? ReactionTypeId = null, Guid? ReactionId = null, string? EncryptedEnvelope = null,
