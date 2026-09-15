@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.31";
+    public const string Version = "1.3.32";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "15 September 2026", [
+            "Yap can now notify you about new messages and incoming calls while the app is closed or in the background.",
+            "Turn notifications on in Settings. On iPhone, add Yap to your Home Screen first."]),
+        ("1.3.31", "15 September 2026", [
             "Calls now ring out loud: a ringback while you wait and a ringtone when someone calls you.",
             "Choose your ringtone and ring volume under Settings, Calls."]),
         ("1.3.30", "15 September 2026", [
@@ -61,7 +64,7 @@ public static class AppRelease
             "Sending, reactions, edits and conversation preferences update immediately while saving continues. Failed changes are restored without losing your draft."]),
         ("1.3.14", "15 September 2026", [
             "Call audio recovers when Android pauses playback, with a tap-to-resume option when the browser needs your permission.",
-            "See who is active in conversation headers. Choose whether to share your own status under Conversation settings ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ General.",
+            "See who is active in conversation headers. Choose whether to share your own status under Conversation settings ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ General.",
             "The app now uses ahead-of-time compilation and Brotli-compressed runtime downloads."]),
         ("1.3.13", "15 September 2026", [
             "Only the latest message shows its time in the conversation. Open any message's options to see its full date and time, with date separators through history.",
