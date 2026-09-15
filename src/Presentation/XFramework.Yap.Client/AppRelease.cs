@@ -2,10 +2,15 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.16";
+    public const string Version = "1.3.17";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "15 September 2026", [
+            "Full-page conversation details, new messages and grouped settings make navigation simpler. Tap a conversation photo to open its details.",
+            "Solid message bubbles, smoother read receipts, popover exits and photo swipes reduce visual work while scrolling.",
+            "Profile photos stay cached, conversation headers show active or last-seen status, and Camera and Record video use separate capture options.",
+            "Startup keeps one consistent splash, with status text changing as saved conversations load."]),
+        ("1.3.16", "15 September 2026", [
             "Applying an app update waits for every message in a rapid send burst to finish saving on your device."]),
         ("1.3.15", "15 September 2026", [
             "Conversations open immediately with the header and composer. Message placeholders appear only when loading takes more than two seconds.",

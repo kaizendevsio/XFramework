@@ -42,6 +42,7 @@ public sealed class PresenceEndpointTests
         hidden = true;
         conversation = (await client.GetFromJsonAsync<Conversation>($"api/chat/conversations/{fixture.Thread}"))!;
         Assert.That(conversation.People.Single(p => p.Id == peer).ActiveUntil, Is.Null);
+        Assert.That(conversation.People.Single(p => p.Id == peer).LastActiveAt, Is.Null);
         client.DefaultRequestHeaders.Remove("RequestVerificationToken");
         Assert.That((await client.PostAsync("api/chat/presence", null)).StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
         await app.StopAsync();

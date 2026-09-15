@@ -7,7 +7,7 @@
         @if (ShowSender && !Message.Mine) { <span class="who">@Message.Sender</span> }
         @if (ShowText || Message.Quote is not null)
         {
-        <button class="bub liquid-glass" @onclick="() => OnSelect.InvokeAsync(Message)" aria-label="@($"Message from {Message.Sender}: {Message.Text}. Open actions")"><GlassLayer /><span class="bubble-content">
+        <button class="bub" @onclick="() => OnSelect.InvokeAsync(Message)" aria-label="@($"Message from {Message.Sender}: {Message.Text}. Open actions")"><span class="bubble-content">
             @if (Message.Quote is not null) { <span class="quote"><span class="qn">@Message.Quote.Sender</span>@Message.Quote.Text</span> }
             @if (ShowText) { @Message.Text }
         </span></button>

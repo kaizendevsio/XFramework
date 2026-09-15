@@ -247,14 +247,15 @@ internal static partial class UiFixture
         }
         if (int.TryParse(Environment.GetEnvironmentVariable("YAP_FIXTURE_HISTORY"), out var history))
         {
+            var small = Environment.GetEnvironmentVariable("YAP_FIXTURE_SMALL_MESSAGES") == "1";
             // Optional browser stress fixture: paginated variable-height text and real PNG previews.
             var image = Guid.NewGuid();
             stored[image] = ("scroll-fixture.png", "image/png", new MemoryStream(File.ReadAllBytes(Path.GetFullPath("src/Presentation/XFramework.Yap.Client/wwwroot/yap-app-v2-512.png"))));
             for (var i = 0; i < Math.Clamp(history, 0, 1000); i++)
             {
                 var item = new ThreadMessageItemResponse { Id = Guid.NewGuid(), SenderCredentialId = i % 2 == 0 ? friend : fixture.Credential,
-                    SenderAlias = "Scroll fixture", Text = $"History {i:D4}: " + string.Join(' ', Enumerable.Repeat("Variable height message for rapid scrolling.", i % 6 + 1)),
-                    CreatedAt = DateTime.UtcNow.AddMinutes(-2000 + i), HasAttachments = i % 5 == 0 };
+                    SenderAlias = "Scroll fixture", Text = small ? $"Message {i:D4}" : $"History {i:D4}: " + string.Join(' ', Enumerable.Repeat("Variable height message for rapid scrolling.", i % 6 + 1)),
+                    CreatedAt = DateTime.UtcNow.AddMinutes(-2000 + i), HasAttachments = !small && i % 5 == 0 };
                 messages.Add(item);
                 if (item.HasAttachments)
                 {
@@ -275,7 +276,7 @@ internal static partial class UiFixture
             .ReturnsAsync((Guid thread, Guid message, int page, int size, CancellationToken _) =>
                 ChatFixture.Ok(new PaginatedResult<MessageFileResponse>(attachments.Count, page, size, attachments.Where(f => f.MessageId == message).ToArray())));
         storage.Setup(s => s.GetStorageDownloadUrl(It.IsAny<GetStorageDownloadUrlRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((GetStorageDownloadUrlRequest request, CancellationToken _) => ChatFixture.Ok(new StorageDownloadUrlResponse { StorageFileId = request.StorageFileId, Url = stored.ContainsKey(request.StorageFileId) ? $"http://127.0.0.1:{port}/test/media/{request.StorageFileId}" : $"http://127.0.0.1:{port}/test/file", ExpiresAt = DateTime.UtcNow.AddMinutes(5) }));
+            .ReturnsAsync((GetStorageDownloadUrlRequest request, CancellationToken _) => ChatFixture.Ok(new StorageDownloadUrlResponse { StorageFileId = request.StorageFileId, Url = stored.ContainsKey(request.StorageFileId) ? $"http://127.0.0.1:{new HttpContextAccessor().HttpContext!.Request.Host.Port}/test/media/{request.StorageFileId}" : $"http://127.0.0.1:{new HttpContextAccessor().HttpContext!.Request.Host.Port}/test/file", ExpiresAt = DateTime.UtcNow.AddMinutes(5) }));
         fixture.Session.Setup(s => s.GetThreadPhotoDownloadUrlAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Guid thread, CancellationToken _) => ChatFixture.Ok(new StorageDownloadUrlResponse { Url = $"http://127.0.0.1:{port}/test/media/{conversations.First(c => c.Id == thread).PhotoStorageFileId}" }));
 

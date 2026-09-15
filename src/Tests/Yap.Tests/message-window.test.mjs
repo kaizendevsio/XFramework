@@ -4,17 +4,20 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 function fixture(ref = { invokeMethodAsync: async () => {} }) {
-    const events = new Map(), frames = new Map(); let nextFrame = 0, resize;
+    const readers = [];
+    const events = new Map(), frames = new Map(), timers = new Map(); let nextFrame = 0, resize;
     const ids = Array.from({ length: 30 }, (_, i) => `m${i}`);
     const rows = ids.map(id => ({ dataset: { windowRow: id }, style: {}, isConnected: true, height: 100, getBoundingClientRect() { return { height: this.height }; } }));
     let scrollTop = 0;
     const element = { clientHeight: 500, scrollHeight: 3000, isConnected: true,
         get scrollTop() { return scrollTop; }, set scrollTop(value) { scrollTop = Math.max(0, Math.min(value, this.scrollHeight - this.clientHeight)); },
         querySelector(selector) { return selector === '[data-window-lead]' ? { getBoundingClientRect: () => ({ height: 0 }) } : { style: {} }; },
-        querySelectorAll: () => rows,
+        querySelectorAll: selector => selector === '[data-reader-id]' ? readers : rows,
+        getClientRects: () => [1], getBoundingClientRect: () => ({ top: 0, bottom: 500 }),
         addEventListener: (name, handler) => events.set(name, handler), removeEventListener: name => events.delete(name)
     };
     const context = { window: { yap: {} }, document: { addEventListener() {}, removeEventListener() {} }, getComputedStyle: () => ({ paddingTop: '0' }),
+        matchMedia: () => ({ matches: false }), setTimeout: callback => { timers.set(++nextFrame, callback); return nextFrame; }, clearTimeout: id => timers.delete(id),
         requestAnimationFrame: callback => { frames.set(++nextFrame, callback); return nextFrame; }, cancelAnimationFrame: id => frames.delete(id),
         ResizeObserver: class { constructor(callback) { resize = callback; } observe() {} unobserve() {} disconnect() {} }
     };
@@ -23,8 +26,18 @@ function fixture(ref = { invokeMethodAsync: async () => {} }) {
     const sync = () => api.sync(element, ref, ids, 0, ids.length, true);
     const flush = () => { const pending = [...frames.values()]; frames.clear(); pending.forEach(callback => callback()); };
     sync(); flush();
-    return { api, element, ids, rows, events, sync, flush, resize: () => resize() };
+    return { api, element, ids, rows, readers, events, sync, flush, timers, resize: () => resize() };
 }
+
+test('a burst of scroll frames schedules one delayed read check instead of interop each frame', async () => {
+    const calls = []; const f = fixture({ invokeMethodAsync: async name => calls.push(name) });
+    for (let i = 0; i < 60; i++) { f.events.get('scroll')(); f.flush(); }
+    assert.equal(calls.filter(x => x === 'ReadVisible').length, 0);
+    assert.equal(f.timers.size, 1);
+    [...f.timers.values()][0]();
+    assert.equal(calls.filter(x => x === 'ReadVisible').length, 1);
+    f.api.dispose(f.element);
+});
 
 test('new messages and late image layout follow when still at the latest message', () => {
     const f = fixture(); assert.equal(f.element.scrollTop, 2500);
@@ -100,4 +113,18 @@ test('returning to a previous history window can load its earlier edge again', (
     f.api.sync(f.element, ref, other, 0, 30, true, true);
     f.api.sync(f.element, ref, f.ids, 0, 30, true, true); f.flush();
     assert.equal(calls.filter(x => x === 'LoadEarlier').length, 2);
+});
+
+
+test('read receipt moves from its previous message and does not animate ordinary scrolling', () => {
+    const f = fixture(), animations = [];
+    const reader = (message, top) => ({ dataset: { readerId: 'person' },
+        closest: () => ({ dataset: { messageId: message } }), getAnimations: () => [],
+        getBoundingClientRect: () => ({ left: 100, top }), animate: frames => animations.push(frames) });
+    f.readers.push(reader('m28', 200)); f.sync();
+    f.readers[0] = reader('m29', 350); f.sync();
+    assert.equal(animations.length, 1);
+    assert.equal(animations[0][0].transform, 'translate(0px,-150px)');
+    f.readers[0] = reader('m29', 250); f.sync();
+    assert.equal(animations.length, 1);
 });

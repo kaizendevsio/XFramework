@@ -4,6 +4,8 @@
     const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
     let pending = null;
     const depth = url => {
+        const path = new URL(url, location.href).pathname;
+        if (/^\/chat\/[^/]+\/details$/.test(path) || /^\/settings\//.test(path)) return 2;
         const route = new URL(url, location.href).pathname.replace(/\.html$/, '').replace(/^\//, '').split('/')[0];
         return ({'':0,dashboard:0,screens:0,login:1,signup:2,settings:1,chat:1,group:1,thread:2,call:2,'video-call':3})[route] ?? 1;
     };
@@ -127,4 +129,75 @@
     document.addEventListener('pointercancel', clear);
     document.addEventListener('visibilitychange', () => { if (document.hidden) { clear(); complete(); } });
     document.addEventListener('contextmenu', e => { if (e.target.closest('.bub,.photo-open') && gesture) e.preventDefault(); });
+
+    // Blazor removes conditional DOM immediately. Retain only a short-lived,
+    // inert visual copy for the exit; actions and state never wait for animation.
+    const retired = new WeakSet(), exitPositions = new Map();
+    const retire = element => {
+        if (reduced() || document.hidden || element.hasAttribute('data-exit-ghost') || retired.has(element)) return;
+        retired.add(element);
+        const modal = element.matches('.message-menu-dialog,.sheet-dialog');
+        const copy = document.createElement('div');
+        for (const attribute of element.attributes) copy.setAttribute(attribute.name, attribute.value);
+        copy.removeAttribute('id'); copy.removeAttribute('role');
+        copy.setAttribute('aria-hidden', 'true'); copy.inert = true;
+        copy.dataset.exitGhost = ''; copy.setAttribute('open', '');
+        copy.innerHTML = element.innerHTML;
+        for (const node of copy.querySelectorAll('[id]')) node.removeAttribute('id');
+        if (modal) {
+            const backdrop = document.createElement('div'); backdrop.className = 'exit-backdrop'; copy.prepend(backdrop);
+            document.body.append(copy);
+        } else if (element.matches('.replyto,.conversation-menu')) {
+            const box = exitPositions.get(element); if (!box) return;
+            Object.assign(copy.style, { position: 'fixed', left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px`, margin: '0' });
+            document.body.append(copy); exitPositions.delete(element);
+        } else {
+            const host = document.querySelector('.toast-host'); if (!host) return;
+            host.append(copy);
+        }
+        const content = copy.querySelector('.message-menu-stack,.sheet') || copy;
+        const to = element.matches('.sheet-dialog') ? 'translateY(32px)' : 'scale(.96)';
+        const animation = content.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: to }], { duration: 180, easing: 'ease-in', fill: 'forwards' });
+        copy.querySelector('.exit-backdrop')?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 180, fill: 'forwards' });
+        animation.finished.catch(() => {}).finally(() => copy.remove());
+    };
+    const observe = () => {
+        const app = document.getElementById('app'); if (!app) return;
+        const composers = new Map();
+        const resize = new ResizeObserver(entries => {
+            for (const { target } of entries) {
+                const before = composers.get(target), box = target.getBoundingClientRect();
+                if (!box.height) continue;
+                const controls = [...target.querySelectorAll(':scope > .inputbox,:scope > .attach-open,:scope > .composer-action')];
+                const after = { box, controls: controls.map(element => ({ element, box: element.getBoundingClientRect() })) };
+                composers.set(target, after);
+                if (!before || reduced() || Math.abs(before.box.height - box.height) < 1) continue;
+                // One layout commit, then FLIP only the backdrop and controls.
+                // Text never scales and no grid/height/padding interpolates per frame.
+                const optics = target.querySelector(':scope > .glass-optics');
+                if (optics) {
+                    optics.style.transformOrigin = '0 0';
+                    optics.animate([{ transform: `translate(${before.box.left-box.left}px,${before.box.top-box.top}px) scale(${before.box.width/box.width},${before.box.height/box.height})` }, { transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.22,1,.36,1)' });
+                }
+                for (const item of after.controls) {
+                    const old = before.controls.find(x => x.element === item.element); if (!old) continue;
+                    item.element.animate([{ transform: `translate(${old.box.left-item.box.left}px,${old.box.top-item.box.top}px)` }, { transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.22,1,.36,1)' });
+                }
+            }
+        });
+        const syncComposers = () => {
+            for (const element of exitPositions.keys()) if (!element.isConnected) exitPositions.delete(element);
+            for (const element of app.querySelectorAll('.replyto,.conversation-menu')) exitPositions.set(element, element.getBoundingClientRect());
+            for (const element of composers.keys()) if (!element.isConnected) { resize.unobserve(element); composers.delete(element); }
+            for (const element of app.querySelectorAll('.inputrow')) if (!composers.has(element)) { composers.set(element, null); resize.observe(element); }
+        };
+        let syncFrame;
+        new MutationObserver(records => {
+            for (const record of records) for (const node of record.removedNodes)
+                if (node.nodeType === 1 && node.matches('.message-menu-dialog,.sheet-dialog,.toast,.replyto,.conversation-menu')) retire(node);
+            if (!syncFrame) syncFrame = requestAnimationFrame(() => { syncFrame = 0; syncComposers(); });
+        }).observe(app, { childList: true, subtree: true });
+        syncComposers();
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', observe, { once: true }); else observe();
 })();

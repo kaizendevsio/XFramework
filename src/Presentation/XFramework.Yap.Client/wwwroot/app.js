@@ -96,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 continue;
             }
             const surface = target.closest('[data-scroll-surface]');
-            if (surface) {
+            if (surface && target.getClientRects().length) {
                 const height = target.getBoundingClientRect().height;
                 const header = target.hasAttribute('data-scroll-header');
                 surface.style.setProperty(header ? '--scroll-top' : '--scroll-bottom', `${height}px`);
@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
         for (const element of watched) if (!element.isConnected) { resize.unobserve(element); element.removeEventListener('scroll', rememberPosition); watched.delete(element); }
         for (const element of document.querySelectorAll('[data-scroll-header],[data-scroll-footer],[data-messages]')) if (!watched.has(element)) {
             watched.add(element);
-            if (element.hasAttribute('data-messages')) { pinned.set(element, true); element.addEventListener('scroll', rememberPosition, { passive: true }); }
+            if (element.hasAttribute('data-messages') && !element.classList.contains('message-window')) { pinned.set(element, true); element.addEventListener('scroll', rememberPosition, { passive: true }); }
             resize.observe(element);
         }
     };

@@ -18,8 +18,12 @@ public sealed class YapPresenceTests
         await presence.TouchAsync(tenant, user, default);
         Assert.That(await presence.ActiveUntilAsync(tenant, user, default), Is.EqualTo(clock.Utc.Add(YapPresence.Lifetime).UtcDateTime));
         Assert.That(await presence.ActiveUntilAsync(Guid.NewGuid(), user, default), Is.Null);
+        var last = clock.Utc.UtcDateTime;
         clock.Utc += TimeSpan.FromSeconds(46);
         Assert.That(await presence.ActiveUntilAsync(tenant, user, default), Is.Null);
+        Assert.That(await presence.LastActiveAtAsync(tenant, user, default), Is.EqualTo(last));
+        clock.Utc += TimeSpan.FromDays(1);
+        Assert.That(await presence.LastActiveAtAsync(tenant, user, default), Is.Null);
         await presence.TouchAsync(tenant, user, default);
         Assert.That(await presence.ActiveUntilAsync(tenant, user, default), Is.Not.Null);
     }

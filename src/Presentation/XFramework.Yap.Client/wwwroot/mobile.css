@@ -52,7 +52,7 @@ button,a,label,nav,.avatar,.appbar,.bottomnav{-webkit-user-select:none;user-sele
 .inputbox{min-width:0;align-items:flex-end}
 .inputbox textarea{flex:1;min-width:0;height:44px;min-height:44px;max-height:144px;border:0;outline:0;background:transparent;color:inherit;padding:11px 0;margin:0;resize:none;line-height:22px;overflow-y:auto;font-family:inherit}
 .inputbox>button{height:44px;flex:none}
-.composer-action{position:relative;flex:none;width:44px;height:44px;transition:width .2s ease}
+.composer-action{position:relative;flex:none;width:44px;height:44px;transition:transform .2s ease}
 .composer-action .sendbtn,.composer-action .voicebtn{position:absolute;inset:0;width:44px;height:44px;transition:opacity .18s ease,transform .22s cubic-bezier(.2,.8,.2,1)}
 .composer-action .sendbtn{opacity:0;transform:scale(.5) rotate(-35deg);pointer-events:none}
 .has-send .sendbtn{opacity:1;transform:scale(1) rotate(0);pointer-events:auto}
@@ -137,7 +137,7 @@ button,a,label,nav,.avatar,.appbar,.bottomnav{-webkit-user-select:none;user-sele
 .attach-note{margin:2px 16px 14px;font-size:12px;color:var(--dim);line-height:1.45}
 .attachment-preview .mid{display:flex;flex-direction:column;gap:3px}
 .upload-bar{display:block;height:4px;border-radius:3px;background:color-mix(in srgb,var(--text) 16%,transparent);overflow:hidden;margin-top:4px}
-.upload-bar i{display:block;height:100%;background:var(--accent-ink);transition:width .2s ease}
+.upload-bar i{display:block;width:100%;transform-origin:left;height:100%;background:var(--accent-ink);transition:transform .2s ease}
 @media(prefers-reduced-motion:reduce){.upload-bar i{transition:none}}
 
 /* A sheet must cover the app, not the subtree that opened it. The composer's attach
@@ -188,7 +188,7 @@ button,a,label,nav,.avatar,.appbar,.bottomnav{-webkit-user-select:none;user-sele
 .selected-person{display:flex;align-items:center;gap:7px;padding:5px 9px 5px 5px;border-radius:24px;background:var(--surface3);font-size:13px}
 .identity-card{flex-direction:row;text-align:left;padding:20px;gap:16px}.identity-summary{min-width:0}.identity-summary p{margin:4px 0 0;color:var(--muted);font-size:13px}.identity-summary h2{font-size:19px}
 .search-hit{flex-direction:column;align-items:flex-start;gap:4px;text-align:left}.search-hit small{color:var(--muted)}
-.inputrow{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;grid-template-rows:minmax(44px,auto) 0px;gap:0;padding:5px 7px;border-radius:29px;transition:grid-template-rows .22s ease,border-radius .22s ease,padding .22s ease;isolation:isolate}
+.inputrow{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;grid-template-rows:minmax(44px,auto) 0px;gap:0;padding:5px 7px;border-radius:29px;transition:none;isolation:isolate}
 .inputrow .inputbox{grid-column:2;grid-row:1;background:transparent;border:0;box-shadow:none;border-radius:0;padding:0 3px}
 .inputrow .attach-open{grid-column:1;grid-row:1;align-self:end}.inputrow .composer-action{grid-column:3;grid-row:1;align-self:end}
 .inputrow:focus-within{grid-template-rows:minmax(54px,auto) 44px;border-radius:26px;padding:10px 9px 7px}

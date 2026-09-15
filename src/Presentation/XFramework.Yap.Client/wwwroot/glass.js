@@ -67,7 +67,9 @@
         function sync(){
             scheduled=false;
             for(const [element,entry]of entries)if(!element.isConnected){observer.unobserve(element);entry.filter?.remove();entries.delete(element);}
-            for(const element of root.querySelectorAll('[data-liquid-glass]'))if(!entries.has(element)){
+            // Scrolling rows must not allocate SVG displacement maps or redraw
+            // refracted backdrops. Chrome mobile paid this cost for every bubble.
+            for(const element of root.querySelectorAll('[data-liquid-glass]'))if(!element.closest('[data-window-row]')&&!entries.has(element)){
                 entries.set(element,{id:`yap-glass-${++sequence}`,filter:null,key:null});observer.observe(element);
             }
         }

@@ -1,16 +1,18 @@
 @page "/settings"
+@page "/settings/{Section}"
 @implements IDisposable
 @inject ChatState State
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 <PageTitle>Settings · Yap</PageTitle>
 <ScrollSurface>
-<Header><div class="appbar plain liquid-glass"><GlassLayer /><h1>Settings</h1><span class="sp"></span></div></Header>
+<Header><div class="appbar plain liquid-glass"><GlassLayer />@if (Section is not null) { <a class="iconbtn" href="/settings" aria-label="Back to settings"><Icon Name="back" /></a> }<h1>@SectionTitle</h1><span class="sp"></span></div></Header>
 <ChildContent>
 <div class="body settings">
 
-    <section class="identity-card liquid-glass">
-        <GlassLayer />
+    @if (Section is null)
+    {
+    <section class="identity-card">
         <Avatar Initials="@ChatMessage.InitialsFor(State.User?.Name)" ImageUrl="@State.User?.AvatarUrl" Size="a48" />
         <div class="identity-summary">
         <h2>@(State.User?.Name ?? "Not signed in")</h2>
@@ -20,9 +22,15 @@
         </div>
     </section>
 
+    <nav class="settings-menu" aria-label="Settings categories">
+        @foreach (var item in Categories)
+        { <a class="set-row" href="@($"/settings/{item.Route}")"><span class="settings-category-icon"><Icon Name="@item.Icon" /></span><span class="set-label">@item.Title<small>@item.Description</small></span><Icon Name="arrow" Size="17" /></a> }
+    </nav>
+    }
+    @if (Section == "appearance")
+    {
     <h3 class="set-group">Appearance</h3>
-    <div class="set-list liquid-glass">
-        <GlassLayer />
+    <div class="set-list">
         <div class="set-row">
             <span class="set-key"><Icon Name="moon" Size="19" /><span class="set-label">Theme</span></span>
             <span class="segmented" role="group" aria-label="Theme">
@@ -49,10 +57,12 @@
         @if (glass) { <div class="set-stack"><GlassControls /></div> }
     </div>
 
-    <EncryptionSettings />
+    }
+    @if (Section == "privacy") { <EncryptionSettings /> }
+    @if (Section == "storage")
+    {
     <h3 class="set-group">Storage and sync</h3>
-    <div class="set-list liquid-glass">
-        <GlassLayer />
+    <div class="set-list">
         <div class="set-row">
             <span class="set-key"><Icon Name="wifi" Size="19" /><span class="set-label">Waiting to sync<small>@(State.Online ? State.NeedsLogin ? "Sign in to resume" : "Connected" : "Offline")</small></span></span>
             <span class="set-value">@State.PendingCount</span>
@@ -66,9 +76,11 @@
         </button>
     </div>
 
+    }
+    @if (Section == "app")
+    {
     <h3 class="set-group">App</h3>
-    <div class="set-list liquid-glass">
-        <GlassLayer />
+    <div class="set-list">
         @if (installed)
         {
             <div class="set-row">
@@ -110,22 +122,25 @@
         }
     </div>
 
+    }
+    @if (Section == "help")
+    {
     <h3 class="set-group">Troubleshooting</h3>
-    <div class="set-list liquid-glass"><GlassLayer /><button class="set-row set-action" aria-expanded="@diagnostics.ToString().ToLowerInvariant()" @onclick="() => diagnostics = !diagnostics"><span class="set-key"><Icon Name="info" Size="19" /><span class="set-label">Diagnostics<small>Collect and share troubleshooting logs</small></span></span><Icon Name="arrow" Size="17" Class="@(diagnostics ? "set-chevron open" : "set-chevron")" /></button>@if(diagnostics){<DiagnosticsControls />}</div>
+    <div class="set-list"><button class="set-row set-action" aria-expanded="@diagnostics.ToString().ToLowerInvariant()" @onclick="() => diagnostics = !diagnostics"><span class="set-key"><Icon Name="info" Size="19" /><span class="set-label">Diagnostics<small>Collect and share troubleshooting logs</small></span></span><Icon Name="arrow" Size="17" Class="@(diagnostics ? "set-chevron open" : "set-chevron")" /></button>@if(diagnostics){<DiagnosticsControls />}</div>
     <p class="set-footnote">Loaded conversations, replies, drafts and opened attachments stay available offline. Messages and uploads you send while offline are saved here and sync when you reconnect.</p>
 
-    @if (State.User is not null)
+    }
+    @if (State.User is not null && Section is null)
     {
-        <div class="set-list liquid-glass">
-            <GlassLayer />
-            <button type="button" class="set-row set-action danger" @onclick="() => signOut = true">
+        <div class="set-list">
+                <button type="button" class="set-row set-action danger" @onclick="() => signOut = true">
                 <span class="set-key"><Icon Name="trash" Size="19" /><span class="set-label">Sign out<small>Removes this account's offline data from this device</small></span></span>
             </button>
         </div>
     }
 </div>
 </ChildContent>
-<Footer><TabBar Current="settings" /></Footer>
+<Footer>@if (Section is null) { <TabBar Current="settings" /> }</Footer>
 </ScrollSurface>
 @if (signOut)
 {
@@ -137,6 +152,14 @@
     </BottomSheet>
 }
 @code {
+    [Parameter] public string? Section { get; set; }
+    private string SectionTitle => Categories.FirstOrDefault(x => x.Route == Section).Title ?? "Settings";
+    private static readonly (string Route, string Title, string Icon, string Description)[] Categories = [
+        ("appearance", "Appearance", "moon", "Theme, colors and glass"),
+        ("privacy", "Privacy and security", "shield", "Encryption, recovery and devices"),
+        ("storage", "Storage and sync", "wifi", "Offline messages and pending sends"),
+        ("app", "About Yap", "info", "Updates, installation and gestures"),
+        ("help", "Help and diagnostics", "settings", "Troubleshooting and logs")];
     private bool signOut, gestures, glass, changes, canInstall, installed, diagnostics;
     private string theme = "system";
     private string accent = "#d5f879";

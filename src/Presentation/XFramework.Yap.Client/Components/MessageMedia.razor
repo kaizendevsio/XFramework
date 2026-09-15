@@ -41,11 +41,12 @@
     [Parameter, EditorRequired] public ChatMessage Message { get; set; } = default!;
     [Parameter] public EventCallback MetadataLoaded { get; set; }
     [Parameter] public EventCallback OnActions { get; set; }
+    [Parameter] public string SourcePrefix { get; set; } = "";
     private ChatAttachment? viewing;
     private readonly Dictionary<Guid, string> urls = [];
     private readonly HashSet<Guid> ready = [];
     private readonly HashSet<Guid> playbackFailed = [];
-    private string PhotoId(ChatAttachment file) => $"photo-{Message.Id}-{file.Id}";
+    private string PhotoId(ChatAttachment file) => $"{SourcePrefix}photo-{Message.Id}-{file.Id}";
     private bool loading, failed, disposed, waitingForConnection;
     private bool WaitingForLinks => Message.EncryptedEnvelope is not null && Message.LocalFileKey is null && !Message.AttachmentLinksReady;
     private string? loaded;

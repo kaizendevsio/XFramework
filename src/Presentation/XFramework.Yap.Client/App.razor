@@ -16,11 +16,11 @@ else if (!State.Ready)
 {
     @if (waitingForDatabase)
     {
-        <main class="loading" role="status"><Brand /><h1>Yap is open in another tab</h1><p>Close the other Yap tab or window. This page will continue automatically. Your saved conversations are safe.</p><progress aria-label="Waiting for the other tab"></progress><p><a href="diagnostics.html">Open diagnostic logs</a></p></main>
+        <StartupSplash Text="Waiting for the other Yap tab…"><p class="startup-help">Close the other tab to continue. Your saved conversations are safe.</p></StartupSplash>
     }
     else
     {
-        <main class="loading"><Brand /><p>Opening your conversations…</p><progress aria-label="Loading Yap"></progress></main>
+        <StartupSplash Text="@startupText" />
     }
 }
 else
@@ -31,6 +31,7 @@ else
 @code {
     private string? failure;
     private bool waitingForDatabase;
+    private string startupText = "Opening device storage…";
     protected override Task OnInitializedAsync() => StartAsync();
     private async Task StartAsync()
     {
@@ -43,6 +44,8 @@ else
                 StateHasChanged();
             }
             waitingForDatabase = false;
+            startupText = "Loading saved conversations…";
+            StateHasChanged();
             await State.InitializeAsync();
             await JS.InvokeVoidAsync("yap.diagnostics.record", "startup.complete");
         }

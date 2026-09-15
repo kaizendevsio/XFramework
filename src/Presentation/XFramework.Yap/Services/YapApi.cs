@@ -89,8 +89,12 @@ public static class YapApi
             // Only an authorized conversation member can query this snapshot. Never reveal
             // heartbeat data for members who have opted out in this conversation.
             // Redis multiplexes these reads; a large group must not serialize cache round trips.
-            members = (await Task.WhenAll(members.Select(async (member, index) => data.Members[index].HideActiveStatus
-                ? member : member with { ActiveUntil = await presence.ActiveUntilAsync(session.TenantId, member.Id, ct) }))).ToList();
+            members = (await Task.WhenAll(members.Select(async (member, index) =>
+            {
+                if (data.Members[index].HideActiveStatus) return member;
+                var last = await presence.LastActiveAtAsync(session.TenantId, member.Id, ct);
+                return member with { LastActiveAt = last, ActiveUntil = last?.Add(YapPresence.Lifetime) };
+            }))).ToList();
             return new Conversation { Id = id, Name = data.IsDirect && !data.HasCustomName ? members.FirstOrDefault(x => x.Id != session.CredentialId)?.Name ?? "Direct message" : data.Name,
                 Group = !data.IsDirect, AvatarUrl = data.IsDirect ? members.FirstOrDefault(x => x.Id != session.CredentialId)?.AvatarUrl : YapProfile.GroupPhoto(id, data.PhotoStorageFileId, session.TenantId, session.CredentialId),
                 Members = members.Count, People = members, Features = (int)data.Features, CanManage = data.CanManage,
