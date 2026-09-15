@@ -1,21 +1,37 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
-<dialog class="photo-viewer" aria-label="Photo viewer" @ref="dialog">
+<dialog class="photo-viewer" aria-label="@($"{Kind} viewer")" @ref="dialog">
     <div class="photo-shade" aria-hidden="true"></div>
     <div class="photo-toolbar">
-        <button aria-label="Close photo" @onclick="CloseAnimatedAsync"><Icon Name="close" /></button>
-        <span class="photo-viewer-title">Photo</span>
-        @if (CanDownload) { <button aria-label="Download original photo" @onclick="() => OnDownload.InvokeAsync()"><Icon Name="download" /></button> }
+        <button aria-label="@($"Close {Noun}")" @onclick="CloseAnimatedAsync"><Icon Name="close" /></button>
+        <span class="photo-viewer-title">@Kind</span>
+        @if (CanDownload) { <button aria-label="@($"Download original {Noun}")" @onclick="() => OnDownload.InvokeAsync()"><Icon Name="download" /></button> }
     </div>
-    <div class="photo-stage"><img src="@Url" alt="@Name" draggable="false" /></div>
+    <div class="photo-stage">
+        @if (IsVideo) { <video src="@Url" preload="metadata" playsinline aria-label="@Name"></video> }
+        else { <img src="@Url" alt="@Name" draggable="false" /> }
+    </div>
+    @if (IsVideo)
+    {
+        @* The gesture stage swallows pointers, so playback gets its own transport beside it. *@
+        <div class="video-transport" data-playing="false">
+            <button type="button" class="video-play" aria-label="Play video"><Icon Name="play" Class="glyph-play" Size="20" /><Icon Name="pause" Class="glyph-pause" Size="20" /></button>
+            <span class="video-elapsed">0:00</span>
+            <input class="video-seek" type="range" min="0" max="1000" step="1" value="0" aria-label="Seek video" />
+            <span class="video-duration">0:00</span>
+        </div>
+    }
 </dialog>
 @code {
     [Parameter, EditorRequired] public string Url { get; set; } = "";
     [Parameter] public string Name { get; set; } = "Photo";
+    [Parameter] public bool IsVideo { get; set; }
     [Parameter] public string? SourceId { get; set; }
     [Parameter] public bool CanDownload { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
     [Parameter] public EventCallback OnDownload { get; set; }
+    private string Kind => IsVideo ? "Video" : "Photo";
+    private string Noun => IsVideo ? "video" : "photo";
     private ElementReference dialog;
     private DotNetObjectReference<PhotoViewer>? reference;
     protected override async Task OnAfterRenderAsync(bool firstRender)

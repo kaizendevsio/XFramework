@@ -1,0 +1,33 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@* The trace and the clock are written by voice.js from the live analyser, so recording
+   never re-renders Blazor at frame rate. *@
+<div class="voice-recorder liquid-glass" role="status" aria-label="Recording voice message" @ref="bar">
+    <GlassLayer />
+    <button type="button" class="voice-discard iconbtn" aria-label="Discard recording" @onclick="() => Cancel.InvokeAsync()"><Icon Name="trash" Size="18" /></button>
+    <span class="voice-live"><i class="voice-dot" aria-hidden="true"></i><span data-voice-elapsed="1">0:00</span></span>
+    <span class="voice-levels" aria-hidden="true">@for (var level = 0; level < Bars; level++) { <i data-voice-bar="1"></i> }</span>
+    <button type="button" class="voice-finish" aria-label="Stop and preview recording" @onclick="() => Stop.InvokeAsync()"><Icon Name="check" Size="20" /></button>
+</div>
+@code {
+    [Parameter] public EventCallback Stop { get; set; }
+    [Parameter] public EventCallback Cancel { get; set; }
+    private const int Bars = 28;
+    private ElementReference bar;
+    private IJSObjectReference? module;
+    private bool disposed;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        module = await JS.InvokeAsync<IJSObjectReference>("import", "./voice.js");
+        if (disposed) { await module.DisposeAsync(); module = null; return; }
+        await module.InvokeVoidAsync("meter", bar);
+    }
+    public async ValueTask DisposeAsync()
+    {
+        disposed = true;
+        if (module is null) return;
+        await module.InvokeVoidAsync("stopMeter", bar);
+        await module.DisposeAsync();
+    }
+}

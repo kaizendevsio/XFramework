@@ -1,0 +1,68 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+<div class="voice">
+    <audio @ref="audio" src="@Url" preload="metadata" aria-label="@Label"></audio>
+    <button type="button" class="voice-play" aria-label="@($"{(playing ? "Pause" : "Play")} {Label}")" @onclick="ToggleAsync"><Icon Name="@(playing ? "pause" : "play")" Size="19" /></button>
+    <div class="voice-body">
+        <div class="voice-wave">
+            @for (var bar = 0; bar < peaks.Length; bar++)
+            { <i class="@(bar < Played ? "on" : "")" style="--level:@peaks[bar].ToString(Culture)"></i> }
+            <input type="range" min="0" max="1000" step="1" value="@Position" aria-label="@($"Seek {Label}")" aria-valuetext="@Clock(current)" @oninput="SeekAsync" />
+        </div>
+        <span class="voice-time">@Clock(playing || current > 0 ? current : duration)</span>
+    </div>
+</div>
+@code {
+    [Parameter, EditorRequired] public string Url { get; set; } = "";
+    [Parameter] public string Name { get; set; } = "Voice message";
+    private const int Bars = 44;
+    private static readonly System.Globalization.CultureInfo Culture = System.Globalization.CultureInfo.InvariantCulture;
+    // A calm placeholder trace so the control reads as a player before the clip is decoded.
+    private static readonly double[] Placeholder = [.. Enumerable.Range(0, Bars).Select(bar => .22 + .5 * Math.Abs(Math.Sin(bar * .7)))];
+    private ElementReference audio;
+    private IJSObjectReference? module;
+    private DotNetObjectReference<VoiceMessage>? reference;
+    private double[] peaks = Placeholder;
+    private double current, duration;
+    private bool playing, disposed;
+    private string? loaded;
+    private string Label => Name.StartsWith("Voice message", StringComparison.OrdinalIgnoreCase) ? "Voice message" : Name;
+    private int Played => duration > 0 ? (int)Math.Round(current / duration * peaks.Length) : 0;
+    private string Position => duration > 0 ? Math.Clamp(current / duration * 1000, 0, 1000).ToString("0", Culture) : "0";
+    private static string Clock(double seconds) => double.IsFinite(seconds) && seconds > 0 ? $"{(int)(seconds / 60)}:{(int)(seconds % 60):00}" : "0:00";
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./voice.js");
+        if (disposed) { await module.DisposeAsync(); module = null; return; }
+        if (loaded == Url) return;
+        loaded = Url;
+        reference ??= DotNetObjectReference.Create(this);
+        await module.InvokeVoidAsync("attach", audio, reference);
+        // Decoding also yields the length: MediaRecorder clips often report duration Infinity.
+        var clip = await module.InvokeAsync<Waveform>("analyse", Url, Bars);
+        if (disposed || loaded != Url) return;
+        if (clip.Peaks.Length > 0) peaks = clip.Peaks;
+        if (duration <= 0) duration = clip.Duration;
+        StateHasChanged();
+    }
+    [JSInvokable] public Task Sync(double time, double length, bool active)
+    {
+        current = time; playing = active;
+        if (length > 0) duration = length;
+        return InvokeAsync(StateHasChanged);
+    }
+    private async Task ToggleAsync() { if (module is not null) await module.InvokeVoidAsync("toggle", audio); }
+    private async Task SeekAsync(ChangeEventArgs e)
+    {
+        if (module is null || duration <= 0 || !double.TryParse(e.Value?.ToString(), Culture, out var position)) return;
+        current = position * duration / 1000;
+        await module.InvokeVoidAsync("seek", audio, current);
+    }
+    public async ValueTask DisposeAsync()
+    {
+        disposed = true;
+        if (module is not null) { await module.InvokeVoidAsync("detach", audio); await module.DisposeAsync(); }
+        reference?.Dispose();
+    }
+    private sealed record Waveform(double Duration, double[] Peaks);
+}

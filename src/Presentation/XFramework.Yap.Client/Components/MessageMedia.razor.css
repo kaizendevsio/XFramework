@@ -1,5 +1,6 @@
 .photo-preview { position: relative; max-width: 100%; }
 .photo-skeleton { width: min(280px, 72vw); max-width: 100%; height: 260px; border-radius: 18px; background: var(--surface2); display: grid; place-items: center; color: var(--dim); }
+.voice-skeleton { width: min(260px, 68vw); height: 56px; }
 .photo-pending .photo-open { position: absolute; inset: 0; visibility: hidden; }
 .photo-pending .photo-download { display: none; }
 .photo-open { display: block; padding: 0; border: 0; background: none; border-radius: 18px; overflow: hidden; }

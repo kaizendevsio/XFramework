@@ -1,14 +1,14 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
+@* A poster thumbnail only: playback happens in the shared media viewer, which owns the gestures. *@
 <div class="video-preview">
-    <video @ref="video" src="@Url" controls playsinline preload="none" aria-label="@Name"
-           @onerror="() => OnError.InvokeAsync()" @oncontextmenu="() => OnActions.InvokeAsync()" @oncontextmenu:preventDefault></video>
+    <video @ref="video" src="@Url" playsinline muted preload="none" aria-label="@Name" @onerror="() => OnError.InvokeAsync()"></video>
+    <span class="video-badge" aria-hidden="true"><Icon Name="play" Size="20" /></span>
 </div>
 @code {
     [Parameter, EditorRequired] public string Url { get; set; } = "";
     [Parameter] public string Name { get; set; } = "Video";
     [Parameter] public EventCallback OnError { get; set; }
-    [Parameter] public EventCallback OnActions { get; set; }
     private ElementReference video;
     private IJSObjectReference? module;
     private string? loaded;

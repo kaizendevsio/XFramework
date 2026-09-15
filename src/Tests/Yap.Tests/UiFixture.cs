@@ -240,10 +240,22 @@ internal static partial class UiFixture
         var attachments = new List<MessageFileResponse>();
         if (Environment.GetEnvironmentVariable("YAP_FIXTURE_VIDEO") is { } videoPath)
         {
-            var id = Guid.NewGuid(); stored[id] = ("sample.mov", "application/octet-stream", new MemoryStream(File.ReadAllBytes(videoPath)));
-            var message = new ThreadMessageItemResponse { Id = Guid.NewGuid(), SenderCredentialId = friend, SenderAlias = "Sarah Mensah", Text = "sample.mov", HasAttachments = true, CreatedAt = DateTime.UtcNow.AddSeconds(-10) };
+            var name = Path.GetFileName(videoPath);
+            var id = Guid.NewGuid(); stored[id] = (name, "application/octet-stream", new MemoryStream(File.ReadAllBytes(videoPath)));
+            var message = new ThreadMessageItemResponse { Id = Guid.NewGuid(), SenderCredentialId = friend, SenderAlias = "Sarah Mensah", Text = name, HasAttachments = true, CreatedAt = DateTime.UtcNow.AddSeconds(-10) };
             messages.Add(message); var attachment = Guid.NewGuid(); mediaLinks[attachment] = id;
             attachments.Add(new MessageFileResponse { Id = attachment, MessageId = message.Id, StorageFileId = id });
+        }
+        // One received and one sent clip: the voice player must appear on both sides.
+        if (Environment.GetEnvironmentVariable("YAP_FIXTURE_VOICE") is { } voicePath)
+        {
+            var id = Guid.NewGuid(); stored[id] = ("Voice message.m4a", "audio/mp4", new MemoryStream(File.ReadAllBytes(voicePath)));
+            foreach (var sender in new[] { friend, fixture.Credential })
+            {
+                var message = new ThreadMessageItemResponse { Id = Guid.NewGuid(), SenderCredentialId = sender, SenderAlias = sender == friend ? "Sarah Mensah" : "Jamie Davis", Text = "Voice message.m4a", HasAttachments = true, CreatedAt = DateTime.UtcNow.AddSeconds(-20) };
+                messages.Add(message); var attachment = Guid.NewGuid(); mediaLinks[attachment] = id;
+                attachments.Add(new MessageFileResponse { Id = attachment, MessageId = message.Id, StorageFileId = id });
+            }
         }
         if (int.TryParse(Environment.GetEnvironmentVariable("YAP_FIXTURE_HISTORY"), out var history))
         {

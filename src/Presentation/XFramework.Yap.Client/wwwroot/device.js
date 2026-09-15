@@ -324,13 +324,20 @@
             try {
                 const mimeType = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].find(type => MediaRecorder.isTypeSupported(type));
                 const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-                const state = { recorder, stream, chunks: [], size: 0, timer: null, finished: null };
+                const state = { recorder, stream, chunks: [], size: 0, timer: null, finished: null, started: performance.now(), meter: null, analyser: null };
+                // The composer draws a live level trace from this; a browser without
+                // WebAudio simply records without one.
+                try {
+                    state.meter = new (window.AudioContext || window.webkitAudioContext)();
+                    state.analyser = state.meter.createAnalyser(); state.analyser.fftSize = 1024;
+                    state.meter.createMediaStreamSource(stream).connect(state.analyser);
+                } catch { state.meter = state.analyser = null; }
                 state.finished = new Promise((resolve, reject) => {
                     recorder.ondataavailable = event => { if (event.data.size) { state.chunks.push(event.data); state.size += event.data.size; } if (state.size > 19 * 1024 * 1024 && recorder.state !== 'inactive') recorder.stop(); };
                     recorder.onerror = () => reject(new Error('Recording failed.'));
-                    recorder.onstop = () => { clearTimeout(state.timer); stream.getTracks().forEach(track => track.stop()); resolve(new Blob(state.chunks, { type: recorder.mimeType })); };
+                    recorder.onstop = () => { clearTimeout(state.timer); state.meter?.close().catch(() => {}); stream.getTracks().forEach(track => track.stop()); resolve(new Blob(state.chunks, { type: recorder.mimeType })); };
                 });
-                state.finished.catch(() => { stream.getTracks().forEach(track => track.stop()); });
+                state.finished.catch(() => { state.meter?.close().catch(() => {}); stream.getTracks().forEach(track => track.stop()); });
                 recorder.start(1000); state.timer = setTimeout(() => { if (recorder.state !== 'inactive') recorder.stop(); }, 300000);
                 window.yapRecording = state;
             } catch (error) { stream.getTracks().forEach(track => track.stop()); throw error; }
@@ -346,7 +353,7 @@
                 await write(key, blob);
                 const extension = blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm';
                 return { key, name: `Voice message.${extension}`, contentType: blob.type, size: blob.size };
-            } finally { clearTimeout(state.timer); state.stream.getTracks().forEach(track => track.stop()); }
+            } finally { clearTimeout(state.timer); state.meter?.close().catch(() => {}); state.stream.getTracks().forEach(track => track.stop()); }
         },
         resizeComposer(input) {
             if (!input) return;

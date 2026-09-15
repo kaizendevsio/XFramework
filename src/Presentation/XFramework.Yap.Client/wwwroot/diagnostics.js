@@ -58,10 +58,15 @@
     document.addEventListener('visibilitychange', () => record('page.visibility', { kind: document.visibilityState }));
     addEventListener('error', e => record('error', { type: errorType(e.error || e.message), route: e.filename, line: e.lineno, column: e.colno }));
     addEventListener('unhandledrejection', e => record('promise.error', { type: errorType(e.reason) }));
-    document.addEventListener('load', e => {
-        if (e.target?.matches?.('.message-media img,dialog.photo-viewer img'))
-            record('image.loaded', { width: e.target.naturalWidth, height: e.target.naturalHeight, count: document.querySelectorAll('.message-media img').length });
-    }, true);
+    // Clips report their size on loadeddata and through videoWidth, never load/naturalWidth.
+    const decoded = e => {
+        const target = e.target;
+        if (!target?.matches?.('.message-media :is(img,video),dialog.photo-viewer :is(img,video)')) return;
+        record('image.loaded', { width: target.naturalWidth ?? target.videoWidth, height: target.naturalHeight ?? target.videoHeight,
+            count: document.querySelectorAll('.message-media :is(img,video)').length });
+    };
+    document.addEventListener('load', decoded, true);
+    document.addEventListener('loadeddata', decoded, true);
     const fetch = window.fetch.bind(window);
     window.fetch = async (...args) => {
         const path = args[0]?.url || String(args[0]);

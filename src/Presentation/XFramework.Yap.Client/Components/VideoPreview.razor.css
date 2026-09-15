@@ -1,0 +1,5 @@
+.video-preview { position: relative; display: block; line-height: 0; }
+/* The wrapping button owns the tap, so the poster itself must not swallow pointers. */
+.video-preview video { pointer-events: none; }
+.video-badge { position: absolute; left: 50%; top: 50%; translate: -50% -50%; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; color: white; background: #0000006b; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.video-badge ::deep svg { display: block; margin-left: 2px; }

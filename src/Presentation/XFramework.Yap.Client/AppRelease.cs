@@ -2,10 +2,15 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.27";
+    public const string Version = "1.3.28";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "15 September 2026", [
+            "Voice messages have a proper player with a waveform you can scrub, and received clips play in the conversation.",
+            "Recording shows a live level meter and a running clock.",
+            "Videos open full screen in the same viewer as photos.",
+            "Opening a photo or video hides its thumbnail, so it no longer shows through while you swipe to close."]),
+        ("1.3.27", "15 September 2026", [
             "Settings uses one consistent edge spacing on every page instead of drifting per section.",
             "Your chosen accent colour now applies across the app, and the chrome no longer carries a green tint.",
             "The sign-in status line under your photo is gone; connection notices appear as a toast."]),
@@ -46,7 +51,7 @@ public static class AppRelease
             "Sending, reactions, edits and conversation preferences update immediately while saving continues. Failed changes are restored without losing your draft."]),
         ("1.3.14", "15 September 2026", [
             "Call audio recovers when Android pauses playback, with a tap-to-resume option when the browser needs your permission.",
-            "See who is active in conversation headers. Choose whether to share your own status under Conversation settings → General.",
+            "See who is active in conversation headers. Choose whether to share your own status under Conversation settings â†’ General.",
             "The app now uses ahead-of-time compilation and Brotli-compressed runtime downloads."]),
         ("1.3.13", "15 September 2026", [
             "Only the latest message shows its time in the conversation. Open any message's options to see its full date and time, with date separators through history.",
