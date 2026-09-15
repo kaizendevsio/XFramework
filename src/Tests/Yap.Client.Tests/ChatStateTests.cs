@@ -312,7 +312,7 @@ public sealed class ChatStateTests
         var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Reader");
         var chat = new Conversation { Id = Guid.NewGuid() };
         var root = new ChatMessage { Id = Guid.NewGuid(), ThreadId = chat.Id, Text = "Root", CreatedAt = DateTime.UtcNow.Date, ReplyTotal = 250 };
-        var messages = Enumerable.Range(1, 250).Select(i => new ChatMessage { Id = Guid.NewGuid(), ThreadId = chat.Id, ParentId = root.Id, Text = $"Reply {i}", CreatedAt = root.CreatedAt.AddSeconds(i) }).ToList();
+        var messages = Enumerable.Range(1, 250).Select(i => new ChatMessage { Id = Guid.NewGuid(), ThreadId = chat.Id, ParentId = root.Id, IsThreadReply = true, Text = $"Reply {i}", CreatedAt = root.CreatedAt.AddSeconds(i) }).ToList();
         messages.Insert(0, root);
         var js = new Mock<IJSRuntime>();
         js.Setup(x => x.InvokeAsync<bool>("yap.device.online", It.IsAny<object?[]?>())).ReturnsAsync(true);
@@ -338,7 +338,7 @@ public sealed class ChatStateTests
         await state.LoadRepliesAsync(parent); await state.LoadRepliesAsync(parent);
         Assert.That(parent.Replies, Has.Count.EqualTo(100));
         var anchor = parent.Replies[^1].Id;
-        messages.Add(new() { Id = Guid.NewGuid(), ThreadId = chat.Id, ParentId = root.Id, Text = "New reply", CreatedAt = root.CreatedAt.AddSeconds(251) });
+        messages.Add(new() { Id = Guid.NewGuid(), ThreadId = chat.Id, ParentId = root.Id, IsThreadReply = true, Text = "New reply", CreatedAt = root.CreatedAt.AddSeconds(251) });
         await state.RefreshHint();
         parent = state.Selected!.Messages.Single(x => x.Id == root.Id);
         Assert.That(parent.Replies, Has.Count.EqualTo(100));
@@ -777,6 +777,31 @@ public sealed class ChatStateTests
         Assert.That(requests, Is.EqualTo(new[] { "/api/session" }));
         Assert.That(await fixture.Store.PendingAsync(OfflineStore.Scope(cached)), Has.Count.EqualTo(1));
         Assert.That(await fixture.Store.PendingAsync(OfflineStore.Scope(switched)), Is.Empty);
+    }
+
+    [Test]
+    public async Task SelectAsync_ThreadReplies_StayInTheirThread_AndOnlyInlineRepliesAreQuoted()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Sender");
+        var scope = OfflineStore.Scope(user);
+        var chat = new Conversation { Id = Guid.NewGuid() };
+        await fixture.Store.SetSettingAsync("user", JsonSerializer.Serialize(user));
+        await fixture.Store.SaveConversationsAsync(scope, [chat]);
+        var now = DateTime.UtcNow.Date;
+        var root = new ChatMessage { Id = Guid.NewGuid(), ThreadId = chat.Id, Text = "root", CreatedAt = now };
+        var inline = new ChatMessage { Id = Guid.NewGuid(), ThreadId = chat.Id, Text = "inline", CreatedAt = now.AddMinutes(1), ParentId = root.Id };
+        var reply = new ChatMessage { Id = Guid.NewGuid(), ThreadId = chat.Id, Text = "in thread", CreatedAt = now.AddMinutes(2), ParentId = root.Id, IsThreadReply = true };
+        await fixture.Store.SaveMessagesAsync(scope, [root, inline, reply]);
+        using var http = new HttpClient(new Handler(_ => throw new AssertionException("Offline selection must not use HTTP")))
+        { BaseAddress = new Uri("https://yap.test/") };
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), new Mock<IJSRuntime>().Object);
+        await state.InitializeAsync();
+        await state.SelectAsync(chat.Id);
+        var messages = state.Selected!.Messages;
+        Assert.That(messages.Select(x => x.Id), Is.EqualTo(new[] { root.Id, inline.Id }));
+        Assert.That(messages.Single(x => x.Id == inline.Id).Quote!.Id, Is.EqualTo(root.Id));
+        Assert.That(messages.Single(x => x.Id == root.Id).Replies, Is.Empty, "The timeline never carries a thread's replies.");
     }
 
     private static HttpResponseMessage Json<T>(T value) => new(HttpStatusCode.OK) { Content = JsonContent.Create(value) };

@@ -755,7 +755,7 @@ public sealed partial class ThreadServiceSecurityTests
         var member = Member(Guid.NewGuid(), Guid.NewGuid(), actor, tenant);
         var parent = Message(Guid.NewGuid(), member.MessageThreadId, member.Id, tenant, "parent");
         var reply = Message(Guid.NewGuid(), member.MessageThreadId, member.Id, tenant, "reply");
-        reply.ParentMessageId = parent.Id;
+        reply.ParentMessageId = parent.Id; reply.IsThreadReply = true;
         var deliveryType = new MessageDeliveryType { Id = Guid.NewGuid(), TenantId = tenant,
             SystemReferenceId = MessageDeliveryTypes.Delivered, Name = "Delivered", IsEnabled = true };
         var context = new InMemoryDataContext();
@@ -851,7 +851,8 @@ public sealed partial class ThreadServiceSecurityTests
         message.EncryptedEnvelope = "ciphertext-only";
         message.EncryptionSenderDeviceId = Guid.NewGuid();
         message.AcceptedSenderDirectoryRevision = 4;
-        message.ParentMessageId = Guid.NewGuid(); message.IsThreadReply = true;
+        // An inline reply can still be the preview; a thread reply never is.
+        message.ParentMessageId = Guid.NewGuid();
         message.PendingEncryptionMembersJson = pending ? $"[\"{member.Id}\"]" : "[]";
         var hidden = Message(Guid.NewGuid(), thread.Id, sender.Id, tenant, "hidden");
         hidden.CreatedAt = message.CreatedAt.AddMinutes(1); hidden.EncryptedEnvelope = "hidden-ciphertext";
@@ -872,7 +873,7 @@ public sealed partial class ThreadServiceSecurityTests
             Assert.That(preview.EncryptionSenderDeviceId, Is.EqualTo(message.EncryptionSenderDeviceId));
             Assert.That(preview.AcceptedSenderDirectoryRevision, Is.EqualTo(4));
             Assert.That(preview.ParentMessageId, Is.EqualTo(message.ParentMessageId));
-            Assert.That(preview.IsThreadReply, Is.True);
+            Assert.That(preview.IsThreadReply, Is.False);
             Assert.That(preview.EncryptionPending, Is.EqualTo(pending));
         });
     }

@@ -263,6 +263,25 @@ public sealed class OfflineStoreTests
         Assert.That(await fixture.Store.MessagesAsync("account-a", message.ThreadId), Is.Empty);
         Assert.That(await fixture.Store.DraftAsync("account-b", "reply"), Is.Empty);
     }
+
+    [Test]
+    public async Task ThreadReplies_StayOutOfTheTimelineWindowCountsAndOffsets()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var thread = Guid.NewGuid();
+        var root = fixture.Message(thread);
+        var inline = fixture.Message(thread); inline.ParentId = root.Id;
+        var reply = fixture.Message(thread); reply.ParentId = root.Id; reply.IsThreadReply = true;
+        await fixture.Store.SaveMessagesAsync("a", [root, inline, reply]);
+        Assert.That((await fixture.Store.MessagesAsync("a", thread)).Select(x => x.Id), Is.EqualTo(new[] { root.Id, inline.Id }));
+        Assert.That((await fixture.Store.MessagesAsync("a", thread, parent: root.Id)).Single().Id, Is.EqualTo(reply.Id));
+        Assert.That(await fixture.Store.MessageCountAsync("a", thread), Is.EqualTo(2));
+        Assert.That(await fixture.Store.ReplyCountAsync("a", root.Id), Is.EqualTo(1));
+        Assert.That(await fixture.Store.MessageOffsetAsync("a", thread, root.Id), Is.EqualTo(1));
+        // A timeline refresh no longer lists thread replies, so it must not evict them either.
+        await fixture.Store.ReplaceWindowAsync("a", thread, [root, inline], true);
+        Assert.That((await fixture.Store.MessagesAsync("a", thread, parent: root.Id)).Single().Id, Is.EqualTo(reply.Id));
+    }
 }
 
 public sealed class OfflineSchemaTests
@@ -285,6 +304,25 @@ public sealed class OfflineSchemaTests
         await fixture.Store.QueueAsync(queued, message, "main");
 
         Assert.That((await fixture.Store.PendingAsync("account-a")).Single().UploadId, Is.EqualTo(queued.UploadId));
+    }
+
+    [Test]
+    public async Task UpgradeAsync_DeviceFromAnEarlierBuild_ReclassifiesCachedThreadReplies()
+    {
+        // The flag only ever lived inside the serialized body, so the new column is backfilled from it.
+        await using var fixture = await StoreFixture.CreateAsync();
+        var thread = Guid.NewGuid();
+        var root = fixture.Message(thread);
+        var reply = fixture.Message(thread); reply.ParentId = root.Id; reply.IsThreadReply = true;
+        await fixture.Store.SaveMessagesAsync("account-a", [root, reply]);
+        await using var db = fixture.CreateDbContext();
+        await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"Messages\" DROP COLUMN \"IsThreadReply\"");
+
+        await OfflineDatabase.UpgradeAsync(db);
+        await OfflineDatabase.UpgradeAsync(db);
+
+        Assert.That((await fixture.Store.MessagesAsync("account-a", thread)).Single().Id, Is.EqualTo(root.Id));
+        Assert.That(await fixture.Store.ReplyCountAsync("account-a", root.Id), Is.EqualTo(1));
     }
 }
 

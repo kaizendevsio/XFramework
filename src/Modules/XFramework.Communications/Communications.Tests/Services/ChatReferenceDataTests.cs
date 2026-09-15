@@ -139,7 +139,7 @@ public sealed class ChatReferenceDataTests
         var blockedMember = Guid.NewGuid();
         await using var db = CreateDb(tenant);
         Message Reply() => new() { Id = Guid.NewGuid(), TenantId = tenant, MessageThreadId = thread,
-            MessageThreadMemberId = Guid.NewGuid(), ParentMessageId = parent, Text = "reply", IsEnabled = true };
+            MessageThreadMemberId = Guid.NewGuid(), ParentMessageId = parent, Text = "reply", IsThreadReply = true, IsEnabled = true };
         var visible = Enumerable.Range(0, 125).Select(_ => Reply()).ToArray();
         var hidden = Reply();
         var blocked = Reply(); blocked.MessageThreadMemberId = blockedMember;
@@ -148,8 +148,9 @@ public sealed class ChatReferenceDataTests
         var foreign = Reply(); foreign.TenantId = Guid.NewGuid();
         var otherThread = Reply(); otherThread.MessageThreadId = Guid.NewGuid();
         var otherParent = Reply(); otherParent.ParentMessageId = Guid.NewGuid();
+        var inline = Reply(); inline.IsThreadReply = false;
         db.AddRange(visible);
-        db.AddRange(hidden, blocked, deleted, disabled, otherThread, otherParent);
+        db.AddRange(hidden, blocked, deleted, disabled, otherThread, otherParent, inline);
         await db.SaveChangesAsync();
         await using (var foreignDb = CreateDb(foreign.TenantId))
         {

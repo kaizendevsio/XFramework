@@ -617,11 +617,11 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
 
     private static void ComposeReplies(List<ChatMessage> messages)
     {
+        // A thread reply never belongs to the timeline; its own window owns Replies, so leave that alone.
+        messages.RemoveAll(x => x.IsThreadReply);
         var lookup = messages.ToDictionary(x => x.Id);
-        foreach (var message in messages) message.Replies = [];
         foreach (var message in messages.Where(x => x.ParentId.HasValue))
-            if (lookup.TryGetValue(message.ParentId!.Value, out var parent))
-            { parent.Replies.Add(message); message.Quote = new(parent.Id, parent.Sender, parent.Text); }
+            if (lookup.TryGetValue(message.ParentId!.Value, out var parent)) message.Quote = new(parent.Id, parent.Sender, parent.Text);
         foreach (var message in messages) message.ReplyTotal = Math.Max(message.ReplyTotal, message.Replies.Count);
     }
 
@@ -724,6 +724,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             if (Scope == scope)
             {
                 Selected?.Messages.RemoveAll(x => x.Id == id);
+                Selected?.Messages.ForEach(x => x.Replies.RemoveAll(reply => reply.Id == id));
                 if (Selected is not null) ComposeReplies(Selected.Messages);
                 PendingCount = Math.Max(0, PendingCount - 1);
             }

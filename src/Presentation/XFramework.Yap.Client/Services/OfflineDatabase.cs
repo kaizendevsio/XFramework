@@ -31,20 +31,25 @@ public sealed class OfflineDatabase(DbContextOptions<OfflineDatabase> options) :
     public static async Task UpgradeAsync(OfflineDatabase db, CancellationToken ct = default)
     {
         await AddColumnAsync(db, "Outbox", "UploadId", "TEXT NULL", ct);
+        if (await AddColumnAsync(db, "Messages", "IsThreadReply", "INTEGER NOT NULL DEFAULT 0", ct))
+            // Rows cached before the column existed still carry the flag inside their serialized body.
+            await db.Database.ExecuteSqlRawAsync(
+                "UPDATE \"Messages\" SET \"IsThreadReply\" = 1 WHERE \"Json\" LIKE '%\"isThreadReply\":true%'", ct);
     }
 
-    private static async Task AddColumnAsync(OfflineDatabase db, string table, string column, string definition, CancellationToken ct)
+    private static async Task<bool> AddColumnAsync(OfflineDatabase db, string table, string column, string definition, CancellationToken ct)
     {
         var connection = db.Database.GetDbConnection();
         if (connection.State != System.Data.ConnectionState.Open) await connection.OpenAsync(ct);
         await using (var probe = connection.CreateCommand())
         {
             probe.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = '{column}'";
-            if (Convert.ToInt64(await probe.ExecuteScalarAsync(ct)) > 0) return;
+            if (Convert.ToInt64(await probe.ExecuteScalarAsync(ct)) > 0) return false;
         }
         await using var alter = connection.CreateCommand();
         alter.CommandText = $"ALTER TABLE \"{table}\" ADD COLUMN \"{column}\" {definition}";
         await alter.ExecuteNonQueryAsync(ct);
+        return true;
     }
 }
 
@@ -60,6 +65,8 @@ public sealed class CachedMessage
     public Guid Id { get; set; }
     public Guid ThreadId { get; set; }
     public Guid? ParentId { get; set; }
+    /// <summary>Queryable copy of the flag inside <see cref="Json"/>: the timeline and the thread page filter on it.</summary>
+    public bool IsThreadReply { get; set; }
     public long CreatedTicks { get; set; }
     public string Json { get; set; } = "";
 }

@@ -18,8 +18,9 @@ public sealed class MessageReplySummaryReader(DbContext db) : IMessageReplySumma
         if (visibleMessageIds.Count > 100) throw new ArgumentOutOfRangeException(nameof(visibleMessageIds));
 
         var query = db.Set<Message>().AsNoTracking()
+            // The badge opens the thread page, so it counts only what that page shows.
             .Where(x => x.TenantId == tenantId && x.MessageThreadId == threadId && !x.IsDeleted && x.IsEnabled
-                && x.ParentMessageId.HasValue && visibleMessageIds.Contains(x.ParentMessageId.Value));
+                && x.IsThreadReply && x.ParentMessageId.HasValue && visibleMessageIds.Contains(x.ParentMessageId.Value));
         if (blockedMemberIds.Count > 0) query = query.Where(x => !blockedMemberIds.Contains(x.MessageThreadMemberId));
         if (hiddenMessageIds.Count > 0) query = query.Where(x => !hiddenMessageIds.Contains(x.Id));
 
