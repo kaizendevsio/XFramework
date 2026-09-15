@@ -44,6 +44,7 @@ public static class YapApi
         });
         api.MapYapProfile();
         api.MapYapEncryption();
+        api.MapYapPush();
         api.MapPost("/initialize", async (ICommunicationsChatClient client, CancellationToken ct) =>
         {
             var session = await client.ForCurrentActorAsync(ct: ct);

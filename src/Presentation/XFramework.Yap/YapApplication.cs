@@ -1,6 +1,7 @@
 using Bolt.Client;
 using Communications.Integration.Clients;
 using Communications.Integration.Drivers;
+using Notifications.Integration.Drivers;
 using IdentityServer.Integration.Drivers;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication;
@@ -74,6 +75,7 @@ public static class YapApplication
         builder.Services.AddIdentityServerWrapperServices();
         builder.Services.AddCommunicationsWrapperServices();
         builder.Services.AddStorageWrapperServices();
+        builder.Services.AddNotificationsWrapperServices();
         builder.Services.AddSingleton<YapSessions>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<YapPresence>();

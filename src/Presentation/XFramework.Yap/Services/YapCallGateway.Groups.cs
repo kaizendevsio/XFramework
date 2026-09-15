@@ -27,6 +27,7 @@ public sealed partial class YapCallGateway
         var room = new GroupRoom(Guid.NewGuid(), tenant, thread, caller, user.Identity?.Name ?? "Someone");
         room.Members.Add(caller, new GroupMember { Session = user.FindFirstValue(YapAuth.SessionClaim), Accepted = true, DeviceId = deviceId });
         foreach (var id in recipients) room.Members.Add(id, new GroupMember());
+        YapGroupCall snapshot;
         lock (gate)
         {
             if (groups.Count + invites.Count >= 64 || room.Members.Keys.Any(id => GroupMemberBusy(tenant, id) ||
@@ -34,8 +35,12 @@ public sealed partial class YapCallGateway
                 throw new YapApiException(409, "Someone is already in a call.");
             groups.Add(room.Id, room);
             PublishGroupLocked(room, "group-incoming");
-            return Snapshot(room);
+            snapshot = Snapshot(room);
         }
+
+        // Outside the lock: a push round trip must never hold the gateway's single mutex.
+        NotifyIncomingCall(tenant, thread, room.Id, recipients);
+        return snapshot;
     }
 
     internal async Task<YapGroupCall> AcceptGroupAsync(ClaimsPrincipal user, Guid callId, CancellationToken ct = default, Guid deviceId = default)
@@ -288,7 +293,7 @@ public sealed partial class YapCallGateway
         public Guid Caller { get; } = caller;
         public string CallerName { get; } = callerName;
         public long Revision = 1;
-        public DateTimeOffset InviteExpires { get; } = DateTimeOffset.UtcNow.AddSeconds(60);
+        public DateTimeOffset InviteExpires { get; } = DateTimeOffset.UtcNow.Add(InviteLifetime);
         public DateTimeOffset Expires { get; } = DateTimeOffset.UtcNow.AddHours(1);
         public Dictionary<Guid, GroupMember> Members { get; } = [];
         public Dictionary<(Guid Sender, Guid Recipient, string Kind), YapGroupControlEvent> Controls { get; } = [];

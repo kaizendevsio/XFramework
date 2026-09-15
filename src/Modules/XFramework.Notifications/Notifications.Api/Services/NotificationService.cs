@@ -3,13 +3,16 @@ using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Security;
+using Notifications.Api.Services.Push;
 
 namespace Notifications.Api.Services;
 
 public sealed class NotificationService(
     AppDbContext db,
     ILogger<NotificationService> logger,
-    ITrustedInvocationContextAccessor trustedInvocationContextAccessor)
+    ITrustedInvocationContextAccessor trustedInvocationContextAccessor,
+    NotificationPushService push,
+    NotificationDeliverySignal deliverySignal)
 {
     private const char TemplateKeySeparator = '\n';
 
@@ -38,6 +41,14 @@ public sealed class NotificationService(
         var enabledChannels = preferences?.EnabledChannels ?? NotificationPreferenceDefaults.EnabledChannels;
         var requestedChannels = NotificationPreferenceDefaults.Normalize(request.DeliveryChannels);
         var effectiveChannels = requestedChannels & enabledChannels;
+
+        // Push is enabled by default, so drop it when this person has no registered device.
+        // Otherwise every notification would queue a delivery job that can only ever fail.
+        if (effectiveChannels.HasFlag(NotificationDeliveryChannel.Push) &&
+            !await push.HasSubscriptionsAsync(tenantId, request.RecipientCredentialId, ct))
+        {
+            effectiveChannels &= ~NotificationDeliveryChannel.Push;
+        }
 
         if (effectiveChannels == NotificationDeliveryChannel.None)
         {
@@ -96,6 +107,11 @@ public sealed class NotificationService(
             item.Id,
             item.RecipientCredentialId,
             tenantId);
+
+        // A push that arrives a poll interval late has already lost most of its value; wake the
+        // dispatcher now instead of waiting for the next timer tick.
+        if (effectiveChannels.HasFlag(NotificationDeliveryChannel.Push))
+            deliverySignal.Notify();
 
         return Result<NotificationInboxItemResponse>.Success(ToInboxResponse(item), 201, "Notification created");
     }
@@ -436,13 +452,15 @@ public sealed class NotificationService(
                 Status = NotificationDeliveryStatus.Queued,
                 ProviderKey = ResolveDefaultProviderKey(channel),
                 RecipientAddress = string.IsNullOrWhiteSpace(deliveryAddress) ? null : deliveryAddress.Trim(),
-                PayloadJson = JsonSerializer.Serialize(new
-                {
-                    item.Title,
-                    item.Body,
-                    item.TemplateKey,
-                    item.DataJson
-                }),
+                PayloadJson = channel == NotificationDeliveryChannel.Push
+                    ? JsonSerializer.Serialize(PushPayload(item), NotificationPushService.PushEnvelopeJson)
+                    : JsonSerializer.Serialize(new
+                    {
+                        item.Title,
+                        item.Body,
+                        item.TemplateKey,
+                        item.DataJson
+                    }),
                 CorrelationId = correlationId,
                 NextAttemptAt = now,
                 CreatedAt = now,
@@ -453,6 +471,41 @@ public sealed class NotificationService(
         }
     }
 
+    // Routing identifiers only. Title and Body are ciphertext-derived or server-composed text and
+    // neither belongs in a payload that leaves the trust boundary on its way to a device.
+    private static PushEnvelope PushPayload(NotificationInboxItem item) => new(
+        1,
+        NotificationPushService.KindMessage,
+        ReadThreadId(item.DataJson),
+        item.Id,
+        null);
+
+    // Fanout callers spell the thread key differently depending on the event they build it from.
+    private static readonly string[] ThreadIdKeys = ["threadId", "ThreadId", "messageThreadId", "MessageThreadId"];
+
+    private static Guid? ReadThreadId(string? dataJson)
+    {
+        if (string.IsNullOrWhiteSpace(dataJson))
+            return null;
+
+        try
+        {
+            using var document = JsonDocument.Parse(dataJson);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+                return null;
+            foreach (var name in ThreadIdKeys)
+                if (document.RootElement.TryGetProperty(name, out var value) &&
+                    Guid.TryParse(value.ValueKind == JsonValueKind.String ? value.GetString() : value.GetRawText().Trim('"'), out var threadId))
+                    return threadId;
+        }
+        catch (JsonException)
+        {
+            // Caller-supplied data; a malformed blob just means no deep link.
+        }
+
+        return null;
+    }
+
     private static IEnumerable<NotificationDeliveryChannel> EnumerateExternalChannels(NotificationDeliveryChannel channels)
     {
         if (channels.HasFlag(NotificationDeliveryChannel.Email))
@@ -461,6 +514,8 @@ public sealed class NotificationService(
             yield return NotificationDeliveryChannel.Sms;
         if (channels.HasFlag(NotificationDeliveryChannel.Webhook))
             yield return NotificationDeliveryChannel.Webhook;
+        if (channels.HasFlag(NotificationDeliveryChannel.Push))
+            yield return NotificationDeliveryChannel.Push;
     }
 
     private static string ResolveDefaultProviderKey(NotificationDeliveryChannel channel) =>
@@ -469,6 +524,7 @@ public sealed class NotificationService(
             NotificationDeliveryChannel.Email => "smtp",
             NotificationDeliveryChannel.Sms => "sms-gateway",
             NotificationDeliveryChannel.Webhook => "webhook",
+            NotificationDeliveryChannel.Push => WebPushVapidProvider.ProviderKey,
             _ => channel.ToString().ToLowerInvariant()
         };
 

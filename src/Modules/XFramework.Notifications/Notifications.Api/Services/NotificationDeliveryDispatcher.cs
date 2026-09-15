@@ -1,3 +1,4 @@
+using Notifications.Api.Services.Push;
 using Notifications.Domain.Shared.Contracts;
 using SmsGateway.Domain.Shared.Contracts.Requests.Create;
 using SmsGateway.Integration.Drivers;
@@ -14,6 +15,7 @@ namespace Notifications.Api.Services;
 public sealed class NotificationDeliveryDispatcher(
     AppDbContext db,
     ISmsGatewayServiceWrapper smsGateway,
+    NotificationPushService push,
     ILogger<NotificationDeliveryDispatcher> logger,
     IConfiguration configuration)
 {
@@ -22,6 +24,10 @@ public sealed class NotificationDeliveryDispatcher(
     private readonly int _batchSize = Math.Clamp(configuration.GetValue("Notifications:Delivery:BatchSize", 25), 1, 100);
     private readonly int _maxAttempts = Math.Max(1, configuration.GetValue("Notifications:Delivery:MaxAttempts", 5));
 
+    // A message notification that surfaces a day later is noise; expire it at the push service instead.
+    private readonly int _pushTimeToLiveSeconds = Math.Clamp(
+        configuration.GetValue("Notifications:Push:TimeToLiveSeconds", 3600), 0, 2419200);
+
     public async Task<int> DispatchDueAsync(CancellationToken ct)
     {
         var now = DateTime.UtcNow;
@@ -29,6 +35,10 @@ public sealed class NotificationDeliveryDispatcher(
             .AsTracking()
             .Where(x => !x.IsDeleted)
             .Where(x => x.Status == NotificationDeliveryStatus.Queued || x.Status == NotificationDeliveryStatus.Failed)
+            // CompletedAt is stamped only when a job is finished for good. Without this a job that
+            // exhausted its attempts stays Failed with a past NextAttemptAt and is leased again on
+            // every poll forever, burning an attempt row each time.
+            .Where(x => x.CompletedAt == null)
             .Where(x => x.NextAttemptAt == null || x.NextAttemptAt <= now)
             .OrderBy(x => x.NextAttemptAt)
             .ThenBy(x => x.CreatedAt)
@@ -62,6 +72,9 @@ public sealed class NotificationDeliveryDispatcher(
         if (dueJobs.Count > 0)
             await db.SaveChangesAsync(ct);
 
+        if (dueJobs.Any(job => job.Channel == NotificationDeliveryChannel.Push))
+            await push.PruneExpiredAsync(ct);
+
         var processed = 0;
         foreach (var job in dueJobs)
         {
@@ -71,6 +84,7 @@ public sealed class NotificationDeliveryDispatcher(
                 NotificationDeliveryChannel.Sms => await DispatchSmsAsync(job, ct),
                 NotificationDeliveryChannel.Email => await DispatchEmailAsync(job, ct),
                 NotificationDeliveryChannel.Webhook => await DispatchWebhookAsync(job, ct),
+                NotificationDeliveryChannel.Push => await DispatchPushAsync(job, ct),
                 _ => Result.Failure("Unsupported delivery channel", 400)
             };
 
@@ -115,6 +129,56 @@ public sealed class NotificationDeliveryDispatcher(
 
         await MarkSentAsync(job, "sms-gateway", ct);
         return Result.Success();
+    }
+
+    private async Task<Result> DispatchPushAsync(NotificationDeliveryJob job, CancellationToken ct)
+    {
+        var inbox = await db.Set<NotificationInboxItem>()
+            .AsNoTracking()
+            .Where(x => x.Id == job.NotificationInboxItemId && x.TenantId == job.TenantId)
+            .Select(x => new { x.Id, x.RecipientCredentialId })
+            .FirstOrDefaultAsync(ct);
+
+        if (inbox is null)
+            return await MarkFailedAsync(job, "not-found", "Notification inbox item was not found", false, ct);
+
+        // The payload was fixed when the job was queued so nothing here can widen it. It holds
+        // routing identifiers only: the message body is end-to-end encrypted and the server
+        // could not include it even if the notification wanted to.
+        PushEnvelope? envelope = null;
+        if (!string.IsNullOrWhiteSpace(job.PayloadJson))
+        {
+            try { envelope = JsonSerializer.Deserialize<PushEnvelope>(job.PayloadJson, NotificationPushService.PushEnvelopeJson); }
+            catch (JsonException) { /* Fall back to a bare wake-up below. */ }
+        }
+
+        envelope ??= new PushEnvelope(1, NotificationPushService.KindMessage, null, inbox.Id, null);
+
+        var summary = await push.SendAsync(
+            job.TenantId,
+            inbox.RecipientCredentialId,
+            envelope,
+            _pushTimeToLiveSeconds,
+            "normal",
+            ct);
+
+        if (summary.Delivered > 0)
+        {
+            await MarkSentAsync(job, $"web-push:{summary.Delivered}", ct);
+            return Result.Success();
+        }
+
+        // No device left to try, so retrying only burns attempts; a transient failure still may
+        // succeed on the next lease.
+        var retryable = summary.Failed > 0;
+        return await MarkFailedAsync(
+            job,
+            retryable ? "push-send-failed" : "push-no-subscriptions",
+            retryable
+                ? "No push endpoint accepted the notification"
+                : "No push subscription remains for this recipient",
+            retryable,
+            ct);
     }
 
     private async Task<Result> MarkProviderPendingAsync(NotificationDeliveryJob job, string reason, CancellationToken ct)

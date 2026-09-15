@@ -16,6 +16,7 @@
     <ProjectReference Include="../XFramework.Yap.Client/XFramework.Yap.Client.csproj" />
     <ProjectReference Include="../../Modules/XFramework.Communications/Communications.Integration/Communications.Integration.csproj" />
     <ProjectReference Include="../../Modules/XFramework.IdentityServer/IdentityServer.Integration/IdentityServer.Integration.csproj" />
+    <ProjectReference Include="../../Modules/XFramework.Notifications/Notifications.Integration/Notifications.Integration.csproj" />
     <ProjectReference Include="../../Modules/XFramework.Storage/Storage.Integration/Storage.Integration.csproj" />
   </ItemGroup>
 </Project>

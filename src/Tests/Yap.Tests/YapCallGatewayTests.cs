@@ -5,6 +5,10 @@ using Bolt.Server;
 using Communications.Domain.Shared.Contracts.Requests.Threads;
 using Communications.Domain.Shared.Contracts.Responses;
 using Communications.Integration.Drivers;
+using System.Collections.Concurrent;
+using Notifications.Domain.Shared.Contracts.Requests;
+using Notifications.Domain.Shared.Contracts.Responses;
+using Notifications.Integration.Drivers;
 using IdentityServer.Integration.Drivers;
 using IdentityServer.Domain.Shared.Contracts.Requests;
 using IdentityServer.Domain.Shared.Contracts.Responses;
@@ -388,6 +392,37 @@ public sealed class YapCallGatewayTests
         public Task<WebSocket> AcceptAsync(WebSocketAcceptContext context) => throw new IOException("Test connection interrupted during upgrade");
     }
 
+    // A ringing invite lives for 60 seconds and never reaches the Communications outbox, so the
+    // only thing that can wake a closed phone in time is this direct push.
+    [Test]
+    public async Task StartingAGroupCall_ImmediatelyPushesEveryInvitedDevice()
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        var room = await f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId, f.CharlieId], deviceId: f.AliceDevice);
+
+        Assert.That(await f.PushArrived.WaitAsync(TimeSpan.FromSeconds(5)), Is.True);
+        Assert.That(await f.PushArrived.WaitAsync(TimeSpan.FromSeconds(5)), Is.True);
+        var pushes = f.Pushes.ToArray();
+        Assert.That(pushes.Select(x => x.RecipientCredentialId), Is.EquivalentTo(new[] { f.BobId, f.CharlieId }));
+        Assert.That(pushes.All(x => x.Kind == "call" && x.Urgency == "high"), Is.True);
+        Assert.That(pushes.All(x => x.ThreadId == f.Thread && x.Reference == room.Id.ToString("N")), Is.True);
+        // Expiring at the push service beats waking a phone for a call that already timed out.
+        Assert.That(pushes.All(x => x.TimeToLiveSeconds <= YapCallGateway.InviteLifetime.TotalSeconds), Is.True);
+        // The payload must never carry the caller's name or anything else about the conversation.
+        Assert.That(System.Text.Json.JsonSerializer.Serialize(pushes[0]), Does.Not.Contain("Someone"));
+    }
+
+    [Test]
+    public async Task StartingADirectCall_PushesOnlyTheRecipient()
+    {
+        await using var f = await Fixture.CreateAsync();
+        var invite = await f.Gateway.StartAsync(f.Alice, new StartYapCall(f.Thread, f.BobId), default);
+
+        Assert.That(await f.PushArrived.WaitAsync(TimeSpan.FromSeconds(5)), Is.True);
+        Assert.That(f.Pushes.Single().RecipientCredentialId, Is.EqualTo(f.BobId));
+        Assert.That(f.Pushes.Single().Reference, Is.EqualTo(invite.Id.ToString("N")));
+    }
+
     private sealed class Fixture : IAsyncDisposable
     {
         public Guid Thread { get; } = Guid.NewGuid();
@@ -397,6 +432,8 @@ public sealed class YapCallGatewayTests
         public Guid BobDevice { get; } = Guid.NewGuid();
         public Guid CharlieDevice { get; } = Guid.NewGuid();
         public HashSet<Guid> RevokedDevices { get; } = [];
+        public ConcurrentQueue<SendDirectPushRequest> Pushes { get; } = new();
+        public SemaphoreSlim PushArrived { get; } = new(0);
         public List<ThreadMemberResponse> Members { get; } = [];
         public ClaimsPrincipal Alice { get; private set; } = null!;
         public ClaimsPrincipal Bob { get; private set; } = null!;
@@ -416,8 +453,16 @@ public sealed class YapCallGatewayTests
                     Response = new GetThreadResponse { Id = fixture.Thread, Members = fixture.Members } });
             var actorScope = new Mock<IActorAccessTokenScope>();
             var identity = new Mock<IIdentityServerServiceWrapper>();
+            var notifications = new Mock<INotificationsServiceWrapper>();
+            notifications.Setup(x => x.SendDirectPush(It.IsAny<SendDirectPushRequest>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((SendDirectPushRequest request, CancellationToken _) =>
+                {
+                    fixture.Pushes.Enqueue(request);
+                    fixture.PushArrived.Release();
+                    return new QueryResponse<SendDirectPushResponse> { HttpStatusCode = HttpStatusCode.OK, Response = new() { Delivered = 1 } };
+                });
             var services = new ServiceCollection().AddLogging().AddDistributedMemoryCache().AddDataProtection().Services;
-            services.AddSingleton<IConfiguration>(configuration).AddSingleton(wrapper.Object).AddSingleton(identity.Object).AddSingleton(actorScope.Object).AddSingleton<YapSessions>();
+            services.AddSingleton<IConfiguration>(configuration).AddSingleton(wrapper.Object).AddSingleton(identity.Object).AddSingleton(actorScope.Object).AddSingleton(notifications.Object).AddSingleton<YapSessions>();
             fixture.provider = services.BuildServiceProvider();
             var sessions = fixture.provider.GetRequiredService<YapSessions>();
             var alice = YapSessionsTests.Session();

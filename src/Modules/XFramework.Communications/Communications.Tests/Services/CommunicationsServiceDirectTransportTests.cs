@@ -420,6 +420,24 @@ public sealed class CommunicationsServiceDirectTransportTests
             RecordNotificationDeliveryStatusRequest request,
             CancellationToken ct = default) =>
             throw new NotSupportedException();
+
+        // Push subscriptions and direct push are Notifications-owned surfaces that Communications
+        // never calls; fanout only creates inbox items.
+        public Task<QueryResponse<PushConfigurationResponse>> GetPushConfiguration(
+            GetPushConfigurationRequest request,
+            CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task<QueryResponse<PushSubscriptionResponse>> RegisterPushSubscription(
+            RegisterPushSubscriptionRequest request,
+            CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task<CmdResponse> RemovePushSubscription(
+            RemovePushSubscriptionRequest request,
+            CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task<QueryResponse<SendDirectPushResponse>> SendDirectPush(
+            SendDirectPushRequest request,
+            CancellationToken ct = default) => throw new NotSupportedException();
     }
 
     private sealed class TestCommunicationsTemplateService : ICommunicationsTemplateService
@@ -475,6 +493,22 @@ public sealed class CommunicationsServiceDirectTransportTests
 
         public Task<QueryResponse<NotificationDeliveryStatusResponse>> RecordNotificationDeliveryStatus(
             RecordNotificationDeliveryStatusRequest request,
+            CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task<QueryResponse<PushConfigurationResponse>> GetPushConfiguration(
+            GetPushConfigurationRequest request,
+            CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task<QueryResponse<PushSubscriptionResponse>> RegisterPushSubscription(
+            RegisterPushSubscriptionRequest request,
+            CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task<CmdResponse> RemovePushSubscription(
+            RemovePushSubscriptionRequest request,
+            CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task<QueryResponse<SendDirectPushResponse>> SendDirectPush(
+            SendDirectPushRequest request,
             CancellationToken ct = default) => throw new NotSupportedException();
     }
 
