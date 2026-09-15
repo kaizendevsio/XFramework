@@ -6,7 +6,8 @@ public static class AppRelease
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "15 September 2026", [
-            "New messages and receipts update directly without reloading the whole conversation and inbox."]),
+            "New messages and receipts update directly without reloading the whole conversation and inbox.",
+            "Live updates reconnect after a server interruption without needing to reopen the conversation."]),
         ("1.3.19", "15 September 2026", [
             "Queued messages get a turn before inbox refreshes, and conversation reads run together to reduce delivery delay.",
             "A brief server reconnect retries a read once instead of immediately waiting for the next background sync."]),

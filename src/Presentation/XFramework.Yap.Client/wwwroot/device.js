@@ -1,6 +1,7 @@
 // Files stay in OPFS. SQLite owns conversations, drafts and upload receipts.
 (() => {
     let listener, events, account, activeThread, installPrompt, databaseLock;
+    let reconnectTimer, reconnectDelay = 1000;
     const urls = new Set();
     // Attachments too large to copy into OPFS are held as live File handles instead.
     // They do not survive a reload, which is why they also require a connection.
@@ -122,16 +123,32 @@
                 window.yap.diagnostics?.record('storage.cleanup-failed', { name: error.name }));
         },
         events(scope, thread) {
-            if (account === scope && activeThread === thread && events) return;
+            if (account === scope && activeThread === thread && events && events.readyState !== EventSource.CLOSED) return;
+            clearTimeout(reconnectTimer); reconnectTimer = null;
+            if (account !== scope || activeThread !== thread) reconnectDelay = 1000;
             events?.close(); events = null; account = scope; activeThread = thread;
             if (!scope) return;
-            events = new EventSource(`/api/chat/events?account=${encodeURIComponent(scope)}${thread ? `&thread=${thread}` : ''}`);
+            const source = events = new EventSource(`/api/chat/events?account=${encodeURIComponent(scope)}${thread ? `&thread=${thread}` : ''}`);
             events.onmessage = event => {
                 if (account !== scope || activeThread !== thread) return;
                 listener?.invokeMethodAsync('ChatEvent', scope, event.data).catch(() => {});
             };
             events.onopen = () => {
+                if (source !== events) return;
+                reconnectDelay = 1000;
                 if (account === scope && activeThread === thread) listener?.invokeMethodAsync('RefreshHint').catch(() => {});
+            };
+            // Browsers retry interrupted streams, but a failed HTTP reconnect can
+            // leave EventSource permanently CLOSED. Recover without a page reload.
+            events.onerror = () => {
+                if (source !== events || source.readyState !== EventSource.CLOSED || reconnectTimer) return;
+                reconnectTimer = setTimeout(() => {
+                    reconnectTimer = null;
+                    if (source !== events) return;
+                    if (!navigator.onLine || document.hidden) { source.onerror(); return; }
+                    window.yap.device.events(scope, thread);
+                }, reconnectDelay);
+                reconnectDelay = Math.min(30000, reconnectDelay * 2);
             };
             events.addEventListener('call', event => listener?.invokeMethodAsync('VoiceEvent', event.data).catch(() => {}));
             events.addEventListener('typing', event => {
@@ -387,6 +404,13 @@
         update() { window.yap.updates.apply(); },
         checkUpdate() { window.yap.updates.notice(); }
     };
+
+    const resumeEvents = () => {
+        if (account && navigator.onLine && !document.hidden && events?.readyState === EventSource.CLOSED)
+            window.yap.device.events(account, activeThread);
+    };
+    addEventListener('online', resumeEvents);
+    document.addEventListener('visibilitychange', resumeEvents);
 
     // The visual viewport excludes the on-screen keyboard on iOS and Android.
     // Keep the app inside it; only the message body scrolls under the glass chrome.
