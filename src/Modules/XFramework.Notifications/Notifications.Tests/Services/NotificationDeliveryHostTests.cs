@@ -35,6 +35,8 @@ public sealed class NotificationDeliveryHostTests
 {
     private const string P256dh = "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4";
     private const string Auth = "BTBZMqHH6r4Tts7J_aSIgg";
+    // Published example values from RFC 8291 section 5, not credentials: the delivery loop needs a
+    // well-formed key pair to reach the send path at all.
     private const string VapidPublic = "BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8";
     private const string VapidPrivate = "yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw";
 
