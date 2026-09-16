@@ -250,7 +250,7 @@ services:
       ServiceIdentity__Clients__4__ValidationFallback__ClientSecret: ${NOTIFICATIONS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__Clients__4__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__4__AllowedAudiences: *service-identity-audiences
-      ServiceIdentity__Clients__4__AllowedScopes: bolt.service,identity.session.validate,smsgateway.send,tenant.target
+      ServiceIdentity__Clients__4__AllowedScopes: bolt.service,datacontext.query.all-tenants,identity.session.validate,smsgateway.send,tenant.target
       ServiceIdentity__Clients__5__ClientId: XFramework.Storage
       ServiceIdentity__Clients__5__ClientSecret: ${STORAGE_SERVICE_IDENTITY_SECRET:?Set STORAGE_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__Clients__5__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}

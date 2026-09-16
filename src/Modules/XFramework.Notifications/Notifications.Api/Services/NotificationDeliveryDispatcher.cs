@@ -2,6 +2,7 @@ using Notifications.Api.Services.Push;
 using Notifications.Domain.Shared.Contracts;
 using SmsGateway.Domain.Shared.Contracts.Requests.Create;
 using SmsGateway.Integration.Drivers;
+using System.Linq.Expressions;
 using System.Net;
 using System.Net.Mail;
 using System.Security.Cryptography;
@@ -28,18 +29,45 @@ public sealed class NotificationDeliveryDispatcher(
     private readonly int _pushTimeToLiveSeconds = Math.Clamp(
         configuration.GetValue("Notifications:Push:TimeToLiveSeconds", 3600), 0, 2419200);
 
+    /// <summary>Tenants examined per discovery pass; a full page means the loop comes straight back.</summary>
+    public const int TenantDiscoveryLimit = 50;
+
+    /// <summary>
+    /// Cross-tenant discovery for a system dispatcher. Delivery jobs are written by every tenant and
+    /// the background loop has no tenant of its own, so the filters are bypassed here and re-applied
+    /// per tenant in <see cref="DispatchDueAsync"/>, which runs under that tenant's trusted context.
+    /// Only tenant IDs leave this query; no tenant-owned data is read across the boundary.
+    /// </summary>
+    public async Task<IReadOnlyList<Guid>> FindDueTenantIdsAsync(CancellationToken ct)
+    {
+        var now = DateTime.UtcNow;
+        return await db.Set<NotificationDeliveryJob>()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(x => !x.IsDeleted)
+            .Where(x => x.TenantId != Guid.Empty)
+            .Where(IsDue(now))
+            .Select(x => x.TenantId)
+            .Distinct()
+            .Take(TenantDiscoveryLimit)
+            .ToListAsync(ct);
+    }
+
+    // CompletedAt is stamped only when a job is finished for good. Without it a job that exhausted
+    // its attempts stays Failed with a past NextAttemptAt and is leased again on every poll forever,
+    // burning an attempt row each time.
+    private static Expression<Func<NotificationDeliveryJob, bool>> IsDue(DateTime now) =>
+        x => (x.Status == NotificationDeliveryStatus.Queued || x.Status == NotificationDeliveryStatus.Failed) &&
+             x.CompletedAt == null &&
+             (x.NextAttemptAt == null || x.NextAttemptAt <= now);
+
     public async Task<int> DispatchDueAsync(CancellationToken ct)
     {
         var now = DateTime.UtcNow;
         var dueJobs = await db.Set<NotificationDeliveryJob>()
             .AsTracking()
             .Where(x => !x.IsDeleted)
-            .Where(x => x.Status == NotificationDeliveryStatus.Queued || x.Status == NotificationDeliveryStatus.Failed)
-            // CompletedAt is stamped only when a job is finished for good. Without this a job that
-            // exhausted its attempts stays Failed with a past NextAttemptAt and is leased again on
-            // every poll forever, burning an attempt row each time.
-            .Where(x => x.CompletedAt == null)
-            .Where(x => x.NextAttemptAt == null || x.NextAttemptAt <= now)
+            .Where(IsDue(now))
             .OrderBy(x => x.NextAttemptAt)
             .ThenBy(x => x.CreatedAt)
             .Take(_batchSize)
