@@ -5,7 +5,7 @@ public static class AppRelease
     public const string Version = "1.3.41";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
-        (Version, "15 September 2026", [
+        (Version, "16 September 2026", [
             "Profile photos are kept on your device instead of downloading again every time you open a conversation."]),
         ("1.3.40", "16 September 2026", [
             "A staged photo or video now shows just its preview with a remove button on it, and video finally previews before you send it.",
