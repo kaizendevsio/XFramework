@@ -92,6 +92,20 @@ test('JPEG uses a bounded display copy and extension/magic recover missing HEIF 
     assert.equal(await f.helper.contentType(new File(['0000ftypheic'], 'image', { type: 'application/octet-stream' })), 'image/heif');
 });
 
+test('a staged video too large to copy still previews from the held file handle', async () => {
+    const f = fixture();
+    // Past the stage limit pickFile keeps the File instead of copying it into OPFS; the
+    // composer shows that thumbnail in place of a filename chip, so it must still resolve.
+    const picked = await f.api.pickFile({ files: [new File(['movie'], 'IMG_0042.MOV', { type: '' })] }, 'staged', 1, 1024);
+    assert.equal(picked.staged, false);
+    assert.equal(f.files.size, 0);
+    const url = await f.api.mediaUrl('staged', '/file', 'account', true, 'video/quicktime', true, 'IMG_0042.MOV');
+    assert.equal(await f.displayed.get(url).text(), 'movie');
+    assert.deepEqual(f.stats(), { conversions: 0, downloads: 0 });
+    await f.api.removeFile('staged');
+    await assert.rejects(f.api.mediaUrl('staged', '/file', 'account', true, 'video/quicktime', true, 'IMG_0042.MOV'));
+});
+
 test('received video streams through the account-bound route without buffering a file', async () => {
     const f = fixture();
     const url = await f.api.mediaUrl('large', 'api/chat/video', 'tenant:user', true, 'video/quicktime', false, 'IMG.MOV');

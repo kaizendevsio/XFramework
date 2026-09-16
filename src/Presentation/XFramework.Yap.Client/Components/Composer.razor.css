@@ -1,1 +1,16 @@
-.composer ::deep .message-media img{max-height:160px;max-width:100%;object-fit:contain}
+/* A staged photo or video is its own preview: fixed height so the box hugs the thumbnail
+   and the remove control can sit on its corner instead of floating beside a letterboxed gap. */
+.composer ::deep .message-media{margin:0;max-width:100%}
+.composer ::deep .message-media img,.composer ::deep .message-media video{height:160px;width:auto;max-width:100%;object-fit:cover}
+.staged{position:relative;width:fit-content;max-width:100%;margin-bottom:9px}
+.staged-voice{display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:3px 4px 3px 12px;border-radius:24px;background:var(--surface2);color:var(--text)}
+.staged-remove{flex:none;display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;background:none;color:var(--dim)}
+.staged-remove ::deep svg{display:block}
+/* Over a photo the glyph has to survive both light and dark image content, so it rides
+   its own scrim — the same treatment as the download control on a sent photo. */
+.staged-media .staged-remove{position:absolute;top:0;right:0;color:#fff}
+.staged-media .staged-remove::before{content:"";position:absolute;width:31px;height:31px;border-radius:50%;background:#0009;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.staged-media .staged-remove ::deep svg{position:relative}
+.staged-upload{display:flex;align-items:center;gap:8px;padding:6px 2px 0;font-size:11.5px;font-variant-numeric:tabular-nums;color:var(--dim)}
+.staged-voice .staged-upload{flex-basis:100%;padding:0 10px 5px}
+.staged-upload .upload-bar{flex:1;margin:0}
