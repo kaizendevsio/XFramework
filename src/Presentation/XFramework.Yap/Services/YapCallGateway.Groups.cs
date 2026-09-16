@@ -39,7 +39,7 @@ public sealed partial class YapCallGateway
         }
 
         // Outside the lock: a push round trip must never hold the gateway's single mutex.
-        NotifyIncomingCall(tenant, thread, room.Id, recipients);
+        NotifyIncomingCall(tenant, thread, room.Id, room.InviteExpires, recipients);
         return snapshot;
     }
 

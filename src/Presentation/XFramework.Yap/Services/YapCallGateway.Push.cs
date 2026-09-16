@@ -16,10 +16,9 @@ public sealed partial class YapCallGateway
     /// Fire and forget on purpose: the caller's HTTP request must not wait on a push service, and a
     /// push failure must never fail the call.
     /// </summary>
-    private void NotifyIncomingCall(Guid tenant, Guid thread, Guid callId, IReadOnlyCollection<Guid> recipients)
+    private void NotifyIncomingCall(Guid tenant, Guid thread, Guid callId, DateTimeOffset expires, IReadOnlyCollection<Guid> recipients)
     {
         if (recipients.Count == 0) return;
-        var deadline = (int)Math.Max(5, (InviteLifetime - TimeSpan.FromSeconds(5)).TotalSeconds);
         _ = Task.Run(async () =>
         {
             try
@@ -28,6 +27,12 @@ public sealed partial class YapCallGateway
                 var notifications = scope.ServiceProvider.GetRequiredService<INotificationsServiceWrapper>();
                 foreach (var recipient in recipients)
                 {
+                    // Recomputed per recipient rather than once before queuing: scope creation, the
+                    // Bolt round trip and a slow push service all burn invite time, and a TTL
+                    // measured before any of that would let a push service hold the ring past the
+                    // deadline this gateway enforces.
+                    var deadline = RemainingSeconds(expires, DateTimeOffset.UtcNow);
+                    if (deadline == 0) break; // Nothing left to ring for; the invite has already timed out.
                     await notifications.SendDirectPush(new SendDirectPushRequest
                     {
                         TenantId = tenant,
@@ -38,6 +43,10 @@ public sealed partial class YapCallGateway
                         // close it when the invite is answered elsewhere or expires.
                         Reference = callId.ToString("N"),
                         TimeToLiveSeconds = deadline,
+                        // A TTL only bounds delivery attempts; a push held to the last second still
+                        // arrives. The absolute deadline lets the worker render a missed call
+                        // instead of an invitation the authenticated flow would refuse.
+                        ExpiresAt = expires,
                         Urgency = "high",
                         Metadata = YapPush.Metadata(tenant)
                     });
@@ -50,4 +59,11 @@ public sealed partial class YapCallGateway
             }
         });
     }
+
+    /// <summary>
+    /// Seconds a ring is still worth delivering. Floored, never rounded up, so the TTL can only
+    /// ever expire before the invite does.
+    /// </summary>
+    internal static int RemainingSeconds(DateTimeOffset expires, DateTimeOffset now) =>
+        (int)Math.Clamp(Math.Floor((expires - now).TotalSeconds), 0, int.MaxValue);
 }

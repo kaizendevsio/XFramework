@@ -78,7 +78,7 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
         }
         Publish(tenant, invite.RecipientId, new("incoming", invite));
         // A closed or backgrounded device has no live subscriber; push is the only way it rings.
-        NotifyIncomingCall(tenant, invite.ThreadId, invite.Id, [invite.RecipientId]);
+        NotifyIncomingCall(tenant, invite.ThreadId, invite.Id, invite.ExpiresAt, [invite.RecipientId]);
         return invite;
     }
 

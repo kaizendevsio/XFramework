@@ -408,6 +408,7 @@ public sealed class YapCallGatewayTests
         Assert.That(pushes.All(x => x.ThreadId == f.Thread && x.Reference == room.Id.ToString("N")), Is.True);
         // Expiring at the push service beats waking a phone for a call that already timed out.
         Assert.That(pushes.All(x => x.TimeToLiveSeconds <= YapCallGateway.InviteLifetime.TotalSeconds), Is.True);
+        Assert.That(pushes.All(x => x.ExpiresAt == room.ExpiresAt), Is.True);
         // The payload must never carry the caller's name or anything else about the conversation.
         Assert.That(System.Text.Json.JsonSerializer.Serialize(pushes[0]), Does.Not.Contain("Someone"));
     }
@@ -421,6 +422,80 @@ public sealed class YapCallGatewayTests
         Assert.That(await f.PushArrived.WaitAsync(TimeSpan.FromSeconds(5)), Is.True);
         Assert.That(f.Pushes.Single().RecipientCredentialId, Is.EqualTo(f.BobId));
         Assert.That(f.Pushes.Single().Reference, Is.EqualTo(invite.Id.ToString("N")));
+    }
+
+    // A push held by a push service until the end of its TTL still arrives. The absolute deadline
+    // travels with it so a worker woken late can tell a live invitation from a dead one.
+    [Test]
+    public async Task StartingACall_SendsTheInviteDeadlineAndATimeToLiveThatCannotOutliveIt()
+    {
+        await using var f = await Fixture.CreateAsync();
+        var invite = await f.Gateway.StartAsync(f.Alice, new StartYapCall(f.Thread, f.BobId), default);
+
+        Assert.That(await f.PushArrived.WaitAsync(TimeSpan.FromSeconds(5)), Is.True);
+        var push = f.Pushes.Single();
+        Assert.That(push.Urgency, Is.EqualTo("high"));
+        Assert.That(push.ExpiresAt, Is.EqualTo(invite.ExpiresAt));
+        Assert.That(push.TimeToLiveSeconds, Is.GreaterThan(0));
+        Assert.That(push.TimeToLiveSeconds, Is.LessThanOrEqualTo((invite.ExpiresAt - DateTimeOffset.UtcNow).TotalSeconds + 1));
+    }
+
+    // The bug a fixed TTL hides: the invite starts ticking when the gateway creates it, but the
+    // push is queued, scoped and sent afterwards. Only a TTL measured against the real deadline
+    // shrinks with that delay instead of extending delivery past it.
+    [Test]
+    public void PushTimeToLive_ShrinksWithProcessingDelayAndStopsAtTheDeadline()
+    {
+        var start = DateTimeOffset.UtcNow;
+        var expires = start.Add(YapCallGateway.InviteLifetime);
+
+        Assert.That(YapCallGateway.RemainingSeconds(expires, start), Is.EqualTo(60));
+        Assert.That(YapCallGateway.RemainingSeconds(expires, start.AddSeconds(12)), Is.EqualTo(48));
+        // Floored, never rounded up: the TTL may only ever run out before the invite does.
+        Assert.That(YapCallGateway.RemainingSeconds(expires, start.AddSeconds(12.9)), Is.EqualTo(47));
+        Assert.That(YapCallGateway.RemainingSeconds(expires, expires), Is.EqualTo(0));
+        Assert.That(YapCallGateway.RemainingSeconds(expires, expires.AddSeconds(30)), Is.EqualTo(0));
+    }
+
+    // Tapping a notification only surfaces the app; everything it does next goes through these
+    // authenticated entry points, which is where a dead call has to stay dead.
+    [Test]
+    public async Task ExpiredCall_IsNeitherReplayedNorConnectableWhenTheAppOpens()
+    {
+        await using var f = await Fixture.CreateAsync();
+        var invite = await f.Gateway.StartAsync(f.Alice, new StartYapCall(f.Thread, f.BobId), default);
+        Expire(f.Gateway, invite.Id);
+
+        var events = new List<YapCallEvent>();
+        using var subscription = f.Gateway.Subscribe(f.Bob, events.Add);
+        Assert.That(events, Is.Empty, "an expired invite must never ring again on a device that reconnects");
+        Assert.That(Assert.ThrowsAsync<YapApiException>(() => f.Gateway.ConnectAsync(f.Bob, invite.Id, default))!.Status, Is.EqualTo(404));
+    }
+
+    [Test]
+    public async Task EndedCall_IsNeitherReplayedNorConnectableWhenTheAppOpens()
+    {
+        await using var f = await Fixture.CreateAsync();
+        var invite = await f.Gateway.StartAsync(f.Alice, new StartYapCall(f.Thread, f.BobId), default);
+        f.Gateway.End(f.Alice, invite.Id);
+
+        var events = new List<YapCallEvent>();
+        using var subscription = f.Gateway.Subscribe(f.Bob, events.Add);
+        Assert.That(events, Is.Empty);
+        Assert.That(Assert.ThrowsAsync<YapApiException>(() => f.Gateway.ConnectAsync(f.Bob, invite.Id, default))!.Status, Is.EqualTo(404));
+    }
+
+    // Invite expiry is wall-clock. Rather than sleeping out a 60 second invite, the stored one is
+    // rewritten with a deadline in the past so the real guards run against a real expired call.
+    private static void Expire(YapCallGateway gateway, Guid callId)
+    {
+        var field = typeof(YapCallGateway).GetField("invites", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        var invites = (System.Collections.IDictionary)field.GetValue(gateway)!;
+        var active = invites[callId]!;
+        var type = active.GetType();
+        var invite = (YapCallInvite)type.GetProperty("Invite")!.GetValue(active)!;
+        invites[callId] = Activator.CreateInstance(type, type.GetProperty("Tenant")!.GetValue(active),
+            invite with { ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(-1) })!;
     }
 
     private sealed class Fixture : IAsyncDisposable
