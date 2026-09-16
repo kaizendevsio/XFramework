@@ -33,6 +33,8 @@ public static class YapProfile
         {
             var person = (await directory.ResolveAsync([id], ct)).SingleOrDefault();
             if (person?.AvatarStorageFileId is not { } storageId) return Results.NotFound();
+            // Answered before storage is touched: a revalidating client costs nothing upstream.
+            if (WritePhotoHeaders(context, storageId)) return Results.Empty;
             var actor = await actors.GetCurrentActorAsync(ct) ?? throw new UnauthorizedAccessException();
             using var token = tokens.Push(actor.AccessToken!);
             var download = YapApi.Require(await storage.GetStorageDownloadUrl(new GetStorageDownloadUrlRequest
@@ -44,10 +46,6 @@ public static class YapProfile
             using var response = await http.CreateClient("attachments").SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
             response.EnsureSuccessStatusCode();
             context.Response.ContentType = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
-            context.Response.Headers.XContentTypeOptions = "nosniff";
-            // URLs contain the account and storage version. Only the browser may
-            // reuse the photo; shared proxies must never cache authenticated media.
-            context.Response.Headers.CacheControl = "private, max-age=86400";
             await response.Content.CopyToAsync(context.Response.Body, ct);
             return Results.Empty;
         }).WithMetadata(new MediaAccountQuery());
@@ -67,16 +65,40 @@ public static class YapProfile
             IHttpClientFactory http, IConfiguration configuration, HttpContext context, CancellationToken ct) =>
         {
             var session = await client.ForCurrentActorAsync(ct: ct);
+            // The thread read is the same membership check the download already performs, and it
+            // is what names the current photo, so the version is known before any storage call.
+            var thread = YapApi.Require(await session.GetThreadAsync(id, ct));
+            if (thread.PhotoStorageFileId is not { } storageId) return Results.NotFound();
+            if (WritePhotoHeaders(context, storageId)) return Results.Empty;
             var download = YapApi.Require(await session.GetThreadPhotoDownloadUrlAsync(id, ct));
             using var request = YapApi.CreateAttachmentDownloadRequest(download.Url, configuration);
             using var response = await http.CreateClient("attachments").SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
             response.EnsureSuccessStatusCode();
             context.Response.ContentType = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
-            context.Response.Headers.XContentTypeOptions = "nosniff";
-            context.Response.Headers.CacheControl = "private, max-age=86400";
             await response.Content.CopyToAsync(context.Response.Body, ct);
             return Results.Empty;
         }).WithMetadata(new MediaAccountQuery());
+    }
+
+    // A photo URL names the exact stored file it serves, so its bytes can never change under it:
+    // replacing the photo mints a new storage ID and therefore a new URL. That is what makes
+    // immutable safe, and immutable is what stops a reload or a cold app start from asking again
+    // for a photo the device already has - max-age alone leaves the client free to revalidate,
+    // and a revalidation with no validator can only come back as the whole image all over again.
+    // private, never public: the account is in the URL and membership is checked per request, so
+    // a shared proxy holding these would hand one member's face to another.
+    // Returns true when the response is complete and the caller must not write a body.
+    private static bool WritePhotoHeaders(HttpContext context, Guid version)
+    {
+        var tag = $"\"{version:N}\"";
+        context.Response.Headers.XContentTypeOptions = "nosniff";
+        context.Response.Headers.CacheControl = "private, max-age=31536000, immutable";
+        context.Response.Headers.ETag = tag;
+        // Clients send a list, and a cache that stored the body but not the strength sends W/.
+        if (!context.Request.Headers.IfNoneMatch.ToString().Split(',')
+            .Any(x => x.Trim() is var candidate && (candidate == "*" || candidate.TrimStart('W', '/') == tag))) return false;
+        context.Response.StatusCode = StatusCodes.Status304NotModified;
+        return true;
     }
     private static void Validate(ProfilePhoto request)
     {

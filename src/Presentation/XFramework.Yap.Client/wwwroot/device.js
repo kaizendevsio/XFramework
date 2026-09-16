@@ -367,6 +367,11 @@
         async clearFiles() {
             for (const url of urls) URL.revokeObjectURL(url); urls.clear();
             pending.clear(); previews.clear();
+            // Cached photos outlive the HTTP cache by design, so sign-out has to remove them
+            // itself. Every account's bucket goes: the person leaving this device is entitled
+            // to have their face gone from it, and a bucket left behind is the one that would
+            // still be there for whoever signs in next.
+            if (self.caches) for (const key of await caches.keys()) if (key.startsWith('yap-media-')) await caches.delete(key);
             await (await navigator.storage.getDirectory()).removeEntry('yap-files', { recursive: true }).catch(error => { if (error.name !== 'NotFoundError') throw error; });
         },
         async clearAccountFiles(scope, keys) {
