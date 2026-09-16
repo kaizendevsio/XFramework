@@ -71,6 +71,8 @@ Subscriptions are owned by the Notifications module (`Notifications.Notification
 
 **What a notification contains.** Nothing readable. Message bodies are end-to-end encrypted and the server cannot decrypt them, so the payload is routing identifiers only - a version, a kind (`message` or `call`), the conversation ID, the inbox item ID, and an opaque reference. The service worker renders a fixed string ("New message" / "Incoming call") and the app fills in the real content after it opens and decrypts locally. No sender name, preview, or conversation title is sent to Apple, Google or Mozilla, and none is written into the delivery-job row either.
 
+**One banner per message.** A message notification is tagged with the inbox item ID (`yap-msg-<id>`), so three messages stack as three banners instead of one replacing the next; a redelivery of the same push carries the same ID and replaces its own banner. Calls still collapse on the call reference. On a module worker the handler waits up to 2 s for a local decrypt and then shows a single notification - the decrypted one if it succeeded, the generic one otherwise. It is deliberately one `showNotification` call on every path: iOS does not honour tag replacement, so showing a generic banner first and replacing it left two banners per message.
+
 **Configure VAPID.** Generate one P-256 key pair per deployment (for example `npx web-push generate-vapid-keys`) and supply it to the **Notifications** service, never to this host:
 
 | Setting | Environment variable | Notes |

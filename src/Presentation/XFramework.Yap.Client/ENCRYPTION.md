@@ -213,14 +213,24 @@ anywhere: it exists for one `showNotification` call. The only storage write is t
 trust pin `validateDirectory` already makes, under the same `yap-encryption` lock
 the app uses.
 
-The banner is shown first and replaced afterwards. The generic "New message"
-notification goes up before any fetch starts, and only a successful decrypt within
-about five seconds calls `showNotification` again with the same tag,
-`renotify:false` and `silent:true`. Every other outcome - no encryption identity on
-this device, an envelope it cannot open, offline, a slow network, a push for an
-account this device is not signed into, or the Settings toggle off - does nothing
-more and leaves the generic banner alone. That ordering also satisfies
-`userVisibleOnly` before any work that can fail.
+One banner per push, and only one. The push handler resolves a descriptor first -
+the decrypted message if it arrives inside a 2 s budget, the generic "New message"
+otherwise - and calls `showNotification` exactly once, as its last statement,
+under a `try` that falls back to a fixed generic descriptor if anything above it
+throws. Every failing outcome - no encryption identity on this device, an envelope
+it cannot open, offline, a slow network, a push for an account this device is not
+signed into, or the Settings toggle off - lands on that same single call, which is
+what `userVisibleOnly` requires. This replaced a show-then-replace ordering:
+iOS treats a second `showNotification` with an existing tag as a new notification
+rather than a replacement, so every message arrived as two stacked banners. The
+worst case before anything appears is now the budget.
+
+Each message gets its own banner, tagged `yap-msg-<notificationId>` from the inbox
+item id the payload already carries, so three messages are three notifications
+instead of one that keeps being overwritten. The id is fixed when the delivery job
+is queued, so a redelivery of the same push replaces its own banner. Calls still
+collapse on `yap-call-<reference>`; only a payload with no message id falls back to
+collapsing per conversation.
 
 `PushEnvelope.Account` ("tenantId:credentialId") is what makes multi-account
 devices work: it selects the IndexedDB key scope and the `X-Yap-Account` header.

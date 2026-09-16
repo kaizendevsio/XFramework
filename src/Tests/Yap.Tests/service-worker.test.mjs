@@ -185,7 +185,7 @@ test('the published worker never calls importScripts once its imports are alread
     await f.run('install');
     assert.equal(f.downloads.length, 4, 'the offline shell still installs');
     await f.run('push', pushEvent({ version: 1, kind: 'message', threadId: thread, account }));
-    assert.deepEqual(f.shown.map(x => x.title), ['New message', 'Ada Lovelace']);
+    assert.deepEqual(f.shown.map(x => x.title), ['Ada Lovelace']);
 });
 
 // Push has to behave identically in development and in published builds. A worker that only
@@ -198,7 +198,32 @@ for (const [name, script] of Object.entries(workers)) {
         assert.equal(f.shown[0].title, 'New message');
         assert.equal(f.shown[0].options.renotify, true);
         assert.equal(f.shown[0].options.data.url, '/chat/5f2b8f3c-0000-4000-8000-000000000001');
-        assert.equal(f.shown[0].options.tag, 'yap-thread-5f2b8f3c-0000-4000-8000-000000000001');
+        // Per message, not per conversation: three messages have to be three banners.
+        assert.equal(f.shown[0].options.tag, 'yap-msg-n1');
+    });
+
+    // The defect: the tag was per-thread, so a second message replaced the first and someone who
+    // received three messages could only ever see the last one.
+    test(`${name}: two messages in one conversation stack instead of replacing each other`, async () => {
+        const f = context(script);
+        const of = id => pushEvent({ version: 1, kind: 'message', threadId: thread, notificationId: id });
+        await f.run('push', of('n1'));
+        await f.run('push', of('n2'));
+        assert.equal(f.shown.length, 2);
+        assert.notEqual(f.shown[0].options.tag, f.shown[1].options.tag);
+        // Both still open the same conversation - there is nowhere better for a message to land.
+        assert.ok(f.shown.every(x => x.options.data.url === `/chat/${thread}`));
+        // A redelivery of the same push carries the same id, so it replaces its own banner.
+        await f.run('push', of('n1'));
+        assert.equal(f.shown[2].options.tag, f.shown[0].options.tag);
+    });
+
+    // A payload with no message id is the only thing left that collapses per conversation: better
+    // one banner too few than an unbounded pile the person cannot dismiss.
+    test(`${name}: a push with no message id still falls back to one banner per conversation`, async () => {
+        const f = context(script);
+        await f.run('push', pushEvent({ version: 1, kind: 'message', threadId: thread }));
+        assert.equal(f.shown[0].options.tag, `yap-thread-${thread}`);
     });
 
     test(`${name}: a notification never repeats content the server cannot read`, async () => {
@@ -328,9 +353,11 @@ for (const [name, script] of Object.entries(workers)) {
         assert.deepEqual(f.opened, ['https://yap.test/chat/t1']);
     });
 
-    // Show-then-replace. The generic banner is on screen before anything that can fail starts, so
-    // every path below that does not produce plaintext simply stops and leaves it there.
-    const message = { version: 1, kind: 'message', threadId: thread, account };
+    // Single shot. iOS does not honour tag replacement, so #527's show-then-replace put two
+    // banners on the phone per message. Nothing is shown until the decrypt has had its say, and
+    // then exactly one notification is shown - the decrypted one if it worked, the generic one if
+    // it did not. A handler that ends without one can cost the origin its push permission.
+    const message = { version: 1, kind: 'message', threadId: thread, account, notificationId: 'n1' };
 
     test(`${name}: a classic worker has no resolver, so the banner stays generic`, async () => {
         const f = context(script);
@@ -339,31 +366,33 @@ for (const [name, script] of Object.entries(workers)) {
         assert.equal(f.shown[0].title, 'New message');
     });
 
-    test(`${name}: a decrypted preview replaces the generic banner in place and silently`, async () => {
+    test(`${name}: a decrypted preview is the only notification shown`, async () => {
         const f = context(script, { preview: async () => ({ title: 'Ada Lovelace', body: 'Dinner at eight?' }) });
         await f.run('push', pushEvent(message));
-        assert.equal(f.shown.length, 2, 'the generic banner must appear first, then be replaced');
-        assert.equal(f.shown[0].title, 'New message');
-        assert.equal(f.shown[1].title, 'Ada Lovelace');
-        assert.equal(f.shown[1].options.body, 'Dinner at eight?');
-        // Same tag replaces rather than stacks; the device already buzzed a moment ago.
-        assert.equal(f.shown[1].options.tag, f.shown[0].options.tag);
-        assert.equal(f.shown[1].options.renotify, false);
-        assert.equal(f.shown[1].options.silent, true);
-        assert.equal(f.shown[1].options.data.url, `/chat/${thread}`, 'a replaced banner still deep links');
+        assert.equal(f.shown.length, 1, 'a second banner is the iOS duplicate this replaced');
+        assert.equal(f.shown[0].title, 'Ada Lovelace');
+        assert.equal(f.shown[0].options.body, 'Dinner at eight?');
+        assert.equal(f.shown[0].options.tag, 'yap-msg-n1');
+        // It is the first and only banner for this message, so it alerts like any other.
+        assert.equal(f.shown[0].options.renotify, true);
+        assert.equal(f.shown[0].options.silent, false);
+        assert.equal(f.shown[0].options.data.url, `/chat/${thread}`, 'a decrypted banner still deep links');
     });
 
     // Every one of these is a real state: an unenrolled device, an envelope this device cannot
-    // open, no network, a budget overrun, the setting off, and a push for an account this device
-    // is not currently signed into. The resolver reports them all the same way - nothing.
+    // open, no network, the setting switched off, and a push for an account this device is not
+    // currently signed into. The resolver reports them all the same way - nothing - and each one
+    // still has to produce exactly one banner.
     for (const [reason, resolver] of [
         ['this device holds no encryption identity', async () => null],
         ['the envelope cannot be decrypted', async () => { throw new Error('This account is not an encrypted recipient.'); }],
+        ['the resolver throws before it awaits anything', () => { throw new TypeError('preview is not a function'); }],
         ['the device is offline', async () => { throw new TypeError('Failed to fetch'); }],
+        ['the person turned message text off', async () => null],
         ['the account cannot be resolved', async () => null],
         ['the message decrypts to nothing worth showing', async () => null]
     ]) {
-        test(`${name}: the generic banner is left alone when ${reason}`, async () => {
+        test(`${name}: exactly one generic banner is shown when ${reason}`, async () => {
             const f = context(script, { preview: resolver });
             await f.run('push', pushEvent(message));
             assert.equal(f.shown.length, 1);
@@ -372,11 +401,30 @@ for (const [name, script] of Object.entries(workers)) {
         });
     }
 
-    test(`${name}: a decrypt that overruns its budget never replaces the banner`, async () => {
+    test(`${name}: a decrypt that overruns its budget shows the generic banner and only that`, async () => {
         const f = context(script, { budget: 5, preview: () => new Promise(done => setTimeout(() => done({ title: 'Too late', body: 'x' }), 60)) });
         await f.run('push', pushEvent(message));
         assert.equal(f.shown.length, 1);
         assert.equal(f.shown[0].title, 'New message');
+    });
+
+    // A decrypt that never settles at all, which is what a hung socket looks like: the budget, not
+    // the resolver, is what ends the wait, and the banner still goes up.
+    test(`${name}: a decrypt that never settles still notifies once`, async () => {
+        const f = context(script, { budget: 5, preview: () => new Promise(() => {}) });
+        await f.run('push', pushEvent(message));
+        assert.equal(f.shown.length, 1);
+        assert.equal(f.shown[0].title, 'New message');
+    });
+
+    // The last line of defence: a payload that makes the worker's own rendering throw must still
+    // leave a banner, because a push handler that shows nothing can lose the permission outright.
+    test(`${name}: a push whose own rendering throws still notifies once`, async () => {
+        const f = context(script);
+        await f.run('push', { data: { json: () => ({ kind: 'message', get threadId() { throw new Error('boom'); } }) } });
+        assert.equal(f.shown.length, 1);
+        assert.equal(f.shown[0].title, 'New message');
+        assert.equal(f.shown[0].options.data.url, '/');
     });
 
     test(`${name}: a resolver is asked for a message and never for a call`, async () => {
@@ -388,7 +436,7 @@ for (const [name, script] of Object.entries(workers)) {
         assert.equal(f.shown.length, 2);
     });
 
-    test(`${name}: a resolver is aborted once the banner is settled`, async () => {
+    test(`${name}: a resolver is aborted once the banner is decided`, async () => {
         let signal = null;
         const f = context(script, { preview: async (_payload, aborts) => { signal = aborts; return null; } });
         await f.run('push', pushEvent(message));
