@@ -134,6 +134,30 @@ public sealed class NotificationPushServiceTests
     }
 
     [Test]
+    public async Task RemoveAsync_AnotherUsersEndpoint_DoesNotRemoveTheirSubscription()
+    {
+        await using var database = await NotificationTestDatabase.CreateAsync();
+        var ownerId = Guid.NewGuid();
+        var owner = NotificationTestHost.CreatePushService(
+            database.Context, new TestInvocationContextAccessor(database.TenantId, ownerId));
+        var registration = Registration(ownerId);
+        (await owner.RegisterAsync(registration, CancellationToken.None)).IsSuccess.Should().BeTrue();
+        var otherId = Guid.NewGuid();
+        var other = NotificationTestHost.CreatePushService(
+            database.Context, new TestInvocationContextAccessor(database.TenantId, otherId));
+
+        var result = await other.RemoveAsync(new RemovePushSubscriptionRequest
+        {
+            CredentialId = otherId,
+            Endpoint = registration.Endpoint
+        }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        (await database.Context.Set<NotificationPushSubscription>().SingleAsync())
+            .CredentialId.Should().Be(ownerId);
+    }
+
+    [Test]
     public async Task SendAsync_PayloadCarriesRoutingIdentifiersOnly()
     {
         await using var database = await NotificationTestDatabase.CreateAsync();

@@ -7,6 +7,7 @@ using XFramework.Core.Extensions;
 using XFramework.Core.Health;
 using XFramework.Core.Middlewares;
 using XFramework.Core.RateLimiting;
+using XFramework.Core.Services.FeatureGates;
 using XFramework.Integration.Extensions;
 
 var builder = XApplication.Configure<Program>();
@@ -26,8 +27,7 @@ var app = (WebApplication)builder.Build();
 
 app.UseCorrelationId();
 app.UseXFrameworkRateLimiting();
-app.UseTenantModuleFeatureGate(options =>
-    options.RequireFeature(TenantModuleFeatureKeys.Notifications, "/api/notifications"));
+app.UseTenantModuleFeatureGate(Program.ConfigureFeatureGates);
 app.EnsureDatabase<AppDbContext>();
 
 app.MapXFrameworkHealthChecks("Notifications");
@@ -37,4 +37,14 @@ app.MapApiDocumentation();
 
 app.Run();
 
-public partial class Program;
+public partial class Program
+{
+    internal static void ConfigureFeatureGates(TenantModuleFeatureGateOptions options)
+    {
+        options.RequireFeature(TenantModuleFeatureKeys.Notifications, "/api/notifications");
+        // Subscription self-service must not grant access to notification creation or sending.
+        // The more specific rules win; /push/send retains the module gate and service scopes.
+        options.RequireFeature(TenantModuleFeatureKeys.NotificationsPush, "/api/notifications/push/configuration");
+        options.RequireFeature(TenantModuleFeatureKeys.NotificationsPush, "/api/notifications/push/subscriptions");
+    }
+}

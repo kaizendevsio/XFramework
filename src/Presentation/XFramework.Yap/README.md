@@ -30,6 +30,12 @@ Use an existing XFramework environment with IdentityServer, Communications, Stor
 6. Deploy the matching Bolt Hub before using this client's actor-isolated transient subscriptions. See [shared-client subscription compatibility](../../../docs/solutions/architecture-patterns/bolt-transient-actor-subscriptions.md).
 7. Enable registration in IdentityServer with `SelfRegistration:Clients:0:ClientId=XFramework.Yap`, `TenantId`, and `RoleId` under the same section. Use the same workspace/role configured in Yap. The tenant and role group must be active; the role must have `RoleLevel=0`. Missing or invalid configuration disables registration. Compose supplies these settings from `YAP_TENANT_ID`/`YAP_ROLE_ID`. The registration handler only admits the authenticated Yap service with `identity.register` and `tenant.target`; it checks the effective tenant against this policy before creating any records. It does not expose administrator credential-creation permissions.
 
+### Push subscription permissions
+
+Enable the `notifications.push` (Push Subscriptions) tenant feature and grant the Yap member role **View, Create, and Delete** for that feature through Portal's tenant and role-permission settings. Preserve the existing permissions and the tenant's default-deny policy. These grants cover configuration, registering the signed-in user's device, and removing that user's subscription; they do not grant module-wide Notifications permissions or permission to send push notifications.
+
+The parent `notifications` feature must remain enabled for notification delivery. `/api/notifications/push/send` retains the parent gate and its trusted-service caller/scope restrictions. VAPID keys and service scopes alone are insufficient for the actor-owned subscription routes: missing member permissions produce a Notifications feature-gate 403, which `/api/chat/push/config` currently presents as `enabled:false`. Restarting containers does not provision role permissions. Existing installations must enable the new feature and apply the role grants after deploying this permission boundary; new accounts inherit the configured member role.
+
 From the repository root, replace the placeholders below with your environment values:
 
 ```powershell
