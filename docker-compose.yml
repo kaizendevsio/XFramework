@@ -208,6 +208,7 @@ services:
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__BoltTransportTokenIssuer__Enabled: true
       ServiceIdentity__BoltTransportTokenIssuer__LifetimeSeconds: 120
+      Opaque__SetupPath: /var/lib/xframework/identity/opaque-setup-v1
       ServiceIdentity__BoltTransportTokenIssuer__SigningKeyPath: /var/lib/xframework/identity/bolt-transport-signing-key.pem
       ServiceIdentity__ServiceTokenSigningKeyDirectory: /var/lib/xframework/identity/service-token-signing-keys
       JwtOptions__SigningPrivateKeyPath: /run/secrets/identity-user-jwt-private-key.pem

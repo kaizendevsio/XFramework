@@ -61,6 +61,13 @@ jobs:
           echo "scope=$scope" >> "$GITHUB_OUTPUT"
           echo "Validation scope: $scope" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Set up OPAQUE native compiler
+        if: steps.scope.outputs.scope != 'yap'
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup default 1.88.0
+          node --version
+
       - name: Set up .NET 10
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
@@ -284,6 +291,7 @@ jobs:
       - name: Test Yap chat application
         run: |
           node --test src/Tests/Yap.Tests/*.test.mjs
+          node --test src/Presentation/XFramework.Yap.Client/test/*.test.mjs
           node --test src/Libraries/Bolt/Bolt.Media.Browser/test/audio.test.mjs
           dotnet test src/Tests/Yap.Tests/Yap.Tests.csproj \
             --configuration Release --no-build --no-restore

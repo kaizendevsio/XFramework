@@ -27,7 +27,14 @@ public sealed class RegistrationService(DbContext db, IConfiguration configurati
     ITrustedInvocationContextAccessor invocation, IDistributedSecurityRateLimiter limiter,
     ILogger<RegistrationService> logger)
 {
-    public async Task<Result<RegisterIdentityResponse>> RegisterAsync(RegisterIdentityRequest request, CancellationToken ct)
+    public Task<Result<RegisterIdentityResponse>> RegisterAsync(RegisterIdentityRequest request, CancellationToken ct) =>
+        RegisterCoreAsync(request, null, null, ct);
+
+    internal Task<Result<RegisterIdentityResponse>> RegisterOpaqueAsync(RegisterIdentityRequest request,
+        OpaqueCredential opaque, EncryptionAccount encryption, CancellationToken ct) => RegisterCoreAsync(request, opaque, encryption, ct);
+
+    private async Task<Result<RegisterIdentityResponse>> RegisterCoreAsync(RegisterIdentityRequest request,
+        OpaqueCredential? opaque, EncryptionAccount? encryption, CancellationToken ct)
     {
         var caller = invocation.Current?.Service;
         if (caller is null || !caller.Scopes.Contains(XFrameworkServiceScopes.IdentityRegister) ||
@@ -77,9 +84,9 @@ public sealed class RegistrationService(DbContext db, IConfiguration configurati
             };
             var credential = new IdentityCredential
             {
-                Id = Guid.NewGuid(), TenantId = profile.TenantId, IdentityInfoId = identity.Id,
+                Id = opaque?.CredentialId ?? Guid.NewGuid(), TenantId = profile.TenantId, IdentityInfoId = identity.Id,
                 UserName = request.UserName, UserAlias = request.DisplayName,
-                PasswordByte = Encoding.ASCII.GetBytes(BCrypt.Net.BCrypt.HashPassword(request.Password, workFactor: 11)),
+                PasswordByte = opaque is null ? Encoding.ASCII.GetBytes(BCrypt.Net.BCrypt.HashPassword(request.Password, workFactor: 11)) : null,
                 IsEnabled = true, CreatedAt = now, ConcurrencyStamp = Guid.NewGuid()
             };
             var role = new IdentityRole
@@ -90,6 +97,12 @@ public sealed class RegistrationService(DbContext db, IConfiguration configurati
             };
             // One EF save is transactional: failure cannot leave a profile without its credential/role.
             db.AddRange(identity, credential, role);
+            if (opaque is not null && encryption is not null)
+            {
+                if (opaque.TenantId != profile.TenantId || encryption.TenantId != profile.TenantId || encryption.CredentialId != credential.Id)
+                    return Result<RegisterIdentityResponse>.Forbidden("Invalid enrollment scope.");
+                db.AddRange(opaque, encryption);
+            }
             await db.SaveChangesAsync(ct);
             return Result<RegisterIdentityResponse>.Success(new()
             { CredentialId = credential.Id, TenantId = profile.TenantId, RoleId = profile.RoleId });

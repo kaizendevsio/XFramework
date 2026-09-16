@@ -327,6 +327,9 @@ internal static partial class UiFixture
         var callMembership = new Mock<ICommunicationsServiceWrapper>();
         callMembership.Setup(x => x.GetDeferredEncryptionAsync(It.IsAny<GetDeferredEncryptionRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(ChatFixture.Ok(new DeferredEncryptionResponse()));
         var encryption = encryptionFixture ? new EncryptionFixture(fixture, identity, directory, fixtureMembers, conversations, messages, attachments, mediaLinks, stored, third, callMembership) : null;
+        identity.Setup(x => x.OpaqueAuth(It.IsAny<OpaqueAuthRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OpaqueAuthRequest request, CancellationToken _) => ChatFixture.Ok(new IdentityServer.Domain.Shared.Contracts.Responses.OpaqueAuthResponse
+            { Mode = "legacy", UserName = "fixture", Client = $"{fixture.Tenant:D}:{fixture.Credential:D}" }));
         configureIdentity?.Invoke(identity);
         callMembership.Setup(c => c.GetThreadAsync(It.IsAny<GetThreadRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((GetThreadRequest request, CancellationToken _) => request.Id == fixture.Thread

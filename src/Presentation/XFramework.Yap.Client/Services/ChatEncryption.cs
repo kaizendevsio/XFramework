@@ -73,6 +73,16 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js, TimeProvider? tim
         finally { InvalidateRecipients(); gate.Release(); }
     }
 
+    public Task<bool> PasswordRestoreAsync(UserSession user) => ChangeAsync(user, async operation =>
+    {
+        var restored = await JsAsync<bool>(operation, "passwordRestore");
+        Status = await JsAsync<EncryptionStatus>(operation, "status");
+        backedUpRevision = -1;
+        return restored;
+    });
+    public Task<bool> PasswordEnrollAsync(UserSession user, string username, string password) => ChangeAsync(user,
+        operation => JsAsync<bool>(operation, "passwordEnroll", username, password));
+
     public static string CallRosterBinding(YapGroupCall call)
     {
         var roster = string.Join("|", call.Participants.Where(x => x.Accepted && !x.Left)
@@ -291,12 +301,15 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js, TimeProvider? tim
     }
     private async Task SaveBackupAsync(Operation operation, bool reveal, long revealRequest = 0)
     {
-        var recovery = await JsAsync<JsonElement>(operation, "exportRecovery");
         long revision = 0;
-        try { revision = (await GetAsync<JsonElement>(operation, "api/chat/encryption/recovery")).GetProperty("revision").GetInt64(); }
+        string? previousArchive = null;
+        try { var previous = await GetAsync<JsonElement>(operation, "api/chat/encryption/recovery");
+            revision = previous.GetProperty("revision").GetInt64(); previousArchive = previous.GetProperty("archive").GetString(); }
         catch (ChatApiException ex) when (ex.Status == 404) { }
         var directory = await GetAsync<JsonElement>(operation, "api/chat/encryption/directory");
         await JsVoidAsync(operation, "acceptDirectory", directory);
+        await JsVoidAsync(operation, "mergeRecovery", previousArchive, directory);
+        var recovery = await JsAsync<JsonElement>(operation, "exportRecovery");
         await PostAsync<object>(operation, "api/chat/encryption/recovery", new { expectedRevision = revision,
             archive = recovery.GetProperty("recoveryArchive").GetString(), rootPublicKey = directory.GetProperty("rootPublicKey").GetString() });
         if (reveal && revealRequest == revealGeneration) RecoveryKey = recovery.GetProperty("recoveryKey").GetString();
@@ -383,6 +396,12 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js, TimeProvider? tim
 
     public Task ResetIdentityAsync(UserSession user, string password) => ChangeAsync(user, async operation =>
     {
+        if (await JsAsync<bool>(operation, "passwordReset", password))
+        {
+            HideRecovery(); backedUpRevision = -1;
+            Status = await JsAsync<EncryptionStatus>(operation, "status");
+            return true;
+        }
         var current = await GetAsync<JsonElement>(operation, "api/chat/encryption/directory");
         if (!await JsAsync<bool>(operation, "confirmReset", current))
         {

@@ -1,3 +1,10 @@
+# OPAQUE server primitives are built separately; no Rust toolchain enters runtime images.
+FROM rust:1.88.0-bookworm@sha256:4727898c104ecd2e22d780925832502faee9fe4e70581b8572af081370b315a0 AS opaque-native
+WORKDIR /opaque
+COPY src/Libraries/XFramework.Opaque.Native/Cargo.toml src/Libraries/XFramework.Opaque.Native/Cargo.lock ./
+COPY src/Libraries/XFramework.Opaque.Native/src/ src/
+RUN cargo build --release --locked
+
 # linux/amd64 manifests are pinned so deployment provenance includes immutable
 # compiler and runtime roots. Update both digests together during SDK upgrades.
 FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:493fca072aac81307027cbb7b7c9a82b6e87d222af315504d05dc6530e69b519 AS restore-inputs
@@ -29,11 +36,13 @@ RUN dotnet restore "${PROJECT_PATH}"
 
 COPY src/ src/
 
+COPY --from=opaque-native /opaque/target/release/libxframework_opaque.so /opt/opaque/libxframework_opaque.so
+
 # Build + publish
 RUN dotnet publish "${PROJECT_PATH}" \
     -c Release \
     -o /app/publish \
-    --no-restore
+    --no-restore -p:SkipOpaqueNativeBuild=true -p:OpaqueNativePath=/opt/opaque/libxframework_opaque.so
 
 # A server-only health check cannot detect a missing Blazor browser runtime.
 RUN case "${PROJECT_PATH}" in *XFramework.Portal.csproj) \

@@ -49,4 +49,20 @@
         </PackageReference>
     </ItemGroup>
 
+    <PropertyGroup>
+        <OpaqueNativeName Condition="'$(OS)' == 'Windows_NT'">xframework_opaque.dll</OpaqueNativeName>
+        <OpaqueNativeName Condition="'$(OS)' != 'Windows_NT'">libxframework_opaque.so</OpaqueNativeName>
+        <OpaqueSource>$(MSBuildThisFileDirectory)../../../Libraries/XFramework.Opaque.Native</OpaqueSource>
+        <OpaqueNativePath Condition="'$(OpaqueNativePath)' == ''">$(OpaqueSource)/target/release/$(OpaqueNativeName)</OpaqueNativePath>
+    </PropertyGroup>
+    <PropertyGroup>
+        <CargoExecutable Condition="'$(OS)' == 'Windows_NT'">$(USERPROFILE)/.cargo/bin/cargo.exe</CargoExecutable>
+        <CargoExecutable Condition="'$(OS)' != 'Windows_NT'">cargo</CargoExecutable>
+    </PropertyGroup>
+    <Target Name="BuildOpaqueNative" BeforeTargets="PrepareForBuild" Condition="'$(SkipOpaqueNativeBuild)' != 'true'">
+        <Exec Command="&quot;$(CargoExecutable)&quot; build --release --locked --manifest-path &quot;$(OpaqueSource)/Cargo.toml&quot;" />
+    </Target>
+    <ItemGroup>
+        <None Include="$(OpaqueNativePath)" Link="$(OpaqueNativeName)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
 </Project>

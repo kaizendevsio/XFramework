@@ -10,7 +10,7 @@ namespace IdentityServer.IntegrationTests.Tests;
 
 [TestFixture]
 [NonParallelizable]
-public sealed class RegistrationTests : IntegrationTestBase
+public sealed partial class RegistrationTests : IntegrationTestBase
 {
     [OneTimeSetUp]
     public async Task SeedMemberRole()

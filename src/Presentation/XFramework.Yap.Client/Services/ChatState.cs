@@ -908,6 +908,12 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
                 }
                 catch (ChatApiException ex) when (ex.Status is >= 400 and < 500 && ex.Status is not (401 or 408 or 428 or 429))
                 { item.Paused = true; item.Error = ex.Message; await store.SaveQueueAsync(item); Error = ex.Message; }
+                catch (JSException ex) when (ex.Message.Contains("security key changed", StringComparison.OrdinalIgnoreCase))
+                {
+                    item.Paused = true;
+                    item.Error = "Encryption identity changed. Open Settings > Privacy > Verify a person to compare fingerprints and resume sending.";
+                    await store.SaveQueueAsync(item); Error = item.Error;
+                }
                 catch (Exception ex) when (Transient(ex))
                 {
                     // The message stays queued and its own bubble already says so. A backend
@@ -1140,6 +1146,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         await localChanges.WaitAsync();
         try
         {
+            await js.InvokeVoidAsync("yap.encryption.passwordClear");
             Encryption.Reset(); EncryptionEnabled = false;
             await store.SetSettingAsync("pendingLogout", "true");
             await store.ClearPrivateAsync();

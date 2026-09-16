@@ -40,6 +40,10 @@ public class ServicesInstaller : IInstaller
         services.AddHostedService<StorageCleanupOutboxDispatcher>();
         services.AddHostedService<StorageClaimOutboxDispatcher>();
         services.AddScoped<AuthService>();
+        services.AddSingleton<OpaqueExchanges>();
+        services.AddSingleton<OpaqueSetup>();
+        if (!string.IsNullOrWhiteSpace(configuration["Opaque:SetupPath"]))
+            services.AddHealthChecks().AddCheck<OpaqueHealthCheck>("opaque", tags: ["ready"]);
         services.AddScoped<Features.Auth.Register.RegistrationService>();
         services.AddScoped<IAuthService>(serviceProvider => serviceProvider.GetRequiredService<AuthService>());
         services.AddScoped<IPasswordResetProcessor>(serviceProvider => serviceProvider.GetRequiredService<AuthService>());

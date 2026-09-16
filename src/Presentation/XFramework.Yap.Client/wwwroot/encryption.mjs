@@ -430,6 +430,22 @@ export function createEncryption(store = indexedDbStore()) {
             catch (error) { await Promise.resolve().then(() => sink?.abort?.()).catch(() => {}); throw error; }
             return decryptToSink(prepared, source, sink);
         },
+        mergeRecovery: (scope, recoveryArchive, directory) => locked(scope, async (s, key) => {
+            const state = await requireState(key);
+            if (!recoveryArchive || !state.recoveryKey || !state.rootPrivateKey) return;
+            check(directory.rootPublicKey === state.rootPublicKey, 'Encryption identity changed.');
+            const result = await pgp.decrypt({ message: await pgp.readMessage({ armoredMessage: recoveryArchive }),
+                passwords: [state.recoveryKey], verificationKeys: await readPublic(state.rootPublicKey), expectSigned: true, format: 'binary', config });
+            await requireSignature(result);
+            const data = JSON.parse(decoder.decode(result.data));
+            check(data.v === 1 && data.kind === 'account-recovery' && data.tenantId === s.tenantId &&
+                data.credentialId === s.credentialId && data.rootPublicKey === state.rootPublicKey &&
+                Array.isArray(data.decryptionKeys) && data.decryptionKeys.length <= MAX_DIRECTORY_DEVICES, 'Invalid recovery archive.');
+            for (const privateKey of data.decryptionKeys) await readPrivate(privateKey);
+            state.historyKeys = [...new Set([...(state.historyKeys ?? []), ...data.decryptionKeys])].filter(x => x !== state.device.encryptionPrivateKey);
+            check(state.historyKeys.length < MAX_DIRECTORY_DEVICES, 'Recovery device limit reached.');
+            await store.put(key, state);
+        }),
         exportRecovery: scope => locked(scope, async (s, key) => { const state = await requireState(key); const backup = await archive(state, s); await store.put(key, state); return backup; }),
         proposeDevice: scope => locked(scope, async (s, key) => {
             let state = await store.get(key);
@@ -520,7 +536,7 @@ export function createEncryption(store = indexedDbStore()) {
             await store.put(key, state);
             return { expectedRevision: d.revision, directory: updated };
         }),
-        recovery: (scope, recoveryKey, recoveryArchive, directory) => locked(scope, async (s, key) => {
+        recovery: (scope, recoveryKey, recoveryArchive, directory, preserveDevices = false) => locked(scope, async (s, key) => {
             check(typeof recoveryKey === 'string' && /^[0-9a-f]{64}$/.test(recoveryKey), 'Invalid recovery key.');
             check(typeof recoveryArchive === 'string' && recoveryArchive.length <= 4 * 1024 * 1024, 'Invalid recovery archive.');
             const existing = await store.get(key);
@@ -540,9 +556,9 @@ export function createEncryption(store = indexedDbStore()) {
             await validateDirectory(s, d, pins);
             check(d.devices.length < MAX_DIRECTORY_DEVICES && Array.isArray(data.decryptionKeys) && data.decryptionKeys.length <= MAX_DIRECTORY_DEVICES, 'Recovery device limit reached.');
             for (const privateKey of data.decryptionKeys) await readPrivate(privateKey);
-            // Restored keys become history-only; future ciphertext is addressed
-            // solely to fresh device keys, never cloned active sender identities.
-            for (const old of d.devices) {
+            // Restored keys become history-only on this device. Its active identity
+            // is fresh; password recovery may leave other devices' identities active.
+            for (const old of preserveDevices ? [] : d.devices) {
                 if (!old.revocation) old.revocation = await signed({ v: 1, kind: 'device-revocation', ...s, deviceId: old.deviceId, revokedRevision: d.revision + 1 }, data.rootPrivateKey);
             }
             const device = await newDevice();

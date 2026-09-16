@@ -24,7 +24,7 @@ namespace IdentityServer.Api.Services;
 /// Unified authentication service implementing all IdentityServer operations.
 /// Consolidates credential management, authentication, verification, and session management.
 /// </summary>
-public sealed class AuthService : IAuthService, IPasswordResetProcessor
+public sealed partial class AuthService : IAuthService, IPasswordResetProcessor
 {
     private const int MaxFailedLoginAttempts = 5;
     private const int LockoutDurationMinutes = 15;
@@ -333,6 +333,8 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
                 BCrypt.Net.BCrypt.HashPassword(inputKey: request.NewPassword, workFactor: 11));
             _dataContext.Update(credential);
             _dataContext.Update(verification);
+            await _dbContext.Set<OpaqueCredential>().IgnoreQueryFilters()
+                .Where(x => x.TenantId == credential.TenantId && x.CredentialId == credential.Id).ExecuteDeleteAsync(ct);
             credential.PasswordByte = hashPasswordByte;
             credential.FailedLoginAttempts = 0;
             credential.LockoutEnd = null;
@@ -445,9 +447,13 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
     #region Authentication
 
     /// <inheritdoc />
-    public async Task<Result<AuthenticateIdentityResponse>> AuthenticateAsync(
-        AuthenticateIdentityRequest request,
-        CancellationToken ct = default)
+    public Task<Result<AuthenticateIdentityResponse>> AuthenticateAsync(
+        AuthenticateIdentityRequest request, CancellationToken ct = default) => AuthenticateCoreAsync(request, null, ct);
+
+    private sealed record OpaqueProof(Guid CredentialId, Guid Epoch);
+
+    private async Task<Result<AuthenticateIdentityResponse>> AuthenticateCoreAsync(
+        AuthenticateIdentityRequest request, OpaqueProof? proof, CancellationToken ct)
     {
         try
         {
@@ -466,12 +472,12 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
                 return Result<AuthenticateIdentityResponse>.Failure("Username is required", 400);
             }
 
-            if (string.IsNullOrEmpty(request.Password))
+            if (proof is null && string.IsNullOrEmpty(request.Password))
             {
                 return Result<AuthenticateIdentityResponse>.Failure("Password is required", 400);
             }
 
-            if (!IdentityPasswordPolicy.IsWithinBcryptByteLimit(request.Password))
+            if (proof is null && !IdentityPasswordPolicy.IsWithinBcryptByteLimit(request.Password))
                 return Result<AuthenticateIdentityResponse>.Failure("Invalid credentials", 401);
 
             var rateLimitDecision = await AcquireAuthenticationRateLimitAsync(request, ct);
@@ -536,8 +542,13 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
                 return Result<AuthenticateIdentityResponse>.Failure("Invalid credentials", 401);
             }
 
-            // Validate password - SECURITY CRITICAL
-            if (!VerifyPasswordHash(request.Password, credential.PasswordByte))
+            // A migrated account must never fall back to its retired password verifier.
+            var opaque = await _dbContext.Set<OpaqueCredential>().IgnoreQueryFilters().AsNoTracking()
+                .SingleOrDefaultAsync(x => x.TenantId == tenant.Id && x.CredentialId == credential.Id, ct);
+            var passwordValid = proof is not null
+                ? opaque is not null && proof.CredentialId == credential.Id && proof.Epoch == opaque.Epoch
+                : opaque is null && VerifyPasswordHash(request.Password, credential.PasswordByte);
+            if (!passwordValid)
             {
                 // Track failed login attempt for lockout - SECURITY CRITICAL
                 credential.FailedLoginAttempts++;
@@ -2954,6 +2965,8 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
                 BCrypt.Net.BCrypt.HashPassword(inputKey: request.NewPassword, workFactor: 11));
             _dataContext.Update(credential);
             _dataContext.Update(verification);
+            await _dbContext.Set<OpaqueCredential>().IgnoreQueryFilters()
+                .Where(x => x.TenantId == credential.TenantId && x.CredentialId == credential.Id).ExecuteDeleteAsync(ct);
             credential.PasswordByte = hashPasswordByte;
             credential.FailedLoginAttempts = 0;
             credential.LockoutEnd = null;
