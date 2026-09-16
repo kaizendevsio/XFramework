@@ -3,16 +3,23 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-const source = readFileSync(new URL('../../Presentation/XFramework.Yap.Client/wwwroot/startup-recovery.js', import.meta.url), 'utf8');
+const read = name => readFileSync(new URL(`../../Presentation/XFramework.Yap.Client/wwwroot/${name}`, import.meta.url), 'utf8');
+const source = read('startup-recovery.js');
 function fixture({ waiting = true, fail = false, online = true } = {}) {
-    const button = {}, notice = {}, navigations = [], messages = [], listeners = new Set();
+    const button = {}, notice = {}, navigations = [], messages = [], listeners = new Set(), registered = [];
     const worker = { state: 'installed', addEventListener: (_, fn) => listeners.add(fn), removeEventListener: (_, fn) => listeners.delete(fn),
         postMessage(value) { messages.push(value); worker.state = 'activated'; for (const fn of [...listeners]) fn(); } };
     const registration = { waiting: waiting ? worker : null, async update() { if (fail) throw Error('download-failed'); } };
-    vm.runInNewContext(source, { document: { getElementById: id => id === 'recover' ? button : notice },
-        navigator: { onLine: online, serviceWorker: { async register(url, options) { assert.equal(url, '/service-worker.js'); assert.equal(options.updateViaCache, 'none'); return registration; } } },
-        window: {}, location: { replace: url => navigations.push(url) }, setTimeout, clearTimeout });
-    return { button, notice, navigations, messages, listeners, registration, worker };
+    const self = {};
+    const sandbox = { self, document: { getElementById: id => id === 'recover' ? button : notice },
+        navigator: { onLine: online, serviceWorker: { async register(url, options) { registered.push(url); assert.equal(options.updateViaCache, 'none'); return registration; } } },
+        window: {}, location: { replace: url => navigations.push(url) }, setTimeout, clearTimeout };
+    const context = vm.createContext(sandbox);
+    // The recovery page shares the app's one registration helper, so it cannot install a different
+    // worker than the app decided on and leave the two fighting over the same scope.
+    vm.runInContext(read('worker-registration.js'), context);
+    vm.runInContext(source, context);
+    return { button, notice, navigations, messages, listeners, registration, worker, registered };
 }
 
 test('explicit recovery activates a waiting update and reopens without touching account storage', async () => {

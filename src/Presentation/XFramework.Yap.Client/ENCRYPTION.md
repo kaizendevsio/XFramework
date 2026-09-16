@@ -200,6 +200,50 @@ exchange at the configured 128 kbps target, mute/unmute, departure and recovery
 revocation with a continuing two-party epoch. Public deployment and physical
 mobile validation remain separate from these client/gateway proofs.
 
+## Notification previews
+
+A push payload still carries routing identifiers only. The sender and the message
+text on a banner are produced on the device: `service-worker.module.js` is a
+module service worker that statically imports `encryption.mjs`, so a push can read
+`GET /api/chat/conversations` with the same-origin cookie, fetch the sender
+directory and decrypt the conversation's last envelope through the ordinary
+`decrypt` path - the same directory validation, pinning, rollback and revocation
+checks. There is no second decrypt implementation, and no plaintext is written
+anywhere: it exists for one `showNotification` call. The only storage write is the
+trust pin `validateDirectory` already makes, under the same `yap-encryption` lock
+the app uses.
+
+The banner is shown first and replaced afterwards. The generic "New message"
+notification goes up before any fetch starts, and only a successful decrypt within
+about five seconds calls `showNotification` again with the same tag,
+`renotify:false` and `silent:true`. Every other outcome - no encryption identity on
+this device, an envelope it cannot open, offline, a slow network, a push for an
+account this device is not signed into, or the Settings toggle off - does nothing
+more and leaves the generic banner alone. That ordering also satisfies
+`userVisibleOnly` before any work that can fail.
+
+`PushEnvelope.Account` ("tenantId:credentialId") is what makes multi-account
+devices work: it selects the IndexedDB key scope and the `X-Yap-Account` header.
+It is stamped server-side from the credential the push is addressed to, carries
+nothing the recipient does not already know about themselves, and the BFF still
+requires the header to match the signed-in cookie, so a push for the other account
+fails closed with a 401.
+
+Where message text may appear is a per-device, per-account setting stored in
+`yap-notifications-v1` (IndexedDB, because a service worker has no localStorage),
+default on. Turning it off keeps the generic banner and issues no request at all.
+
+Limitations. Only browsers with module service workers - Chrome 91+, Safari 16.4+,
+Firefox 147+ - get previews; older browsers fall back to the classic worker and
+today's generic banner, and no iOS release that can receive a web push at all is
+below that line. In a group the banner titles the conversation, not the individual
+sender, because the conversation row carries no per-message sender name. iOS's own
+"Show Previews" notification setting can hide banner content until the phone is
+unlocked no matter what the app renders; that is an OS-level user preference, not
+a defect in this path. Loading the OpenPGP bundle at worker startup costs roughly
+20 ms on a desktop and plausibly 60-150 ms on a mid-range phone, on every module
+worker start including the cold navigations that serve the offline shell.
+
 ## Security and verification limits
 
 First contact is TOFU until fingerprints are compared. A fresh device cannot

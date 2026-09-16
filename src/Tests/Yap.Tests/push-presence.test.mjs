@@ -3,19 +3,24 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-const source = readFileSync(new URL('../../Presentation/XFramework.Yap.Client/wwwroot/push.js', import.meta.url), 'utf8');
+const read = name => readFileSync(new URL(`../../Presentation/XFramework.Yap.Client/wwwroot/${name}`, import.meta.url), 'utf8');
+const source = read('push.js');
 function fixture() {
     const listeners = {}, requests = [];
     const document = { visibilityState: 'visible', addEventListener: (name, fn) => listeners[name] = fn };
     const window = { yap: {}, PushManager: {}, Notification: {}, addEventListener: (name, fn) => listeners[name] = fn };
     let fail = false;
-    vm.runInNewContext(source, { window, document, crypto: { randomUUID: () => 'window-1' }, AbortSignal,
+    const self = {};
+    const context = vm.createContext({ self, window, document, crypto: { randomUUID: () => 'window-1' }, AbortSignal,
         navigator: { serviceWorker: { addEventListener() {}, getRegistration: async () => ({
             pushManager: { getSubscription: async () => ({ endpoint: 'https://push.test/device' }) }
         }) } }, setInterval: fn => { listeners.heartbeat = fn; },
         fetch: async (url, options) => { requests.push({ url, ...options, body: JSON.parse(options.body) });
             if (fail) throw new TypeError('offline'); return { ok: true }; }
     });
+    // Push reuses the app's registration through the shared helper rather than choosing a script.
+    vm.runInContext(read('worker-registration.js'), context);
+    vm.runInContext(source, context);
     return { push: window.yap.push, document, listeners, requests, offline: () => { fail = true; } };
 }
 const drain = () => new Promise(resolve => setImmediate(resolve));

@@ -19,8 +19,8 @@
         return Uint8Array.from(atob(padded), character => character.charCodeAt(0));
     };
     // The app registers its worker in updates.js; reuse that registration rather than racing it.
-    const registration = async () => await navigator.serviceWorker.getRegistration()
-        || await navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' });
+    // worker-registration.js decides module or classic, so nothing here picks a script URL.
+    const registration = () => self.yapWorker.existing();
     const describe = subscription => subscription && {
         endpoint: subscription.endpoint,
         p256dh: encode(subscription.getKey('p256dh')),

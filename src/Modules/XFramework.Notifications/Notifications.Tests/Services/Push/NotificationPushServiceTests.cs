@@ -235,6 +235,42 @@ public sealed class NotificationPushServiceTests
         handler.Bodies[0].Length.Should().BeGreaterThan(86);
     }
 
+    // A device can hold several enrolled accounts. The worker needs to know which key store to open
+    // before it can decrypt anything locally, and nothing else in the payload can tell it.
+    [Test]
+    public async Task SendAsync_StampsTheRecipientAccountAndNothingElse()
+    {
+        await using var database = await NotificationTestDatabase.CreateAsync();
+        var credentialId = Guid.NewGuid();
+        var handler = new RecordingPushHandler(_ => HttpStatusCode.Created);
+        var invocation = new TestInvocationContextAccessor(database.TenantId, credentialId);
+        var service = NotificationTestHost.CreatePushService(database.Context, invocation, VapidConfiguration(), handler);
+        await service.RegisterAsync(Registration(credentialId), CancellationToken.None);
+
+        // Whatever a caller hands in, the account is the one this send is actually addressed to.
+        var account = $"{database.TenantId:N}:{credentialId:N}";
+        var sent = new[]
+        {
+            new PushEnvelope(1, NotificationPushService.KindMessage, Guid.NewGuid(), null, null, null, "someone:else"),
+            new PushEnvelope(1, NotificationPushService.KindCall, null, null, "call-1", 1730000000L)
+        };
+        foreach (var envelope in sent)
+            await service.SendAsync(database.TenantId, credentialId, envelope, 3600, "normal", CancellationToken.None);
+
+        // The body is aes128gcm, so the payload can only be observed through its size - and that is
+        // enough: the record has a fixed overhead, so a body whose size matches the stamped envelope
+        // byte for byte, across two envelopes of different lengths, can hold nothing else.
+        var overheads = sent.Select((envelope, index) => handler.Bodies[index].Length
+            - JsonSerializer.SerializeToUtf8Bytes(envelope with { Account = account }, NotificationPushService.PushEnvelopeJson).Length).ToArray();
+        overheads[0].Should().Be(overheads[1]);
+
+        // Routing identifiers only: the record has no field a body, name or preview could ride in.
+        typeof(PushEnvelope).GetProperties().Select(x => x.Name).Should()
+            .BeEquivalentTo(["Version", "Kind", "ThreadId", "NotificationId", "Reference", "ExpiresAt", "Account"]);
+        JsonSerializer.Serialize(sent[1] with { Account = account }, NotificationPushService.PushEnvelopeJson)
+            .Should().Be($$"""{"version":1,"kind":"call","reference":"call-1","expiresAt":1730000000,"account":"{{account}}"}""");
+    }
+
     [Test]
     public async Task SendAsync_PushServiceReports410_DeletesTheSubscription()
     {
