@@ -19,8 +19,24 @@ public partial class Settings
 
     private PushConfig? pushConfig;
     private string pushState = "unsupported";
-    private bool pushSubscribed, pushBusy;
+    private bool pushSubscribed, pushBusy, previewText;
     private string? pushNotice;
+
+    // The banner content preference lives in IndexedDB, not localStorage, because the service
+    // worker is what reads it and a worker has no localStorage. Per device and per account: a
+    // shared tablet and a personal phone are different decisions.
+    private string PreviewDetail => previewText
+        ? "Banners show who wrote and what they said, decrypted on this device."
+        : "Banners say only that a message arrived.";
+
+    private async Task LoadPreviewAsync() =>
+        previewText = State.User is not null && await JS.InvokeAsync<bool>("yap.notifications.preview", OfflineStore.Scope(State.User));
+
+    private async Task TogglePreviewAsync()
+    {
+        if (State.User is null) return;
+        previewText = await JS.InvokeAsync<bool>("yap.notifications.setPreview", OfflineStore.Scope(State.User), !previewText);
+    }
 
     // "denied" is deliberately excluded: no web API can re-prompt, so an enabled toggle would do
     // nothing. Reopening Settings re-reads the permission once it is changed in browser settings.

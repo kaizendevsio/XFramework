@@ -14,12 +14,12 @@ class FakeResponse {
     clone() { return new FakeResponse(this.status, this.body); }
 }
 
-function context(script, { failDownload = false, windows = [], network = () => new FakeResponse(200, 'jpeg') } = {}) {
+function context(script, { failDownload = false, windows = [], network = () => new FakeResponse(200, 'jpeg'), preview = null, budget, moduleWorker = false } = {}) {
     const handlers = {}, downloads = [], deleted = [], shown = [], opened = [], fetched = [];
     const paths = ['index.html', '_framework/app.wasm', 'vendor/openpgp/openpgp.min.mjs', 'vendor/openpgp/LICENSE.txt',
         '_content/Bolt.Media.Browser/sframe/.gitattributes', '_content/Bolt.Media.Browser/sframe/SHA256SUMS',
         'vendor/openpgp/LICENSE', 'api/private.json', 'service-worker-assets.js'];
-    const self = { importScripts() {}, assetsManifest: { version: 'new', assets: paths.map(url => ({ url, hash: 'sha256-test' })) },
+    const self = { assetsManifest: { version: 'new', assets: paths.map(url => ({ url, hash: 'sha256-test' })) },
         location: new URL('https://yap.test/service-worker.js'), addEventListener: (name, handler) => handlers[name] = handler,
         clients: { matchAll: async () => windows, openWindow: async url => { opened.push(url); } },
         registration: { showNotification: async (title, options) => { shown.push({ title, options }); } } };
@@ -27,7 +27,7 @@ function context(script, { failDownload = false, windows = [], network = () => n
     // second visit that was served locally from one that quietly went back to the network.
     const buckets = new Map([['yap-shell-old', new Map()], ['yap-shell-new', new Map()], ['private-media', new Map()]]);
     const key = request => request.url ?? request;
-    vm.runInNewContext(script, { self, URL, Set, Map,
+    const sandbox = { self, URL, Set, Map, setTimeout, clearTimeout, AbortController, console,
         Request: class { constructor(url, options) { this.url = url; Object.assign(this, options); } },
         fetch: async request => { fetched.push(key(request)); return network(key(request)); },
         caches: {
@@ -44,7 +44,19 @@ function context(script, { failDownload = false, windows = [], network = () => n
             },
             keys: async () => [...buckets.keys()],
             delete: async name => { deleted.push(name); return buckets.delete(name); }
-        } });
+        } };
+    const sandboxed = vm.createContext(sandbox);
+    // importScripts really loads, the way the browser does: a worker whose shared push module is
+    // stubbed out would prove nothing about the file that actually ships.
+    self.importScripts = moduleWorker
+        ? () => { throw new TypeError('importScripts is not available in modules'); }
+        : (...names) => { for (const name of names) vm.runInContext(read(name.replace('./', '')), sandboxed, { filename: name }); };
+    // A module worker resolves the same files through static imports before the worker body runs.
+    if (moduleWorker) vm.runInContext(read('notifications.js'), sandboxed, { filename: 'notifications.js' });
+    vm.runInContext(script, sandboxed, { filename: 'worker' });
+    // What the module worker does after its imports resolve. Classic workers never get one.
+    if (preview) self.yapNotifications.preview = preview;
+    if (budget !== undefined) self.yapNotifications.budget = budget;
     const run = async (event, detail) => { let work; handlers[event]({ ...detail, waitUntil: value => work = value }); return work; };
     // Returns null when the worker never called respondWith - the request was left to the
     // browser, which is the only correct outcome for anything the worker must not touch.
@@ -53,7 +65,7 @@ function context(script, { failDownload = false, windows = [], network = () => n
         handlers.fetch({ request: { url, method }, respondWith: value => { responded = value; }, waitUntil: () => {} });
         return responded === null ? null : await responded;
     };
-    return { run, fetchEvent, handlers, downloads, deleted, shown, opened, fetched, buckets };
+    return { run, fetchEvent, handlers, downloads, deleted, shown, opened, fetched, buckets, self };
 }
 
 const fixture = options => context(source, options);
@@ -64,6 +76,8 @@ const windowClient = (url, visibilityState = 'hidden') => {
         navigate: async value => { navigated.push(value); } };
 };
 const pushEvent = payload => ({ data: payload === undefined ? null : { json: () => { if (payload === null) throw Error('not json'); return payload; } } });
+const account = `${'a'.repeat(32)}:${'b'.repeat(32)}`;
+const thread = '5f2b8f3c-0000-4000-8000-000000000002';
 
 test('install verifies runtime assets and the served license, excluding unservable metadata', async () => {
     const f = fixture(); await f.run('install');
@@ -144,6 +158,34 @@ test('a group photo caches on the same account-scoped terms as a person', async 
     await f.fetchEvent(url);
     assert.equal(f.fetched.length, 1);
     assert.deepEqual([...f.buckets.get(`yap-media-${'a'.repeat(32)}-${'b'.repeat(32)}`).keys()], [url]);
+});
+
+// The invariant that keeps development, published, classic and module workers from drifting: one
+// copy of the push logic, in a file that has to parse as both a classic script and an ES module.
+test('the push handling is written once and loaded by every worker', () => {
+    const shared = read('notifications.js');
+    assert.ok(!/^\s*(?:import|export)\s/m.test(shared), 'importScripts and a module import must both be able to load it');
+    assert.ok(!/^\s*(?:import|export)\s/m.test(read('notification-settings.js')));
+    for (const worker of Object.values(workers)) {
+        assert.ok(!worker.includes('showNotification'), 'a second copy of the banner is how the two workers drift apart');
+        assert.ok(worker.includes("self.importScripts('./notifications.js')") && worker.includes('yapNotifications.install(self)'));
+    }
+    // Order matters: each import satisfies an "already loaded?" guard in the file after it, and a
+    // service worker may not use import(), so the decryptor has to be resolved at startup.
+    const module = read('service-worker.module.js');
+    assert.deepEqual([...module.matchAll(/^import .*'(\.\/[^']+)'/gm)].map(m => m[1]),
+        ['./service-worker-assets.js', './notifications.js', './service-worker.js', './notification-preview.mjs']);
+    assert.ok(module.includes('self.yapNotifications.preview = preview'));
+});
+
+// importScripts still exists inside a module worker and throws the moment it is called, so the
+// guards have to be satisfied by the module worker's imports rather than by a type check.
+test('the published worker never calls importScripts once its imports are already loaded', async () => {
+    const f = fixture({ moduleWorker: true, preview: async () => ({ title: 'Ada Lovelace', body: 'Dinner at eight?' }) });
+    await f.run('install');
+    assert.equal(f.downloads.length, 4, 'the offline shell still installs');
+    await f.run('push', pushEvent({ version: 1, kind: 'message', threadId: thread, account }));
+    assert.deepEqual(f.shown.map(x => x.title), ['New message', 'Ada Lovelace']);
 });
 
 // Push has to behave identically in development and in published builds. A worker that only
@@ -284,5 +326,72 @@ for (const [name, script] of Object.entries(workers)) {
         await f.run('notificationclick', { notification: { close: () => {}, data: { url: '/chat/t1' } } });
         assert.equal(foreign.focused, false);
         assert.deepEqual(f.opened, ['https://yap.test/chat/t1']);
+    });
+
+    // Show-then-replace. The generic banner is on screen before anything that can fail starts, so
+    // every path below that does not produce plaintext simply stops and leaves it there.
+    const message = { version: 1, kind: 'message', threadId: thread, account };
+
+    test(`${name}: a classic worker has no resolver, so the banner stays generic`, async () => {
+        const f = context(script);
+        await f.run('push', pushEvent(message));
+        assert.equal(f.shown.length, 1);
+        assert.equal(f.shown[0].title, 'New message');
+    });
+
+    test(`${name}: a decrypted preview replaces the generic banner in place and silently`, async () => {
+        const f = context(script, { preview: async () => ({ title: 'Ada Lovelace', body: 'Dinner at eight?' }) });
+        await f.run('push', pushEvent(message));
+        assert.equal(f.shown.length, 2, 'the generic banner must appear first, then be replaced');
+        assert.equal(f.shown[0].title, 'New message');
+        assert.equal(f.shown[1].title, 'Ada Lovelace');
+        assert.equal(f.shown[1].options.body, 'Dinner at eight?');
+        // Same tag replaces rather than stacks; the device already buzzed a moment ago.
+        assert.equal(f.shown[1].options.tag, f.shown[0].options.tag);
+        assert.equal(f.shown[1].options.renotify, false);
+        assert.equal(f.shown[1].options.silent, true);
+        assert.equal(f.shown[1].options.data.url, `/chat/${thread}`, 'a replaced banner still deep links');
+    });
+
+    // Every one of these is a real state: an unenrolled device, an envelope this device cannot
+    // open, no network, a budget overrun, the setting off, and a push for an account this device
+    // is not currently signed into. The resolver reports them all the same way - nothing.
+    for (const [reason, resolver] of [
+        ['this device holds no encryption identity', async () => null],
+        ['the envelope cannot be decrypted', async () => { throw new Error('This account is not an encrypted recipient.'); }],
+        ['the device is offline', async () => { throw new TypeError('Failed to fetch'); }],
+        ['the account cannot be resolved', async () => null],
+        ['the message decrypts to nothing worth showing', async () => null]
+    ]) {
+        test(`${name}: the generic banner is left alone when ${reason}`, async () => {
+            const f = context(script, { preview: resolver });
+            await f.run('push', pushEvent(message));
+            assert.equal(f.shown.length, 1);
+            assert.equal(f.shown[0].title, 'New message');
+            assert.equal(f.shown[0].options.body, 'Open Yap to read it.');
+        });
+    }
+
+    test(`${name}: a decrypt that overruns its budget never replaces the banner`, async () => {
+        const f = context(script, { budget: 5, preview: () => new Promise(done => setTimeout(() => done({ title: 'Too late', body: 'x' }), 60)) });
+        await f.run('push', pushEvent(message));
+        assert.equal(f.shown.length, 1);
+        assert.equal(f.shown[0].title, 'New message');
+    });
+
+    test(`${name}: a resolver is asked for a message and never for a call`, async () => {
+        const asked = [];
+        const f = context(script, { preview: async payload => { asked.push(payload); return null; } });
+        await f.run('push', pushEvent({ version: 1, kind: 'call', threadId: thread, reference: 'call1', account }));
+        await f.run('push', pushEvent({ version: 1, kind: 'message', account }));
+        assert.deepEqual(asked, [], 'a ring must not wait on anything, and an inbox push has no thread to read');
+        assert.equal(f.shown.length, 2);
+    });
+
+    test(`${name}: a resolver is aborted once the banner is settled`, async () => {
+        let signal = null;
+        const f = context(script, { preview: async (_payload, aborts) => { signal = aborts; return null; } });
+        await f.run('push', pushEvent(message));
+        assert.equal(signal.aborted, true, 'an abandoned fetch must not outlive the push event');
     });
 }

@@ -26,7 +26,7 @@
         try {
             if (!navigator.onLine) throw new Error('offline');
             if ('serviceWorker' in navigator) {
-                const registration = await timeout(navigator.serviceWorker.register('/service-worker.js', { updateViaCache: 'none' }), 20000);
+                const registration = await timeout(self.yapWorker.register(), 20000);
                 await timeout(registration.update(), 20000);
                 if (registration.installing) {
                     notice.textContent = 'Downloading the update. Keep this page open…';

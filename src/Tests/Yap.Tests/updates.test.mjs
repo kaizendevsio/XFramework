@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-const source = readFileSync(new URL('../../Presentation/XFramework.Yap.Client/wwwroot/updates.js', import.meta.url), 'utf8');
+const read = name => readFileSync(new URL(`../../Presentation/XFramework.Yap.Client/wwwroot/${name}`, import.meta.url), 'utf8');
+const source = read('updates.js');
 function fixture({ waiting = false, installing = false, controlled = true } = {}) {
     const events = () => ({ handlers: {}, addEventListener(name, fn) { (this.handlers[name] ??= []).push(fn); },
         async emit(name) { for (const fn of this.handlers[name] ?? []) await fn(); } });
@@ -11,16 +12,22 @@ function fixture({ waiting = false, installing = false, controlled = true } = {}
     const worker = { ...events(), messages: [], postMessage(value) { this.messages.push(value); } };
     const registration = { ...events(), waiting: waiting ? worker : null, installing: installing ? worker : null,
         async update() { checks++; if (fail) throw Error('Offline'); } };
+    const registered = [];
     const serviceWorker = { ...events(), controller: controlled ? {} : null,
-        async register(_url, options) { registrations++; assert.equal(options.updateViaCache, 'none'); return registration; } };
+        async register(url, options) { registrations++; registered.push(url); assert.equal(options.updateViaCache, 'none'); return registration; } };
     const label = { textContent: '' }, notice = { hidden: true, querySelector: selector => { assert.equal(selector, ".toast-text"); return label; } };
     const document = { ...events(), hidden: false, getElementById: () => notice, querySelector: () => busy ? {} : null };
     const window = { ...events(), yap: {} }, navigator = { onLine: true, serviceWorker };
     let interval;
-    vm.runInNewContext(source, { window, navigator, document, location: { reload() { reloads++; } },
+    const self = {};
+    const context = vm.createContext({ self, window, navigator, document, location: { reload() { reloads++; } },
         Date: { now: () => now }, WeakSet, addEventListener: window.addEventListener.bind(window),
         setInterval(fn, ms) { assert.equal(ms, 300000); interval = fn; } });
-    return { window, document, navigator, registration, worker, notice, label, serviceWorker,
+    // Every registration site shares one helper, so updates cannot install a different worker than
+    // push and the recovery page and leave them replacing each other at the same scope.
+    vm.runInContext(read('worker-registration.js'), context);
+    vm.runInContext(source, context);
+    return { window, document, navigator, registration, worker, notice, label, serviceWorker, registered,
         api: window.yap.updates, tick: () => now += 60001, interval: () => interval(),
         busy: value => busy = value, fail: value => fail = value,
         counts: () => ({ checks, registrations, reloads }) };

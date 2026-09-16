@@ -38,7 +38,8 @@ test('log history is bounded, disable stops recording, and clear removes persist
 });
 test('recovery log navigation uses its cached page instead of booting Blazor', async () => {
     const handlers = {}, matches = [];
-    const self = { importScripts() {}, assetsManifest: { version: 'test', assets: [] }, location: new URL('https://yap.test/service-worker.js'), addEventListener: (name, handler) => handlers[name] = handler };
+    // Only the navigation fetch matters here, so push arrives pre-loaded rather than via importScripts.
+    const self = { importScripts() {}, yapNotifications: { install() {} }, assetsManifest: { version: 'test', assets: [] }, location: new URL('https://yap.test/service-worker.js'), addEventListener: (name, handler) => handlers[name] = handler };
     vm.runInNewContext(readFileSync(new URL('service-worker.published.js', root), 'utf8'), { self, URL, Set,
         caches: { open: async () => ({ match: async path => { matches.push(path); return 'cached'; } }) } });
     let response;

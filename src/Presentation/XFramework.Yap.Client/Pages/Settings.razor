@@ -147,9 +147,13 @@
             <span class="set-key"><Icon Name="alert" Size="19" /><span class="set-label">Push notifications<small>@PushDetail</small></span></span>
             <span class="set-value">@(pushBusy ? "…" : pushSubscribed ? "On" : "Off")</span>
         </button>
+        <button type="button" class="set-row set-action" disabled="@(State.User is null)" aria-pressed="@previewText.ToString().ToLowerInvariant()" @onclick="TogglePreviewAsync">
+            <span class="set-key"><Icon Name="shield" Size="19" /><span class="set-label">Show message text<small>@PreviewDetail</small></span></span>
+            <span class="set-value">@(previewText ? "On" : "Off")</span>
+        </button>
         @if (pushNotice is not null) { <div class="set-note" role="status">@pushNotice</div> }
     </div>
-    <p class="set-footnote">A notification only wakes this device. Your messages stay end-to-end encrypted, so the server has nothing readable to put in one and never sends message text to Apple, Google or Mozilla.</p>
+    <p class="set-footnote">A notification only wakes this device. Your messages stay end-to-end encrypted, so the server has nothing readable to put in one and never sends message text to Apple, Google or Mozilla. When message text is shown, this device decrypts it itself after the banner appears. Your phone's own "show previews" setting still decides what is visible while it is locked.</p>
     }
 </div>
 </ChildContent>
@@ -192,6 +196,7 @@
         canInstall = await JS.InvokeAsync<bool>("yap.device.canInstall");
         installed = await JS.InvokeAsync<bool>("yap.device.isInstalled");
         await LoadPushAsync();
+        await LoadPreviewAsync();
         StateHasChanged();
     }
 

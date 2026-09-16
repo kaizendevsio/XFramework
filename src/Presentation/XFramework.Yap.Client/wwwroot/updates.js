@@ -30,7 +30,7 @@
         checking = (async () => {
             try {
                 if (!registration) {
-                    registration = await navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' });
+                    registration = await self.yapWorker.register();
                     registration.addEventListener('updatefound', observeWorker);
                     observeWorker(); // Registration may already have an installing worker.
                 } else await registration.update();

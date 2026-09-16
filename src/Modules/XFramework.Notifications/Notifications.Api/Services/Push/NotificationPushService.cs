@@ -164,7 +164,10 @@ public sealed class NotificationPushService(
         if (subscriptions.Count == 0)
             return summary;
 
-        var payload = JsonSerializer.SerializeToUtf8Bytes(envelope, PushEnvelopeJson);
+        // Stamped here rather than by each caller: this is the only place that knows which
+        // credential the push is actually addressed to, and a device with two enrolled accounts
+        // cannot otherwise tell which key store to open or which account header to send.
+        var payload = JsonSerializer.SerializeToUtf8Bytes(envelope with { Account = $"{tenantId:N}:{credentialId:N}" }, PushEnvelopeJson);
         var now = DateTime.UtcNow;
         var gone = new List<Guid>();
         var delivered = new List<Guid>();
@@ -358,10 +361,18 @@ public sealed class NotificationPushService(
 /// Unix seconds rather than a timestamp string because the worker only ever compares it to
 /// Date.now(), and a push payload has four kilobytes to spend. Null for events that do not expire.
 /// </param>
+/// <param name="Account">
+/// "tenantId:credentialId", both compact, stamped by <see cref="NotificationPushService.SendAsync"/>.
+/// One device can hold several enrolled accounts, and a module service worker that wants to decrypt
+/// this conversation locally has to know whose key store to open and which X-Yap-Account header to
+/// send. Still routing only: two identifiers the receiving device already stores, and nothing the
+/// recipient does not already know about themselves.
+/// </param>
 public sealed record PushEnvelope(
     int Version,
     string Kind,
     Guid? ThreadId,
     Guid? NotificationId,
     string? Reference,
-    long? ExpiresAt = null);
+    long? ExpiresAt = null,
+    string? Account = null);
