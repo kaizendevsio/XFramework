@@ -18,10 +18,20 @@
             beeps: [{ at: 0, dur: .12, freq: [523.25] }, { at: .22, dur: .12, freq: [523.25] }, { at: .44, dur: .12, freq: [523.25] }], vibrate: [120, 110, 120, 110, 120, 1820] },
         { id: 'silent', label: 'Silent (vibrate only)', wave: 'sine', level: 0, period: 3, beeps: [], vibrate: [500, 400, 500, 1600] }
     ];
+    // Ringback is what the *caller* hears, and it is deliberately not in TONES: the picker
+    // dresses up "somebody is calling you", while this says "their phone is ringing". It is
+    // the conventional slow double-beep on a single 425 Hz telephone frequency - no musical
+    // interval, no beating pair - so it can never be mistaken for anyone's chosen ringtone.
+    const RINGBACK = { id: 'ringback', wave: 'sine', level: .09, period: 4, vibrate: [],
+        beeps: [{ at: 0, dur: .4, freq: [425] }, { at: .7, dur: .4, freq: [425] }] };
     const TONE_KEY = 'yap-ringtone', VOLUME_KEY = 'yap-ring-volume', DEFAULT_VOLUME = .7;
+    // resume() under an autoplay policy settles neither way until the page earns a gesture,
+    // so every wait on it is capped; the ring falls back rather than hanging on the promise.
+    const RESUME_MS = 350;
     const find = id => TONES.find(tone => tone.id === id) ?? TONES[0];
 
     let context = null, master = null, cycle = null, ending = null, mode = '', unlocked = false, lastResume = -Infinity;
+    let starting = 0, generation = 0;
     const voices = new Set();
 
     const read = () => {
@@ -40,38 +50,55 @@
     };
 
     const ensure = () => {
-        if (context) return context;
+        // A closed context can never be resumed again. iOS closes one after a long
+        // interruption, so it is replaced rather than kept as a permanently dead handle.
+        if (context && context.state !== 'closed') return context;
         const Audio = globalThis.AudioContext ?? globalThis.webkitAudioContext;
         if (!Audio) return null;
         try { context = new Audio({ latencyHint: 'interactive' }); } catch { return null; }
-        // Android suspends Web Audio during permission prompts and route changes;
-        // a ring that is still wanted has to climb back out on its own.
-        context.onstatechange = () => { if (mode && context?.state !== 'running') void resume(false); };
+        context.onstatechange = () => {
+            if (!mode || starting) return;
+            // Android suspends Web Audio during permission prompts and route changes;
+            // a ring that is still wanted has to climb back out on its own.
+            if (context?.state !== 'running') { void resume(false); return; }
+            // The other direction: audio that was refused at ring time is unlocked later
+            // (a tap, an iOS interruption ending). The ring is still wanted, so play it now
+            // instead of waiting for the next invitation.
+            if (!master) start(mode).catch(() => {});
+        };
         return context;
     };
 
     const resume = async (userAction = true) => {
         const audio = ensure();
-        if (!audio || audio.state === 'closed') return false;
+        if (!audio) return false;
         if (audio.state !== 'running') {
             if (!userAction && Date.now() - lastResume < 1000) return false;
             lastResume = Date.now();
-            try { await audio.resume(); } catch {} // Autoplay policy, not an error: the caller reports silence.
+            // Autoplay refusal is not an error and not a rejection: it is a promise that never
+            // settles. Racing it keeps vibration, the retry button and stop() from queueing
+            // behind a wait that may last until the user taps Accept.
+            try { await Promise.race([Promise.resolve(audio.resume()).catch(() => {}), new Promise(done => setTimeout(done, RESUME_MS))]); } catch {}
         }
         const running = context === audio && audio.state === 'running';
         if (running) unlocked = true;
         return running;
     };
 
-    // An incoming call brings no gesture of its own, so the first tap anywhere in
-    // the session primes the context; it is parked again until something rings.
+    // An incoming call brings no gesture of its own, so taps anywhere in the session prime
+    // the context; it is parked again until something rings. Priming repeats whenever the
+    // context is not resumable - once is not enough across a backgrounded PWA, an iOS
+    // interruption or a context the browser closed under us.
     const gesture = () => {
         if (mode) { void resume(true); return; }
-        if (unlocked || !ensure()) return;
+        const audio = ensure();
+        if (!audio || (unlocked && audio.state === 'suspended')) return;
         void resume(true).then(ok => { if (ok && !mode) context?.suspend().catch(() => {}); });
     };
     document.addEventListener('pointerdown', gesture, true);
     document.addEventListener('keydown', gesture, true);
+    // Returning to a ringing tab is the one moment the browser may have relaxed on its own.
+    document.addEventListener('visibilitychange', () => { if (mode && !document.hidden) void resume(false); });
 
     const buzz = tone => { try { return navigator.vibrate?.(tone.vibrate) === true; } catch { return false; } };
 
@@ -110,25 +137,40 @@
 
     async function start(kind) {
         const wanted = kind === 'ringback' || kind === 'preview' ? kind : 'ringtone';
-        stop(false); // A second invitation replaces the first ring; rings never stack.
-        const { tone: id, volume } = read(), tone = find(id);
-        mode = wanted;
-        const vibrating = wanted === 'ringtone' && typeof navigator.vibrate === 'function';
-        const audible = tone.level > 0 && volume > 0 && await resume();
-        if (mode !== wanted) return { audible: false, vibrating: false }; // Stopped while the context was resuming.
-        if (audible) {
-            master = context.createGain();
-            master.gain.value = 1;
-            master.connect(context.destination);
+        const token = ++generation;
+        starting++;
+        try {
+            stop(false); // A second invitation replaces the first ring; rings never stack.
+            const { tone: id, volume } = read();
+            // The personal ringtone belongs to the person being called. A caller gets ringback,
+            // so the tone they picked never doubles as "the phone at the other end is ringing".
+            const tone = wanted === 'ringback' ? RINGBACK : find(id);
+            mode = wanted;
+            // Vibration is scheduled before any audio wait: navigator.vibrate needs no autoplay
+            // permission, so it must not be held hostage by a resume() that may never answer.
+            const vibrating = wanted === 'ringtone' && buzz(tone);
+            // Ringback ignores the ring-volume dial. That dial answers "how loudly should this
+            // phone shout at me from across the room", which is the opposite of a caller holding
+            // it to an ear; loudness there belongs to the device's own volume buttons. Zero is
+            // still zero, because "off" is the one promise the setting has to keep.
+            const level = wanted === 'ringback' ? (volume > 0 ? tone.level : 0) : volume * volume * tone.level;
+            const audible = level > 0 && await resume();
+            // Stopped, or replaced by a newer ring, while the context was resuming.
+            if (generation !== token || mode !== wanted) return { audible: false, vibrating: false };
+            if (audible) {
+                master = context.createGain();
+                master.gain.value = 1;
+                master.connect(context.destination);
+            }
+            let repeat = false;
+            const emit = () => { if (audible && master) play(tone, level, context.currentTime + .06); if (vibrating && repeat) buzz(tone); repeat = true; };
+            emit();
+            if (wanted === 'preview') ending = setTimeout(stop, tone.period * 1000);
+            else if (audible || vibrating) cycle = setInterval(emit, tone.period * 1000);
+            window.yap?.diagnostics?.record('call.ring', { phase: wanted, tone: tone.id, audible, vibrating, state: context?.state ?? 'none' });
+            return { audible, vibrating };
         }
-        // Ringback is quieter: the caller is usually already holding the phone to an ear.
-        const level = volume * volume * tone.level * (wanted === 'ringback' ? .55 : 1);
-        const emit = () => { if (audible && master) play(tone, level, context.currentTime + .06); if (vibrating) buzz(tone); };
-        emit();
-        if (wanted === 'preview') ending = setTimeout(stop, tone.period * 1000);
-        else if (audible || vibrating) cycle = setInterval(emit, tone.period * 1000);
-        window.yap?.diagnostics?.record('call.ring', { phase: wanted, tone: tone.id, audible, vibrating, state: context?.state ?? 'none' });
-        return { audible, vibrating };
+        finally { starting--; }
     }
 
     (window.yap ??= {}).ring = {

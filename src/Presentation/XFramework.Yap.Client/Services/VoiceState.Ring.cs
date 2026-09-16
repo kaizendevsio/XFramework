@@ -14,6 +14,9 @@ public sealed partial class VoiceState
     // dispose) already ends at Notify(), so none of them can leave a ring
     // playing over a connected call or after the call screen is gone.
     internal const string RingingStatus = "Ringing...";
+    // A browser that never settles the start promise (autoplay policy does exactly that) must
+    // not wedge the queue: the stop for accept or hangup is chained behind every start.
+    internal static TimeSpan RingStartTimeout = TimeSpan.FromSeconds(4);
     private string ringing = "";
     private Task ringWork = Task.CompletedTask;
     /// <summary>The callee is being alerted, but this browser refused to play audio.</summary>
@@ -41,13 +44,18 @@ public sealed partial class VoiceState
                 await js.InvokeVoidAsync("yap.ring.stop");
                 return;
             }
-            var status = await js.InvokeAsync<RingStatus>("yap.ring.start", mode);
+            using var timeout = new CancellationTokenSource(RingStartTimeout);
+            var status = await js.InvokeAsync<RingStatus>("yap.ring.start", timeout.Token, [mode]);
             // Only the incoming screen can offer the gesture that unblocks autoplay.
             if (ringing != mode) return;
             RingSilent = mode == "ringtone" && !status.Audible;
             Changed?.Invoke();
         }
-        catch { /* Ring audio is decoration: a missing or blocked AudioContext must never fail a call. */ }
+        // A start that timed out is a ring nobody heard, so the incoming screen still has to
+        // offer the retry gesture. Any other failure is decoration: a missing or blocked
+        // AudioContext must never fail a call.
+        catch (OperationCanceledException) { if (ringing == mode) { RingSilent = mode == "ringtone"; Changed?.Invoke(); } }
+        catch { }
     }
 
     /// <summary>Retries the ring from a user gesture after autoplay blocked it.</summary>

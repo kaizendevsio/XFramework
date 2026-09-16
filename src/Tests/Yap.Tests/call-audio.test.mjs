@@ -9,9 +9,9 @@ const plain = value => JSON.parse(JSON.stringify(value));
 const patterns = vibrations => plain(vibrations.filter(Array.isArray));
 const source = readFileSync(new URL('../../Presentation/XFramework.Yap.Client/wwwroot/call-audio.js', import.meta.url), 'utf8');
 
-function fixture({ blocked = false, vibrate = true, saved = {} } = {}) {
-    const storage = new Map(Object.entries(saved)), vibrations = [], listeners = new Map();
-    const context = {
+function fixture({ blocked = false, hangs = false, vibrate = true, saved = {} } = {}) {
+    const storage = new Map(Object.entries(saved)), vibrations = [], listeners = new Map(), contexts = [];
+    const audio = () => ({
         state: 'suspended', currentTime: 0, destination: { id: 'out' }, oscillators: [], gains: [], suspended: 0,
         createGain() { const node = gain(); this.gains.push(node); return node; },
         createOscillator() {
@@ -22,9 +22,10 @@ function fixture({ blocked = false, vibrate = true, saved = {} } = {}) {
             };
             this.oscillators.push(node); return node;
         },
-        async resume() { if (!blocked) this.state = 'running'; this.onstatechange?.(); },
+        // An autoplay refusal does not reject: the real promise simply never settles.
+        resume() { if (hangs) return new Promise(() => {}); if (!blocked) this.state = 'running'; this.onstatechange?.(); return Promise.resolve(); },
         async suspend() { this.suspended++; this.state = 'suspended'; }
-    };
+    });
     function gain() {
         const ramps = [];
         return { ramps, gain: {
@@ -36,7 +37,7 @@ function fixture({ blocked = false, vibrate = true, saved = {} } = {}) {
     }
     const window = { yap: {} };
     const sandbox = {
-        window, AudioContext: function () { return context; },
+        window, AudioContext: function () { const made = audio(); contexts.push(made); return made; },
         document: { addEventListener: (name, handler) => listeners.set(name, handler) },
         addEventListener: (name, handler) => listeners.set(name, handler),
         navigator: vibrate ? { vibrate: pattern => { vibrations.push(pattern); return true; } } : {},
@@ -47,8 +48,15 @@ function fixture({ blocked = false, vibrate = true, saved = {} } = {}) {
     };
     sandbox.globalThis = sandbox;
     vm.runInContext(source, vm.createContext(sandbox));
-    return { ring: window.yap.ring, context, vibrations, storage, listeners };
+    // The module makes its context lazily, and replaces one the browser closed, so the
+    // interesting context is always the newest one.
+    const spare = audio(); // A ring that never needs audio at all never builds a context.
+    return { ring: window.yap.ring, contexts, vibrations, storage, listeners,
+        get context() { return contexts.at(-1) ?? spare; }, allow: () => { blocked = false; } };
 }
+
+const frequencies = context => [...new Set(context.oscillators.map(osc => osc.frequency.value))].sort((a, b) => a - b);
+const peak = context => Math.max(0, ...context.gains.flatMap(node => node.ramps.map(([, value]) => value)));
 
 test('a ringtone schedules tones and vibration, and stopping silences every voice', async () => {
     const f = fixture();
@@ -91,15 +99,59 @@ test('a second call replaces the first ring instead of stacking on top of it', a
     f.ring.stop();
 });
 
-test('ringback is quieter than the ringtone at the same volume', async () => {
-    const peak = async mode => {
+// The bug this pins down: the caller was hearing the callee's personal ringtone as ringback.
+test('the caller never hears the ringtone the user picked, whichever one it is', async () => {
+    for (const id of fixture().ring.tones().map(tone => tone.id)) {
+        const f = fixture({ saved: { 'yap-ringtone': id } });
+        await f.ring.start('ringback');
+        const heard = frequencies(f.context);
+        assert.deepEqual(heard, [425], `ringback stays the standard tone even with "${id}" chosen`);
+        f.ring.stop();
+        f.context.oscillators.length = 0;
+        // The same fixture rings the chosen tone for an incoming call, so the two really differ.
+        await f.ring.start('ringtone');
+        assert.notDeepEqual(frequencies(f.context), heard, `"${id}" must sound unlike ringback`);
+        f.ring.stop();
+    }
+});
+
+test('ringback is a slow double beep, unlike the single burst of the default ringtone', async () => {
+    const f = fixture();
+    await f.ring.start('ringback');
+    const [first, second] = f.context.oscillators;
+    assert.equal(f.context.oscillators.length, 2, 'two beeps per cadence, one frequency each');
+    assert.ok(Math.abs(second.started - first.started - .7) < 1e-9, 'the pair is spaced like a telephone double ring');
+    assert.ok(second.stopped - first.started < 1.2, 'and the pair is over well inside its four-second period');
+    f.ring.stop();
+});
+
+test('ringback is quieter than the ringtone at the default volume', async () => {
+    const level = async mode => {
         const f = fixture();
         await f.ring.start(mode);
-        const value = Math.max(...f.context.gains.flatMap(node => node.ramps.map(([, value]) => value)));
+        const value = peak(f.context);
         f.ring.stop();
         return value;
     };
-    assert.ok(await peak('ringback') < await peak('ringtone'));
+    assert.ok(await level('ringback') < await level('ringtone'));
+});
+
+// The dial means "how loudly should this phone shout at me from across the room", which is
+// nothing to do with a caller holding the phone to an ear - but off has to stay off.
+test('ringback ignores the ring volume dial, except that zero still silences it', async () => {
+    const at = async (volume, mode) => {
+        const f = fixture({ saved: { 'yap-ring-volume': String(volume) } });
+        const status = plain(await f.ring.start(mode));
+        const value = peak(f.context);
+        f.ring.stop();
+        return { status, peak: value };
+    };
+    const quiet = await at(.2, 'ringback'), loud = await at(1, 'ringback');
+    assert.equal(quiet.peak, loud.peak, 'the dial must not move ringback');
+    assert.ok((await at(.2, 'ringtone')).peak < (await at(1, 'ringtone')).peak, 'but it must still move the ringtone');
+    const muted = await at(0, 'ringback');
+    assert.deepEqual(muted.status, { audible: false, vibrating: false });
+    assert.equal(muted.peak, 0);
 });
 
 test('ringback never vibrates: the caller already knows they are calling', async () => {
@@ -188,6 +240,51 @@ test('every tone offered in Settings can actually be rung', async () => {
         assert.ok(tone.id === 'silent' ? f.context.oscillators.length === before : f.context.oscillators.length > before, tone.id);
         f.ring.stop();
     }
+});
+
+// Autoplay refusal is a promise that never settles. Everything that does not need audio
+// permission - the buzz, the honest answer the incoming screen renders its retry button from,
+// and the stop that is queued behind this start - has to happen anyway.
+test('a resume that never answers still vibrates and still reports back', async () => {
+    const f = fixture({ hangs: true });
+    const status = await f.ring.start('ringtone');
+    assert.deepEqual(plain(status), { audible: false, vibrating: true });
+    assert.deepEqual(patterns(f.vibrations), [[900, 3100]]);
+    assert.equal(f.context.oscillators.length, 0);
+    f.ring.stop();
+    assert.equal(f.ring.state().mode, '');
+});
+
+test('a tap during a refused ring starts the sound instead of waiting for the retry button', async () => {
+    const f = fixture({ blocked: true });
+    assert.deepEqual(plain(await f.ring.start('ringtone')), { audible: false, vibrating: true });
+    assert.equal(f.context.oscillators.length, 0);
+    f.allow();
+    await f.listeners.get('pointerdown')();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.ok(f.context.oscillators.length > 0, 'the ring that autoplay refused plays once it is allowed');
+    assert.equal(f.ring.state().mode, 'ringtone');
+    f.ring.stop();
+});
+
+test('unlocking twice never stacks a second ring on the first', async () => {
+    const f = fixture();
+    await f.ring.start('ringtone');
+    const played = f.context.oscillators.length;
+    f.context.onstatechange();
+    f.context.onstatechange();
+    assert.equal(f.context.oscillators.length, played, 'a running context that is already ringing is left alone');
+    f.ring.stop();
+});
+
+test('a context the browser closed is replaced rather than left dead', async () => {
+    const f = fixture();
+    await f.listeners.get('pointerdown')();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    f.context.state = 'closed';
+    assert.deepEqual(plain(await f.ring.start('ringtone')), { audible: true, vibrating: true });
+    assert.equal(f.contexts.length, 2, 'a closed context cannot be resumed, so a fresh one takes over');
+    f.ring.stop();
 });
 
 test('an earlier tap in the session primes audio and parks it again until something rings', async () => {
