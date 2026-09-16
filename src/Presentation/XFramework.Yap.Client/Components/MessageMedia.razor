@@ -18,7 +18,7 @@
             }
             else if (IsVideo(file)) {
                 <div class="photo-preview">
-                    <button id="@PhotoId(file)" class="photo-open" aria-label="@($"Play video {file.Name}")" @onclick="() => viewing = file" @oncontextmenu="() => OnActions.InvokeAsync()" @oncontextmenu:preventDefault><VideoPreview @key="url" Url="@url" Name="@file.Name" OnError="() => playbackFailed.Add(file.Id)" /></button>
+                    <button id="@PhotoId(file)" class="photo-open" aria-label="@($"Play video {file.Name}")" @onclick="() => viewing = file" @oncontextmenu="() => OnActions.InvokeAsync()" @oncontextmenu:preventDefault><VideoPreview @key="url" Url="@url" Name="@file.Name" OnError="() => PlaybackFailedAsync(file)" /></button>
                 </div>
                 @if (playbackFailed.Contains(file.Id)) { <button class="media-open" @onclick="() => State.OpenFileAsync(Message, file)"><Icon Name="download" Size="20" /><span>This video cannot play here. Download to watch.</span></button> }
             }
@@ -43,6 +43,8 @@
     [Parameter, EditorRequired] public ChatMessage Message { get; set; } = default!;
     [Parameter] public EventCallback MetadataLoaded { get; set; }
     [Parameter] public EventCallback OnActions { get; set; }
+    /// <summary>Raised when nothing can be shown, so a caller that replaced a file row with this preview can put it back.</summary>
+    [Parameter] public EventCallback PreviewFailed { get; set; }
     [Parameter] public string SourcePrefix { get; set; } = "";
     private ChatAttachment? viewing;
     private readonly Dictionary<Guid, string> urls = [];
@@ -53,9 +55,8 @@
     private bool WaitingForLinks => Message.EncryptedEnvelope is not null && Message.LocalFileKey is null && !Message.AttachmentLinksReady;
     private string? loaded;
     private int version;
-    private static bool IsHeif(ChatAttachment file) => file.ContentType.StartsWith("image/heic", StringComparison.OrdinalIgnoreCase) || file.ContentType.StartsWith("image/heif", StringComparison.OrdinalIgnoreCase) || Path.GetExtension(file.Name).ToLowerInvariant() is ".heic" or ".heif";
-    public static bool IsImage(ChatAttachment file) => IsHeif(file) || file.ContentType.Split(';')[0].ToLowerInvariant() is "image/jpeg" or "image/png" or "image/gif" or "image/webp" or "image/avif";
-    public static bool IsVideo(ChatAttachment file) => MediaType(file) is "video/mp4" or "video/quicktime" or "video/webm";
+    public static bool IsImage(ChatAttachment file) => ChatMedia.IsInlineImage(file.ContentType, file.Name);
+    public static bool IsVideo(ChatAttachment file) => ChatMedia.IsInlineVideo(file.ContentType, file.Name);
     public static bool IsAudio(ChatAttachment file) => ChatMedia.IsInlineAudio(file.ContentType, file.Name);
     private static string MediaType(ChatAttachment file) => ChatMedia.ContentType(file.ContentType, file.Name);
     protected override async Task OnParametersSetAsync()
@@ -101,12 +102,18 @@
         }
         catch (Exception ex) { await FailedAsync(phase, ex, request); }
     }
+    private async Task PlaybackFailedAsync(ChatAttachment file)
+    {
+        playbackFailed.Add(file.Id);
+        await PreviewFailed.InvokeAsync();
+    }
     private async Task FailedAsync(string phase, Exception error, int request)
     {
         if (disposed || request != version) return;
         if (ChatState.IsConnectionFailure(error)) State.Report(error);
         if (!State.Online) { waitingForConnection = true; return; }
         failed = true;
+        await PreviewFailed.InvokeAsync();
         await LogFailureAsync(phase, error);
     }
     private async Task LogFailureAsync(string phase, Exception? error = null)
@@ -117,7 +124,7 @@
     private async Task ImageFailedAsync(ChatAttachment file, string url)
     {
         if (urls.TryGetValue(file.Id, out var current) && current == url)
-        { urls.Remove(file.Id); failed = true; await LogFailureAsync("image-decode"); await JS.InvokeVoidAsync("yap.device.releaseMedia", url); }
+        { urls.Remove(file.Id); failed = true; await PreviewFailed.InvokeAsync(); await LogFailureAsync("image-decode"); await JS.InvokeVoidAsync("yap.device.releaseMedia", url); }
     }
     private async Task ReleaseAsync() { var previous = urls.Values.ToArray(); urls.Clear(); ready.Clear(); foreach (var url in previous) await JS.InvokeVoidAsync("yap.device.releaseMedia", url); }
     public async ValueTask DisposeAsync() { disposed = true; await ReleaseAsync(); }

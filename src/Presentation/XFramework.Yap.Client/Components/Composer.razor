@@ -6,17 +6,34 @@
     @if (State.Selected?.Allows(ChatFeature.Typing) != false && State.TypingPeople is { Count: > 0 } people)
     { <div class="typing-indicator" role="status" aria-label="@State.TypingText">@foreach (var person in people) { <Avatar Initials="@ChatMessage.InitialsFor(person.Name)" ImageUrl="@person.AvatarUrl" Size="a28" /> }<span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span></div> }
     @if (Reply is not null && ParentId is null) { <div class="replyto liquid-glass"><GlassLayer /><Icon Name="reply" Size="17" /><span class="mid"><span class="n">Replying to @Reply.Sender</span><span class="p">@Reply.Text</span></span><button type="button" class="iconbtn" aria-label="Cancel reply" @onclick="Cancel"><Icon Name="close" Size="16" /></button></div> }
-    @if (file is not null)
+    @if (file is { } staged)
     {
-        <div class="replyto liquid-glass attachment-preview"><GlassLayer />
-            <Icon Name="@Glyph(file.ContentType)" Size="17" />
-            <span class="mid"><span class="n">@file.Name</span><span class="p">@Describe(file)</span>
-                @if (uploading) { <span class="upload-bar" role="progressbar" aria-valuenow="@progress" aria-valuemin="0" aria-valuemax="100" aria-label="Upload progress"><i style="transform:scaleX(@((progress / 100d).ToString(System.Globalization.CultureInfo.InvariantCulture)))"></i></span> }
-            </span>
-            <button type="button" class="iconbtn" aria-label="Remove attachment" @onclick="RemoveFileAsync"><Icon Name="close" Size="16" /></button>
-        </div>
+        var preview = ChatMedia.Preview(staged.ContentType, staged.Name);
+        @* A photo, a video poster and a voice player already say what they are; only a plain
+           file has nothing to show, so only it keeps the name-and-size row. A codec this
+           browser cannot decode leaves nothing to show either, so it falls back to that row. *@
+        if (preview is AttachmentPreview.File || previewFailed)
+        {
+            <div class="replyto liquid-glass attachment-preview"><GlassLayer />
+                <Icon Name="@Glyph(staged.ContentType)" Size="17" />
+                <span class="mid"><span class="n">@staged.Name</span><span class="p">@Describe(staged)</span>
+                    @if (uploading) { <span class="upload-bar" role="progressbar" aria-valuenow="@progress" aria-valuemin="0" aria-valuemax="100" aria-label="Upload progress"><i style="transform:scaleX(@Filled)"></i></span> }
+                </span>
+                <button type="button" class="iconbtn" aria-label="Remove attachment" @onclick="RemoveFileAsync"><Icon Name="close" Size="16" /></button>
+            </div>
+        }
+        else
+        {
+            <div class="staged @(preview is AttachmentPreview.Voice ? "staged-voice" : "staged-media")">
+                <MessageMedia @key="staged.Key" Message="@Local(staged)" PreviewFailed="() => previewFailed = true" />
+                <button type="button" class="staged-remove" aria-label="Remove attachment" @onclick="RemoveFileAsync"><Icon Name="close" Size="18" /></button>
+                @if (uploading)
+                {
+                    <span class="staged-upload"><span class="upload-bar" role="progressbar" aria-valuenow="@progress" aria-valuemin="0" aria-valuemax="100" aria-label="Upload progress"><i style="transform:scaleX(@Filled)"></i></span><span>@(progress)%</span></span>
+                }
+            </div>
+        }
     }
-    @if (file is not null && (file.ContentType.StartsWith("audio/") || file.ContentType.StartsWith("image/"))) { <MessageMedia @key="file.Key" Message="@(new ChatMessage { Id = Guid.Parse(file.Key), LocalFileKey = file.Key, HasAttachments = true, Attachments = [new(Guid.Parse(file.Key), file.Name, file.ContentType, file.Size)] })" /> }
     @if (recording) { <VoiceRecorder Stop="FinishRecordingAsync" Cancel="CancelRecordingAsync" /> }
     <div class="inputrow liquid-glass @(CanSend ? "has-send" : "")"><GlassLayer />
         @if (State.Selected?.Allows(ChatFeature.Attachments) != false) { <button type="button" class="iconbtn attach-open" aria-label="Attach" @onpointerdown:preventDefault disabled="@(busy || recording || uploading)" @onclick="() => attaching = true"><Icon Name="plus" /></button> }
@@ -51,7 +68,7 @@
     private string Key => $"{ThreadId:N}:{ParentId?.ToString("N") ?? "main"}";
     private string draft = "", loaded = "";
     private long draftRevision;
-    private bool busy, recording, attaching, uploading;
+    private bool busy, recording, attaching, uploading, previewFailed;
     private int progress;
     private ElementReference editor;
     private bool CanSend => !uploading && (!string.IsNullOrWhiteSpace(draft) || file is not null);
@@ -169,6 +186,7 @@
 
     private async Task RemoveFileAsync()
     {
+        previewFailed = false;
         if (file is not { } previous) return;
         file = null;
         if (previous.UploadId is { } session) await AbortAsync(session);
@@ -187,7 +205,7 @@
         // Keep attachment ownership exclusive until it is durable, but let text
         // sends continue while previous messages are being saved.
         busy = attachment is not null;
-        draft = ""; file = null;
+        draft = ""; file = null; previewFailed = false;
         try
         {
             _ = StopTypingAsync();
@@ -214,6 +232,15 @@
         }
         finally { if (attachment is not null) busy = false; }
     }
+
+    private string Filled => (progress / 100d).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    // The staged file is previewed through the same component the thread uses, from the local copy.
+    private static ChatMessage Local(ChatState.PickedFile picked) => new()
+    {
+        Id = Guid.Parse(picked.Key), LocalFileKey = picked.Key, HasAttachments = true,
+        Attachments = [new(Guid.Parse(picked.Key), picked.Name, picked.ContentType, picked.Size)]
+    };
 
     private string Describe(ChatState.PickedFile picked) => uploading
         ? $"Uploading {progress}% · {Size(picked.Size)}"

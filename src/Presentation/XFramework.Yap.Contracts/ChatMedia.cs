@@ -24,4 +24,30 @@ public static class ChatMedia
     // Kept in step with the types yap.device.mediaUrl will hand back.
     public static bool IsInlineAudio(string? type, string name) => ContentType(type, name)
         is "audio/mp4" or "audio/mpeg" or "audio/ogg" or "audio/webm" or "audio/wav" or "audio/x-wav" or "audio/aac";
+
+    // HEIF never decodes natively; image-previews.js converts it before anything renders it.
+    private static bool IsHeif(string? type, string name) =>
+        (type ?? "").StartsWith("image/heic", StringComparison.OrdinalIgnoreCase)
+        || (type ?? "").StartsWith("image/heif", StringComparison.OrdinalIgnoreCase)
+        || Path.GetExtension(name).ToLowerInvariant() is ".heic" or ".heif";
+
+    /// <summary>Images shown as a thumbnail; anything else stays a download row.</summary>
+    public static bool IsInlineImage(string? type, string name) => IsHeif(type, name)
+        || type?.Split(';')[0].ToLowerInvariant() is "image/jpeg" or "image/png" or "image/gif" or "image/webp" or "image/avif";
+
+    /// <summary>Video shown as a poster thumbnail; anything else stays a download row.</summary>
+    public static bool IsInlineVideo(string? type, string name) => ContentType(type, name)
+        is "video/mp4" or "video/quicktime" or "video/webm";
+
+    /// <summary>
+    /// What stands in for a file on screen. Only <see cref="AttachmentPreview.File"/> has nothing
+    /// to show, so only it earns a name-and-size row; the rest are their own preview.
+    /// </summary>
+    public static AttachmentPreview Preview(string? type, string name) =>
+        IsInlineImage(type, name) ? AttachmentPreview.Photo
+        : IsInlineVideo(type, name) ? AttachmentPreview.Video
+        : IsInlineAudio(type, name) ? AttachmentPreview.Voice
+        : AttachmentPreview.File;
 }
+
+public enum AttachmentPreview { Photo, Video, Voice, File }

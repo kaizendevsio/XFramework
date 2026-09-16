@@ -10,9 +10,9 @@ html[data-nav-direction=back]{--motion-enter:-32px;--motion-exit:18px}
 @keyframes yap-page-in{from{opacity:0;transform:translateX(var(--motion-enter)) scale(.985)}to{opacity:1;transform:none}}
 @keyframes yap-page-out{to{opacity:0;transform:translateX(var(--motion-exit)) scale(.99)}}
 /* Native entry transitions for newly inserted Blazor elements. */
-.row,.card,.replyto,.toast,.inbox-panel{opacity:1;transform:none;transition:opacity 220ms ease,transform 240ms var(--ease-out)}
+.row,.card,.replyto,.staged,.toast,.inbox-panel{opacity:1;transform:none;transition:opacity 220ms ease,transform 240ms var(--ease-out)}
 @starting-style{
-    .replyto{opacity:0;transform:translateY(10px) scale(.98)}
+    .replyto,.staged{opacity:0;transform:translateY(10px) scale(.98)}
     .row,.card{opacity:0;transform:translateY(9px)}
     .toast{opacity:0;transform:translateY(-12px) scale(.98)}
     .inbox-panel{opacity:0;transform:translateX(12px)}
