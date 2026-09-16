@@ -20,6 +20,51 @@ public sealed class NotificationPushServiceTests
     private const string VapidPrivate = "yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw";
 
     [Test]
+    public async Task ForegroundLease_SuppressesOnlyOwnedDevice_AndHidingRestoresDelivery()
+    {
+        await using var database = await NotificationTestDatabase.CreateAsync();
+        using var cache = new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions());
+        var presence = new PushPresence(cache);
+        var credential = Guid.NewGuid();
+        var handler = new RecordingPushHandler(_ => HttpStatusCode.Created);
+        var service = NotificationTestHost.CreatePushService(database.Context,
+            new TestInvocationContextAccessor(database.TenantId, credential), VapidConfiguration(), handler, presence);
+        await service.RegisterAsync(Registration(credential), CancellationToken.None);
+        await service.RegisterAsync(Registration(credential) with { Endpoint = "https://push.example.test/other-phone" }, CancellationToken.None);
+        var request = new SetPushPresenceRequest { CredentialId = credential, Endpoint = Registration(credential).Endpoint, WindowId = Guid.NewGuid(), Visible = true };
+        (await service.SetPresenceAsync(request, CancellationToken.None)).IsSuccess.Should().BeTrue();
+        var summary = await service.SendAsync(database.TenantId, credential, new PushEnvelope(1, "message", null, null, null), 60, "high", CancellationToken.None);
+        summary.Suppressed.Should().Be(1);
+        summary.Delivered.Should().Be(1);
+        handler.Requests.Single().RequestUri!.AbsolutePath.Should().Be("/other-phone");
+        request.Visible = false;
+        await service.SetPresenceAsync(request, CancellationToken.None);
+        summary = await service.SendAsync(database.TenantId, credential, new PushEnvelope(1, "call", null, null, null), 60, "high", CancellationToken.None);
+        summary.Suppressed.Should().Be(0);
+        summary.Delivered.Should().Be(2);
+        var outsider = NotificationTestHost.CreatePushService(database.Context,
+            new TestInvocationContextAccessor(database.TenantId, Guid.NewGuid()), presence: presence);
+        request.CredentialId = Guid.Empty;
+        (await outsider.SetPresenceAsync(request, CancellationToken.None)).StatusCode.Should().Be(404);
+    }
+
+    [Test]
+    public void ForegroundLease_ExpiresAndSeparatesWindowsAccountsAndTenants()
+    {
+        using var cache = new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions());
+        var presence = new PushPresence(cache);
+        var tenant = Guid.NewGuid(); var user = Guid.NewGuid(); var tab1 = Guid.NewGuid(); var tab2 = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        presence.Set(tenant, user, "device", tab1, true, now);
+        presence.Set(tenant, user, "device", tab2, true, now);
+        presence.Set(tenant, user, "device", tab1, false, now);
+        presence.IsVisible(tenant, user, "device", now).Should().BeTrue();
+        presence.IsVisible(Guid.NewGuid(), user, "device", now).Should().BeFalse();
+        presence.IsVisible(tenant, Guid.NewGuid(), "device", now).Should().BeFalse();
+        presence.IsVisible(tenant, user, "device", now.AddSeconds(46)).Should().BeFalse();
+    }
+
+    [Test]
     public async Task GetConfigurationAsync_WithoutVapidKeys_ReportsPushDisabled()
     {
         await using var database = await NotificationTestDatabase.CreateAsync();

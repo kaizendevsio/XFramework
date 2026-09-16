@@ -11,6 +11,7 @@ namespace Notifications.Integration.Drivers;
 
 public interface INotificationsServiceWrapper : IServiceWrapper
 {
+    Task<CmdResponse> SetPushPresence(SetPushPresenceRequest request, CancellationToken ct = default);
     Task<QueryResponse<NotificationInboxItemResponse>> CreateNotification(
         CreateNotificationRequest request,
         CancellationToken ct = default);
@@ -53,6 +54,8 @@ public sealed record NotificationsServiceWrapper(
     IConfiguration configuration
 ) : DriverBase(messageBusDriver, configuration), INotificationsServiceWrapper
 {
+    public Task<CmdResponse> SetPushPresence(SetPushPresenceRequest request, CancellationToken ct = default) => SendVoidAsync(request, ct);
+
     public override void Initialize()
     {
         TargetClient = "XFramework.Notifications".ToSha256();

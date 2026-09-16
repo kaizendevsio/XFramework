@@ -139,7 +139,7 @@ class AudioPipeline {
     async startCapture(dotNetRef, constraints, transmit = true) {
         if (this.captureRunning) {
             void this.resumePlayback();
-            this.transmitting = transmit;
+            this.setCaptureMuted(!transmit);
             return this.captureRunning;
         }
         if ((!this.encoder && !this.managed) || !this.audioContext?.audioWorklet)
@@ -197,6 +197,12 @@ class AudioPipeline {
             if (generation === this.captureGeneration) this.stopCapture();
             throw error;
         }
+    }
+
+    setCaptureMuted(muted) {
+        this.transmitting = this.captureRunning && !muted;
+        this.encodedQueue.length = 0;
+        this.mediaStream?.getAudioTracks().forEach(track => { track.enabled = !muted; });
     }
 
     stopCapture() {

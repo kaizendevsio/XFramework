@@ -232,7 +232,10 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         await _video.StartCaptureAsync(_options.VideoWidth, _options.VideoHeight, _options.VideoFramerate);
     }
 
-    /// <summary>Stop audio capture (mute).</summary>
+    /// <summary>Mute an active call while retaining its microphone permission and stream.</summary>
+    public Task SetAudioMutedAsync(bool muted) => _audio.SetMutedAsync(muted);
+
+    /// <summary>Release the microphone at call end or cancellation.</summary>
     public async Task StopAudioAsync() => await _audio.StopCaptureAsync();
 
     /// <summary>Stop video capture (camera off).</summary>

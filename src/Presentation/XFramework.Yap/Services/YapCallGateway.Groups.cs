@@ -112,7 +112,8 @@ public sealed partial class YapCallGateway
             room = GetGroup(tenant, credential, callId);
             if (revision is { } expected && room.Revision != expected) throw new YapApiException(409, "The call membership changed.");
             room.Members[credential].Ready = true;
-            if (room.Members.Values.Count(x => x.Ready && !x.Left) >= 2) room.Started = true;
+            if (room.Members.Values.Count(x => x.Ready && !x.Left) >= 2)
+            { room.Started = true; room.ConnectedAt ??= DateTimeOffset.UtcNow; }
             PublishGroupLocked(room, "group-roster");
         }
     }
@@ -199,7 +200,7 @@ public sealed partial class YapCallGateway
             cancel = [member];
             if (!CanContinueGroup(room))
             {
-                groups.Remove(room.Id);
+                RemoveGroupLocked(room);
                 cancel = room.Members.Values.ToArray();
                 foreach (var id in room.Members.Keys) { room.Members[id].Left = true; RemoveGroupTickets(room.Id, id); }
                 PublishGroupLocked(room, "group-ended");
@@ -227,7 +228,7 @@ public sealed partial class YapCallGateway
             cancel = [removed];
             if (!CanContinueGroup(room))
             {
-                groups.Remove(call);
+                RemoveGroupLocked(room);
                 cancel = room.Members.Values.ToArray();
                 foreach (var id in room.Members.Keys) { room.Members[id].Left = true; RemoveGroupTickets(call, id); }
                 PublishGroupLocked(room, "group-ended");
@@ -244,7 +245,7 @@ public sealed partial class YapCallGateway
             expired = groups.Values.Where(x => x.Expires <= DateTimeOffset.UtcNow || (!x.Started && x.InviteExpires <= DateTimeOffset.UtcNow) || !CanContinueGroup(x)).ToArray();
             foreach (var room in expired)
             {
-                groups.Remove(room.Id);
+                RemoveGroupLocked(room);
                 foreach (var id in room.Members.Keys) { room.Members[id].Left = true; RemoveGroupTickets(room.Id, id); }
                 AdvanceGroupRoster(room);
                 PublishGroupLocked(room, "group-ended");
@@ -298,6 +299,7 @@ public sealed partial class YapCallGateway
         public Dictionary<Guid, GroupMember> Members { get; } = [];
         public Dictionary<(Guid Sender, Guid Recipient, string Kind), YapGroupControlEvent> Controls { get; } = [];
         public bool Started;
+        public DateTimeOffset? ConnectedAt;
     }
     private sealed class GroupMember
     {

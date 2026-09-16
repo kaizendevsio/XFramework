@@ -2,10 +2,14 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.37";
+    public const string Version = "1.3.38";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "16 September 2026", [
+            "Notifications pause on the device where Yap is open; background message alerts can alert again.",
+            "Conversations now keep voice-call durations and missed calls.",
+            "Check microphone access in call settings. Muting and unmuting keeps the same microphone connection."]),
+        ("1.3.37", "16 September 2026", [
             "New message notifications now actually arrive while Yap is closed or in the background."]),
         ("1.3.36", "16 September 2026", [
             "Your chosen ringtone now plays only when you receive a call; placing one plays a standard ringback tone.",

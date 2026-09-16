@@ -279,7 +279,7 @@ public sealed partial class VoiceState
         attempt.Muting = true;
         try
         {
-            if (Muted && attempt.Epoch?.Active == true) await media.StartAudioAsync(); else await media.StopAudioAsync();
+            if (Muted && attempt.Epoch?.Active == true) await media.StartAudioAsync(); else await media.SetAudioMutedAsync(true);
             if (!Current(attempt)) { await media.StopAudioAsync(); return; }
             Muted = !Muted; Notify();
             await api.PostAsync($"api/chat/calls/groups/{attempt.Group.Id}/mute", new YapGroupMute(Muted), attempt.Lifetime.Token);

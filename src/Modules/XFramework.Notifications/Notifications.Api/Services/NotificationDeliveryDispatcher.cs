@@ -187,10 +187,10 @@ public sealed class NotificationDeliveryDispatcher(
             inbox.RecipientCredentialId,
             envelope,
             _pushTimeToLiveSeconds,
-            "normal",
+            "high",
             ct);
 
-        if (summary.Delivered > 0)
+        if (summary.Delivered > 0 || summary.Suppressed > 0 && summary.Failed == 0)
         {
             await MarkSentAsync(job, $"web-push:{summary.Delivered}", ct);
             return Result.Success();

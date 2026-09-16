@@ -10,6 +10,7 @@ namespace Notifications.Tests.Services.Push;
 
 public sealed class NotificationPushAuthorizationTests
 {
+    [TestCase("/api/notifications/push/subscriptions/presence", "POST", "create")]
     [TestCase("/api/notifications/push/configuration", "GET", "view")]
     [TestCase("/api/notifications/push/subscriptions", "POST", "create")]
     [TestCase("/api/notifications/push/subscriptions/remove", "POST", "delete")]

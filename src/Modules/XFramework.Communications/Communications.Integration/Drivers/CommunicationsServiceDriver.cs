@@ -1,4 +1,4 @@
-﻿using Communications.Domain.Shared;
+using Communications.Domain.Shared;
 using Communications.Domain.Shared.Contracts.Realtime;
 using Communications.Domain.Shared.Contracts.Requests.Admin;
 using Communications.Domain.Shared.Contracts.Requests.Attachments;
@@ -90,6 +90,8 @@ public interface ICommunicationsServiceWrapper : IServiceWrapper
     Task<CmdResponse> UpdateThreadMemberRoleAsync(
         UpdateThreadMemberRoleRequest request,
         CancellationToken ct = default);
+    Task<CmdResponse> RecordCall(RecordCallRequest request, CancellationToken ct = default);
+
     Task<QueryResponse<CreateThreadMessageResponse>> CreateThreadMessageAsync(
         CreateThreadMessageRequest request,
         CancellationToken ct = default);
@@ -474,6 +476,8 @@ public sealed record CommunicationsServiceWrapper(
         ct.ThrowIfCancellationRequested();
         return SendVoidAsync(request, ct);
     }
+
+    public Task<CmdResponse> RecordCall(RecordCallRequest request, CancellationToken ct = default) => SendVoidAsync(request, ct);
 
     public Task<QueryResponse<CreateThreadMessageResponse>> CreateThreadMessageAsync(
         CreateThreadMessageRequest request,

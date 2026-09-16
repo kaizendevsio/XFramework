@@ -247,7 +247,11 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         finally { typingPublish.Release(); }
     }
 
-    private ValueTask WatchEventsAsync() => js.InvokeVoidAsync("yap.device.events", Scope, Selected?.Id, api.Token);
+    private async ValueTask WatchEventsAsync()
+    {
+        await js.InvokeVoidAsync("yap.push.presence", Scope, api.Token);
+        await js.InvokeVoidAsync("yap.device.events", Scope, Selected?.Id, api.Token);
+    }
 
     public async Task SynchronizeAsync()
     {
@@ -1143,6 +1147,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             messageUpdates.Clear(); deliveredPending.Clear();
             typing.Clear(); publishingThread = null;
             api.Account = "";
+            await js.InvokeVoidAsync("yap.push.presence", "", "");
             await js.InvokeVoidAsync("yap.device.events", "");
             await js.InvokeVoidAsync("yap.device.clearFiles");
         }

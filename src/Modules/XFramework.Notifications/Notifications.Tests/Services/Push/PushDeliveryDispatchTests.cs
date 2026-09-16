@@ -28,6 +28,44 @@ public sealed class PushDeliveryDispatchTests
     private const string VapidPrivate = "yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw";
 
     [Test]
+    public async Task ForegroundSuppression_DoesNotHideFailureOnAnotherPhone()
+    {
+        using var cache = new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions());
+        var presence = new PushPresence(cache);
+        var handler = new RecordingPushHandler(_ => HttpStatusCode.ServiceUnavailable);
+        await using var database = await NotificationTestDatabase.CreateAsync();
+        var (push, id) = await QueueAsync(database, handler, presence);
+        var subscription = await database.Context.Set<NotificationPushSubscription>().SingleAsync();
+        presence.Set(database.TenantId, subscription.CredentialId, subscription.EndpointHash, Guid.NewGuid(), true, DateTimeOffset.UtcNow);
+        await push.RegisterAsync(new RegisterPushSubscriptionRequest { CredentialId = subscription.CredentialId,
+            Endpoint = "https://push.example.net/background", P256dh = P256dh, Auth = Auth }, CancellationToken.None);
+        await Dispatcher(database, push).DispatchDueAsync(CancellationToken.None);
+        var stored = await database.Context.Set<NotificationDeliveryJob>().AsNoTracking().SingleAsync(x => x.Id == id);
+        stored.Status.Should().Be(NotificationDeliveryStatus.Queued);
+        handler.Requests.Should().ContainSingle();
+    }
+
+    [Test]
+    public async Task ForegroundSuppression_CompletesJobWithoutRetryingAfterAppCloses()
+    {
+        using var cache = new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions());
+        var presence = new PushPresence(cache);
+        var handler = new RecordingPushHandler(_ => HttpStatusCode.Created);
+        await using var database = await NotificationTestDatabase.CreateAsync();
+        var (push, id) = await QueueAsync(database, handler, presence);
+        var subscription = await database.Context.Set<NotificationPushSubscription>().SingleAsync();
+        var window = Guid.NewGuid();
+        presence.Set(database.TenantId, subscription.CredentialId, subscription.EndpointHash, window, true, DateTimeOffset.UtcNow);
+        await Dispatcher(database, push).DispatchDueAsync(CancellationToken.None);
+        var stored = await database.Context.Set<NotificationDeliveryJob>().AsNoTracking().SingleAsync(x => x.Id == id);
+        stored.Status.Should().Be(NotificationDeliveryStatus.Sent);
+        handler.Requests.Should().BeEmpty();
+        presence.Set(database.TenantId, subscription.CredentialId, subscription.EndpointHash, window, false, DateTimeOffset.UtcNow);
+        (await Dispatcher(database, push).DispatchDueAsync(CancellationToken.None)).Should().Be(0);
+        handler.Requests.Should().BeEmpty();
+    }
+
+    [Test]
     public async Task DispatchDueAsync_DeliversThePushJobAndMarksItSent()
     {
         var handler = new RecordingPushHandler(_ => HttpStatusCode.Created);
@@ -38,6 +76,7 @@ public sealed class PushDeliveryDispatchTests
 
         processed.Should().Be(1);
         handler.Requests.Should().ContainSingle();
+        handler.Requests[0].Headers.GetValues("Urgency").Should().ContainSingle().Which.Should().Be("high");
         // An aes128gcm record is header(21) + sender point(65) + ciphertext + tag(16); anything
         // shorter would mean the payload never got encrypted.
         handler.Bodies[0].Length.Should().BeGreaterThan(102);
@@ -86,11 +125,11 @@ public sealed class PushDeliveryDispatchTests
 
     private static async Task<(NotificationPushService Push, Guid JobId)> QueueAsync(
         NotificationTestDatabase database,
-        RecordingPushHandler handler)
+        RecordingPushHandler handler, PushPresence? presence = null)
     {
         var credentialId = Guid.NewGuid();
         var invocation = new TestInvocationContextAccessor(database.TenantId, credentialId);
-        var push = NotificationTestHost.CreatePushService(database.Context, invocation, VapidConfiguration(), handler);
+        var push = NotificationTestHost.CreatePushService(database.Context, invocation, VapidConfiguration(), handler, presence);
         await push.RegisterAsync(new RegisterPushSubscriptionRequest
         {
             CredentialId = credentialId,

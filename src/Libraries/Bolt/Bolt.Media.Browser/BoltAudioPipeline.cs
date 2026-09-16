@@ -94,6 +94,12 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
         _logger.LogDebug("Audio capture started");
     }
 
+    /// <summary>Mute without reacquiring permission; StopCaptureAsync still releases the microphone.</summary>
+    public async Task SetMutedAsync(bool muted)
+    {
+        if (_pipeline is not null) await _pipeline.InvokeVoidAsync("setCaptureMuted", muted);
+    }
+
     /// <summary>Stop capturing audio.</summary>
     public async Task StopCaptureAsync()
     {

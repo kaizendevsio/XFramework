@@ -414,7 +414,7 @@ public static class YapApi
                 Id = x.Id, ThreadId = id, SenderId = x.SenderCredentialId,
                 Sender = x.SenderCredentialId == session.CredentialId ? "You" : string.IsNullOrWhiteSpace(x.SenderAlias)
                     ? people.FirstOrDefault(p => p.Id == x.SenderCredentialId)?.Name ?? "Workspace member" : x.SenderAlias,
-                Text = x.Text, CreatedAt = x.CreatedAt, Mine = x.SenderCredentialId == session.CredentialId,
+                Text = x.Text, IsCallSummary = x.IsCallSummary, CreatedAt = x.CreatedAt, Mine = x.SenderCredentialId == session.CredentialId,
                 EncryptedEnvelope = x.EncryptedEnvelope,
                 EncryptionPending = x.EncryptionPending, PendingEncryptionCount = x.PendingEncryptionCount,
                 EncryptionAudienceCredentialIds = x.EncryptionAudienceCredentialIds,

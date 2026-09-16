@@ -30,7 +30,8 @@ function fixture() {
             return item;
         }
     }
-    const stream = { getTracks: () => [{ stop() { stats.stopped++; } }] };
+    const track = { enabled: true, stop() { stats.stopped++; } };
+    const stream = { getTracks: () => [track], getAudioTracks: () => [track] };
     const sandbox = {
         document: { hidden: false, addEventListener: (name, handler) => listeners.set(name, handler),
             removeEventListener: name => listeners.delete(name) },
@@ -316,4 +317,25 @@ test('group playback overlaps speakers instead of serializing them and remains b
     f.p.stopPlayback();
     assert.equal(f.p.sources.size, 0); assert.equal(f.p.receivers.size, 0);
     assert.ok(sources.every(source => source.stopped));
+});
+
+
+test('mute retains the microphone, unmute does not recapture, and hangup releases it', async () => {
+    const f = fixture(); await initialized(f);
+    let captures = 0;
+    f.sandbox.navigator.mediaDevices.getUserMedia = async () => { captures++; return f.stream; };
+    await f.p.startCapture({});
+    f.p.encodedQueue.push(new Uint8Array([1]));
+    f.p.setCaptureMuted(true);
+    assert.equal(f.p.transmitting, false);
+    assert.equal(f.stream.getAudioTracks()[0].enabled, false);
+    assert.equal(f.p.encodedQueue.length, 0);
+    assert.equal(f.stats.stopped, 0);
+    await f.p.startCapture({});
+    assert.equal(f.p.transmitting, true);
+    assert.equal(f.stream.getAudioTracks()[0].enabled, true);
+    assert.equal(captures, 1);
+    f.p.stopCapture();
+    assert.equal(f.stats.stopped, 1);
+    assert.equal(f.p.captureRunning, false);
 });
