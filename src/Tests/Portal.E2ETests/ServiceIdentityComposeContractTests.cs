@@ -124,6 +124,35 @@ public sealed class ServiceIdentityComposeContractTests
     }
 
     [Test]
+    public void NotificationsDelivery_UsesTrustedTenantScopes()
+    {
+        var root = FindRepositoryRoot().FullName;
+        var compose = File.ReadAllText(Path.Combine(root, "docker-compose.yml"));
+
+        // The delivery loop owns no tenant, so it discovers tenants across the boundary and then
+        // re-enters per tenant. Without both grants every queued push stays in the table.
+        ExtractAllowedScopesForClient(compose, XFrameworkServiceNames.Notifications).Should().Contain(
+        [
+            XFrameworkServiceScopes.DataContextQueryAllTenants,
+            XFrameworkServiceScopes.TenantTarget
+        ]);
+
+        var dispatcher = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "XFramework.Notifications",
+            "Notifications.Api",
+            "Services",
+            "NotificationDeliveryDispatcherHostedService.cs"));
+        dispatcher.Should().Contain("EstablishTenantlessAsync(");
+        dispatcher.Should().Contain("XFrameworkServiceScopes.DataContextQueryAllTenants");
+        dispatcher.Should().Contain("FindDueTenantIdsAsync(");
+        dispatcher.Should().Contain("EstablishAsync(");
+        dispatcher.Should().Contain("XFrameworkServiceScopes.TenantTarget");
+    }
+
+    [Test]
     public void AuditStartup_UsesModuleGeneratedRoutes()
     {
         var program = File.ReadAllText(Path.Combine(FindRepositoryRoot().FullName,

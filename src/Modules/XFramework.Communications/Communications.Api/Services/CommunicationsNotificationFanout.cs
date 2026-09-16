@@ -9,14 +9,33 @@ using XFramework.Core.Services.FeatureGates;
 
 namespace Communications.Api.Services;
 
+// DbContext rather than AppDbContext: the outbox dispatcher resolves the same registration, and it
+// lets the fan-out rules be tested against a model without a PostgreSQL container.
 public sealed class CommunicationsNotificationFanout(
-    AppDbContext db,
+    DbContext db,
     ITenantModuleFeatureService featureService,
     INotificationsServiceWrapper notificationsWrapper,
     ILogger<CommunicationsNotificationFanout> logger) : ICommunicationsNotificationFanout
 {
+    // Read receipts, typing and delivery markers dominate outbox volume and notify nobody. Deciding
+    // that here keeps the feature lookup - and the warning below - off the hot path.
+    private static readonly HashSet<string> NotifiableEventTypes = new(StringComparer.Ordinal)
+    {
+        MessageRealtimeEvents.MessageCreated,
+        MessageRealtimeEvents.ThreadInviteCreated,
+        MessageRealtimeEvents.ReactionCreated,
+        MessageRealtimeEvents.MessageReported
+    };
+
+    // One warning per tenant per process. A tenant without the Notifications feature drops every
+    // message notification silently, which is indistinguishable from a broken delivery pipeline.
+    private static readonly HashSet<Guid> DisabledTenantsLogged = [];
+
     public async Task CreateNotificationsAsync(MessageOutboxEvent outboxEvent, CancellationToken ct = default)
     {
+        if (!NotifiableEventTypes.Contains(outboxEvent.EventType))
+            return;
+
         if (!await NotificationsEnabledAsync(outboxEvent.TenantId, ct))
             return;
 
@@ -251,6 +270,15 @@ public sealed class CommunicationsNotificationFanout(
         try
         {
             var result = await featureService.EnsureEnabledAsync(tenantId, TenantModuleFeatureKeys.Notifications, string.Empty, ct);
+            if (!result.IsSuccess && LogDisabledTenantOnce(tenantId))
+            {
+                logger.LogWarning(
+                    "Message notifications are disabled for tenant {TenantId}: the '{FeatureKey}' module feature is not enabled, " +
+                    "so no inbox item or push is created for this tenant",
+                    tenantId,
+                    TenantModuleFeatureKeys.Notifications);
+            }
+
             return result.IsSuccess;
         }
         catch (Exception ex)
@@ -258,6 +286,12 @@ public sealed class CommunicationsNotificationFanout(
             logger.LogDebug(ex, "Notifications feature check failed for tenant {TenantId}", tenantId);
             return false;
         }
+    }
+
+    private static bool LogDisabledTenantOnce(Guid tenantId)
+    {
+        lock (DisabledTenantsLogged)
+            return DisabledTenantsLogged.Add(tenantId);
     }
 
     private async Task<List<MessageThreadMember>> ActiveMembersAsync(Guid tenantId, Guid threadId, CancellationToken ct) =>
