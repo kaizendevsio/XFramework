@@ -14,6 +14,37 @@ namespace XFramework.Core.Tests.Services.FeatureGates;
 [TestFixture]
 public sealed class TenantCredentialCapabilityServiceTests
 {
+    [TestCase("view")]
+    [TestCase("create")]
+    [TestCase("delete")]
+    public async Task EnsureAllowedAsync_PushOnlyGrant_DoesNotGrantParentNotificationsPermission(string capability)
+    {
+        await using var db = CreateDbContext();
+        var subject = SeedSubject(db);
+        db.Set<IdentityRoleTypeFeaturePermission>().Add(new IdentityRoleTypeFeaturePermission
+        {
+            Id = Guid.NewGuid(),
+            TenantId = subject.TenantId,
+            RoleTypeId = subject.RoleTypeId,
+            ModuleKey = TenantModuleFeatureKeys.Notifications,
+            SubFeatureKey = "push",
+            CapabilityKey = capability,
+            Effect = RoleCapabilityPermissionEffect.Allow,
+            IsEnabled = true,
+            CreatedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        var subscription = await service.EnsureAllowedAsync(
+            subject.TenantId, subject.CredentialId, "notifications", "push", capability);
+        var parent = await service.EnsureAllowedAsync(
+            subject.TenantId, subject.CredentialId, "notifications", null, capability);
+
+        subscription.IsSuccess.Should().BeTrue();
+        parent.StatusCode.Should().Be(403);
+    }
+
     [Test]
     public async Task EnsureAllowedAsync_RoleTypePermissionAllowsRequestedCapability()
     {

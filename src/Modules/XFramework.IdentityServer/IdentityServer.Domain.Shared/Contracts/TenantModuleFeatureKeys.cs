@@ -39,6 +39,7 @@ public static class TenantModuleFeatureKeys
     public const string Community = "community";
     public const string Payments = "payments";
     public const string Notifications = "notifications";
+    public const string NotificationsPush = "notifications.push";
     public const string Attendance = "attendance";
     public const string Storage = "storage";
     public const string Identity = "identity";
@@ -130,6 +131,7 @@ public static class TenantModuleFeatureKeys
         new(Community, string.Empty, "Community", "Community identities, content, feed, and connections.", "users"),
         new(Payments, string.Empty, "Payments", "Payment gateway and cash-in/cash-out capabilities.", "credit-card"),
         new(Notifications, string.Empty, "Notifications", "Tenant notifications and read-state workflows.", "bell"),
+        new(Notifications, "push", "Push Subscriptions", "Manage the signed-in user's own browser push subscriptions.", "bell-ring"),
         new(Attendance, string.Empty, "Attendance", "Attendance contexts, sessions, participants, time events, and reports.", "calendar-check"),
         new(Storage, string.Empty, "Storage", "Tenant file metadata, resumable uploads, signed URLs, and retention cleanup.", "hard-drive"),
         new(Identity, string.Empty, "Identity", "Identity, credential, role, tenant, session, and verification administration.", "users"),
