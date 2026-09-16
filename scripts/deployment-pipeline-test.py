@@ -134,6 +134,8 @@ class ContextTests(unittest.TestCase):
                 project = compose["services"][service]["build"]["args"]["PROJECT_PATH"]
                 self.assertTrue((context / project).is_file(), service)
                 self.assertTrue((context / "Dockerfile").is_file(), service)
+                self.assertTrue((context / "src/Libraries/XFramework.Opaque.Native/Cargo.lock").is_file(), service)
+                self.assertTrue((context / "src/Libraries/XFramework.Opaque.Native/src/lib.rs").is_file(), service)
 
     def test_yap_includes_transitive_service_and_generator_dependencies(self):
         directories = contexts.project_directories(ROOT, "src/Presentation/XFramework.Yap/XFramework.Yap.csproj")

@@ -108,6 +108,7 @@ public static class YapApplication
             }
         });
         app.MapYapAuth();
+        app.MapYapOpaqueAuth();
         app.MapYapApi();
         app.MapYapCalls();
         // Older workers already pass /api/ through to the network. This recovery

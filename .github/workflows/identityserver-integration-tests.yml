@@ -43,6 +43,13 @@ jobs:
           echo "scope=$scope" >> "$GITHUB_OUTPUT"
           echo "Validation scope: $scope (Yap-only coverage runs in Validate Phase 0)." >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Set up OPAQUE native compiler
+        if: steps.scope.outputs.scope != 'yap'
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup default 1.88.0
+          node --version
+
       - name: Set up .NET 10
         if: steps.scope.outputs.scope != 'yap'
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
@@ -64,6 +71,10 @@ jobs:
           --no-restore
           -m:1
           /nr:false
+
+      - name: Verify browser and native OPAQUE interoperability
+        if: steps.scope.outputs.scope != 'yap'
+        run: node --test src/Libraries/XFramework.Opaque.Native/test/interop.test.mjs
 
       - name: Run IdentityServer Portal contract tests
         if: steps.scope.outputs.scope != 'yap'

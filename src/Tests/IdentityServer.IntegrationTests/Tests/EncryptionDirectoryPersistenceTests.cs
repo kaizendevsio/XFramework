@@ -238,6 +238,33 @@ public sealed class EncryptionDirectoryPersistenceTests
         Assert.That((await service.ResetEncryptionIdentityAsync(request with { Password = null! }, password.Object)).StatusCode, Is.EqualTo(400));
     }
 
+    [Test]
+    public async Task Reset_OpaqueProof_RewrapsBackupAtomicallyAndCannotReplayOrUseLegacyPassword()
+    {
+        var original = await Initialize();
+        var epoch = Guid.NewGuid();
+        await using var db = Context();
+        db.Add(new OpaqueCredential { TenantId = _tenant, CredentialId = _owner, Epoch = epoch, Record = "test record", WrappedRecovery = "old envelope", UpdatedAt = DateTime.UtcNow });
+        await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+        var grants = new IdentityServer.Api.Infrastructure.OpaqueExchanges(TimeProvider.System);
+        var service = new EncryptionDirectoryService(db, new Accessor(Actor(_tenant, _owner)), grants);
+        var verifier = new Mock<IAuthService>(MockBehavior.Strict);
+        var next = Directory() with { ExpectedRevision = 1, RootPublicKey = Armor("PUBLIC KEY BLOCK", "new root") };
+        var request = new ResetEncryptionIdentityRequest { Directory = next, RecoveryArchive = Armor("MESSAGE", "new encrypted backup"), Password = "old path must not work" };
+        Assert.That((await service.ResetEncryptionIdentityAsync(request, verifier.Object)).StatusCode, Is.EqualTo(403));
+        var grant = grants.Add(new(_tenant, Guid.NewGuid(), "user", "scope", _owner, epoch, Guid.Empty, "reauth", "", default));
+        request.Password = ""; request.OpaqueProof = grant;
+        request.WrappedRecovery = System.Text.Json.JsonSerializer.Serialize(new { v = 1, iv = Convert.ToBase64String(new byte[12]), ciphertext = Convert.ToBase64String(new byte[80]) });
+        Assert.That((await service.ResetEncryptionIdentityAsync(request, verifier.Object)).IsSuccess, Is.True);
+        db.ChangeTracker.Clear();
+        var credential = await db.Set<OpaqueCredential>().SingleAsync(x => x.CredentialId == _owner && x.TenantId == _tenant);
+        Assert.That(credential.WrappedRecovery, Is.EqualTo(request.WrappedRecovery));
+        Assert.That(credential.Epoch, Is.Not.EqualTo(epoch));
+        Assert.That((await service.GetEncryptionRecoveryAsync(new())).Data!.Archive, Is.EqualTo(request.RecoveryArchive));
+        Assert.That((await service.ResetEncryptionIdentityAsync(request, verifier.Object)).StatusCode, Is.EqualTo(403));
+        verifier.VerifyNoOtherCalls();
+    }
+
     private async Task<PutEncryptionDirectoryRequest> Initialize()
     {
         await using var db = Context(); var request = Directory();
@@ -254,5 +281,5 @@ public sealed class EncryptionDirectoryPersistenceTests
     private sealed class Accessor(TrustedInvocationContext? value) : ITrustedInvocationContextAccessor { public TrustedInvocationContext? Current => value; }
     private Store Context() => new(new DbContextOptionsBuilder<Store>().UseNpgsql(_postgres.GetConnectionString()).Options);
     private sealed class Store(DbContextOptions<Store> options) : DbContext(options)
-    { protected override void OnModelCreating(ModelBuilder model) => model.ApplyConfiguration(new EncryptionAccountConfiguration()); }
+    { protected override void OnModelCreating(ModelBuilder model) { model.ApplyConfiguration(new EncryptionAccountConfiguration()); model.ApplyConfiguration(new OpaqueCredentialConfiguration()); } }
 }

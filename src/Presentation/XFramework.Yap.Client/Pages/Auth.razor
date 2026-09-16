@@ -2,6 +2,7 @@
 @page "/register"
 @page "/signup"
 @implements IDisposable
+@inject IJSRuntime JS
 @inject ChatApi Api
 @inject ChatState State
 @inject NavigationManager Nav
@@ -41,32 +42,55 @@
         });
     }
     public void Dispose() => Nav.LocationChanged -= LocationChanged;
+    private sealed record PasswordLogin(string Mode, string? Scope, bool RecoveryAvailable);
     private async Task SubmitAsync()
     {
         busy = true; error = null;
         try
         {
             if (Register && password != confirm) { error = "The passwords do not match."; return; }
-            var path = await Api.AuthenticateAsync(Register ? "register" : "login", new()
-            { ["displayName"] = name, ["username"] = username, ["password"] = password, ["confirmPassword"] = confirm });
-            if (path.Contains("error="))
+            var result = Register
+                ? await JS.InvokeAsync<PasswordLogin>("yap.encryption.passwordRegister", username.Trim(), password, name.Trim())
+                : await JS.InvokeAsync<PasswordLogin>("yap.encryption.passwordSignIn", username.Trim(), password);
+            var path = "/";
+            if (result.Mode == "legacy")
             {
-                error = path.Split("error=").Last() switch
+                path = await Api.AuthenticateAsync("login", new()
+                { ["displayName"] = name, ["username"] = username, ["password"] = password, ["confirmPassword"] = confirm });
+                if (path.Contains("error="))
                 {
-                    "taken" => "That username is already taken.", "mismatch" => "The passwords do not match.",
-                    "validation" => "Check your name and username. Passwords need at least 8 characters and at most 72 UTF-8 bytes.",
-                    "credentials" => "The username or password is incorrect.", "limited" => "Too many attempts. Try again shortly.",
-                    "disabled" or "setup" => "Account creation is not available for this workspace yet.",
-                    _ => "The sign-in service is unavailable. Please try again."
-                };
-                return;
+                    error = path.Split("error=").Last() switch
+                    {
+                        "taken" => "That username is already taken.", "mismatch" => "The passwords do not match.",
+                        "validation" => "Check your name and username. Passwords need at least 8 characters and at most 72 UTF-8 bytes.",
+                        "credentials" => "The username or password is incorrect.", "limited" => "Too many attempts. Try again shortly.",
+                        "disabled" or "setup" => "Account creation is not available for this workspace yet.",
+                        _ => "The sign-in service is unavailable. Please try again."
+                    };
+                    return;
+                }
+            }
+            await State.SynchronizeAsync();
+            if (State.EncryptionEnabled && State.User is { } user)
+            {
+                try
+                {
+                    if (result.Mode == "legacy")
+                    {
+                        await State.Encryption.EnsureAsync(user);
+                        if (!await State.Encryption.PasswordEnrollAsync(user, username.Trim(), password)) path = "/settings";
+                    }
+                    else if (!await State.Encryption.PasswordRestoreAsync(user)) path = "/settings";
+                    await State.Encryption.EnsureAsync(user);
+                }
+                catch { path = "/settings"; } // Sign-in survives a temporary recovery outage; never create replacement keys here.
             }
             password = confirm = "";
             registered = Register;
             await State.SynchronizeAsync();
             Nav.NavigateTo(path);
         }
-        catch (Exception ex) { error = ex is ChatApiException ? ex.Message : "Cannot reach the sign-in service. Please try again."; }
-        finally { busy = false; }
+        catch (Exception ex) { error = ex is ChatApiException or JSException ? ex.Message.Split('\n')[0] : "Cannot reach the sign-in service. Please try again."; }
+        finally { busy = false; password = confirm = ""; }
     }
 }

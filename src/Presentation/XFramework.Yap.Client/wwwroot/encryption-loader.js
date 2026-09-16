@@ -10,10 +10,16 @@
         });
         worker.addEventListener('error', () => { rpc.close(); worker.terminate(); loaded = null; });
         worker.addEventListener('messageerror', () => { rpc.close(); worker.terminate(); loaded = null; });
-        return rpc;
+        return { call: (...args) => rpc.call(...args), dispose: () => { rpc.close(); worker.terminate(); } };
     }
     window.yap.encryption = new Proxy({}, {
         get: (_target, method) => async (...args) => {
+            if (method === 'passwordClear') {
+                const previous = loaded; loaded = null;
+                // Logout must clear worker memory even if its RPC loop is stalled.
+                try { (await previous)?.dispose(); } catch { }
+                return;
+            }
             let rpc;
             try { rpc = await (loaded ??= connect()); }
             catch (error) { loaded = null; throw error; }

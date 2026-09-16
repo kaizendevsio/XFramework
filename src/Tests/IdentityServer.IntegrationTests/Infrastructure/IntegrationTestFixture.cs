@@ -359,6 +359,11 @@ public class IntegrationTestFixture
         builder.Services.AddHostedService<VerificationDeliveryOutboxDispatcher>();
         builder.Services.AddHostedService<StorageCleanupOutboxDispatcher>();
         builder.Services.AddHostedService<StorageClaimOutboxDispatcher>();
+        var opaquePath = Path.Combine(TransportSigningKeyDirectory, "opaque-setup-test");
+        File.WriteAllText(opaquePath, OpaqueNative.Execute(new { operation = "setup" }).GetProperty("setup").GetString());
+        builder.Configuration["Opaque:SetupPath"] = opaquePath;
+        builder.Services.AddSingleton<OpaqueSetup>();
+        builder.Services.AddSingleton<OpaqueExchanges>();
         builder.Services.AddScoped<AuthService>();
         builder.Services.AddScoped<EncryptionDirectoryService>();
         builder.Services.AddScoped<IdentityServer.Api.Features.Auth.Register.RegistrationService>();

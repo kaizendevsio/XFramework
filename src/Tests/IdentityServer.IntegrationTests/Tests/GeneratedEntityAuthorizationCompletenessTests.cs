@@ -11,6 +11,15 @@ namespace GeneratedAuthorizationContractTests.IdentityServer;
 [Category("Area:GeneratedAuthorization")]
 public sealed class GeneratedEntityAuthorizationCompletenessTests
 {
+    [Test]
+    public void OpaqueCredentials_AreNotExposedThroughGeneratedRemoteQueriesOrCrud()
+    {
+        var registry = typeof(global::IdentityServer.Api.Features.Auth.Opaque.OpaqueAuthEndpoint)
+            .Assembly.GetType("XFramework.Core.DataContext.DataContextEntityRegistrations", true)!;
+        var entities = (Dictionary<string, Type>)registry.GetMethod("GetDataContextEntityTypes")!.Invoke(null, null)!;
+        entities.Values.Should().NotContain(typeof(global::IdentityServer.Domain.Shared.Contracts.OpaqueCredential));
+    }
+
     [TestCase("IdentityRoleType", "identity.roles")]
     [TestCase("IdentityRoleTypeGroup", "identity.roles")]
     [TestCase("IdentityContactType", "identity.contacts")]

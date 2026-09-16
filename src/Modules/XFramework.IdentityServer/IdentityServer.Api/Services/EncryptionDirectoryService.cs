@@ -4,7 +4,7 @@ using Npgsql;
 namespace IdentityServer.Api.Services;
 
 /// <summary>Account ownership and persistence boundary. Clients verify all OpenPGP signatures and pinned roots.</summary>
-public sealed class EncryptionDirectoryService(DbContext db, ITrustedInvocationContextAccessor trusted)
+public sealed class EncryptionDirectoryService(DbContext db, ITrustedInvocationContextAccessor trusted, Infrastructure.OpaqueExchanges? exchanges = null)
 {
     public async Task<Result<EncryptionDirectoryResponse>> GetEncryptionDirectoryAsync(GetEncryptionDirectoryRequest request, CancellationToken ct = default)
     {
@@ -68,13 +68,24 @@ public sealed class EncryptionDirectoryService(DbContext db, ITrustedInvocationC
     {
         var actor = Actor();
         if (actor is null) return Result<EncryptionDirectoryResponse>.Failure("An authenticated user is required", 401);
-        if (string.IsNullOrEmpty(request.Password) || request.Password.Length > 256 || request.Directory is null || !ValidDirectory(request.Directory)
+        if ((request.OpaqueProof == Guid.Empty && string.IsNullOrEmpty(request.Password)) || request.Password?.Length > 256 || request.Directory is null || !ValidDirectory(request.Directory)
             || !Armor(request.RecoveryArchive, "MESSAGE", 2097152))
             return Result<EncryptionDirectoryResponse>.Failure("A password, new directory and encrypted backup are required", 400);
-        var verified = await auth.VerifyPasswordAsync(new VerifyPasswordRequest
-        { CredentialId = actor.CredentialId, Password = request.Password, Metadata = request.Metadata }, ct);
-        if (verified.StatusCode == 429) return Result<EncryptionDirectoryResponse>.Failure("Too many attempts. Try again later.", 429);
-        if (!verified.IsSuccess || !verified.Data) return Result<EncryptionDirectoryResponse>.Failure("Confirm your password before resetting encryption", 403);
+        var opaque = await db.Set<OpaqueCredential>().AsTracking()
+            .SingleOrDefaultAsync(x => x.TenantId == actor.TenantId && x.CredentialId == actor.CredentialId, ct);
+        if (opaque is not null)
+        {
+            var proof = exchanges?.TakeForActor(request.OpaqueProof, actor.TenantId, actor.CredentialId);
+            if (proof is null || proof.Epoch != opaque.Epoch || !AuthService.ValidWrappedRecovery(request.WrappedRecovery))
+                return Result<EncryptionDirectoryResponse>.Failure("Confirm your password before resetting encryption", 403);
+        }
+        else
+        {
+            var verified = await auth.VerifyPasswordAsync(new VerifyPasswordRequest
+            { CredentialId = actor.CredentialId, Password = request.Password, Metadata = request.Metadata }, ct);
+            if (verified.StatusCode == 429) return Result<EncryptionDirectoryResponse>.Failure("Too many attempts. Try again later.", 429);
+            if (!verified.IsSuccess || !verified.Data) return Result<EncryptionDirectoryResponse>.Failure("Confirm your password before resetting encryption", 403);
+        }
         var row = await OwnAccount(actor).AsTracking().SingleOrDefaultAsync(ct);
         if (row is null) return Result<EncryptionDirectoryResponse>.NotFound("Encryption directory not found");
         var next = request.Directory;
@@ -95,6 +106,11 @@ public sealed class EncryptionDirectoryService(DbContext db, ITrustedInvocationC
         row.DirectoryRevision++; row.RecoveryRevision++;
         row.RootPublicKey = next.RootPublicKey; row.Roster = next.Roster; row.DevicesJson = JsonSerializer.Serialize(next.Devices);
         row.RecoveryArchive = request.RecoveryArchive;
+        if (opaque is not null)
+        {
+            opaque.WrappedRecovery = request.WrappedRecovery!;
+            opaque.Epoch = Guid.NewGuid(); opaque.UpdatedAt = DateTime.UtcNow;
+        }
         return await SaveAsync(row, ct)
             ? await GetEncryptionDirectoryAsync(new() { CredentialId = actor.CredentialId }, ct)
             : Result<EncryptionDirectoryResponse>.Failure("Encryption changed; refresh before resetting", 409);
@@ -149,7 +165,7 @@ public sealed class EncryptionDirectoryService(DbContext db, ITrustedInvocationC
 
     private static List<EncryptionDevice> ReadDevices(string json) => JsonSerializer.Deserialize<List<EncryptionDevice>>(json)!;
 
-    private static bool ValidDirectory(PutEncryptionDirectoryRequest request) =>
+    internal static bool ValidDirectory(PutEncryptionDirectoryRequest request) =>
         request.ExpectedRevision >= 0 && request.ExpectedRevision < long.MaxValue
         && Armor(request.RootPublicKey, "PUBLIC KEY BLOCK", 16384)
         && Armor(request.Roster, "MESSAGE", 524288)

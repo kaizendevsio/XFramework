@@ -2,10 +2,14 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.38";
+    public const string Version = "1.3.39";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "16 September 2026", [
+            "Your sign-in password can now restore encrypted messages on another device, without a separate recovery phrase.",
+            "Enable password recovery on an existing device under Settings, Privacy. New accounts get it automatically.",
+            "Change your password without changing message keys. After a genuine key reset, verify the person's new key to resume queued messages."]),
+        ("1.3.38", "16 September 2026", [
             "Notifications pause on the device where Yap is open; background message alerts can alert again.",
             "Conversations now keep voice-call durations and missed calls.",
             "Check microphone access in call settings. Muting and unmuting keeps the same microphone connection."]),
