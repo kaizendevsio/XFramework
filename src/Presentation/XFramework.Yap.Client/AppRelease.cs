@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.35";
+    public const string Version = "1.3.36";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "16 September 2026", [
+            "Your chosen ringtone now plays only when you receive a call; placing one plays a standard ringback tone.",
+            "Incoming calls ring and buzz more reliably, and a tap anywhere starts the ring if the browser blocked it."]),
+        ("1.3.35", "16 September 2026", [
             "An incoming call notification now has Open call and Dismiss buttons, and buzzes on phones that support it.",
             "A call notification that arrives too late shows as a missed call instead of a call you cannot answer."]),
         ("1.3.34", "15 September 2026", [
