@@ -241,7 +241,7 @@ public sealed class NotificationPushService(
         var summary = await SendAsync(
             tenantId,
             request.RecipientCredentialId,
-            new PushEnvelope(1, kind, request.ThreadId, null, Truncate(request.Reference, 64)),
+            new PushEnvelope(1, kind, request.ThreadId, null, Truncate(request.Reference, 64), request.ExpiresAt?.ToUnixTimeSeconds()),
             request.TimeToLiveSeconds,
             NormalizeUrgency(request.Urgency),
             ct);
@@ -334,9 +334,15 @@ public sealed class NotificationPushService(
 /// <param name="ThreadId">Conversation to open on tap.</param>
 /// <param name="NotificationId">Inbox item, so the app can mark it read without refetching everything.</param>
 /// <param name="Reference">Opaque collapse key, for example a call ID.</param>
+/// <param name="ExpiresAt">
+/// Unix seconds after which the event is stale, for a ringing invite the moment it times out.
+/// Unix seconds rather than a timestamp string because the worker only ever compares it to
+/// Date.now(), and a push payload has four kilobytes to spend. Null for events that do not expire.
+/// </param>
 public sealed record PushEnvelope(
     int Version,
     string Kind,
     Guid? ThreadId,
     Guid? NotificationId,
-    string? Reference);
+    string? Reference,
+    long? ExpiresAt = null);

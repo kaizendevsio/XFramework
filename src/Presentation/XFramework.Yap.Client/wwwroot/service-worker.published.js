@@ -35,21 +35,44 @@ self.addEventListener('push', event => event.waitUntil((async () => {
     try { data = event.data ? event.data.json() : {}; } catch { /* A wake-up with no readable payload still notifies. */ }
     const call = data.kind === 'call';
     const thread = typeof data.threadId === 'string' ? data.threadId : null;
+    // A push service may hold a ring until the last moment of its TTL, so a call push can arrive
+    // after the invite it describes has timed out. Ringing then would offer a call the
+    // authenticated flow is going to refuse, so a late ring reports the missed call instead.
+    // It still shows something: a userVisibleOnly subscription that handles a push without
+    // showing a notification can cost the whole origin its push permission, and "you missed a
+    // call" is both honest and the one thing the person actually needs to know.
+    const stale = call && typeof data.expiresAt === 'number' && data.expiresAt * 1000 <= Date.now();
+    const ringing = call && !stale;
     // A visible tab still holds its live socket and renders the message itself; a banner would
     // only duplicate it. Every other state - hidden, suspended, closed - needs the notification.
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     if (windows.some(client => client.visibilityState === 'visible')) return;
-    await self.registration.showNotification(call ? 'Incoming call' : 'New message', {
-        body: call ? 'Tap to answer in Yap.' : 'Open Yap to read it.',
+    await self.registration.showNotification(ringing ? 'Incoming call' : stale ? 'Missed call' : 'New message', {
+        body: ringing ? 'Tap to answer in Yap.' : stale ? 'The call ended before this device could ring.' : 'Open Yap to read it.',
         icon: 'yap-app-v2-192.png', badge: 'yap-app-v2-192.png',
-        // One banner per conversation, but every call ring replaces and re-alerts.
+        // One banner per conversation, but every call ring replaces and re-alerts. A late ring
+        // keeps the call's tag so it replaces that call's stale banner instead of stacking a
+        // second one under it.
         tag: call ? `yap-call-${data.reference ?? ''}` : `yap-thread-${thread ?? 'inbox'}`,
-        renotify: call, requireInteraction: call, silent: false,
-        data: { kind: call ? 'call' : 'message', url: thread ? `/chat/${thread}` : '/' }
+        renotify: ringing, requireInteraction: ringing, silent: false,
+        // A short double buzz, distinct from the single buzz of a message. Requested, not
+        // promised: the option is ignored wherever the Vibration API is absent, iOS included.
+        vibrate: ringing ? [200, 100, 200] : undefined,
+        // Also advisory - a browser that renders no action buttons (iOS again) still delivers the
+        // banner, and tapping its body does exactly what Open call does, so nothing is lost.
+        actions: ringing ? [{ action: 'open', title: 'Open call' }, { action: 'dismiss', title: 'Dismiss' }] : [],
+        data: { kind: ringing ? 'call' : stale ? 'missed' : 'message', url: thread ? `/chat/${thread}` : '/' }
     });
 })()));
 self.addEventListener('notificationclick', event => {
     event.notification.close();
+    // Dismiss silences this device and nothing else: no request is sent, so the call keeps
+    // ringing on the person's other devices and no participant is told anything. Declining for
+    // real is an authenticated action that belongs to the app, not to a worker.
+    if (event.action === 'dismiss') return;
+    // Open call and a tap on the body are the same thing: surface the app and let it decide. The
+    // worker never checks or joins a call itself - it holds no credentials, and the microphone
+    // stays untouched until the person accepts in the app.
     const url = new URL(event.notification.data?.url || '/', self.location).href;
     event.waitUntil((async () => {
         const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });

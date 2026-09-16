@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.34";
+    public const string Version = "1.3.35";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
-        (Version, "15 September 2026", [
+        (Version, "16 September 2026", [
+            "An incoming call notification now has Open call and Dismiss buttons, and buzzes on phones that support it.",
+            "A call notification that arrives too late shows as a missed call instead of a call you cannot answer."]),
+        ("1.3.34", "15 September 2026", [
             "Message search is rebuilt: results show who said it and highlight the match in context.",
             "Searching a conversation now opens its own screen instead of a cramped sheet."]),
         ("1.3.33", "15 September 2026", [

@@ -80,6 +80,67 @@ for (const [name, script] of Object.entries(workers)) {
         assert.equal(f.shown[0].options.requireInteraction, true);
     });
 
+    test(`${name}: a ringing call asks for a short buzz and offers Open call and Dismiss`, async () => {
+        const f = context(script);
+        await f.run('push', pushEvent({ version: 1, kind: 'call', threadId: 't1', reference: 'call1', expiresAt: Math.floor(Date.now() / 1000) + 30 }));
+        assert.equal(f.shown[0].title, 'Incoming call');
+        assert.equal(JSON.stringify(f.shown[0].options.vibrate), '[200,100,200]');
+        assert.equal(JSON.stringify(f.shown[0].options.actions), JSON.stringify([{ action: 'open', title: 'Open call' }, { action: 'dismiss', title: 'Dismiss' }]));
+    });
+
+    test(`${name}: a message push never buzzes like a call or offers call actions`, async () => {
+        const f = context(script);
+        await f.run('push', pushEvent({ version: 1, kind: 'message', threadId: 't1' }));
+        assert.equal(f.shown[0].options.vibrate, undefined);
+        assert.equal(JSON.stringify(f.shown[0].options.actions), '[]');
+    });
+
+    // A push service may hold a ring to the last second of its TTL. Showing nothing would risk the
+    // origin's push permission; showing "Incoming call" would offer a call that no longer exists.
+    test(`${name}: a call delivered after its deadline reports a missed call, not an invitation`, async () => {
+        const f = context(script);
+        await f.run('push', pushEvent({ version: 1, kind: 'call', threadId: 't1', reference: 'call1', expiresAt: Math.floor(Date.now() / 1000) - 1 }));
+        assert.equal(f.shown.length, 1, 'a handler that shows nothing can cost the origin its push permission');
+        assert.equal(f.shown[0].title, 'Missed call');
+        assert.equal(f.shown[0].options.data.kind, 'missed');
+        assert.equal(f.shown[0].options.requireInteraction, false);
+        assert.equal(f.shown[0].options.renotify, false);
+        assert.equal(f.shown[0].options.vibrate, undefined);
+        assert.equal(JSON.stringify(f.shown[0].options.actions), '[]', 'nothing is left to open or dismiss');
+        // Still the call's tag, so it replaces a stale ringing banner rather than stacking on it.
+        assert.equal(f.shown[0].options.tag, 'yap-call-call1');
+    });
+
+    test(`${name}: Dismiss closes the banner on this device and tells no one`, async () => {
+        const open = windowClient('https://yap.test/chat/t1');
+        const f = context(script, { windows: [open] });
+        let closed = false;
+        await f.run('notificationclick', { action: 'dismiss', notification: { close: () => { closed = true; }, data: { kind: 'call', url: '/chat/t1' } } });
+        assert.ok(closed);
+        // Declining is an authenticated action: a dismissed banner must not reach the app, the
+        // gateway or the other participants, so the call keeps ringing everywhere else.
+        assert.deepEqual(open.posted, []);
+        assert.equal(open.focused, false);
+        assert.deepEqual(f.opened, []);
+    });
+
+    test(`${name}: Open call focuses the window already running Yap`, async () => {
+        const open = windowClient('https://yap.test/');
+        const f = context(script, { windows: [open] });
+        await f.run('notificationclick', { action: 'open', notification: { close: () => {}, data: { kind: 'call', url: '/chat/t1' } } });
+        assert.ok(open.focused);
+        assert.equal(JSON.stringify(open.posted), JSON.stringify([{ type: 'yap-notification-click', url: 'https://yap.test/chat/t1' }]));
+        assert.deepEqual(f.opened, []);
+    });
+
+    test(`${name}: Open call opens Yap when no window is running`, async () => {
+        const f = context(script);
+        await f.run('notificationclick', { action: 'open', notification: { close: () => {}, data: { kind: 'call', url: '/chat/t1' } } });
+        // The worker holds no credentials: it only surfaces the app, which checks the call over
+        // the authenticated flow. No call is joined and no microphone is touched here.
+        assert.deepEqual(f.opened, ['https://yap.test/chat/t1']);
+    });
+
     test(`${name}: an unreadable or empty payload still wakes the device`, async () => {
         for (const payload of [undefined, null]) {
             const f = context(script);

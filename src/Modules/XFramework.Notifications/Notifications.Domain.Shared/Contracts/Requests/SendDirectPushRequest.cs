@@ -23,6 +23,13 @@ public partial record SendDirectPushRequest : RequestBase,
 
     public int TimeToLiveSeconds { get; set; } = 30;
 
+    /// <summary>
+    /// Absolute moment the event stops being worth showing, for example when a ringing invite
+    /// times out. A push service TTL only bounds how long delivery is attempted; this lets a
+    /// worker that is woken late tell the difference between a live event and a stale one.
+    /// </summary>
+    public DateTimeOffset? ExpiresAt { get; set; }
+
     /// <summary>RFC 8030 urgency. "high" keeps a ringing call out of a push service's batching window.</summary>
     public string Urgency { get; set; } = "high";
 }
