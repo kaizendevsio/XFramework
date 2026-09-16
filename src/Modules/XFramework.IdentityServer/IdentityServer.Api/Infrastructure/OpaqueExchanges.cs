@@ -6,6 +6,7 @@ namespace IdentityServer.Api.Infrastructure;
 /// <summary>Single-use short-lived exchanges for the current single-instance IdentityServer.</summary>
 public sealed class OpaqueExchanges(TimeProvider clock)
 {
+    public sealed class CapacityException : Exception;
     private readonly object admission = new();
     private readonly ConcurrentDictionary<Guid, Entry> entries = new();
     public sealed record Entry(Guid TenantId, Guid RoleId, string UserName, string Client,
@@ -18,7 +19,7 @@ public sealed class OpaqueExchanges(TimeProvider clock)
         lock (admission)
         {
             foreach (var item in entries.Where(x => x.Value.Expires <= clock.GetUtcNow())) entries.TryRemove(item.Key, out _);
-            if (entries.Count >= 256) throw new InvalidOperationException("Too many authentication exchanges.");
+            if (entries.Count >= 256) throw new CapacityException();
             var id = Guid.NewGuid();
             if (!entries.TryAdd(id, entry with { Expires = clock.GetUtcNow().AddMinutes(2) })) throw new CryptographicException();
             return id;

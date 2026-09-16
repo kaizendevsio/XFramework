@@ -7,6 +7,16 @@ namespace IdentityServer.UnitTests;
 public sealed class OpaqueExchangesTests
 {
     [Test]
+    public void CapacityIsBounded_AndExpiredEntriesReleaseCapacity()
+    {
+        var clock = new Clock(); var exchanges = new OpaqueExchanges(clock);
+        var entry = new OpaqueExchanges.Entry(Guid.NewGuid(), Guid.NewGuid(), "name", "scope", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "login", "state", default);
+        for (var i = 0; i < 256; i++) exchanges.Add(entry);
+        Assert.Throws<OpaqueExchanges.CapacityException>(() => exchanges.Add(entry));
+        clock.Now += TimeSpan.FromMinutes(2);
+        Assert.DoesNotThrow(() => exchanges.Add(entry));
+    }
+    [Test]
     public void Exchange_BindsTenantRoleAndExpiration_AndCannotReplay()
     {
         var clock = new Clock(); var exchanges = new OpaqueExchanges(clock);

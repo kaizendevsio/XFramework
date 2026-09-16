@@ -32,6 +32,13 @@ public sealed partial class AuthService
             var limit = await AcquireAuthenticationRateLimitAsync(login, ct);
             if (!limit.IsAllowed) return Result<OpaqueAuthResponse>.Failure("Too many requests.", 429);
         }
+        if (request.Stage.EndsWith("-start", StringComparison.Ordinal))
+        {
+            // Bound anonymous state allocation even when callers vary the username.
+            var limit = await AcquireSecurityRateLimitAsync(new("opaque-start", 120, TimeSpan.FromMinutes(1)),
+                request.Metadata, "opaque-exchanges", "OPAQUE exchange", ct);
+            if (!limit.IsAllowed) return Result<OpaqueAuthResponse>.Failure("Too many requests.", 429);
+        }
         try
         {
             var tenant = await _tenantService.GetTenant(tenantId, ct);
@@ -181,6 +188,7 @@ public sealed partial class AuthService
             return Result<OpaqueAuthResponse>.Failure("Unsupported authentication exchange.", 400);
         }
         catch (CryptographicException) { return OpaqueDenied(); }
+        catch (OpaqueExchanges.CapacityException) { return Result<OpaqueAuthResponse>.Failure("Too many attempts. Try again shortly.", 429); }
         catch (DbUpdateConcurrencyException) { return Result<OpaqueAuthResponse>.Conflict("Account changed. Sign in again."); }
     }
 
