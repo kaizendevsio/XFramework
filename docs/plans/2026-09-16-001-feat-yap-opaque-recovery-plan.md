@@ -86,4 +86,3 @@ The existing recovery persistence suite exercises stale revisions/concurrent dir
 - Live Chromium profile A registered one synthetic account through the public UI and encrypted a synthetic payload locally. An independent empty profile B signed in using only the same password, automatically restored the same root fingerprint, and decrypted that original ciphertext. Both devices remained approved (two active devices). Diagnostics reported version `1.3.39`.
 - No message was sent to another user. Both test sessions were signed out/revoked, the task-created credential was disabled and soft-deleted using its exact tenant/credential/unique test username, and the temporary test password was removed. Existing accounts and messages were not changed by this smoke test.
 - Real-device iOS/Android validation and independent cryptographic review remain outside this verification; no claim of either is made.
-
