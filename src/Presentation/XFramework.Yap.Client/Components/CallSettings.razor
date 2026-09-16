@@ -1,8 +1,8 @@
 @inject IJSRuntime JS
-<h3 class="set-group">Ring sound</h3>
+<h3 class="set-group">Incoming call ringtone</h3>
 <div class="set-list">
     <div class="set-row">
-        <span class="set-key"><Icon Name="volume" Size="19" /><span class="set-label">Ring volume<small>Used for calls you receive and for the ringing you hear while calling</small></span></span>
+        <span class="set-key"><Icon Name="volume" Size="19" /><span class="set-label">Ring volume<small>How loudly this device rings for calls you receive</small></span></span>
         <input class="ring-volume" type="range" min="0" max="100" step="5" aria-label="Ring volume" value="@Percent" @onchange="VolumeAsync" />
     </div>
     @foreach (var tone in tones)
@@ -14,12 +14,12 @@
     }
 </div>
 <p class="set-footnote" role="status">@notice</p>
-<p class="set-footnote">Ringing is stored on this device only. Call volume during a call follows your device’s own volume buttons.</p>
+<p class="set-footnote">This tone plays only for calls you receive. While you are placing a call you hear the standard ringing tone instead, at a fixed low level — turning the volume all the way down silences that too. Ringing is stored on this device only. Call volume during a call follows your device’s own volume buttons.</p>
 @code {
     private RingTone[] tones = [];
     private string selected = "classic";
     private double volume = .7;
-    private string notice = "Pick a ringtone to hear it on this device.";
+    private string notice = "Pick a ringtone to hear how an incoming call sounds on this device.";
     private int Percent => (int)Math.Round(volume * 100);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -54,7 +54,7 @@
         catch { notice = "Ring sounds are unavailable in this browser."; }
     }
 
-    private void Describe(RingStatus status) => notice = status.Audible ? "Ringing plays on this device."
+    private void Describe(RingStatus status) => notice = status.Audible ? "Incoming calls ring like this on this device."
         : status.Vibrating ? "This browser blocked the sound, so Yap vibrates instead."
         : volume == 0 ? "Ring volume is off. Incoming calls still show on screen."
         : selected == "silent" ? "Silent ringing. Incoming calls vibrate where the device supports it."

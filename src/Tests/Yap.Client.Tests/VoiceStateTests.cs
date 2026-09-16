@@ -143,6 +143,40 @@ public sealed class VoiceStateTests
         });
     }
 
+    // The chosen ringtone belongs to the person being called. Whatever a caller's call is doing,
+    // it must never ask for "ringtone" - that is how the picker leaked onto the calling side.
+    [Test]
+    public void Caller_IsNeverRungWithTheRingtoneThePersonalPickerSets()
+    {
+        string[] statuses = ["", "Preparing microphone...", VoiceState.RingingStatus, "Securing call...", "Connected", "Connecting..."];
+        Assert.Multiple(() =>
+        {
+            Assert.That(statuses.Select(status => VoiceState.RingModeFor(true, false, status)), Has.None.EqualTo("ringtone"));
+            Assert.That(statuses.Select(status => VoiceState.RingModeFor(true, true, status)), Has.All.EqualTo("ringtone"));
+        });
+    }
+
+    // Autoplay policy answers a blocked resume() with a promise that never settles. The ring
+    // queue chains every stop behind the start before it, so a wait with no end would leave the
+    // ring unstoppable and the incoming screen without its retry button.
+    [Test]
+    public async Task AStartThatNeverAnswers_ReportsSilence_AndStillLetsTheRingStop()
+    {
+        var js = new RingJs { Hang = true };
+        var previous = VoiceState.RingStartTimeout;
+        VoiceState.RingStartTimeout = TimeSpan.FromMilliseconds(50);
+        try
+        {
+            await using var fixture = new Fixture(js: js);
+            await fixture.DeliverAsync(fixture.GroupEvent(fixture.Invite()));
+            Assert.That(() => fixture.Voice.RingSilent, Is.True.After(2000, 20), "a ring nobody heard still has to offer the gesture that unblocks it");
+            js.Hang = false;
+            await fixture.Voice.EndAsync().WaitAsync(TimeSpan.FromSeconds(2));
+            Assert.That(() => js.Snapshot().Last(), Is.EqualTo("yap.ring.stop").After(2000, 20));
+        }
+        finally { VoiceState.RingStartTimeout = previous; }
+    }
+
     [Test]
     public async Task IncomingCall_RingsOnce_AndStopsWhenDeclined()
     {
@@ -218,11 +252,20 @@ public sealed class VoiceStateTests
     {
         public List<string> Calls { get; } = [];
         public bool Audible { get; set; } = true;
-        public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args) => Record<TValue>(identifier, args);
-        public ValueTask<TValue> InvokeAsync<TValue>(string identifier, CancellationToken cancellationToken, object?[]? args) => Record<TValue>(identifier, args);
-        private ValueTask<TValue> Record<TValue>(string identifier, object?[]? args)
+        /// <summary>Answers yap.ring.start the way a blocked autoplay policy does: never.</summary>
+        public bool Hang { get; set; }
+        public string[] Snapshot() { lock (Calls) return [.. Calls]; }
+        public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args) => Record<TValue>(identifier, args, default);
+        public ValueTask<TValue> InvokeAsync<TValue>(string identifier, CancellationToken cancellationToken, object?[]? args) => Record<TValue>(identifier, args, cancellationToken);
+        private ValueTask<TValue> Record<TValue>(string identifier, object?[]? args, CancellationToken cancellationToken)
         {
-            if (identifier.StartsWith("yap.ring.")) Calls.Add(args is { Length: > 0 } ? $"{identifier}:{args[0]}" : identifier);
+            if (identifier.StartsWith("yap.ring.")) lock (Calls) Calls.Add(args is { Length: > 0 } ? $"{identifier}:{args[0]}" : identifier);
+            if (Hang && identifier == "yap.ring.start")
+            {
+                var pending = new TaskCompletionSource<TValue>(TaskCreationOptions.RunContinuationsAsynchronously);
+                cancellationToken.Register(() => pending.TrySetCanceled(cancellationToken));
+                return new(pending.Task);
+            }
             object? value = typeof(TValue) == typeof(RingStatus) ? new RingStatus(Audible, false)
                 : typeof(TValue) == typeof(bool) ? (object)true
                 : typeof(TValue).IsValueType ? Activator.CreateInstance(typeof(TValue)) : null;
