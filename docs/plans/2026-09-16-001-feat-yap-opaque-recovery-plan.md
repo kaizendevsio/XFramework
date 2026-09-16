@@ -1,7 +1,7 @@
 ---
 title: "feat: Single-password Yap encryption recovery with OPAQUE"
 type: feat
-status: active
+status: completed
 date: 2026-09-16
 ---
 
@@ -30,9 +30,9 @@ Sign in to Yap with one password and automatically restore the existing encrypti
 - [x] Add browser OPAQUE authentication and automatic encrypted backup protection/restoration.
 - [x] Handle password change/reset, logout, interrupted enrollment and lost-key states.
 - [x] Expose actionable identity-change verification so existing chats can resume after reset.
-- [ ] Run protocol, authorization, replay, concurrency, migration, recovery and browser regression tests.
+- [x] Run protocol, authorization, replay, concurrency, migration, recovery and browser regression tests.
 - [x] Document operational secrets/rollback limits and release notes.
-- [ ] Merge and deploy; verify IdentityServer/Yap health, exact release assets and restore on a fresh browser profile.
+- [x] Merge and deploy; verify IdentityServer/Yap health, exact release assets and restore on a fresh browser profile.
 
 # Acceptance evidence
 
@@ -57,12 +57,13 @@ Keep legacy users functional while migration is incomplete. Do not enable a part
 
 Release: Yap 1.3.39. Thin Rust native adapter invokes the pinned OPAQUE implementation; the browser uses the matching unmodified WASM package in the existing encryption worker. Rust source and Cargo.lock are committed. The Docker build pins Rust 1.88.0 by digest and copies only the resulting native library into IdentityServer.
 
-Validated locally:
-- 138 IdentityServer PostgreSQL/Bolt integration tests passed, including real browser/native registration, migration, password change, session revocation, proof replay, disabled accounts, and atomic OPAQUE-backed identity reset.
-- 103 IdentityServer unit tests passed, including exchange tenant/role/actor/expiry binding.
+Validated locally and in final PR CI:
+- 139 IdentityServer PostgreSQL/Bolt integration tests passed, including real browser/native registration, migration, password change, session revocation, proof replay, disabled accounts, and atomic OPAQUE-backed identity reset.
+- 104 IdentityServer unit tests passed, including exchange tenant/role/actor/expiry binding.
 - 172 Yap server tests and 161 Yap client tests passed.
 - 38 JavaScript tests passed, including native/WASM interoperability, wrong passwords, malformed/tampered exchanges, encrypted wrapping scope binding, fresh-device history restoration, preservation of existing devices, backup merging, and lost committed-response recovery.
-- Browser fixture sign-in succeeded through the real worker/module loading path. Live fresh-profile verification remains a rollout gate.
+- Browser fixture sign-in, password-recovery settings and logout succeeded through the real worker/module loading path. Live fresh-profile verification passed after rollout.
+- Final IdentityServer CI run `35076796994` passed (including 29 Portal contracts and the native/WASM interop test); full Phase 0 run `35076797196` passed. Local deployment-context packaging tests passed (21), including native Rust sources in scoped build contexts.
 
 The existing recovery persistence suite exercises stale revisions/concurrent directory and archive updates. Enrollment captures both the credential stamp/OPAQUE epoch and the backup root/revision; its transaction rejects an intervening change. This is integration coverage, not an independent cryptographic audit or a physical iOS/Android certification.
 
@@ -77,6 +78,12 @@ The existing recovery persistence suite exercises stale revisions/concurrent dir
 - Actual identity reset atomically replaces the public directory, encrypted archive and wrapped recovery secret. Peers still need to compare/accept the new fingerprint. Pending sends pause with instructions; accepting the fingerprint retries the queue. No automatic trust downgrade.
 - Once any credential migrates, rollback must retain an OPAQUE-capable IdentityServer/Yap pair and the new table/setup. Do not deploy an old password-only UI/server, reverse the migration, or replace the setup. Prefer a forward fix. Deployment health gates must pass before live migration verification.
 
-# Remaining rollout evidence
+# Completed rollout evidence
 
-Record the merged commit, deployment run, public readiness/version checks and fresh-profile recovery result here after rollout. Do not mark deployment complete from a successful build alone.
+- Implementation merged in [PR #523](https://github.com/kaizendevsio/XFramework/pull/523), commit `6304d00d8d5e7980aa481dcf9fb9417110c79a62`.
+- [Deployment run 35078059282](https://github.com/kaizendevsio/XFramework/actions/runs/35078059282) completed successfully on 2026-09-16. Migration, authenticated Bolt smoke/observation, browser runtime and HTTPS authorization gates passed before release activation.
+- Public Yap `:8443/health/ready` and IdentityServer `:8261/health/ready` returned HTTP 200 Healthy. The served OPAQUE WASM bundle matched exactly; the password-recovery module matched source after Windows/Linux line-ending normalization.
+- Live Chromium profile A registered one synthetic account through the public UI and encrypted a synthetic payload locally. An independent empty profile B signed in using only the same password, automatically restored the same root fingerprint, and decrypted that original ciphertext. Both devices remained approved (two active devices). Diagnostics reported version `1.3.39`.
+- No message was sent to another user. Both test sessions were signed out/revoked, the task-created credential was disabled and soft-deleted using its exact tenant/credential/unique test username, and the temporary test password was removed. Existing accounts and messages were not changed by this smoke test.
+- Real-device iOS/Android validation and independent cryptographic review remain outside this verification; no claim of either is made.
+
