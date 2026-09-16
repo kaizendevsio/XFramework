@@ -62,6 +62,8 @@ def stage(root, project, destination, tracked):
         source = root / relative
         # Root configuration and all Directory.* files preserve ancestor discovery.
         include = len(relative.parts) == 1 or relative.name.startswith("Directory.")
+        # Docker's shared native stage is outside the MSBuild project graph.
+        include = include or relative.is_relative_to(pathlib.Path("src/Libraries/XFramework.Opaque.Native"))
         include = include or any(source == directory or source.is_relative_to(directory) for directory in directories)
         if not include:
             continue
