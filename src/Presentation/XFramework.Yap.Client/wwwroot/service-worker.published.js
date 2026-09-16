@@ -43,10 +43,8 @@ self.addEventListener('push', event => event.waitUntil((async () => {
     // call" is both honest and the one thing the person actually needs to know.
     const stale = call && typeof data.expiresAt === 'number' && data.expiresAt * 1000 <= Date.now();
     const ringing = call && !stale;
-    // A visible tab still holds its live socket and renders the message itself; a banner would
-    // only duplicate it. Every other state - hidden, suspended, closed - needs the notification.
-    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    if (windows.some(client => client.visibilityState === 'visible')) return;
+    // Foreground devices are filtered before sending. A delivered Web Push must remain
+    // user-visible, including races where the app becomes visible while it is in transit.
     await self.registration.showNotification(ringing ? 'Incoming call' : stale ? 'Missed call' : 'New message', {
         body: ringing ? 'Tap to answer in Yap.' : stale ? 'The call ended before this device could ring.' : 'Open Yap to read it.',
         icon: 'yap-app-v2-192.png', badge: 'yap-app-v2-192.png',
@@ -54,7 +52,7 @@ self.addEventListener('push', event => event.waitUntil((async () => {
         // keeps the call's tag so it replaces that call's stale banner instead of stacking a
         // second one under it.
         tag: call ? `yap-call-${data.reference ?? ''}` : `yap-thread-${thread ?? 'inbox'}`,
-        renotify: ringing, requireInteraction: ringing, silent: false,
+        renotify: !stale, requireInteraction: ringing, silent: false,
         // A short double buzz, distinct from the single buzz of a message. Requested, not
         // promised: the option is ignored wherever the Vibration API is absent, iOS included.
         vibrate: ringing ? [200, 100, 200] : undefined,

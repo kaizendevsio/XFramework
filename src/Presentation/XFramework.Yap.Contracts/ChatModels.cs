@@ -48,6 +48,7 @@ public sealed class Conversation
 
 public sealed class ChatMessage
 {
+    public bool IsCallSummary { get; set; }
     public Guid Id { get; set; }
     public Guid ThreadId { get; set; }
     public Guid SenderId { get; set; }

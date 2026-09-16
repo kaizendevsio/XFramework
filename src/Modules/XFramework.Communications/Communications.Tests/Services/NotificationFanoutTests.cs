@@ -25,6 +25,17 @@ namespace Communications.Tests.Services;
 public sealed class NotificationFanoutTests
 {
     [Test]
+    public async Task CallHistory_DoesNotSendAnotherMessageAlert()
+    {
+        await using var harness = await FanoutHarness.CreateAsync();
+        var sender = harness.AddMember(); harness.AddMember();
+        var message = harness.AddMessage(sender); message.TemplateType = "CallSummary";
+        await harness.SaveAsync();
+        await harness.Fanout.CreateNotificationsAsync(harness.OutboxEvent(MessageRealtimeEvents.MessageCreated, message.Id, sender.CredentialId));
+        Assert.That(harness.Notifications.Requests, Is.Empty);
+    }
+
+    [Test]
     public async Task MessageCreated_RequestsPushForEveryEligibleMember()
     {
         await using var harness = await FanoutHarness.CreateAsync();
@@ -237,6 +248,8 @@ public sealed class NotificationFanoutTests
         public Task<QueryResponse<NotificationDeliveryStatusResponse>> RecordNotificationDeliveryStatus(RecordNotificationDeliveryStatusRequest request, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<QueryResponse<PushConfigurationResponse>> GetPushConfiguration(GetPushConfigurationRequest request, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<QueryResponse<PushSubscriptionResponse>> RegisterPushSubscription(RegisterPushSubscriptionRequest request, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<CmdResponse> SetPushPresence(SetPushPresenceRequest request, CancellationToken ct = default) => throw new NotSupportedException();
+
         public Task<CmdResponse> RemovePushSubscription(RemovePushSubscriptionRequest request, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<QueryResponse<SendDirectPushResponse>> SendDirectPush(SendDirectPushRequest request, CancellationToken ct = default) => throw new NotSupportedException();
     }

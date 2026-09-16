@@ -58,6 +58,7 @@ for (const [name, script] of Object.entries(workers)) {
         await f.run('push', pushEvent({ version: 1, kind: 'message', threadId: '5f2b8f3c-0000-4000-8000-000000000001', notificationId: 'n1' }));
         assert.equal(f.shown.length, 1);
         assert.equal(f.shown[0].title, 'New message');
+        assert.equal(f.shown[0].options.renotify, true);
         assert.equal(f.shown[0].options.data.url, '/chat/5f2b8f3c-0000-4000-8000-000000000001');
         assert.equal(f.shown[0].options.tag, 'yap-thread-5f2b8f3c-0000-4000-8000-000000000001');
     });
@@ -150,11 +151,11 @@ for (const [name, script] of Object.entries(workers)) {
         }
     });
 
-    test(`${name}: a visible window renders the message itself, so no banner is shown`, async () => {
+    test(`${name}: an already-dispatched push remains visible even if a window opens during delivery`, async () => {
         const visible = windowClient('https://yap.test/', 'visible');
         const f = context(script, { windows: [visible] });
         await f.run('push', pushEvent({ version: 1, kind: 'message', threadId: 't1' }));
-        assert.equal(f.shown.length, 0);
+        assert.equal(f.shown.length, 1);
     });
 
     test(`${name}: a hidden window still gets a banner, because its socket is torn down`, async () => {

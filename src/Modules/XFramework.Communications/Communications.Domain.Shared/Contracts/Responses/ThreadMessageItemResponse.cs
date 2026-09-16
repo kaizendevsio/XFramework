@@ -27,4 +27,5 @@ public partial record ThreadMessageItemResponse
     public List<Guid> EncryptionAudienceCredentialIds { get; set; } = [];
     public bool IsLatestOwnMessage { get; set; }
     public List<Guid> LatestReadCredentialIds { get; set; } = [];
+    public bool IsCallSummary { get; set; }
 }

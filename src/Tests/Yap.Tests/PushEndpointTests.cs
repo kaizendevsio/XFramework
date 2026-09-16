@@ -19,6 +19,29 @@ public sealed class PushEndpointTests
     private const string VapidPublic = "BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8";
 
     [Test]
+    public async Task Presence_UsesSessionIdentityAndRequiresAntiforgery()
+    {
+        SetPushPresenceRequest? captured = null;
+        var notifications = Notifications();
+        notifications.Setup(x => x.SetPushPresence(It.IsAny<SetPushPresenceRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((SetPushPresenceRequest request, CancellationToken _) =>
+            { captured = request; return new CmdResponse { HttpStatusCode = HttpStatusCode.NoContent }; });
+        await using var app = UiFixture.Create(0, configureServices: services =>
+            services.Replace(ServiceDescriptor.Singleton(notifications.Object)));
+        await app.StartAsync(); using var client = Client(app);
+        Assert.That((await client.PostAsJsonAsync("api/chat/push/presence", new {})).StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        var session = await SignInAsync(client);
+        var payload = new { endpoint = "https://push.example.net/device", windowId = Guid.NewGuid(), visible = true, credentialId = Guid.NewGuid() };
+        Assert.That((await client.PostAsJsonAsync("api/chat/push/presence", payload)).StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+        Assert.That(captured!.CredentialId, Is.EqualTo(session.User!.CredentialId));
+        Assert.That(captured.Metadata.RequestedTenantId, Is.EqualTo(session.User.TenantId));
+        Assert.That(captured.Visible, Is.True);
+        client.DefaultRequestHeaders.Remove("RequestVerificationToken");
+        Assert.That((await client.PostAsJsonAsync("api/chat/push/presence", payload)).StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        await app.StopAsync();
+    }
+
+    [Test]
     public async Task PushEndpoints_RequireASignedInSessionAndTheAntiforgeryToken()
     {
         var notifications = Notifications();

@@ -431,6 +431,8 @@ public sealed class CommunicationsServiceDirectTransportTests
             RegisterPushSubscriptionRequest request,
             CancellationToken ct = default) => throw new NotSupportedException();
 
+        public Task<CmdResponse> SetPushPresence(SetPushPresenceRequest request, CancellationToken ct = default) => throw new NotSupportedException();
+
         public Task<CmdResponse> RemovePushSubscription(
             RemovePushSubscriptionRequest request,
             CancellationToken ct = default) => throw new NotSupportedException();
@@ -502,6 +504,8 @@ public sealed class CommunicationsServiceDirectTransportTests
         public Task<QueryResponse<PushSubscriptionResponse>> RegisterPushSubscription(
             RegisterPushSubscriptionRequest request,
             CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task<CmdResponse> SetPushPresence(SetPushPresenceRequest request, CancellationToken ct = default) => throw new NotSupportedException();
 
         public Task<CmdResponse> RemovePushSubscription(
             RemovePushSubscriptionRequest request,

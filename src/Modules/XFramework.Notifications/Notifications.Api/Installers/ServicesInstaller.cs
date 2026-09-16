@@ -19,6 +19,8 @@ public sealed class ServicesInstaller : IInstaller
         services.AddSingleton<NotificationDeliverySignal>();
         services.AddScoped<WebPushVapidProvider>();
         services.AddScoped<NotificationPushService>();
+        services.AddMemoryCache();
+        services.AddSingleton<PushPresence>();
         services.AddSingleton<WebPushSender>();
         // Push services are a handful of long-lived hosts; a pooled handler avoids a TLS
         // handshake per notification without pinning DNS for the life of the process.

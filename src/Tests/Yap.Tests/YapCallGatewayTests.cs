@@ -30,6 +30,39 @@ namespace Yap.Tests;
 public sealed class YapCallGatewayTests
 {
     [Test]
+    public async Task HistoryFailure_DoesNotBlockHangupAndRetriesTheSameOutcome()
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        f.FailHistory = true;
+        var room = await f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId], deviceId: f.AliceDevice);
+        await f.Gateway.LeaveGroupAsync(f.Alice, room.Id);
+        Assert.That(await f.HistoryFailed.WaitAsync(TimeSpan.FromSeconds(5)), Is.True);
+        Assert.Throws<YapApiException>(() => f.Gateway.GroupRoster(f.Bob, room.Id));
+        f.FailHistory = false;
+        // The same retry used by the cleanup timer; a write still completing may defer one tick.
+        for (var n = 0; n < 10 && f.History.IsEmpty; n++)
+        { await f.Gateway.FlushCallHistoryAsync(); await Task.Delay(20); }
+        Assert.That(f.History.Single().CallId, Is.EqualTo(room.Id));
+        await f.Gateway.FlushCallHistoryAsync();
+        Assert.That(f.History, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public async Task UnansweredCall_WritesOnePersistentRecordAfterCallerLeaves()
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        var room = await f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId], deviceId: f.AliceDevice);
+        await f.Gateway.LeaveGroupAsync(f.Alice, room.Id);
+        Assert.That(await f.HistoryArrived.WaitAsync(TimeSpan.FromSeconds(5)), Is.True);
+        await f.Gateway.FlushCallHistoryAsync();
+        var item = f.History.Single();
+        Assert.That(item.CallId, Is.EqualTo(room.Id));
+        Assert.That(item.ThreadId, Is.EqualTo(f.Thread));
+        Assert.That(item.ConnectedAt, Is.Null);
+        Assert.That(item.EndedAt, Is.LessThanOrEqualTo(DateTimeOffset.UtcNow));
+    }
+
+    [Test]
     public async Task CallerLeavesBeforeAcceptance_EndsPendingInvitationsAndReleasesParticipants()
     {
         await using var f = await Fixture.CreateAsync(groupLifecycle: true);
@@ -508,6 +541,10 @@ public sealed class YapCallGatewayTests
         public Guid CharlieDevice { get; } = Guid.NewGuid();
         public HashSet<Guid> RevokedDevices { get; } = [];
         public ConcurrentQueue<SendDirectPushRequest> Pushes { get; } = new();
+        public ConcurrentQueue<RecordCallRequest> History { get; } = new();
+        public SemaphoreSlim HistoryArrived { get; } = new(0);
+        public bool FailHistory;
+        public SemaphoreSlim HistoryFailed { get; } = new(0);
         public SemaphoreSlim PushArrived { get; } = new(0);
         public List<ThreadMemberResponse> Members { get; } = [];
         public ClaimsPrincipal Alice { get; private set; } = null!;
@@ -523,6 +560,14 @@ public sealed class YapCallGatewayTests
             var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
             { ["Yap:Calls:Enabled"] = "true", ["Yap:Calls:EncryptedGroups"] = groupLifecycle.ToString(), ["Yap:Calls:SecurityMode"] = groupLifecycle ? "EndToEndEncrypted" : "TrustedServerTls" }).Build();
             var wrapper = new Mock<ICommunicationsServiceWrapper>();
+            wrapper.Setup(x => x.RecordCall(It.IsAny<RecordCallRequest>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((RecordCallRequest request, CancellationToken _) =>
+                {
+                    if (fixture.FailHistory)
+                    { fixture.HistoryFailed.Release(); return new CmdResponse { HttpStatusCode = HttpStatusCode.ServiceUnavailable }; }
+                    fixture.History.Enqueue(request); fixture.HistoryArrived.Release();
+                    return new CmdResponse { HttpStatusCode = HttpStatusCode.OK };
+                });
             wrapper.Setup(x => x.GetThreadAsync(It.IsAny<GetThreadRequest>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(() => new QueryResponse<GetThreadResponse> { HttpStatusCode = HttpStatusCode.OK,
                     Response = new GetThreadResponse { Id = fixture.Thread, Members = fixture.Members } });

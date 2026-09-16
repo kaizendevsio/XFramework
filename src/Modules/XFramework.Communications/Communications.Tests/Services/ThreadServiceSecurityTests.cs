@@ -36,6 +36,31 @@ public sealed partial class ThreadServiceSecurityTests
 {
     private static readonly AsyncLocal<TrustedInvocationContext?> TrustedContext = new();
 
+    [TestCase(false, "Missed voice call")]
+    [TestCase(true, "Voice call \u00b7 2:05")]
+    public async Task RecordCall_StoresOneOutcomeInEncryptedThread(bool connected, string expected)
+    {
+        var tenant = Guid.NewGuid(); var actor = Guid.NewGuid(); var thread = Guid.NewGuid();
+        var member = Member(Guid.NewGuid(), thread, actor, tenant);
+        var conversation = Thread(thread, tenant); conversation.EncryptionRequired = true;
+        var context = new InMemoryDataContext(); context.Seed(conversation, member);
+        var service = CreateService(context);
+        TrustedContext.Value = new FakeTrustedServiceInvocationResolver(tenant, serviceName: XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceNames.Yap).Current;
+        var end = DateTimeOffset.UtcNow;
+        var request = new RecordCallRequest { CallId = Guid.NewGuid(), ThreadId = thread, CallerId = actor,
+            ConnectedAt = connected ? end.AddSeconds(-125) : null, EndedAt = end,
+            Metadata = new() { RequestedTenantId = tenant } };
+        var first = await service.RecordCallAsync(request);
+        Assert.That(first.IsSuccess, Is.True, first.Message);
+        Assert.That((await service.RecordCallAsync(request)).IsSuccess, Is.True);
+        Assert.That(context.Set<Message>(), Has.Count.EqualTo(1));
+        Assert.That(context.Set<Message>().Single().Text, Is.EqualTo(expected));
+        Assert.That(context.Set<MessageOutboxEvent>(), Has.Count.EqualTo(1));
+        Assert.That(conversation.EncryptionRequired, Is.True);
+        request.Metadata = Metadata(actor, tenant);
+        Assert.That((await service.RecordCallAsync(request)).IsSuccess, Is.False, "A client must never forge call history");
+    }
+
     [Test]
     public async Task CreateThreadMessageAsync_ClientRetry_ReturnsSameMessageAndOneOutboxEvent()
     {

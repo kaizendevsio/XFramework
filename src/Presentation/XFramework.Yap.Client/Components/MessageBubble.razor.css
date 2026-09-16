@@ -1,2 +1,4 @@
 .media-actions { align-self: flex-end; padding: 2px 8px; color: var(--dim); }
 .rd { margin-left: 5px; font-size: 11px; }
+.call-history { display: flex; justify-content: center; align-items: center; gap: .65rem; padding: .7rem 1rem; color: var(--muted, #a8aca0); }
+.call-history small { display: block; text-align: center; font-size: .75rem; margin-top: .2rem; }

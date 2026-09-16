@@ -1,5 +1,14 @@
 @inject ChatState State
 @implements IDisposable
+@if (Message.IsCallSummary)
+{
+    <div class="call-history" data-message-id="@Message.Id">
+        <Icon Name="phone" Size="18" />
+        <span>@(Message.Mine && Message.Text == "Missed voice call" ? "Unanswered voice call" : Message.Text)<small>@Message.Time</small></span>
+    </div>
+}
+else
+{
 <div class="msg @(Message.Mine ? "out" : "in")" data-message-id="@Message.Id" data-swipe-reply>
     @if (State.Selected?.Allows(ChatFeature.Replies) != false) { <button class="gesture-reply" aria-label="@($"Reply to {Message.Sender}: {Message.Text}")" @onclick="() => OnReply.InvokeAsync(Message)"><Icon Name="reply" Size="18" /></button> }
     @if (!Message.Mine) { <Avatar ImageUrl="@Message.AvatarUrl" Initials="@Message.Initials" Color="@Message.Color" Size="a34" /> }
@@ -28,6 +37,7 @@
         @if (Message.Mine && Message.PendingEncryptionCount > 0) { <div class="meta" role="status">Waiting for @Message.PendingEncryptionCount @(Message.PendingEncryptionCount == 1 ? "member" : "members") to finish setup</div> }
     </div>
 </div>
+}
 @code {
     [Parameter, EditorRequired] public ChatMessage Message { get; set; } = default!;
     [Parameter] public bool ShowSender { get; set; }

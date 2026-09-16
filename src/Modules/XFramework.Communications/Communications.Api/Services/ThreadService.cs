@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Text.Json;
 using IdentityServer.Domain.Shared;
 using Communications.Domain.Shared;
@@ -1832,6 +1832,7 @@ public sealed partial class ThreadService(
                 {
                     Id = m.Id,
                     Text = m.Text,
+                    IsCallSummary = m.TemplateType == CallSummaryType,
                     EncryptedEnvelope = m.EncryptedEnvelope,
                     AcceptedSenderDirectoryRevision = m.AcceptedSenderDirectoryRevision,
                     EncryptionSenderDeviceId = m.EncryptionSenderDeviceId,
@@ -2241,6 +2242,9 @@ public sealed partial class ThreadService(
 
             if (message is null)
                 return Result<CmdResponse>.NotFound("Message not found");
+
+            if (message.TemplateType == CallSummaryType)
+                return Result<CmdResponse>.Forbidden("Call records cannot be edited");
 
             var canEditAsAdmin = await MemberHasAdminRoleAsync(member.TenantId, member.Id, ct);
             var thread = await dataContext.Query<MessageThread>()

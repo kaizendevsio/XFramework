@@ -77,7 +77,8 @@ public sealed class CommunicationsNotificationFanout(
             .Where(m => m.Id == outboxEvent.AggregateId)
             .Where(m => m.TenantId == outboxEvent.TenantId)
             .FirstOrDefaultAsync(ct);
-        if (message is null)
+        // Calls have their own invitations. A history entry must not ring again as a message.
+        if (message is null || message.TemplateType == ThreadService.CallSummaryType)
             return;
 
         var senderMember = await db.Set<MessageThreadMember>()
@@ -156,7 +157,8 @@ public sealed class CommunicationsNotificationFanout(
             .Where(m => m.Id == reaction.MessageId)
             .Where(m => m.TenantId == outboxEvent.TenantId)
             .FirstOrDefaultAsync(ct);
-        if (message is null)
+        // Calls have their own invitations. A history entry must not ring again as a message.
+        if (message is null || message.TemplateType == ThreadService.CallSummaryType)
             return;
 
         var author = await db.Set<MessageThreadMember>()

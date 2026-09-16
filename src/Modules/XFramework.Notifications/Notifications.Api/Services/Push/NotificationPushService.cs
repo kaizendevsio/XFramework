@@ -20,10 +20,24 @@ public sealed class NotificationPushService(
     WebPushVapidProvider vapid,
     WebPushSender sender,
     ILogger<NotificationPushService> logger,
-    ITrustedInvocationContextAccessor invocation)
+    ITrustedInvocationContextAccessor invocation,
+    PushPresence? presence = null)
 {
     public const string KindMessage = "message";
     public const string KindCall = "call";
+
+    public async Task<Result> SetPresenceAsync(SetPushPresenceRequest request, CancellationToken ct)
+    {
+        if (!TryResolveActor(request.TenantId, request.CredentialId, out var tenant, out var credential, out var failure))
+            return Result.Failure(failure, 400);
+        if (request.WindowId == Guid.Empty || string.IsNullOrWhiteSpace(request.Endpoint) || request.Endpoint.Length > 2048)
+            return Result.Failure("A browser window and subscription are required", 400);
+        var hash = HashEndpoint(request.Endpoint.Trim());
+        if (!await ActiveSubscriptions(tenant, credential).AnyAsync(x => x.EndpointHash == hash, ct))
+            return Result.Failure("Subscription not found", 404);
+        presence?.Set(tenant, credential, hash, request.WindowId, request.Visible, DateTimeOffset.UtcNow);
+        return Result.Success();
+    }
 
     public async Task<Result<PushConfigurationResponse>> GetConfigurationAsync(
         GetPushConfigurationRequest request,
@@ -158,6 +172,11 @@ public sealed class NotificationPushService(
 
         foreach (var subscription in subscriptions)
         {
+            if (presence?.IsVisible(tenantId, credentialId, subscription.EndpointHash, DateTimeOffset.UtcNow) == true)
+            {
+                summary.Suppressed++;
+                continue;
+            }
             var result = await sender.SendAsync(
                 keys,
                 subscription.Endpoint,

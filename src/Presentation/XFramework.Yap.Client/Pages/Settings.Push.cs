@@ -107,6 +107,7 @@ public partial class Settings
             subscription.Label
         });
         pushSubscribed = true;
+        await JS.InvokeVoidAsync("yap.push.refreshPresence");
         pushNotice = "Notifications are on for this device.";
     }
 

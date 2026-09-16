@@ -216,7 +216,7 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
         {
             if (!invites.TryGetValue(context.CallId, out var current) || !ReferenceEquals(current, active) ||
                 (!active.Answered && active.Invite.ExpiresAt <= DateTimeOffset.UtcNow)) return false;
-            if (context.Operation == SignalType.Answer) active.Answered = true;
+            if (context.Operation == SignalType.Answer) { active.Answered = true; active.ConnectedAt ??= DateTimeOffset.UtcNow; }
         }
         return true;
     }
@@ -251,7 +251,8 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
         ? value : throw new YapApiException(404, "This call has ended.");
     private void RemoveLocked(Guid id)
     {
-        invites.Remove(id);
+        if (invites.Remove(id, out var ended))
+            QueueCallHistory(ended.Tenant, ended.Invite.ThreadId, id, ended.Invite.CallerId, ended.ConnectedAt);
         foreach (var token in tickets.Where(x => x.Value.CallId == id).Select(x => x.Key).ToArray()) tickets.Remove(token);
     }
     private void PublishBoth(ActiveInvite invite, string type, Guid? credential = null)
@@ -268,6 +269,7 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
     }
     private void Prune()
     {
+        _ = FlushCallHistoryAsync();
         PruneGroups();
         ActiveInvite[] expired;
         lock (gate)
@@ -299,6 +301,7 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
         public HashSet<Guid> Ready { get; } = [];
         public CancellationTokenSource Lifetime { get; } = new();
         public bool Answered { get; set; }
+        public DateTimeOffset? ConnectedAt { get; set; }
     }
     private sealed class FixedActor(YapSessions sessions, ClaimsPrincipal user) : ICommunicationsChatActorProvider
     { public async ValueTask<CommunicationsChatActor?> GetCurrentActorAsync(CancellationToken ct = default) => await sessions.GetActorAsync(user, ct); }

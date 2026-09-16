@@ -17,6 +17,18 @@ public static class YapPush
 {
     public static void MapYapPush(this RouteGroupBuilder api)
     {
+        api.MapPost("/push/presence", async (PushPresenceRequest request, INotificationsServiceWrapper notifications,
+            ICommunicationsChatActorProvider actors, IActorAccessTokenScope tokens, CancellationToken ct) =>
+        {
+            var actor = await actors.GetCurrentActorAsync(ct) ?? throw new UnauthorizedAccessException();
+            using var token = tokens.Push(actor.AccessToken!);
+            var result = await notifications.SetPushPresence(new SetPushPresenceRequest
+            {
+                CredentialId = actor.CredentialId, Endpoint = request.Endpoint ?? string.Empty,
+                WindowId = request.WindowId, Visible = request.Visible, Metadata = Metadata(actor.TenantId)
+            }, ct);
+            return Results.StatusCode((int)result.HttpStatusCode);
+        });
         // The public application server key is safe to hand out; it is what PushManager.subscribe
         // needs. Reporting enabled:false lets the client hide the toggle instead of failing later.
         api.MapGet("/push/config", async (INotificationsServiceWrapper notifications,
@@ -73,3 +85,4 @@ public static class YapPush
 public sealed record PushConfig(bool Enabled, string? PublicKey, int Devices);
 public sealed record PushSubscribeRequest(string? Endpoint, string? P256dh, string? Auth, Guid? DeviceId, string? Label, DateTime? ExpiresAt);
 public sealed record PushUnsubscribeRequest(string? Endpoint);
+public sealed record PushPresenceRequest(string? Endpoint, Guid WindowId, bool Visible);

@@ -104,7 +104,7 @@ internal static class NotificationTestHost
         AppDbContext db,
         ITrustedInvocationContextAccessor invocation,
         IConfiguration? configuration = null,
-        HttpMessageHandler? handler = null) =>
+        HttpMessageHandler? handler = null, PushPresence? presence = null) =>
         new(
             db,
             new WebPushVapidProvider(
@@ -115,7 +115,7 @@ internal static class NotificationTestHost
                 new StubHttpClientFactory(handler ?? new UnusedHandler()),
                 NullLogger<WebPushSender>.Instance),
             NullLogger<NotificationPushService>.Instance,
-            invocation);
+            invocation, presence);
 
     public static NotificationService CreateNotificationService(
         AppDbContext db,

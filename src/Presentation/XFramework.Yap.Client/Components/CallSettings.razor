@@ -1,4 +1,12 @@
 @inject IJSRuntime JS
+@inject VoiceState Voice
+<h3 class="set-group">Microphone</h3>
+<div class="set-list">
+    <button type="button" class="set-row set-action" disabled="@(checkingMicrophone || Voice.IsCalling)" @onclick="EnableMicrophoneAsync">
+        <span class="set-key"><Icon Name="mic" Size="19" /><span class="set-label">Enable microphone<small>@microphoneNotice</small></span></span>
+    </button>
+</div>
+<p class="set-footnote">Your browser controls microphone permission. On iPhone, Safari's website settings may offer Microphone > Allow. An installed web app may still ask again; installing Yap cannot grant permanent access. This check releases the microphone immediately.</p>
 <h3 class="set-group">Incoming call ringtone</h3>
 <div class="set-list">
     <div class="set-row">
@@ -16,6 +24,26 @@
 <p class="set-footnote" role="status">@notice</p>
 <p class="set-footnote">This tone plays only for calls you receive. While you are placing a call you hear the standard ringing tone instead, at a fixed low level — turning the volume all the way down silences that too. Ringing is stored on this device only. Call volume during a call follows your device’s own volume buttons.</p>
 @code {
+    private bool checkingMicrophone;
+    private string microphoneNotice = "Check access before your next call";
+    private async Task EnableMicrophoneAsync()
+    {
+        if (checkingMicrophone || Voice.IsCalling) return;
+        checkingMicrophone = true;
+        try { DescribeMicrophone(await JS.InvokeAsync<string>("yap.microphone.request")); }
+        catch { microphoneNotice = "Microphone access could not be checked."; }
+        finally { checkingMicrophone = false; }
+    }
+    private void DescribeMicrophone(string state) => microphoneNotice = state switch
+    {
+        "ready" => "Microphone works. Your browser may ask again next time.",
+        "granted" => "Access is currently allowed by your browser",
+        "denied" => "Access is blocked. Check this site's microphone permission in your browser settings.",
+        "missing" => "No microphone was found on this device",
+        "unsupported" => "Microphone access is unavailable in this browser",
+        "unavailable" => "Microphone is unavailable. Check whether another app is using it.",
+        _ => "Tap to check access before your next call"
+    };
     private RingTone[] tones = [];
     private string selected = "classic";
     private double volume = .7;
@@ -25,6 +53,7 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
+        try { DescribeMicrophone(await JS.InvokeAsync<string>("yap.microphone.state")); } catch { }
         try
         {
             tones = await JS.InvokeAsync<RingTone[]>("yap.ring.tones");

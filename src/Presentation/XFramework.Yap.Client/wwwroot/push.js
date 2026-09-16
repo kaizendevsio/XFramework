@@ -1,5 +1,5 @@
-// Browser Push API plumbing. The network calls stay in C# so they keep the antiforgery token and
-// account header; this file only touches APIs that have no managed equivalent.
+// Browser Push API plumbing. Subscription management goes through C#; lifecycle heartbeats
+// use the current account header and antiforgery token supplied by ChatState.
 //
 // iOS only exposes PushManager to a home-screen installed PWA on 16.4 or newer, and every browser
 // requires Notification.requestPermission to run inside a user gesture. `enable` is therefore
@@ -32,7 +32,39 @@
             : /Mac/.test(navigator.userAgent) ? 'Mac' : 'This browser'
     };
 
+    const windowId = crypto.randomUUID();
+    let account = '', token = '', lastPresence = '', lastSent = 0;
+    let presenceWork = Promise.resolve();
+    // Serialize visibility updates so a slow foreground request cannot overwrite a later hide.
+    const publishPresence = (visible = document.visibilityState === 'visible', force = false) => {
+        const owner = account, csrf = token;
+        if (!owner || !csrf || !supported()) return;
+        presenceWork = presenceWork.catch(() => {}).then(async () => {
+            const endpoint = await window.yap.push.endpoint();
+            if (!endpoint) return;
+            const key = `${owner}:${endpoint}:${visible}`;
+            if (!force && key === lastPresence && Date.now() - lastSent < 20000) return;
+            try {
+                const response = await fetch('/api/chat/push/presence', {
+                    method: 'POST', credentials: 'same-origin', keepalive: true, signal: AbortSignal.timeout(5000),
+                    headers: { 'Content-Type': 'application/json', 'X-Yap-Account': owner, 'RequestVerificationToken': csrf },
+                    body: JSON.stringify({ endpoint, windowId, visible })
+                });
+                if (response.ok) { lastPresence = key; lastSent = Date.now(); }
+            } catch { /* A lost lease expires automatically; never toast for background work. */ }
+        });
+    };
+    document.addEventListener('visibilitychange', () => publishPresence(undefined, true));
+    window.addEventListener('pagehide', () => publishPresence(false, true));
+    window.addEventListener('pageshow', () => publishPresence(undefined, true));
+    setInterval(() => { if (document.visibilityState === 'visible') publishPresence(); }, 20000);
+
     window.yap.push = {
+        presence(nextAccount, nextToken) {
+            if (account && nextAccount !== account) publishPresence(false, true);
+            account = nextAccount; token = nextToken;
+            publishPresence();
+        },
         // 'unsupported' and 'uninstalled' let Settings explain why instead of showing a dead toggle.
         state() {
             if (!supported()) return /iPhone|iPad|iPod/.test(navigator.userAgent) && !installed() ? 'uninstalled' : 'unsupported';
@@ -67,6 +99,7 @@
                 return { error: 'failed' };
             }
         },
+        refreshPresence() { publishPresence(undefined, true); },
         async disable() {
             if (!supported()) return null;
             try {
