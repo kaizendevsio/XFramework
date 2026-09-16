@@ -237,14 +237,20 @@ internal static partial class UiFixture
             .ReturnsAsync(ChatFixture.Ok(new StorageFileResponse { Id = fileId }));
         var mediaLinks = new Dictionary<Guid, Guid>();
         var stored = new Dictionary<Guid, (string Name, string Type, MemoryStream Data)>();
+        var upstreamReads = new System.Collections.Concurrent.ConcurrentDictionary<Guid, int>();
         Guid? profilePhoto = null;
         identity.Setup(i => i.UploadOwnAvatar(It.IsAny<UploadOwnAvatarRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((UploadOwnAvatarRequest request, CancellationToken _) => {
                 var id = Guid.NewGuid(); profilePhoto = id; stored[id] = (request.FileName!, request.ContentType!, new MemoryStream(request.FileBytes!));
                 return ChatFixture.Ok(new IdentityServer.Domain.Shared.Contracts.Responses.CredentialAvatarResponse { CredentialId = fixture.Credential, StorageFileId = id });
             });
+        // A peer photo has to come from the account-scoped media route, exactly like production.
+        // Pointing peers at a static PNG hid every caching defect on that route behind the
+        // static-file pipeline, which is the one pipeline the route does not use.
+        var friendPhoto = Guid.NewGuid();
+        stored[friendPhoto] = ("sarah.jpg", "image/jpeg", new MemoryStream(FixtureJpeg));
         directory.Setup(d => d.ResolveAsync(It.IsAny<Guid[]>(), It.IsAny<CancellationToken>())).ReturnsAsync((Guid[] ids, CancellationToken _) =>
-            new[] { new ChatPerson(friend, "Sarah Mensah", "sarah", "/yap-app-v2-192.png"),
+            new[] { new ChatPerson(friend, "Sarah Mensah", "sarah", $"/api/chat/people/{friend}/photo?account={fixture.Tenant:N}:{fixture.Credential:N}&v={friendPhoto:N}", friendPhoto),
                 new ChatPerson(fixture.Credential, "Jamie Davis", "fixture", profilePhoto is { } id ? $"/api/chat/people/{fixture.Credential}/photo?account={fixture.Tenant:N}:{fixture.Credential:N}&v={id:N}" : null, profilePhoto) }.Where(p => ids.Contains(p.Id)).ToArray());
         fixture.Session.Setup(s => s.CreateAttachmentUploadAsync(It.IsAny<Communications.Domain.Shared.Contracts.Requests.Attachments.CreateChatAttachmentUploadRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Communications.Domain.Shared.Contracts.Requests.Attachments.CreateChatAttachmentUploadRequest request, CancellationToken _) => {
@@ -318,7 +324,8 @@ internal static partial class UiFixture
         storage.Setup(s => s.GetStorageDownloadUrl(It.IsAny<GetStorageDownloadUrlRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((GetStorageDownloadUrlRequest request, CancellationToken _) => ChatFixture.Ok(new StorageDownloadUrlResponse { StorageFileId = request.StorageFileId, Url = stored.ContainsKey(request.StorageFileId) ? $"http://127.0.0.1:{new HttpContextAccessor().HttpContext!.Request.Host.Port}/test/media/{request.StorageFileId}" : $"http://127.0.0.1:{new HttpContextAccessor().HttpContext!.Request.Host.Port}/test/file", ExpiresAt = DateTime.UtcNow.AddMinutes(5) }));
         fixture.Session.Setup(s => s.GetThreadPhotoDownloadUrlAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Guid thread, CancellationToken _) => ChatFixture.Ok(new StorageDownloadUrlResponse { Url = $"http://127.0.0.1:{port}/test/media/{conversations.First(c => c.Id == thread).PhotoStorageFileId}" }));
+            // The live port, not the requested one: tests ask for 0 and are given a free port.
+            .ReturnsAsync((Guid thread, CancellationToken _) => ChatFixture.Ok(new StorageDownloadUrlResponse { Url = $"http://127.0.0.1:{new HttpContextAccessor().HttpContext!.Request.Host.Port}/test/media/{conversations.First(c => c.Id == thread).PhotoStorageFileId}" }));
 
         fixture.Session.Setup(s => s.UpdateThreadAsync(It.IsAny<UpdateThreadRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((UpdateThreadRequest request, CancellationToken _) => { var chat = conversations.First(c => c.Id == request.ThreadId); if(request.Name is not null) { chat.Name = request.Name; chat.HasCustomName = true; } if (request.PhotoStorageFileId is { } photo) chat.PhotoStorageFileId = photo; features = request.Features ?? features; if (request.NicknameMemberId.HasValue) fixtureMembers.First(m => m.Id == request.NicknameMemberId).Alias = request.Nickname ?? ""; return Success(); });
@@ -363,7 +370,14 @@ internal static partial class UiFixture
             configureChat?.Invoke(fixture);
             configureServices?.Invoke(builder.Services);
         });
-        app.MapGet("/test/media/{id:guid}", (Guid id) => Results.Bytes(stored[id].Data.ToArray(), stored[id].Type, enableRangeProcessing: true));
+        // Upstream reads are proxied one-for-one, so this count is exactly how many browser
+        // requests reached the server - the number a caching claim has to be measured against.
+        app.MapGet("/test/media/{id:guid}", (Guid id) =>
+        {
+            upstreamReads.AddOrUpdate(id, 1, (_, count) => count + 1);
+            return Results.Bytes(stored[id].Data.ToArray(), stored[id].Type, enableRangeProcessing: true);
+        });
+        app.MapGet("/test/upstream-reads", () => Results.Ok(upstreamReads.ToDictionary(x => x.Key.ToString("N"), x => x.Value)));
         app.MapPost("/test/history/{count:int}", (int count) => {
             for (var i = 0; i < Math.Min(count, 2000); i++) messages.Add(new() { Id = Guid.NewGuid(), Text = $"History {i}: " + new string('a', i % 5 * 70), SenderCredentialId = friend, SenderAlias = "Sarah Mensah", CreatedAt = DateTime.UtcNow.AddDays(-1).AddSeconds(i) });
             return Results.Ok();
@@ -385,4 +399,10 @@ internal static partial class UiFixture
     }
 
     private static CmdResponse Success() => new() { HttpStatusCode = HttpStatusCode.OK };
+
+    // A 1x1 baseline JPEG: the smallest payload an <img> will actually decode, so a photo that
+    // fails to render cannot be mistaken for a photo that failed to cache.
+    internal static byte[] FixtureJpeg { get; } = Convert.FromBase64String(
+        "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/" +
+        "wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==");
 }

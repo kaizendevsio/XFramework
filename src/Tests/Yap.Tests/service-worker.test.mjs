@@ -7,8 +7,15 @@ const read = name => readFileSync(new URL(`../../Presentation/XFramework.Yap.Cli
 const source = read('service-worker.published.js');
 const workers = { 'service-worker.published.js': source, 'service-worker.js': read('service-worker.js') };
 
-function context(script, { failDownload = false, windows = [] } = {}) {
-    const handlers = {}, downloads = [], deleted = [], shown = [], opened = [];
+// A response the worker can store and hand back, which is the whole point of the photo cache:
+// what comes out of Cache Storage has to be usable without the network being consulted again.
+class FakeResponse {
+    constructor(status, body) { this.status = status; this.ok = status >= 200 && status < 300; this.body = body; }
+    clone() { return new FakeResponse(this.status, this.body); }
+}
+
+function context(script, { failDownload = false, windows = [], network = () => new FakeResponse(200, 'jpeg') } = {}) {
+    const handlers = {}, downloads = [], deleted = [], shown = [], opened = [], fetched = [];
     const paths = ['index.html', '_framework/app.wasm', 'vendor/openpgp/openpgp.min.mjs', 'vendor/openpgp/LICENSE.txt',
         '_content/Bolt.Media.Browser/sframe/.gitattributes', '_content/Bolt.Media.Browser/sframe/SHA256SUMS',
         'vendor/openpgp/LICENSE', 'api/private.json', 'service-worker-assets.js'];
@@ -16,12 +23,37 @@ function context(script, { failDownload = false, windows = [] } = {}) {
         location: new URL('https://yap.test/service-worker.js'), addEventListener: (name, handler) => handlers[name] = handler,
         clients: { matchAll: async () => windows, openWindow: async url => { opened.push(url); } },
         registration: { showNotification: async (title, options) => { shown.push({ title, options }); } } };
-    vm.runInNewContext(script, { self, URL, Set,
+    // Real bucket contents, not a call log: a cache that only records writes cannot tell a
+    // second visit that was served locally from one that quietly went back to the network.
+    const buckets = new Map([['yap-shell-old', new Map()], ['yap-shell-new', new Map()], ['private-media', new Map()]]);
+    const key = request => request.url ?? request;
+    vm.runInNewContext(script, { self, URL, Set, Map,
         Request: class { constructor(url, options) { this.url = url; Object.assign(this, options); } },
-        caches: { open: async () => ({ addAll: async requests => { downloads.push(...requests); if (failDownload) throw Error('Integrity mismatch'); } }),
-            keys: async () => ['yap-shell-old', 'yap-shell-new', 'private-media'], delete: async key => { deleted.push(key); } } });
+        fetch: async request => { fetched.push(key(request)); return network(key(request)); },
+        caches: {
+            open: async name => {
+                if (!buckets.has(name)) buckets.set(name, new Map());
+                const entries = buckets.get(name);
+                return {
+                    addAll: async requests => { downloads.push(...requests); if (failDownload) throw Error('Integrity mismatch'); },
+                    match: async request => entries.get(key(request)),
+                    put: async (request, response) => { entries.set(key(request), response); },
+                    keys: async () => [...entries.keys()].map(url => ({ url })),
+                    delete: async request => entries.delete(key(request))
+                };
+            },
+            keys: async () => [...buckets.keys()],
+            delete: async name => { deleted.push(name); return buckets.delete(name); }
+        } });
     const run = async (event, detail) => { let work; handlers[event]({ ...detail, waitUntil: value => work = value }); return work; };
-    return { run, handlers, downloads, deleted, shown, opened };
+    // Returns null when the worker never called respondWith - the request was left to the
+    // browser, which is the only correct outcome for anything the worker must not touch.
+    const fetchEvent = async (url, method = 'GET') => {
+        let responded = null;
+        handlers.fetch({ request: { url, method }, respondWith: value => { responded = value; }, waitUntil: () => {} });
+        return responded === null ? null : await responded;
+    };
+    return { run, fetchEvent, handlers, downloads, deleted, shown, opened, fetched, buckets };
 }
 
 const fixture = options => context(source, options);
@@ -48,6 +80,70 @@ test('a broken runtime download still rejects installation and preserves existin
 test('activation removes only older app shells, preserving private media caches', async () => {
     const f = fixture(); await f.run('activate');
     assert.deepEqual(f.deleted, ['yap-shell-old']);
+});
+
+// The defect these cover: an installed app loses the HTTP cache whenever the system reclaims it,
+// so the only photos that survive a cold start are the ones the worker put in Cache Storage.
+const photoUrl = (person, version, account = 'a'.repeat(32) + ':' + 'b'.repeat(32)) =>
+    `https://yap.test/api/chat/people/${person}/photo?account=${account}&v=${version}`;
+const person = '5f2b8f3c-0000-4000-8000-000000000001';
+
+test('a photo is fetched once and served from the account bucket afterwards', async () => {
+    const f = fixture();
+    const first = await f.fetchEvent(photoUrl(person, 'v1'));
+    const second = await f.fetchEvent(photoUrl(person, 'v1'));
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 200);
+    assert.equal(f.fetched.length, 1, 'the second visit must not reach the network');
+    assert.deepEqual([...f.buckets.get(`yap-media-${'a'.repeat(32)}-${'b'.repeat(32)}`).keys()], [photoUrl(person, 'v1')]);
+});
+
+test('a changed photo is downloaded again and replaces the version it supersedes', async () => {
+    const f = fixture();
+    await f.fetchEvent(photoUrl(person, 'v1'));
+    await f.fetchEvent(photoUrl(person, 'v2'));
+    assert.equal(f.fetched.length, 2, 'a new version is a new URL and must miss');
+    assert.deepEqual([...f.buckets.get(`yap-media-${'a'.repeat(32)}-${'b'.repeat(32)}`).keys()], [photoUrl(person, 'v2')]);
+});
+
+test('two accounts on one device never read each other photos', async () => {
+    const other = 'c'.repeat(32) + ':' + 'd'.repeat(32);
+    const f = fixture();
+    await f.fetchEvent(photoUrl(person, 'v1'));
+    await f.fetchEvent(photoUrl(person, 'v1', other));
+    assert.equal(f.fetched.length, 2, 'the second account must not be served the first account copy');
+    assert.ok(f.buckets.has(`yap-media-${'a'.repeat(32)}-${'b'.repeat(32)}`));
+    assert.ok(f.buckets.has(`yap-media-${'c'.repeat(32)}-${'d'.repeat(32)}`));
+});
+
+test('a rejected photo is never stored, so access is re-checked every time', async () => {
+    const f = fixture({ network: () => new FakeResponse(401, '') });
+    const first = await f.fetchEvent(photoUrl(person, 'v1'));
+    await f.fetchEvent(photoUrl(person, 'v1'));
+    assert.equal(first.status, 401);
+    assert.equal(f.fetched.length, 2);
+    assert.equal(f.buckets.has(`yap-media-${'a'.repeat(32)}-${'b'.repeat(32)}`), true);
+    assert.equal(f.buckets.get(`yap-media-${'a'.repeat(32)}-${'b'.repeat(32)}`).size, 0);
+});
+
+test('an unattributable photo and every other private request are left to the browser', async () => {
+    const f = fixture();
+    assert.equal(await f.fetchEvent(`https://yap.test/api/chat/people/${person}/photo`), null, 'no account scope, no bucket');
+    assert.equal(await f.fetchEvent(`https://yap.test/api/chat/people/${person}/photo?account=nonsense&v=v1`), null);
+    assert.equal(await f.fetchEvent('https://yap.test/api/chat/conversations'), null);
+    assert.equal(await f.fetchEvent('https://yap.test/api/session'), null);
+    assert.equal(await f.fetchEvent('https://yap.test/auth/login'), null);
+    assert.equal(await f.fetchEvent(photoUrl(person, 'v1'), 'POST'), null);
+    assert.equal(f.fetched.length, 0, 'the worker must not fetch anything it does not answer');
+});
+
+test('a group photo caches on the same account-scoped terms as a person', async () => {
+    const f = fixture();
+    const url = `https://yap.test/api/chat/conversations/${person}/photo?account=${'a'.repeat(32)}:${'b'.repeat(32)}&v=v1`;
+    await f.fetchEvent(url);
+    await f.fetchEvent(url);
+    assert.equal(f.fetched.length, 1);
+    assert.deepEqual([...f.buckets.get(`yap-media-${'a'.repeat(32)}-${'b'.repeat(32)}`).keys()], [url]);
 });
 
 // Push has to behave identically in development and in published builds. A worker that only

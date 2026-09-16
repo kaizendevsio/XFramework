@@ -86,7 +86,8 @@ public sealed class BrowserApiTests
         Assert.That(hits.Where(x => x.Mine).Select(x => x.Sender), Is.All.EqualTo("You"));
         var theirs = hits.First(x => !x.Mine);
         Assert.That(theirs.Sender, Is.EqualTo("Sarah Mensah"));
-        Assert.That(theirs.AvatarUrl, Is.EqualTo("/yap-app-v2-192.png"));
+        Assert.That(theirs.AvatarUrl, Does.StartWith("/api/chat/people/").And
+            .Contains($"account={session.User.TenantId:N}:{session.User.CredentialId:N}").And.Contains("&v="));
         await app.StopAsync();
     }
 }
