@@ -582,7 +582,7 @@ public sealed class YapCallGatewayTests
                     return new QueryResponse<SendDirectPushResponse> { HttpStatusCode = HttpStatusCode.OK, Response = new() { Delivered = 1 } };
                 });
             var services = new ServiceCollection().AddLogging().AddDistributedMemoryCache().AddDataProtection().Services;
-            services.AddSingleton<IConfiguration>(configuration).AddSingleton(wrapper.Object).AddSingleton(identity.Object).AddSingleton(actorScope.Object).AddSingleton(notifications.Object).AddSingleton<YapSessions>();
+            services.AddSingleton<IConfiguration>(configuration).AddSingleton(wrapper.Object).AddSingleton(identity.Object).AddSingleton(actorScope.Object).AddSingleton(notifications.Object).AddSingleton(TimeProvider.System).AddSingleton<YapSessions>();
             fixture.provider = services.BuildServiceProvider();
             var sessions = fixture.provider.GetRequiredService<YapSessions>();
             var alice = YapSessionsTests.Session();

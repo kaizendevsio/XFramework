@@ -44,7 +44,9 @@ public static class YapApplication
             options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
                 ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
             options.LoginPath = "/login";
-            options.ExpireTimeSpan = TimeSpan.FromHours(8);
+            options.ExpireTimeSpan = YapSessions.IdleWindow;
+            // The cookie is renewed below against the session entry's own rolling deadline,
+            // not on the handler's half-window rule, so the two layers lapse together.
             options.SlidingExpiration = false;
             options.Events.OnRedirectToLogin = context =>
             {
@@ -59,14 +61,22 @@ public static class YapApplication
             options.Events.OnValidatePrincipal = async context =>
             {
                 var sessions = context.HttpContext.RequestServices.GetRequiredService<YapSessions>();
-                if (!await sessions.ContainsAsync(context.Principal, context.HttpContext.RequestAborted))
-                    context.RejectPrincipal();
-                else if (!context.Properties.IsPersistent)
+                // Every authenticated request is both the liveness check and the activity
+                // signal that rolls the sign-in. Null means idle, capped, or signed out.
+                if (await sessions.TouchAsync(context.Principal, context.HttpContext.RequestAborted) is not { } expires)
                 {
-                    // Upgrade existing browser-session cookies without extending the sign-in.
-                    context.Properties.IsPersistent = true;
-                    await context.HttpContext.SignInAsync(YapAuth.Scheme, context.Principal!, context.Properties);
+                    context.RejectPrincipal();
+                    return;
                 }
+                // Carry the entry's deadline in the cookie, or whichever layer lapses first
+                // decides. The entry only rolls hourly, so this rewrites at most that often;
+                // the minute of slack absorbs the cookie's second-precision expiry format.
+                // Cookies from before this change also arrive non-persistent or on the old window.
+                if (context.Properties is { IsPersistent: true, ExpiresUtc: { } current } &&
+                    expires - current < TimeSpan.FromMinutes(1)) return;
+                context.Properties.IsPersistent = true;
+                context.Properties.ExpiresUtc = expires;
+                await context.HttpContext.SignInAsync(YapAuth.Scheme, context.Principal!, context.Properties);
             };
         });
         builder.Services.AddAuthorization();

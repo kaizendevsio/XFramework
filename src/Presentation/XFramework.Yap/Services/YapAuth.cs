@@ -92,13 +92,17 @@ public static class YapAuth
             {
                 UserName = username, Password = password, RoleId = role,
                 AuthorizationType = AuthorizationType.Username, GenerateToken = true,
+                // An app installed to a home screen is a remembered device. Without this
+                // IdentityServer stamps a 24-hour cap on the upstream session that no refresh
+                // extends, and Yap's rolling sign-in would die there instead of at its own cap.
+                RememberMe = true,
                 Metadata = new RequestMetadata { RequestedTenantId = tenant, RequestId = Guid.NewGuid(), OperationName = "Yap login" }
             }, ct);
             if (!response.IsSuccess || response.Response?.Credential?.TenantId != tenant)
                 return Redirect(context, "/login?error=credentials");
             var principal = await sessions.CreateAsync(response.Response, ct);
             await context.SignInAsync(Scheme, principal,
-                new AuthenticationProperties { IsPersistent = true, ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8) });
+                new AuthenticationProperties { IsPersistent = true, ExpiresUtc = DateTimeOffset.UtcNow.Add(YapSessions.IdleWindow) });
             return Redirect(context, "/");
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }

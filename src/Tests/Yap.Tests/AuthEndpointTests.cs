@@ -62,7 +62,11 @@ public sealed class AuthEndpointTests
             Assert.That((await legacy.GetFromJsonAsync<SessionResponse>("/api/session"))!.User, Is.Not.Null);
             var upgraded = legacyHandler.CookieContainer.GetCookies(client.BaseAddress)["Yap.Session"]!;
             Assert.That(upgraded.Expires.ToUniversalTime(), Is.GreaterThan(DateTime.UtcNow));
-            Assert.That(format.Unprotect(upgraded.Value)!.Properties.ExpiresUtc, Is.EqualTo(expiry), "Upgrade must preserve session expiry");
+            // The sign-in rolls with use, so the upgraded cookie carries the session entry's
+            // current idle deadline. It must never reach past that window on its own.
+            Assert.That(format.Unprotect(upgraded.Value)!.Properties.ExpiresUtc, Is.GreaterThanOrEqualTo(expiry!.Value)
+                .And.LessThanOrEqualTo(DateTimeOffset.UtcNow.Add(YapSessions.IdleWindow).AddMinutes(1)),
+                "Upgrade must roll the sign-in, never past the idle window");
         }
         var settings = await client.GetStringAsync("/api/session");
         Assert.That(settings, Does.Contain("Jamie Davis"));
