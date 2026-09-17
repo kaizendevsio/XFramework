@@ -1,6 +1,7 @@
 @page "/saved"
 @implements IDisposable
 @inject ChatState State
+@inject BrowserTime Times
 <PageTitle>Saved · Yap</PageTitle>
 @if (State.User is null) { <div class="body"><p class="empty">Sign in to see the messages you saved.</p><a class="btn" href="/login">Sign in</a></div> }
 else
@@ -31,7 +32,7 @@ else
                         @($"{message.Sender}: {Preview(message)}")
                     </span>
                 </span>
-                <span class="end"><span class="time">@message.CreatedAt.ToLocalTime().ToString("MMM d")</span><span class="time">@message.Time</span></span>
+                <span class="end"><span class="time">@Times.DayMonth(message.CreatedAt)</span><span class="time">@Times.Clock(message.CreatedAt)</span></span>
             </a>
             <button class="saved-remove iconbtn" aria-label="@($"Remove {item.ConversationName} message from saved")" title="Remove from saved"
                     disabled="@(!State.Online || State.NeedsLogin || removing.Contains(message.Id))" @onclick="() => UnsaveAsync(item)"><Icon Name="bookmark" Size="19" /></button>

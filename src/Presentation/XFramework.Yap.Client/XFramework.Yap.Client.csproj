@@ -8,6 +8,28 @@
     <OverrideHtmlAssetPlaceholders>false</OverrideHtmlAssetPlaceholders>
     <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
     <RunAOTCompilation Condition="'$(Configuration)' == 'Release'">true</RunAOTCompilation>
+    <!-- Trimmer feature switches, pinned rather than inherited. Measured: setting all of these changed
+         the published output by zero bytes, because the Blazor WebAssembly SDK already defaults every one
+         of them to this value in a Release build. They are here so a future SDK cannot quietly flip one
+         back on, not because they bought anything. UseSystemResourceKeys is the only one with a behaviour
+         cost - framework exception text becomes a resource ID - and nothing here reads framework messages;
+         the single message this app matches on is a JSException raised by our own encryption JS. -->
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <EventSourceSupport>false</EventSourceSupport>
+    <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
+    <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
+    <!-- Nothing reads NullabilityInfo or serializes with BinaryFormatter. -->
+    <NullabilityInfoContextSupport>false</NullabilityInfoContextSupport>
+    <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
+    <EnableUnsafeUTF7Encoding>false</EnableUnsafeUTF7Encoding>
+    <DebuggerSupport Condition="'$(Configuration)' == 'Release'">false</DebuggerSupport>
+    <!-- No ICU and no tz database. These are only safe because nothing on the .NET side formats a date or
+         compares a string linguistically any more: Intl does it, and the browser knows the viewer's zone
+         and locale for bytes already downloaded. With them off, TimeZoneInfo.Local silently becomes UTC
+         and CurrentCulture the invariant one - no exception, just every timestamp quietly shifted by the
+         viewer's offset - so GlobalizationGuardTests fails the build if a .NET-side conversion returns. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <BlazorEnableTimeZoneSupport>false</BlazorEnableTimeZoneSupport>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />

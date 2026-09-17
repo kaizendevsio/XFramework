@@ -1,10 +1,11 @@
 @inject ChatState State
+@inject BrowserTime Times
 @implements IDisposable
 @if (Message.IsCallSummary)
 {
     <div class="call-history" data-message-id="@Message.Id">
         <Icon Name="phone" Size="18" />
-        <span>@(Message.Mine && Message.Text == "Missed voice call" ? "Unanswered voice call" : Message.Text)<small>@Message.Time</small></span>
+        <span>@(Message.Mine && Message.Text == "Missed voice call" ? "Unanswered voice call" : Message.Text)<small>@Times.Clock(Message.CreatedAt)</small></span>
     </div>
 }
 else
@@ -29,7 +30,7 @@ else
         {
             <div class="meta">
                 @if (Message.Pinned) { <span aria-label="Pinned">📌</span> }
-                @if (ShowTime) { <time datetime="@Message.CreatedAt.ToUniversalTime().ToString("O")">@Message.Time</time> }
+                @if (ShowTime) { <time datetime="@BrowserTime.Iso(Message.CreatedAt)">@Times.Clock(Message.CreatedAt)</time> }
                 @if (HasReaders) { <ReaderAvatars People="Readers" /> }
                 else if (ShowDelivery) { <span class="rd" aria-label="@DeliveryLabel">@DeliveryLabel</span> }
             </div>
