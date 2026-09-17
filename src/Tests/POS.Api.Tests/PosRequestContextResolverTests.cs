@@ -100,6 +100,52 @@ public sealed class PosRequestContextResolverTests
     }
 
     [Test]
+    public void Resolve_ActorWithTenantManageCapability_OperatesAsAnotherCashier()
+    {
+        var tenantId = Guid.NewGuid();
+        var actorCredentialId = Guid.NewGuid();
+        var resolver = new PosRequestContextResolver(
+            TrustedContext(
+                actor: Actor(
+                    tenantId,
+                    actorCredentialId,
+                    roles: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "ControlPanel Super Admin" },
+                    capabilities: new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        XFrameworkActorCapabilities.IdentityTenantsManage
+                    }),
+                service: Service()));
+
+        var result = resolver.Resolve(
+            new RequestBase { Metadata = new RequestMetadata() },
+            requestCredentialId: Guid.NewGuid());
+
+        result.IsSuccess.Should().BeTrue(result.Message);
+        result.Data!.IsPrivilegedActor.Should().BeTrue();
+        result.Data.ActorCredentialId.Should().Be(actorCredentialId);
+    }
+
+    [Test]
+    public void Resolve_ActorWithAdminRoleName_OperatesAsAnotherCashier()
+    {
+        var tenantId = Guid.NewGuid();
+        var resolver = new PosRequestContextResolver(
+            TrustedContext(
+                actor: Actor(
+                    tenantId,
+                    Guid.NewGuid(),
+                    roles: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin" }),
+                service: Service()));
+
+        var result = resolver.Resolve(
+            new RequestBase { Metadata = new RequestMetadata() },
+            requestCredentialId: Guid.NewGuid());
+
+        result.IsSuccess.Should().BeTrue(result.Message);
+        result.Data!.IsPrivilegedActor.Should().BeTrue();
+    }
+
+    [Test]
     public void Resolve_ServiceOnlyContext_RemainsTrustedInternal()
     {
         var tenantId = Guid.NewGuid();
@@ -126,13 +172,17 @@ public sealed class PosRequestContextResolverTests
             null,
             Guid.NewGuid()));
 
-    private static TrustedActorIdentity Actor(Guid tenantId, Guid credentialId) => new(
+    private static TrustedActorIdentity Actor(
+        Guid tenantId,
+        Guid credentialId,
+        IReadOnlySet<string>? roles = null,
+        IReadOnlySet<string>? capabilities = null) => new(
         credentialId,
         Guid.NewGuid(),
         tenantId,
         Guid.NewGuid(),
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase),
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+        roles ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+        capabilities ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase),
         "test-generation",
         DateTimeOffset.UtcNow.AddMinutes(5));
 
