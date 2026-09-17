@@ -267,8 +267,14 @@ In particular, later private-key compromise can decrypt recorded OpenPGP
 call-key envelopes and therefore expose recorded calls; adding SFrame does not
 make that key distribution forward-secret. A stolen master/recovery secret is
 account-authority compromise, beyond ordinary device revocation. Older plaintext
-messages do not become confidential retroactively, and login alone cannot restore
-encrypted history without a trusted device or the recovery key.
+messages do not become confidential retroactively. Once password recovery is on,
+the account password *is* sufficient to restore encrypted history on a new
+device: the OPAQUE export key never leaves the browser, but anyone who knows the
+password obtains it and can unwrap the recovery secret. Message history is
+therefore only as confidential as that password; the recovery key remains the
+fallback for a password its owner has forgotten, and a server-side password
+reset deletes the OPAQUE credential and its wrapped envelope, so the new
+password alone cannot restore history.
 
 Run `node --test src/Presentation/XFramework.Yap.Client/test/encryption.test.mjs`.
 Tests use the actual vendored browser crypto bundle, with in-memory storage.

@@ -6,6 +6,10 @@ const unb64 = value => Uint8Array.from(atob(value.replaceAll('-', '+').replaceAl
 const serverIdentity = 'XFramework.IdentityServer.OPAQUE.v1';
 const canonicalScope = value => value.split(':').map(x => { const n = x.replaceAll('-', '').toLowerCase(); if (!/^[a-f0-9]{32}$/.test(n)) throw new Error('Invalid account.'); return `${n.slice(0,8)}-${n.slice(8,12)}-${n.slice(12,16)}-${n.slice(16,20)}-${n.slice(20)}`; }).join(':');
 const keyStretching = 'memory-constrained';
+// Said once, in the words the person reads. A failure here is never a connection problem.
+const noBackup = 'This account has no password-protected backup yet. Unlock with your recovery key or a trusted device, then turn password recovery back on.';
+const unwrapFailed = 'Your password no longer opens this account’s saved backup. Unlock with your recovery key or a trusted device, then turn password recovery back on.';
+const notSignedIn = 'Sign in again to unlock older messages with your password.';
 
 async function wrappingKey(exportKey, scope) {
     const material = unb64(exportKey);
@@ -83,10 +87,14 @@ export function passwordRecovery(encryption, fetcher = (...args) => fetch(...arg
         if (!finished) throw new Error('The username or password is incorrect.');
         const confirmed = await exchange({ stage: 'login-finish', userName: username, exchangeId: started.exchangeId, message: finished.finishLoginRequest }, token);
         if (version !== generation) throw new Error('The signed-in account changed.');
-        let secret = null;
-        try { secret = await unwrapRecovery(finished.exportKey, started.client, confirmed.wrappedRecovery); } catch { /* Authentication succeeded; keep reauthentication available for an explicit lost-key reset. */ }
-        unlocked.set(started.client, { secret, exportKey: finished.exportKey, grant: confirmed.exchangeId, username });
-        return { mode: 'opaque', scope: started.client, recoveryAvailable: !!secret };
+        let secret = null, problem = null;
+        // Authentication succeeded; keep reauthentication available for an explicit lost-key reset.
+        // Keep the reason too: swallowing it turned every cause - no envelope, a reset that dropped
+        // it, a wrong account - into one unexplained "restore unavailable" for the person.
+        try { secret = await unwrapRecovery(finished.exportKey, started.client, confirmed.wrappedRecovery); }
+        catch { problem = confirmed.wrappedRecovery ? unwrapFailed : noBackup; }
+        unlocked.set(started.client, { secret, problem, exportKey: finished.exportKey, grant: confirmed.exchangeId, username });
+        return { mode: 'opaque', scope: started.client, recoveryAvailable: !!secret, problem };
     }
     async function enroll(scope, username, password, newPassword) {
         scope = canonicalScope(scope);
@@ -113,7 +121,7 @@ export function passwordRecovery(encryption, fetcher = (...args) => fetch(...arg
         if (await unwrapRecovery(registered.exportKey, scope, wrappedRecovery) !== archive.recoveryKey) throw new Error('Backup verification failed.');
         await confirmRegistration(username, nextPassword, started, registered, { wrappedRecovery }, token);
         if (generation !== version) throw new Error('The signed-in account changed.');
-        unlocked.set(scope, { secret: archive.recoveryKey, exportKey: registered.exportKey, username });
+        unlocked.set(scope, { secret: archive.recoveryKey, problem: null, exportKey: registered.exportKey, username });
         return true;
     }
     async function confirmRegistration(username, password, started, registered, backup, token) {
@@ -159,10 +167,19 @@ export function passwordRecovery(encryption, fetcher = (...args) => fetch(...arg
             }, token);
             return signIn(username, password);
         },
+        // True once this worker still holds sign-in material, so an unlock that was interrupted
+        // can be retried without asking for the password a second time.
+        passwordUnlockState(scope) {
+            const material = unlocked.get(canonicalScope(scope));
+            return { signedIn: !!material, available: !!material?.secret, problem: material ? material.problem : notSignedIn };
+        },
         async passwordRestore(scope) {
             scope = canonicalScope(scope);
             const material = unlocked.get(scope);
-            if (!material?.secret) return false;
+            // Only "no sign-in in this browser session" is an ordinary false. Every other reason
+            // is reported, because the caller can do nothing useful with an unexplained failure.
+            if (!material) return false;
+            if (!material.secret) throw new Error(material.problem ?? noBackup);
             const version = generation;
             const current = await scopedSession(scope);
             const directory = await get('/api/chat/encryption/directory', scope);
@@ -225,7 +242,7 @@ export function passwordRecovery(encryption, fetcher = (...args) => fetch(...arg
                 if (directory.rootPublicKey !== pending.directory.rootPublicKey) throw error;
             }
             if (!await encryption.confirmReset(scope, directory)) throw new Error('Reset could not be confirmed.');
-            unlocked.set(scope, { ...material, secret: pending.recoveryKey, grant: null });
+            unlocked.set(scope, { ...material, secret: pending.recoveryKey, problem: null, grant: null });
             return true;
         },
         passwordClear() { generation++; unlocked.clear(); }

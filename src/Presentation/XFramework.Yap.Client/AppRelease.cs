@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.46";
+    public const string Version = "1.3.48";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
-        (Version, "17 September 2026", [
+        (Version, "16 September 2026", [
+            "Signing in on a new device now restores your messages automatically, without a recovery key or a second password prompt.",
+            "When unlocking does fail, Yap now says why instead of showing one generic message."]),
+        ("1.3.46", "17 September 2026", [
             "Yap starts faster and downloads about 800 KB less, with times now formatted by your phone in your own locale and timezone."]),
         ("1.3.45", "17 September 2026", [
             "Yap opens faster: the offline database schema is now prepared ahead of time instead of being built on every launch."]),

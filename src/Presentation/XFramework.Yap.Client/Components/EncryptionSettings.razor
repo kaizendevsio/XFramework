@@ -14,7 +14,7 @@
         {
             <details>
                 <summary>Recovery and devices</summary>
-                <p>@(passwordStatus?.Enabled == true ? "Your sign-in password restores encrypted messages on another device. A recovery key is an optional backup if you forget it." : "Enable password recovery below while this device still has your keys. Until then, keep a recovery key or another trusted device.")</p>
+                <p>@(passwordStatus?.Enabled == true ? "Signing in on a new device restores your messages automatically, using the password you type at sign-in. Keep a recovery key for the day you forget that password." : "Turn on password recovery below while this device still has your keys. Until then, a new device needs a recovery key or this device's approval.")</p>
                 <button class="btn" disabled="@busy" @onclick="ShowRecoveryAsync">Show recovery key</button>
                 @if (State.Encryption.RecoveryKey is { } key)
                 {
@@ -61,10 +61,39 @@
         }
         else
         {
-            <label>Recovery key<textarea @bind="recoveryKey" autocomplete="off" spellcheck="false" placeholder="Paste your saved recovery key"></textarea></label>
-            <button class="btn" disabled="@(busy || string.IsNullOrWhiteSpace(recoveryKey))" @onclick="RestoreAsync">Restore encrypted messages</button>
-            <details><summary>Approve from another device</summary>
-                <p>Open Yap on a trusted device, then paste this device request in Settings → Privacy → Approve another device.</p>
+            @* One way in, matching what sign-in already attempted. The recovery key is the fallback
+               for a forgotten password, not a second route competing with it. *@
+            @if (unlock is { Available: true })
+            {
+                <p>This sign-in still carries what this device needs. Nothing to retype.</p>
+                <button class="btn" disabled="@busy" @onclick="UnlockAsync">Unlock encrypted messages</button>
+            }
+            else if (unlock is { SignedIn: true, Problem: { Length: > 0 } reason })
+            {
+                @* This sign-in proved the password and still could not open the backup. Retyping
+                   the same password cannot change that, so say what did happen instead. *@
+                <p role="alert">@reason</p>
+            }
+            else if (passwordStatus is { Enabled: true })
+            {
+                <p>Signing in restores your messages automatically. Confirm your account password to finish it here.</p>
+                <label>Account password<input type="password" @bind="unlockPassword" autocomplete="current-password" /></label>
+                <button class="btn" disabled="@(busy || string.IsNullOrEmpty(unlockPassword))" @onclick="UnlockWithPasswordAsync">Unlock with your password</button>
+            }
+            else if (passwordStatus is null)
+            {
+                <button class="btn" disabled="@busy" @onclick="LoadPasswordStatusAsync">Check unlock options</button>
+            }
+            else
+            {
+                @* An account whose password was reset looks exactly like one that never enrolled:
+                   the reset deletes the wrapped backup key along with the old credential. *@
+                <p>This account is not using password recovery right now, so your password cannot unlock older messages here. A password reset removes it; turn it back on from a device that still has your keys.</p>
+            }
+            <details><summary>Can't use your password?</summary>
+                <label>Recovery key<textarea @bind="recoveryKey" autocomplete="off" spellcheck="false" placeholder="Paste your saved recovery key"></textarea></label>
+                <button class="btn" disabled="@(busy || string.IsNullOrWhiteSpace(recoveryKey))" @onclick="RestoreAsync">Restore encrypted messages</button>
+                <p>Or open Yap on a trusted device, then paste this device request in Settings → Privacy → Approve another device.</p>
                 <button class="btn" disabled="@busy" @onclick="ProposeAsync">Create device request</button>
                 @if (proposal is not null) { <textarea readonly aria-label="Device request" value="@proposal"></textarea><button class="btn" @onclick="() => CopyAsync(proposal)">Copy device request</button> }
                 <label>Approval code<textarea @bind="approvalCode" autocomplete="off" spellcheck="false" placeholder="Paste the approval from your trusted device"></textarea></label>
@@ -97,15 +126,17 @@
         }
         <details>
             <summary>Password and recovery</summary>
-            <button class="btn" disabled="@busy" @onclick="LoadPasswordStatusAsync">Check password recovery</button>
-            @if (passwordStatus is not null)
+            @if (passwordStatus is null) { <button class="btn" disabled="@busy" @onclick="LoadPasswordStatusAsync">Check password recovery</button> }
+            else
             {
-                <p>@(passwordStatus.Enabled ? "Password recovery is enabled." : "Password recovery has not been enabled for this account yet.")</p>
-                <p>Forgetting your password still requires a recovery key or trusted device to keep old messages. An account password reset alone cannot recover them.</p>
+                <p>@(passwordStatus.Enabled ? "Password recovery is on. Signing in on a new device restores your messages automatically, with the password you type at sign-in." : "Password recovery has not been enabled for this account yet.")</p>
+                @* The build no longer promises that a known password cannot reach old messages: with
+                   recovery on it can, by design, and saying otherwise is the more dangerous half. *@
+                @if (passwordStatus.Enabled) { <p>Anyone who knows this password can read your message history on a new device. Change it here if you ever share it or suspect it.</p> }
+                <p>Changing your password here keeps your old messages: it re-protects the same backup with your new password. A password reset you request from the sign-in screen does not, because it removes that protected backup along with the old password. After a reset, use a recovery key or a trusted device and turn password recovery back on.</p>
                 <label>Current password<input type="password" @bind="currentPassword" autocomplete="current-password" /></label>
                 @if (passwordStatus.Enabled)
                 {
-                    <button class="btn" disabled="@(busy || string.IsNullOrEmpty(currentPassword))" @onclick="RestoreWithPasswordAsync">Unlock with password</button>
                     <label>New password<input type="password" @bind="newPassword" autocomplete="new-password" minlength="8" /></label>
                     <label>Confirm new password<input type="password" @bind="confirmPassword" autocomplete="new-password" /></label>
                     <button class="btn" disabled="@(busy || string.IsNullOrEmpty(currentPassword) || newPassword.Length < 8 || newPassword != confirmPassword)" @onclick="ChangePasswordAsync">Change password</button>
@@ -140,6 +171,8 @@
     private string recoveryKey = "", deviceRequest = "", approvalCode = "";
     private string? proposal, approval, notice;
     private string? accountScope;
+    private string unlockPassword = "";
+    private ChatEncryption.PasswordUnlock? unlock;
     private List<ChatEncryption.DeviceInfo>? devices;
     private Guid? revokeCandidate;
     private Guid peerId;
@@ -155,11 +188,32 @@
     protected override void OnParametersSet()
     {
         var scope = State.User is null ? null : OfflineStore.Scope(State.User);
-        if (scope == accountScope) return;
-        accountScope = scope; ClearPrivateUi();
+        if (scope == accountScope) { _ = LoadUnlockAsync(); return; }
+        accountScope = scope; ClearPrivateUi(); _ = LoadUnlockAsync();
+    }
+    // What this browser session already holds decides whether unlocking needs the password typed
+    // again at all, so a locked device asks before it offers anything rather than after.
+    private bool loadingUnlock;
+    private async Task LoadUnlockAsync()
+    {
+        var user = State.User;
+        if (user is null || State.Encryption.Status.Approved || unlock is not null || loadingUnlock) return;
+        var scope = OfflineStore.Scope(user);
+        loadingUnlock = true;
+        try
+        {
+            var state = await State.Encryption.PasswordUnlockStateAsync(user);
+            if (State.User is null || OfflineStore.Scope(State.User) != scope) return;
+            unlock = state;
+            if (!state.SignedIn && passwordStatus is null)
+                passwordStatus = await JS.InvokeAsync<PasswordStatus>("yap.encryption.passwordStatus", scope);
+            if (State.User is not null && OfflineStore.Scope(State.User) == scope) StateHasChanged();
+        }
+        catch { /* An unavailable worker or a dropped connection is reported by the next action. */ }
+        finally { loadingUnlock = false; }
     }
     private void ClearPrivateUi()
-    { currentPassword = newPassword = confirmPassword = ""; passwordStatus = null; recoveryKey = deviceRequest = approvalCode = comparison = resetPassword = ""; resetConsent = false; proposal = approval = notice = null; devices = null; revokeCandidate = null; fingerprint = null; peerId = Guid.Empty; }
+    { currentPassword = newPassword = confirmPassword = unlockPassword = ""; passwordStatus = null; unlock = null; recoveryKey = deviceRequest = approvalCode = comparison = resetPassword = ""; resetConsent = false; proposal = approval = notice = null; devices = null; revokeCandidate = null; fingerprint = null; peerId = Guid.Empty; }
     private void ClearPeer() { fingerprint = null; comparison = ""; }
     private async Task RunAsync(Func<UserSession, Task> action)
     {
@@ -168,9 +222,22 @@
         var scope = OfflineStore.Scope(user);
         busy = true; notice = null;
         try { await action(user); }
-        catch { if (State.User is not null && OfflineStore.Scope(State.User) == scope) notice = "Could not update encryption. Check the code, fingerprint and connection, then try again."; }
+        catch (Exception error)
+        {
+            // The old catch-all replaced every cause with one sentence about codes and connections,
+            // so a failed unlock told the person - and the logs - nothing. Say what actually failed.
+            if (State.User is not null && OfflineStore.Scope(State.User) == scope) notice = Explain(error);
+            try { await JS.InvokeVoidAsync("yap.diagnostics.record", "encryption.failed", new { type = error.GetType().Name }); } catch { }
+        }
         finally { busy = false; if (State.User is null || OfflineStore.Scope(State.User) != scope) ClearPrivateUi(); }
     }
+    private static string Explain(Exception error) => error switch
+    {
+        OperationCanceledException => "The signed-in account changed. Open Settings again.",
+        ChatApiException or JSException or InvalidOperationException when First(error.Message) is { Length: > 0 } message => message,
+        _ => "Could not update encryption. Check the code, fingerprint and connection, then try again."
+    };
+    private static string First(string message) => message.Split('\n')[0].Trim();
     private Task LoadPasswordStatusAsync() => RunAsync(async user =>
         passwordStatus = await JS.InvokeAsync<PasswordStatus>("yap.encryption.passwordStatus", OfflineStore.Scope(user)));
     private Task EnablePasswordAsync() => RunAsync(async user =>
@@ -184,17 +251,28 @@
         }
         finally { currentPassword = ""; }
     });
-    private Task RestoreWithPasswordAsync() => RunAsync(async user =>
+    // The sign-in already produced the export key this needs; finish with it rather than asking again.
+    private Task UnlockAsync() => RunAsync(async user =>
+    {
+        if (!await State.Encryption.PasswordRestoreAsync(user))
+            throw new InvalidOperationException("Sign in again to unlock older messages with your password.");
+        await State.SynchronizeAsync(); unlock = null; notice = "Encrypted messages unlocked.";
+    });
+    private Task UnlockWithPasswordAsync() => RunAsync(async user =>
     {
         try
         {
             if (passwordStatus is null) return;
-            await JS.InvokeVoidAsync("yap.encryption.passwordSignIn", passwordStatus.Username, currentPassword);
+            await JS.InvokeVoidAsync("yap.encryption.passwordSignIn", passwordStatus.Username, unlockPassword);
             await State.SynchronizeAsync();
-            if (!await State.Encryption.PasswordRestoreAsync(user)) throw new InvalidOperationException();
-            await State.SynchronizeAsync(); notice = "Encrypted messages unlocked.";
+            unlock = await State.Encryption.PasswordUnlockStateAsync(user);
+            // A sign-in that leaves no material behind means this account still authenticates the
+            // old way, so there is no password-wrapped backup to open.
+            if (!await State.Encryption.PasswordRestoreAsync(user))
+                throw new InvalidOperationException("Password recovery is not enabled for this account.");
+            await State.SynchronizeAsync(); unlock = null; notice = "Encrypted messages unlocked.";
         }
-        finally { currentPassword = ""; }
+        finally { unlockPassword = ""; }
     });
     private Task ChangePasswordAsync() => RunAsync(async user =>
     {
@@ -223,10 +301,10 @@
         }
         finally { resetPassword = ""; resetConsent = false; }
     });
-    private Task RestoreAsync() => RunAsync(async user => { await State.Encryption.RestoreAsync(user, recoveryKey.Trim()); recoveryKey = ""; await State.SynchronizeAsync(); notice = "This device is ready."; });
+    private Task RestoreAsync() => RunAsync(async user => { await State.Encryption.RestoreAsync(user, recoveryKey.Trim()); recoveryKey = ""; unlock = null; await State.SynchronizeAsync(); notice = "This device is ready."; });
     private Task ProposeAsync() => RunAsync(async user => proposal = await State.Encryption.ProposeAsync(user));
     private Task ApproveAsync() => RunAsync(async user => { approval = await State.Encryption.ApproveAsync(user, deviceRequest); deviceRequest = ""; devices = null; });
-    private Task AcceptAsync() => RunAsync(async user => { await State.Encryption.AcceptApprovalAsync(user, approvalCode); approvalCode = ""; await State.SynchronizeAsync(); });
+    private Task AcceptAsync() => RunAsync(async user => { await State.Encryption.AcceptApprovalAsync(user, approvalCode); approvalCode = ""; unlock = null; await State.SynchronizeAsync(); });
     private Task LoadDevicesAsync() => RunAsync(async user => devices = await State.Encryption.DevicesAsync(user));
     private Task RevokeAsync(Guid id) => RunAsync(async user => { await State.Encryption.RevokeAsync(user, id); revokeCandidate = null; devices = await State.Encryption.DevicesAsync(user); notice = "Device removed."; });
     private Task LoadFingerprintAsync() => RunAsync(async user => fingerprint = await State.Encryption.FingerprintAsync(user, peerId));

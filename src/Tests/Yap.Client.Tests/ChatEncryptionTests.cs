@@ -116,6 +116,32 @@ public sealed class ChatEncryptionTests
     }
 
     [Test]
+    public async Task PasswordRestoreAsync_UnusableBackup_SurfacesTheReasonInsteadOfAFalseResult()
+    {
+        using var fixture = new Fixture();
+        await fixture.Encryption.EnsureAsync(fixture.User);
+        const string reason = "Your password no longer opens this account's saved backup.";
+        fixture.Js.Setup(j => j.InvokeAsync<bool>("yap.encryption.passwordRestore", It.IsAny<object?[]?>()))
+            .Throws(new JSException(reason));
+        // The regression: this used to reach the settings page as a sentence about codes and
+        // fingerprints, so nobody - user or log - learned what actually stopped the unlock.
+        var error = Assert.ThrowsAsync<JSException>(() => fixture.Encryption.PasswordRestoreAsync(fixture.User));
+        Assert.That(error!.Message, Is.EqualTo(reason));
+    }
+
+    [Test]
+    public async Task PasswordUnlockStateAsync_ReportsWhatThisSignInStillHolds()
+    {
+        using var fixture = new Fixture();
+        await fixture.Encryption.EnsureAsync(fixture.User);
+        fixture.Js.Setup(j => j.InvokeAsync<ChatEncryption.PasswordUnlock>("yap.encryption.passwordUnlockState", It.IsAny<object?[]?>()))
+            .ReturnsAsync(new ChatEncryption.PasswordUnlock(true, true, null));
+        Assert.That(await fixture.Encryption.PasswordUnlockStateAsync(fixture.User), Is.EqualTo(new ChatEncryption.PasswordUnlock(true, true, null)));
+        fixture.Js.Verify(j => j.InvokeAsync<ChatEncryption.PasswordUnlock>("yap.encryption.passwordUnlockState",
+            It.Is<object?[]?>(a => a != null && a.Length == 1 && (string)a[0]! == OfflineStore.Scope(fixture.User))), Times.Once);
+    }
+
+    [Test]
     public async Task RevokeAsync_LocalDevice_IsRejectedBeforeDirectoryMutation()
     {
         using var fixture = new Fixture();
