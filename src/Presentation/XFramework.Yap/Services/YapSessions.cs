@@ -16,9 +16,26 @@ namespace Yap.Services;
 // opaque session key, and the tokens themselves live in the session store under that key.
 // The store is distributed so a restart or a rollout no longer signs everyone out, and the
 // payload is sealed with Data Protection so the shared cache only ever holds ciphertext.
-public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider protection, IServiceScopeFactory scopes)
+public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider protection,
+    IServiceScopeFactory scopes, TimeProvider clock)
 {
-    private static readonly TimeSpan Lifetime = TimeSpan.FromHours(8);
+    // An installed phone messenger must not sign you out while you keep using it, so the
+    // sign-in rolls: use pushes the idle deadline out again, and the absolute cap is the
+    // backstop a lost or stolen device cannot outlive. Both numbers are bounded by what
+    // IdentityServer will actually honour, because a longer promise here only trades
+    // "signed out at eight hours" for "inexplicably broken at N days":
+    //   - the refresh token lives 14 days and slides on each rotation, so a returning
+    //     device must arrive well inside that or it has nothing left to refresh with;
+    //   - the upstream session carries a hard 30-day cap (RememberMe, see YapAuth) that no
+    //     refresh extends, so this cap sits inside it with room for clock skew and ends the
+    //     session with Yap's own message rather than an upstream 401.
+    public static readonly TimeSpan IdleWindow = TimeSpan.FromDays(7);
+    private static readonly TimeSpan AbsoluteLifetime = TimeSpan.FromDays(28);
+
+    // Rolling on every request would write the shared store on every request. The deadline
+    // only moves once it has drifted this far, which costs one write per active hour.
+    private static readonly TimeSpan RollSlack = TimeSpan.FromHours(1);
+
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     // Refreshing rotates the refresh token, so two concurrent requests for one session
@@ -31,6 +48,16 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
         user?.Identity?.IsAuthenticated == true &&
         user.FindFirstValue(YapAuth.SessionClaim) is { } key &&
         await ReadAsync(key, ct) is not null;
+
+    /// <summary>Records use and returns the deadline the sign-in now holds, or null once the
+    /// idle window lapsed, the absolute cap was reached, or sign-out revoked it.</summary>
+    public async ValueTask<DateTimeOffset?> TouchAsync(ClaimsPrincipal? user, CancellationToken ct = default)
+    {
+        if (user?.Identity?.IsAuthenticated != true || user.FindFirstValue(YapAuth.SessionClaim) is not { } key ||
+            await ReadAsync(key, ct) is not { } entry) return null;
+        if (Roll(entry)) await WriteAsync(key, entry, ct);
+        return entry.ActiveUntil;
+    }
 
     public async Task<ClaimsPrincipal> CreateAsync(AuthenticateIdentityResponse response, CancellationToken ct = default)
     {
@@ -47,8 +74,9 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
         {
             TenantId = tenant, CredentialId = credential, SessionId = session,
             AccessToken = response.AccessToken, RefreshToken = response.RefreshToken,
-            ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(response.ExpiresIn),
-            SignedOutAt = DateTimeOffset.UtcNow.Add(Lifetime)
+            ExpiresAt = clock.GetUtcNow().AddSeconds(response.ExpiresIn),
+            ActiveUntil = clock.GetUtcNow().Add(IdleWindow),
+            SignedOutAt = clock.GetUtcNow().Add(AbsoluteLifetime)
         }, ct);
         return new ClaimsPrincipal(new ClaimsIdentity([
             new Claim(ClaimTypes.NameIdentifier, credential.ToString()),
@@ -69,7 +97,10 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
         try
         {
             var entry = await ReadAsync(key, ct) ?? throw new UnauthorizedAccessException("Your session ended. Please sign in again.");
-            if (entry.ExpiresAt <= DateTimeOffset.UtcNow.AddSeconds(60))
+            // Chat work is use like any other. A socket that stays open for days never
+            // revalidates the cookie, so the actor path has to roll the sign-in itself.
+            var rolled = Roll(entry);
+            if (entry.ExpiresAt <= clock.GetUtcNow().AddSeconds(60))
             {
                 using var scope = scopes.CreateScope();
                 // Once rotation starts it must finish and persist even if the browser crashes
@@ -99,9 +130,10 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
                 }
                 entry.AccessToken = tokens.AccessToken;
                 entry.RefreshToken = tokens.RefreshToken;
-                entry.ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(tokens.ExpiresIn);
+                entry.ExpiresAt = clock.GetUtcNow().AddSeconds(tokens.ExpiresIn);
                 await WriteAsync(key, entry, CancellationToken.None);
             }
+            else if (rolled) await WriteAsync(key, entry, ct);
             return new CommunicationsChatActor(entry.TenantId, entry.CredentialId, key, entry.AccessToken);
         }
         finally { gate.Release(); }
@@ -129,6 +161,17 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
 
     private static string CacheKey(string key) => $"yap:session:{key}";
 
+    // Use pushes the idle deadline out, but never past the cap the sign-in started with.
+    // Returns whether the move is worth a write.
+    private bool Roll(Entry entry)
+    {
+        var rolled = clock.GetUtcNow().Add(IdleWindow);
+        if (rolled > entry.SignedOutAt) rolled = entry.SignedOutAt;
+        if (rolled - entry.ActiveUntil < RollSlack) return false;
+        entry.ActiveUntil = rolled;
+        return true;
+    }
+
     private async ValueTask<Entry?> ReadAsync(string key, CancellationToken ct)
     {
         var stored = await cache.GetAsync(CacheKey(key), ct);
@@ -136,8 +179,12 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
         try
         {
             var entry = JsonSerializer.Deserialize<Entry>(protector.Unprotect(Encoding.UTF8.GetString(stored)), Json);
+            if (entry is null) return null;
+            // Entries written before sign-ins rolled carry no idle deadline. Honour the one
+            // deadline they do have instead of signing everybody out on the rollout.
+            if (entry.ActiveUntil == default) entry.ActiveUntil = entry.SignedOutAt;
             // A rewritten entry must never outlive the sign-in it belongs to.
-            return entry is null || entry.SignedOutAt <= DateTimeOffset.UtcNow ? null : entry;
+            return entry.ActiveUntil <= clock.GetUtcNow() || entry.SignedOutAt <= clock.GetUtcNow() ? null : entry;
         }
         catch (System.Security.Cryptography.CryptographicException)
         {
@@ -148,7 +195,10 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
 
     private async Task WriteAsync(string key, Entry entry, CancellationToken ct)
     {
-        var remaining = entry.SignedOutAt - DateTimeOffset.UtcNow;
+        // The cache TTL tracks the rolling deadline, not the cap: a shorter TTL would let
+        // Redis evict a session the app still considers valid, a longer one would keep
+        // ciphertext around past the sign-in it belongs to.
+        var remaining = entry.ActiveUntil - clock.GetUtcNow();
         if (remaining <= TimeSpan.Zero) return;
         var payload = Encoding.UTF8.GetBytes(protector.Protect(JsonSerializer.Serialize(entry, Json)));
         await cache.SetAsync(CacheKey(key), payload,
@@ -164,7 +214,9 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
         public string RefreshToken { get; set; } = "";
         /// <summary>When the access token needs refreshing.</summary>
         public DateTimeOffset ExpiresAt { get; set; }
-        /// <summary>When the sign-in itself lapses; refreshes never extend this.</summary>
+        /// <summary>The rolling idle deadline: use pushes it out, never past <see cref="SignedOutAt"/>.</summary>
+        public DateTimeOffset ActiveUntil { get; set; }
+        /// <summary>The absolute cap on this sign-in. Neither use nor a token refresh extends it.</summary>
         public DateTimeOffset SignedOutAt { get; set; }
     }
 }

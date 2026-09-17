@@ -402,6 +402,7 @@ public sealed class YapChatGatewayTests
             var wrapper = new Mock<ICommunicationsServiceWrapper>();
             builder.Services.AddSingleton(wrapper.Object);
             builder.Services.AddSingleton(Mock.Of<IActorAccessTokenScope>());
+            builder.Services.AddSingleton(TimeProvider.System);
             builder.Services.AddSingleton<YapSessions>();
             builder.Services.AddSingleton<YapCallGateway>();
             builder.Services.AddSingleton<YapChatGateway>();
