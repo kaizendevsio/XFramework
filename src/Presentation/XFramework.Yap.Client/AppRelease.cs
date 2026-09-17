@@ -2,10 +2,12 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.43";
+    public const string Version = "1.3.44";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "16 September 2026", [
+            "Staying signed in now lasts as long as you keep using Yap, instead of ending a few hours after you sign in."]),
+        ("1.3.43", "16 September 2026", [
             "A message now shows one notification, not two, and several messages stack instead of replacing each other."]),
         ("1.3.42", "16 September 2026", [
             "Message notifications can now show who wrote and what they said, decrypted on your own device.",
