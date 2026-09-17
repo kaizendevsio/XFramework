@@ -80,10 +80,16 @@
                         await State.Encryption.EnsureAsync(user);
                         if (!await State.Encryption.PasswordEnrollAsync(user, username.Trim(), password)) path = "/settings";
                     }
+                    // First sign-in on a new device restores history here, from the export key this
+                    // exchange just produced. Settings is only where an interrupted one is finished.
                     else if (!await State.Encryption.PasswordRestoreAsync(user)) path = "/settings";
                     await State.Encryption.EnsureAsync(user);
                 }
-                catch { path = "/settings"; } // Sign-in survives a temporary recovery outage; never create replacement keys here.
+                catch (Exception failure) // Sign-in survives a temporary recovery outage; never create replacement keys here.
+                {
+                    path = "/settings";
+                    try { await JS.InvokeVoidAsync("yap.diagnostics.record", "encryption.unlock-failed", new { type = failure.GetType().Name }); } catch { }
+                }
             }
             password = confirm = "";
             registered = Register;

@@ -82,6 +82,11 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js, TimeProvider? tim
     });
     public Task<bool> PasswordEnrollAsync(UserSession user, string username, string password) => ChangeAsync(user,
         operation => JsAsync<bool>(operation, "passwordEnroll", username, password));
+    /// <summary>Whether the sign-in that is still held in this browser session can unlock history
+    /// without asking for the password again, and why not when it cannot.</summary>
+    public Task<PasswordUnlock> PasswordUnlockStateAsync(UserSession user) =>
+        ChangeAsync(user, operation => JsAsync<PasswordUnlock>(operation, "passwordUnlockState"));
+    public sealed record PasswordUnlock(bool SignedIn, bool Available, string? Problem);
 
     public static string CallRosterBinding(YapGroupCall call)
     {
