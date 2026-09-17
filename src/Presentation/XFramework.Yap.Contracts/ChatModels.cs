@@ -86,8 +86,7 @@ public sealed class ChatMessage
     public int DeliveredCount { get; set; }
     public string Initials => InitialsFor(Sender);
     public string Color => Mine ? "g1" : "g3";
-    // No Time property: clock text is the browser's job now (BrowserTime/yap.time). The client runs
-    // with no timezone data, so anything formatted here would be UTC wearing the user's clock face.
+    public string Time => CreatedAt.ToLocalTime().ToString("HH:mm");
     public static string InitialsFor(string? text) => string.Concat((text ?? "?")
         .Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(s => char.ToUpperInvariant(s[0])));
 }

@@ -34,9 +34,7 @@ public sealed partial class ChatState
             return text.Length > 100 ? text[..100] + "…" : text;
         if (message.Attachments.Count == 0) return "Message";
         var type = ChatMedia.ContentType(message.Attachments[0].ContentType, message.Attachments[0].Name);
-        var name = type.StartsWith("image/", StringComparison.Ordinal) ? "Photo"
-            : type.StartsWith("video/", StringComparison.Ordinal) ? "Video"
-            : type.StartsWith("audio/", StringComparison.Ordinal) ? "Voice message" : "Attachment";
+        var name = type.StartsWith("image/") ? "Photo" : type.StartsWith("video/") ? "Video" : type.StartsWith("audio/") ? "Voice message" : "Attachment";
         return message.Attachments.Count == 1 ? name : $"{message.Attachments.Count} attachments";
     }
 }

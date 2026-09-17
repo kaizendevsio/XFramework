@@ -82,7 +82,7 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         await db.Messages.Where(x => x.Scope == scope && x.ThreadId == thread).ExecuteDeleteAsync(ct);
         if (discardPending) await db.Outbox.Where(x => x.Scope == scope && x.ThreadId == thread).ExecuteDeleteAsync(ct);
         var prefix = thread.ToString("N") + ":";
-        await db.Drafts.Where(x => x.Scope == scope && x.Key.StartsWith(prefix)).ExecuteDeleteAsync(ct); // culture-ok: an expression tree EF turns into SQL LIKE, never a .NET comparison
+        await db.Drafts.Where(x => x.Scope == scope && x.Key.StartsWith(prefix)).ExecuteDeleteAsync(ct);
         await transaction.CommitAsync(ct);
         return true;
     }, ct);

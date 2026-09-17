@@ -1,6 +1,5 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
-@inject BrowserTime Times
 <div class="body messages message-window" data-messages @ref="element">
     <div data-window-lead>@Header
 
@@ -9,10 +8,10 @@
     @for (var index = start; index < Math.Min(Items.Count, start + count); index++)
     {
         var message = Items[index];
-        var day = Times.DayKey(message.CreatedAt);
+        var date = message.CreatedAt.ToLocalTime().Date;
         <div data-window-row="@message.Id" @key="message.Id">
-            @if (index == 0 || Times.DayKey(Items[index - 1].CreatedAt) != day)
-            { <div class="message-date"><time datetime="@day">@Times.DaySeparator(message.CreatedAt)</time></div> }
+            @if (index == 0 || Items[index - 1].CreatedAt.ToLocalTime().Date != date)
+            { <div class="message-date"><time datetime="@date.ToString("yyyy-MM-dd")">@DateLabel(date)</time></div> }
             @ChildContent(message)
         </div>
     }
@@ -39,6 +38,8 @@
     private int start, count = 40;
     private Guid? first;
     private bool initialized, loading;
+    private static string DateLabel(DateTime date) => date == DateTime.Today ? "Today"
+        : date == DateTime.Today.AddDays(-1) ? "Yesterday" : date.ToString("D");
     protected override void OnParametersSet()
     {
         if (!initialized) { initialized = true; start = Math.Max(0, Items.Count - count); }

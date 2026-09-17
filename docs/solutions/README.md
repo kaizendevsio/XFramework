@@ -46,7 +46,6 @@ status: current
 - [EF Core data access patterns](conventions/ef-core-data-access-patterns.md) - `AppDbContext` discovery, module configurations, migrations, tests, and local/remote `IDataContext` behavior.
 - [Backend guidelines](../../rules/BackendGuidelines.md) - mandatory backend rules for the single-database, schema-per-module architecture, service ownership, EF performance, caching, migrations, and cross-module boundaries.
 - [XFramework caching strategy](best-practices/xframework-caching-strategy.md) - custom `HybridCacheService`, Redis/distributed cache, remote data-context client cache, module-local caches, and generated endpoint cache metadata.
-- [Yap WebAssembly IL stripping is already on](tooling-decisions/yap-wasm-il-stripping.md) - why `WasmStripILAfterAOT` needs no project setting, with the measured payload difference.
 - [OpenTelemetry integration guide](tooling-decisions/opentelemetry-integration-guide.md) - tracing, metrics, resources, exporters, and log correlation.
 - [Logging standards](conventions/logging-standards.md) - structured logging conventions for the current ZLogger pipeline.
 - [Unified ZLogger logging pipeline](architecture-patterns/unified-zlogger-logging-pipeline.md) - current logging decision record and historical Serilog removal context.
@@ -59,7 +58,6 @@ status: current
 - [Wallets backend audit revalidation](workflow-issues/wallets-backend-audit-2026-08-04.md) - records the current post-IdentityServer/Post-Bolt BackendGuidelines findings, resolved stale findings, missing coverage, and verification evidence.
 - [Portal service wrapper and integration test contract](developer-experience/portal-service-wrapper-and-integration-test-contract.md) - wrapper-first Portal business operations, direct `IDataContext` mutation rules, and standard/extended integration-test tiers.
 - [Portal feature Razor Class Library architecture](developer-experience/portal-feature-rcl-architecture.md) - modular-monolith boundaries for the Portal host, shared UI, feature projects, service registration, and route discovery.
-- [Yap client EF Core compiled model](developer-experience/yap-ef-compiled-model.md) - generated EF model for the browser database, how to regenerate it, and the tests that stop it going stale.
 - [Yap-scoped deployment pipeline](developer-experience/yap-scoped-deployment-pipeline.md) - conservative app-only deployment, image reuse, verification gates, rollback, and focused CI inside the normal release workflow.
 - [Yap browser Bolt messaging](architecture-patterns/yap-browser-bolt-messaging.md) - authenticated direct ciphertext delivery, explicit receipts, bounded queues and reconciliation.
 - [Yap voice trusted-server relay](architecture-patterns/yap-voice-trusted-server-relay.md) - authenticated browser voice, transport security, codec fallback, verification evidence and remaining device limitations.

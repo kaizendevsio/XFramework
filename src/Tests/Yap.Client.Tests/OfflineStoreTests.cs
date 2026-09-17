@@ -329,9 +329,7 @@ public sealed class OfflineSchemaTests
 internal sealed class StoreFixture(SqliteConnection connection) : IDbContextFactory<OfflineDatabase>, IAsyncDisposable
 {
     public OfflineStore Store => new(this);
-    // The browser runs on the generated compiled model, so every store test must run on it too.
-    public OfflineDatabase CreateDbContext() => new(new DbContextOptionsBuilder<OfflineDatabase>()
-        .UseModel(OfflineDatabaseModel.Instance).UseSqlite(connection).Options);
+    public OfflineDatabase CreateDbContext() => new(new DbContextOptionsBuilder<OfflineDatabase>().UseSqlite(connection).Options);
     public static async Task<StoreFixture> CreateAsync()
     {
         var connection = new SqliteConnection("Data Source=:memory:"); await connection.OpenAsync();

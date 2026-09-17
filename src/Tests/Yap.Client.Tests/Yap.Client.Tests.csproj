@@ -4,16 +4,10 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" /><PackageReference Include="NUnit" /><PackageReference Include="NUnit3TestAdapter" /><PackageReference Include="Moq" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
-    <!-- Hosts `dotnet ef dbcontext optimize` for the client: the browser project must never ship it. -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
     <ProjectReference Include="../../Presentation/XFramework.Yap.Contracts/XFramework.Yap.Contracts.csproj" />
     <ProjectReference Include="../../Libraries/Bolt/Bolt.Media.Browser/Bolt.Media.Browser.csproj" />
     <!-- Execute the actual cache/outbox code against SQLite, independent of the browser-only worker. -->
     <Compile Include="../../Presentation/XFramework.Yap.Client/Services/*.cs" Exclude="../../Presentation/XFramework.Yap.Client/Services/DatabaseStartup.cs" Link="Services/%(Filename)%(Extension)" />
-    <!-- The generated compiled model is produced from here, so the tests can prove it still matches.
-         Its [DbContextModel] attribute is left out: it would auto-apply the compiled model to every
-         context in this assembly, and the staleness test needs one model reflected from the classes. -->
-    <Compile Include="../../Presentation/XFramework.Yap.Client/Services/Generated/*.cs" Exclude="../../Presentation/XFramework.Yap.Client/Services/Generated/OfflineDatabaseAssemblyAttributes.cs" Link="Services/Generated/%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

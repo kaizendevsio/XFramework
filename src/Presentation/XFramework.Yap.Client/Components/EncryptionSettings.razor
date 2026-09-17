@@ -145,13 +145,8 @@
     private Guid peerId;
     private string comparison = "";
     private ChatEncryption.FingerprintInfo? fingerprint;
-    // The only string sort in the app, and the only place InvariantGlobalization changes an order rather
-    // than a format: a default OrderBy would compare through a collation this build no longer ships.
-    // Ordinal, ignoring case, is what the runtime would fall back to anyway - said out loud so it is a
-    // decision and not a side effect. Accented names sort after unaccented ones; nobody sees a wrong time.
     private IEnumerable<Person> Peers => State.Conversations.SelectMany(c => c.People)
-        .Concat(State.Selected?.People ?? []).Where(p => p.Id != State.User?.CredentialId).DistinctBy(p => p.Id)
-        .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase);
+        .Concat(State.Selected?.People ?? []).Where(p => p.Id != State.User?.CredentialId).DistinctBy(p => p.Id).OrderBy(p => p.Name);
     protected override void OnParametersSet()
     {
         var scope = State.User is null ? null : OfflineStore.Scope(State.User);
