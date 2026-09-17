@@ -25,6 +25,17 @@ public sealed class OfflineDatabase(DbContextOptions<OfflineDatabase> options) :
     }
 
     /// <summary>
+    /// Startup's whole database step: create what is missing, then upgrade what an earlier release
+    /// left behind. It lives here rather than in DatabaseStartup so a test can run the exact
+    /// sequence the browser runs, against a database a previous build wrote.
+    /// </summary>
+    public static async Task PrepareAsync(OfflineDatabase db, CancellationToken ct = default)
+    {
+        await db.Database.EnsureCreatedAsync(ct);
+        await UpgradeAsync(db, ct);
+    }
+
+    /// <summary>
     /// EnsureCreated never alters a database an earlier build already created, so additive
     /// columns are applied here instead. Each statement is skipped when the column exists.
     /// </summary>
