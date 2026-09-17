@@ -32,5 +32,8 @@ builder.Services.AddScoped<VoiceState>();
 builder.Services.AddBoltMediaBrowser(options => options.SecurityMode = Bolt.Media.Browser.MediaSecurityMode.AuthenticatedSFrame);
 builder.Services.AddScoped<DatabaseStartup>();
 var host = builder.Build();
-await host.Services.GetRequiredService<IJSRuntime>().InvokeVoidAsync("yap.diagnostics.version", AppRelease.Version);
+// A breadcrumb must never be the reason Yap fails to open. Throwing here escapes Main before the
+// root component exists, and the static splash spins on with nothing left to explain it.
+try { await host.Services.GetRequiredService<IJSRuntime>().InvokeVoidAsync("yap.diagnostics.version", AppRelease.Version); }
+catch (JSException) { }
 await host.RunAsync();

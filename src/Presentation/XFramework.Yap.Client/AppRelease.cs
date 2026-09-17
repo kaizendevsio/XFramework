@@ -2,10 +2,12 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.48";
+    public const string Version = "1.3.49";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "16 September 2026", [
+            "If Yap ever fails to start, it now says so and offers recovery instead of showing the splash forever."]),
+        ("1.3.48", "16 September 2026", [
             "Signing in on a new device now restores your messages automatically, without a recovery key or a second password prompt.",
             "When unlocking does fail, Yap now says why instead of showing one generic message."]),
         ("1.3.46", "17 September 2026", [
