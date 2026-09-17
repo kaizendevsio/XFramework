@@ -74,10 +74,10 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         null => true,
         { EditAnyMessage: true } => true,
         { EditWindowMinutes: <= 0 } => false,
-        var defaults => DateTime.UtcNow < message.CreatedAt.ToUniversalTime().AddMinutes(defaults.EditWindowMinutes)
+        var defaults => DateTime.UtcNow < BrowserTime.AsUtc(message.CreatedAt).AddMinutes(defaults.EditWindowMinutes)
     };
     public DateTime? EditExpiry(ChatMessage message) => Defaults is { EditAnyMessage: false, EditWindowMinutes: > 0 } defaults
-        ? message.CreatedAt.ToUniversalTime().AddMinutes(defaults.EditWindowMinutes) : null;
+        ? BrowserTime.AsUtc(message.CreatedAt).AddMinutes(defaults.EditWindowMinutes) : null;
     public string Scope => User is null ? "" : OfflineStore.Scope(User);
     public event Action? Changed;
     public event Func<YapCallEvent, Task>? CallReceived;

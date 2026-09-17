@@ -1,6 +1,7 @@
 @page "/"
 @implements IDisposable
 @inject ChatState State
+@inject BrowserTime Times
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 <PageTitle>Yap · A little closer.</PageTitle>
@@ -18,7 +19,7 @@ else
 @foreach (var chat in section)
 {
     <div class="inbox-item" data-conversation-menu @oncontextmenu="e => OpenMenu(chat, e)" @oncontextmenu:preventDefault>
-    <a class="row" href="@($"/chat/{chat.Id}")"><Avatar Initials="@chat.Initials" ImageUrl="@chat.AvatarUrl" Color="@chat.Color" Size="a48" /><span class="mid"><span class="t1">@if(chat.IsFavorite){<span class="favorite-mark" aria-label="Favorite">&#9733;</span>}@chat.Name @if (chat.Group) { <span class="tag">@chat.Members</span> }</span><span class="t2 @(chat.Unread > 0 ? "unread" : "")">@chat.Preview</span></span><span class="end"><span class="time">@chat.LastMessageAt?.ToLocalTime().ToString("HH:mm")</span>@if (chat.Unread > 0) { <span class="badge">@chat.Unread</span> }</span></a>
+    <a class="row" href="@($"/chat/{chat.Id}")"><Avatar Initials="@chat.Initials" ImageUrl="@chat.AvatarUrl" Color="@chat.Color" Size="a48" /><span class="mid"><span class="t1">@if(chat.IsFavorite){<span class="favorite-mark" aria-label="Favorite">&#9733;</span>}@chat.Name @if (chat.Group) { <span class="tag">@chat.Members</span> }</span><span class="t2 @(chat.Unread > 0 ? "unread" : "")">@chat.Preview</span></span><span class="end"><span class="time">@(chat.LastMessageAt is { } at ? Times.Clock(at) : "")</span>@if (chat.Unread > 0) { <span class="badge">@chat.Unread</span> }</span></a>
     <button class="inbox-menu-trigger iconbtn" aria-label="@($"Options for {chat.Name}")" @onclick="e => OpenMenu(chat, e)"><Icon Name="more" Size="18" /></button>
     </div>
 }

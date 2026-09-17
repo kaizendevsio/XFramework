@@ -23,6 +23,13 @@
     <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
     <EnableUnsafeUTF7Encoding>false</EnableUnsafeUTF7Encoding>
     <DebuggerSupport Condition="'$(Configuration)' == 'Release'">false</DebuggerSupport>
+    <!-- No ICU and no tz database. These are only safe because nothing on the .NET side formats a date or
+         compares a string linguistically any more: Intl does it, and the browser knows the viewer's zone
+         and locale for bytes already downloaded. With them off, TimeZoneInfo.Local silently becomes UTC
+         and CurrentCulture the invariant one - no exception, just every timestamp quietly shifted by the
+         viewer's offset - so GlobalizationGuardTests fails the build if a .NET-side conversion returns. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <BlazorEnableTimeZoneSupport>false</BlazorEnableTimeZoneSupport>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />

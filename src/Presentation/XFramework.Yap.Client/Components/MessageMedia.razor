@@ -28,7 +28,7 @@
             @if (waitingForConnection) { <div class="photo-skeleton" role="status"><span>Available when you’re back online</span></div> }
             else if (!failed) { <div class="photo-skeleton @(IsAudio(file) ? "voice-skeleton" : "")" role="status" aria-label="@(IsAudio(file) ? "Loading voice message" : IsVideo(file) ? "Loading video" : "Loading photo")"><span class="spinner"></span></div> }
         }
-        else { <button class="media-open" disabled="@(loading || WaitingForLinks)" @onclick="() => OpenAsync(file)"><Icon Name="@(file.ContentType.StartsWith("audio/") ? "mic" : "file")" Size="20" /><span>@file.Name</span><small>@(file.Size / 1024) KB</small></button> }
+        else { <button class="media-open" disabled="@(loading || WaitingForLinks)" @onclick="() => OpenAsync(file)"><Icon Name="@(file.ContentType.StartsWith("audio/", StringComparison.Ordinal) ? "mic" : "file")" Size="20" /><span>@file.Name</span><small>@(file.Size / 1024) KB</small></button> }
     }
     @if (loading && Message.Attachments.Count == 0) { <span class="spinner" role="status" aria-label="Loading attachment"></span> }
     @if (waitingForConnection && Message.Attachments.Count == 0) { <span>Attachment available when you’re back online</span> }

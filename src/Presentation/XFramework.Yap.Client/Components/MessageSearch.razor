@@ -1,5 +1,6 @@
 @implements IDisposable
 @inject ChatState State
+@inject BrowserTime Times
 @* One results surface for both search entry points, so a hit reads the same wherever it was found. *@
 <div class="msearch">
     <p class="msearch-live" role="status">@Announcement</p>
@@ -44,7 +45,7 @@
                     <span class="msearch-head">
                         <span class="msearch-who">@Who(hit)</span>
                         @if (!Thread.HasValue) { <span class="msearch-in">@Where(hit)</span> }
-                        <time class="msearch-when" datetime="@hit.CreatedAt.ToUniversalTime().ToString("O")">@Stamp(hit.CreatedAt)</time>
+                        <time class="msearch-when" datetime="@BrowserTime.Iso(hit.CreatedAt)">@Times.Stamp(hit.CreatedAt)</time>
                     </span>
                     <span class="msearch-text">@foreach (var part in SearchSnippet.Build(hit.Text, found)) { if (part.Match) { <mark>@part.Text</mark> } else { @part.Text } }</span>
                 </span>
@@ -81,14 +82,6 @@
     private string Who(SearchHit hit) => hit.Sender.Length > 0 ? hit.Sender
         : State.Conversations.FirstOrDefault(x => x.Id == hit.ThreadId)?.Name ?? "Message";
     private string Where(SearchHit hit) => State.Conversations.FirstOrDefault(x => x.Id == hit.ThreadId)?.Name ?? "";
-    // Dates read as a person would say them; a same-day hit only needs a clock time.
-    private static string Stamp(DateTime value)
-    {
-        var local = value.ToLocalTime();
-        var days = (DateTime.Now.Date - local.Date).Days;
-        return days == 0 ? local.ToString("HH:mm") : days == 1 ? "Yesterday"
-            : days < 7 ? local.ToString("ddd") : local.Year == DateTime.Now.Year ? local.ToString("MMM d") : local.ToString("MMM yyyy");
-    }
     protected override void OnParametersSet()
     {
         if ((Query ?? "") == current) return;

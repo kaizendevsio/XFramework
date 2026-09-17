@@ -25,6 +25,8 @@ builder.Services.AddDbContextFactory<OfflineDatabase>(options => options
 builder.Services.AddSqliteWasm();
 builder.Services.AddScoped<OfflineStore>();
 builder.Services.AddScoped<ChatApi>();
+// Scoped, not singleton, so its memo of formatted timestamps dies with the account's session.
+builder.Services.AddScoped<BrowserTime>();
 builder.Services.AddScoped<ChatState>();
 builder.Services.AddScoped<VoiceState>();
 builder.Services.AddBoltMediaBrowser(options => options.SecurityMode = Bolt.Media.Browser.MediaSecurityMode.AuthenticatedSFrame);
