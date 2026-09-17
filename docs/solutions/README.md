@@ -58,6 +58,7 @@ status: current
 - [Wallets backend audit revalidation](workflow-issues/wallets-backend-audit-2026-08-04.md) - records the current post-IdentityServer/Post-Bolt BackendGuidelines findings, resolved stale findings, missing coverage, and verification evidence.
 - [Portal service wrapper and integration test contract](developer-experience/portal-service-wrapper-and-integration-test-contract.md) - wrapper-first Portal business operations, direct `IDataContext` mutation rules, and standard/extended integration-test tiers.
 - [Portal feature Razor Class Library architecture](developer-experience/portal-feature-rcl-architecture.md) - modular-monolith boundaries for the Portal host, shared UI, feature projects, service registration, and route discovery.
+- [Yap client EF Core compiled model](developer-experience/yap-ef-compiled-model.md) - generated EF model for the browser database, how to regenerate it, and the tests that stop it going stale.
 - [Yap-scoped deployment pipeline](developer-experience/yap-scoped-deployment-pipeline.md) - conservative app-only deployment, image reuse, verification gates, rollback, and focused CI inside the normal release workflow.
 - [Yap browser Bolt messaging](architecture-patterns/yap-browser-bolt-messaging.md) - authenticated direct ciphertext delivery, explicit receipts, bounded queues and reconciliation.
 - [Yap voice trusted-server relay](architecture-patterns/yap-voice-trusted-server-relay.md) - authenticated browser voice, transport security, codec fallback, verification evidence and remaining device limitations.
