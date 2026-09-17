@@ -5,7 +5,7 @@ public static class AppRelease
     public const string Version = "1.3.45";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
-        (Version, "15 September 2026", [
+        (Version, "17 September 2026", [
             "Yap opens faster: the offline database schema is now prepared ahead of time instead of being built on every launch."]),
         ("1.3.44", "16 September 2026", [
             "Staying signed in now lasts as long as you keep using Yap, instead of ending a few hours after you sign in."]),
