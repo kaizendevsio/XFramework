@@ -12,7 +12,9 @@ await opaque.ready;
 const password = 'test password only, never a real user password';
 function device() {
     const store = new Map();
-    return createEncryption({ get: async key => structuredClone(store.get(key)), put: async (key, value) => store.set(key, structuredClone(value)) });
+    // The persisted record travels with the device: some of what these cover is state an older
+    // build left behind, which only the store can express.
+    return Object.assign(createEncryption({ get: async key => structuredClone(store.get(key)), put: async (key, value) => store.set(key, structuredClone(value)) }), { store });
 }
 
 // Mirrors the deployed server: OPAQUE stages over a stored record, and directory/recovery rows
@@ -211,4 +213,42 @@ test('a sign-in that cannot recover reports the lock and leaves the account iden
     assert.deepEqual([api.directory.rootPublicKey, api.directory.revision], [root, revision]);
     await peer.acceptDirectory(peerScope, api.directory);
     assert.equal((await peer.decrypt(peerScope, context, ciphertext, api.directory)).text, 'sent before the sign-out');
+});
+
+// The report this fixes: "I logged out and logged back in. Still the same. And there is no button
+// where I can verify or approve the changed identity." The sentence came from the contact
+// protection, fired on the person's own account, where it asks for a comparison with nobody and
+// no screen could answer it. Signing in holds the account root private key; that settles it.
+test('signing in repairs an own-account pin left by a replaced identity, in silence', async () => {
+    const { scope, api, owner, context, ciphertext } = await migrated();
+    const { peer, peerScope, context: shared, ciphertext: message } = await peerOf(scope, api, owner);
+    const credentialId = scope.split(':')[1], fingerprint = (await owner.status(scope)).rootFingerprint;
+    // What an install that changed identity before that was fixed still holds: the published account
+    // root, and an own-account pin naming the root this account retired.
+    const record = owner.store.get(scope);
+    record.pins[credentialId] = { rootFingerprint: 'a'.repeat(40), revision: 1, digest: 'retired', verified: false };
+    owner.store.set(scope, record);
+    api.archive = (await owner.exportRecovery(scope)).recoveryArchive; // the same pin reaches the backup
+    const login = passwordRecovery(owner, api.fetcher);
+    await login.passwordSignIn('test-user', password);
+    assert.equal(await login.passwordRestore(scope), true);
+    assert.equal(api.directory.rootPublicKey, record.rootPublicKey, 'nothing is republished to repair a pin');
+    assert.deepEqual(await owner.inspectDirectory(scope, api.directory), { fingerprint, verified: false, changed: false });
+    assert.equal((await owner.decrypt(scope, context, ciphertext, api.directory)).text, 'message from before the migration');
+    // A device that restores that backup inherits the repair rather than the dead end.
+    const fresh = device(), next = passwordRecovery(fresh, api.fetcher);
+    await next.passwordSignIn('test-user', password);
+    assert.equal(await next.passwordRestore(scope), true);
+    assert.equal((await fresh.status(scope)).rootFingerprint, fingerprint);
+    assert.equal((await fresh.decrypt(scope, context, ciphertext, api.directory)).text, 'message from before the migration');
+    // The contact protection is untouched: a peer whose key changed still has to be verified.
+    await peer.acceptDirectory(peerScope, api.directory);
+    assert.equal((await peer.decrypt(peerScope, shared, message, api.directory)).text, 'sent before the sign-out');
+    const stale = peer.store.get(peerScope);
+    stale.pins[credentialId] = { rootFingerprint: 'a'.repeat(40), revision: 1, digest: 'retired', verified: false };
+    peer.store.set(peerScope, stale);
+    await assert.rejects(peer.acceptDirectory(peerScope, api.directory), /key changed/);
+    await assert.rejects(peer.verifyFingerprint(peerScope, credentialId, fingerprint), /does not match/);
+    await peer.verifyDirectory(peerScope, api.directory, fingerprint);
+    assert.equal((await peer.status(peerScope)).verifiedContacts.includes(credentialId), true);
 });

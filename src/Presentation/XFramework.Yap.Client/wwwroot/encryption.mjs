@@ -66,7 +66,11 @@ function directoryShape(directory) {
         devices: directory.devices.map(d => ({ deviceId: guid(d.deviceId), signingPublicKey: d.signingPublicKey, encryptionPublicKey: d.encryptionPublicKey, approval: d.approval, revocation: d.revocation ?? null })).sort((a, b) => a.deviceId.localeCompare(b.deviceId))
     };
 }
-async function validateDirectory(scope, directory, pins) {
+// Proof that the published account root is this device's own: the fingerprint of the root private
+// key it actually holds. A stored `rootFingerprint` would only repeat what the same record claims,
+// and the account id alone proves nothing at all - a hostile server can publish any root under it.
+const heldRoot = state => state?.rootPrivateKey ? async () => (await readPrivate(state.rootPrivateKey)).getFingerprint() : null;
+async function validateDirectory(scope, directory, pins, ownRoot = null) {
     const d = directoryShape(directory);
     check(d.tenantId === scope.tenantId, 'Directory belongs to another tenant.');
     check(new Set(d.devices.map(x => x.deviceId)).size === d.devices.length, 'Duplicate device identity.');
@@ -91,12 +95,21 @@ async function validateDirectory(scope, directory, pins) {
     }
     const digest = await hash(canonical(payload));
     const previous = pins[d.credentialId];
+    // "Verify it with this person" is a contact protection: someone else's key changed, compare it
+    // out of band. On this account's own credential there is no second person and no question to
+    // ask - only a pin left behind by an identity this account no longer publishes. That one pin is
+    // superseded in silence, and only when `ownRoot` produces a root private key whose fingerprint
+    // is the published one. Without that proof the check below still fires, so a server that swaps
+    // an account's identity is never quietly believed just because it named the right account.
+    const stale = !!previous && previous.rootFingerprint !== rootFingerprint
+        && d.credentialId === scope.credentialId && !!ownRoot && await ownRoot() === rootFingerprint;
     if (previous) {
-        check(previous.rootFingerprint === rootFingerprint, 'The account security key changed. Verify it with this person.');
+        check(stale || previous.rootFingerprint === rootFingerprint, 'The account security key changed. Verify it with this person.');
         check(d.revision >= previous.revision, 'An older device roster was returned.');
-        check(d.revision !== previous.revision || digest === previous.digest, 'Conflicting device rosters were returned.');
+        // Rosters can only fork under one root; a different root always differs in digest as well.
+        check(stale || d.revision !== previous.revision || digest === previous.digest, 'Conflicting device rosters were returned.');
     }
-    pins[d.credentialId] = { rootFingerprint, revision: d.revision, digest, verified: previous?.verified ?? false };
+    pins[d.credentialId] = { rootFingerprint, revision: d.revision, digest, verified: !stale && (previous?.verified ?? false) };
     return { directory: d, rootFingerprint, digest, revisions };
 }
 async function keyPair(label, signingOnly = false) {
@@ -156,7 +169,7 @@ export function createEncryption(store = indexedDbStore()) {
     };
     const requireState = async key => { const state = await store.get(key); check(state?.device, 'Set up encryption on this device first.'); return state; };
     async function accept(s, state, directory) {
-        const result = await validateDirectory(s, directory, state.pins);
+        const result = await validateDirectory(s, directory, state.pins, heldRoot(state));
         if (result.directory.credentialId === s.credentialId) {
             check(state.rootFingerprint === result.rootFingerprint, 'The account security key changed.');
             const rotation = state.pendingRotation;
@@ -214,7 +227,7 @@ export function createEncryption(store = indexedDbStore()) {
         check(selected === null || selected.size > 0 && selected.size === recipientDeviceIds.length, 'Invalid selected recipient devices.');
         const included = new Set();
         for (const input of directories) {
-            const { directory: d, digest } = await validateDirectory(s, input, state.pins);
+            const { directory: d, digest } = await validateDirectory(s, input, state.pins, heldRoot(state));
             check(!accounts.has(d.credentialId), 'Duplicate recipient account.'); accounts.add(d.credentialId);
             const active = d.devices.filter(device => !device.revocation);
             check(active.length > 0, 'A recipient has no approved devices.');
@@ -246,7 +259,7 @@ export function createEncryption(store = indexedDbStore()) {
         const root = await fingerprint(senderDirectory.rootPublicKey), senderId = guid(senderDirectory.credentialId);
         const previous = state.historicalPins?.[senderId]?.[root];
         // Retired roots verify history only. They never become the active recipient identity again.
-        const { directory: d, revisions } = await validateDirectory(s, senderDirectory, previous ? { [senderId]: previous } : state.pins);
+        const { directory: d, revisions } = await validateDirectory(s, senderDirectory, previous ? { [senderId]: previous } : state.pins, heldRoot(state));
         check(d.credentialId === c.senderId, 'Unexpected sender directory.');
         await store.put(key, state);
         return { s, c, d, revisions, decryptionKeys: await Promise.all([...new Set([state.device.encryptionPrivateKey, ...(state.historyKeys ?? [])])].map(readPrivate)), verificationKeys: await Promise.all(d.devices.map(device => readPublic(device.signingPublicKey))) };
@@ -335,6 +348,30 @@ export function createEncryption(store = indexedDbStore()) {
             check(result.directory.revision > (state.directory?.revision ?? 0), 'An older account identity was returned.');
             // Keep old keys until the owner explicitly recovers or approves this device.
             state.identityChanged = true; state.approved = false; await store.put(key, state); return true;
+        }),
+        // What the account publishes, against what this device can prove it holds. `matches` is the
+        // ordinary answer and needs no one's attention; `replaced` is the only case with a decision
+        // in it, and the settings panel needs to tell them apart to offer the right words.
+        ownIdentity: (scope, directory) => locked(scope, async (s, key) => {
+            const state = await store.get(key), result = await validateDirectory(s, directory, {});
+            check(result.directory.credentialId === s.credentialId, 'Wrong account directory.');
+            const held = state?.rootPrivateKey ? (await readPrivate(state.rootPrivateKey)).getFingerprint() : state?.rootFingerprint ?? null;
+            return { published: result.rootFingerprint, held, revision: result.directory.revision,
+                matches: !!held && held === result.rootFingerprint, replaced: !!held && held !== result.rootFingerprint };
+        }),
+        // The deliberate half of the same decision: this account's identity really was replaced and
+        // the person chose the published one. It stops this device presenting a retired identity as
+        // the account's, so the ordinary unlock, recovery-key and approval paths can join. Nothing
+        // is deleted - the old root, its history keys and its pin stay, so restoring it stays open.
+        adoptIdentity: (scope, directory) => locked(scope, async (s, key) => {
+            const state = await requireState(key), result = await validateDirectory(s, directory, {});
+            check(result.directory.credentialId === s.credentialId, 'Wrong account directory.');
+            check(state.rootFingerprint && result.rootFingerprint !== state.rootFingerprint, 'This account still publishes the identity this device holds.');
+            check(result.directory.revision > (state.directory?.revision ?? 0), 'An older account identity was returned.');
+            const pin = state.pins[s.credentialId];
+            if (pin) { state.historicalPins ??= {}; (state.historicalPins[s.credentialId] ??= {})[pin.rootFingerprint] = pin; delete state.pins[s.credentialId]; }
+            state.identityChanged = true; state.approved = false;
+            await store.put(key, state); return true;
         }),
         prepareReset: (scope, directory) => locked(scope, async (s, key) => {
             const old = directoryShape(directory);
@@ -565,13 +602,17 @@ export function createEncryption(store = indexedDbStore()) {
             await requireSignature(result);
             const data = JSON.parse(decoder.decode(result.data));
             check(data.v === 1 && data.kind === 'account-recovery' && data.tenantId === s.tenantId && data.credentialId === s.credentialId && data.rootPublicKey === d.rootPublicKey && data.rootFingerprint === await fingerprint(d.rootPublicKey), 'Recovery belongs to another account or security key.');
-            check((await readPrivate(data.rootPrivateKey)).getFingerprint() === data.rootFingerprint, 'Invalid recovered account key.');
+            const held = (await readPrivate(data.rootPrivateKey)).getFingerprint();
+            check(held === data.rootFingerprint, 'Invalid recovered account key.');
             const pins = { ...(data.pins ?? {}), ...(existing?.pins ?? {}) };
             if (existing?.identityChanged) {
                 check(d.revision > (existing.directory?.revision ?? 0), 'An older account identity was returned.');
                 delete pins[s.credentialId];
             }
-            await validateDirectory(s, d, pins);
+            // Both pin sources can name a root this account has since replaced. The archive just
+            // proved which root this device holds, so its own pin is repaired here rather than
+            // re-raising a contact-verification prompt at every sign-in with no way to answer it.
+            await validateDirectory(s, d, pins, () => held);
             check(d.devices.length < MAX_DIRECTORY_DEVICES && Array.isArray(data.decryptionKeys) && data.decryptionKeys.length <= MAX_DIRECTORY_DEVICES, 'Recovery device limit reached.');
             for (const privateKey of data.decryptionKeys) await readPrivate(privateKey);
             // Restored keys become history-only on this device. Its active identity

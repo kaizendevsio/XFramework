@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.JSInterop;
@@ -255,6 +255,70 @@ public sealed class ChatEncryptionTests
         fixture.Js.Verify(j => j.InvokeAsync<JsonElement>("yap.encryption.initialize", It.IsAny<object?[]?>()), Times.Never);
         // Still local-only, and still what makes approval from a trusted device possible.
         fixture.Js.Verify(j => j.InvokeAsync<JsonElement>("yap.encryption.proposeDevice", It.IsAny<object?[]?>()), Times.Once);
+    }
+
+    // A sentence with no button under it is where this started. An identity this device cannot
+    // prove is its own is a decision - take the published one, or restore the previous one - so the
+    // service has to report which case it is rather than hand settings a warning to print.
+    [Test]
+    public async Task EnsureAsync_AccountPublishesAnIdentityThisDeviceCannotProve_OffersTheChoice()
+    {
+        using var fixture = new Fixture { InitiallyApproved = false };
+        fixture.Js.Setup(j => j.InvokeAsync<bool>("yap.encryption.observeOwnDirectory", It.IsAny<object?[]?>())).ReturnsAsync(true);
+        await fixture.Encryption.EnsureAsync(fixture.User);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.Encryption.IdentityReplaced, Is.True);
+            Assert.That(fixture.Encryption.Locked, Does.Contain("replaced"));
+            Assert.That(fixture.Encryption.Locked, Does.Contain("current identity"));
+            Assert.That(fixture.DirectoryPosts, Is.Zero);
+        });
+    }
+
+    [Test]
+    public async Task AdoptIdentityAsync_TakesThePublishedIdentity_AndEndsTheChoice()
+    {
+        using var fixture = new Fixture { InitiallyApproved = false };
+        fixture.Js.Setup(j => j.InvokeAsync<bool>("yap.encryption.observeOwnDirectory", It.IsAny<object?[]?>())).ReturnsAsync(true);
+        await fixture.Encryption.EnsureAsync(fixture.User);
+        var joined = false;
+        fixture.Js.Setup(j => j.InvokeAsync<ChatEncryption.EncryptionStatus>("yap.encryption.status", It.IsAny<object?[]?>()))
+            .Returns(() => ValueTask.FromResult(new ChatEncryption.EncryptionStatus { Enrolled = joined, Approved = joined,
+                CanApproveDevices = false, DeviceId = fixture.DeviceId, RootFingerprint = joined ? "root" : null }));
+        fixture.Js.Setup(j => j.InvokeAsync<bool>("yap.encryption.adoptIdentity", It.IsAny<object?[]?>())).ReturnsAsync(true);
+        fixture.Js.Setup(j => j.InvokeAsync<bool>("yap.encryption.passwordRestore", It.IsAny<object?[]?>()))
+            .Returns(() => { joined = true; return ValueTask.FromResult(true); });
+        Assert.That(await fixture.Encryption.AdoptIdentityAsync(fixture.User), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.Encryption.IdentityReplaced, Is.False);
+            Assert.That(fixture.Encryption.Locked, Is.Null);
+            Assert.That(fixture.Encryption.Status.Approved, Is.True);
+        });
+        // Adopting is answered against the roster the server publishes now, never a cached one.
+        fixture.Js.Verify(j => j.InvokeAsync<bool>("yap.encryption.adoptIdentity", It.Is<object?[]?>(a =>
+            a != null && a.Length == 2 && Fixture.Json(a[1]!).GetProperty("rootPublicKey").GetString() == "root-key")), Times.Once);
+    }
+
+    [Test]
+    public async Task AdoptIdentityAsync_NothingCanJoinThePublishedIdentityYet_KeepsTheChoiceAndSaysWhy()
+    {
+        using var fixture = new Fixture { InitiallyApproved = false };
+        fixture.Js.Setup(j => j.InvokeAsync<bool>("yap.encryption.observeOwnDirectory", It.IsAny<object?[]?>())).ReturnsAsync(true);
+        await fixture.Encryption.EnsureAsync(fixture.User);
+        fixture.Js.Setup(j => j.InvokeAsync<ChatEncryption.EncryptionStatus>("yap.encryption.status", It.IsAny<object?[]?>()))
+            .ReturnsAsync(new ChatEncryption.EncryptionStatus { Enrolled = false, Approved = false, RootFingerprint = null });
+        fixture.Js.Setup(j => j.InvokeAsync<bool>("yap.encryption.adoptIdentity", It.IsAny<object?[]?>())).ReturnsAsync(true);
+        fixture.Js.Setup(j => j.InvokeAsync<bool>("yap.encryption.passwordRestore", It.IsAny<object?[]?>()))
+            .ThrowsAsync(new JSException("Your password no longer opens this account's saved backup."));
+        Assert.That(await fixture.Encryption.AdoptIdentityAsync(fixture.User), Is.False);
+        Assert.Multiple(() =>
+        {
+            // The choice stays on screen with the module's own reason, not a generic failure.
+            Assert.That(fixture.Encryption.IdentityReplaced, Is.True);
+            Assert.That(fixture.Encryption.Locked, Does.Contain("no longer opens"));
+            Assert.That(fixture.DirectoryPosts, Is.Zero);
+        });
     }
 
     [Test]
