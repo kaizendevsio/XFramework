@@ -8,7 +8,9 @@
     <section class="encryption-settings set-list">
         <div class="security-summary">
             <Icon Name="shield" Size="22" />
-            <div><strong>Encrypted messages</strong><p>@(State.Encryption.Status.Approved ? "This device is ready" : "Unlock this device to send and read encrypted messages")</p></div>
+            @* A locked device says which lock it is in. The alternative - looking ready on new
+               keys - is what orphaned the history this panel exists to protect. *@
+            <div><strong>Encrypted messages</strong><p role="@(State.Encryption.Status.Approved ? "status" : "alert")">@(State.Encryption.Status.Approved ? "This device is ready" : State.Encryption.Locked ?? "Unlock this device to send and read encrypted messages")</p></div>
         </div>
         @if (State.Encryption.Status.Approved && State.Encryption.Status.CanApproveDevices)
         {

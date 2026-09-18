@@ -180,6 +180,92 @@ public sealed class ChatEncryptionTests
         Assert.That(fixture.Encryption.RecoveryKey, Is.Null);
     }
 
+    // Local keys can go missing for reasons that say nothing about the account: a cleared site, a
+    // second browser, a sign-out. Answering that with a new account root is what orphaned history.
+    [Test]
+    public async Task EnsureAsync_AccountHasARecoveryArchiveButNoRoster_ReportsLockedAndCreatesNothing()
+    {
+        using var fixture = new Fixture { DirectoryMissing = true, Backup = Fixture.Json(new { revision = 1, archive = "encrypted-backup" }) };
+        await fixture.Encryption.EnsureAsync(fixture.User);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.DirectoryPosts, Is.Zero);
+            Assert.That(fixture.Encryption.Locked, Does.Contain("recovery key"));
+        });
+        fixture.Js.Verify(j => j.InvokeAsync<JsonElement>("yap.encryption.initialize", It.IsAny<object?[]?>()), Times.Never);
+    }
+
+    [Test]
+    public async Task EnsureAsync_ServerHasNeitherDirectoryNorArchive_EnrollsWithThatCheckedAnswer()
+    {
+        using var fixture = new Fixture { DirectoryMissing = true };
+        fixture.Js.Setup(j => j.InvokeAsync<JsonElement>("yap.encryption.initialize", It.IsAny<object?[]?>()))
+            .ReturnsAsync(Fixture.Json(new { directory = fixture.NewDirectory(1) }));
+        await fixture.Encryption.EnsureAsync(fixture.User);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.DirectoryPosts, Is.EqualTo(1));
+            Assert.That(fixture.Encryption.Status.Approved, Is.True);
+            Assert.That(fixture.Encryption.Locked, Is.Null);
+        });
+        // The account state travels with the call; enrolment is never inferred from missing keys.
+        fixture.Js.Verify(j => j.InvokeAsync<JsonElement>("yap.encryption.initialize", It.Is<object?[]?>(a =>
+            a != null && a.Length == 2 && Fixture.Json(a[1]!).GetProperty("checked").GetBoolean()
+            && Fixture.Json(a[1]!).GetProperty("directory").ValueKind == JsonValueKind.Null
+            && Fixture.Json(a[1]!).GetProperty("recoveryArchive").ValueKind == JsonValueKind.Null)), Times.Once);
+    }
+
+    [Test]
+    public async Task EnsureAsync_DeviceCannotReadThePublishedIdentity_FinishesTheSignInUnlockFirst()
+    {
+        using var fixture = new Fixture();
+        var unlocked = false;
+        fixture.Js.Setup(j => j.InvokeAsync<ChatEncryption.EncryptionStatus>("yap.encryption.status", It.IsAny<object?[]?>()))
+            .Returns(() => ValueTask.FromResult(new ChatEncryption.EncryptionStatus { Enrolled = unlocked, Approved = unlocked,
+                CanApproveDevices = unlocked, DeviceId = fixture.DeviceId, RootFingerprint = unlocked ? "root" : null, DirectoryRevision = unlocked ? 2 : 0 }));
+        fixture.Js.Setup(j => j.InvokeAsync<bool>("yap.encryption.passwordRestore", It.IsAny<object?[]?>()))
+            .Returns(() => { unlocked = true; return ValueTask.FromResult(true); });
+        await fixture.Encryption.EnsureAsync(fixture.User);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.Encryption.Status.Approved, Is.True);
+            Assert.That(fixture.Encryption.Locked, Is.Null);
+        });
+        // The unlock runs inside the same account lock that just read the directory, so its result
+        // no longer depends on whether sign-in or synchronization reached the module first.
+        fixture.Js.Verify(j => j.InvokeAsync<bool>("yap.encryption.passwordRestore", It.IsAny<object?[]?>()), Times.Once);
+        fixture.Js.Verify(j => j.InvokeAsync<JsonElement>("yap.encryption.initialize", It.IsAny<object?[]?>()), Times.Never);
+        fixture.Js.Verify(j => j.InvokeAsync<JsonElement>("yap.encryption.proposeDevice", It.IsAny<object?[]?>()), Times.Never);
+    }
+
+    [Test]
+    public async Task EnsureAsync_PublishedIdentityAndNothingCanUnlockIt_ReportsLockedAndKeepsTheDirectory()
+    {
+        using var fixture = new Fixture();
+        fixture.Js.Setup(j => j.InvokeAsync<ChatEncryption.EncryptionStatus>("yap.encryption.status", It.IsAny<object?[]?>()))
+            .ReturnsAsync(new ChatEncryption.EncryptionStatus { Enrolled = false, Approved = false, RootFingerprint = null });
+        fixture.Js.Setup(j => j.InvokeAsync<bool>("yap.encryption.passwordRestore", It.IsAny<object?[]?>())).ReturnsAsync(false);
+        await fixture.Encryption.EnsureAsync(fixture.User);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.DirectoryPosts, Is.Zero);
+            Assert.That(fixture.Encryption.Status.Approved, Is.False);
+            Assert.That(fixture.Encryption.Locked, Does.Contain("locked"));
+        });
+        fixture.Js.Verify(j => j.InvokeAsync<JsonElement>("yap.encryption.initialize", It.IsAny<object?[]?>()), Times.Never);
+        // Still local-only, and still what makes approval from a trusted device possible.
+        fixture.Js.Verify(j => j.InvokeAsync<JsonElement>("yap.encryption.proposeDevice", It.IsAny<object?[]?>()), Times.Once);
+    }
+
+    [Test]
+    public void EnsureAsync_ServerUnreachable_WaitsInsteadOfAssumingTheAccountHasNoIdentity()
+    {
+        using var fixture = new Fixture { OverrideGet = () => Task.FromException<HttpResponseMessage>(new HttpRequestException("offline")) };
+        Assert.ThrowsAsync<HttpRequestException>(() => fixture.Encryption.EnsureAsync(fixture.User));
+        Assert.That(fixture.DirectoryPosts, Is.Zero);
+        fixture.Js.Verify(j => j.InvokeAsync<JsonElement>("yap.encryption.initialize", It.IsAny<object?[]?>()), Times.Never);
+    }
+
     private sealed class Fixture : IDisposable
     {
         public UserSession User { get; } = new(Guid.NewGuid(), Guid.NewGuid(), "Owner");
@@ -193,6 +279,7 @@ public sealed class ChatEncryptionTests
         public int DirectoryPosts { get; private set; }
         public int ResetPosts { get; private set; }
         public bool LoseDirectoryResponse { get; set; }
+        public bool DirectoryMissing { get; set; }
         public bool FailBackup { get; set; }
         public bool InitiallyApproved { get; set; } = true;
         public Func<Task<HttpResponseMessage>>? OverrideGet { get; set; }
@@ -223,10 +310,14 @@ public sealed class ChatEncryptionTests
                 return new(HttpStatusCode.OK) { Content = JsonContent.Create(Directory) };
             }
             if (request.Method == HttpMethod.Get && (path.EndsWith("/directory") || path.Contains("/people/")))
-            { if (OverrideGet is not null) return await OverrideGet(); return new(HttpStatusCode.OK) { Content = JsonContent.Create(Directory) }; }
+            {
+                if (OverrideGet is not null) return await OverrideGet();
+                if (DirectoryMissing) return new(HttpStatusCode.NotFound);
+                return new(HttpStatusCode.OK) { Content = JsonContent.Create(Directory) };
+            }
             if (request.Method == HttpMethod.Post && path.EndsWith("/directory"))
             {
-                DirectoryPosts++;
+                DirectoryPosts++; DirectoryMissing = false;
                 var sent = await request.Content!.ReadFromJsonAsync<JsonElement>();
                 Directory = Json(new { tenantId = User.TenantId, credentialId = User.CredentialId,
                     revision = sent.GetProperty("expectedRevision").GetInt64() + 1, rootPublicKey = sent.GetProperty("rootPublicKey").GetString(),

@@ -158,7 +158,9 @@ export function passwordRecovery(encryption, fetcher = (...args) => fetch(...arg
             const started = await exchange({ stage: 'register-start', userName: username, displayName, message: start.registrationRequest }, token);
             const registered = opaque.client.finishRegistration({ ...start, password, identifiers: identifiers(started), keyStretching, registrationResponse: started.message });
             const scope = started.client;
-            const initialized = await encryption.initialize(scope);
+            // `register-start` minted this credential a moment ago, so the account provably has
+            // no directory or archive yet. That, not missing local state, is what permits a root.
+            const initialized = await encryption.initialize(scope, { kind: 'account-identity', checked: true, directory: null, recoveryArchive: null });
             const archive = await encryption.exportRecovery(scope);
             const directory = initialized.directory;
             await confirmRegistration(username, password, started, registered, {

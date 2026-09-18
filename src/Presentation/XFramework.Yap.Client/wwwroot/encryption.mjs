@@ -8,6 +8,12 @@ const decoder = new TextDecoder('utf-8', { fatal: true });
 const MAX_BYTES = 64 * 1024 * 1024;
 const MAX_STREAM_BYTES = 4 * 1024 * 1024 * 1024;
 const MAX_DIRECTORY_DEVICES = 16;
+// Minting an account root is the one operation that can orphan readable history, so it never
+// happens as a side effect of signing in. `initialize` takes the server's checked answer about
+// the account instead of guessing from missing local state, and says so in the words the person
+// reads: a blocked device that still has its history beats a working one that silently lost it.
+const identityExists = 'This account already has encrypted messages set up. Unlock with your password, use your recovery key, or approve this device from a device you already use.';
+const identityUnknown = 'Yap could not check whether this account already has encryption set up, so it created nothing. Reconnect and open Yap again.';
 const canonical = value => JSON.stringify(normalize(value));
 function normalize(value) {
     if (Array.isArray(value)) return value.map(normalize);
@@ -375,14 +381,26 @@ export function createEncryption(store = indexedDbStore()) {
             } else await validateDirectory(s, directory, state.pins);
             state.pins[id] = { ...pins[id], verified: true }; await store.put(key, state); return true;
         }),
-        initialize: scope => locked(scope, async (s, key) => {
+        // `account` is what the server answered about this account before anything was created:
+        // { kind:'account-identity', checked, directory, recoveryArchive }. `checked` is false
+        // whenever the lookup did not complete, so an unreachable server can never be mistaken
+        // for an account that has no identity. Only a checked, empty account enrolls.
+        initialize: (scope, account) => locked(scope, async (s, key) => {
+            const known = account?.kind === 'account-identity' && account.checked === true;
+            const published = (known && account.directory) || null;
+            check(!published || guid(published.tenantId) === s.tenantId && guid(published.credentialId) === s.credentialId, 'Directory belongs to another account.');
             let state = await store.get(key);
             if (!state?.device) {
+                check(known, identityUnknown);
+                check(!published && !account.recoveryArchive, identityExists);
                 const root = await keyPair(`Yap account ${s.credentialId}`, true), device = await newDevice();
                 const directory = await signDirectory({ ...s, revision: 1, rootPublicKey: root.publicKey, devices: [await approveRecord(s, device, 1, root.privateKey)] }, root.privateKey);
                 state = { device, rootPrivateKey: root.privateKey, rootPublicKey: root.publicKey, rootFingerprint: await fingerprint(root.publicKey), pins: {}, historyKeys: [], approved: false, directory: null, pendingDirectory: directory };
                 await store.put(key, state);
             }
+            // A local identity this account never confirmed must not be offered as a replacement
+            // for the one it published. Nothing is deleted here; the keys stay for recovery.
+            check(!published || !!state.directory || state.rootPublicKey === published.rootPublicKey, identityExists);
             check(state.rootPrivateKey, 'Approve this device from an existing device.');
             const backup = await archive(state, s);
             await store.put(key, state);

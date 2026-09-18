@@ -31,8 +31,13 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js, TimeProvider? tim
     public bool BackupPending { get; private set; }
     public EncryptionStatus Status { get; private set; } = new();
     public string? RecoveryKey { get; private set; }
+    /// <summary>Why this device cannot read the account's encrypted history, when it cannot.
+    /// A locked device that keeps its history is the correct outcome; replacing the account
+    /// identity to make the app look ready would orphan every message already sent to it.</summary>
+    public string? Locked { get; private set; }
+    private const string LockedMessage = "Your encrypted messages are locked on this device. Unlock with your password, use your recovery key, or approve this device from a device you already use.";
     public Guid? LocalDeviceId => Status.DeviceId;
-    public void Reset() { generation++; activeScope = null; InvalidateRecipients(); HideRecovery(); Status = new(); backedUpRevision = -1; BackupPending = false; }
+    public void Reset() { generation++; activeScope = null; InvalidateRecipients(); HideRecovery(); Status = new(); Locked = null; backedUpRevision = -1; BackupPending = false; }
     public void InvalidateRecipients(Guid? thread = null)
     {
         lock (recipientsGate)
@@ -77,6 +82,7 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js, TimeProvider? tim
     {
         var restored = await JsAsync<bool>(operation, "passwordRestore");
         Status = await JsAsync<EncryptionStatus>(operation, "status");
+        if (Status.Approved) Locked = null;
         backedUpRevision = -1;
         return restored;
     });
@@ -130,11 +136,26 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js, TimeProvider? tim
 
     public Task EnsureAsync(UserSession user) => ChangeAsync(user, async operation =>
     {
+            // What the account already has decides everything below. An answer this request could
+            // not obtain - offline, 5xx, a rejected session - propagates instead of being read as
+            // "no identity": signing in again must never be able to mint a replacement root.
             JsonElement directory;
             try { directory = await GetAsync<JsonElement>(operation, "api/chat/encryption/directory"); }
             catch (ChatApiException ex) when (ex.Status == 404)
             {
-                var enrollment = await JsAsync<JsonElement>(operation, "initialize");
+                // No published roster. A stored archive still means this account has an identity
+                // whose history a new root would orphan, so enrolment needs the server to hold neither.
+                string? archive = null;
+                try { archive = (await GetAsync<JsonElement>(operation, "api/chat/encryption/recovery")).GetProperty("archive").GetString(); }
+                catch (ChatApiException missing) when (missing.Status == 404) { }
+                if (archive is not null)
+                {
+                    Status = await JsAsync<EncryptionStatus>(operation, "status");
+                    Locked = "This account has an encrypted backup but no registered devices. Restore it with your recovery key, or approve this device from a device you already use.";
+                    return true;
+                }
+                var enrollment = await JsAsync<JsonElement>(operation, "initialize",
+                    new { kind = "account-identity", @checked = true, directory = (object?)null, recoveryArchive = (string?)null });
                 directory = await PublishDirectoryAsync(operation, enrollment.GetProperty("directory"));
                 await JsVoidAsync(operation, "acceptDirectory", directory);
             }
@@ -142,15 +163,27 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js, TimeProvider? tim
             if (await JsAsync<bool>(operation, "observeOwnDirectory", directory))
             {
                 Status = await JsAsync<EncryptionStatus>(operation, "status");
-                HideRecovery(); return true;
+                HideRecovery();
+                Locked = "This account's security key was replaced. Unlock with your password, use your recovery key, or approve this device from a device you already use.";
+                return true;
             }
             var local = await JsAsync<EncryptionStatus>(operation, "status");
-            if (!local.Enrolled)
+            if (!local.Enrolled || local.RootFingerprint is null)
             {
-                await JsAsync<JsonElement>(operation, "proposeDevice");
+                // This device cannot read the published identity yet. The unlock that sign-in
+                // already paid for runs here, inside the same account lock that just read the
+                // directory, so the outcome no longer depends on which caller ran first.
+                var problem = await UnlockAsync(operation);
                 local = await JsAsync<EncryptionStatus>(operation, "status");
+                if (problem is null && local.Approved) directory = await GetAsync<JsonElement>(operation, "api/chat/encryption/directory");
+                if (!local.Enrolled)
+                {
+                    await JsAsync<JsonElement>(operation, "proposeDevice");
+                    local = await JsAsync<EncryptionStatus>(operation, "status");
+                }
+                if (local.RootFingerprint is null) { Status = local; Locked = problem ?? LockedMessage; return true; }
             }
-            if (local.RootFingerprint is null) { Status = local; return true; }
+            Locked = null;
             await JsVoidAsync(operation, "acceptDirectory", directory);
             Status = await JsAsync<EncryptionStatus>(operation, "status");
             if (Status.CanApproveDevices && backedUpRevision != Status.DirectoryRevision)
@@ -165,6 +198,23 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js, TimeProvider? tim
             }
             return true;
     });
+
+    /// <summary>Finishes the unlock the sign-in already paid for, without asking for the password
+    /// again. Null means history is readable; anything else is the reason it is not, kept as the
+    /// crypto module worded it rather than collapsed into one unexplained failure.</summary>
+    private async Task<string?> UnlockAsync(Operation operation)
+    {
+        // A worker holding no sign-in material answers false immediately and sends nothing, so an
+        // ordinary reload of a locked device costs one call, and never a second published device.
+        try { return await JsAsync<bool>(operation, "passwordRestore") ? null : LockedMessage; }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception failure)
+        {
+            Check(operation);
+            return failure is JSException or InvalidOperationException && failure.Message.Split('\n')[0].Trim() is { Length: > 0 } reason
+                ? reason : LockedMessage;
+        }
+    }
 
     public async Task<JsonElement[]> RecipientsAsync(UserSession user, Guid thread, bool allowPending = false, List<Guid>? audience = null)
     {
@@ -289,6 +339,7 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js, TimeProvider? tim
         var confirmed = await PublishDirectoryAsync(operation, restored.GetProperty("directory"));
         await JsVoidAsync(operation, "acceptDirectory", confirmed);
         Status = await JsAsync<EncryptionStatus>(operation, "status");
+        if (Status.Approved) Locked = null;
         await TryBackupAsync(operation);
         return true;
     });
@@ -338,6 +389,7 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js, TimeProvider? tim
         var directory = await GetAsync<JsonElement>(operation, "api/chat/encryption/directory");
         await JsVoidAsync(operation, "importApproval", JsonSerializer.Deserialize<JsonElement>(approval), directory);
         Status = await JsAsync<EncryptionStatus>(operation, "status");
+        if (Status.Approved) Locked = null;
         if (Status.CanApproveDevices) await TryBackupAsync(operation);
         return true;
     });

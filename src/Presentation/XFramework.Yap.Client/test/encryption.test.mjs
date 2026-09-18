@@ -9,9 +9,12 @@ function client() {
     return { api: createEncryption({ get: async key => structuredClone(data.get(key)), put: async (key, value) => data.set(key, structuredClone(value)) }), data };
 }
 const tenantId = crypto.randomUUID();
+// The server's checked answer for an account that has published nothing: the only input that
+// lets a root be created. Every other answer, including an unreachable one, must refuse.
+const emptyAccount = { kind: 'account-identity', checked: true, directory: null, recoveryArchive: null };
 async function account(credentialId = crypto.randomUUID()) {
     const c = client(), scope = { tenantId, credentialId };
-    const initial = await c.api.initialize(scope);
+    const initial = await c.api.initialize(scope, emptyAccount);
     await c.api.acceptDirectory(scope, initial.directory);
     return { ...c, scope, ...initial };
 }
@@ -20,7 +23,7 @@ const stored = a => a.data.get(`${a.scope.tenantId}:${a.scope.credentialId}`);
 
 test('enrollment persists before publishing and retry retains device and root', async () => {
     const a = client(), scope = { tenantId, credentialId: crypto.randomUUID() };
-    const first = await a.api.initialize(scope), retry = await a.api.initialize(scope);
+    const first = await a.api.initialize(scope, emptyAccount), retry = await a.api.initialize(scope, emptyAccount);
     assert.deepEqual(first.directory, retry.directory);
     assert.equal((await a.api.status(scope)).approved, false);
     await a.api.acceptDirectory(scope, first.directory);
@@ -326,4 +329,48 @@ test('a former device stays locked after reset and can rejoin with the new recov
         assert.equal((await old.api.status(old.scope)).resetHistoryPending, true);
         assert.equal(stored(old).rootPublicKey, next.directory.rootPublicKey);
     }
+});
+
+// Signing in on a device with no local keys used to mint a brand-new account root, which orphaned
+// every message already encrypted to the old one. Creating a root is now a decision taken against
+// the server's checked answer, never a side effect of finding local state missing.
+test('an account that already has an identity cannot be re-enrolled, and an unknown one cannot either', async () => {
+    const a = await account(), fresh = client();
+    const published = { kind: 'account-identity', checked: true, directory: a.directory, recoveryArchive: a.recoveryArchive };
+    await assert.rejects(fresh.api.initialize(a.scope, published), /already has encrypted messages/);
+    // A published archive without a roster is still an identity: enrolling over it orphans history.
+    await assert.rejects(fresh.api.initialize(a.scope, { kind: 'account-identity', checked: true, directory: null, recoveryArchive: a.recoveryArchive }), /already has encrypted messages/);
+    // Offline, a 5xx, or a caller that simply forgot to ask: none of these mean "no identity".
+    await assert.rejects(fresh.api.initialize(a.scope, { kind: 'account-identity', checked: false, directory: null, recoveryArchive: null }), /could not check/);
+    await assert.rejects(fresh.api.initialize(a.scope), /could not check/);
+    await assert.rejects(fresh.api.initialize(a.scope, { ...emptyAccount, directory: { ...a.directory, credentialId: crypto.randomUUID() } }), /another account/);
+    assert.equal(fresh.data.size, 0, 'nothing at all was created for the account');
+    assert.deepEqual(await fresh.api.status(a.scope), { enrolled: false, approved: false, deviceId: null, rootFingerprint: null,
+        directoryRevision: 0, resetHistoryPending: false, canApproveDevices: false, verifiedContacts: [] });
+    // A genuinely empty account still enrolls, and repeated calls still return that same identity.
+    const empty = { ...a.scope, credentialId: crypto.randomUUID() };
+    const created = await fresh.api.initialize(empty, emptyAccount);
+    await fresh.api.acceptDirectory(empty, created.directory);
+    const again = await fresh.api.initialize(empty, { kind: 'account-identity', checked: true, directory: created.directory, recoveryArchive: created.recoveryArchive });
+    assert.deepEqual([again.directory, again.recoveryKey], [created.directory, created.recoveryKey]);
+    // An identity this account never confirmed is never offered as a replacement for a published one.
+    const other = { ...a.scope, credentialId: crypto.randomUUID() }, unpublished = await fresh.api.initialize(other, emptyAccount);
+    await assert.rejects(fresh.api.initialize(other, { kind: 'account-identity', checked: true, directory: { ...a.directory, tenantId: other.tenantId, credentialId: other.credentialId }, recoveryArchive: null }), /already has encrypted messages/);
+    const kept = await fresh.api.initialize(other, { kind: 'account-identity', checked: true, directory: unpublished.directory, recoveryArchive: null });
+    assert.deepEqual([kept.directory, kept.recoveryKey], [unpublished.directory, unpublished.recoveryKey]);
+});
+
+// The start-fresh flow is the deliberate opposite of the guard above: it replaces the identity on
+// purpose, from a device that has nothing but its own pending request, and it must keep working.
+test('the deliberate start-fresh flow still replaces the identity from a device that cannot recover', async () => {
+    const a = await account(), fresh = client();
+    await fresh.api.proposeDevice(a.scope);
+    await assert.rejects(fresh.api.initialize(a.scope, { kind: 'account-identity', checked: true, directory: a.directory, recoveryArchive: a.recoveryArchive }), /already has encrypted messages/);
+    const pending = await fresh.api.prepareReset(a.scope, a.directory);
+    assert.notEqual(pending.directory.rootPublicKey, a.directory.rootPublicKey);
+    assert.equal(pending.directory.revision, a.directory.revision + 1);
+    assert.equal(await fresh.api.confirmReset(a.scope, pending.directory), true);
+    const status = await fresh.api.status(a.scope);
+    assert.equal(status.approved, true);
+    assert.equal(status.resetHistoryPending, true, 'the person is told their old messages stayed behind');
 });
