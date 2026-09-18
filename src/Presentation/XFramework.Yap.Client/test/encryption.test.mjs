@@ -374,3 +374,92 @@ test('the deliberate start-fresh flow still replaces the identity from a device 
     assert.equal(status.approved, true);
     assert.equal(status.resetHistoryPending, true, 'the person is told their old messages stayed behind');
 });
+
+// "Verify it with this person" is a contact protection. Fired on the account's own credential it
+// asks the impossible - there is no second person - and no UI could answer it, so a device that had
+// changed identity before that was fixed stayed wedged at every sign-in. The own-account pin is now
+// repaired in silence, but only against the root private key this device can actually produce.
+test('a stale own-account pin heals against the held root key while a peer\'s still demands verification', async () => {
+    const a = await account(), b = await account(), ctx = context(b);
+    const message = await b.api.encrypt(b.scope, ctx, { text: 'Already delivered' }, [a.directory, b.directory]);
+    const held = (await a.api.status(a.scope)).rootFingerprint;
+    // What an install that changed identity on an older build kept: this device holds the published
+    // account root, and its own pin still names the one that account retired.
+    const record = stored(a);
+    record.pins[a.scope.credentialId] = { rootFingerprint: 'a'.repeat(40), revision: 1, digest: 'retired', verified: false };
+    record.pins[b.scope.credentialId] = { rootFingerprint: 'b'.repeat(40), revision: 1, digest: 'retired', verified: false };
+    a.data.set(`${a.scope.tenantId}:${a.scope.credentialId}`, record);
+    await assert.rejects(a.api.acceptDirectory(a.scope, b.directory), /key changed/, 'a peer keeps the out-of-band check');
+    await assert.rejects(a.api.decrypt(a.scope, ctx, message, b.directory), /key changed/);
+    // Own account: no prompt, no button, no trace in what settings reads back.
+    const accepted = await a.api.acceptDirectory(a.scope, a.directory);
+    assert.equal(accepted.fingerprint, held);
+    assert.equal(stored(a).pins[a.scope.credentialId].rootFingerprint, held);
+    assert.deepEqual(await a.api.inspectDirectory(a.scope, a.directory), { fingerprint: held, verified: false, changed: false });
+    assert.equal(stored(a).pins[b.scope.credentialId].rootFingerprint, 'b'.repeat(40), 'the peer pin is untouched');
+    const own = context(a), sent = await a.api.encrypt(a.scope, own, { text: 'Sent after the sign-in' }, [a.directory]);
+    assert.equal((await a.api.decrypt(a.scope, own, sent, a.directory)).text, 'Sent after the sign-in');
+    // Rollback survives the repair: a retired-root pin from a later roster is still not a licence
+    // to serve an older one back.
+    const ahead = stored(a);
+    ahead.pins[a.scope.credentialId] = { rootFingerprint: 'a'.repeat(40), revision: 99, digest: 'retired', verified: false };
+    a.data.set(`${a.scope.tenantId}:${a.scope.credentialId}`, ahead);
+    await assert.rejects(a.api.acceptDirectory(a.scope, a.directory), /older device roster/);
+});
+
+// The same repair has to reach the archive, because that is what a device restores from at sign-in.
+test('an archive carrying an older own-account pin restores instead of dead-ending on a new device', async () => {
+    const a = await account(), fresh = client();
+    const record = stored(a);
+    record.pins[a.scope.credentialId] = { rootFingerprint: 'a'.repeat(40), revision: 1, digest: 'retired', verified: false };
+    a.data.set(`${a.scope.tenantId}:${a.scope.credentialId}`, record);
+    const backup = await a.api.exportRecovery(a.scope);
+    const restored = await fresh.api.recovery(a.scope, backup.recoveryKey, backup.recoveryArchive, a.directory);
+    await fresh.api.acceptDirectory(a.scope, restored.directory);
+    const status = await fresh.api.status(a.scope);
+    assert.equal(status.approved, true);
+    assert.equal(status.rootFingerprint, (await a.api.status(a.scope)).rootFingerprint);
+    // The proof is the key, not the account id: a device holding no root key cannot heal its own pin.
+    const stranger = client();
+    await stranger.api.proposeDevice(a.scope);
+    const record2 = stranger.data.get(`${a.scope.tenantId}:${a.scope.credentialId}`);
+    record2.pins[a.scope.credentialId] = { rootFingerprint: 'a'.repeat(40), revision: 1, digest: 'retired', verified: false };
+    stranger.data.set(`${a.scope.tenantId}:${a.scope.credentialId}`, record2);
+    await assert.rejects(stranger.api.acceptDirectory(a.scope, a.directory), /key changed/);
+});
+
+// When the identity really was replaced there is nothing to prove and nothing to heal. That is a
+// decision, so the module has to report it as one and let the person take the published identity.
+test('an identity this device cannot prove reports the choice, and adopting it joins the published one', async () => {
+    const a = await account(), fresh = client();
+    assert.deepEqual(await a.api.ownIdentity(a.scope, a.directory), { published: (await a.api.status(a.scope)).rootFingerprint,
+        held: (await a.api.status(a.scope)).rootFingerprint, revision: a.directory.revision, matches: true, replaced: false });
+    await fresh.api.proposeDevice(a.scope);
+    const next = await fresh.api.prepareReset(a.scope, a.directory);
+    await fresh.api.confirmReset(a.scope, next.directory);
+    const replaced = await a.api.ownIdentity(a.scope, next.directory);
+    assert.equal(replaced.replaced, true);
+    assert.equal(replaced.matches, false);
+    assert.equal(replaced.published, (await fresh.api.status(a.scope)).rootFingerprint);
+    await assert.rejects(a.api.adoptIdentity(a.scope, a.directory), /still publishes the identity/);
+    // Rollback protection is unchanged: an identity older than the roster this device already
+    // accepted is refused, replacement or not.
+    const record = stored(a), accepted = record.directory;
+    record.directory = { ...accepted, revision: 99 };
+    a.data.set(`${a.scope.tenantId}:${a.scope.credentialId}`, record);
+    await assert.rejects(a.api.adoptIdentity(a.scope, next.directory), /older account identity/);
+    record.directory = accepted;
+    a.data.set(`${a.scope.tenantId}:${a.scope.credentialId}`, record);
+    const keys = structuredClone(stored(a));
+    assert.equal(await a.api.adoptIdentity(a.scope, next.directory), true);
+    assert.equal(stored(a).rootPrivateKey, keys.rootPrivateKey, 'adopting deletes no key material');
+    assert.equal(stored(a).device.encryptionPrivateKey, keys.device.encryptionPrivateKey);
+    assert.equal((await a.api.status(a.scope)).approved, false);
+    // Adopting only clears the way; joining still needs the account's own recovery material.
+    await assert.rejects(a.api.recovery(a.scope, a.recoveryKey, next.recoveryArchive, next.directory));
+    const joined = await a.api.recovery(a.scope, next.recoveryKey, next.recoveryArchive, next.directory);
+    await a.api.acceptDirectory(a.scope, joined.directory);
+    assert.equal((await a.api.status(a.scope)).approved, true);
+    const ctx = context(a), envelope = await a.api.encrypt(a.scope, ctx, { text: 'Working again' }, [joined.directory]);
+    assert.equal((await a.api.decrypt(a.scope, ctx, envelope, joined.directory)).text, 'Working again');
+});

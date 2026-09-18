@@ -45,8 +45,25 @@ All persistence and trust pins are bound to this account and tenant.
   and revocation records. It pins the root fingerprint, highest revision and
   manifest digest. Root changes, rollback and conflicting same-revision records
   fail. Own device approval becomes active only after accepting its directory.
+  "The account security key changed. Verify it with this person." is a **contact**
+  protection and is raised for every credential except one case: this account's own
+  credential, where a pin naming a different root is a record left by an identity
+  this account no longer publishes, there is no second person to compare with, and
+  no screen could answer it. That one pin is rewritten in silence, and only when the
+  device can produce a root **private** key whose fingerprint is the published root's.
+  Holding no such key - an additionally approved device, or a device whose identity
+  really was replaced - keeps the check, so a swapped root is never adopted quietly.
+  Rollback, conflicting-roster and revocation checks are unchanged in both cases.
 - `verifyFingerprint(scope,credentialId,fingerprint)` marks an existing matching
   pin verified. The user must compare fingerprints through another trusted path.
+- `ownIdentity(scope,directory)` returns `{published,held,revision,matches,replaced}`
+  for this account: what the server publishes against the root this device can
+  produce a private key for. `adoptIdentity(scope,directory)` is the deliberate
+  answer to `replaced`. It stops this device presenting a retired identity as the
+  account's, so the ordinary password unlock, recovery key and device approval can
+  join the published one; it refuses a directory older than the roster this device
+  already accepted, and deletes nothing, so restoring the previous identity stays
+  open. Messages encrypted to that previous identity stay unreadable here.
 - `proposeDevice(scope)` creates a fresh keypair and returns a public proposal.
 - `approveDevice(scope,proposal,directory)` returns
   `{alreadyPublished,expectedRevision,directory,approval}`. Publish its directory using CAS unless `alreadyPublished` is true, then
@@ -303,7 +320,12 @@ password alone cannot restore history.
 `password-unlock.test.mjs` additionally covers a sign-out and sign-in on an
 account that already has an identity: the published root is untouched, the peer
 that had pinned it sees no security-key change, and a device that cannot recover
-reports the lock instead of enrolling over the account.
+reports the lock instead of enrolling over the account. It also covers an install
+whose own-account pin names a retired root - the state that answered every sign-in
+with the contact-verification sentence and offered nothing to press: the pin is
+repaired from the root key the archive restores, nothing is republished to do it,
+the backup carries the repair to the next device, and a peer whose key really
+changed still has to be verified out of band before its directory is accepted.
 
 Run `node --test src/Presentation/XFramework.Yap.Client/test/encryption.test.mjs`.
 Tests use the actual vendored browser crypto bundle, with in-memory storage.
