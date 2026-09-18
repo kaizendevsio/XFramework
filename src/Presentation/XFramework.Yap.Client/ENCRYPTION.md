@@ -28,9 +28,19 @@ All persistence and trust pins are bound to this account and tenant.
 
 - `status(scope)` returns `enrolled`, `approved`, `deviceId`, `rootFingerprint`,
   `directoryRevision`, `canApproveDevices`, and `verifiedContacts`.
-- `initialize(scope)` persists a pending identity before returning
+- `initialize(scope,account)` persists a pending identity before returning
   `{directory,recoveryArchive,recoveryKey}`. Repeated calls retain the identity.
   Publish directory with expected revision 0, then call `acceptDirectory`.
+  `account` is the server's checked answer about this account, gathered *before*
+  anything is created: `{kind:'account-identity',checked,directory,recoveryArchive}`.
+  A root is minted only for a checked account holding neither a directory nor an
+  archive. A published identity reports "this account already has encrypted
+  messages set up"; an unchecked one - offline, 5xx, a caller that never asked -
+  reports that it could not check. Neither creates anything, and neither deletes
+  anything: a device that stays locked keeps every key it already had. An
+  identity this account never confirmed is likewise never offered in place of the
+  published one. Creating a replacement root remains available, deliberately and
+  with its own confirmation, through `prepareReset`/`confirmReset`.
 - `acceptDirectory(scope,directory)` validates the full signed roster, approval
   and revocation records. It pins the root fingerprint, highest revision and
   manifest digest. Root changes, rollback and conflicting same-revision records
@@ -68,6 +78,20 @@ Approving a device transfers history readable using the owner's retired keys.
 The owner key rotation occurs atomically with approval, so those transferred
 keys cannot decrypt future messages addressed to the fresh active devices.
 Never copy the private key of another active device.
+
+`EnsureAsync` is the one place that decides between the three cases, in a fixed
+order, inside the account lock that just read the directory. It reads the
+published directory; on 404 it also reads the recovery archive, and only when the
+server holds neither does it enroll. When the account has an identity this device
+cannot yet read, it finishes the unlock the sign-in already paid for -
+`passwordRestore`, using the export key from that exchange - before anything
+else, so history no longer depends on whether sign-in or synchronization reached
+the module first. If that cannot unlock, it publishes nothing, records `Locked`
+with the reason the module gave, and leaves the local device request in place so
+recovery-key restore, trusted-device approval and start-fresh all remain
+reachable from Settings. A directory read that fails for any other reason -
+offline, 5xx, a changed account - propagates: an unknown answer is never read as
+"this account has no identity".
 
 The C# coordinator reconciles an uncertain directory publication by fetching the
 server's signed roster and comparing it with the persisted pending result. A
@@ -275,6 +299,11 @@ therefore only as confidential as that password; the recovery key remains the
 fallback for a password its owner has forgotten, and a server-side password
 reset deletes the OPAQUE credential and its wrapped envelope, so the new
 password alone cannot restore history.
+
+`password-unlock.test.mjs` additionally covers a sign-out and sign-in on an
+account that already has an identity: the published root is untouched, the peer
+that had pinned it sees no security-key change, and a device that cannot recover
+reports the lock instead of enrolling over the account.
 
 Run `node --test src/Presentation/XFramework.Yap.Client/test/encryption.test.mjs`.
 Tests use the actual vendored browser crypto bundle, with in-memory storage.

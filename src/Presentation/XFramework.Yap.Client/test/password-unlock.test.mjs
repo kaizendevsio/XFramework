@@ -75,7 +75,7 @@ function server(scope, { corruptEnvelope = false } = {}) {
 async function migrated(options) {
     const scope = `${crypto.randomUUID()}:${crypto.randomUUID()}`;
     const api = server(scope, options), owner = device();
-    const initialized = await owner.initialize(scope);
+    const initialized = await owner.initialize(scope, { kind: 'account-identity', checked: true, directory: null, recoveryArchive: null });
     api.directory = initialized.directory; api.archive = initialized.recoveryArchive; api.revision = 1;
     await owner.acceptDirectory(scope, api.directory);
     const context = { tenantId: scope.split(':')[0], senderId: scope.split(':')[1], threadId: crypto.randomUUID(),
@@ -158,4 +158,57 @@ test('a full device roster says so rather than reporting a connection problem', 
     assert.equal(unlocked, 15, 'fifteen unlocks fit beside the original device');
     assert.equal(api.directory.devices.length, 16);
     assert.match(failure.message, /device limit/i);
+});
+
+// The account state a sign-in device must never guess at: what the server already holds for it.
+const asked = api => ({ kind: 'account-identity', checked: true, directory: api.directory, recoveryArchive: api.archive });
+async function peerOf(scope, api, owner) {
+    const peerScope = `${scope.split(':')[0]}:${crypto.randomUUID()}`, peer = device();
+    const enrolled = await peer.initialize(peerScope, { kind: 'account-identity', checked: true, directory: null, recoveryArchive: null });
+    await peer.acceptDirectory(peerScope, enrolled.directory);
+    const context = { tenantId: scope.split(':')[0], senderId: scope.split(':')[1], threadId: crypto.randomUUID(),
+        messageId: crypto.randomUUID(), kind: 'message', parentId: null, isThreadReply: false };
+    const ciphertext = await owner.encrypt(scope, context, { text: 'sent before the sign-out' }, [api.directory, enrolled.directory]);
+    // Decrypting pins the sender's root. A replacement root is what turns this into a warning.
+    assert.equal((await peer.decrypt(peerScope, context, ciphertext, api.directory)).text, 'sent before the sign-out');
+    return { peer, peerScope, context, ciphertext };
+}
+
+test('signing out and in again recovers the same account root instead of publishing a new one', async () => {
+    const { scope, api, owner, context, ciphertext } = await migrated();
+    const { peer, peerScope, context: shared, ciphertext: message } = await peerOf(scope, api, owner);
+    const root = api.directory.rootPublicKey, fingerprint = (await owner.status(scope)).rootFingerprint;
+    // Signing out leaves this device with no keys at all; signing in must not answer that with a
+    // brand-new account identity, which is what made the messages above unreadable.
+    const fresh = device(), login = passwordRecovery(fresh, api.fetcher);
+    await assert.rejects(fresh.initialize(scope, asked(api)), /already has encrypted messages/);
+    await login.passwordSignIn('test-user', password);
+    assert.equal(await login.passwordRestore(scope), true);
+    assert.equal(api.directory.rootPublicKey, root, 'the published account root is untouched');
+    assert.equal((await fresh.status(scope)).rootFingerprint, fingerprint);
+    assert.equal((await fresh.decrypt(scope, context, ciphertext, api.directory)).text, 'message from before the migration');
+    // The reported symptom: every peer that had pinned this account saw its key change.
+    await peer.acceptDirectory(peerScope, api.directory);
+    assert.equal((await peer.decrypt(peerScope, shared, message, api.directory)).text, 'sent before the sign-out');
+    assert.deepEqual(await fresh.inspectDirectory(scope, api.directory), { fingerprint, verified: false, changed: false });
+});
+
+test('a sign-in that cannot recover reports the lock and leaves the account identity alone', async () => {
+    const { scope, api, owner } = await migrated({ corruptEnvelope: true });
+    const { peer, peerScope, context, ciphertext } = await peerOf(scope, api, owner);
+    const root = api.directory.rootPublicKey, revision = api.directory.revision;
+    const fresh = device(), login = passwordRecovery(fresh, api.fetcher);
+    const signedIn = await login.passwordSignIn('test-user', password);
+    await assert.rejects(login.passwordRestore(scope), error => error.message === signedIn.problem);
+    // Nothing is created for an account this device cannot open yet: a blocked screen keeps the
+    // history that a replacement identity would have orphaned.
+    await assert.rejects(fresh.initialize(scope, asked(api)), /already has encrypted messages/);
+    assert.equal((await fresh.status(scope)).enrolled, false);
+    assert.deepEqual([api.directory.rootPublicKey, api.directory.revision], [root, revision]);
+    // A device request is still local-only, so approval from a trusted device stays available.
+    await fresh.proposeDevice(scope);
+    await assert.rejects(fresh.initialize(scope, asked(api)), /already has encrypted messages/);
+    assert.deepEqual([api.directory.rootPublicKey, api.directory.revision], [root, revision]);
+    await peer.acceptDirectory(peerScope, api.directory);
+    assert.equal((await peer.decrypt(peerScope, context, ciphertext, api.directory)).text, 'sent before the sign-out');
 });

@@ -69,10 +69,11 @@ test('encrypted uploads and downloaded plaintext survive a file writer that igno
     const data = new Map();
     const encryption = createEncryption({ get: async k => structuredClone(data.get(k)), put: async (k, v) => data.set(k, structuredClone(v)) });
     sandbox.yap.encryption = encryption;
-    const initial = await encryption.initialize(scope);
+    const emptyAccount = { kind: 'account-identity', checked: true, directory: null, recoveryArchive: null };
+    const initial = await encryption.initialize(scope, emptyAccount);
     await encryption.acceptDirectory(scope, initial.directory);
     const recipientScope = `${tenant.replaceAll('-', '')}:${crypto.randomUUID().replaceAll('-', '')}`;
-    const recipient = await encryption.initialize(recipientScope);
+    const recipient = await encryption.initialize(recipientScope, emptyAccount);
     await encryption.acceptDirectory(recipientScope, recipient.directory);
     // An uneven size exercises OpenPGP's partial packet views and the decrypted context subarray.
     const bytes = Uint8Array.from({ length: 1399531 }, (_, i) => i % 251);
