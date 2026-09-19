@@ -2,118 +2,132 @@ using Microsoft.AspNetCore.Components;
 
 namespace Bolt.Media.Browser;
 
+/// <summary>What the browser reported about this device's video encoders, before any camera is opened.</summary>
+public sealed record VideoCapabilities(bool Supported, string? Reason, int Ceiling, VideoCodecProbe[] Codecs);
+public sealed record VideoCodecProbe(string Codec, bool Encode, bool Decode, bool Hardware, int MaxHeight);
+/// <summary>The camera actually acquired, which may differ from what was asked for.</summary>
+public sealed record VideoCaptureState(bool Capturing, string DeviceId, string FacingMode, int Width, int Height, string Codec);
+public sealed record VideoSendStats(double Fps, double Kbps, int Dropped, int Backlog);
+
 /// <summary>
-/// Video capture → WebCodecs H.264 encode → C# callback,
-/// and C# → WebCodecs decode → canvas rendering.
+/// Camera capture → WebCodecs encode → C# callback, and C# → per-sender WebCodecs decode → canvas.
+///
+/// The pipeline never opens a camera on its own: <see cref="StartCaptureAsync"/> is the only path
+/// to getUserMedia, and the browser side releases the track on page hide, track end and dispose.
 /// </summary>
-public sealed class BoltVideoPipeline : IAsyncDisposable
+public sealed class BoltVideoPipeline(IJSRuntime js, ILogger<BoltVideoPipeline> logger) : IAsyncDisposable
 {
-    private readonly IJSRuntime _js;
-    private readonly ILogger<BoltVideoPipeline> _logger;
-    private IJSObjectReference? _module;
-    private IJSObjectReference? _pipeline;
-    private DotNetObjectReference<BoltVideoPipeline>? _dotNetRef;
-    private bool _capturing;
+    private IJSObjectReference? module;
+    private IJSObjectReference? pipeline;
+    private DotNetObjectReference<BoltVideoPipeline>? self;
+    private bool capturing;
 
-    /// <summary>Fires when the video encoder produces an encoded H.264 frame.</summary>
-    public event Action<byte[], bool>? OnEncoded;
+    /// <summary>An encoded picture: payload, keyframe flag, sender-assigned frame ID, capture time in µs.</summary>
+    public event Action<byte[], bool, uint, uint>? OnEncoded;
+    /// <summary>The browser released the camera: "hidden", "ended", "denied" or "encoder".</summary>
+    public event Action<string>? OnCaptureStopped;
+    /// <summary>A remote decoder failed; the caller should ask that sender for a keyframe.</summary>
+    public event Action<string>? OnDecodeFailed;
 
-    public bool IsCapturing => _capturing;
+    public bool IsCapturing => capturing;
 
-    public BoltVideoPipeline(IJSRuntime js, ILogger<BoltVideoPipeline> logger)
+    private async Task<IJSObjectReference> ModuleAsync() => module ??=
+        await js.InvokeAsync<IJSObjectReference>("import", "./_content/Bolt.Media.Browser/bolt-media.js");
+
+    /// <summary>A participant who never turns a camera on still needs the pipeline to render others.</summary>
+    private async Task<IJSObjectReference> PipelineAsync()
     {
-        _js = js;
-        _logger = logger;
+        pipeline ??= await (await ModuleAsync()).InvokeAsync<IJSObjectReference>("createVideoPipeline");
+        self ??= DotNetObjectReference.Create(this);
+        return pipeline;
     }
 
-    /// <summary>Load JS module, initialize H.264 encoder.</summary>
-    public async Task InitializeEncoderAsync(
-        int width = 1280, int height = 720, int bitrateKbps = 2_000,
-        int framerate = 30, string codec = "h264", int keyframeInterval = 60)
-    {
-        _module ??= await _js.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/Bolt.Media.Browser/bolt-media.js");
-        _pipeline ??= await _module.InvokeAsync<IJSObjectReference>("createVideoPipeline");
-        _dotNetRef ??= DotNetObjectReference.Create(this);
+    /// <summary>Probe encoders and decoders. Safe to call before a call: it opens no device.</summary>
+    public async Task<VideoCapabilities> CheckCapabilitiesAsync()
+        => await (await ModuleAsync()).InvokeAsync<VideoCapabilities>("checkVideoCapabilities");
 
-        await _pipeline.InvokeVoidAsync("initEncoder", width, height, bitrateKbps, framerate, codec, keyframeInterval);
+    public async Task<MediaDeviceInfo[]> CamerasAsync()
+        => await (await ModuleAsync()).InvokeAsync<MediaDeviceInfo[]>("enumerateVideoInputs");
+
+    public async Task InitializeEncoderAsync(string codec, VideoTier tier, int keyframeSeconds = 2)
+    {
+        var active = await PipelineAsync();
+        await active.InvokeAsync<object>("initEncoder", codec, tier.Width, tier.Height, tier.BitrateKbps, tier.Framerate, keyframeSeconds);
     }
 
-    /// <summary>Initialize decoder and attach to a canvas element for rendering.</summary>
-    public async Task InitializeDecoderAsync(ElementReference canvasElement, string codec = "h264")
+    /// <summary>Opens the camera. The only call in this library that asks for video input.</summary>
+    public async Task<VideoCaptureState> StartCaptureAsync(string? deviceId = null, string? facingMode = null)
     {
-        _module ??= await _js.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/Bolt.Media.Browser/bolt-media.js");
-        _pipeline ??= await _module.InvokeAsync<IJSObjectReference>("createVideoPipeline");
-
-        await _pipeline.InvokeVoidAsync("initDecoder", canvasElement, codec);
+        if (pipeline is null) throw new InvalidOperationException("Initialize the video encoder first.");
+        var state = await pipeline.InvokeAsync<VideoCaptureState>("startCapture", self, new { deviceId, facingMode });
+        capturing = state.Capturing;
+        logger.LogDebug("Camera started {Width}x{Height} {Codec}", state.Width, state.Height, state.Codec);
+        return state;
     }
 
-    /// <summary>Start capturing video from the camera.</summary>
-    public async Task StartCaptureAsync(int? width = null, int? height = null, int? framerate = null)
-    {
-        if (_pipeline is null) throw new InvalidOperationException("Call InitializeEncoderAsync first");
-
-        object? constraints = (width.HasValue || height.HasValue || framerate.HasValue)
-            ? new { width = width ?? 1280, height = height ?? 720, framerate = framerate ?? 30 }
-            : null;
-
-        await _pipeline.InvokeVoidAsync("startCapture", _dotNetRef, constraints);
-        _capturing = true;
-        _logger.LogDebug("Video capture started");
-    }
-
-    /// <summary>Stop capturing video.</summary>
     public async Task StopCaptureAsync()
     {
-        if (_pipeline is null) return;
-        await _pipeline.InvokeVoidAsync("stopCapture");
-        _capturing = false;
+        capturing = false;
+        if (pipeline is not null) await pipeline.InvokeVoidAsync("stopCapture");
     }
 
-    /// <summary>Decode and render an incoming video frame to the canvas.</summary>
-    public async ValueTask DecodeFrameAsync(ReadOnlyMemory<byte> data, uint timestamp, bool isKeyframe)
+    public async Task AttachPreviewAsync(ElementReference element)
+        => await (await PipelineAsync()).InvokeVoidAsync("attachPreview", element);
+
+    public async Task DetachPreviewAsync()
     {
-        if (_pipeline is null) return;
-        await _pipeline.InvokeVoidAsync("decodeFrame", data.ToArray(), timestamp, isKeyframe);
+        if (pipeline is not null) await pipeline.InvokeVoidAsync("attachPreview", null);
     }
 
-    /// <summary>Request the encoder to produce a keyframe on the next encode cycle.</summary>
+    public async Task<bool> AddRemoteAsync(Guid streamId, ElementReference canvas, string codec)
+        => await (await PipelineAsync()).InvokeAsync<bool>("addRemote", streamId.ToString("D"), canvas, codec, self);
+
+    public async Task RemoveRemoteAsync(Guid streamId)
+    {
+        if (pipeline is not null) await pipeline.InvokeVoidAsync("removeRemote", streamId.ToString("D"));
+    }
+
+    public async ValueTask DecodeFrameAsync(Guid streamId, byte[] data, uint timestampMicroseconds, bool isKeyframe)
+    {
+        if (pipeline is null) return;
+        await pipeline.InvokeAsync<bool>("decodeFrame", streamId.ToString("D"), data, timestampMicroseconds, isKeyframe);
+    }
+
+    public async ValueTask<bool> ApplyTierAsync(VideoTier tier)
+        => pipeline is not null && await pipeline.InvokeAsync<bool>("applyTier", tier.Width, tier.Height, tier.BitrateKbps, tier.Framerate);
+
     public async ValueTask RequestKeyframeAsync()
     {
-        if (_pipeline is null) return;
-        await _pipeline.InvokeVoidAsync("requestKeyframe");
+        if (pipeline is not null) await pipeline.InvokeVoidAsync("requestKeyframe");
     }
 
-    /// <summary>Change encoder bitrate for ABR.</summary>
-    public async ValueTask ReconfigureBitrateAsync(int newBitrateKbps)
-    {
-        if (_pipeline is null) return;
-        await _pipeline.InvokeVoidAsync("reconfigureBitrate", newBitrateKbps);
-    }
+    public async ValueTask<VideoSendStats> StatsAsync()
+        => pipeline is null ? new(0, 0, 0, 0) : await pipeline.InvokeAsync<VideoSendStats>("getStats");
 
-    /// <summary>Change encoder resolution/framerate for ABR.</summary>
-    public async ValueTask ReconfigureResolutionAsync(int width, int height, int? framerate = null)
+    [JSInvokable]
+    public void OnVideoEncoded(byte[] data, bool isKeyframe, uint frameId, uint timestamp)
+        => OnEncoded?.Invoke(data, isKeyframe, frameId, timestamp);
+
+    [JSInvokable]
+    public void OnVideoCaptureStopped(string reason)
     {
-        if (_pipeline is null) return;
-        await _pipeline.InvokeVoidAsync("reconfigureResolution", width, height, framerate);
+        capturing = false;
+        OnCaptureStopped?.Invoke(reason);
     }
 
     [JSInvokable]
-    public void OnVideoEncoded(byte[] data, bool isKeyframe)
-    {
-        OnEncoded?.Invoke(data, isKeyframe);
-    }
+    public void OnVideoDecodeFailed(string streamId) => OnDecodeFailed?.Invoke(streamId);
 
     public async ValueTask DisposeAsync()
     {
-        _capturing = false;
-        if (_pipeline is not null)
+        capturing = false;
+        if (pipeline is not null)
         {
-            await _pipeline.InvokeVoidAsync("dispose");
-            await _pipeline.DisposeAsync();
+            try { await pipeline.InvokeVoidAsync("dispose"); } catch (JSException) { /* The page may already be gone. */ }
+            await pipeline.DisposeAsync();
+            pipeline = null;
         }
-        _dotNetRef?.Dispose();
-        if (_module is not null) await _module.DisposeAsync();
+        self?.Dispose(); self = null;
+        if (module is not null) { await module.DisposeAsync(); module = null; }
     }
 }

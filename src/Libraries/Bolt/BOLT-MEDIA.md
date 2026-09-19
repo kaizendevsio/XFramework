@@ -6,7 +6,9 @@ Bolt Media is an experimental extension of the Bolt binary RPC protocol for audi
 
 For standard XFramework module RPC, prefer the generated `[BoltHandler]` plus `IBoltRequest<TRequest, TResponse>` pattern documented in `BOLT.md`. Bolt Media is the specialized media-streaming layer, not the default pattern for CRUD or feature-command handlers.
 
-**Current status:** the general Hub media, ECDH, video and group-conference paths remain quarantined. A separate, explicitly scoped two-party voice implementation now serves Yap through its authenticated HTTPS host. See [Yap voice trusted-server relay](../../../docs/solutions/architecture-patterns/yap-voice-trusted-server-relay.md) for its security decision, browser verification and device limitations. This transport-encrypted relay is not end-to-end encrypted and is not a replacement for WebRTC.
+**Current status:** the general Hub media, ECDH and group-conference paths remain quarantined. A separate, explicitly scoped implementation now serves Yap through its authenticated HTTPS host. See [Yap voice trusted-server relay](../../../docs/solutions/architecture-patterns/yap-voice-trusted-server-relay.md) for its security decision, browser verification and device limitations. This transport-encrypted relay is not end-to-end encrypted and is not a replacement for WebRTC.
+
+Yap's encrypted group path additionally carries camera video under the same per-epoch SFrame key as the audio. Because the SFrame session accepts at most 4096 plaintext bytes per operation, an encoded picture is cut into fragments that each go through the same authenticated encryption as an Opus packet; the fragment header (picture ID, index, count, keyframe flag, timestamp) travels inside that plaintext, so the relay cannot see or forge a picture boundary. The relay routes `MediaType.Video` only for `AV1`, `VP9` and `H264`, and only with the encrypted-payload flag set. Nothing outside that path is unquarantined.
 
 ### Deployment Containment
 
@@ -185,9 +187,12 @@ services.AddBoltServer(options =>
 
 | Codec | ID | Status | Notes |
 |-------|----|--------|-------|
-| H.264 | 0x02 | Quarantined | Wire ID and partial codec path exist; end-to-end browser media is not release-qualified. |
-| VP9 | 0x03 | Defined | Not yet integrated |
-| AV1 | 0x04 | Defined | Not yet integrated |
+| H.264 | 0x02 | Yap encrypted groups only | Universal floor. Annex B, no decoder description. Hardware encode everywhere that matters. |
+| VP9 | 0x03 | Yap encrypted groups only | ~20-30% fewer bits than H.264. Hardware encode on some phones; software up to 540p. |
+| AV1 | 0x04 | Yap encrypted groups only | Best compression. Hardware encode is not widespread; software is allowed only up to 360p. |
+| H.265 | 0x05 | Not negotiated | Licensing and patchy `VideoEncoder` support; not in the preference ladder. |
+
+The browser probes every codec with `VideoEncoder.isConfigSupported` (and again with `hardwareAcceleration: 'require-hardware'`) at call setup, advertises what it can *decode* inside the end-to-end encrypted epoch envelope, and the sender picks the best codec every peer can decode. A codec is only preferred over the next one at a given height when this device reported hardware encode for it, or when the height is within that codec's software ceiling.
 
 ---
 

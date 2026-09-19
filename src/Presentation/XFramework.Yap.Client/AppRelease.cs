@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.50";
+    public const string Version = "1.3.53";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "16 September 2026", [
+            "Video calls are here: turn your camera on in a call, with quality that adapts to your device and connection.",
+            "Video is end-to-end encrypted on the same key as the call audio."]),
+        ("1.3.50", "16 September 2026", [
             "Signing out and back in no longer replaces your account's encryption key, so your messages stay readable and contacts stop seeing a key-change warning."]),
         ("1.3.48", "16 September 2026", [
             "Signing in on a new device now restores your messages automatically, without a recovery key or a second password prompt.",

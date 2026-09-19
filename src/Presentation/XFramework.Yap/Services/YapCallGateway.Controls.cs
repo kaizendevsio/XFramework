@@ -61,6 +61,24 @@ public sealed partial class YapCallGateway
         }
     }
 
+    /// <summary>Camera on/off, published to the roster so the other screens can lay out their tiles.</summary>
+    internal void VideoGroup(ClaimsPrincipal user, Guid callId, bool video)
+    {
+        RequireGroupLifecycle();
+        if (video && !videoEnabled) throw new YapApiException(503, "Video calls are not available yet.");
+        var (tenant, credential) = Identity(user);
+        lock (gate)
+        {
+            var room = GetGroup(tenant, credential, callId);
+            RequireAccepted(room.Members[credential], user);
+            // More cameras than any phone can decode is refused here, not negotiated between clients.
+            if (video && room.Members.Count(x => x.Value.Video && !x.Value.Left && x.Key != credential) >= MaxVideoSenders)
+                throw new YapApiException(409, "This call already has as many cameras as it can carry.");
+            room.Members[credential].Video = video;
+            PublishGroupLocked(room, "group-roster");
+        }
+    }
+
     private static void AdvanceGroupRoster(GroupRoom room)
     {
         room.Revision++;

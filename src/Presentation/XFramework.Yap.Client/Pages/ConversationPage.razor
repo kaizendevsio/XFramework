@@ -16,7 +16,8 @@ else
         @if (!ParentId.HasValue) { <button class="conversation-avatar" aria-label="Conversation details" @onclick="OpenDetails"><Avatar Initials="@chat.Initials" ImageUrl="@chat.AvatarUrl" Color="@chat.Color" /></button> }
         <button class="mid conversation-title" aria-label="Conversation settings" @onclick="OpenDetails"><h1 style="font-size:16px">@(ParentId.HasValue ? "Thread" : chat.Name)</h1><span class="muted" style="font-size:12px">@(ParentId.HasValue ? $"{chat.Name} · {Parent?.ReplyTotal ?? 0} replies" : State.ConversationSubtitle(chat))</span></button>
         <button class="iconbtn" aria-label="Search messages" @onclick="OpenSearch"><Icon Name="search" /></button>
-        @if(Voice.Enabled){<button class="iconbtn" aria-label="Start voice call" disabled="@(!State.Online || State.NeedsLogin || Voice.IsCalling)" @onclick="CallAsync"><Icon Name="phone" /></button>}
+        @if(Voice.VideoAvailable){<button class="iconbtn" aria-label="Start video call" disabled="@(!State.Online || State.NeedsLogin || Voice.IsCalling)" @onclick="() => CallAsync(true)"><Icon Name="video" /></button>}
+        @if(Voice.Enabled){<button class="iconbtn" aria-label="Start voice call" disabled="@(!State.Online || State.NeedsLogin || Voice.IsCalling)" @onclick="() => CallAsync(false)"><Icon Name="phone" /></button>}
     </div></Header>
     <ChildContent>
     @if (ParentId.HasValue)
@@ -102,7 +103,7 @@ else if (mode == "forward")
     private void ClearSearch() { query = ""; focusSearch = true; }
     private void SearchKeyDown(KeyboardEventArgs e) { if (e.Key == "Escape") CloseSearch(); }
     private void SearchFromDetails() { Nav.NavigateTo($"/chat/{Id}"); OpenSearch(); }
-    private async Task CallFromDetails() { Nav.NavigateTo($"/chat/{Id}"); await CallAsync(); }
+    private async Task CallFromDetails() { Nav.NavigateTo($"/chat/{Id}"); await CallAsync(false); }
     private async Task LocateFromDetails(Guid message) { Nav.NavigateTo($"/chat/{Id}"); await ShowHitAsync(message); }
     private string edit = "";
     private Guid loaded;
@@ -157,11 +158,11 @@ else if (mode == "forward")
     private Task ActionAsync(string action, string? text = null) { mode = null; return State.ActionAsync(selected!, action, text); }
     private async Task ForwardAsync(Guid target) { var text = selected!.Text; mode = null; Nav.NavigateTo($"/chat/{target}"); try { await State.SendAsync(target, text, null, $"forward:{Guid.NewGuid()}"); } catch (Exception ex) { State.Report(ex); } }
     private async Task ShowHitAsync(Guid id) { mode = null; query = ""; await State.LocateAsync(id); focus = id; }
-    private async Task CallAsync()
+    private async Task CallAsync(bool video)
     {
         if (State.Selected is not { } conversation) return;
         mode = null;
-        await Voice.StartGroupAsync(Id, conversation.Name, conversation.People);
+        await Voice.StartGroupAsync(Id, conversation.Name, conversation.People, video);
     }
     public void Dispose() { editExpiry?.Cancel(); editExpiry?.Dispose(); Nav.LocationChanged -= LocationChanged; State.Changed -= Changed; State.ConversationRemoved -= Removed; Voice.Changed -= Changed; State.LeaveConversation(loaded); }
 }
