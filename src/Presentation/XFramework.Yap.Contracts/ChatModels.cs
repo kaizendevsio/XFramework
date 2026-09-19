@@ -127,6 +127,15 @@ public sealed record SearchHit(Guid ThreadId, Guid MessageId, string Text, DateT
 /// <summary>A bookmarked message plus the conversation context the saved list shows around it.</summary>
 public sealed record SavedMessage(ChatMessage Message, string ConversationName, bool Group, DateTime SavedAt, string? ConversationAvatarUrl = null);
 public sealed record TypingUpdate(Guid ThreadId, Guid CredentialId, bool IsTyping);
+/// <summary>One person's reaction. The badges on a bubble only count; this says who, and is fetched
+/// for one message at a time so a busy conversation never carries the roster on every page.</summary>
+public sealed record MessageReactor(Guid Id, string Emoji, Person Person, DateTime ReactedAt, bool Mine);
+/// <summary>When one member received, and read, the caller's own message. A member with no row is
+/// absent: the conversation roster is already on the device, so "not delivered" costs nothing.</summary>
+public sealed record MessageReceiptEntry(Person Person, DateTime DeliveredAt, DateTime? ReadAt);
+/// <summary>Delivery detail for one of the caller's own messages. <paramref name="ReadReceipts"/> is
+/// false when the conversation has them switched off - then there is no read section, not an empty one.</summary>
+public sealed record MessageReceiptDetail(Guid MessageId, bool ReadReceipts, List<MessageReceiptEntry> Entries);
 public enum ChatFeature { ReadReceipts = 1, Typing = 2, Threads = 4, Reactions = 8, Replies = 16, Voice = 32, Attachments = 64 }
 public sealed record ConversationUpdate(Guid ThreadId, int? Features = null, Guid? NicknameMemberId = null, string? Nickname = null, string? Name = null);
 public sealed record ConversationMemberAction(Guid ThreadId, Guid CredentialId, Guid MemberId, string Action, string? Role = null);

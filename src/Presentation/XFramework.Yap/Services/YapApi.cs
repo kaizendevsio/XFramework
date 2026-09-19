@@ -119,6 +119,41 @@ public static class YapApi
                 : await session.GetMessagesAsync(id, Page(page), 50, ct, suppressDeliveryAcknowledgement: acknowledge == false));
             return await MapMessagesAsync(id, data, session, directory, ct);
         });
+        // Both details are fetched for one message, when a person asks for it. Neither rides along on
+        // the message page: a group of a hundred would otherwise add a hundred rows to every message.
+        api.MapGet("/conversations/{thread:guid}/messages/{message:guid}/reactions", async (Guid thread, Guid message,
+            ICommunicationsChatClient client, IChatDirectory directory, CancellationToken ct) =>
+        {
+            var session = await client.ForCurrentActorAsync(ct: ct);
+            var data = Require(await session.GetReactionsAsync(thread, message, pageSize: 100, ct: ct));
+            // Names come from the authorized directory, never from anything a sender typed.
+            var people = await directory.ResolveAsync(data.Items.Select(x => x.CredentialId).Distinct().ToArray(), ct);
+            return data.Items.Select(x =>
+            {
+                var mine = x.CredentialId == session.CredentialId;
+                var person = people.FirstOrDefault(p => p.Id == x.CredentialId);
+                return new MessageReactor(x.Id, x.Emoji,
+                    new Person(x.CredentialId, mine ? "You" : person?.Name ?? "Workspace member", person?.UserName ?? "",
+                        person?.AvatarUrl, x.MemberId), x.CreatedAt, mine);
+            }).ToList();
+        });
+        api.MapGet("/conversations/{thread:guid}/messages/{message:guid}/receipts", async (Guid thread, Guid message,
+            ICommunicationsChatClient client, IChatDirectory directory, CancellationToken ct) =>
+        {
+            var session = await client.ForCurrentActorAsync(ct: ct);
+            var response = await session.GetReceiptsAsync(thread, message, pageSize: 100, ct: ct);
+            // Communications answers 403 for a message the caller did not send. That is the rule, not
+            // an error to surface: the menu simply has no status section for someone else's message.
+            if (response.HttpStatusCode == HttpStatusCode.Forbidden) return new MessageReceiptDetail(message, false, []);
+            var data = Require(response);
+            var people = await directory.ResolveAsync(data.Items.Select(x => x.CredentialId).Distinct().ToArray(), ct);
+            return new MessageReceiptDetail(message, data.ReadReceiptsEnabled, data.Items.Select(x =>
+            {
+                var person = people.FirstOrDefault(p => p.Id == x.CredentialId);
+                return new MessageReceiptEntry(new Person(x.CredentialId, person?.Name ?? "Workspace member",
+                    person?.UserName ?? "", person?.AvatarUrl, x.MemberId), x.DeliveredAt, x.ReadAt);
+            }).ToList());
+        });
         api.MapGet("/people", async (string search, IChatDirectory directory, CancellationToken ct) =>
             (await directory.SearchAsync(search, ct)).Select(x => new Person(x.Id, x.Name, x.UserName, x.AvatarUrl)));
         api.MapGet("/search", async (string query, Guid? thread, int? page, ICommunicationsChatClient client, IChatDirectory directory, CancellationToken ct) =>

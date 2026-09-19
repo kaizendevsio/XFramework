@@ -3,7 +3,6 @@
 @page "/thread/{Id:guid}/{ParentId:guid}"
 @implements IDisposable
 @inject ChatState State
-@inject BrowserTime Times
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject VoiceState Voice
@@ -56,7 +55,7 @@ else
 <MessageMenu Message="selected" OnClose="() => mode = null">
     @if (State.Selected?.Allows(ChatFeature.Reactions) != false) { <div class="menu-reactions">@foreach (var reaction in State.Defaults?.Reactions ?? []) { <button aria-label="@($"React {reaction.Emoji}")" disabled="@(!State.Online || State.NeedsLogin)" @onclick="() => ReactAsync(reaction.Emoji)">@reaction.Emoji</button> }</div> }
     <div class="menu-message-preview"><span data-menu-photo></span><span class="menu-preview-label">@(selected.HasAttachments ? selected.Attachments.Any(MessageMedia.IsVideo) ? "Video" : "Attachment" : selected.Text)</span></div>
-    <time class="menu-message-time" datetime="@BrowserTime.Iso(selected.CreatedAt)">@Times.Full(selected.CreatedAt)</time>
+    <MessageStatus @key="selected.Id" Message="selected" />
     <div class="menu-actions">
     @if (State.Selected?.Allows(ChatFeature.Replies) != false) { <button @onclick="() => ReplyTo(selected)">Reply<Icon Name="reply" Size="20" /></button> }
     @if (!selected.HasAttachments) { <button @onclick="CopyAsync">Copy<Icon Name="file" Size="20" /></button> }

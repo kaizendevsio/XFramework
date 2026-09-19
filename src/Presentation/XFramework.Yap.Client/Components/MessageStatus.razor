@@ -1,0 +1,33 @@
+@inject ChatState State
+@inject BrowserTime Times
+@* Sent is known from the message itself and shows at once; delivered and read arrive from the host,
+   for the caller's own message only. Every instant is rendered by BrowserTime: the published client
+   ships no timezone data, so a .NET format here would print a plausible, wrong hour. *@
+<div class="menu-message-status @(Message.Mine ? "mine" : "")">
+    <time class="menu-message-time" datetime="@BrowserTime.Iso(Message.CreatedAt)">Sent @Times.Full(Message.CreatedAt)</time>
+    @if (MessageReceipts.Status(detail, Group, State.Selected?.People ?? [], State.User?.CredentialId) is { Count: > 0 } rows)
+    {
+        <ul class="status-rows">
+            @foreach (var row in rows)
+            {
+                <li @key="row.Key"><span class="status-who">@row.Who</span><span class="status-when @(row.Read ? "read" : "")">@row.State @(row.At is { } at ? Group ? Times.Clock(at) : Times.Full(at) : "")</span></li>
+            }
+        </ul>
+    }
+</div>
+@code {
+    [Parameter, EditorRequired] public ChatMessage Message { get; set; } = default!;
+    private MessageReceiptDetail? detail;
+    private Guid loaded;
+    private bool Group => State.Selected?.Group == true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loaded == Message.Id) return;
+        loaded = Message.Id; detail = null;
+        var loading = Message.Id;
+        var received = await State.ReceiptsAsync(Message);
+        // The menu can close, or move to another message, while this is in flight.
+        if (loaded == loading) { detail = received; StateHasChanged(); }
+    }
+}

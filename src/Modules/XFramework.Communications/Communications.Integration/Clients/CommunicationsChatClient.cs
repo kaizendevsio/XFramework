@@ -1,10 +1,11 @@
-﻿using Communications.Domain.Shared;
+using Communications.Domain.Shared;
 using Communications.Domain.Shared.Contracts.Realtime;
 using Communications.Domain.Shared.Contracts.Requests.Attachments;
 using Communications.Domain.Shared.Contracts.Requests.Create;
 using Communications.Domain.Shared.Contracts.Requests.Delete;
 using Communications.Domain.Shared.Contracts.Requests.Edit;
 using Communications.Domain.Shared.Contracts.Requests.Reactions;
+using Communications.Domain.Shared.Contracts.Requests.Receipts;
 using Communications.Domain.Shared.Contracts.Requests.ReferenceData;
 using Communications.Domain.Shared.Contracts.Requests.Realtime;
 using Communications.Domain.Shared.Contracts.Requests.Threads;
@@ -54,6 +55,8 @@ public interface ICommunicationsChatSession
     Task<QueryResponse<ChatReferenceDataResponse>> EnsureChatDefaultsAsync(CancellationToken ct = default);
     Task<QueryResponse<ChatReferenceDataResponse>> GetChatReferenceDataAsync(CancellationToken ct = default);
     Task<QueryResponse<PaginatedResult<MessageReactionResponse>>> GetReactionsAsync(
+        Guid threadId, Guid messageId, int pageIndex = 0, int pageSize = 100, CancellationToken ct = default);
+    Task<QueryResponse<GetMessageReceiptsResponse>> GetReceiptsAsync(
         Guid threadId, Guid messageId, int pageIndex = 0, int pageSize = 100, CancellationToken ct = default);
     Task<QueryResponse<GetThreadMessagesResponse>> GetRepliesAsync(
         Guid threadId, Guid parentMessageId, int pageIndex = 0, int pageSize = 20, CancellationToken ct = default,
@@ -262,6 +265,13 @@ internal sealed class CommunicationsChatSession(
     public Task<QueryResponse<PaginatedResult<MessageReactionResponse>>> GetReactionsAsync(
         Guid threadId, Guid messageId, int pageIndex = 0, int pageSize = 100, CancellationToken ct = default) =>
         InvokeAsync(callCt => wrapper.GetMessageReactionsAsync(Prepare(new GetMessageReactionsRequest
+        {
+            ThreadId = threadId, MessageId = messageId, PageIndex = pageIndex, PageSize = pageSize
+        }), callCt), ct);
+
+    public Task<QueryResponse<GetMessageReceiptsResponse>> GetReceiptsAsync(
+        Guid threadId, Guid messageId, int pageIndex = 0, int pageSize = 100, CancellationToken ct = default) =>
+        InvokeAsync(callCt => wrapper.GetMessageReceiptsAsync(Prepare(new GetMessageReceiptsRequest
         {
             ThreadId = threadId, MessageId = messageId, PageIndex = pageIndex, PageSize = pageSize
         }), callCt), ct);
