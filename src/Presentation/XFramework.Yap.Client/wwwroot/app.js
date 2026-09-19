@@ -36,6 +36,8 @@ window.yap = {
     showMessage(id) { const list = document.querySelector('.message-window'); if (list) { yap.messageWindow.show(list, id); return; } const element = document.querySelector(`[data-message-id="${CSS.escape(id)}"]`); element?.scrollIntoView({block:'center',behavior:'smooth'}); },
     openSheet(dialog, element) {
         dialog.addEventListener('cancel', event => { event.preventDefault(); element.querySelector('[data-sheet-drag]')?.click(); });
+        // Once, as the sheet arrives - not on the renders that follow it.
+        yap.haptics?.buzz('tap');
         dialog.showModal(); yap.focusSheet(element);
     },
     openCall(dialog) { dialog.addEventListener('cancel', event => event.preventDefault()); dialog.showModal(); },

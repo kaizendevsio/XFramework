@@ -11,6 +11,7 @@
                 thumbnail.alt = 'Selected photo';
                 preview.replaceChildren(thumbnail);
             }
+            window.yap.haptics?.buzz('press');
             dialog.showModal();
             const place = () => {
                 const height = stack.getBoundingClientRect().height;

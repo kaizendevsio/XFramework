@@ -411,6 +411,11 @@
             if (keyboard) {
                 root.style.setProperty('--viewport-height', `${view.height}px`);
                 root.style.setProperty('--viewport-top', `${view.offsetTop}px`);
+                // The emoji keyboard takes this exact height when it replaces the real one, so
+                // the composer does not move as they swap. Remembered for the first open too.
+                const height = Math.round(fullHeight - view.height);
+                root.style.setProperty('--yap-keyboard', `${height}px`);
+                try { localStorage.setItem('yap-keyboard-height', height); } catch {}
             } else {
                 root.style.setProperty('--viewport-height', `${window.innerHeight}px`);
                 root.style.removeProperty('--viewport-top');
