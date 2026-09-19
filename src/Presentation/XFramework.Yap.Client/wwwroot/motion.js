@@ -78,11 +78,15 @@
         const conversation = e.target.closest('[data-conversation-menu]');
         const element = handle?.closest('.sheet') || message || conversation || panel;
         if (!element) return;
-        const g = gesture = {element, bubble, kind:handle?'sheet':message?'message':conversation?'conversation':'tabs', id:e.pointerId, x:e.clientX, y:e.clientY, dx:0, dy:0, axis:'pending', fired:false, timer:null};
+        const g = gesture = {element, bubble, kind:handle?'sheet':message?'message':conversation?'conversation':'tabs', id:e.pointerId, x:e.clientX, y:e.clientY, dx:0, dy:0, axis:'pending', fired:false, ready:false, timer:null};
         if (g.kind === 'message' || g.kind === 'conversation') {
             g.timer = setTimeout(() => {
                 if (gesture !== g || g.axis !== 'pending') return;
                 g.fired = true;
+                // The hold has been recognised. That pulse is the answer, so the menu it opens
+                // a render later stays silent rather than landing a second one on top.
+                window.yap.haptics?.buzz('press');
+                window.yap.haptics?.mute(600);
                 element.classList.add('is-holding');
                 suppressClick();
                 if (g.kind === 'conversation') element.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX:g.x, clientY:g.y }));
@@ -110,7 +114,12 @@
         g.element.classList.add('is-dragging');
         if (g.kind === 'message') {
             g.element.style.setProperty('--reply-drag', Math.max(0,Math.min(84,g.dx * .75)) + 'px');
-            g.element.classList.toggle('gesture-ready',g.dx >= 60);
+            // Fire on the rising edge only. pointermove runs every frame; the reply commits once,
+            // the moment the drag crosses the threshold, which is where the tap belongs.
+            const ready = g.dx >= 60;
+            if (ready && !g.ready) window.yap.haptics?.buzz('tap');
+            g.ready = ready;
+            g.element.classList.toggle('gesture-ready',ready);
         } else g.element.style.setProperty('--tab-drag',Math.max(-28,Math.min(28,g.dx * .3)) + 'px');
     }, {passive:false});
     document.addEventListener('pointerup', e => {

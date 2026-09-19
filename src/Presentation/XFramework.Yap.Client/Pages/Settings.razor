@@ -54,6 +54,10 @@
             <Icon Name="arrow" Size="17" Class="@(glass ? "set-chevron open" : "set-chevron")" />
         </button>
         @if (glass) { <div class="set-stack"><GlassControls /></div> }
+        <button type="button" class="set-row set-action" disabled="@(!canVibrate)" aria-pressed="@haptics.ToString().ToLowerInvariant()" @onclick="ToggleHapticsAsync">
+            <span class="set-key"><Icon Name="phone" Size="19" /><span class="set-label">Haptics<small>@HapticsDetail</small></span></span>
+            <span class="set-value">@(!canVibrate ? "—" : haptics ? "On" : "Off")</span>
+        </button>
     </div>
 
     }
@@ -172,7 +176,7 @@
     [Parameter] public string? Section { get; set; }
     private string SectionTitle => Categories.FirstOrDefault(x => x.Route == Section).Title ?? "Settings";
     private static readonly (string Route, string Title, string Icon, string Description)[] Categories = [
-        ("appearance", "Appearance", "moon", "Theme, colors and glass"),
+        ("appearance", "Appearance", "moon", "Theme, colors, glass and haptics"),
         ("notifications", "Notifications", "alert", "Alerts while Yap is closed"),
         ("privacy", "Privacy and security", "shield", "Encryption, recovery and devices"),
         ("calls", "Calls", "phone", "Microphone, ringtone and volume"),
@@ -180,6 +184,7 @@
         ("app", "About Yap", "info", "Updates, installation and gestures"),
         ("help", "Help and diagnostics", "settings", "Troubleshooting and logs")];
     private bool signOut, gestures, glass, changes, canInstall, installed, diagnostics;
+    private bool haptics = true, canVibrate;
     private string theme = "system";
     private string accent = "#d5f879";
     private string? persistNotice;
@@ -193,6 +198,8 @@
         if (!firstRender) return;
         theme = await JS.InvokeAsync<string>("yap.themePreference");
         accent = await JS.InvokeAsync<string>("yap.accentPreference");
+        canVibrate = await JS.InvokeAsync<bool>("yap.haptics.supported");
+        haptics = await JS.InvokeAsync<bool>("yap.haptics.enabled");
         canInstall = await JS.InvokeAsync<bool>("yap.device.canInstall");
         installed = await JS.InvokeAsync<bool>("yap.device.isInstalled");
         await LoadPushAsync();
@@ -204,6 +211,17 @@
     {
         theme = preference;
         await JS.InvokeVoidAsync("yap.setThemePreference", preference);
+    }
+
+    // Safari has never shipped the Vibration API on iPhone or iPad, and no script can add it,
+    // so the row says why it is dead rather than offering a switch that does nothing.
+    private string HapticsDetail => !canVibrate
+        ? "This browser cannot vibrate. iPhone and iPad never can, in Safari or as an installed app."
+        : "A brief tap when menus, sheets and gestures land on this device";
+    private async Task ToggleHapticsAsync()
+    {
+        haptics = await JS.InvokeAsync<bool>("yap.haptics.setEnabled", !haptics);
+        if (haptics) await JS.InvokeVoidAsync("yap.haptics.buzz", "commit");
     }
 
     private Task AccentAsync(ChangeEventArgs args) => SetAccentAsync(args.Value?.ToString() ?? accent);
