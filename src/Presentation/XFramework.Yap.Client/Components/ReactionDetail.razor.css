@@ -1,0 +1,6 @@
+/* Sits inside .reacts beside the badges, so it borrows their height and never changes the row's. */
+.react-who{display:inline-flex;align-items:center;justify-content:center;width:23px;height:23px;border-radius:999px;background:var(--surface2);border:1px solid var(--border);color:var(--dim)}
+.react-who:active{background:var(--surface3)}
+.reactor-list{padding:4px 0 10px}
+.reactor-note{padding:14px 18px;color:var(--dim);font-size:13.5px}
+.reactor-emoji{font-size:19px;line-height:1}

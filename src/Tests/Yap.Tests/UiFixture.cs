@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Communications.Domain.Shared.Contracts.Realtime;
 using Communications.Domain.Shared.Contracts.Requests.Threads;
 using Communications.Domain.Shared.Contracts.Responses;
@@ -70,7 +70,19 @@ internal static partial class UiFixture
             new() { Id = Guid.NewGuid(), SenderCredentialId = friend, SenderAlias = "Sarah Mensah", Text = "Perfect, I'll push the new build tonight", CreatedAt = DateTime.UtcNow.AddMinutes(-1) }
         };
         messages[2].DeliveredCount = 1;
-        messages[4].DeliveredCount = 1; messages[4].ReadCount = 1; messages[4].ReadCredentialIds = [friend];
+        messages[4].DeliveredCount = 2; messages[4].ReadCount = 1; messages[4].ReadCredentialIds = [friend];
+        var thirdMember = new ThreadMemberResponse { Id = Guid.NewGuid(), CredentialId = third, Alias = "Robin Chen", Role = "Member" };
+        // Reactions from other people, so the "who reacted" detail has something to say that the
+        // grouped badges cannot: the same emoji twice is two names, not one.
+        var heartType = Guid.NewGuid();
+        var reactors = new List<MessageReactionResponse>
+        {
+            new() { Id = Guid.NewGuid(), MessageId = messages[3].Id, TypeId = heartType, MemberId = fixtureMembers[1].Id, CredentialId = friend, Name = "Heart", Emoji = "❤️", CreatedAt = DateTime.UtcNow.AddMinutes(-11) },
+            new() { Id = Guid.NewGuid(), MessageId = messages[3].Id, TypeId = heartType, MemberId = thirdMember.Id, CredentialId = third, Name = "Heart", Emoji = "❤️", CreatedAt = DateTime.UtcNow.AddMinutes(-9) },
+            new() { Id = Guid.NewGuid(), MessageId = messages[3].Id, TypeId = Guid.NewGuid(), MemberId = thirdMember.Id, CredentialId = third, Name = "Party", Emoji = "🎉", CreatedAt = DateTime.UtcNow.AddMinutes(-4) }
+        };
+        messages[3].Reactions = [new() { TypeId = heartType, Name = "Heart", Emoji = "❤️", Count = 2 },
+            new() { TypeId = reactors[2].TypeId, Name = "Party", Emoji = "🎉", Count = 1 }];
         var deletedThreads = new List<Guid>();
         fixture.Session.Setup(s => s.GetDeletedThreadsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((int page, CancellationToken _) => ChatFixture.Ok(new GetDeletedThreadsResponse { Items = deletedThreads.Skip(page * 100).Take(100).ToList(), TotalCount = deletedThreads.Count }));
@@ -86,7 +98,10 @@ internal static partial class UiFixture
             .ReturnsAsync((Guid id, CancellationToken _) => ChatFixture.Ok(new GetThreadResponse
             {
                 Id = id, Name = conversations.First(c => c.Id == id).Name, IsDirect = conversations.First(c => c.Id == id).IsDirect, HasCustomName = conversations.First(c => c.Id == id).HasCustomName, PhotoStorageFileId = conversations.First(c => c.Id == id).PhotoStorageFileId, CanManage = true, Features = features,
-                Members = fixtureMembers.ToList()
+                // A group needs a third person for the status detail to be worth looking at - but the
+                // encryption fixture already adds them for real, and a duplicate member is a different bug.
+                Members = conversations.First(c => c.Id == id).IsDirect || fixtureMembers.Any(m => m.CredentialId == third)
+                    ? fixtureMembers.ToList() : [.. fixtureMembers, thirdMember]
             }));
         fixture.Session.Setup(s => s.SetThreadActiveStatusAsync(It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Guid id, bool share, CancellationToken _) =>
@@ -116,7 +131,31 @@ internal static partial class UiFixture
             });
         fixture.Session.Setup(s => s.DeleteReactionAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Guid thread, Guid message, Guid reaction, CancellationToken _) =>
-            { messages.First(m => m.Id == message).Reactions.RemoveAll(r => r.MyReactionId == reaction); return Success(); });
+            { messages.First(m => m.Id == message).Reactions.RemoveAll(r => r.MyReactionId == reaction); reactors.RemoveAll(r => r.Id == reaction); return Success(); });
+        fixture.Session.Setup(s => s.GetReactionsAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid thread, Guid message, int page, int size, CancellationToken _) =>
+            {
+                var rows = reactors.Where(r => r.MessageId == message).ToList();
+                var mine = messages.FirstOrDefault(m => m.Id == message)?.Reactions.Where(r => r.MyReactionId.HasValue) ?? [];
+                rows.AddRange(mine.Select(r => new MessageReactionResponse { Id = r.MyReactionId!.Value, MessageId = message, TypeId = r.TypeId,
+                    MemberId = fixtureMembers[0].Id, CredentialId = fixture.Credential, Name = r.Name, Emoji = r.Emoji, CreatedAt = DateTime.UtcNow }));
+                return ChatFixture.Ok(new PaginatedResult<MessageReactionResponse>(rows.Count, page, size, rows.Skip(page * size).Take(size).ToList()));
+            });
+        // Receipts belong to the sender: the real service refuses anyone else's message outright,
+        // and the fixture has to refuse it the same way or the UI is never exercised against the rule.
+        fixture.Session.Setup(s => s.GetReceiptsAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid thread, Guid message, int page, int size, CancellationToken _) =>
+            {
+                var item = messages.FirstOrDefault(m => m.Id == message);
+                if (item is null || item.SenderCredentialId != fixture.Credential)
+                    return new QueryResponse<GetMessageReceiptsResponse> { HttpStatusCode = HttpStatusCode.Forbidden };
+                List<MessageReceiptItemResponse> rows = [new() { MemberId = fixtureMembers[1].Id, CredentialId = friend,
+                    DeliveredAt = item.CreatedAt.AddSeconds(26), ReadAt = item.ReadCount > 0 ? item.CreatedAt.AddSeconds(94) : null }];
+                if (conversations.FirstOrDefault(c => c.Id == thread)?.IsDirect == false && item.DeliveredCount > 1)
+                    rows.Add(new() { MemberId = thirdMember.Id, CredentialId = third, DeliveredAt = item.CreatedAt.AddMinutes(3) });
+                return ChatFixture.Ok(new GetMessageReceiptsResponse { Items = rows, TotalCount = rows.Count, PageIndex = page, PageSize = size,
+                    ReadReceiptsEnabled = features.HasFlag(Communications.Domain.Shared.Contracts.ConversationFeatures.ReadReceipts) });
+            });
         fixture.Session.Setup(s => s.SearchMessagesAsync(It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string query, Guid? thread, int page, int size, CancellationToken _) =>
             {
@@ -251,6 +290,7 @@ internal static partial class UiFixture
         stored[friendPhoto] = ("sarah.jpg", "image/jpeg", new MemoryStream(FixtureJpeg));
         directory.Setup(d => d.ResolveAsync(It.IsAny<Guid[]>(), It.IsAny<CancellationToken>())).ReturnsAsync((Guid[] ids, CancellationToken _) =>
             new[] { new ChatPerson(friend, "Sarah Mensah", "sarah", $"/api/chat/people/{friend}/photo?account={fixture.Tenant:N}:{fixture.Credential:N}&v={friendPhoto:N}", friendPhoto),
+                new ChatPerson(third, "Robin Chen", "robin"),
                 new ChatPerson(fixture.Credential, "Jamie Davis", "fixture", profilePhoto is { } id ? $"/api/chat/people/{fixture.Credential}/photo?account={fixture.Tenant:N}:{fixture.Credential:N}&v={id:N}" : null, profilePhoto) }.Where(p => ids.Contains(p.Id)).ToArray());
         fixture.Session.Setup(s => s.CreateAttachmentUploadAsync(It.IsAny<Communications.Domain.Shared.Contracts.Requests.Attachments.CreateChatAttachmentUploadRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Communications.Domain.Shared.Contracts.Requests.Attachments.CreateChatAttachmentUploadRequest request, CancellationToken _) => {

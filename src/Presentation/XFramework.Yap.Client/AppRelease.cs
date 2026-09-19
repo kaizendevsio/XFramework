@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.50";
+    public const string Version = "1.3.54";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "16 September 2026", [
+            "Tap a reaction to see exactly who reacted with what.",
+            "A message's options now show when it was sent, delivered and read, per person in a group."]),
+        ("1.3.50", "16 September 2026", [
             "Signing out and back in no longer replaces your account's encryption key, so your messages stay readable and contacts stop seeing a key-change warning."]),
         ("1.3.48", "16 September 2026", [
             "Signing in on a new device now restores your messages automatically, without a recovery key or a second password prompt.",
