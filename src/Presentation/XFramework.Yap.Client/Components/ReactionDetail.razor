@@ -1,0 +1,38 @@
+@inject ChatState State
+@inject BrowserTime Times
+@* Tapping a badge still toggles that reaction, so "who" needs an affordance of its own rather than
+   a second meaning for the same tap. *@
+<button class="react-who" aria-haspopup="dialog" aria-label="@($"See who reacted to this message, {Total} {(Total == 1 ? "reaction" : "reactions")}")" @onclick="OpenAsync"><Icon Name="users" Size="12" /></button>
+@if (open)
+{
+    <BottomSheet Title="Reactions" ShowHeader="true" OnClose="() => open = false">
+        <div class="reactor-list">
+            @if (loading) { <p class="reactor-note">Loading…</p> }
+            else if (reactors.Count == 0) { <p class="reactor-note">@(State.Online && !State.NeedsLogin ? "Nobody has reacted yet." : "Connect to see who reacted.")</p> }
+            else
+            {
+                @foreach (var reactor in reactors)
+                {
+                    <div class="row" @key="reactor.Id">
+                        <Avatar Initials="@ChatMessage.InitialsFor(reactor.Person.Name)" ImageUrl="@reactor.Person.AvatarUrl" Color="@(reactor.Mine ? "g1" : "g3")" Size="a40" />
+                        <span class="mid"><span class="t1">@reactor.Person.Name</span><span class="t2"><time datetime="@BrowserTime.Iso(reactor.ReactedAt)">@Times.Clock(reactor.ReactedAt)</time></span></span>
+                        <span class="reactor-emoji">@reactor.Emoji</span>
+                    </div>
+                }
+            }
+        </div>
+    </BottomSheet>
+}
+@code {
+    [Parameter, EditorRequired] public ChatMessage Message { get; set; } = default!;
+    private List<MessageReactor> reactors = [];
+    private bool open, loading;
+    private int Total => Message.Reactions.Values.Sum();
+    private async Task OpenAsync()
+    {
+        open = true; loading = true; reactors = [];
+        // Ordered newest first: the reaction someone is asking about is usually the one that just arrived.
+        reactors = (await State.ReactorsAsync(Message)).OrderByDescending(x => x.ReactedAt).ToList();
+        loading = false;
+    }
+}
