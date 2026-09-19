@@ -183,6 +183,64 @@ public sealed class YapCallGatewayTests
         Assert.That(next.Participants.Count(x => x.Muted), Is.EqualTo(1));
     }
 
+    // Camera state is roster presence, exactly like mute: it must not rotate the epoch, because a
+    // rekey pauses everybody's media and a camera button should never interrupt the audio.
+    [Test]
+    public async Task GroupVideoFlag_TracksTheCameraWithoutChangingTheKeyEpoch()
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        var room = await f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId, f.CharlieId], deviceId: f.AliceDevice);
+        room = await f.Gateway.AcceptGroupAsync(f.Bob, room.Id, deviceId: f.BobDevice);
+        Assert.That(room.Participants, Has.None.Matches<YapGroupParticipant>(x => x.Video), "no camera is on until someone turns one on");
+
+        f.Gateway.VideoGroup(f.Bob, room.Id, true);
+        var next = f.Gateway.GroupRoster(f.Alice, room.Id);
+        Assert.Multiple(() =>
+        {
+            Assert.That(next.Revision, Is.EqualTo(room.Revision));
+            Assert.That(next.Participants.Single(x => x.CredentialId == f.BobId).Video, Is.True);
+            Assert.That(next.Participants.Count(x => x.Video), Is.EqualTo(1));
+        });
+
+        f.Gateway.VideoGroup(f.Bob, room.Id, false);
+        Assert.That(f.Gateway.GroupRoster(f.Alice, room.Id).Participants, Has.None.Matches<YapGroupParticipant>(x => x.Video));
+    }
+
+    [Test]
+    public async Task AParticipantWhoLeaves_StopsBeingListedAsOnCamera()
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        var room = await f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId, f.CharlieId], deviceId: f.AliceDevice);
+        await f.Gateway.AcceptGroupAsync(f.Bob, room.Id, deviceId: f.BobDevice);
+        f.Gateway.VideoGroup(f.Bob, room.Id, true);
+        await f.Gateway.LeaveGroupAsync(f.Bob, room.Id);
+        Assert.That(f.Gateway.GroupRoster(f.Alice, room.Id).Participants, Has.None.Matches<YapGroupParticipant>(x => x.Video));
+    }
+
+    [TestCase(true, true)]
+    [TestCase(false, false)]
+    public void Video_FollowsTheEncryptedGroupGateAndItsOwnSwitch(bool video, bool expected)
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        { ["Yap:Calls:Enabled"] = "true", ["Yap:Calls:EncryptedGroups"] = "true",
+          ["Yap:Calls:SecurityMode"] = "EndToEndEncrypted", ["Yap:Calls:Video"] = video.ToString() }).Build();
+        using var gateway = new YapCallGateway(config, services.GetRequiredService<IServiceScopeFactory>(), NullLogger<BoltServer>.Instance);
+        Assert.That(gateway.VideoEnabled, Is.EqualTo(expected));
+    }
+
+    // Without encrypted groups there is no epoch key, so there is nothing to encrypt a picture with.
+    [Test]
+    public void Video_IsNeverAvailableWithoutEndToEndEncryptedGroups()
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        { ["Yap:Calls:Enabled"] = "true", ["Yap:Calls:EncryptedGroups"] = "false",
+          ["Yap:Calls:SecurityMode"] = "TrustedServerTls", ["Yap:Calls:Video"] = "true" }).Build();
+        using var gateway = new YapCallGateway(config, services.GetRequiredService<IServiceScopeFactory>(), NullLogger<BoltServer>.Instance);
+        Assert.That(gateway.VideoEnabled, Is.False);
+    }
+
     [Test]
     public async Task GroupAdmission_ProductionConstructor_DefaultsToDisabled()
     {

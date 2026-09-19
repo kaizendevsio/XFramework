@@ -18,12 +18,15 @@ public sealed class MediaServiceOptions
     public int AudioSampleRate { get; set; } = 48_000;
     public int AudioChannels { get; set; } = 1;
 
-    public int VideoWidth { get; set; } = 1280;
-    public int VideoHeight { get; set; } = 720;
-    public int VideoBitrateKbps { get; set; } = 2_000;
-    public int VideoFramerate { get; set; } = 30;
-    public string VideoCodec { get; set; } = "h264";
-    public int KeyframeIntervalFrames { get; set; } = 60;
+    /// <summary>Tallest picture this build will ever ask an encoder for. Devices cap themselves below it.</summary>
+    public int VideoMaxHeight { get; set; } = 1080;
+    /// <summary>Rung the ladder starts on. 720p climbs to 1080p within seconds on a good link and
+    /// falls quickly on a bad one, which beats opening at 1080p and stalling the first two seconds.</summary>
+    public int VideoStartTier { get; set; } = 3;
+    /// <summary>Seconds between forced keyframes. Short enough for a late joiner, long enough not to flood.</summary>
+    public int KeyframeIntervalSeconds { get; set; } = 2;
+    /// <summary>How often the send ladder looks at measured conditions.</summary>
+    public int AdaptationIntervalMs { get; set; } = 1_000;
 
     /// <summary>Legacy option retained for source compatibility. SecurityMode is authoritative;
     /// setting this to false cannot opt into transport-only security.</summary>
