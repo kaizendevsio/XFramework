@@ -312,159 +312,346 @@ class AudioPipeline {
     }
 }
 
+// ─── Video ──────────────────────────────────────────
+// Codec strings are chosen per height: a level that is too low is rejected outright by
+// isConfigSupported, and one that is too high needlessly excludes small hardware encoders.
+
+function av1Codec(height) { return height > 720 ? 'av01.0.08M.08' : height > 480 ? 'av01.0.05M.08' : 'av01.0.04M.08'; }
+function vp9Codec(height) { return height > 1080 ? 'vp09.00.51.08' : height > 720 ? 'vp09.00.40.08' : height > 480 ? 'vp09.00.31.08' : 'vp09.00.21.08'; }
+function h264Codec(height) { return height > 720 ? 'avc1.4d0028' : height > 480 ? 'avc1.42001f' : 'avc1.42001e'; }
+
+export function videoCodecString(codec, height) {
+    return codec === 'av1' ? av1Codec(height) : codec === 'vp9' ? vp9Codec(height) : h264Codec(height);
+}
+
+function encoderConfig(codec, width, height, bitrateKbps, framerate, hardware) {
+    const config = {
+        codec: videoCodecString(codec, height), width, height,
+        bitrate: Math.max(64, bitrateKbps) * 1000, framerate,
+        latencyMode: 'realtime', bitrateMode: 'variable', scalabilityMode: 'L1T1',
+        hardwareAcceleration: hardware ?? 'no-preference'
+    };
+    // Without a decoder description an H.264/H.265 bitstream has to be Annex B, and the
+    // decoder here is fed raw chunks. Asking for the wrong container plays as green mush.
+    if (codec === 'h264') config.avc = { format: 'annexb' };
+    return config;
+}
+
+/// Probe what this device can actually do, per codec, encode and decode, hardware and software.
+/// Everything below is decided from these answers rather than from a user-agent guess.
+export async function probeVideoCodecs(maxHeight = 1080) {
+    const results = [];
+    if (typeof VideoEncoder === 'undefined' || typeof VideoDecoder === 'undefined' ||
+        typeof MediaStreamTrackProcessor === 'undefined') return results;
+    const heights = [1080, 720, 540, 360].filter(h => h <= maxHeight);
+    if (heights.length === 0) heights.push(Math.max(180, maxHeight));
+    for (const codec of ['av1', 'vp9', 'h264']) {
+        let best = 0, hardware = false, decode = false;
+        for (const height of heights) {
+            const width = Math.round(height * 16 / 9 / 2) * 2;
+            try {
+                const supported = await VideoEncoder.isConfigSupported(encoderConfig(codec, width, height, 2000, 30));
+                if (!supported?.supported) continue;
+                if (best === 0) best = height;
+                if (!hardware) {
+                    try {
+                        const accelerated = await VideoEncoder.isConfigSupported(
+                            encoderConfig(codec, width, height, 2000, 30, 'require-hardware'));
+                        hardware = accelerated?.supported === true;
+                    } catch { /* require-hardware is allowed to throw; it just means "no". */ }
+                }
+            } catch { /* An unsupported configuration is an answer, not a failure. */ }
+        }
+        for (const height of heights) {
+            try {
+                const supported = await VideoDecoder.isConfigSupported(
+                    { codec: videoCodecString(codec, height), hardwareAcceleration: 'no-preference' });
+                if (supported?.supported) { decode = true; break; }
+            } catch { /* Same: treat a throw as unsupported. */ }
+        }
+        results.push({ codec, encode: best > 0, decode, hardware, maxHeight: best });
+    }
+    return results;
+}
+
+/// Battery and core count only ever lower the ceiling; they never raise it.
+export async function videoDeviceCeiling() {
+    let ceiling = 1080;
+    if ((navigator.hardwareConcurrency ?? 8) <= 4) ceiling = 720;
+    try {
+        const battery = await navigator.getBattery?.();
+        // A phone below a fifth of its battery and off the charger should not spend it on pixels
+        // nobody can see on a small screen.
+        if (battery && !battery.charging && battery.level <= 0.2) ceiling = Math.min(ceiling, 540);
+    } catch { /* The Battery API is absent or blocked; the other limits still apply. */ }
+    return ceiling;
+}
+
 class VideoPipeline {
     constructor() {
         this.encoder = null;
-        this.decoder = null;
         this.mediaStream = null;
-        this.trackProcessor = null;
         this.captureReader = null;
         this.captureRunning = false;
-        this.canvas = null;
-        this.canvasCtx = null;
+        this.captureGeneration = 0;
+        this.preview = null;
         this.dotNetRef = null;
-        this.frameCount = 0;
-        this.keyframeInterval = 60;
-        this._lastConfig = null;
+        this.remotes = new Map();
+        this.config = null;
+        this.codec = 'h264';
+        this.keyframeIntervalMs = 2000;
+        this.lastKeyframe = 0;
+        this.frameId = 0;
+        this.pendingKeyframe = true;
+        this.window = { since: 0, frames: 0, bytes: 0 };
+        this.stats = { fps: 0, kbps: 0, dropped: 0, backlog: 0 };
+        this.facingMode = 'user';
+        this.deviceId = '';
+        this.lastRequest = null;
+        this.hostRef = null;
+        this.hidden = () => { if (globalThis.document?.hidden && this.captureRunning) this.stopCapture('hidden'); };
+        globalThis.document?.addEventListener('visibilitychange', this.hidden);
+        globalThis.addEventListener?.('pagehide', this.hidden);
     }
 
-    async initEncoder(width, height, bitrate, framerate, codec, keyframeInterval) {
-        this.keyframeInterval = keyframeInterval || 60;
-        this.frameCount = 0;
-
-        const codecString = codec === 'h265' ? 'hev1.1.6.L93.B0' : 'avc1.42001f';
-
-        this._lastConfig = {
-            codec: codecString,
-            width: width,
-            height: height,
-            bitrate: bitrate * 1000,
-            framerate: framerate,
-            latencyMode: 'realtime',
-            hardwareAcceleration: 'prefer-hardware'
-        };
-
+    async initEncoder(codec, width, height, bitrateKbps, framerate, keyframeSeconds) {
+        this.codec = codec || 'h264';
+        this.keyframeIntervalMs = Math.max(500, (keyframeSeconds || 2) * 1000);
+        // 'prefer-hardware' is not a hint that degrades gracefully: on a machine with no hardware
+        // encoder Chrome reports the configuration unsupported and configure() throws outright.
+        // Ask for hardware, then settle for whatever the browser has.
+        let config = null;
+        for (const acceleration of ['prefer-hardware', 'no-preference']) {
+            const candidate = encoderConfig(this.codec, width, height, bitrateKbps, framerate, acceleration);
+            try { if ((await VideoEncoder.isConfigSupported(candidate))?.supported) { config = candidate; break; } }
+            catch { /* Treat a throw as unsupported and try the next acceleration. */ }
+        }
+        if (!config) throw new Error('This device cannot encode video for calls.');
+        this._closeEncoder();
+        this.config = config;
+        this.frameId = 0;
+        this.pendingKeyframe = true;
         this.encoder = new VideoEncoder({
-            output: (chunk, metadata) => {
-                const data = new Uint8Array(chunk.byteLength);
-                chunk.copyTo(data);
-                const isKeyframe = chunk.type === 'key';
-                if (this.dotNetRef) {
-                    this.dotNetRef.invokeMethodAsync('OnVideoEncoded', data, isKeyframe);
-                }
-            },
-            error: (e) => console.error('VideoEncoder error:', e)
+            output: (chunk) => this._onEncoded(chunk),
+            error: (error) => {
+                console.error('Bolt video encoder:', error);
+                this.stopCapture('encoder');
+            }
         });
-        this.encoder.configure(this._lastConfig);
+        this.encoder.configure(config);
+        return { width: config.width, height: config.height, codec: config.codec };
     }
 
-    async initDecoder(canvasElement, codec) {
-        this.canvas = canvasElement;
-        this.canvasCtx = canvasElement.getContext('2d');
-
-        const codecString = codec === 'h265' ? 'hev1.1.6.L93.B0' : 'avc1.42001f';
-
-        this.decoder = new VideoDecoder({
-            output: (frame) => {
-                this._renderFrame(frame);
-            },
-            error: (e) => console.error('VideoDecoder error:', e)
-        });
-        this.decoder.configure({
-            codec: codecString,
-            hardwareAcceleration: 'prefer-hardware'
-        });
+    _onEncoded(chunk) {
+        const data = new Uint8Array(chunk.byteLength);
+        chunk.copyTo(data);
+        const now = Date.now();
+        if (this.window.since === 0) this.window.since = now;
+        this.window.frames++; this.window.bytes += data.byteLength;
+        const elapsed = now - this.window.since;
+        if (elapsed >= 1000) {
+            this.stats.fps = this.window.frames * 1000 / elapsed;
+            this.stats.kbps = this.window.bytes * 8 / elapsed;
+            this.window = { since: now, frames: 0, bytes: 0 };
+        }
+        if (!this.captureRunning || !this.dotNetRef) return;
+        // Frame IDs are the reassembly key on the far side; they must not restart mid-call.
+        const frameId = (this.frameId = (this.frameId + 1) >>> 0);
+        void this.dotNetRef.invokeMethodAsync('OnVideoEncoded', data, chunk.type === 'key',
+            frameId, Math.max(0, Math.round(chunk.timestamp)) >>> 0);
     }
 
-    async startCapture(dotNetRef, constraints) {
-        this.dotNetRef = dotNetRef;
-        const videoConstraints = constraints
-            ? { width: constraints.width, height: constraints.height, frameRate: constraints.framerate }
-            : { width: 1280, height: 720, frameRate: 30 };
-
-        this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: videoConstraints });
-        const track = this.mediaStream.getVideoTracks()[0];
-
-        this.trackProcessor = new MediaStreamTrackProcessor({ track: track });
-        this.captureReader = this.trackProcessor.readable.getReader();
+    /// Opening the camera is the only place getUserMedia is called with video, and it happens
+    /// only from an explicit user action on the call screen.
+    async startCapture(dotNetRef, options) {
+        if (!this.encoder) throw new Error('Configure the video encoder first.');
+        // A bandwidth-driven resume passes nothing; it must come back on the camera the user chose.
+        const wanted = (options && (options.deviceId || options.facingMode)) ? options : (this.lastRequest || {});
+        const same = this.lastRequest && wanted.deviceId === this.lastRequest.deviceId &&
+            wanted.facingMode === this.lastRequest.facingMode;
+        if (this.captureRunning && same) return this.describe();
+        // Switching between the front and back camera means closing the one that is open: a phone
+        // will not hand out both at once, and leaving the old track live keeps its indicator lit.
+        if (this.captureRunning) this.stopCapture();
+        this.lastRequest = wanted;
+        const generation = ++this.captureGeneration;
+        const video = {
+            width: { ideal: this.config.width }, height: { ideal: this.config.height },
+            frameRate: { ideal: this.config.framerate, max: this.config.framerate }
+        };
+        if (wanted.deviceId) video.deviceId = { exact: wanted.deviceId };
+        else if (wanted.facingMode) video.facingMode = { ideal: wanted.facingMode };
+        let stream;
+        try { stream = await navigator.mediaDevices.getUserMedia({ audio: false, video }); }
+        catch (error) {
+            if (generation === this.captureGeneration) this.stopCapture('denied');
+            throw error;
+        }
+        if (generation !== this.captureGeneration) { stream.getTracks().forEach(t => t.stop()); return this.describe(); }
+        const track = stream.getVideoTracks()[0];
+        if (!track) { stream.getTracks().forEach(t => t.stop()); throw new Error('No camera was available.'); }
+        this.mediaStream = stream;
+        const settings = track.getSettings?.() ?? {};
+        this.deviceId = settings.deviceId || wanted.deviceId || '';
+        this.facingMode = settings.facingMode || wanted.facingMode || 'user';
         this.captureRunning = true;
-
-        this._readLoop();
+        this.pendingKeyframe = true;
+        this.window = { since: 0, frames: 0, bytes: 0 };
+        this.dotNetRef = dotNetRef;
+        if (this.preview) this.preview.srcObject = stream;
+        // The camera can be revoked from the browser's own UI; that must end the send, not hang it.
+        track.addEventListener('ended', () => { if (generation === this.captureGeneration) this.stopCapture('ended'); });
+        this.captureReader = new MediaStreamTrackProcessor({ track }).readable.getReader();
+        void this._readLoop(generation);
+        return this.describe();
     }
 
-    async _readLoop() {
-        while (this.captureRunning) {
+    async _readLoop(generation) {
+        while (this.captureRunning && generation === this.captureGeneration) {
+            let frame;
             try {
                 const { value, done } = await this.captureReader.read();
                 if (done) break;
-                if (this.encoder && this.encoder.state === 'configured') {
-                    this.frameCount++;
-                    const keyFrame = this.frameCount % this.keyframeInterval === 0;
-                    this.encoder.encode(value, { keyFrame: keyFrame });
-                }
-                value.close();
-            } catch {
-                break;
+                frame = value;
+            } catch { break; }
+            try {
+                if (!this.encoder || this.encoder.state !== 'configured') continue;
+                // Dropping the newest frame beats queueing it: a backlog is latency the call never recovers.
+                if (this.encoder.encodeQueueSize >= 2) { this.stats.dropped++; continue; }
+                const now = Date.now();
+                const keyFrame = this.pendingKeyframe || now - this.lastKeyframe >= this.keyframeIntervalMs;
+                if (keyFrame) { this.lastKeyframe = now; this.pendingKeyframe = false; }
+                this.encoder.encode(frame, { keyFrame });
+            } finally { frame.close(); }
+        }
+    }
+
+    describe() {
+        return { capturing: this.captureRunning, deviceId: this.deviceId, facingMode: this.facingMode,
+            width: this.config?.width ?? 0, height: this.config?.height ?? 0, codec: this.codec };
+    }
+
+    getStats() {
+        this.stats.backlog = this.encoder?.encodeQueueSize ?? 0;
+        return { fps: this.stats.fps, kbps: this.stats.kbps, dropped: this.stats.dropped, backlog: this.stats.backlog };
+    }
+
+    attachPreview(element) {
+        this.preview = element || null;
+        // srcObject shows the camera without a second decode; drawing it would double the cost.
+        if (this.preview) this.preview.srcObject = this.mediaStream;
+    }
+
+    setPreviewEnabled(enabled) { if (this.preview) this.preview.srcObject = enabled ? this.mediaStream : null; }
+
+    /// Change picture size, rate or bitrate in place. A reconfigure needs a fresh keyframe or the
+    /// far side decodes the new size against the old reference.
+    applyTier(width, height, bitrateKbps, framerate) {
+        if (!this.encoder || this.encoder.state !== 'configured' || !this.config) return false;
+        const next = encoderConfig(this.codec, width, height, bitrateKbps, framerate, this.config.hardwareAcceleration);
+        if (next.width === this.config.width && next.height === this.config.height &&
+            next.bitrate === this.config.bitrate && next.framerate === this.config.framerate) return false;
+        this.config = next;
+        this.encoder.configure(next);
+        this.pendingKeyframe = true;
+        return true;
+    }
+
+    requestKeyframe() { this.pendingKeyframe = true; }
+
+    /// One decoder and one canvas per remote sender: group tiles are independent, and a stall in
+    /// one participant's stream must not freeze the others.
+    addRemote(streamId, canvas, codec, hostRef) {
+        // The host reference is kept apart from the capture one: a decode failure has to reach
+        // C# whether or not this device's own camera is on.
+        this.hostRef = hostRef ?? this.hostRef;
+        this.removeRemote(streamId);
+        if (this.remotes.size >= 7) return false;
+        const context = canvas?.getContext?.('2d', { alpha: false, desynchronized: true });
+        if (!context) return false;
+        const remote = { canvas, context, codec: codec || 'h264', decoder: null, width: 0, height: 0, primed: false };
+        this._openDecoder(streamId, remote);
+        this.remotes.set(streamId, remote);
+        return true;
+    }
+
+    _openDecoder(streamId, remote) {
+        remote.primed = false;
+        remote.decoder = new VideoDecoder({
+            output: (frame) => this._render(remote, frame),
+            error: (error) => {
+                console.error('Bolt video decoder:', error);
+                // A decoder that errored is closed for good. Rebuild it and wait for the next
+                // keyframe; the C# side asks the sender for one rather than showing a frozen tile.
+                if (this.remotes.get(streamId) === remote) this._openDecoder(streamId, remote);
+                void this.hostRef?.invokeMethodAsync('OnVideoDecodeFailed', streamId);
             }
-        }
-    }
-
-    stopCapture() {
-        this.captureRunning = false;
-        if (this.captureReader) { this.captureReader.cancel(); this.captureReader = null; }
-        if (this.trackProcessor) { this.trackProcessor = null; }
-        if (this.mediaStream) {
-            this.mediaStream.getTracks().forEach(t => t.stop());
-            this.mediaStream = null;
-        }
-    }
-
-    decodeFrame(data, timestamp, isKeyframe) {
-        if (!this.decoder || this.decoder.state !== 'configured') return;
-        const chunk = new EncodedVideoChunk({
-            type: isKeyframe ? 'key' : 'delta',
-            timestamp: timestamp,
-            data: data
         });
-        this.decoder.decode(chunk);
+        remote.decoder.configure({ codec: videoCodecString(remote.codec, 1080), hardwareAcceleration: 'no-preference',
+            optimizeForLatency: true });
     }
 
-    requestKeyframe() {
-        this.frameCount = this.keyframeInterval - 1;
+    removeRemote(streamId) {
+        const remote = this.remotes.get(streamId);
+        if (!remote) return;
+        if (remote.decoder?.state !== 'closed') remote.decoder?.close();
+        this.remotes.delete(streamId);
     }
 
-    reconfigureBitrate(newBitrate) {
-        if (!this.encoder || this.encoder.state !== 'configured' || !this._lastConfig) return;
-        this._lastConfig.bitrate = newBitrate * 1000;
-        this.encoder.configure(this._lastConfig);
+    decodeFrame(streamId, data, timestamp, isKeyframe) {
+        const remote = this.remotes.get(streamId);
+        if (!remote || remote.decoder?.state !== 'configured') return false;
+        // A decoder that has not seen a keyframe yet cannot use deltas; feeding them wastes work.
+        if (!remote.primed && !isKeyframe) return false;
+        if (remote.decoder.decodeQueueSize >= 6) return false;
+        try {
+            remote.decoder.decode(new EncodedVideoChunk(
+                { type: isKeyframe ? 'key' : 'delta', timestamp, data }));
+            remote.primed = true;
+            return true;
+        } catch { remote.primed = false; return false; }
     }
 
-    reconfigureResolution(width, height, framerate) {
-        if (!this.encoder || this.encoder.state !== 'configured' || !this._lastConfig) return;
-        this._lastConfig.width = width;
-        this._lastConfig.height = height;
-        if (framerate) this._lastConfig.framerate = framerate;
-        this.encoder.configure(this._lastConfig);
+    _render(remote, frame) {
+        try {
+            if (remote.width !== frame.displayWidth || remote.height !== frame.displayHeight) {
+                remote.width = remote.canvas.width = frame.displayWidth;
+                remote.height = remote.canvas.height = frame.displayHeight;
+            }
+            remote.context.drawImage(frame, 0, 0);
+        } catch { /* A detached canvas is a closed tile, not a call failure. */ }
+        finally { frame.close(); }
     }
 
-    _renderFrame(frame) {
-        if (!this.canvasCtx || !this.canvas) {
-            frame.close();
-            return;
-        }
-        this.canvas.width = frame.displayWidth;
-        this.canvas.height = frame.displayHeight;
-        this.canvasCtx.drawImage(frame, 0, 0);
-        frame.close();
+    /// Releases the camera outright - track.stop() is what turns the hardware indicator off.
+    stopCapture(reason) {
+        const wasRunning = this.captureRunning;
+        this.captureGeneration++;
+        this.captureRunning = false;
+        if (this.captureReader) { try { this.captureReader.cancel(); } catch { } this.captureReader = null; }
+        if (this.preview) this.preview.srcObject = null;
+        if (this.mediaStream) { this.mediaStream.getTracks().forEach(t => t.stop()); this.mediaStream = null; }
+        this.stats = { fps: 0, kbps: 0, dropped: this.stats.dropped, backlog: 0 };
+        const notify = this.dotNetRef;
+        this.dotNetRef = null;
+        if (wasRunning && reason && notify) void notify.invokeMethodAsync('OnVideoCaptureStopped', reason);
+        return wasRunning;
+    }
+
+    _closeEncoder() {
+        if (this.encoder && this.encoder.state !== 'closed') { try { this.encoder.close(); } catch { } }
+        this.encoder = null;
     }
 
     async dispose() {
+        globalThis.document?.removeEventListener('visibilitychange', this.hidden);
+        globalThis.removeEventListener?.('pagehide', this.hidden);
         this.stopCapture();
-        if (this.encoder) { this.encoder.close(); this.encoder = null; }
-        if (this.decoder) { this.decoder.close(); this.decoder = null; }
-        this.canvas = null;
-        this.canvasCtx = null;
-        this.dotNetRef = null;
+        this._closeEncoder();
+        for (const streamId of [...this.remotes.keys()]) this.removeRemote(streamId);
+        this.hostRef = null;
+        this.preview = null;
+        this.config = null;
     }
 }
 
@@ -546,6 +733,19 @@ export async function checkVoiceCapabilities() {
     return { supported: true, nativeCodecs: false, reason: null };
 }
 export function createVideoPipeline() { return new VideoPipeline(); }
+
+/// Everything the caller needs to decide whether, and how well, this device can send video.
+/// Runs before the camera is touched: probing never opens a capture device.
+export async function checkVideoCapabilities() {
+    if (!globalThis.isSecureContext || typeof VideoEncoder === 'undefined' ||
+        typeof MediaStreamTrackProcessor === 'undefined' || !navigator.mediaDevices?.getUserMedia)
+        return { supported: false, reason: 'Video calls are not supported by this browser.', ceiling: 0, codecs: [] };
+    const ceiling = await videoDeviceCeiling();
+    const codecs = await probeVideoCodecs(ceiling);
+    return codecs.some(x => x.encode)
+        ? { supported: true, reason: null, ceiling, codecs }
+        : { supported: false, reason: 'This device has no video encoder for calls.', ceiling, codecs };
+}
 
 export async function enumerateAudioInputs() { return await DeviceManager.enumerateAudioInputs(); }
 export async function enumerateVideoInputs() { return await DeviceManager.enumerateVideoInputs(); }

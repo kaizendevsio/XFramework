@@ -79,6 +79,16 @@ public sealed class BoltMediaStream : IAsyncDisposable
     /// <summary>True if this is an audio stream; false for video.</summary>
     public bool IsAudio { get; }
 
+    /// <summary>Codec the remote peer announced in its MediaConfig; unset for locally created streams.</summary>
+    public CodecId Codec { get; internal set; }
+
+    /// <summary>Relay-stamped owner of a remote stream, used to name it and to check its sender key.</summary>
+    public string SenderId { get; internal set; } = "";
+
+    /// <summary>Picture size the remote peer announced. Advisory: the encoder may adapt below it.</summary>
+    public int Width { get; internal set; }
+    public int Height { get; internal set; }
+
     /// <summary>True if payload encryption is active. The caller must authenticate peer key material.</summary>
     public bool IsEncrypted => _encryption?.IsReady == true;
 

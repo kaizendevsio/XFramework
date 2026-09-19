@@ -179,6 +179,16 @@ public sealed class BoltMediaClient : IAsyncDisposable
     public BoltMediaStream? GetMediaStream(Guid streamId)
         => _mediaStreams.TryGetValue(streamId, out var stream) ? stream : null;
 
+    /// <summary>Ask a remote sender for a keyframe. The relay routes it back to that stream's owner.</summary>
+    public async ValueTask RequestRemoteKeyframeAsync(Guid streamId, CancellationToken ct = default)
+    {
+        if (!_mediaStreams.ContainsKey(streamId)) return;
+        var writer = RentedBufferWriter.GetThreadLocal();
+        BoltCodec.WriteMediaKeyRequest(writer, streamId);
+        try { await _client.GetPrimaryConnection().SendAsync(writer.WrittenMemory, ct); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Keyframe request for {StreamId} was not delivered", streamId); }
+    }
+
     public bool RegisterMediaStream(BoltMediaStream stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
@@ -229,14 +239,21 @@ public sealed class BoltMediaClient : IAsyncDisposable
 
         var isAudio = config.MediaType == MediaType.Audio;
         var stream = new BoltMediaStream(conn, config.StreamId, config.CallId, isAudio);
+        stream.Codec = config.CodecId;
+        stream.Width = config.Param1;
+        stream.Height = config.Param2;
         if (AuthenticatedStreamEncryptionFactory is { } encryptionFactory)
         {
-            if (_mediaStreams.Count >= 8 || !isAudio || config.CodecId != CodecId.Opus || (config.Flags & 0x10) == 0 ||
+            // Eight participants may each publish voice and camera, so sixteen routes is the ceiling.
+            var codecAllowed = isAudio ? config.CodecId == CodecId.Opus
+                : config.MediaType == MediaType.Video && config.CodecId is CodecId.H264 or CodecId.VP9 or CodecId.AV1;
+            if (_mediaStreams.Count >= 16 || !codecAllowed || (config.Flags & 0x10) == 0 ||
                 config.ExtensionLength is < 6 or > 133) return;
             var owner = System.Text.Encoding.UTF8.GetString(buffer, config.ExtensionOffset, config.ExtensionLength);
             if (!owner.StartsWith("SFR1:", StringComparison.Ordinal)) return;
             try { stream.SetEncryption(encryptionFactory(config.CallId, owner[5..])); }
             catch { return; }
+            stream.SenderId = owner[5..];
         }
         if (!_mediaStreams.TryAdd(config.StreamId, stream)) return;
 
