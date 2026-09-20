@@ -40,7 +40,9 @@ window.yap = {
         yap.haptics?.buzz('tap');
         dialog.showModal(); yap.focusSheet(element);
     },
-    openCall(dialog) { dialog.addEventListener('cancel', event => event.preventDefault()); dialog.showModal(); },
+    // Idempotent: a call re-opens its surface whenever Blazor hands it a different element, and a
+    // second listener on the same node would swallow Escape twice.
+    openCall(dialog) { if (!dialog.yapCall) { dialog.yapCall = true; dialog.addEventListener('cancel', event => event.preventDefault()); } if (!dialog.open) dialog.showModal(); },
     focusSheet(element) {
         element.yapPreviousFocus = document.activeElement;
         element.yapTrap = event => {

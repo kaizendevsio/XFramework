@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.54";
+    public const string Version = "1.3.55";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
-        (Version, "20 September 2026", [
+        (Version, "16 September 2026", [
+            "The call screen no longer disappears when a camera turns on, and video now shows.",
+            "Expanding a minimized video call shows the picture again instead of a black tile."]),
+        ("1.3.54", "20 September 2026", [
             "Video calls are here: turn your camera on in a call, with quality that adapts to your device and connection.",
             "Video is end-to-end encrypted on the same key as the call audio."]),
         ("1.3.53", "20 September 2026", [
