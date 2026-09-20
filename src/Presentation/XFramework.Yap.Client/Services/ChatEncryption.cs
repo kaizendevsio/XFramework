@@ -36,8 +36,12 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js, TimeProvider? tim
     /// identity to make the app look ready would orphan every message already sent to it.</summary>
     public string? Locked { get; private set; }
     private const string LockedMessage = "Your encrypted messages are locked on this device. Unlock with your password, use your recovery key, or approve this device from a device you already use.";
+    /// <summary>The account publishes an identity this device cannot prove is its own. That is a
+    /// decision - take the published identity, or restore the previous one - not a sentence to read,
+    /// so settings offers both instead of a warning with nothing attached to it.</summary>
+    public bool IdentityReplaced { get; private set; }
     public Guid? LocalDeviceId => Status.DeviceId;
-    public void Reset() { generation++; activeScope = null; InvalidateRecipients(); HideRecovery(); Status = new(); Locked = null; backedUpRevision = -1; BackupPending = false; }
+    public void Reset() { generation++; activeScope = null; InvalidateRecipients(); HideRecovery(); Status = new(); Locked = null; IdentityReplaced = false; backedUpRevision = -1; BackupPending = false; }
     public void InvalidateRecipients(Guid? thread = null)
     {
         lock (recipientsGate)
@@ -88,6 +92,25 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js, TimeProvider? tim
     });
     public Task<bool> PasswordEnrollAsync(UserSession user, string username, string password) => ChangeAsync(user,
         operation => JsAsync<bool>(operation, "passwordEnroll", username, password));
+    /// <summary>What the account publishes against what this device can prove it holds.</summary>
+    public Task<OwnIdentity> OwnIdentityAsync(UserSession user) => ChangeAsync(user, async operation =>
+        await JsAsync<OwnIdentity>(operation, "ownIdentity", await GetAsync<JsonElement>(operation, "api/chat/encryption/directory")));
+    public sealed record OwnIdentity(string? Published, string? Held, long Revision, bool Matches, bool Replaced);
+    /// <summary>Takes the account's current published identity in place of the retired one this
+    /// device holds, then finishes the unlock the sign-in already paid for, so the choice ends in a
+    /// working device rather than another screen. Nothing is deleted: the previous root and its
+    /// history keys stay, so restoring that identity later remains possible.</summary>
+    public Task<bool> AdoptIdentityAsync(UserSession user) => ChangeAsync(user, async operation =>
+    {
+        var directory = await GetAsync<JsonElement>(operation, "api/chat/encryption/directory");
+        await JsAsync<bool>(operation, "adoptIdentity", directory);
+        var problem = await UnlockAsync(operation);
+        Status = await JsAsync<EncryptionStatus>(operation, "status");
+        backedUpRevision = -1;
+        if (!Status.Approved) { Locked = problem ?? LockedMessage; return false; }
+        Locked = null; IdentityReplaced = false;
+        return true;
+    });
     /// <summary>Whether the sign-in that is still held in this browser session can unlock history
     /// without asking for the password again, and why not when it cannot.</summary>
     public Task<PasswordUnlock> PasswordUnlockStateAsync(UserSession user) =>
@@ -164,7 +187,8 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js, TimeProvider? tim
             {
                 Status = await JsAsync<EncryptionStatus>(operation, "status");
                 HideRecovery();
-                Locked = "This account's security key was replaced. Unlock with your password, use your recovery key, or approve this device from a device you already use.";
+                IdentityReplaced = true;
+                Locked = "This account's encryption identity was replaced. Take the account's current identity, or restore your previous one with its recovery key or a device that still has it.";
                 return true;
             }
             var local = await JsAsync<EncryptionStatus>(operation, "status");
@@ -183,7 +207,7 @@ public sealed class ChatEncryption(ChatApi api, IJSRuntime js, TimeProvider? tim
                 }
                 if (local.RootFingerprint is null) { Status = local; Locked = problem ?? LockedMessage; return true; }
             }
-            Locked = null;
+            Locked = null; IdentityReplaced = false;
             await JsVoidAsync(operation, "acceptDirectory", directory);
             Status = await JsAsync<EncryptionStatus>(operation, "status");
             if (Status.CanApproveDevices && backedUpRevision != Status.DirectoryRevision)

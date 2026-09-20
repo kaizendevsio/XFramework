@@ -12,7 +12,7 @@ select, input { display: block; width: 100%; margin: 8px 0; padding: 12px; borde
 .device-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); }
 .device-row small { display: block; margin-top: 4px; color: var(--dim); }
 .device-remove { color: var(--danger, #e57777); }
-.device-confirm { padding: 8px 12px; border-radius: 12px; background: var(--surface); }
+.device-confirm, .identity-replaced { padding: 8px 12px; border-radius: 12px; background: var(--surface); }
 .verified-person { color: var(--accent); }
 .reset-encryption { border-top: 1px solid var(--border); }
 .reset-consent { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; }

@@ -63,6 +63,23 @@
         }
         else
         {
+            @* An identity this device cannot prove is its own is a decision, not a notice. The
+               warning that used to appear here belonged to a contact whose key changed - there is
+               nobody to verify with on your own account, so this says what happened and what to do. *@
+            @if (State.Encryption.IdentityReplaced)
+            {
+                <div class="identity-replaced">
+                    <p>This account's encryption identity was replaced. This device still holds the previous one.</p>
+                    <p>Taking the account's current identity lets you send and read new messages here. Messages encrypted to your previous identity stay unreadable on this device unless you restore that identity as well. Nothing is deleted either way.</p>
+                    @if (identity is not null)
+                    {
+                        <p class="fingerprint">This device holds @identity.Held</p>
+                        <p class="fingerprint">This account now publishes @identity.Published</p>
+                    }
+                    <button class="btn" disabled="@busy" @onclick="AdoptAsync">Use the account's current identity</button>
+                    <p>To restore the previous identity instead, use its recovery key or a device that still has it, under "Can't use your password?" below.</p>
+                </div>
+            }
             @* One way in, matching what sign-in already attempted. The recovery key is the fallback
                for a forgotten password, not a second route competing with it. *@
             @if (unlock is { Available: true })
@@ -175,6 +192,7 @@
     private string? accountScope;
     private string unlockPassword = "";
     private ChatEncryption.PasswordUnlock? unlock;
+    private ChatEncryption.OwnIdentity? identity;
     private List<ChatEncryption.DeviceInfo>? devices;
     private Guid? revokeCandidate;
     private Guid peerId;
@@ -207,6 +225,8 @@
             var state = await State.Encryption.PasswordUnlockStateAsync(user);
             if (State.User is null || OfflineStore.Scope(State.User) != scope) return;
             unlock = state;
+            // Naming both identities is what turns "your key changed" into something a person can act on.
+            if (State.Encryption.IdentityReplaced && identity is null) identity = await State.Encryption.OwnIdentityAsync(user);
             if (!state.SignedIn && passwordStatus is null)
                 passwordStatus = await JS.InvokeAsync<PasswordStatus>("yap.encryption.passwordStatus", scope);
             if (State.User is not null && OfflineStore.Scope(State.User) == scope) StateHasChanged();
@@ -215,7 +235,7 @@
         finally { loadingUnlock = false; }
     }
     private void ClearPrivateUi()
-    { currentPassword = newPassword = confirmPassword = unlockPassword = ""; passwordStatus = null; unlock = null; recoveryKey = deviceRequest = approvalCode = comparison = resetPassword = ""; resetConsent = false; proposal = approval = notice = null; devices = null; revokeCandidate = null; fingerprint = null; peerId = Guid.Empty; }
+    { currentPassword = newPassword = confirmPassword = unlockPassword = ""; passwordStatus = null; unlock = null; identity = null; recoveryKey = deviceRequest = approvalCode = comparison = resetPassword = ""; resetConsent = false; proposal = approval = notice = null; devices = null; revokeCandidate = null; fingerprint = null; peerId = Guid.Empty; }
     private void ClearPeer() { fingerprint = null; comparison = ""; }
     private async Task RunAsync(Func<UserSession, Task> action)
     {
@@ -285,6 +305,13 @@
             await State.SynchronizeAsync(); notice = "Password changed. Other sessions have been signed out.";
         }
         finally { currentPassword = newPassword = confirmPassword = ""; }
+    });
+    // The adopt path ends in a working device or in the reason it could not, never in silence.
+    private Task AdoptAsync() => RunAsync(async user =>
+    {
+        if (await State.Encryption.AdoptIdentityAsync(user))
+        { await State.SynchronizeAsync(); unlock = null; identity = null; notice = "This device is now using the account's current identity."; }
+        else unlock = await State.Encryption.PasswordUnlockStateAsync(user);
     });
     private Task ShowRecoveryAsync() => RunAsync(State.Encryption.ShowRecoveryAsync);
     private Task ResetAsync() => RunAsync(async user =>
