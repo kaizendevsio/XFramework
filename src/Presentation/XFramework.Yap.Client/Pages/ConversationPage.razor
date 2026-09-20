@@ -25,7 +25,7 @@ else
         {
             <MessageWindow @key="ParentId" Items="parent.Replies" Visible="() => State.ReadVisibleAsync(Id, ParentId)" HasMore="State.HasEarlierReplies(parent)" Earlier="() => State.LoadRepliesAsync(parent)" HasNewer="State.HasNewerReplies" Newer="() => State.LoadRepliesAsync(parent, true)">
                 <Header><div class="threadhead"><div class="parentmsg"><Avatar Initials="@parent.Initials" ImageUrl="@parent.AvatarUrl" Color="@parent.Color" Size="a34" /><div class="mid"><div class="nm">@parent.Sender </div><div class="tx">@parent.Text</div><MessageMedia Message="parent" /></div></div><div class="replycount">@parent.ReplyTotal replies</div></div></Header>
-                <ChildContent Context="message"><MessageBubble Message="message" Latest="MessageReceipts.IsLatest(message, parent.Replies)" ShowTime="@(!State.HasNewerReplies && parent.Replies.LastOrDefault()?.Id == message.Id)" Readers="MessageReceipts.Readers(message, parent.Replies)" ShowSender="true" OnSelect="Select" OnReply="ReplyTo" OnThread="OpenThreadAsync" OnReact='emoji => State.ActionAsync(message, "react", emoji: emoji)' /></ChildContent>
+                <ChildContent Context="message"><MessageBubble Message="message" Latest="MessageReceipts.IsLatest(message, parent.Replies)" ShowTime="@(!State.HasNewerReplies && parent.Replies.LastOrDefault()?.Id == message.Id)" Readers="MessageReceipts.Readers(message, parent.Replies)" ShowSender="true" OnSelect="Select" OnReply="ReplyTo" OnThread="OpenThreadAsync" OnReact='emoji => ReactToAsync(message, emoji)' /></ChildContent>
             </MessageWindow>
         }
         else if (State.OpeningConversation) { <MessageSkeleton /> }
@@ -34,7 +34,7 @@ else
     else
     {
         <MessageWindow @key="Id" Items="chat.Messages" Opening="State.OpeningConversation" Visible="() => State.ReadVisibleAsync(Id)" HasMore="State.HasEarlierMessages" Earlier="State.LoadEarlierAsync" HasNewer="State.HasNewerMessages" Newer="State.LoadNewerAsync">
-            <ChildContent Context="message"><MessageBubble Message="message" Latest="MessageReceipts.IsLatest(message, chat.Messages)" ShowTime="@(!State.HasNewerMessages && chat.Messages.LastOrDefault()?.Id == message.Id)" Readers="MessageReceipts.Readers(message, chat.Messages)" ShowSender="chat.Group" OnSelect="Select" OnReply="ReplyTo" OnThread="OpenThreadAsync" OnReact='emoji => State.ActionAsync(message, "react", emoji: emoji)' /></ChildContent>
+            <ChildContent Context="message"><MessageBubble Message="message" Latest="MessageReceipts.IsLatest(message, chat.Messages)" ShowTime="@(!State.HasNewerMessages && chat.Messages.LastOrDefault()?.Id == message.Id)" Readers="MessageReceipts.Readers(message, chat.Messages)" ShowSender="chat.Group" OnSelect="Select" OnReply="ReplyTo" OnThread="OpenThreadAsync" OnReact='emoji => ReactToAsync(message, emoji)' /></ChildContent>
         </MessageWindow>
     }
     </ChildContent><Footer><Composer @key="@(ParentId ?? Id)" ThreadId="Id" ParentId="ParentId" Reply="reply" Cancel="() => reply = null" RestoreReply="message => reply ??= message" /></Footer></ScrollSurface></div>
@@ -153,7 +153,14 @@ else if (mode == "forward")
     private Task OpenThreadAsync(ChatMessage message) { if (State.Selected?.Allows(ChatFeature.Threads) != false) { mode = null; Nav.NavigateTo($"/thread/{Id}/{message.Id}"); } return Task.CompletedTask; }
     private async Task CopyAsync() { mode = null; try { await JS.InvokeVoidAsync("yap.copy", selected!.Text); } catch (Exception ex) { State.Report(ex); } }
     private async Task FilesAsync() { mode = "files"; try { await State.OpenAttachmentsAsync(selected!); } catch (Exception ex) { State.Report(ex); } }
-    private Task ReactAsync(string emoji) { mode = null; return State.ActionAsync(selected!, "react", emoji: emoji); }
+    // Both ways in - the menu's reaction row and a chip under the bubble - land here, so the
+    // tap that confirms the choice is fired once and from one place.
+    private Task ReactToAsync(ChatMessage message, string emoji)
+    {
+        _ = JS.InvokeVoidAsync("yap.haptics.buzz", "tap");
+        return State.ActionAsync(message, "react", emoji: emoji);
+    }
+    private Task ReactAsync(string emoji) { mode = null; return ReactToAsync(selected!, emoji); }
     private Task ActionAsync(string action, string? text = null) { mode = null; return State.ActionAsync(selected!, action, text); }
     private async Task ForwardAsync(Guid target) { var text = selected!.Text; mode = null; Nav.NavigateTo($"/chat/{target}"); try { await State.SendAsync(target, text, null, $"forward:{Guid.NewGuid()}"); } catch (Exception ex) { State.Report(ex); } }
     private async Task ShowHitAsync(Guid id) { mode = null; query = ""; await State.LocateAsync(id); focus = id; }

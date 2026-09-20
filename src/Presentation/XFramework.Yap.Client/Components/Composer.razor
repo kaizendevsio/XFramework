@@ -35,14 +35,17 @@
         }
     }
     @if (recording) { <VoiceRecorder Stop="FinishRecordingAsync" Cancel="CancelRecordingAsync" /> }
-    <div class="inputrow liquid-glass @(CanSend ? "has-send" : "")"><GlassLayer />
+    <div class="inputrow liquid-glass @(CanSend ? "has-send" : "") @(emoji.Open ? "emoji-open" : "")"><GlassLayer />
         @if (State.Selected?.Allows(ChatFeature.Attachments) != false) { <button type="button" class="iconbtn attach-open" aria-label="Attach" @onpointerdown:preventDefault disabled="@(busy || recording || uploading)" @onclick="() => attaching = true"><Icon Name="plus" /></button> }
-        <div class="inputbox"><textarea @ref="editor" rows="1" aria-label="@(ParentId.HasValue ? "Reply in thread" : "Message")" placeholder="@(ParentId.HasValue ? "Reply in thread" : "Message")" @bind="draft" @bind:event="oninput" @bind:after="SaveDraftAsync" @onblur="StopTypingAsync" disabled="@recording" maxlength="4000" autocomplete="off"></textarea><button type="button" aria-label="Add smile emoji" @onpointerdown:preventDefault @onclick="AddEmojiAsync">☺</button></div>
+        @* @onpointerdown:preventDefault on the toggle keeps the native keyboard up until the
+           picker has taken its place, so the two never both animate. *@
+        <div class="inputbox"><textarea @ref="editor" rows="1" aria-label="@(ParentId.HasValue ? "Reply in thread" : "Message")" placeholder="@(ParentId.HasValue ? "Reply in thread" : "Message")" @bind="draft" @bind:event="oninput" @bind:after="SaveDraftAsync" @onfocus="CloseEmojiAsync" @onblur="StopTypingAsync" disabled="@recording" maxlength="4000" autocomplete="off"></textarea><button type="button" class="emoji-toggle" aria-label="@(emoji.Open ? "Show the keyboard" : "Emoji keyboard")" aria-expanded="@emoji.Open.ToString().ToLowerInvariant()" @onpointerdown:preventDefault @onclick="ToggleEmojiAsync">@(emoji.Open ? "⌨" : "☺")</button></div>
         <div class="composer-action">
             <button type="submit" class="sendbtn" aria-label="Send message" @onpointerdown:preventDefault tabindex="@(CanSend ? 0 : -1)" disabled="@(busy || !CanSend || recording)"><Icon Name="send" Size="20" /></button>
             @if (State.Selected?.Allows(ChatFeature.Voice) != false) { <button type="button" class="voicebtn iconbtn" aria-label="Record voice message" @onpointerdown:preventDefault tabindex="@(CanSend ? -1 : 0)" disabled="@(busy || recording || CanSend)" @onclick="StartRecordingAsync"><Icon Name="mic" Size="20" /></button> }
         </div>
     </div>
+    @if (emoji.Open) { <EmojiKeyboard OnPick="InsertEmojiAsync" OnClose="() => ToggleEmojiAsync()" /> }
 </form>
 @if (attaching)
 {
@@ -71,6 +74,7 @@
     private bool busy, recording, attaching, uploading, previewFailed;
     private int progress;
     private ElementReference editor;
+    private readonly EmojiKeyboardState emoji = new();
     private bool CanSend => !uploading && (!string.IsNullOrWhiteSpace(draft) || file is not null);
     private InputFile? mediaInput, cameraInput, videoInput, fileInput;
     private ChatState.PickedFile? file;
@@ -101,9 +105,42 @@
         await StopTypingAsync();
         await CancelRecordingAsync();
         await RemoveFileAsync();
+        // The picker owns a document-level flag while it is up; leaving the conversation
+        // must not leave the shell laid out for a keyboard that is no longer there.
+        if (emoji.Open) { emoji.Close(); await JS.InvokeVoidAsync("yap.emojiKeyboard.hide", editor, false); }
         reporter?.Dispose();
     }
-    private async Task AddEmojiAsync() { draft += "😊"; await SaveDraftAsync(); }
+
+    /// <summary>Hands the keyboard's place to the picker and back. Neither direction touches the draft.</summary>
+    private async Task ToggleEmojiAsync()
+    {
+        if (emoji.Toggle())
+        {
+            await JS.InvokeVoidAsync("yap.emojiKeyboard.show", editor);
+            await JS.InvokeVoidAsync("yap.haptics.buzz", "tap");
+        }
+        else await JS.InvokeVoidAsync("yap.emojiKeyboard.hide", editor, true);
+    }
+
+    // Tapping the draft asks for the real keyboard back, so the picker steps aside without
+    // stealing the focus the tap just gave it.
+    private async Task CloseEmojiAsync()
+    {
+        if (!emoji.Open) return;
+        emoji.Close();
+        await JS.InvokeVoidAsync("yap.emojiKeyboard.hide", editor, false);
+    }
+
+    private async Task InsertEmojiAsync(string glyph)
+    {
+        var range = await JS.InvokeAsync<int[]>("yap.emojiKeyboard.caret", editor);
+        draft = emoji.Insert(draft, range.ElementAtOrDefault(0), range.ElementAtOrDefault(1), glyph);
+        // Writing the new value drops the caret at the end, so the render has to happen before
+        // the caret goes back - not on some later OnAfterRender, which would land on the old text.
+        await InvokeAsync(StateHasChanged);
+        if (emoji.TakeCaret() is { } caret) await JS.InvokeVoidAsync("yap.emojiKeyboard.place", editor, caret);
+        await SaveDraftAsync();
+    }
     private async Task StartRecordingAsync()
     {
         try { await JS.InvokeVoidAsync("yap.device.startRecording"); recording = true; }
@@ -209,6 +246,8 @@
         try
         {
             _ = StopTypingAsync();
+            // The send commits here, not when the server answers: the tap confirms the gesture.
+            _ = JS.InvokeVoidAsync("yap.haptics.buzz", "commit");
             var saving = State.SendAsync(ThreadId, text, ParentId ?? Reply?.Id, key, attachment, ParentId.HasValue);
             await Cancel.InvokeAsync(); await Sent.InvokeAsync();
             await saving;

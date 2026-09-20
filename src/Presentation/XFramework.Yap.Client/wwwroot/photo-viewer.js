@@ -131,7 +131,8 @@
                 state.previous = next;
             });
             const end = event => {
-                if (state.swipe && event.type === 'pointerup' && Math.abs(state.swipeY) >= 80) { state.points.clear(); state.close(); return; }
+                // The swipe has passed the point of no return; the pulse says so before the animation does.
+                if (state.swipe && event.type === 'pointerup' && Math.abs(state.swipeY) >= 80) { window.yap.haptics?.buzz('tap'); state.points.clear(); state.close(); return; }
                 if (state.swipeY) { state.swipeY = 0; void animateTo('none', '1', 200); }
                 if (event.type === 'pointerup' && !state.moved) {
                     // A clip carries no fine detail to inspect, so its tap drives playback and zoom
@@ -147,7 +148,7 @@
             on(state.stage, 'dblclick', event => { if (!state.toggle && event.pointerType !== 'touch') toggle(); });
             on(state.stage, 'wheel', event => { event.preventDefault(); state.scale = clamp(state.scale * Math.exp(-event.deltaY * .002), 1, 6); paint(state); }, { passive: false });
             on(window, 'resize', () => { state.image.style.transform = 'none'; state.base = state.image.getBoundingClientRect(); thumbnailTransform(); paint(state); });
-            viewers.set(dialog, state); dialog.showModal();
+            viewers.set(dialog, state); window.yap.haptics?.buzz('tap'); dialog.showModal();
             state.base = state.image.getBoundingClientRect();
             if (isClip(state.image)) transport(dialog, state, on);
             const enter = () => {

@@ -1,0 +1,17 @@
+/* The height is the on-screen keyboard's own, measured by device.js, clamped so an unmeasured
+   device or a landscape phone still gets a usable panel rather than a sliver or half the screen. */
+.emoji-keyboard{display:flex;flex-direction:column;min-height:0;height:clamp(200px,var(--yap-keyboard,300px),58vh);margin:8px 0 0;padding:6px 4px 2px;border-radius:22px;background:var(--surface);box-shadow:var(--glass-shadow)}
+.emoji-search{flex:none;display:flex;align-items:center;gap:8px;height:38px;padding:0 12px;margin:0 4px 6px;border-radius:19px;background:color-mix(in srgb,var(--text) 7%,transparent);color:var(--dim)}
+.emoji-search input{flex:1;min-width:0;height:36px;border:0;outline:0;background:transparent;color:var(--text);font-family:inherit}
+.emoji-search input::placeholder{color:var(--faint)}
+.emoji-search input::-webkit-search-cancel-button{display:none}
+.emoji-search .iconbtn{flex:none;width:28px;height:28px;border-radius:50%;color:var(--dim)}
+.emoji-grid{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;display:grid;grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:2px;padding:0 4px 4px;-webkit-overflow-scrolling:touch}
+.emoji-cell{display:grid;place-items:center;height:42px;padding:0;border:0;border-radius:12px;background:transparent;font-size:26px;line-height:1;font-family:inherit}
+.emoji-cell:hover{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+.emoji-cell:active{background:color-mix(in srgb,var(--accent) 38%,transparent)}
+.emoji-empty{grid-column:1/-1;margin:24px 8px;text-align:center;color:var(--dim);font-size:13px}
+.emoji-tabs{flex:none;display:flex;gap:2px;padding:4px;margin:4px 4px 0;border-radius:16px;background:color-mix(in srgb,var(--text) 6%,transparent)}
+.emoji-tabs button{flex:1;min-width:0;height:34px;padding:0;border:0;border-radius:12px;background:transparent;font-size:17px;line-height:1;filter:grayscale(1);opacity:.6}
+.emoji-tabs button.on{background:color-mix(in srgb,var(--accent) 34%,transparent);filter:none;opacity:1}
+@media(min-width:800px){.emoji-keyboard{height:clamp(200px,var(--yap-keyboard,320px),42vh)}}

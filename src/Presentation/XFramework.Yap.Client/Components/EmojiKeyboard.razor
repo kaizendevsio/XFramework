@@ -1,0 +1,62 @@
+@inject IJSRuntime JS
+@* Sized to --yap-keyboard - the on-screen keyboard this replaced - so the composer above it
+   does not move as one hands over to the other. Never a dialog: a modal would steal focus
+   from the draft and close the conversation behind it. *@
+<div class="emoji-keyboard" role="group" aria-label="Emoji keyboard" @onkeydown="KeyDown">
+    <div class="emoji-search">
+        <Icon Name="search" Size="16" />
+        <input type="search" enterkeyhint="search" autocomplete="off" aria-label="Search emoji" placeholder="Search emoji" @bind="query" @bind:event="oninput" />
+        @if (query.Length > 0) { <button type="button" class="iconbtn" aria-label="Clear search" @onpointerdown:preventDefault @onclick="() => query = string.Empty"><Icon Name="close" Size="15" /></button> }
+    </div>
+    <div class="emoji-grid" role="tabpanel" aria-label="@(query.Length > 0 ? "Search results" : category)" @ref="grid">
+        @{ var index = 0; }
+        @foreach (var emoji in Visible)
+        {
+            var glyph = emoji.Glyph;
+            @* tabindex rides the first cell only: Tab reaches the grid once and the arrow keys
+               walk it from there, instead of putting sixty stops between search and the tabs. *@
+            <button type="button" class="emoji-cell" tabindex="@(index++ == 0 ? 0 : -1)" aria-label="@emoji.Name" @onpointerdown:preventDefault @onclick="() => PickAsync(glyph)">@glyph</button>
+        }
+        @if (Visible.Count == 0) { <p class="emoji-empty" role="status">@(query.Length > 0 ? "No emoji match that search." : "Emoji you use show up here.")</p> }
+    </div>
+    <div class="emoji-tabs" role="tablist" aria-label="Emoji categories">
+        @if (recents.Count > 0) { <button type="button" role="tab" class="@Tab(EmojiCatalog.Recent)" aria-selected="@Selected(EmojiCatalog.Recent)" aria-label="Recently used" @onpointerdown:preventDefault @onclick="() => Show(EmojiCatalog.Recent)">🕘</button> }
+        @foreach (var (name, tab) in EmojiCatalog.Tabs)
+        {
+            var group = name;
+            <button type="button" role="tab" class="@Tab(group)" aria-selected="@Selected(group)" aria-label="@group" @onpointerdown:preventDefault @onclick="() => Show(group)">@tab</button>
+        }
+    </div>
+</div>
+@code {
+    [Parameter] public EventCallback<string> OnPick { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    private string query = "", category = EmojiCatalog.Tabs[0].Name;
+    private IReadOnlyList<string> recents = [];
+    private ElementReference grid;
+
+    private IReadOnlyList<Emoji> Visible => query.Length > 0 ? EmojiCatalog.Search(query)
+        : category == EmojiCatalog.Recent ? [.. recents.Select(EmojiCatalog.Describe)]
+        : EmojiCatalog.Group(category);
+    private string Tab(string name) => query.Length == 0 && category == name ? "on" : "";
+    private string Selected(string name) => (query.Length == 0 && category == name).ToString().ToLowerInvariant();
+    private void Show(string name) { category = name; query = ""; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await JS.InvokeVoidAsync("yap.emojiKeyboard.grid", grid);
+        recents = await JS.InvokeAsync<string[]>("yap.emojiKeyboard.recent");
+        // Opening on what this device actually uses beats opening on smileys it does not.
+        if (recents.Count > 0) category = EmojiCatalog.Recent;
+        StateHasChanged();
+    }
+
+    private async Task PickAsync(string glyph)
+    {
+        recents = await JS.InvokeAsync<string[]>("yap.emojiKeyboard.use", glyph);
+        await OnPick.InvokeAsync(glyph);
+    }
+
+    private Task KeyDown(KeyboardEventArgs e) => e.Key == "Escape" ? OnClose.InvokeAsync() : Task.CompletedTask;
+}
