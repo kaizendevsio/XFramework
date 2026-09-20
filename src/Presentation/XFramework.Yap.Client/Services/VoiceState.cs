@@ -235,6 +235,8 @@ public sealed partial class VoiceState : IAsyncDisposable
         public string Device = "";
         public VideoCodec Codec;
         public string? CodecNotice;
+        /// <summary>The browser-level reason video is impossible here, from the capability probe.</summary>
+        public string? VideoBlocked;
         /// <summary>Tallest picture this device said it can encode, before any call-size cap.</summary>
         public int Ceiling = 720;
         public VideoCodecLadder? Ladder;

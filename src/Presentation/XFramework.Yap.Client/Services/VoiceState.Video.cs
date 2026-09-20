@@ -97,7 +97,8 @@ public sealed partial class VoiceState
 
     private async Task StartCameraAsync(Attempt attempt, BoltMediaService media)
     {
-        if (attempt.Codec == VideoCodec.None) { VideoNotice = attempt.CodecNotice ?? "No shared video format with this call."; return; }
+        if (attempt.Codec == VideoCodec.None)
+        { VideoNotice = attempt.CodecNotice ?? VideoBlockedNotice(attempt.VideoBlocked, attempt.Ladder?.Probed.Any(x => x.Encode) == true); return; }
         if (attempt.Tiles.Count >= Bolt.Media.Browser.VideoAdaptation.MaxVideoParticipants)
         { VideoNotice = "This call already has as many cameras as it can carry."; return; }
         // The roster is claimed before the camera opens: a refusal must not leave a lit camera behind.
@@ -169,12 +170,27 @@ public sealed partial class VoiceState
             codec = ladder.Negotiate(epoch.Peers.Select(peer => epoch.PeerCodecs.GetValueOrDefault(peer, [])), 360);
         var previous = attempt.Codec;
         attempt.Codec = codec;
-        attempt.CodecNotice = codec == VideoCodec.None ? "This device cannot encode video for calls." : null;
+        attempt.CodecNotice = codec == VideoCodec.None
+            ? VideoBlockedNotice(attempt.VideoBlocked, ladder.Probed.Any(x => x.Encode))
+            : null;
         // A codec that stops working mid-call means a late joiner cannot decode it. Stop rather than
         // keep sending a picture that one participant only sees as a frozen tile.
         if (previous != VideoCodec.None && codec != previous && attempt.CameraOn)
             _ = InvokeStopAsync(attempt, "Video stopped: a participant's device cannot receive this video.");
     }
+
+    /// <summary>
+    /// Why video is off, in words that point at the actual fix.
+    ///
+    /// "This device cannot encode video" reads as a hardware limit and sends nobody anywhere useful.
+    /// A browser without the capture or codec API is the commonest cause by far - it is what every
+    /// iOS Safari hit before the frame-callback path existed - and the fix is a different browser,
+    /// so <paramref name="browserReason"/> is kept rather than overwritten by the codec outcome.
+    /// </summary>
+    internal static string VideoBlockedNotice(string? browserReason, bool anyLocalEncoder) =>
+        browserReason ?? (anyLocalEncoder
+            ? "No video format works for everyone on this call."
+            : "This device has no video encoder for calls.");
 
     private void ApplyRemoteVideo(Attempt attempt)
     {

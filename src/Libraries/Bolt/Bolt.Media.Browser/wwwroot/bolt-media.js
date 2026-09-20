@@ -333,16 +333,33 @@ function encoderConfig(codec, width, height, bitrateKbps, framerate, hardware) {
     };
     // Without a decoder description an H.264/H.265 bitstream has to be Annex B, and the
     // decoder here is fed raw chunks. Asking for the wrong container plays as green mush.
-    if (codec === 'h264') config.avc = { format: 'annexb' };
+    // WebKit rejects odd H.264 dimensions outright, so both sides are rounded to even.
+    if (codec === 'h264') { config.avc = { format: 'annexb' }; config.width &= ~1; config.height &= ~1; }
     return config;
+}
+
+/// How this browser can get camera frames out of a MediaStreamTrack.
+///
+/// Chromium exposes MediaStreamTrackProcessor on Window. Safari 18 has it too but only inside a
+/// DedicatedWorker, so on the page it is undefined there and in Firefox. Both reach the same
+/// frames through requestVideoFrameCallback on a <video> element (Safari 15.4+, WebCodecs 16.4+).
+/// Feature detection of the primitive itself, never a user-agent guess.
+export function videoCaptureStrategy() {
+    if (typeof MediaStreamTrackProcessor !== 'undefined') return 'processor';
+    if (typeof VideoFrame !== 'undefined' && typeof HTMLVideoElement !== 'undefined' &&
+        typeof HTMLVideoElement.prototype?.requestVideoFrameCallback === 'function') return 'rvfc';
+    return 'none';
 }
 
 /// Probe what this device can actually do, per codec, encode and decode, hardware and software.
 /// Everything below is decided from these answers rather than from a user-agent guess.
+///
+/// The gate asks only for the codec APIs being probed. Requiring MediaStreamTrackProcessor here
+/// handed Safari an empty ladder, which surfaced as "this device cannot encode video" on hardware
+/// that encodes H.264 perfectly well; capture support is a separate question, asked separately.
 export async function probeVideoCodecs(maxHeight = 1080) {
     const results = [];
-    if (typeof VideoEncoder === 'undefined' || typeof VideoDecoder === 'undefined' ||
-        typeof MediaStreamTrackProcessor === 'undefined') return results;
+    if (typeof VideoEncoder === 'undefined' || typeof VideoDecoder === 'undefined') return results;
     const heights = [1080, 720, 540, 360].filter(h => h <= maxHeight);
     if (heights.length === 0) heights.push(Math.max(180, maxHeight));
     for (const codec of ['av1', 'vp9', 'h264']) {
@@ -394,6 +411,14 @@ class VideoPipeline {
         this.captureReader = null;
         this.captureRunning = false;
         this.captureGeneration = 0;
+        // rVFC fallback state: the off-screen element frames are read from, its pending callback
+        // handle, and the canvas only used if a browser refuses a VideoFrame built from the element.
+        this.captureVideo = null;
+        this.captureCallbackId = 0;
+        this.captureStrategy = null;
+        this.captureCanvas = null;
+        this.captureContext = null;
+        this.frameFromCanvas = false;
         this.preview = null;
         this.dotNetRef = null;
         this.remotes = new Map();
@@ -501,9 +526,109 @@ class VideoPipeline {
         if (this.preview) this.preview.srcObject = stream;
         // The camera can be revoked from the browser's own UI; that must end the send, not hang it.
         track.addEventListener('ended', () => { if (generation === this.captureGeneration) this.stopCapture('ended'); });
-        this.captureReader = new MediaStreamTrackProcessor({ track }).readable.getReader();
-        void this._readLoop(generation);
+        // Everything downstream of here - encode, fragmentation, SFrame, adaptation, transport - is
+        // identical on both strategies; only the way a VideoFrame is obtained differs.
+        if (this.strategy() === 'processor') {
+            this.captureReader = new MediaStreamTrackProcessor({ track }).readable.getReader();
+            void this._readLoop(generation);
+        } else {
+            this._startFrameCallbacks(stream, generation);
+        }
         return this.describe();
+    }
+
+    strategy() { return this.captureStrategy ?? videoCaptureStrategy(); }
+
+    /// Force a capture strategy. Only the tests and the cost measurement use this; a real page
+    /// picks by feature detection, because a browser that has both should use the cheaper one.
+    useCaptureStrategy(strategy) { this.captureStrategy = strategy || null; }
+
+    /// The Safari path: an off-screen <video> carrying the camera stream, one callback per decoded
+    /// frame, and a VideoFrame built straight from the element - no canvas, no pixel copy.
+    _startFrameCallbacks(stream, generation) {
+        const video = this.captureVideo = globalThis.document.createElement('video');
+        video.srcObject = stream;
+        video.muted = video.defaultMuted = true;
+        video.autoplay = video.playsInline = true;
+        video.setAttribute('playsinline', '');
+        // iOS only keeps decoding for an element the page actually has: a detached or display:none
+        // video is allowed to stall, and a stalled element never fires the frame callback.
+        video.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none';
+        globalThis.document.body?.appendChild(video);
+        const onFrame = (_now, metadata) => {
+            this.captureCallbackId = 0;
+            // A callback queued before stopCapture must not push a frame from the previous session.
+            if (!this.captureRunning || generation !== this.captureGeneration) return;
+            try { this._encodeElementFrame(video, metadata); }
+            finally {
+                // Re-arm in finally: one bad frame must not silently end the whole capture.
+                if (this.captureRunning && generation === this.captureGeneration)
+                    this.captureCallbackId = video.requestVideoFrameCallback(onFrame);
+            }
+        };
+        this.captureCallbackId = video.requestVideoFrameCallback(onFrame);
+        void video.play?.()?.catch?.(error => {
+            // A muted element fed by getUserMedia is exempt from autoplay rules everywhere this
+            // path runs, so a refusal means no frame will ever arrive: end it, don't send black.
+            console.error('Bolt video capture element:', error);
+            if (generation === this.captureGeneration) this.stopCapture('capture');
+        });
+    }
+
+    /// One VideoFrame per callback, closed on every path. The fallback allocates a frame per
+    /// picture, so a single missed close() exhausts the frame pool within seconds.
+    _encodeElementFrame(video, metadata) {
+        if (!this.encoder || this.encoder.state !== 'configured') return;
+        // Same rule as the reader loop: drop the newest frame rather than queue latency.
+        if (this.encoder.encodeQueueSize >= 2) { this.stats.dropped++; return; }
+        const seconds = metadata?.mediaTime ?? video.currentTime ?? 0;
+        const frame = this._elementFrame(video, Math.max(0, Math.round(seconds * 1e6)));
+        if (!frame) return;
+        try {
+            const now = Date.now();
+            const keyFrame = this.pendingKeyframe || now - this.lastKeyframe >= this.keyframeIntervalMs;
+            if (keyFrame) { this.lastKeyframe = now; this.pendingKeyframe = false; }
+            this.encoder.encode(frame, { keyFrame });
+        } finally { frame.close(); }
+    }
+
+    /// A VideoFrame built from the element itself copies no pixels. Should a browser refuse that
+    /// source, degrade once to a canvas draw rather than losing video for the rest of the call.
+    _elementFrame(video, timestamp) {
+        // WebKit throws InvalidStateError for an element below HAVE_CURRENT_DATA or with no decoded
+        // frame in hand. rVFC should never hand us one, but a throw per frame would be expensive.
+        if (!video.videoWidth || !video.videoHeight || (video.readyState ?? 2) < 2) return null;
+        if (!this.frameFromCanvas) {
+            try { return new VideoFrame(video, { timestamp }); }
+            catch (error) {
+                console.warn('Bolt video: VideoFrame from <video> refused; drawing through a canvas.', error);
+                this.frameFromCanvas = true;
+            }
+        }
+        try {
+            const canvas = this.captureCanvas ??= typeof OffscreenCanvas !== 'undefined'
+                ? new OffscreenCanvas(video.videoWidth, video.videoHeight)
+                : globalThis.document.createElement('canvas');
+            if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight)
+            { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
+            this.captureContext ??= canvas.getContext('2d', { alpha: false, desynchronized: true });
+            this.captureContext.drawImage(video, 0, 0, canvas.width, canvas.height);
+            return new VideoFrame(canvas, { timestamp });
+        } catch { return null; }
+    }
+
+    /// rVFC hands back a handle; an uncancelled one fires after the camera is gone and would build
+    /// a frame from a dead element. The canvas goes too: it would otherwise hold the last picture.
+    _stopFrameCallbacks() {
+        const video = this.captureVideo;
+        this.captureVideo = null;
+        this.captureCanvas = this.captureContext = null;
+        if (!video) return;
+        if (this.captureCallbackId) { try { video.cancelVideoFrameCallback(this.captureCallbackId); } catch { } }
+        this.captureCallbackId = 0;
+        try { video.pause?.(); } catch { }
+        video.srcObject = null;
+        video.remove?.();
     }
 
     async _readLoop(generation) {
@@ -528,7 +653,8 @@ class VideoPipeline {
 
     describe() {
         return { capturing: this.captureRunning, deviceId: this.deviceId, facingMode: this.facingMode,
-            width: this.config?.width ?? 0, height: this.config?.height ?? 0, codec: this.codec };
+            width: this.config?.width ?? 0, height: this.config?.height ?? 0, codec: this.codec,
+            strategy: this.strategy() };
     }
 
     getStats() {
@@ -629,6 +755,7 @@ class VideoPipeline {
         this.captureGeneration++;
         this.captureRunning = false;
         if (this.captureReader) { try { this.captureReader.cancel(); } catch { } this.captureReader = null; }
+        this._stopFrameCallbacks();
         if (this.preview) this.preview.srcObject = null;
         if (this.mediaStream) { this.mediaStream.getTracks().forEach(t => t.stop()); this.mediaStream = null; }
         this.stats = { fps: 0, kbps: 0, dropped: this.stats.dropped, backlog: 0 };
@@ -737,9 +864,14 @@ export function createVideoPipeline() { return new VideoPipeline(); }
 /// Everything the caller needs to decide whether, and how well, this device can send video.
 /// Runs before the camera is touched: probing never opens a capture device.
 export async function checkVideoCapabilities() {
-    if (!globalThis.isSecureContext || typeof VideoEncoder === 'undefined' ||
-        typeof MediaStreamTrackProcessor === 'undefined' || !navigator.mediaDevices?.getUserMedia)
-        return { supported: false, reason: 'Video calls are not supported by this browser.', ceiling: 0, codecs: [] };
+    if (!globalThis.isSecureContext)
+        return { supported: false, reason: 'Open Yap using its HTTPS address to use video calls.', ceiling: 0, codecs: [] };
+    // "Cannot encode video" reads as a hardware limit. A browser missing the capture or codec API
+    // is a different problem with a different fix, and the user cannot guess it from the old words.
+    if (typeof VideoEncoder === 'undefined' || typeof VideoFrame === 'undefined' ||
+        !navigator.mediaDevices?.getUserMedia || videoCaptureStrategy() === 'none')
+        return { supported: false, ceiling: 0, codecs: [],
+            reason: 'This browser cannot send video in calls. Try the latest Safari, Chrome, Edge or Firefox.' };
     const ceiling = await videoDeviceCeiling();
     const codecs = await probeVideoCodecs(ceiling);
     return codecs.some(x => x.encode)

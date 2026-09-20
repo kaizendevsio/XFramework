@@ -295,6 +295,27 @@ public sealed class VideoCallTests
         });
     }
 
+    // ── What the user is told when video will not start ──
+
+    // "This device cannot encode video" reads as a hardware limit. On iOS Safari the real cause was
+    // a missing browser API, and nothing in that wording would make anyone try another browser.
+    [Test]
+    public void TheVideoNotice_NamesTheBrowserWhenTheBrowserIsTheProblem()
+    {
+        const string browser = "This browser cannot send video in calls. Try the latest Safari, Chrome, Edge or Firefox.";
+        Assert.Multiple(() =>
+        {
+            Assert.That(VoiceState.VideoBlockedNotice(browser, anyLocalEncoder: false), Is.EqualTo(browser),
+                "a browser-level refusal survives negotiation rather than being overwritten by the codec outcome");
+            Assert.That(VoiceState.VideoBlockedNotice(null, anyLocalEncoder: true),
+                Is.EqualTo("No video format works for everyone on this call."));
+            Assert.That(VoiceState.VideoBlockedNotice(null, anyLocalEncoder: false),
+                Is.EqualTo("This device has no video encoder for calls."));
+            Assert.That(VoiceState.VideoBlockedNotice(browser, anyLocalEncoder: false),
+                Does.Not.Contain("cannot encode"), "the old wording blamed hardware for a browser problem");
+        });
+    }
+
     // ── Camera lifecycle in VoiceState ──
 
     [Test]
