@@ -2,6 +2,7 @@ using Communications.Domain.Shared.Contracts.Requests.Attachments;
 using Communications.Domain.Shared.Contracts.Requests.Delete;
 using Communications.Domain.Shared.Contracts.Requests.Edit;
 using Communications.Domain.Shared.Contracts.Requests.Reactions;
+using Communications.Domain.Shared.Contracts.Requests.Receipts;
 using Communications.Domain.Shared.Contracts.Requests.Realtime;
 using Communications.Domain.Shared.Contracts.Requests.Threads;
 using Communications.Domain.Shared.Contracts.Responses;
@@ -57,6 +58,7 @@ public interface IThreadService
     Task<Result<CmdResponse>> DeleteMessageReactionAsync(DeleteMessageReactionRequest request, CancellationToken ct = default);
 
     // Round 3: Read Receipts
+    Task<Result<GetMessageReceiptsResponse>> GetMessageReceiptsAsync(GetMessageReceiptsRequest request, CancellationToken ct = default);
     Task<Result<CmdResponse>> MarkMessagesReadAsync(MarkMessagesReadRequest request, CancellationToken ct = default);
     Task<Result<CmdResponse>> MarkMessagesDeliveredAsync(MarkMessagesDeliveredRequest request, CancellationToken ct = default);
     Task<Result<CmdResponse>> PublishTypingAsync(PublishCommunicationsTypingRequest request, CancellationToken ct = default);

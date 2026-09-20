@@ -6,6 +6,7 @@ using Communications.Domain.Shared.Contracts.Requests.Create;
 using Communications.Domain.Shared.Contracts.Requests.Delete;
 using Communications.Domain.Shared.Contracts.Requests.Edit;
 using Communications.Domain.Shared.Contracts.Requests.Reactions;
+using Communications.Domain.Shared.Contracts.Requests.Receipts;
 using Communications.Domain.Shared.Contracts.Requests.ReferenceData;
 using Communications.Domain.Shared.Contracts.Requests.Realtime;
 using Communications.Domain.Shared.Contracts.Requests.Settings;
@@ -34,6 +35,7 @@ public interface ICommunicationsServiceWrapper : IServiceWrapper
     Task<QueryResponse<ChatReferenceDataResponse>> EnsureChatDefaultsAsync(EnsureChatDefaultsRequest request, CancellationToken ct = default);
     Task<QueryResponse<ChatReferenceDataResponse>> GetChatReferenceDataAsync(GetChatReferenceDataRequest request, CancellationToken ct = default);
     Task<QueryResponse<PaginatedResult<MessageReactionResponse>>> GetMessageReactionsAsync(GetMessageReactionsRequest request, CancellationToken ct = default);
+    Task<QueryResponse<GetMessageReceiptsResponse>> GetMessageReceiptsAsync(GetMessageReceiptsRequest request, CancellationToken ct = default);
     Task<CmdResponse> CreateDirectMessage(CreateDirectMessageRequest request);
     Task<CmdResponse> CreateDirectMessageAsync(
         CreateDirectMessageRequest request,
@@ -604,6 +606,9 @@ public sealed record CommunicationsServiceWrapper(
 
     public Task<QueryResponse<PaginatedResult<MessageReactionResponse>>> GetMessageReactionsAsync(GetMessageReactionsRequest request, CancellationToken ct = default) =>
         SendAsync<GetMessageReactionsRequest, PaginatedResult<MessageReactionResponse>>(request, ct);
+
+    public Task<QueryResponse<GetMessageReceiptsResponse>> GetMessageReceiptsAsync(GetMessageReceiptsRequest request, CancellationToken ct = default) =>
+        SendAsync<GetMessageReceiptsRequest, GetMessageReceiptsResponse>(request, ct);
 
     public Task<CmdResponse> DeleteMessageReactionAsync(
         DeleteMessageReactionRequest request,
