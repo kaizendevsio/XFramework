@@ -5,9 +5,14 @@
 {
     @if(Voice.Minimized)
     { <button class="active-call" data-update-busy="true" @onclick="Expand"><Icon Name="@(Voice.AnyVideo ? "video" : "phone")" Size="18" />@Voice.Name · @Elapsed</button> }
-    else if (Video)
+    else
     {
-    <dialog class="voice-dialog" @ref="dialog" data-update-busy="true" aria-label="Video call">
+    @* One dialog for the whole call. showModal() puts *this node* in the top layer, so a second
+       <dialog> in a sibling branch would be a fresh, closed element the moment a camera came on -
+       the call would keep running behind the chat. Only the contents may switch. *@
+    <dialog class="voice-dialog" @ref="dialog" data-update-busy="true" aria-label="@(Video ? "Video call" : "Voice call")">
+    @if (Video)
+    {
         <div class="callscreen"><div class="callinner vidscreen">
             <div class="vidtop">
                 <button class="iconbtn" aria-label="Back to chat" @onclick="Minimize"><Icon Name="back" /></button>
@@ -43,11 +48,9 @@
             @if (playbackSuspended && Voice.ConnectedAt is not null)
             { <button class="btn" @onclick="ResumeAudioAsync">Tap to resume call audio</button> }
         </div></div>
-    </dialog>
     }
     else
     {
-    <dialog class="voice-dialog" @ref="dialog" data-update-busy="true" aria-label="Voice call">
         <div class="callscreen"><div class="callbg"></div><div class="callinner">
             <div class="call-top"><button class="iconbtn" aria-label="Back to chat" @onclick="Minimize"><Icon Name="back" /></button><span class="callenc"><Icon Name="lock" Size="14" />Encrypted @(Voice.IncomingHasVideo ? "video" : "voice") call</span></div>
             <div class="call-center"><Avatar Initials="@ChatMessage.InitialsFor(Voice.Name)" ImageUrl="@Voice.AvatarUrl" Size="a92" /><h1 class="callname">@Voice.Name</h1><p class="callstate" role="status">@Elapsed</p></div>
@@ -92,6 +95,7 @@
             { <button class="btn" @onclick="ResumeAudioAsync">Tap to resume call audio</button> }
             <p class="call-footer">End-to-end encrypted</p>
         </div></div>
+    }
     </dialog>
     }
 }
@@ -101,10 +105,13 @@
     private ElementReference dialog;
     private ElementReference preview;
     private readonly Dictionary<Guid, ElementReference> canvases = [];
-    private readonly HashSet<Guid> attached = [];
-    private bool previewAttached;
+    // Every latch below holds the *element* it acted on, never a "we did it once" bool. Switching
+    // between the voice and video screens destroys and rebuilds everything inside the dialog, and a
+    // new node's reference id differs, so the work is redone exactly when the node it bound is gone.
+    private readonly Dictionary<Guid, string> attached = [];
+    private string? previewAttached;
+    private string? opened;
     private readonly CancellationTokenSource lifetime = new();
-    private bool shown;
     private bool outputOpen, outputBusy;
     private bool playbackSuspended;
     // The video screen replaces the avatar screen only once there is a picture to show; a
@@ -128,7 +135,7 @@
     private string Elapsed => Voice.Status == "Connected" && Voice.ConnectedAt is { } time ? (DateTimeOffset.UtcNow - time).ToString(@"mm\:ss") : Voice.Status;
     protected override void OnInitialized(){ Voice.Changed += Changed; _ = Tick(); }
     private void Changed() => _ = InvokeAsync(() => { if (!Voice.IsCalling) { outputOpen = false; outputs = null; outputError = null; playbackSuspended = false; Release(); } StateHasChanged(); });
-    private void Release(){ canvases.Clear(); attached.Clear(); previewAttached = false; }
+    private void Release(){ canvases.Clear(); attached.Clear(); previewAttached = null; opened = null; }
     // Ringing counts: the output picker is usable before the call connects, so it must refresh then too.
     private async Task Tick(){ try { while(!lifetime.IsCancellationRequested){await Task.Delay(1000,lifetime.Token);if(Voice.IsCalling)await InvokeAsync(async () => { if (outputOpen && !outputBusy) await RefreshOutputsAsync(); await CheckPlaybackAsync(); StateHasChanged(); });} }catch(OperationCanceledException){} }
     private async Task ToggleOutputAsync() { outputOpen = !outputOpen; if (outputOpen) { outputError = null; await RefreshOutputsAsync(); await RefreshCamerasAsync(); } }
@@ -171,17 +178,21 @@
     </div>;
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if(Voice.IsCalling && !Voice.Minimized && !shown){shown=true;await JS.InvokeVoidAsync("yap.openCall",dialog);}
-        if(!Voice.IsCalling || Voice.Minimized){shown=false; if(!Voice.IsCalling) Release(); return;}
-        // Canvases and the preview element exist only after their first render; bind each once.
-        if (Voice.CameraOn && Video && !previewAttached) { previewAttached = true; await Voice.AttachLocalPreviewAsync(preview); }
-        else if (!Voice.CameraOn) previewAttached = false;
+        // Open the surface whenever the node we last opened is not the one on screen: the first
+        // render of a call, and again after anything hands Blazor a different dialog element.
+        if(Voice.IsCalling && !Voice.Minimized && opened != dialog.Id){opened=dialog.Id;await JS.InvokeVoidAsync("yap.openCall",dialog);}
+        // Minimizing removes the dialog and everything captured inside it, so drop the bindings too.
+        if(!Voice.IsCalling || Voice.Minimized){Release(); return;}
+        // Canvases and the preview element exist only after their first render; bind each once per node.
+        if (Voice.CameraOn && Video) { if (previewAttached != preview.Id) { previewAttached = preview.Id; await Voice.AttachLocalPreviewAsync(preview); } }
+        else previewAttached = null;
         foreach (var tile in Voice.RemoteVideo)
-            if (attached.Add(tile.StreamId) && canvases.TryGetValue(tile.StreamId, out var canvas))
-                await Voice.AttachRemoteVideoAsync(tile.StreamId, canvas);
-        attached.RemoveWhere(id => Voice.RemoteVideo.All(tile => tile.StreamId != id));
+            if (canvases.TryGetValue(tile.StreamId, out var canvas) && attached.GetValueOrDefault(tile.StreamId) != canvas.Id)
+            { attached[tile.StreamId] = canvas.Id; await Voice.AttachRemoteVideoAsync(tile.StreamId, canvas); }
+        foreach (var id in canvases.Keys.Where(id => Voice.RemoteVideo.All(tile => tile.StreamId != id)).ToArray())
+        { canvases.Remove(id); attached.Remove(id); }
     }
-    private void Minimize(){Voice.Minimized=true;shown=false;}
-    private void Expand(){Voice.Minimized=false;shown=false;}
+    private void Minimize(){Voice.Minimized=true;}
+    private void Expand(){Voice.Minimized=false;}
     public ValueTask DisposeAsync(){Voice.Changed-=Changed;lifetime.Cancel();lifetime.Dispose();return ValueTask.CompletedTask;}
 }
