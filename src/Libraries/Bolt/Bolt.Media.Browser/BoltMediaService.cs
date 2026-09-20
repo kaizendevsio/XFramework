@@ -138,11 +138,8 @@ public sealed partial class BoltMediaService : IAsyncDisposable
             await StopPipelinesAsync();
             if (OnCallEnded is not null) await OnCallEnded(callId);
         };
-        _mediaClient.OnKeyframeRequested += streamId =>
-        {
-            _ = _video.RequestKeyframeAsync();
-        };
-        _mediaClient.OnMediaStreamConfigured += StartPlaybackLoop;
+        _mediaClient.OnKeyframeRequested += streamId => { _ = _video.RequestKeyframeAsync(); };
+        _mediaClient.OnMediaStreamConfigured += stream => { RegisterRemoteVideo(stream); StartPlaybackLoop(stream); };
 
         _initialized = true;
         _logger.LogInformation("BoltMediaService initialized");
@@ -162,12 +159,6 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         _audio.OnEncoded -= OnAudioEncodedForStream;
         _audio.OnEncoded += OnAudioEncodedForStream;
 
-        if (video)
-        {
-            _video.OnEncoded -= OnVideoEncodedForStream;
-            _video.OnEncoded += OnVideoEncodedForStream;
-        }
-
         var startedCallId = await _mediaClient!.StartCallAsync(recipientId, video, encrypted: false, authorizedCallId: callId);
         _logger.LogInformation("Call started: {CallId} to {Recipient}, video={Video}", startedCallId, recipientId, video);
         return startedCallId;
@@ -184,12 +175,6 @@ public sealed partial class BoltMediaService : IAsyncDisposable
 
         _audio.OnEncoded -= OnAudioEncodedForStream;
         _audio.OnEncoded += OnAudioEncodedForStream;
-
-        if (video)
-        {
-            _video.OnEncoded -= OnVideoEncodedForStream;
-            _video.OnEncoded += OnVideoEncodedForStream;
-        }
 
         await _mediaClient!.AnswerCallAsync(callId, encrypted: false);
         await HandleCallAnsweredAsync(callId);
@@ -217,29 +202,11 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         await _audio.StartCaptureAsync(_options.AudioSampleRate, _options.AudioChannels);
     }
 
-    /// <summary>
-    /// Start capturing and sending video. Call after the call is answered.
-    /// Pass a canvas ElementReference for remote video rendering.
-    /// </summary>
-    public async Task StartVideoAsync(ElementReference remoteVideoCanvas)
-    {
-        await _video.InitializeEncoderAsync(
-            _options.VideoWidth, _options.VideoHeight, _options.VideoBitrateKbps,
-            _options.VideoFramerate, _options.VideoCodec, _options.KeyframeIntervalFrames);
-
-        await _video.InitializeDecoderAsync(remoteVideoCanvas, _options.VideoCodec);
-
-        await _video.StartCaptureAsync(_options.VideoWidth, _options.VideoHeight, _options.VideoFramerate);
-    }
-
     /// <summary>Mute an active call while retaining its microphone permission and stream.</summary>
     public Task SetAudioMutedAsync(bool muted) => _audio.SetMutedAsync(muted);
 
     /// <summary>Release the microphone at call end or cancellation.</summary>
     public async Task StopAudioAsync() => await _audio.StopCaptureAsync();
-
-    /// <summary>Stop video capture (camera off).</summary>
-    public async Task StopVideoAsync() => await _video.StopCaptureAsync();
 
     // ── Internal Wiring ──
 
@@ -274,27 +241,9 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         await conn.SendAsync(writer.WrittenMemory, CancellationToken.None);
         writer.Reset();
 
-        // Send video MediaConfig if video is active for this call
-        if (_hasVideo || _video.IsCapturing)
-        {
-            _activeVideoStreamId = Guid.NewGuid();
-            var videoStream = new BoltMediaStream(conn, _activeVideoStreamId, callId, false);
-            if (_options.EnableFec) videoStream.EnableFec(_options.FecVideoGroupSize);
-            videoStream.EnableNack(256);
-            videoStream.EnableBandwidthProbing(_options.VideoBitrateKbps);
-            videoStream.OnBitrateChanged += kbps => _ = _video.ReconfigureBitrateAsync(kbps);
-            videoStream.OnKeyframeNeeded += () => _ = _video.RequestKeyframeAsync();
-            if (!_mediaClient.RegisterMediaStream(videoStream))
-            {
-                await videoStream.DisposeAsync();
-                throw new InvalidOperationException("Unable to register the local video stream.");
-            }
-
-            BoltCodec.WriteMediaConfig(writer, _activeVideoStreamId, callId, MediaType.Video, CodecId.H264,
-                _options.VideoWidth, _options.VideoHeight, _options.VideoBitrateKbps, 0, ReadOnlySpan<byte>.Empty);
-            await conn.SendAsync(writer.WrittenMemory, CancellationToken.None);
-            writer.Reset();
-        }
+        // The camera is never opened by answering. A video stream is published only when the user
+        // turns the camera on, from StartVideoAsync.
+        if (_hasVideo) await StartVideoStreamAsync(callId);
 
         if (OnCallAnswered is not null) await OnCallAnswered(callId);
     }
@@ -309,13 +258,6 @@ public sealed partial class BoltMediaService : IAsyncDisposable
             catch (InvalidOperationException) when (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame)
             { /* A paused epoch or full bounded crypto queue drops audio, never sends plaintext. */ }
         }
-    }
-
-    private void OnVideoEncodedForStream(byte[] data, bool isKeyframe)
-    {
-        var stream = _mediaClient?.GetMediaStream(_activeVideoStreamId);
-        if (stream is not null)
-            _ = stream.SendFrameAsync(data, isKeyframe);
     }
 
     private void StartPlaybackLoop(BoltMediaStream stream)
@@ -336,7 +278,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
                     if (stream.IsAudio)
                         await _audio.DecodeFrameAsync(stream.StreamId, frame.Data, frame.Timestamp);
                     else
-                        await _video.DecodeFrameAsync(frame.Data, frame.Timestamp, frame.IsKeyframe);
+                        await PlayVideoFragmentAsync(stream.StreamId, frame.Data);
                 }
             }
             catch (OperationCanceledException) { }
@@ -349,6 +291,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
                 try
                 {
                     if (stream.IsAudio) await _audio.ReleaseRemoteStreamAsync(stream.StreamId);
+                    else await ReleaseRemoteVideoAsync(stream.StreamId);
                 }
                 finally
                 {
@@ -380,7 +323,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
 
         if (_audio.IsCapturing) await _audio.StopCaptureAsync();
         await _audio.StopPlaybackAsync();
-        if (_video.IsCapturing) await _video.StopCaptureAsync();
+        await StopVideoPipelineAsync();
         if (_sframe is not null)
         {
             try { await _sframe.EndCallAsync(); }
@@ -399,7 +342,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
     {
         await StopPipelinesAsync();
         _audio.OnEncoded -= OnAudioEncodedForStream;
-        _video.OnEncoded -= OnVideoEncodedForStream;
+        DetachVideoHandlers();
         if (_mediaClient is not null) await _mediaClient.DisposeAsync();
         // These dependencies belong to the DI scope; it disposes each once after this service.
         _initialized = false;

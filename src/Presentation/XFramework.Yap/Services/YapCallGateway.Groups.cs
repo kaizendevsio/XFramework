@@ -11,7 +11,11 @@ namespace Yap.Services;
 public sealed partial class YapCallGateway
 {
     private readonly bool groupLifecycleEnabled;
+    private readonly bool videoEnabled;
     private readonly Dictionary<Guid, GroupRoom> groups = [];
+
+    /// <summary>Cameras one call may carry at once. Eight voices is fine; eight live pictures is not.</summary>
+    internal const int MaxVideoSenders = 4;
 
     // Admission requires the explicit encrypted-group configuration and approved devices.
     internal async Task<YapGroupCall> StartGroupAsync(ClaimsPrincipal user, Guid thread, IReadOnlyCollection<Guid> recipients, CancellationToken ct = default, Guid deviceId = default)
@@ -192,7 +196,7 @@ public sealed partial class YapCallGateway
         lock (gate)
         {
             if (!room.Members.TryGetValue(credential, out var member) || member.Left) return;
-            member.Left = true; member.Ready = false; member.Registered = false; member.Connected = false;
+            member.Left = true; member.Ready = false; member.Registered = false; member.Connected = false; member.Video = false;
             if (member.Accepted) AdvanceGroupRoster(room);
             Publish(room.Tenant, credential, GroupEvent(room, credential, "group-roster"));
             PublishGroupLocked(room, "group-roster");
@@ -220,7 +224,7 @@ public sealed partial class YapCallGateway
             if (credential == Guid.Empty) return;
             var removed = room.Members[credential];
             if (removed.Left) return;
-            removed.Left = true; removed.Ready = false; removed.Registered = false; removed.Connected = false;
+            removed.Left = true; removed.Ready = false; removed.Registered = false; removed.Connected = false; removed.Video = false;
             AdvanceGroupRoster(room);
             Publish(room.Tenant, credential, GroupEvent(room, credential, "group-roster"));
             PublishGroupLocked(room, "group-roster");
@@ -285,7 +289,7 @@ public sealed partial class YapCallGateway
     private void RemoveGroupTickets(Guid call, Guid credential)
     { foreach (var key in tickets.Where(x => x.Value.CallId == call && x.Value.User == credential).Select(x => x.Key).ToArray()) tickets.Remove(key); }
     private static YapGroupCall Snapshot(GroupRoom room) => new(room.Id, room.Thread, room.Caller, room.CallerName, room.Revision, room.InviteExpires,
-        room.Members.Select(x => new YapGroupParticipant(x.Key, x.Value.DeviceId, x.Value.Accepted, x.Value.Ready, x.Value.Left, x.Value.Muted)).ToArray());
+        room.Members.Select(x => new YapGroupParticipant(x.Key, x.Value.DeviceId, x.Value.Accepted, x.Value.Ready, x.Value.Left, x.Value.Muted, x.Value.Video)).ToArray());
     private sealed class GroupRoom(Guid id, Guid tenant, Guid thread, Guid caller, string callerName)
     {
         public Guid Id { get; } = id;
@@ -305,7 +309,7 @@ public sealed partial class YapCallGateway
     {
         public string? Session;
         public Guid DeviceId;
-        public bool Muted;
+        public bool Muted, Video;
         public DateTimeOffset ControlWindow;
         public int ControlCount;
         public bool Accepted, Connected, Registered, Ready, Left;

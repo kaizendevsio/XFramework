@@ -43,8 +43,8 @@ public class BoltMediaBrowserTests
         services.AddBoltMediaBrowser(opts =>
         {
             opts.AudioBitrateKbps = 128;
-            opts.VideoWidth = 1920;
-            opts.VideoHeight = 1080;
+            opts.VideoMaxHeight = 1080;
+            opts.VideoStartTier = 5;
             opts.EnableEncryption = false;
         });
 
@@ -52,8 +52,8 @@ public class BoltMediaBrowserTests
         var options = provider.GetRequiredService<MediaServiceOptions>();
 
         options.AudioBitrateKbps.Should().Be(128);
-        options.VideoWidth.Should().Be(1920);
-        options.VideoHeight.Should().Be(1080);
+        options.VideoMaxHeight.Should().Be(1080);
+        options.VideoStartTier.Should().Be(5);
         options.EnableEncryption.Should().BeFalse();
     }
 
@@ -65,12 +65,10 @@ public class BoltMediaBrowserTests
         options.AudioBitrateKbps.Should().Be(128);
         options.AudioSampleRate.Should().Be(48_000);
         options.AudioChannels.Should().Be(1);
-        options.VideoWidth.Should().Be(1280);
-        options.VideoHeight.Should().Be(720);
-        options.VideoBitrateKbps.Should().Be(2_000);
-        options.VideoFramerate.Should().Be(30);
-        options.VideoCodec.Should().Be("h264");
-        options.KeyframeIntervalFrames.Should().Be(60);
+        options.VideoMaxHeight.Should().Be(1080);
+        // The ladder opens at 720p30 and climbs; see VideoAdaptation for why it does not open at 1080p.
+        VideoAdaptation.Ladder[options.VideoStartTier].Height.Should().Be(720);
+        options.KeyframeIntervalSeconds.Should().Be(2);
         options.EnableEncryption.Should().BeTrue();
         options.EnableFec.Should().BeTrue();
         options.FecAudioGroupSize.Should().Be(4);

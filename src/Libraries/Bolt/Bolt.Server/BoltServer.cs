@@ -2131,7 +2131,11 @@ public sealed partial class BoltServer : IDisposable
             return;
         }
 
-        if (_authenticatedMediaOnly && (config.MediaType != MediaType.Audio || config.CodecId != CodecId.Opus))
+        // Authenticated relays carry exactly two kinds of payload: Opus voice and one of the three
+        // negotiable video codecs. Screen share and everything else stays unrouted.
+        if (_authenticatedMediaOnly && !(
+                config.MediaType == MediaType.Audio && config.CodecId == CodecId.Opus ||
+                config.MediaType == MediaType.Video && config.CodecId is CodecId.H264 or CodecId.VP9 or CodecId.AV1))
             return;
 
         if (_requireEncryptedMedia)
@@ -2179,8 +2183,9 @@ public sealed partial class BoltServer : IDisposable
             if (!_activeMediaStreams.TryGetValue(config.StreamId, out route))
             {
                 if (callState.HostManagedGroup && GetMediaStreamSnapshot(callState).Any(id =>
-                    _activeMediaStreams.TryGetValue(id, out var existing) && existing.Sender.StreamId == sender.StreamId))
-                    return; // One audio stream per group participant keeps decode and fanout work bounded.
+                    _activeMediaStreams.TryGetValue(id, out var existing) && existing.Sender.StreamId == sender.StreamId &&
+                    existing.MediaType == config.MediaType))
+                    return; // One audio and one video stream per participant keeps decode and fanout work bounded.
                 if (!TryReserveQuota(_activeMediaStreamsByPrincipal, sender.QuotaKey, _maxMediaStreamsPerPrincipal))
                 {
                     BoltServerMetrics.RecordQuotaRejection("media_streams");
@@ -2196,6 +2201,7 @@ public sealed partial class BoltServer : IDisposable
                 {
                     Sender = sender,
                     CallId = config.CallId,
+                    MediaType = config.MediaType,
                 };
 
                 if (!_activeMediaStreams.TryAdd(config.StreamId, candidate))
@@ -5596,6 +5602,9 @@ internal sealed class MediaStreamRoute
     /// The hub forwards only the selected layer per recipient.
     /// </summary>
     public byte? SimulcastLayerId { get; set; }
+
+    /// <summary>What this route carries. A group participant may own one route per media type.</summary>
+    public MediaType MediaType { get; init; }
 
     public bool ContainsRecipient(BoltHubConnection connection)
     {

@@ -25,6 +25,8 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
     internal static readonly TimeSpan InviteLifetime = TimeSpan.FromSeconds(60);
     public bool Enabled { get; }
     public bool EncryptedGroupsEnabled => Enabled && groupLifecycleEnabled;
+    /// <summary>Encrypted camera streams ride the same epoch key as the audio, so they follow the same gate.</summary>
+    public bool VideoEnabled => EncryptedGroupsEnabled && videoEnabled;
     public BoltServer Server { get; }
 
     public YapCallGateway(IConfiguration configuration, IServiceScopeFactory scopes, ILogger<BoltServer> logger)
@@ -36,6 +38,8 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
         this.scopes = scopes;
         pushLogger = logger;
         groupLifecycleEnabled = enableGroupLifecycle;
+        // Video is on wherever encrypted groups are, and can still be switched off per environment.
+        videoEnabled = enableGroupLifecycle && configuration.GetValue("Yap:Calls:Video", true);
         Enabled = configuration.GetValue<bool>("Yap:Calls:Enabled");
         var requiredMode = enableGroupLifecycle ? "EndToEndEncrypted" : "TrustedServerTls";
         if (Enabled && configuration["Yap:Calls:SecurityMode"] != requiredMode)
@@ -331,7 +335,8 @@ public static class YapCallEndpoints
     {
         var api = app.MapGroup("/api/chat/calls").RequireAuthorization().AddEndpointFilter<YapApiFilter>();
         api.MapGet("/config", (YapCallGateway gateway) => new { enabled = gateway.Enabled,
-            securityMode = gateway.EncryptedGroupsEnabled ? "EndToEndEncrypted" : "TrustedServerTls", groupCalls = gateway.EncryptedGroupsEnabled });
+            securityMode = gateway.EncryptedGroupsEnabled ? "EndToEndEncrypted" : "TrustedServerTls", groupCalls = gateway.EncryptedGroupsEnabled,
+            video = gateway.VideoEnabled, maxVideoSenders = YapCallGateway.MaxVideoSenders });
         api.MapPost("/", (StartYapCall request, HttpContext context, YapCallGateway gateway, CancellationToken ct) => gateway.StartAsync(context.User, request, ct));
         api.MapPost("/{id:guid}/connect", (Guid id, HttpContext context, YapCallGateway gateway, CancellationToken ct) => gateway.ConnectAsync(context.User, id, ct));
         api.MapPost("/{id:guid}/ready", (Guid id, HttpContext context, YapCallGateway gateway) => { gateway.Ready(context.User, id); return Results.NoContent(); });
@@ -353,6 +358,7 @@ public static class YapCallEndpoints
         api.MapPost("/groups/{id:guid}/leave", async (Guid id, HttpContext context, YapCallGateway gateway, CancellationToken ct) => { await gateway.LeaveGroupAsync(context.User, id, ct); return Results.NoContent(); });
         api.MapPost("/groups/{id:guid}/control", async (Guid id, YapGroupControl request, HttpContext context, YapCallGateway gateway, CancellationToken ct) => { await gateway.RelayGroupControlAsync(context.User, id, request, ct); return Results.NoContent(); });
         api.MapPost("/groups/{id:guid}/mute", (Guid id, YapGroupMute request, HttpContext context, YapCallGateway gateway) => { gateway.MuteGroup(context.User, id, request.Muted); return Results.NoContent(); });
+        api.MapPost("/groups/{id:guid}/video", (Guid id, YapGroupVideo request, HttpContext context, YapCallGateway gateway) => { gateway.VideoGroup(context.User, id, request.Video); return Results.NoContent(); });
         // The one-use ticket and exact Origin check protect the upgrade; the cookie is still required.
         // HTTP/2 WebSockets use extended CONNECT; HTTP/1.1 upgrades use GET.
         app.MapMethods("/api/chat/calls/socket", [HttpMethods.Get, HttpMethods.Connect], async (HttpContext context, YapCallGateway gateway, ILogger<YapCallGateway> logger) =>

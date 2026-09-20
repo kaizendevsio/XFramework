@@ -50,14 +50,14 @@ public sealed partial class VoiceState : IAsyncDisposable
     {
         if (active is { } attempt && !Current(attempt)) _ = EndAttemptAsync(attempt, false);
         if (chat.User is null || chat.NeedsLogin || api.Account != chat.Scope)
-        { Enabled = false; configured = ""; Notify(); }
+        { Enabled = false; VideoAvailable = false; configured = ""; Notify(); }
     }
 
     public async Task InitializeAsync()
     {
         if (active is { } attempt && !Current(attempt)) await EndAttemptAsync(attempt, false);
         if (disposed || chat.User is null || chat.NeedsLogin || api.Account != chat.Scope)
-        { Enabled = false; configured = ""; return; }
+        { Enabled = false; VideoAvailable = false; configured = ""; return; }
         var account = chat.Scope;
         if (configured == account) return;
         configured = account;
@@ -65,7 +65,11 @@ public sealed partial class VoiceState : IAsyncDisposable
         {
             var configuration = await api.GetAsync<Configuration>("api/chat/calls/config");
             if (!disposed && chat.Scope == account && api.Account == account && !chat.NeedsLogin)
-            { Enabled = configuration.Enabled && configuration.GroupCalls && configuration.SecurityMode == "EndToEndEncrypted"; Notify(); }
+            {
+                Enabled = configuration.Enabled && configuration.GroupCalls && configuration.SecurityMode == "EndToEndEncrypted";
+                VideoAvailable = Enabled && configuration.Video;
+                Notify();
+            }
         }
         catch { if (configured == account) configured = ""; }
     }
@@ -80,6 +84,9 @@ public sealed partial class VoiceState : IAsyncDisposable
         if (!capability.Supported) throw new InvalidOperationException(capability.Reason);
         await media.PrepareVoiceAsync();
         CheckCurrent(attempt);
+        // Probing runs concurrently with admission and connection: it opens no camera, and the
+        // epoch needs its answer only when it publishes this device's decoder list.
+        if (VideoAvailable) attempt.VideoProbe = media.CheckVideoCapabilitiesAsync();
     }
 
     public Task StartAsync(Guid thread, Person person)
@@ -87,13 +94,19 @@ public sealed partial class VoiceState : IAsyncDisposable
         return StartGroupAsync(thread, person.Name, [person]);
     }
 
-    public Task AcceptAsync()
+    /// <summary>Answer. <paramref name="video"/> is the only way answering can ever open the camera.</summary>
+    public Task AcceptAsync(bool video = false)
     {
         var attempt = active;
         if (attempt is null || !Incoming || attempt.Starting || !Current(attempt)) return Task.CompletedTask;
-        attempt.Starting = true; Error = null; Status = "Connecting..."; Incoming = false; Notify();
+        attempt.Starting = true; attempt.WantsVideo = video && VideoAvailable;
+        Error = null; Status = "Connecting..."; Incoming = false; Notify();
         return attempt.Setup = AcceptGroupCoreAsync(attempt);
     }
+
+    /// <summary>The caller's camera is on, so the incoming screen offers to answer with video.</summary>
+    public bool IncomingHasVideo => Incoming && active?.Group is { } group &&
+        group.Participants.Any(x => x.Video && !x.Left && x.CredentialId != chat.User?.CredentialId);
     private async Task ReceiveAsync(YapCallEvent item)
     {
         if (disposed || chat.User is null || chat.NeedsLogin || api.Account != chat.Scope) return;
@@ -140,8 +153,16 @@ public sealed partial class VoiceState : IAsyncDisposable
         attempt.Lifetime.Cancel();
         if (ReferenceEquals(active, attempt))
         {
-            active = null; Incoming = false; ConnectedAt = null; Minimized = false; Muted = false; Notify();
+            active = null; Incoming = false; ConnectedAt = null; Minimized = false; Muted = false;
+            VideoQuality = null; VideoNotice = null; Notify();
         }
+        if (attempt.Media is { } video)
+        {
+            video.OnLocalVideoStopped -= attempt.VideoStopped;
+            video.OnVideoTierChanged -= attempt.TierChanged;
+            video.OnRemoteVideoChanged -= attempt.RemoteVideoChanged;
+        }
+        attempt.CameraOn = false;
         // Stop capture before network notification, including a pending microphone permission request.
         if (attempt.Media is { } media)
         {
@@ -189,7 +210,7 @@ public sealed partial class VoiceState : IAsyncDisposable
     public void DismissError() { Error = null; Notify(); }
     public async ValueTask DisposeAsync()
     { disposed = true; chat.CallReceived -= ReceiveAsync; chat.Changed -= AccountChanged; await EndAsync(); StopRing(); await ringWork; }
-    private sealed record Configuration(bool Enabled, bool GroupCalls = false, string SecurityMode = "");
+    private sealed record Configuration(bool Enabled, bool GroupCalls = false, string SecurityMode = "", bool Video = false);
     private sealed class Attempt(string account)
     {
         public string Account { get; } = account;
@@ -207,5 +228,20 @@ public sealed partial class VoiceState : IAsyncDisposable
         public SemaphoreSlim MediaGate { get; } = new(1, 1);
         public Dictionary<(Guid, string), YapGroupControlEvent> PendingControls { get; } = [];
         public bool Starting, Ended, Muting, Notified;
+
+        // ── Video. Everything here stays inert until the user turns the camera on. ──
+        public bool WantsVideo, CameraOn, CameraBusy;
+        public string Facing = "user";
+        public string Device = "";
+        public VideoCodec Codec;
+        public string? CodecNotice;
+        /// <summary>Tallest picture this device said it can encode, before any call-size cap.</summary>
+        public int Ceiling = 720;
+        public VideoCodecLadder? Ladder;
+        public Task<VideoCapabilities>? VideoProbe;
+        public IReadOnlyList<VideoTile> Tiles = [];
+        public Action<string> VideoStopped = _ => { };
+        public Action<VideoTier?> TierChanged = _ => { };
+        public Action RemoteVideoChanged = () => { };
     }
 }

@@ -67,6 +67,51 @@ public sealed class BoltAuthenticatedMediaModeTests
         }
     }
 
+    // Video rides the same authenticated, per-frame-encrypted relay as the voice. The relay must
+    // carry the three negotiable video codecs and nothing else: screen share and unknown codecs
+    // have no key exchange behind them, so they never reach a recipient.
+    [TestCase(MediaType.Video, CodecId.AV1, true)]
+    [TestCase(MediaType.Video, CodecId.VP9, true)]
+    [TestCase(MediaType.Video, CodecId.H264, true)]
+    [TestCase(MediaType.Video, CodecId.Opus, false)]
+    [TestCase(MediaType.ScreenShare, CodecId.H264, false)]
+    public async Task EncryptedPayloadMode_RoutesNegotiatedVideoCodecsOnly(MediaType mediaType, CodecId codec, bool routed)
+    {
+        using var server = new BoltServer(NullLogger<BoltServer>.Instance,
+            new BoltServerOptions { MediaEnabled = true, AuthenticatedMediaOnly = true,
+                RequireSecureTransport = true, RequireEncryptedMedia = true, CallAuthorizer = new Policy() });
+        await using var alice = new Peer(); await using var bob = new Peer();
+        var first = server.HandleConnectionAsync(alice, Principal("alice"), CancellationToken.None, true);
+        var second = server.HandleConnectionAsync(bob, Principal("bob"), CancellationToken.None, true);
+        try
+        {
+            alice.Push(Frame(w => BoltCodec.WriteRegister(w, "alice", "Alice")));
+            bob.Push(Frame(w => BoltCodec.WriteRegister(w, "bob", "Bob")));
+            await WaitAsync(() => alice.Has(FrameType.RegisterAck) && bob.Has(FrameType.RegisterAck));
+            var call = Guid.NewGuid(); var payload = new byte[4];
+            BinaryPrimitives.WriteInt32LittleEndian(payload, BoltCodec.Fnv1aHash("bob"));
+            alice.Push(Frame(w => BoltCodec.WriteCallSignal(w, call, SignalType.Initiate, payload)));
+            await WaitAsync(() => bob.HasSignal(SignalType.Initiate));
+            bob.Push(Frame(w => BoltCodec.WriteCallSignal(w, call, SignalType.Answer, [])));
+            await WaitAsync(() => alice.HasSignal(SignalType.Answer));
+
+            var audio = Guid.NewGuid(); var video = Guid.NewGuid();
+            alice.Push(Frame(w => BoltCodec.WriteMediaConfig(w, video, call, mediaType, codec, 1920, 1080, 3800, 0x10, [])));
+            // The audio config behind it is the fence: once it lands, the video one has been decided.
+            alice.Push(Frame(w => BoltCodec.WriteMediaConfig(w, audio, call, MediaType.Audio, CodecId.Opus, 48000, 1, 128, 0x10, [])));
+            await WaitAsync(() => bob.Sent.Count(x => x[0] == (byte)FrameType.MediaConfig) >= 1);
+            var configs = bob.Sent.Where(x => x[0] == (byte)FrameType.MediaConfig)
+                .Select(x => { BoltCodec.TryReadMediaConfig(x, out var parsed); return parsed; }).ToArray();
+            configs.Any(x => x.StreamId == video).Should().Be(routed);
+            configs.Should().Contain(x => x.StreamId == audio, "voice is never affected by a refused video config");
+        }
+        finally
+        {
+            await alice.DisposeAsync(); await bob.DisposeAsync();
+            await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(3));
+        }
+    }
+
     [Test]
     public void DedicatedMode_WithoutSecureTransportRequirement_CannotStart()
     {

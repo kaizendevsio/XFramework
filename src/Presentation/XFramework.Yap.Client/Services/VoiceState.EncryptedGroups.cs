@@ -15,15 +15,16 @@ public sealed partial class VoiceState
         chat.Selected?.People.FirstOrDefault(x => x.Id == credential)?.Name ?? "Participant";
     public string? ParticipantAvatar(Guid credential) => chat.Selected?.People.FirstOrDefault(x => x.Id == credential)?.AvatarUrl;
 
-    public Task StartGroupAsync(Guid thread, string name, IReadOnlyList<Person> people)
+    public Task StartGroupAsync(Guid thread, string name, IReadOnlyList<Person> people, bool video = false)
     {
         if (!Enabled || disposed || active is not null || chat.User is null || chat.NeedsLogin || api.Account != chat.Scope)
             return Task.CompletedTask;
         var recipients = people.Where(x => x.Id != chat.User.CredentialId).Select(x => x.Id).Distinct().ToArray();
         if (recipients.Length is < 1 or > 7) { Error = "Voice calls support up to eight people."; Notify(); return Task.CompletedTask; }
-        var attempt = active = new Attempt(chat.Scope) { Starting = true };
+        var attempt = active = new Attempt(chat.Scope) { Starting = true, WantsVideo = video && VideoAvailable };
         Name = name; AvatarUrl = people.Count == 1 ? people[0].AvatarUrl : null;
-        Status = "Preparing microphone..."; Incoming = false; Minimized = false; Error = null; Notify();
+        Status = "Preparing microphone..."; Incoming = false; Minimized = false; Error = null;
+        VideoQuality = null; VideoNotice = null; Notify();
         return attempt.Setup = StartEncryptedGroupCoreAsync(attempt, thread, recipients);
     }
 
@@ -86,6 +87,17 @@ public sealed partial class VoiceState
         CheckCurrent(attempt);
         await media.JoinHostedGroupAsync(group.Id);
         CheckCurrent(attempt);
+        attempt.VideoStopped = reason => CameraReleased(attempt, reason);
+        attempt.TierChanged = tier =>
+        {
+            if (!Current(attempt)) return;
+            VideoQuality = tier;
+            // A null tier is the ladder standing video down so the voice keeps its bandwidth.
+            if (attempt.CameraOn) VideoNotice = tier is null ? "Video paused: not enough bandwidth. Audio continues." : null;
+            Notify();
+        };
+        attempt.RemoteVideoChanged = () => _ = InvokeRemoteVideoAsync(attempt);
+        media.OnRemoteVideoChanged += attempt.RemoteVideoChanged;
         attempt.TransportReady = true;
         // Acceptance may race the caller's first connection; fetch the current roster before deriving an epoch.
         await ApplyGroupRosterAsync(attempt, await api.GetAsync<YapGroupCall>($"api/chat/calls/groups/{group.Id}", attempt.Lifetime.Token));
@@ -151,6 +163,7 @@ public sealed partial class VoiceState
         var epoch = attempt.Epoch = new GroupEpoch(group.Revision, ChatEncryption.CallRosterBinding(group), local,
             group.Participants.Where(x => x.Accepted && !x.Left && x.CredentialId != localId).Select(x => x.CredentialId).ToArray());
         Status = epoch.Peers.Length == 0 ? RingingStatus : "Securing call..."; Notify();
+        await LoadVideoLadderAsync(attempt);
         // Close the managed send gate synchronously, before an older media operation can finish.
         var pause = attempt.Media!.PauseSFrameAsync();
         await RunEpochMediaAsync(attempt, epoch, () => pause);
@@ -160,7 +173,8 @@ public sealed partial class VoiceState
         _ = ExpireEpochAsync(attempt, epoch);
         foreach (var peer in epoch.Peers)
         {
-            await SendEpochControlAsync(attempt, epoch, peer, "key", new CallKey(local.Kid, Convert.ToBase64String(local.Key)));
+            await SendEpochControlAsync(attempt, epoch, peer, "key",
+                new CallKey(local.Kid, Convert.ToBase64String(local.Key), VideoCodecLadder.Advertise(attempt.Ladder?.Decodable ?? [])));
             if (!CurrentEpoch(attempt, epoch)) return;
         }
         var pending = attempt.PendingControls.Values.Where(x => x.Revision == epoch.Revision).ToArray();
@@ -219,6 +233,10 @@ public sealed partial class VoiceState
                 CryptographicOperations.ZeroMemory(key);
             }
             else epoch.Remote[control.SenderId] = new(MediaSender(control.CallId, control.SenderId), payload.Kid, key);
+            // Decoder advertisements are peer claims about their own hardware, nothing more: a bad
+            // one can only cost that peer its picture, so a short unknown string is simply ignored.
+            if (payload.Video is { Length: <= 32 } advertised)
+                epoch.PeerCodecs[control.SenderId] = VideoCodecLadder.ReadAdvertisement(advertised);
         }
         else if (control.Kind == "ack" && payload.Kid == epoch.Local.Kid && payload.Key is null) epoch.Acknowledged.Add(control.SenderId);
         else throw new InvalidOperationException("Invalid call acknowledgment.");
@@ -258,6 +276,11 @@ public sealed partial class VoiceState
             if (!Muted && !await RunEpochMediaAsync(attempt, epoch, media.StartAudioAsync)) return;
             if (!CurrentEpoch(attempt, epoch)) return;
             ConnectedAt ??= DateTimeOffset.UtcNow; Status = "Connected"; Notify();
+            NegotiateVideo(attempt, epoch);
+            // A call started with the camera button opens it once, here, after the keys are live.
+            // Detached on purpose: a camera permission prompt must not stall the call-event loop.
+            if (attempt.WantsVideo && !attempt.CameraOn && !attempt.CameraBusy)
+            { attempt.WantsVideo = false; _ = ToggleCameraAsync(); }
         }
         finally { epoch.Completion.Release(); }
     }
@@ -288,7 +311,31 @@ public sealed partial class VoiceState
         finally { attempt.Muting = false; }
     }
 
-    private sealed record CallKey(string Kid, string? Key);
+    /// <summary>Epoch control payload. <c>Video</c> lists the codecs the sender can decode, so the
+    /// choice of wire codec never leaves the end-to-end encrypted envelope.</summary>
+    private sealed record CallKey(string Kid, string? Key, string? Video = null);
+
+    /// <summary>Resolve the concurrent capability probe into a ladder, once per call.</summary>
+    private async Task LoadVideoLadderAsync(Attempt attempt)
+    {
+        if (attempt.Ladder is not null || attempt.VideoProbe is not { } probe) return;
+        try
+        {
+            var capabilities = await probe;
+            if (!Current(attempt)) return;
+            var ladder = new VideoCodecLadder();
+            foreach (var codec in capabilities.Codecs)
+                ladder.Record(new(VideoCodecLadder.Parse(codec.Codec), codec.Encode, codec.Decode, codec.Hardware, codec.MaxHeight));
+            attempt.Ladder = ladder;
+            attempt.Ceiling = capabilities.Ceiling;
+            attempt.CodecNotice = capabilities.Supported ? null : capabilities.Reason;
+        }
+        // A device without WebCodecs video still makes a perfectly good voice call.
+        catch { attempt.Ladder = new VideoCodecLadder(); attempt.CodecNotice = "This device cannot encode video for calls."; }
+    }
+
+    private async Task InvokeRemoteVideoAsync(Attempt attempt)
+    { await Task.Yield(); ApplyRemoteVideo(attempt); }
     private sealed class GroupEpoch(long revision, string binding, SFrameSenderKey local, Guid[] peers)
     {
         public long Revision { get; } = revision;
@@ -297,6 +344,7 @@ public sealed partial class VoiceState
         public SFrameSenderKey Local { get; } = local;
         public Guid[] Peers { get; } = peers;
         public Dictionary<Guid, SFrameSenderKey> Remote { get; } = [];
+        public Dictionary<Guid, VideoCodec[]> PeerCodecs { get; } = [];
         public HashSet<Guid> Acknowledged { get; } = [];
         public Dictionary<(Guid, string), long> Seen { get; } = [];
         public SemaphoreSlim Completion { get; } = new(1, 1);
