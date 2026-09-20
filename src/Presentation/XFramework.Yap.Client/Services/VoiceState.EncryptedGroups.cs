@@ -328,10 +328,18 @@ public sealed partial class VoiceState
                 ladder.Record(new(VideoCodecLadder.Parse(codec.Codec), codec.Encode, codec.Decode, codec.Hardware, codec.MaxHeight));
             attempt.Ladder = ladder;
             attempt.Ceiling = capabilities.Ceiling;
-            attempt.CodecNotice = capabilities.Supported ? null : capabilities.Reason;
+            // Held apart from CodecNotice: negotiation recomputes that every epoch, and a missing
+            // browser API is not something a later epoch can fix.
+            attempt.VideoBlocked = capabilities.Supported ? null : capabilities.Reason;
+            attempt.CodecNotice = attempt.VideoBlocked;
         }
         // A device without WebCodecs video still makes a perfectly good voice call.
-        catch { attempt.Ladder = new VideoCodecLadder(); attempt.CodecNotice = "This device cannot encode video for calls."; }
+        catch
+        {
+            attempt.Ladder = new VideoCodecLadder();
+            attempt.CodecNotice = attempt.VideoBlocked =
+                "This browser cannot send video in calls. Try the latest Safari, Chrome, Edge or Firefox.";
+        }
     }
 
     private async Task InvokeRemoteVideoAsync(Attempt attempt)

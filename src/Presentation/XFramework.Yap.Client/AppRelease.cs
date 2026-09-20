@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.55";
+    public const string Version = "1.3.56";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "16 September 2026", [
+            "Video calls now work in Safari and on iPhone, using the camera path that browser supports.",
+            "Video errors now say what is actually wrong instead of blaming the device."]),
+        ("1.3.55", "16 September 2026", [
             "The call screen no longer disappears when a camera turns on, and video now shows.",
             "Expanding a minimized video call shows the picture again instead of a black tile."]),
         ("1.3.54", "20 September 2026", [

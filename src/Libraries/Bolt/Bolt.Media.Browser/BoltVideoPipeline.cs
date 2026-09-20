@@ -5,8 +5,10 @@ namespace Bolt.Media.Browser;
 /// <summary>What the browser reported about this device's video encoders, before any camera is opened.</summary>
 public sealed record VideoCapabilities(bool Supported, string? Reason, int Ceiling, VideoCodecProbe[] Codecs);
 public sealed record VideoCodecProbe(string Codec, bool Encode, bool Decode, bool Hardware, int MaxHeight);
-/// <summary>The camera actually acquired, which may differ from what was asked for.</summary>
-public sealed record VideoCaptureState(bool Capturing, string DeviceId, string FacingMode, int Width, int Height, string Codec);
+/// <summary>The camera actually acquired, which may differ from what was asked for.
+/// <paramref name="Strategy"/> is how frames are read: "processor" or the "rvfc" fallback.</summary>
+public sealed record VideoCaptureState(bool Capturing, string DeviceId, string FacingMode, int Width, int Height,
+    string Codec, string Strategy = "");
 public sealed record VideoSendStats(double Fps, double Kbps, int Dropped, int Backlog);
 
 /// <summary>
@@ -61,7 +63,7 @@ public sealed class BoltVideoPipeline(IJSRuntime js, ILogger<BoltVideoPipeline> 
         if (pipeline is null) throw new InvalidOperationException("Initialize the video encoder first.");
         var state = await pipeline.InvokeAsync<VideoCaptureState>("startCapture", self, new { deviceId, facingMode });
         capturing = state.Capturing;
-        logger.LogDebug("Camera started {Width}x{Height} {Codec}", state.Width, state.Height, state.Codec);
+        logger.LogDebug("Camera started {Width}x{Height} {Codec} via {Strategy}", state.Width, state.Height, state.Codec, state.Strategy);
         return state;
     }
 

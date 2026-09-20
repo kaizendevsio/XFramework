@@ -10,9 +10,47 @@ const source = readFileSync(new URL('../wwwroot/bolt-media.js', import.meta.url)
 
 // `support` decides what each probed configuration answers, so a test can describe a device
 // (hardware AV1, software VP9, H.264 only) without pretending to run a real encoder.
-function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 8, battery = null, cameras = 1 } = {}) {
+// `capture` shapes the capture primitives the browser has: 'processor' is Chromium, 'rvfc' is
+// Safari (MediaStreamTrackProcessor is worker-only there, so undefined on the page) and 'none' is
+// a browser too old for either.
+function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 8, battery = null, cameras = 1,
+    capture = 'processor', frameFromElement = true } = {}) {
     const listeners = new Map();
-    const stats = { encoded: [], decoded: [], stopped: 0, opened: [], invoked: [], closedFrames: 0 };
+    const stats = { encoded: [], decoded: [], stopped: 0, opened: [], invoked: [], closedFrames: 0, frames: [] };
+
+    class Frame {
+        constructor(source, init) {
+            if (source?.isVideoElement && !frameFromElement) throw new TypeError('unsupported source');
+            this.source = source; this.timestamp = init?.timestamp; this.closed = false;
+            stats.frames.push(this);
+        }
+        close() { this.closed = true; stats.closedFrames++; }
+    }
+
+    // Stands in for the <video> the fallback reads through: one pending frame callback at a time,
+    // fired by hand so a test controls exactly when a frame arrives.
+    class FakeVideoElement {
+        constructor() {
+            this.isVideoElement = true; this.videoWidth = 1280; this.videoHeight = 720; this.readyState = 2;
+            this.style = {}; this.srcObject = null; this.currentTime = 0; this.paused = true; this.attached = false;
+            this.callbacks = new Map(); this.nextId = 1; this.cancelled = [];
+        }
+        setAttribute() { }
+        requestVideoFrameCallback(callback) { const id = this.nextId++; this.callbacks.set(id, callback); return id; }
+        cancelVideoFrameCallback(id) { this.cancelled.push(id); this.callbacks.delete(id); }
+        play() { this.paused = false; return Promise.resolve(); }
+        pause() { this.paused = true; }
+        remove() { this.attached = false; }
+        /// Deliver one decoded frame, as rVFC would.
+        emit(mediaTime) {
+            const entry = [...this.callbacks.entries()].at(-1);
+            if (!entry) return false;
+            this.callbacks.delete(entry[0]);
+            entry[1](mediaTime * 1000, { mediaTime });
+            return true;
+        }
+    }
+    let element = null;
 
     class Encoder {
         static async isConfigSupported(config) { return { supported: !!support(config, 'encode'), config }; }
@@ -50,14 +88,12 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
         AudioContext: class {}, AudioWorkletNode: class {},
         VideoEncoder: Encoder, VideoDecoder: Decoder,
         EncodedVideoChunk: class { constructor(data) { Object.assign(this, data); } },
-        MediaStreamTrackProcessor: class {
-            constructor({ track }) {
-                this.readable = { getReader: () => ({ read: () => new Promise(() => {}), cancel() {} }) };
-                this.track = track;
-            }
-        },
+        VideoFrame: Frame,
         document: { hidden: false, addEventListener: (name, handler) => listeners.set(name, handler),
-            removeEventListener: name => listeners.delete(name) },
+            removeEventListener: name => listeners.delete(name),
+            body: { appendChild: node => { node.attached = true; } },
+            createElement: name => name === 'video' ? (element = new FakeVideoElement())
+                : { width: 0, height: 0, getContext: () => ({ drawImage() { } }) } },
         addEventListener: (name, handler) => listeners.set(name, handler),
         removeEventListener: name => listeners.delete(name),
         navigator: {
@@ -76,6 +112,13 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
             }
         }
     };
+    if (capture === 'processor') sandbox.MediaStreamTrackProcessor = class {
+        constructor({ track }) {
+            this.readable = { getReader: () => ({ read: () => new Promise(() => { }), cancel() { } }) };
+            this.track = track;
+        }
+    };
+    if (capture === 'rvfc') sandbox.HTMLVideoElement = FakeVideoElement;
     sandbox.globalThis = sandbox;
     vm.createContext(sandbox);
     vm.runInContext(source + `
@@ -83,11 +126,13 @@ this.pipeline = createVideoPipeline();
 this.probe = probeVideoCodecs;
 this.ceiling = videoDeviceCeiling;
 this.capabilities = checkVideoCapabilities;
+this.strategyOf = typeof videoCaptureStrategy === 'function' ? videoCaptureStrategy : () => 'absent';
 this.codecString = videoCodecString;`, sandbox);
 
     const host = { invokeMethodAsync: async (...args) => { stats.invoked.push(args); } };
     const canvas = { width: 0, height: 0, getContext: () => ({ drawImage() {} }) };
-    return { p: sandbox.pipeline, sandbox, stats, listeners, host, canvas, get track() { return track; } };
+    return { p: sandbox.pipeline, sandbox, stats, listeners, host, canvas,
+        get track() { return track; }, get video() { return element; } };
 }
 
 const tier = { width: 1280, height: 720, bitrate: 1500, framerate: 30 };
@@ -305,4 +350,147 @@ test('a decoder that errors is rebuilt and the sender is asked for a keyframe', 
     assert.equal(rebuilt.state, 'configured');
     assert.equal(f.p.remotes.get('s1').primed, false);
     assert.deepEqual(f.stats.invoked.at(-1), ['OnVideoDecodeFailed', 's1']);
+});
+
+// ── Capture without MediaStreamTrackProcessor (Safari, Firefox) ──
+
+// Chromium exposes MediaStreamTrackProcessor on Window; Safari 18 only inside a DedicatedWorker,
+// so on the page it is undefined. Gating the probe on it handed iOS an empty ladder, which the
+// user saw as "this device cannot encode video" on a phone that encodes H.264 in hardware.
+test('a browser without MediaStreamTrackProcessor still gets a real codec ladder', async () => {
+    const f = fixture({ capture: 'rvfc' });
+    assert.equal(f.sandbox.strategyOf(), 'rvfc');
+    const probed = await f.sandbox.probe(1080);
+    assert.ok(probed.some(x => x.encode), 'the encoder was never asked before; now it is');
+    const capabilities = await f.sandbox.capabilities();
+    assert.equal(capabilities.supported, true);
+    assert.equal(capabilities.reason, null);
+});
+
+// WebKit accepts avc1.* and vp09.00*, refuses av01 unless AV1 hardware is present, and throws a
+// TypeError on 'require-hardware' because it is not a WebCodecs enum value at all.
+test('a Safari-shaped probe finds H.264 and VP9, never AV1, and never claims hardware', async () => {
+    const f = fixture({ capture: 'rvfc', support: (config) => {
+        if (config.hardwareAcceleration === 'require-hardware') throw new TypeError('not a valid enum value');
+        return config.codec.startsWith('avc1.') || config.codec.startsWith('vp09.00');
+    } });
+    const by = Object.fromEntries((await f.sandbox.probe(1080)).map(x => [x.codec, x]));
+    assert.equal(by.av1.encode, false);
+    assert.equal(by.vp9.encode, true);
+    assert.equal(by.h264.encode, true);
+    assert.equal(by.h264.maxHeight, 1080);
+    assert.equal(by.h264.hardware, false, 'require-hardware throws rather than answering, everywhere');
+});
+
+test('the frame-callback fallback encodes each frame straight from the element and closes it', async () => {
+    const f = fixture({ capture: 'rvfc' });
+    await init(f);
+    const state = await f.p.startCapture(f.host, {});
+    assert.equal(state.strategy, 'rvfc');
+    assert.equal(f.video.attached, true, 'iOS stalls a detached element, and a stalled one never calls back');
+    assert.equal(f.video.srcObject, f.p.mediaStream);
+    for (let i = 0; i < 5; i++) f.video.emit(i / 30);
+    assert.equal(f.stats.encoded.length, 5);
+    assert.equal(f.stats.frames.length, 5);
+    assert.ok(f.stats.frames.every(x => x.closed), 'one leaked VideoFrame per picture exhausts memory in seconds');
+    assert.ok(f.stats.frames.every(x => x.source === f.video), 'built from the element itself, with no canvas copy');
+    assert.equal(f.stats.frames[3].timestamp, Math.round(3e6 / 30), 'mediaTime seconds become WebCodecs microseconds');
+    assert.equal(f.stats.encoded[0].options.keyFrame, true, 'the first picture of a send must be a keyframe');
+    assert.equal(f.video.callbacks.size, 1, 'the loop re-arms itself for the next frame');
+});
+
+test('the fallback drops the newest frame rather than queueing latency, and allocates none', async () => {
+    const f = fixture({ capture: 'rvfc' });
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    f.video.emit(0);
+    f.p.encoder.encodeQueueSize = 2;
+    f.video.emit(1 / 30);
+    f.video.emit(2 / 30);
+    assert.equal(f.stats.encoded.length, 1);
+    assert.equal(f.p.stats.dropped, 2);
+    assert.equal(f.stats.frames.length, 1, 'a frame that will be dropped is never built in the first place');
+    assert.equal(f.video.callbacks.size, 1, 'a dropped frame must not end the capture');
+});
+
+test('stopping cancels the pending frame callback and hands the element back', async () => {
+    const f = fixture({ capture: 'rvfc' });
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    const video = f.video;
+    const late = [...video.callbacks.values()][0];
+    f.p.stopCapture();
+    assert.equal(video.cancelled.length, 1);
+    assert.equal(video.srcObject, null);
+    assert.equal(video.paused, true);
+    assert.equal(video.attached, false);
+    assert.equal(f.stats.stopped, 1, 'track.stop() is still what turns the hardware indicator off');
+    // A callback already queued by the browser fires after the cancel; the generation must stop it.
+    late(0, { mediaTime: 99 });
+    assert.equal(f.stats.encoded.length, 0);
+    assert.equal(f.stats.frames.length, 0);
+});
+
+test('hiding the page cancels the frame callback, and a restart is not fed by the old one', async () => {
+    const f = fixture({ capture: 'rvfc' });
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    const stale = [...f.video.callbacks.values()][0];
+    f.sandbox.document.hidden = true;
+    f.listeners.get('visibilitychange')();
+    assert.equal(f.p.captureRunning, false);
+    assert.deepEqual(f.stats.invoked.at(-1), ['OnVideoCaptureStopped', 'hidden']);
+    f.sandbox.document.hidden = false;
+    await f.p.startCapture(f.host, {});
+    stale(0, { mediaTime: 99 });
+    assert.equal(f.stats.encoded.length, 0, 'a callback from the previous session pushes nothing');
+    f.video.emit(0);
+    assert.equal(f.stats.encoded.length, 1);
+});
+
+test('dispose on the fallback path releases the element and the camera', async () => {
+    const f = fixture({ capture: 'rvfc' });
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    const video = f.video;
+    await f.p.dispose();
+    assert.equal(f.stats.stopped, 1);
+    assert.equal(video.srcObject, null);
+    assert.equal(video.cancelled.length, 1);
+    assert.equal(f.p.captureVideo, null);
+});
+
+// The direct path is the shipped one. This only proves the degrade exists for a browser that
+// refuses an element source, so such a device loses a pixel copy rather than the whole call.
+test('a browser that refuses a VideoFrame from the element degrades to a canvas, still closing every frame', async () => {
+    const f = fixture({ capture: 'rvfc', frameFromElement: false });
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    f.video.emit(0);
+    f.video.emit(1 / 30);
+    assert.equal(f.stats.encoded.length, 2);
+    assert.equal(f.p.frameFromCanvas, true);
+    assert.ok(f.stats.frames.every(x => x.closed && x.source !== f.video));
+    f.p.stopCapture();
+    assert.equal(f.p.captureCanvas, null, 'the canvas would otherwise keep the last picture of the camera');
+});
+
+// ── What the notice says ──
+
+// "This device cannot encode video" reads as a hardware limit. When the cause is a browser without
+// the capture or codec API, the only useful advice is to try a different one.
+test('a browser with no capture primitive at all names the browser, not the hardware', async () => {
+    const f = fixture({ capture: 'none' });
+    assert.equal(f.sandbox.strategyOf(), 'none');
+    const capabilities = await f.sandbox.capabilities();
+    assert.equal(capabilities.supported, false);
+    assert.match(capabilities.reason, /this browser cannot send video/i);
+    assert.match(capabilities.reason, /try the latest Safari/i);
+});
+
+test('a browser that can capture but encodes nothing still blames the device, not the browser', async () => {
+    const f = fixture({ capture: 'rvfc', support: () => false });
+    const capabilities = await f.sandbox.capabilities();
+    assert.equal(capabilities.supported, false);
+    assert.match(capabilities.reason, /no video encoder/i);
 });
