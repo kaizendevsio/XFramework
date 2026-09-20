@@ -5,7 +5,7 @@ public static class AppRelease
     public const string Version = "1.3.52";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
-        (Version, "15 September 2026", [
+        (Version, "20 September 2026", [
             "Menus, sheets and the photo viewer now give a short haptic tap, with a switch under Appearance.",
             "The emoji button opens a proper emoji keyboard with categories, search and recents, inserting at your cursor."]),
         ("1.3.51", "16 September 2026", [
