@@ -247,6 +247,7 @@ public sealed partial class VoiceState : IAsyncDisposable
         public string? VideoBlocked;
         /// <summary>Tallest picture this device said it can encode, before any call-size cap.</summary>
         public int Ceiling = 720;
+        public int DecodeCeiling = 1080;
         public int CodecCeiling = 720;
         public VideoCodecLadder? Ladder;
         public Task<VideoCapabilities>? VideoProbe;

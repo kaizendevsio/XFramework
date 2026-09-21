@@ -31,7 +31,7 @@ public sealed class VideoCodecLadder
     {
         VideoCodec.Av1 => 360,
         VideoCodec.Vp9 => 540,
-        _ => 1080 // Software H.264 (openh264) keeps up at 720p+ and is the universal floor anyway.
+        _ => 2160 // H.264 prefers the native hardware encoder; measured pressure lowers the tier.
     };
 
     private readonly Dictionary<VideoCodec, VideoCodecSupport> support = [];
@@ -47,7 +47,7 @@ public sealed class VideoCodecLadder
 
     /// <summary>Maximum safe height for the selected encoder, including software limits.</summary>
     public int EncodingCeiling(VideoCodec codec) => support.GetValueOrDefault(codec) is { Encode: true } local
-        ? Math.Min(local.MaxHeight, local.Hardware ? 1080 : SoftwareCeiling(codec)) : 0;
+        ? Math.Min(local.MaxHeight, local.Hardware ? 2160 : SoftwareCeiling(codec)) : 0;
 
     /// <summary>
     /// Pick the codec to encode with: the first in compression order that this device can encode

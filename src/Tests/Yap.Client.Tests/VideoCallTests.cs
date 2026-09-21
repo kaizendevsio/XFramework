@@ -237,11 +237,32 @@ public sealed class VideoCallTests
     {
         Assert.Multiple(() =>
         {
-            Assert.That(VideoAdaptation.HeightCapForParticipants(2), Is.EqualTo(1080));
+            Assert.That(VideoAdaptation.HeightCapForParticipants(2), Is.EqualTo(2160));
             Assert.That(VideoAdaptation.HeightCapForParticipants(3), Is.EqualTo(720));
             Assert.That(VideoAdaptation.HeightCapForParticipants(4), Is.EqualTo(540));
             Assert.That(VideoAdaptation.MaxVideoParticipants, Is.EqualTo(4));
         });
+    }
+
+    [Test]
+    public void Requested4K60_DropsFrameRateBeforeResolutionUnderPressure()
+    {
+        var adaptation = new VideoAdaptation(VideoAdaptation.IndexForHeight(2160), 60);
+        Assert.That(adaptation.Current, Is.EqualTo(new VideoTier(3840, 2160, 60, 21000)));
+        adaptation.Observe(new(30000, 25, 3, 0));
+        Assert.That(adaptation.Observe(new(30000, 25, 3, 0)), Is.EqualTo(new VideoTier(3840, 2160, 30, 14000)));
+        adaptation.Observe(new(30000, 25, 3, 0));
+        Assert.That(adaptation.Observe(new(30000, 25, 3, 0))!.Value.Height, Is.EqualTo(1440));
+    }
+
+    [Test]
+    public void DefaultStartsAt1080p30_AndPreferenceCapsUpscaling()
+    {
+        var adaptation = new VideoAdaptation(new MediaServiceOptions().VideoStartTier);
+        adaptation.SetCeiling(1080);
+        Assert.That(adaptation.Current, Is.EqualTo(new VideoTier(1920, 1080, 30, 3800)));
+        for (var i = 0; i < 30; i++) adaptation.Observe(Good(50000));
+        Assert.That(adaptation.Current!.Value.Height, Is.EqualTo(1080));
     }
 
     // ── Fragmentation: every picture rides the same 4 KB authenticated envelope as an Opus packet ──

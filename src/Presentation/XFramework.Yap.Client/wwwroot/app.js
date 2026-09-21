@@ -6,6 +6,14 @@ window.yap = {
         document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#1b1b1b' : '#f7f7f7';
         yap.applyAccent(yap.accentPreference());
     },
+    videoPreference() {
+        try { const value = JSON.parse(localStorage.getItem('yap-video-quality'));
+            if (Array.isArray(value) && value.length === 2) return value; } catch {}
+        return [1080, 30];
+    },
+    setVideoPreference(height, fps) {
+        try { localStorage.setItem('yap-video-quality', JSON.stringify([height, fps])); } catch {}
+    },
     accentPreference() { try { const value = localStorage.getItem('yap-accent'); return /^#[0-9a-f]{6}$/i.test(value) ? value : '#d5f879'; } catch { return '#d5f879'; } },
     setAccent(value) {
         if (!/^#[0-9a-f]{6}$/i.test(value)) return;

@@ -22,9 +22,7 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
         constructor(source, init) {
             if (source?.isVideoElement && !frameFromElement) throw new TypeError('unsupported source');
             this.source = source; this.timestamp = init?.timestamp; this.closed = false;
-            // A frame built from another frame or from a canvas is the size of what it was built
-            // from; the rotation in the init dict overrides the source's, which is how the pipeline
-            // neutralises metadata before applying its own transform.
+            // Canvas frames start upright. Pixel-level orientation is also checked in a real browser.
             this.rotation = init?.rotation ?? source?.rotation ?? 0;
             this.flip = init?.flip ?? source?.flip ?? false;
             this.displayWidth = source?.displayWidth ?? source?.width ?? source?.videoWidth ?? 0;
@@ -123,7 +121,7 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
     };
     let track = null;
     const sandbox = {
-        console, URL, Uint8Array, Float32Array, Math, Date, JSON, Promise, Set, Map, Number, isSecureContext: true,
+        console, URL, Uint8Array, Float32Array, Math, Date, JSON, Promise, Set, Map, Number, performance, isSecureContext: true,
         AudioEncoder: class { static async isConfigSupported() { return { supported: true }; } },
         AudioDecoder: class { static async isConfigSupported() { return { supported: true }; } },
         AudioContext: class {}, AudioWorkletNode: class {},
@@ -197,7 +195,7 @@ test('probing reports codec limits without treating an acceleration preference a
     } });
     const probed = await f.sandbox.probe(1080);
     const by = Object.fromEntries(probed.map(x => [x.codec, x]));
-    assert.deepEqual(plain(by.av1), { codec: 'av1', encode: false, decode: false, hardware: false, maxHeight: 0 });
+    assert.deepEqual(plain(by.av1), { codec: 'av1', encode: false, decode: false, hardware: false, maxHeight: 0, decodeMaxHeight: 0 });
     assert.equal(by.vp9.encode, true);
     assert.equal(by.vp9.hardware, false, 'acceleration is unknown, so use conservative limits');
     assert.equal(by.vp9.maxHeight, 720);
@@ -219,11 +217,11 @@ test('a device with no video encoder at all is reported unsupported, not guessed
     assert.match(capabilities.reason, /no video encoder/i);
 });
 
-test('few cores and a low unplugged battery lower the ceiling', async () => {
-    assert.equal(await fixture({ hardwareConcurrency: 8 }).sandbox.ceiling(), 1080);
-    assert.equal(await fixture({ hardwareConcurrency: 4 }).sandbox.ceiling(), 720);
+test('a low unplugged battery lowers the ceiling, but core count is not a video codec limit', async () => {
+    assert.equal(await fixture({ hardwareConcurrency: 8 }).sandbox.ceiling(), 2160);
+    assert.equal(await fixture({ hardwareConcurrency: 4 }).sandbox.ceiling(), 2160);
     assert.equal(await fixture({ battery: { charging: false, level: 0.15 } }).sandbox.ceiling(), 540);
-    assert.equal(await fixture({ battery: { charging: true, level: 0.05 } }).sandbox.ceiling(), 1080,
+    assert.equal(await fixture({ battery: { charging: true, level: 0.05 } }).sandbox.ceiling(), 2160,
         'on the charger the battery is not a reason to shrink the picture');
 });
 
@@ -348,8 +346,8 @@ test('encoded pictures reach .NET with a frame id and a keyframe flag', async ()
 test('a tier change reconfigures the encoder and forces a fresh keyframe', async () => {
     const f = fixture();
     await init(f);
-    assert.equal(f.p.applyTier(1280, 720, 1500, 30), false, 'the same tier is not a reconfigure');
-    assert.equal(f.p.applyTier(640, 360, 400, 20), true);
+    assert.equal(await f.p.applyTier(1280, 720, 1500, 30), false, 'the same tier is not a reconfigure');
+    assert.equal(await f.p.applyTier(640, 360, 400, 20), true);
     assert.equal(f.p.encoder.config.height, 360);
     assert.equal(f.p.encoder.config.bitrate, 400000);
     assert.equal(f.p.pendingKeyframe, true, 'the far side cannot decode a new size against an old reference');
@@ -429,7 +427,7 @@ test('a Safari-shaped probe finds H.264 and VP9, never AV1, and never claims har
     assert.equal(by.h264.hardware, false, 'require-hardware throws rather than answering, everywhere');
 });
 
-test('the frame-callback fallback encodes each frame straight from the element and closes it', async () => {
+test('the frame-callback path paints displayed pixels into one reusable canvas and closes frames', async () => {
     const f = fixture({ capture: 'rvfc' });
     await init(f);
     const state = await f.p.startCapture(f.host, {});
@@ -440,7 +438,8 @@ test('the frame-callback fallback encodes each frame straight from the element a
     assert.equal(f.stats.encoded.length, 5);
     assert.equal(f.stats.frames.length, 5);
     assert.ok(f.stats.frames.every(x => x.closed), 'one leaked VideoFrame per picture exhausts memory in seconds');
-    assert.ok(f.stats.frames.every(x => x.source === f.video), 'built from the element itself, with no canvas copy');
+    assert.ok(f.stats.frames.every(x => x.source === f.p.captureCanvas));
+    assert.equal(f.canvases.length, 1, 'reuse the canvas across pictures');
     assert.equal(f.stats.frames[3].timestamp, Math.round(3e6 / 30), 'mediaTime seconds become WebCodecs microseconds');
     assert.equal(f.stats.encoded[0].options.keyFrame, true, 'the first picture of a send must be a keyframe');
     assert.equal(f.video.callbacks.size, 1, 'the loop re-arms itself for the next frame');
@@ -516,7 +515,7 @@ test('a browser that refuses a VideoFrame from the element degrades to a canvas,
     f.video.emit(0);
     f.video.emit(1 / 30);
     assert.equal(f.stats.encoded.length, 2);
-    assert.equal(f.p.frameFromCanvas, true);
+    assert.ok(f.p.captureCanvas);
     assert.ok(f.stats.frames.every(x => x.closed && x.source !== f.video));
     f.p.stopCapture();
     assert.equal(f.p.captureCanvas, null, 'the canvas would otherwise keep the last picture of the camera');
@@ -554,7 +553,8 @@ test('a tier is reshaped to the camera aspect rather than squashing it into a la
     const fit = f.sandbox.fitTier;
     assert.deepEqual(plain(fit(1280, 720, 720, 1280)), { width: 720, height: 1280 }, 'a portrait phone stays portrait');
     assert.deepEqual(plain(fit(1280, 720, 1280, 720)), { width: 1280, height: 720 }, '16:9 already fits the tier');
-    assert.deepEqual(plain(fit(1280, 720, 640, 480)), { width: 960, height: 720 }, '4:3 narrows, it does not stretch');
+    assert.deepEqual(plain(fit(1280, 720, 640, 480)), { width: 640, height: 480 }, 'a small camera is not upscaled');
+    assert.deepEqual(plain(fit(3840, 2160, 720, 1280)), { width: 720, height: 1280 }, '4K is a ceiling, not artificial detail');
     assert.deepEqual(plain(fit(640, 360, 720, 1280)), { width: 360, height: 640 }, 'the short edge is the quality knob');
     assert.deepEqual(plain(fit(1280, 720, 0, 0)), { width: 1280, height: 720 }, 'no camera yet means no reshaping');
 });
@@ -590,7 +590,7 @@ test('the ladder still moves, and each tier lands at the camera aspect', async (
     await f.p.startCapture(f.host, {});
     f.pushFrame({ displayWidth: 720, displayHeight: 1280 });
     await new Promise(resolve => setImmediate(resolve));
-    assert.equal(f.p.applyTier(640, 360, 400, 20), true, 'adaptation is untouched by the reshaping');
+    assert.equal(await f.p.applyTier(640, 360, 400, 20), true, 'adaptation is untouched by the reshaping');
     assert.equal(f.p.encoder.config.width, 360);
     assert.equal(f.p.encoder.config.height, 640);
     assert.equal(f.p.encoder.config.bitrate, 400000);
@@ -603,7 +603,7 @@ test('turning the phone over mid-call re-fits the encoder', async () => {
     f.pushFrame({ displayWidth: 720, displayHeight: 1280 });
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(f.p.encoder.config.height, 1280);
-    f.pushFrame({ displayWidth: 1280, displayHeight: 720 });
+    f.pushFrame({ displayWidth: 1280, displayHeight: 720, timestamp: 33334 });
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(f.p.encoder.config.width, 1280);
     assert.equal(f.p.encoder.config.height, 720, 'landscape again, not stuck on the portrait raster');
@@ -637,13 +637,8 @@ test('a rotated Android frame is turned upright before it is encoded', async () 
     assert.ok(drawn, 'a rotated frame has to be redrawn: the encoder ignores the metadata');
     assert.equal(drawn.width, 720, 'the canvas is the upright size, not the sensor size');
     assert.equal(drawn.height, 1280);
-    const rotate = drawn.ops.find(op => op[0] === 'rotate');
-    assert.ok(rotate, 'the rotation must be baked into the pixels');
-    assert.equal(Math.round((rotate[1] * 180) / Math.PI), 90, 'clockwise by the reported rotation');
-    const translate = drawn.ops.find(op => op[0] === 'translate');
-    assert.deepEqual(translate, ['translate', 360, 640], 'turned about the centre of the upright canvas');
-    const draw = drawn.ops.find(op => op[0] === 'drawImage');
-    assert.deepEqual(draw.slice(2), [-640, -360, 1280, 720], 'a quarter turn swaps the source extent');
+    assert.equal(drawn.ops.filter(op => op[0] === 'rotate').length, 0, 'drawImage alone applies metadata');
+    assert.equal(drawn.ops.find(op => op[0] === 'drawImage')[1], camera);
 
     assert.equal(camera.closed, true, 'the sensor frame is released once its pixels have been copied');
     const encoded = f.stats.encoded.at(-1).frame;
@@ -653,18 +648,19 @@ test('a rotated Android frame is turned upright before it is encoded', async () 
     assert.equal(f.p.encoder.config.height, 1280);
 });
 
-test('the frame own metadata is neutralised so the rotation is applied once, not twice', async () => {
+test('frame metadata is applied once by drawImage without a second transform', async () => {
     const f = fixture();
     await init(f);
     await f.p.startCapture(f.host, {});
     f.pushFrame({ displayWidth: 720, displayHeight: 1280, rotation: 270 });
     await new Promise(resolve => setImmediate(resolve));
-    // drawImage honours rotation metadata on Chromium, so the frame handed to it must claim none.
+    // drawImage honours the original rotation metadata on Chromium.
     const drawn = f.canvases.find(c => c.ops.length);
     const source = drawn.ops.find(op => op[0] === 'drawImage')[1];
-    assert.equal(source.rotation, 0, 'drawImage would otherwise turn it a second time');
+    assert.equal(source.rotation, 270, 'drawImage applies the original metadata');
+    assert.equal(drawn.ops.some(op => op[0] === 'rotate'), false);
     assert.equal(source.flip, false);
-    assert.equal(source.closed, true, 'the neutralised view is released with the frame it borrowed');
+    assert.equal(source.closed, true, 'the camera frame is released after copying');
 });
 
 test('an upright Chromium frame is encoded with no copy at all', async () => {
@@ -686,18 +682,22 @@ test('a mirrored frame is unmirrored into the pixels as well', async () => {
     await new Promise(resolve => setImmediate(resolve));
     const drawn = f.canvases.find(c => c.ops.length);
     assert.ok(drawn, 'flip is metadata too, and the encoder drops it the same way');
-    assert.deepEqual(drawn.ops.find(op => op[0] === 'scale'), ['scale', -1, 1]);
+    assert.equal(drawn.ops.find(op => op[0] === 'drawImage')[1].flip, true);
+    assert.equal(drawn.ops.some(op => op[0] === 'scale'), false);
 });
 
-test('the Safari path never rotates: the element has already done it', async () => {
+test('Safari paints upright element pixels, rather than retaining sensor metadata', async () => {
     const f = fixture({ capture: 'rvfc' });
     await init(f);
     await f.p.startCapture(f.host, {});
     f.video.videoWidth = 720; f.video.videoHeight = 1280;
     f.video.emit(0);
     assert.equal(f.stats.encoded.length, 1);
-    assert.equal(f.stats.encoded[0].frame.source, f.video, 'straight from the element, as #541 arranged');
-    assert.ok(f.canvases.every(c => c.ops.length === 0), 'rotating here would turn an upright picture sideways');
+    const canvas = f.p.captureCanvas;
+    assert.equal(f.stats.encoded[0].frame.source, canvas);
+    assert.deepEqual([canvas.width, canvas.height], [720, 1280]);
+    assert.equal(canvas.ops.find(op => op[0] === 'drawImage')[1], f.video);
+    assert.equal(canvas.ops.some(op => op[0] === 'rotate'), false);
 });
 
 
@@ -720,4 +720,63 @@ for (const reason of ['backlog', 'missing-picture']) test(`decoder recovers from
     assert.equal(f.p.decodeFrame('s1', new Uint8Array([1]), 300, false), false);
     assert.equal(f.p.decodeFrame('s1', new Uint8Array([1]), 400, true), true);
     assert.equal(f.p.decodeFrame('s1', new Uint8Array([1]), 500, false), true);
+});
+
+for (const capture of ['processor', 'rvfc']) test(`${capture} paces a 60fps camera at a 30fps target before conversion`, async () => {
+    const f = fixture({ capture }); await init(f); await f.p.startCapture(f.host, {});
+    for (let i = 0; i < 60; i++) {
+        if (capture === 'rvfc') f.video.emit(i / 60);
+        else { f.pushFrame({ timestamp: Math.round(i * 1e6 / 60) }); await new Promise(resolve => setImmediate(resolve)); }
+    }
+    assert.equal(f.stats.encoded.length, 30);
+    assert.ok(f.stats.frames.every(x => x.closed));
+});
+
+test('4K60 asks for a sufficient H264 level and the portrait equivalent uses the same level', async () => {
+    const f = fixture(); await f.p.initEncoder('h264', 3840, 2160, 21000, 60, 2);
+    assert.equal(f.p.config.codec, 'avc1.640034');
+    f.p._noteSource(2160, 3840);
+    assert.equal(f.p.config.codec, 'avc1.640034');
+    assert.deepEqual([f.p.config.width, f.p.config.height, f.p.config.framerate], [2160, 3840, 60]);
+});
+
+test('H264 receiver reads the profile and level from the keyframe SPS', () => {
+    const f = fixture(); f.p.addRemote('s', f.canvas, 'h264', f.host);
+    const key = new Uint8Array([0,0,0,1,0x67,0x64,0,0x34,1,2]);
+    assert.equal(f.p.decodeFrame('s', key, 0, true), true);
+    assert.equal(f.p.remotes.get('s').decoder.config.codec, 'avc1.640034');
+});
+
+
+test('persistent H264 decoder buffering tries software once and restores native if it also falls behind', async () => {
+    const f = fixture(); f.p.addRemote('s', f.canvas, 'h264', f.host);
+    const remote = f.p.remotes.get('s');
+    const frame = { displayWidth: 1920, displayHeight: 1080 };
+    for (let i = 0; i < 11; i++) await f.p._considerDecoderLatency(remote, frame, 200);
+    assert.equal(remote.software, false);
+    await f.p._considerDecoderLatency(remote, frame, 200);
+    assert.equal(remote.decoder.config.hardwareAcceleration, 'prefer-software');
+    assert.deepEqual(f.stats.invoked.at(-1), ['OnVideoDecodeFailed', 's']);
+    for (let i = 0; i < 12; i++) await f.p._considerDecoderLatency(remote, frame, 200);
+    assert.equal(remote.decoder.config.hardwareAcceleration, 'no-preference');
+    for (let i = 0; i < 20; i++) await f.p._considerDecoderLatency(remote, frame, 200);
+    assert.equal(remote.software, false, 'do not oscillate between decoders');
+});
+
+for (const reason of ['4k', 'brief-stall', 'unsupported']) test(`decoder fallback preserves native decoding for ${reason}`, async () => {
+    const f = fixture({ support: config => reason !== 'unsupported' || config.hardwareAcceleration !== 'prefer-software' });
+    f.p.addRemote('s', f.canvas, 'h264', f.host);
+    const remote = f.p.remotes.get('s');
+    const frame = reason === '4k' ? { displayWidth: 2160, displayHeight: 3840 } : { displayWidth: 1280, displayHeight: 720 };
+    for (let i = 0; i < 24; i++) await f.p._considerDecoderLatency(remote, frame, reason === 'brief-stall' && i % 2 ? 5 : 200);
+    assert.equal(remote.decoder.config.hardwareAcceleration, 'no-preference');
+});
+
+test('decoder delay tracking releases timestamps after rendering and stays bounded for stalled decoders', () => {
+    const f = fixture(); f.p.addRemote('s', f.canvas, 'h264', f.host);
+    const remote = f.p.remotes.get('s');
+    for (let i = 0; i < 100; i++) f.p.decodeFrame('s', new Uint8Array([1]), i, i === 0);
+    assert.equal(remote.pending.size, 32);
+    remote.decoder.callbacks.output({ timestamp: 99, displayWidth: 1280, displayHeight: 720, close() {} });
+    assert.equal(remote.pending.has(99), false);
 });

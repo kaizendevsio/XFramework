@@ -275,7 +275,7 @@ public sealed class BoltMediaStream : IAsyncDisposable
     /// Send an encoded media frame to the remote peer.
     /// Applies: VAD → encryption → retransmit buffer → QUIC/reliable send → FEC.
     /// </summary>
-    public async ValueTask SendFrameAsync(ReadOnlyMemory<byte> encodedData, bool isKeyframe = false, CancellationToken ct = default)
+    public async ValueTask SendFrameAsync(ReadOnlyMemory<byte> encodedData, bool isKeyframe = false, CancellationToken ct = default, uint? captureTimestamp = null)
     {
         if (_closed) return;
 
@@ -298,7 +298,7 @@ public sealed class BoltMediaStream : IAsyncDisposable
         }
 
         var seq = _nextSequence++;
-        var ts = _timestampCounter;
+        var ts = captureTimestamp ?? _timestampCounter;
         _timestampCounter += _timestampIncrement;
 
         byte flags = 0;

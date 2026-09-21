@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.58";
+    public const string Version = "1.3.59";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "21 September 2026", [
+            "Video orientation is corrected across phones, with quality settings from 360p to 4K and up to 60 fps. The default is 1080p at 30 fps.",
+            "Video adapts more reliably under load and can recover from excessive decoder buffering."]),
+        ("1.3.58", "21 September 2026", [
             "Call setup is more reliable on a slow first connection, and video recovers after dropped frames or restarting the camera.",
             "Update notices recover more reliably, and interrupted update downloads resume without clearing your saved data."]),
         ("1.3.57", "16 September 2026", [

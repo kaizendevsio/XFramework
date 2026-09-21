@@ -25,6 +25,7 @@ public sealed class AdaptiveBitrateController : IAsyncDisposable
     private uint _expectedSeq;
     private uint _cumulativeLost;
     private long _lastArrivalTicks;
+    private uint? _lastMediaTimestamp;
     private double _jitterSmoothed; // Smoothed jitter in ticks (EWA)
 
     // ── Feedback loop ──
@@ -48,14 +49,14 @@ public sealed class AdaptiveBitrateController : IAsyncDisposable
         _isAudio = isAudio;
         _currentBitrateKbps = initialBitrateKbps;
         _minBitrateKbps = isAudio ? 16 : 100;
-        _maxBitrateKbps = isAudio ? 256 : 10_000;
+        _maxBitrateKbps = isAudio ? 256 : Math.Max(10_000, initialBitrateKbps * 2);
     }
 
     /// <summary>
     /// Record a received frame's sequence number (receiver side).
     /// Tracks loss and inter-arrival jitter for feedback reports.
     /// </summary>
-    public void RecordFrameReceived(uint seq)
+    public void RecordFrameReceived(uint seq, uint? timestamp = null)
     {
         var now = Environment.TickCount64;
 
@@ -72,15 +73,25 @@ public sealed class AdaptiveBitrateController : IAsyncDisposable
             _expectedSeq = seq + 1;
         }
 
-        // Inter-arrival jitter (RFC 3550 smoothing)
-        if (_lastArrivalTicks > 0)
+        // Video is fragmented: many packets belong to the same picture. Sampling each as
+        // a 33ms picture falsely reports congestion on a perfectly healthy high-resolution stream.
+        if (!_isAudio && timestamp.HasValue && timestamp == _lastMediaTimestamp) return;
+        var expectedMs = !_isAudio && timestamp.HasValue && _lastMediaTimestamp.HasValue
+            ? unchecked(timestamp.Value - _lastMediaTimestamp.Value) / 90.0 : (_isAudio ? 20 : 33);
+        if (_lastArrivalTicks > 0 && expectedMs < 5000)
         {
-            var interArrival = now - _lastArrivalTicks;
-            var deviation = Math.Abs(interArrival - (_isAudio ? 20 : 33)); // expected interval ms
+            var deviation = Math.Abs(now - _lastArrivalTicks - expectedMs);
             _jitterSmoothed += (deviation - _jitterSmoothed) / 16.0;
         }
-
+        _lastMediaTimestamp = timestamp;
         _lastArrivalTicks = now;
+    }
+
+    public void SetVideoTarget(int bitrateKbps)
+    {
+        if (_isAudio) return;
+        _currentBitrateKbps = Math.Clamp(bitrateKbps, 100, 30_000);
+        _maxBitrateKbps = Math.Max(10_000, _currentBitrateKbps * 2);
     }
 
     /// <summary>

@@ -316,17 +316,28 @@ class AudioPipeline {
 // Codec strings are chosen per height: a level that is too low is rejected outright by
 // isConfigSupported, and one that is too high needlessly excludes small hardware encoders.
 
-function av1Codec(height) { return height > 720 ? 'av01.0.08M.08' : height > 480 ? 'av01.0.05M.08' : 'av01.0.04M.08'; }
-function vp9Codec(height) { return height > 1080 ? 'vp09.00.51.08' : height > 720 ? 'vp09.00.40.08' : height > 480 ? 'vp09.00.31.08' : 'vp09.00.21.08'; }
-function h264Codec(height) { return height > 720 ? 'avc1.4d0028' : height > 480 ? 'avc1.42001f' : 'avc1.42001e'; }
+function av1Codec(height, fps = 30) { if (height > 1080) return fps > 30 ? 'av01.0.13M.08' : 'av01.0.12M.08'; return height > 720 ? (fps > 30 ? 'av01.0.09M.08' : 'av01.0.08M.08') : height > 480 ? (fps > 30 ? 'av01.0.08M.08' : 'av01.0.05M.08') : 'av01.0.04M.08'; }
+function vp9Codec(height, fps = 30) { return height > 1080 ? (fps > 30 ? 'vp09.00.51.08' : 'vp09.00.50.08') : height > 720 ? (fps > 30 ? 'vp09.00.41.08' : 'vp09.00.40.08') : height > 480 ? (fps > 30 ? 'vp09.00.40.08' : 'vp09.00.31.08') : 'vp09.00.21.08'; }
+function h264Codec(height, fps = 30) { return height > 1080 ? (fps > 30 ? 'avc1.640034' : 'avc1.640033') : height > 720 ? (fps > 30 ? 'avc1.4d002a' : 'avc1.4d0028') : height > 480 ? (fps > 30 ? 'avc1.420020' : 'avc1.42001f') : 'avc1.42001e'; }
 
-export function videoCodecString(codec, height) {
-    return codec === 'av1' ? av1Codec(height) : codec === 'vp9' ? vp9Codec(height) : h264Codec(height);
+export function videoCodecString(codec, height, fps = 30) {
+    return codec === 'av1' ? av1Codec(height, fps) : codec === 'vp9' ? vp9Codec(height, fps) : h264Codec(height, fps);
+}
+
+export function h264BitstreamCodec(data) {
+    // Annex B SPS starts near the front of every keyframe. Bound the scan of untrusted media.
+    for (let i = 0; i + 7 < Math.min(data.length, 65536); i++) {
+        if (data[i] !== 0 || data[i + 1] !== 0) continue;
+        const nal = data[i + 2] === 1 ? i + 3 : data[i + 2] === 0 && data[i + 3] === 1 ? i + 4 : -1;
+        if (nal < 0 || (data[nal] & 31) !== 7) continue;
+        return 'avc1.' + [...data.slice(nal + 1, nal + 4)].map(x => x.toString(16).padStart(2, '0')).join('');
+    }
+    return null;
 }
 
 function encoderConfig(codec, width, height, bitrateKbps, framerate, hardware) {
     const config = {
-        codec: videoCodecString(codec, height), width, height,
+        codec: videoCodecString(codec, Math.min(width, height), framerate), width, height,
         bitrate: Math.max(64, bitrateKbps) * 1000, framerate,
         latencyMode: 'realtime', bitrateMode: 'variable', scalabilityMode: 'L1T1',
         hardwareAcceleration: hardware ?? 'no-preference'
@@ -347,7 +358,8 @@ function encoderConfig(codec, width, height, bitrateKbps, framerate, hardware) {
 /// Keep the tier's short edge as the quality knob and let the camera decide the long one.
 export function fitTierToSource(width, height, sourceWidth, sourceHeight) {
     if (!(sourceWidth > 0) || !(sourceHeight > 0)) return { width, height };
-    const across = Math.min(width, height), longest = Math.max(width, height);
+    // A camera that only supplies 720p must not be upscaled to a 4K preference.
+    const across = Math.min(width, height, sourceWidth, sourceHeight), longest = Math.max(width, height);
     const portrait = sourceHeight > sourceWidth;
     const ratio = portrait ? sourceHeight / sourceWidth : sourceWidth / sourceHeight;
     // Never past the tier's long edge: that length is what the chosen bitrate was measured against.
@@ -374,13 +386,13 @@ export function videoCaptureStrategy() {
 /// The gate asks only for the codec APIs being probed. Requiring MediaStreamTrackProcessor here
 /// handed Safari an empty ladder, which surfaced as "this device cannot encode video" on hardware
 /// that encodes H.264 perfectly well; capture support is a separate question, asked separately.
-export async function probeVideoCodecs(maxHeight = 1080) {
+export async function probeVideoCodecs(maxHeight = 2160) {
     const results = [];
     if (typeof VideoEncoder === 'undefined' || typeof VideoDecoder === 'undefined') return results;
-    const heights = [1080, 720, 540, 360].filter(h => h <= maxHeight);
+    const heights = [2160, 1440, 1080, 720, 540, 360].filter(h => h <= maxHeight);
     if (heights.length === 0) heights.push(Math.max(180, maxHeight));
     for (const codec of ['av1', 'vp9', 'h264']) {
-        let best = 0, hardware = false, decode = false;
+        let best = 0, hardware = false, decode = false, decodeMaxHeight = 0;
         for (const height of heights) {
             const width = Math.round(height * 16 / 9 / 2) * 2;
             try {
@@ -394,19 +406,19 @@ export async function probeVideoCodecs(maxHeight = 1080) {
         for (const height of heights) {
             try {
                 const supported = await VideoDecoder.isConfigSupported(
-                    { codec: videoCodecString(codec, height), hardwareAcceleration: 'no-preference' });
-                if (supported?.supported) { decode = true; break; }
+                    { codec: videoCodecString(codec, height), codedWidth: Math.round(height * 16 / 9), codedHeight: height, hardwareAcceleration: 'no-preference' });
+                if (supported?.supported) { decode = true; decodeMaxHeight = height; break; }
             } catch { /* Same: treat a throw as unsupported. */ }
         }
-        results.push({ codec, encode: best > 0, decode, hardware, maxHeight: best });
+        results.push({ codec, encode: best > 0, decode, hardware, maxHeight: best, decodeMaxHeight });
     }
     return results;
 }
 
-/// Battery and core count only ever lower the ceiling; they never raise it.
+/// Battery can lower the ceiling; codec probes and measured pressure decide device capacity.
 export async function videoDeviceCeiling() {
-    let ceiling = 1080;
-    if ((navigator.hardwareConcurrency ?? 8) <= 4) ceiling = 720;
+    let ceiling = 2160;
+    // CPU core count does not describe a phone's dedicated video encoder.
     try {
         const battery = await navigator.getBattery?.();
         // A phone below a fifth of its battery and off the charger should not spend it on pixels
@@ -430,7 +442,6 @@ class VideoPipeline {
         this.captureStrategy = null;
         this.captureCanvas = null;
         this.captureContext = null;
-        this.frameFromCanvas = false;
         this.preview = null;
         this.dotNetRef = null;
         this.remotes = new Map();
@@ -445,6 +456,7 @@ class VideoPipeline {
         this.facingMode = 'user';
         this.deviceId = '';
         this.lastRequest = null;
+        this.lastCaptureTimestamp = null;
         // What the ladder asked for, kept apart from what the encoder is actually configured with:
         // the raster is the tier reshaped to whatever the camera is currently handing us, and that
         // shape changes on a camera switch and when the phone is turned over mid-call.
@@ -542,6 +554,7 @@ class VideoPipeline {
         this.captureRunning = true;
         this.pendingKeyframe = true;
         this.window = { since: 0, frames: 0, bytes: 0 };
+        this.lastCaptureTimestamp = null;
         this.dotNetRef = dotNetRef;
         if (this.preview) this.preview.srcObject = stream;
         // The camera can be revoked from the browser's own UI; that must end the send, not hang it.
@@ -564,7 +577,7 @@ class VideoPipeline {
     useCaptureStrategy(strategy) { this.captureStrategy = strategy || null; }
 
     /// The Safari path: an off-screen <video> carrying the camera stream, one callback per decoded
-    /// frame, and a VideoFrame built straight from the element - no canvas, no pixel copy.
+    /// frame, painted at the encoder size so sensor rotation cannot leak into the bitstream.
     _startFrameCallbacks(stream, generation) {
         const video = this.captureVideo = globalThis.document.createElement('video');
         video.srcObject = stream;
@@ -605,7 +618,9 @@ class VideoPipeline {
         // _upright on this path: the element paints the rotation itself, so it is already upright.
         this._noteSource(video.videoWidth, video.videoHeight);
         const seconds = metadata?.mediaTime ?? video.currentTime ?? 0;
-        const frame = this._elementFrame(video, Math.max(0, Math.round(seconds * 1e6)));
+        const timestamp = Math.max(0, Math.round(seconds * 1e6));
+        if (!this._acceptCaptureTime(timestamp)) return;
+        const frame = this._elementFrame(video, timestamp);
         if (!frame) return;
         try {
             const now = Date.now();
@@ -615,25 +630,19 @@ class VideoPipeline {
         } finally { frame.close(); }
     }
 
-    /// A VideoFrame built from the element itself copies no pixels. Should a browser refuse that
-    /// source, degrade once to a canvas draw rather than losing video for the rest of the call.
+    /// A video-element VideoFrame can retain sensor rotation, including on Safari. Paint the
+    /// displayed image into a reusable, encoder-sized canvas to bake orientation into the pixels.
+    /// No getImageData/readback and no full-resolution intermediate allocation.
     _elementFrame(video, timestamp) {
         // WebKit throws InvalidStateError for an element below HAVE_CURRENT_DATA or with no decoded
         // frame in hand. rVFC should never hand us one, but a throw per frame would be expensive.
         if (!video.videoWidth || !video.videoHeight || (video.readyState ?? 2) < 2) return null;
-        if (!this.frameFromCanvas) {
-            try { return new VideoFrame(video, { timestamp }); }
-            catch (error) {
-                console.warn('Bolt video: VideoFrame from <video> refused; drawing through a canvas.', error);
-                this.frameFromCanvas = true;
-            }
-        }
         try {
             const canvas = this.captureCanvas ??= typeof OffscreenCanvas !== 'undefined'
-                ? new OffscreenCanvas(video.videoWidth, video.videoHeight)
+                ? new OffscreenCanvas(this.config.width, this.config.height)
                 : globalThis.document.createElement('canvas');
-            if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight)
-            { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
+            if (canvas.width !== this.config.width || canvas.height !== this.config.height)
+            { canvas.width = this.config.width; canvas.height = this.config.height; }
             this.captureContext ??= canvas.getContext('2d', { alpha: false, desynchronized: true });
             this.captureContext.drawImage(video, 0, 0, canvas.width, canvas.height);
             return new VideoFrame(canvas, { timestamp });
@@ -666,6 +675,7 @@ class VideoPipeline {
                 if (!this.encoder || this.encoder.state !== 'configured') continue;
                 // Dropping the newest frame beats queueing it: a backlog is latency the call never recovers.
                 if (this.encoder.encodeQueueSize >= 2) { this.stats.dropped++; continue; }
+                if (!this._acceptCaptureTime(frame.timestamp)) continue;
                 frame = this._upright(frame);
                 this._noteSource(frame.displayWidth, frame.displayHeight);
                 const now = Date.now();
@@ -674,6 +684,14 @@ class VideoPipeline {
                 this.encoder.encode(frame, { keyFrame });
             } finally { frame.close(); }
         }
+    }
+
+    _acceptCaptureTime(timestamp) {
+        const interval = 1e6 / (this.config?.framerate || 30);
+        if (this.lastCaptureTimestamp !== null && timestamp >= this.lastCaptureTimestamp &&
+            timestamp - this.lastCaptureTimestamp < interval * 0.9) return false;
+        this.lastCaptureTimestamp = timestamp;
+        return true;
     }
 
     describe() {
@@ -697,9 +715,16 @@ class VideoPipeline {
 
     /// Change picture size, rate or bitrate in place. A reconfigure needs a fresh keyframe or the
     /// far side decodes the new size against the old reference.
-    applyTier(width, height, bitrateKbps, framerate) {
+    async applyTier(width, height, bitrateKbps, framerate) {
         this.tier = { width, height, bitrateKbps, framerate };
-        return this._configureForSource();
+        const changed = this._configureForSource();
+        const track = this.mediaStream?.getVideoTracks()[0];
+        if (changed && track?.applyConstraints) {
+            try { await track.applyConstraints({ width: { ideal: width }, height: { ideal: height },
+                frameRate: { ideal: framerate, max: framerate } }); }
+            catch { /* Keep the working track; encoder pacing still enforces the limit. */ }
+        }
+        return changed;
     }
 
     /// Configure the encoder for the current tier at the current camera's aspect ratio. Called when
@@ -729,16 +754,8 @@ class VideoPipeline {
 
     /// Bake a frame's display rotation into its pixels.
     ///
-    /// Chromium's MediaStreamTrackProcessor hands over frames in *sensor* orientation and carries
-    /// the display rotation alongside as metadata. VideoEncoder encodes the coded buffer and drops
-    /// that metadata, so an Android phone held upright sends a sideways picture. Safari's rVFC path
-    /// reads a <video> element that has already applied the rotation, which is why iOS looked right
-    /// and Android did not.
-    ///
-    /// Normalising here rather than adding an orientation field to the fragment header keeps the
-    /// wire format exactly as it is - that header rides inside the SFrame plaintext, and widening it
-    /// would move the reassembly bounds the replay and truncation checks are written against. The
-    /// cost is one rotation, on the Chromium path only, and only while a frame actually reports one.
+    /// Camera frames can carry orientation metadata that the encoded elementary stream loses.
+    /// drawImage applies that metadata once; the resulting canvas frame has upright pixels.
     _upright(frame) {
         const rotation = (((frame.rotation ?? 0) % 360) + 360) % 360;
         const flip = frame.flip === true;
@@ -753,22 +770,9 @@ class VideoPipeline {
             if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
             const context = this.rotateContext ??= canvas.getContext('2d', { alpha: false, desynchronized: true });
             if (!context) return frame;
-            // Neutralise the frame's own metadata first, so the transform below is the only one
-            // applied: drawImage honours rotation and flip on Chromium, and ours on top of that
-            // would turn the picture twice.
-            let source = frame, borrowed = null;
-            try { source = borrowed = new VideoFrame(frame, { rotation: 0, flip: false, timestamp: frame.timestamp }); }
-            catch { source = frame; }
-            // Quarter turns swap the source's extent relative to the upright canvas.
-            const quarter = rotation === 90 || rotation === 270;
-            const sourceWidth = quarter ? height : width, sourceHeight = quarter ? width : height;
-            context.save();
-            context.translate(width / 2, height / 2);
-            context.rotate(rotation * Math.PI / 180);
-            if (flip) context.scale(-1, 1);
-            context.drawImage(source, -sourceWidth / 2, -sourceHeight / 2, sourceWidth, sourceHeight);
-            context.restore();
-            if (borrowed) borrowed.close();
+            // drawImage applies the VideoFrame orientation. A clone with rotation: 0 does
+            // NOT erase inherited rotation (WebCodecs composes it), so never rotate twice.
+            context.drawImage(frame, 0, 0, width, height);
             const upright = new VideoFrame(canvas, { timestamp: frame.timestamp, duration: frame.duration });
             frame.close();
             return upright;
@@ -789,7 +793,8 @@ class VideoPipeline {
         if (this.remotes.size >= 7) return false;
         const context = canvas?.getContext?.('2d', { alpha: false, desynchronized: true });
         if (!context) return false;
-        const remote = { canvas, context, codec: codec || 'h264', decoder: null, width: 0, height: 0, primed: false };
+        const remote = { streamId, canvas, context, codec: codec || 'h264', decoder: null, width: 0, height: 0,
+            primed: false, pending: new Map(), lateFrames: 0, software: false, fallbackTried: false };
         this._openDecoder(streamId, remote);
         this.remotes.set(streamId, remote);
         return true;
@@ -797,17 +802,20 @@ class VideoPipeline {
 
     _openDecoder(streamId, remote) {
         remote.primed = false;
+        remote.pending.clear();
+        remote.lateFrames = 0;
         remote.decoder = new VideoDecoder({
             output: (frame) => this._render(remote, frame),
             error: (error) => {
                 console.error('Bolt video decoder:', error);
                 // A decoder that errored is closed for good. Rebuild it and wait for the next
                 // keyframe; the C# side asks the sender for one rather than showing a frozen tile.
+                remote.software = false;
                 if (this.remotes.get(streamId) === remote) this._openDecoder(streamId, remote);
                 void this.hostRef?.invokeMethodAsync('OnVideoDecodeFailed', streamId);
             }
         });
-        remote.decoder.configure({ codec: videoCodecString(remote.codec, 1080), hardwareAcceleration: 'no-preference',
+        remote.decoder.configure({ codec: remote.bitstreamCodec || videoCodecString(remote.codec, 1080), hardwareAcceleration: remote.software ? 'prefer-software' : 'no-preference',
             optimizeForLatency: true });
     }
 
@@ -821,6 +829,14 @@ class VideoPipeline {
     decodeFrame(streamId, data, timestamp, isKeyframe, discontinuity = false) {
         const remote = this.remotes.get(streamId);
         if (!remote || remote.decoder?.state !== 'configured') return false;
+        if (isKeyframe && remote.codec === 'h264') {
+            const codec = h264BitstreamCodec(data);
+            if (codec && codec !== remote.bitstreamCodec) {
+                remote.bitstreamCodec = codec;
+                remote.decoder.close();
+                this._openDecoder(streamId, remote);
+            }
+        }
         // A decoder that has not seen a keyframe yet cannot use deltas; feeding them wastes work.
         if (!remote.primed && !isKeyframe) return false;
         if (remote.decoder.decodeQueueSize >= 6 || (discontinuity && !isKeyframe)) {
@@ -828,6 +844,8 @@ class VideoPipeline {
             return false;
         }
         try {
+            if (remote.pending.size >= 32) remote.pending.delete(remote.pending.keys().next().value);
+            remote.pending.set(timestamp, performance.now());
             remote.decoder.decode(new EncodedVideoChunk(
                 { type: isKeyframe ? 'key' : 'delta', timestamp, data }));
             remote.primed = true;
@@ -844,6 +862,9 @@ class VideoPipeline {
 
     _render(remote, frame) {
         try {
+            const submitted = remote.pending.get(frame.timestamp);
+            remote.pending.delete(frame.timestamp);
+            if (submitted !== undefined) void this._considerDecoderLatency(remote, frame, performance.now() - submitted);
             if (remote.width !== frame.displayWidth || remote.height !== frame.displayHeight) {
                 remote.width = remote.canvas.width = frame.displayWidth;
                 remote.height = remote.canvas.height = frame.displayHeight;
@@ -851,6 +872,33 @@ class VideoPipeline {
             remote.context.drawImage(frame, 0, 0);
         } catch { /* A detached canvas is a closed tile, not a call failure. */ }
         finally { frame.close(); }
+    }
+
+    async _considerDecoderLatency(remote, frame, elapsed) {
+        // Some hardware decoders buffer several pictures despite optimizeForLatency. Try a
+        // software decoder once, only after sustained measured delay at a bounded picture size.
+        // Measure time inside the decoder, not network transit or the sender's unrelated clock.
+        if (remote.codec !== 'h264') return;
+        const tooLarge = frame.displayWidth * frame.displayHeight > 1920 * 1080;
+        remote.lateFrames = elapsed > 100 ? remote.lateFrames + 1 : 0;
+        if (remote.software && (tooLarge || remote.lateFrames >= 12)) {
+            remote.software = false;
+            this._recoverDecoder(remote.streamId, remote);
+            return;
+        }
+        if (tooLarge || remote.fallbackTried || remote.lateFrames < 12) return;
+        remote.fallbackTried = true;
+        const decoder = remote.decoder;
+        try {
+            const support = await VideoDecoder.isConfigSupported({
+                codec: remote.bitstreamCodec || videoCodecString('h264', 1080),
+                codedWidth: frame.displayWidth, codedHeight: frame.displayHeight,
+                hardwareAcceleration: 'prefer-software', optimizeForLatency: true
+            });
+            if (!support?.supported || this.remotes.get(remote.streamId) !== remote || remote.decoder !== decoder) return;
+            remote.software = true;
+            this._recoverDecoder(remote.streamId, remote);
+        } catch { /* Unsupported software paths keep the native decoder. */ }
     }
 
     /// Releases the camera outright - track.stop() is what turns the hardware indicator off.

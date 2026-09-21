@@ -183,7 +183,7 @@ public sealed partial class VoiceState
         foreach (var peer in epoch.Peers)
         {
             await SendEpochControlAsync(attempt, epoch, peer, "key",
-                new CallKey(local.Kid, Convert.ToBase64String(local.Key), VideoCodecLadder.Advertise(attempt.Ladder?.Decodable ?? [])));
+                new CallKey(local.Kid, Convert.ToBase64String(local.Key), VideoCodecLadder.Advertise(attempt.Ladder?.Decodable ?? []), attempt.DecodeCeiling));
             if (!CurrentEpoch(attempt, epoch)) return;
         }
         var pending = attempt.PendingControls.Values.Where(x => x.Revision == epoch.Revision).ToArray();
@@ -246,6 +246,7 @@ public sealed partial class VoiceState
             // one can only cost that peer its picture, so a short unknown string is simply ignored.
             if (payload.Video is { Length: <= 32 } advertised)
                 epoch.PeerCodecs[control.SenderId] = VideoCodecLadder.ReadAdvertisement(advertised);
+            epoch.PeerVideoHeights[control.SenderId] = Math.Clamp(payload.VideoHeight, 240, 2160);
         }
         else if (control.Kind == "ack" && payload.Kid == epoch.Local.Kid && payload.Key is null) epoch.Acknowledged.Add(control.SenderId);
         else throw new InvalidOperationException("Invalid call acknowledgment.");
@@ -322,7 +323,7 @@ public sealed partial class VoiceState
 
     /// <summary>Epoch control payload. <c>Video</c> lists the codecs the sender can decode, so the
     /// choice of wire codec never leaves the end-to-end encrypted envelope.</summary>
-    private sealed record CallKey(string Kid, string? Key, string? Video = null);
+    private sealed record CallKey(string Kid, string? Key, string? Video = null, int VideoHeight = 1080);
 
     /// <summary>Resolve the concurrent capability probe into a ladder, once per call.</summary>
     private async Task LoadVideoLadderAsync(Attempt attempt)
@@ -330,6 +331,7 @@ public sealed partial class VoiceState
         if (attempt.Ladder is not null || attempt.VideoProbe is not { } probe) return;
         try
         {
+            await LoadVideoPreferenceAsync();
             var capabilities = await probe.WaitAsync(TimeSpan.FromSeconds(5), attempt.Lifetime.Token);
             if (!Current(attempt)) return;
             var ladder = new VideoCodecLadder();
@@ -337,6 +339,7 @@ public sealed partial class VoiceState
                 ladder.Record(new(VideoCodecLadder.Parse(codec.Codec), codec.Encode, codec.Decode, codec.Hardware, codec.MaxHeight));
             attempt.Ladder = ladder;
             attempt.Ceiling = capabilities.Ceiling;
+            attempt.DecodeCeiling = capabilities.Codecs.Where(x => x.Decode).Select(x => x.DecodeMaxHeight).DefaultIfEmpty(0).Min();
             // Held apart from CodecNotice: negotiation recomputes that every epoch, and a missing
             // browser API is not something a later epoch can fix.
             attempt.VideoBlocked = capabilities.Supported ? null : capabilities.Reason;
@@ -362,6 +365,7 @@ public sealed partial class VoiceState
         public Guid[] Peers { get; } = peers;
         public Dictionary<Guid, SFrameSenderKey> Remote { get; } = [];
         public Dictionary<Guid, VideoCodec[]> PeerCodecs { get; } = [];
+        public Dictionary<Guid, int> PeerVideoHeights { get; } = [];
         public HashSet<Guid> Acknowledged { get; } = [];
         public Dictionary<(Guid, string), long> Seen { get; } = [];
         public SemaphoreSlim Completion { get; } = new(1, 1);

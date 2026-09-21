@@ -11,7 +11,7 @@ public sealed partial class BoltMediaService
 {
     private readonly Dictionary<Guid, VideoFrameAssembler> _videoAssemblers = [];
     private readonly Dictionary<Guid, RemoteVideoStream> _remoteVideo = [];
-    private Channel<List<byte[]>>? _videoSend;
+    private Channel<VideoFramePayload>? _videoSend;
     private int _videoDeviceCeiling = 1080;
     private bool _videoNeedsKeyframe;
     private Task _videoPump = Task.CompletedTask;
@@ -52,29 +52,45 @@ public sealed partial class BoltMediaService
     /// SFrame epoch as the audio, so a picture can never leave this device in the clear.
     /// </summary>
     public async Task<VideoCaptureState> StartVideoAsync(Guid callId, VideoCodec codec, int ceilingHeight,
-        string? deviceId = null, string? facingMode = null)
+        string? deviceId = null, string? facingMode = null, int? preferredHeight = null, int preferredFramerate = 30)
     {
         EnsureInitialized();
         if (codec == VideoCodec.None) throw new InvalidOperationException("No video codec is shared with this call.");
         if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame && !IsSFrameReady)
             throw new InvalidOperationException("The call's encryption keys are not active yet.");
 
-        var adaptation = _adaptation ??= new VideoAdaptation(_options.VideoStartTier);
-        _videoDeviceCeiling = Math.Min(ceilingHeight, _options.VideoMaxHeight);
+        var requestedHeight = preferredHeight ?? VideoAdaptation.Ladder[Math.Clamp(_options.VideoStartTier, 0, VideoAdaptation.Ladder.Length - 1)].Height;
+        var adaptation = _adaptation ??= new VideoAdaptation(VideoAdaptation.IndexForHeight(requestedHeight), preferredFramerate);
+        _videoDeviceCeiling = Math.Min(requestedHeight, Math.Min(ceilingHeight, _options.VideoMaxHeight));
         adaptation.SetCeiling(_videoDeviceCeiling);
         var tier = adaptation.Current ?? VideoAdaptation.Ladder[0];
         if (_videoCodec != codec || !_video.IsCapturing)
         {
             _videoCodec = codec;
-            await _video.InitializeEncoderAsync(VideoCodecLadder.Name(codec), tier, _options.KeyframeIntervalSeconds);
+            while (true)
+            {
+                try { await _video.InitializeEncoderAsync(VideoCodecLadder.Name(codec), tier, _options.KeyframeIntervalSeconds); break; }
+                catch (JSException) when (tier.Framerate > 30 || adaptation.Index > 0)
+                {
+                    // isConfigSupported at 30 fps cannot promise 60 fps on this device.
+                    adaptation = _adaptation = new VideoAdaptation(tier.Framerate > 30 ? adaptation.Index : adaptation.Index - 1, 30);
+                    _videoDeviceCeiling = Math.Min(_videoDeviceCeiling, adaptation.Current!.Value.Height);
+                    adaptation.SetCeiling(_videoDeviceCeiling);
+                    tier = adaptation.Current!.Value;
+                }
+            }
         }
 
         await StartVideoStreamAsync(callId);
+        _mediaClient!.ConfigureVideoFeedback(_activeVideoStreamId, tier.BitrateKbps);
+        Volatile.Write(ref _videoAllowedKbps, tier.BitrateKbps);
         AttachVideoHandlers();
         var state = await _video.StartCaptureAsync(deviceId, facingMode);
         StartAdaptationLoop();
         return state;
     }
+
+    public void ResetVideoPreference() => _adaptation = null;
 
     /// <summary>Camera off. Releases the capture device but keeps the published stream, so
     /// turning it back on costs one getUserMedia and no renegotiation.</summary>
@@ -83,6 +99,7 @@ public sealed partial class BoltMediaService
         StopAdaptationLoop();
         await _video.StopCaptureAsync();
         DrainVideoSend();
+        await _videoPump;
     }
 
     /// <summary>Lower the ceiling as the call grows; every extra sender is another decode.</summary>
@@ -107,7 +124,8 @@ public sealed partial class BoltMediaService
         else if (_options.EnableFec) stream.EnableFec(_options.FecVideoGroupSize);
         stream.EnableNack(256);
         var tier = _adaptation?.Current ?? VideoAdaptation.Ladder[_options.VideoStartTier];
-        stream.EnableBandwidthProbing(tier.BitrateKbps);
+        // The authenticated relay rejects the legacy plaintext probe packets.
+        // Adapt using real receiver feedback and local encoder/queue measurements.
         // Receiver-driven congestion control is the only view of the far end this sender gets.
         stream.OnBitrateChanged += kbps => Volatile.Write(ref _videoAllowedKbps, kbps);
         stream.OnKeyframeNeeded += () => _ = _video.RequestKeyframeAsync();
@@ -168,13 +186,12 @@ public sealed partial class BoltMediaService
     {
         if (_activeVideoStreamId == Guid.Empty) return;
         if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame && _sframe?.IsReady != true) return;
-        var fragments = VideoFrameFragments.Split(data, frameId, timestamp, isKeyframe);
         if (_videoNeedsKeyframe && !isKeyframe) { _videoDropped++; return; }
-        if (fragments.Count == 0) { VideoDropped(); return; }
+        if (data.Length == 0 || VideoFrameFragments.FragmentCount(data.Length) > VideoFrameFragments.MaxFragments) { VideoDropped(); return; }
         var channel = _videoSend;
         if (channel is null) return;
         // A whole picture is queued or dropped as one: half a picture on the wire is wasted bandwidth.
-        if (!channel.Writer.TryWrite(fragments)) VideoDropped();
+        if (!channel.Writer.TryWrite(new VideoFramePayload(data, timestamp, isKeyframe, FrameId: frameId))) VideoDropped();
         else if (isKeyframe) _videoNeedsKeyframe = false;
     }
 
@@ -185,17 +202,19 @@ public sealed partial class BoltMediaService
         _ = _video.RequestKeyframeAsync();
     }
 
-    private async Task PumpVideoAsync(Channel<List<byte[]>> channel, CancellationToken ct)
+    private async Task PumpVideoAsync(Channel<VideoFramePayload> channel, CancellationToken ct)
     {
         try
         {
-            await foreach (var fragments in channel.Reader.ReadAllAsync(ct))
+            await foreach (var picture in channel.Reader.ReadAllAsync(ct))
             {
                 var stream = _mediaClient?.GetMediaStream(_activeVideoStreamId);
                 if (stream is null) continue;
+                // Fragment only accepted pictures: dropped pictures allocate no fragment arrays.
+                var fragments = VideoFrameFragments.Split(picture.Data, picture.FrameId, picture.TimestampMicroseconds, picture.IsKeyframe);
                 for (var index = 0; index < fragments.Count; index++)
                 {
-                    try { await stream.SendFrameAsync(fragments[index], index == 0 && (fragments[0][0] & 0x01) != 0, ct); }
+                    try { await stream.SendFrameAsync(fragments[index], index == 0 && (fragments[0][0] & 0x01) != 0, ct, (uint)((ulong)picture.TimestampMicroseconds * 90 / 1000)); }
                     catch (InvalidOperationException) { _videoDropped++; break; } // Paused epoch: drop, never send plaintext.
                 }
             }
@@ -240,7 +259,7 @@ public sealed partial class BoltMediaService
     private void StartAdaptationLoop()
     {
         if (_videoLoop is not null) return;
-        _videoSend ??= Channel.CreateBounded<List<byte[]>>(new BoundedChannelOptions(3)
+        _videoSend ??= Channel.CreateBounded<VideoFramePayload>(new BoundedChannelOptions(3)
         { FullMode = BoundedChannelFullMode.Wait, SingleReader = false });
         var loop = _videoLoop = new CancellationTokenSource();
         _videoPump = PumpVideoAsync(_videoSend, loop.Token);

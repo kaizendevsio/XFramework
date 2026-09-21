@@ -4,7 +4,7 @@ namespace Bolt.Media.Browser;
 
 /// <summary>What the browser reported about this device's video encoders, before any camera is opened.</summary>
 public sealed record VideoCapabilities(bool Supported, string? Reason, int Ceiling, VideoCodecProbe[] Codecs);
-public sealed record VideoCodecProbe(string Codec, bool Encode, bool Decode, bool Hardware, int MaxHeight);
+public sealed record VideoCodecProbe(string Codec, bool Encode, bool Decode, bool Hardware, int MaxHeight, int DecodeMaxHeight = 1080);
 /// <summary>The camera actually acquired, which may differ from what was asked for.
 /// <paramref name="Strategy"/> is how frames are read: "processor" or the "rvfc" fallback.</summary>
 public sealed record VideoCaptureState(bool Capturing, string DeviceId, string FacingMode, int Width, int Height,

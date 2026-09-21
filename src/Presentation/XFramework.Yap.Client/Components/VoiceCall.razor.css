@@ -81,4 +81,5 @@
     text-align: center;
 }
 .vidscreen .call-audio-output { color: var(--text); margin-bottom: 12px; }
+.video-call-settings { position: relative; z-index: 6; flex: 0 1 auto; min-height: 0; max-height: 50dvh; overflow-y: auto; overscroll-behavior: contain; padding: 0 12px; }
 .vidscreen .btn { position: relative; z-index: 6; margin: 0 16px 12px; }
