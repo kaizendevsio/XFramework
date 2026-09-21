@@ -43,7 +43,11 @@ public sealed class BoltSFrameInteropTests
             received.Add(packet.SequenceNumber);
             if (received.Count == expected) break;
         }
-        received.Should().Equal(Enumerable.Range(0, expected).Select(x => (uint)x));
+        var expectedSequences = Enumerable.Range(0, expected).Select(x => (uint)x);
+        if (previousFanOut)
+            received.Should().BeEquivalentTo(expectedSequences); // Concurrent continuations can reorder the legacy path.
+        else
+            received.Should().Equal(expectedSequences);
         TestContext.Out.WriteLine($"96-fragment picture, legacy fan-out={previousFanOut}: {received.Count}/96 delivered.");
         connection.CompleteSendChannel();
     }
