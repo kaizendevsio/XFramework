@@ -106,6 +106,58 @@ public sealed class CallSurfaceTests
         });
     }
 
+    // The stage is one grid whose base rule was a 2x2 lifted from the prototype. The component has to
+    // say how many callers there are, or every layout is that 2x2: one caller in a quarter of it, two
+    // callers across the top with a black band underneath.
+    [TestCase(0, "one", TestName = "TheGridAsksForTheLayoutThatFitsTheCallers(no remote camera yet)")]
+    [TestCase(1, "one")]
+    [TestCase(2, "two")]
+    [TestCase(3, "many")]
+    [TestCase(4, "many")]
+    public async Task TheGridAsksForTheLayoutThatFitsTheCallers(int callers, string expected)
+    {
+        await using var call = new SurfaceFixture();
+        await call.RenderAsync();
+        await call.SetTilesAsync(callers);
+
+        Assert.That(call.Classes("vidgrid"), Is.EqualTo(new[] { $"vidgrid {expected}" }),
+            $"{callers} remote camera(s) must not land in the prototype's 2x2");
+        Assert.That(call.Count("canvas"), Is.EqualTo(callers), "one tile per remote camera");
+    }
+
+    // Two back chevrons and two names on screen at once looked like the call header rendering twice.
+    // It was not: the dialog's background resolved to nothing, so the conversation's own app bar was
+    // showing through it. The call screen has one header, and this is what says so.
+    [Test]
+    public async Task TheCallScreenPutsUpExactlyOneHeader()
+    {
+        await using var call = new SurfaceFixture();
+        await call.RenderAsync();
+        foreach (var callers in new[] { 0, 1, 2, 4 })
+        {
+            await call.SetTilesAsync(callers);
+            Assert.Multiple(() =>
+            {
+                Assert.That(call.Labelled("Back to chat"), Is.EqualTo(1), $"{callers} callers: one way back, not two");
+                Assert.That(call.Classes("vidtop"), Has.Length.EqualTo(1), $"{callers} callers: one call header");
+            });
+        }
+    }
+
+    // The self-view is mirrored because a mirror is what people expect of their own face. The back
+    // camera is not a mirror: mirroring it reverses any text it is pointed at. Nothing about either
+    // changes what is sent, which is never mirrored.
+    [TestCase("user", true)]
+    [TestCase("environment", false)]
+    public async Task OnlyTheFrontCameraSelfViewIsMirrored(string facing, bool mirrored)
+    {
+        await using var call = new SurfaceFixture();
+        await call.RenderAsync();
+        await call.SetTilesAsync(1);
+        await call.SetFacingAsync(facing);
+        Assert.That(call.Classes("pip").Single().Split(' ').Contains("mirror"), Is.EqualTo(mirrored));
+    }
+
     /// <summary>A live call whose camera state the test can move, rendered through a real renderer.</summary>
     private sealed class SurfaceFixture : IAsyncDisposable
     {
@@ -163,6 +215,29 @@ public sealed class CallSurfaceTests
 
         public Task SetMinimizedAsync(bool minimized) => ChangeAsync(() => voice.Minimized = minimized);
 
+        public Task SetFacingAsync(string facing) => ChangeAsync(() => attempt.GetType().GetField("Facing")!.SetValue(attempt, facing));
+
+        /// <summary>Put <paramref name="count"/> remote cameras on the call, each its own stream.</summary>
+        public Task SetTilesAsync(int count) => ChangeAsync(() =>
+        {
+            var media = provider.GetRequiredService<BoltMediaService>();
+            var streams = (Dictionary<Guid, RemoteVideoStream>)Field(typeof(BoltMediaService), "_remoteVideo").GetValue(media)!;
+            var tiles = new List<VideoTile>();
+            for (var i = 0; i < count; i++)
+            {
+                // The first is the stream the fixture already registered, so the existing tests keep
+                // the element identity they assert on.
+                var id = i == 0 ? Stream : Guid.NewGuid();
+                streams[id] = new(id, $"peer{i}", VideoCodec.H264);
+                tiles.Add(new(id, Guid.NewGuid()));
+            }
+            var type = attempt.GetType();
+            // Camera on regardless: the video screen is what has a grid, and a call with remote
+            // cameras and none of its own must still show it.
+            type.GetField("CameraOn")!.SetValue(attempt, true);
+            type.GetField("Tiles")!.SetValue(attempt, (IReadOnlyList<VideoTile>)tiles);
+        });
+
         private Task ChangeAsync(Action change) => renderer.Dispatcher.InvokeAsync(() =>
         {
             change();
@@ -179,6 +254,17 @@ public sealed class CallSurfaceTests
         public string? Label => Frames().Where(x => x.FrameType == RenderTreeFrameType.Attribute && x.AttributeName == "aria-label")
             .Select(x => x.AttributeValue as string).FirstOrDefault(x => x is "Voice call" or "Video call");
         public bool Has(string element) => Frames().Any(x => x.FrameType == RenderTreeFrameType.Element && x.ElementName == element);
+        public int Count(string element) => Frames().Count(x => x.FrameType == RenderTreeFrameType.Element && x.ElementName == element);
+
+        /// <summary>Every rendered class attribute that names <paramref name="css"/>, in tree order.</summary>
+        public string[] Classes(string css) => Frames()
+            .Where(x => x.FrameType == RenderTreeFrameType.Attribute && x.AttributeName == "class")
+            .Select(x => (x.AttributeValue as string)?.Trim() ?? "")
+            .Where(value => value.Split(' ').Contains(css))
+            .ToArray();
+
+        public int Labelled(string label) => Frames().Count(x => x.FrameType == RenderTreeFrameType.Attribute
+            && x.AttributeName == "aria-label" && (x.AttributeValue as string) == label);
 
         /// <summary>The reference id Blazor gave the first <paramref name="element"/> it has just created.</summary>
         public string? Element(string element)

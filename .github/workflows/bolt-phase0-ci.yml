@@ -292,7 +292,7 @@ jobs:
         run: |
           node --test src/Tests/Yap.Tests/*.test.mjs
           node --test src/Presentation/XFramework.Yap.Client/test/*.test.mjs
-          node --test src/Libraries/Bolt/Bolt.Media.Browser/test/audio.test.mjs
+          node --test src/Libraries/Bolt/Bolt.Media.Browser/test/*.test.mjs
           dotnet test src/Tests/Yap.Tests/Yap.Tests.csproj \
             --configuration Release --no-build --no-restore
           dotnet test src/Tests/Yap.Client.Tests/Yap.Client.Tests.csproj \

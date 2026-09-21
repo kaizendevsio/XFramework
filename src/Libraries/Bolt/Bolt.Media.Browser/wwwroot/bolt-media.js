@@ -338,6 +338,23 @@ function encoderConfig(codec, width, height, bitrateKbps, framerate, hardware) {
     return config;
 }
 
+/// Reshape a ladder tier to the camera's own aspect ratio.
+///
+/// A tier is a bitrate budget written as a landscape raster (1280x720 and so on). VideoEncoder does
+/// not letterbox a frame that does not match its configured size - it scales it to fit, and scaling
+/// a 720x1280 portrait phone frame into 1280x720 squashes the picture. The far side then receives a
+/// genuinely stretched 16:9 raster and letterboxes *that*: a stretched face between black bands.
+/// Keep the tier's short edge as the quality knob and let the camera decide the long one.
+export function fitTierToSource(width, height, sourceWidth, sourceHeight) {
+    if (!(sourceWidth > 0) || !(sourceHeight > 0)) return { width, height };
+    const across = Math.min(width, height), longest = Math.max(width, height);
+    const portrait = sourceHeight > sourceWidth;
+    const ratio = portrait ? sourceHeight / sourceWidth : sourceWidth / sourceHeight;
+    // Never past the tier's long edge: that length is what the chosen bitrate was measured against.
+    const along = Math.min(longest, Math.round(across * ratio));
+    return portrait ? { width: across, height: along } : { width: along, height: across };
+}
+
 /// How this browser can get camera frames out of a MediaStreamTrack.
 ///
 /// Chromium exposes MediaStreamTrackProcessor on Window. Safari 18 has it too but only inside a
@@ -433,6 +450,12 @@ class VideoPipeline {
         this.facingMode = 'user';
         this.deviceId = '';
         this.lastRequest = null;
+        // What the ladder asked for, kept apart from what the encoder is actually configured with:
+        // the raster is the tier reshaped to whatever the camera is currently handing us, and that
+        // shape changes on a camera switch and when the phone is turned over mid-call.
+        this.tier = null;
+        this.sourceWidth = 0;
+        this.sourceHeight = 0;
         this.hostRef = null;
         this.hidden = () => { if (globalThis.document?.hidden && this.captureRunning) this.stopCapture('hidden'); };
         globalThis.document?.addEventListener('visibilitychange', this.hidden);
@@ -442,6 +465,8 @@ class VideoPipeline {
     async initEncoder(codec, width, height, bitrateKbps, framerate, keyframeSeconds) {
         this.codec = codec || 'h264';
         this.keyframeIntervalMs = Math.max(500, (keyframeSeconds || 2) * 1000);
+        this.tier = { width, height, bitrateKbps, framerate };
+        ({ width, height } = fitTierToSource(width, height, this.sourceWidth, this.sourceHeight));
         // 'prefer-hardware' is not a hint that degrades gracefully: on a machine with no hardware
         // encoder Chrome reports the configuration unsupported and configure() throws outright.
         // Ask for hardware, then settle for whatever the browser has.
@@ -581,6 +606,9 @@ class VideoPipeline {
         if (!this.encoder || this.encoder.state !== 'configured') return;
         // Same rule as the reader loop: drop the newest frame rather than queue latency.
         if (this.encoder.encodeQueueSize >= 2) { this.stats.dropped++; return; }
+        // Before the frame is built, so a reconfigure here can never strand one unclosed. No
+        // _upright on this path: the element paints the rotation itself, so it is already upright.
+        this._noteSource(video.videoWidth, video.videoHeight);
         const seconds = metadata?.mediaTime ?? video.currentTime ?? 0;
         const frame = this._elementFrame(video, Math.max(0, Math.round(seconds * 1e6)));
         if (!frame) return;
@@ -643,6 +671,8 @@ class VideoPipeline {
                 if (!this.encoder || this.encoder.state !== 'configured') continue;
                 // Dropping the newest frame beats queueing it: a backlog is latency the call never recovers.
                 if (this.encoder.encodeQueueSize >= 2) { this.stats.dropped++; continue; }
+                frame = this._upright(frame);
+                this._noteSource(frame.displayWidth, frame.displayHeight);
                 const now = Date.now();
                 const keyFrame = this.pendingKeyframe || now - this.lastKeyframe >= this.keyframeIntervalMs;
                 if (keyFrame) { this.lastKeyframe = now; this.pendingKeyframe = false; }
@@ -673,8 +703,17 @@ class VideoPipeline {
     /// Change picture size, rate or bitrate in place. A reconfigure needs a fresh keyframe or the
     /// far side decodes the new size against the old reference.
     applyTier(width, height, bitrateKbps, framerate) {
-        if (!this.encoder || this.encoder.state !== 'configured' || !this.config) return false;
-        const next = encoderConfig(this.codec, width, height, bitrateKbps, framerate, this.config.hardwareAcceleration);
+        this.tier = { width, height, bitrateKbps, framerate };
+        return this._configureForSource();
+    }
+
+    /// Configure the encoder for the current tier at the current camera's aspect ratio. Called when
+    /// the ladder moves, and again whenever the frames themselves change shape.
+    _configureForSource() {
+        if (!this.encoder || this.encoder.state !== 'configured' || !this.config || !this.tier) return false;
+        const fitted = fitTierToSource(this.tier.width, this.tier.height, this.sourceWidth, this.sourceHeight);
+        const next = encoderConfig(this.codec, fitted.width, fitted.height,
+            this.tier.bitrateKbps, this.tier.framerate, this.config.hardwareAcceleration);
         if (next.width === this.config.width && next.height === this.config.height &&
             next.bitrate === this.config.bitrate && next.framerate === this.config.framerate) return false;
         this.config = next;
@@ -684,6 +723,66 @@ class VideoPipeline {
     }
 
     requestKeyframe() { this.pendingKeyframe = true; }
+
+    /// Record the shape of the frames now arriving and re-fit the encoder if it changed. This is
+    /// what carries a camera switch (front 4:3 to back 16:9) and a phone turned over mid-call.
+    _noteSource(width, height) {
+        if (!(width > 0) || !(height > 0) || (width === this.sourceWidth && height === this.sourceHeight)) return;
+        this.sourceWidth = width; this.sourceHeight = height;
+        this._configureForSource();
+    }
+
+    /// Bake a frame's display rotation into its pixels.
+    ///
+    /// Chromium's MediaStreamTrackProcessor hands over frames in *sensor* orientation and carries
+    /// the display rotation alongside as metadata. VideoEncoder encodes the coded buffer and drops
+    /// that metadata, so an Android phone held upright sends a sideways picture. Safari's rVFC path
+    /// reads a <video> element that has already applied the rotation, which is why iOS looked right
+    /// and Android did not.
+    ///
+    /// Normalising here rather than adding an orientation field to the fragment header keeps the
+    /// wire format exactly as it is - that header rides inside the SFrame plaintext, and widening it
+    /// would move the reassembly bounds the replay and truncation checks are written against. The
+    /// cost is one rotation, on the Chromium path only, and only while a frame actually reports one.
+    _upright(frame) {
+        const rotation = (((frame.rotation ?? 0) % 360) + 360) % 360;
+        const flip = frame.flip === true;
+        if (!rotation && !flip) return frame;
+        try {
+            // displayWidth/Height are the post-rotation dimensions, which is the canvas we want.
+            const width = frame.displayWidth, height = frame.displayHeight;
+            if (!(width > 0) || !(height > 0)) return frame;
+            const canvas = this.rotateCanvas ??= typeof OffscreenCanvas !== 'undefined'
+                ? new OffscreenCanvas(width, height)
+                : globalThis.document.createElement('canvas');
+            if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+            const context = this.rotateContext ??= canvas.getContext('2d', { alpha: false, desynchronized: true });
+            if (!context) return frame;
+            // Neutralise the frame's own metadata first, so the transform below is the only one
+            // applied: drawImage honours rotation and flip on Chromium, and ours on top of that
+            // would turn the picture twice.
+            let source = frame, borrowed = null;
+            try { source = borrowed = new VideoFrame(frame, { rotation: 0, flip: false, timestamp: frame.timestamp }); }
+            catch { source = frame; }
+            // Quarter turns swap the source's extent relative to the upright canvas.
+            const quarter = rotation === 90 || rotation === 270;
+            const sourceWidth = quarter ? height : width, sourceHeight = quarter ? width : height;
+            context.save();
+            context.translate(width / 2, height / 2);
+            context.rotate(rotation * Math.PI / 180);
+            if (flip) context.scale(-1, 1);
+            context.drawImage(source, -sourceWidth / 2, -sourceHeight / 2, sourceWidth, sourceHeight);
+            context.restore();
+            if (borrowed) borrowed.close();
+            const upright = new VideoFrame(canvas, { timestamp: frame.timestamp, duration: frame.duration });
+            frame.close();
+            return upright;
+        } catch (error) {
+            // A rotated picture beats no picture: fall back to sending the frame as it came.
+            console.warn('Bolt video: could not normalise frame orientation.', error);
+            return frame;
+        }
+    }
 
     /// One decoder and one canvas per remote sender: group tiles are independent, and a stall in
     /// one participant's stream must not freeze the others.
@@ -756,6 +855,9 @@ class VideoPipeline {
         this.captureRunning = false;
         if (this.captureReader) { try { this.captureReader.cancel(); } catch { } this.captureReader = null; }
         this._stopFrameCallbacks();
+        // The next camera has its own shape; leaving these set would fit it to the old one's aspect.
+        this.sourceWidth = this.sourceHeight = 0;
+        this.rotateCanvas = this.rotateContext = null;
         if (this.preview) this.preview.srcObject = null;
         if (this.mediaStream) { this.mediaStream.getTracks().forEach(t => t.stop()); this.mediaStream = null; }
         this.stats = { fps: 0, kbps: 0, dropped: this.stats.dropped, backlog: 0 };

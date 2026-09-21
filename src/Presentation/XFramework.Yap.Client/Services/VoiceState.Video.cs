@@ -21,6 +21,13 @@ public sealed partial class VoiceState
     public string VideoCodecName => active is { Codec: not VideoCodec.None } attempt
         ? VideoCodecLadder.Name(attempt.Codec).ToUpperInvariant() : "";
 
+    /// <summary>
+    /// Which camera is sending, "user" or "environment". The self-view mirrors the front camera
+    /// because that is what a mirror does; mirroring the back one would reverse the text on
+    /// whatever is being pointed at. What is sent is never mirrored either way.
+    /// </summary>
+    public string CameraFacing => active?.Facing is { Length: > 0 } facing ? facing : "user";
+
     /// <summary>Remote cameras currently publishing, newest roster order.</summary>
     public IReadOnlyList<VideoTile> RemoteVideo => active?.Tiles ?? [];
     public bool AnyVideo => CameraOn || RemoteVideo.Count != 0;
