@@ -987,7 +987,8 @@ class VideoPipeline {
         // software decoder once, only after sustained measured delay at a bounded picture size.
         // Measure time inside the decoder, not network transit or the sender's unrelated clock.
         if (remote.codec !== 'h264') return;
-        const tooLarge = frame.displayWidth * frame.displayHeight > 1920 * 1080;
+        // Permit up to 1440p in either orientation; keep larger pictures on the native path.
+        const tooLarge = frame.displayWidth * frame.displayHeight > 2560 * 1440;
         remote.lateFrames = elapsed > 100 ? remote.lateFrames + 1 : 0;
         if (remote.software && (tooLarge || remote.lateFrames >= 12)) {
             remote.software = false;

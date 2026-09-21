@@ -748,10 +748,11 @@ test('H264 receiver reads the profile and level from the keyframe SPS', () => {
 });
 
 
-test('persistent H264 decoder buffering tries software once and restores native if it also falls behind', async () => {
+for (const [width, height] of [[1920, 1080], [2560, 1440], [1440, 2560], [1440, 1920]])
+test(`persistent H264 buffering at ${width}x${height} tries software once and restores native if it falls behind`, async () => {
     const f = fixture(); f.p.addRemote('s', f.canvas, 'h264', f.host);
     const remote = f.p.remotes.get('s');
-    const frame = { displayWidth: 1920, displayHeight: 1080 };
+    const frame = { displayWidth: width, displayHeight: height };
     for (let i = 0; i < 11; i++) await f.p._considerDecoderLatency(remote, frame, 200);
     assert.equal(remote.software, false);
     await f.p._considerDecoderLatency(remote, frame, 200);
@@ -763,13 +764,26 @@ test('persistent H264 decoder buffering tries software once and restores native 
     assert.equal(remote.software, false, 'do not oscillate between decoders');
 });
 
-for (const reason of ['4k', 'brief-stall', 'unsupported']) test(`decoder fallback preserves native decoding for ${reason}`, async () => {
+for (const reason of ['4k', 'above-1440p', 'brief-stall', 'unsupported']) test(`decoder fallback preserves native decoding for ${reason}`, async () => {
     const f = fixture({ support: config => reason !== 'unsupported' || config.hardwareAcceleration !== 'prefer-software' });
     f.p.addRemote('s', f.canvas, 'h264', f.host);
     const remote = f.p.remotes.get('s');
-    const frame = reason === '4k' ? { displayWidth: 2160, displayHeight: 3840 } : { displayWidth: 1280, displayHeight: 720 };
+    const frame = reason === '4k' ? { displayWidth: 2160, displayHeight: 3840 }
+        : reason === 'above-1440p' ? { displayWidth: 2560, displayHeight: 1442 }
+        : { displayWidth: 1440, displayHeight: 2560 };
     for (let i = 0; i < 24; i++) await f.p._considerDecoderLatency(remote, frame, reason === 'brief-stall' && i % 2 ? 5 : 200);
     assert.equal(remote.decoder.config.hardwareAcceleration, 'no-preference');
+});
+
+test('software decoding returns to native when the incoming picture grows above 1440p', async () => {
+    const f = fixture(); f.p.addRemote('s', f.canvas, 'h264', f.host);
+    const remote = f.p.remotes.get('s');
+    for (let i = 0; i < 12; i++)
+        await f.p._considerDecoderLatency(remote, { displayWidth: 1440, displayHeight: 2560 }, 200);
+    assert.equal(remote.decoder.config.hardwareAcceleration, 'prefer-software');
+    await f.p._considerDecoderLatency(remote, { displayWidth: 2160, displayHeight: 3840 }, 5);
+    assert.equal(remote.decoder.config.hardwareAcceleration, 'no-preference');
+    assert.equal(remote.software, false);
 });
 
 test('decoder delay tracking releases timestamps after rendering and stays bounded for stalled decoders', () => {

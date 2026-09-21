@@ -2,10 +2,12 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.62";
+    public const string Version = "1.3.63";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "22 September 2026", [
+            "1440p video calls can recover from persistent decoder buffering using a software fallback."]),
+        ("1.3.62", "22 September 2026", [
             "Video calls have an optional on-screen diagnostics panel with measured frame rates, codec preferences and queue timings."]),
         ("1.3.61", "22 September 2026", [
             "Update downloads are visible and can be retried without clearing your saved data.",
