@@ -16,6 +16,45 @@ namespace Yap.Client.Tests;
 public sealed class VoiceStateTests
 {
     [Test]
+    public async Task SlowEncryptionInitialization_DoesNotConsumeTheSocketTicketLifetime()
+    {
+        var loading = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource<IJSObjectReference>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var module = new Mock<IJSObjectReference>();
+        module.Setup(x => x.InvokeAsync<IJSObjectReference>("createAudioPipeline", It.IsAny<object?[]?>())).ReturnsAsync(module.Object);
+        module.Setup(x => x.InvokeAsync<VoiceCapabilities>("checkVoiceCapabilities", It.IsAny<object?[]?>())).ReturnsAsync(new VoiceCapabilities(true, null, true));
+        module.Setup(x => x.InvokeAsync<IJSObjectReference>("createSession", It.IsAny<object?[]?>()))
+            .Returns(() => { loading.TrySetResult(); return new ValueTask<IJSObjectReference>(release.Task); });
+        var js = new Mock<IJSRuntime>();
+        js.Setup(x => x.InvokeAsync<IJSObjectReference>("import", It.IsAny<object?[]?>())).ReturnsAsync(module.Object);
+        var tickets = 0;
+        Fixture? fixture = null;
+        await using var owned = fixture = new Fixture((request, _) =>
+        {
+            if (request.RequestUri!.AbsolutePath.EndsWith("/config")) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                { Content = JsonContent.Create(new { enabled = true, groupCalls = true, securityMode = "EndToEndEncrypted" }) });
+            if (request.RequestUri.AbsolutePath.EndsWith("/connect")) tickets++;
+            if (request.RequestUri.AbsolutePath == "/api/chat/calls/groups") return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                { Content = JsonContent.Create(fixture!.GroupEvent(fixture.Invite()).Group) });
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
+        }, js.Object, encrypted: true);
+        await fixture.Voice.InitializeAsync();
+        var starting = fixture.Voice.StartAsync(Guid.NewGuid(), new Person(Guid.NewGuid(), "Friend", "friend"));
+        Task ending = Task.CompletedTask;
+        try
+        {
+            await loading.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            Assert.That(tickets, Is.Zero, "slow WASM initialization must finish before asking for a short-lived ticket");
+            ending = fixture.Voice.EndAsync();
+            Assert.That(fixture.Voice.IsCalling, Is.False);
+        }
+        finally { release.TrySetResult(module.Object); }
+        await ending.WaitAsync(TimeSpan.FromSeconds(2));
+        await starting.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.That(tickets, Is.Zero, "cancellation during initialization must not issue a ticket afterward");
+    }
+
+    [Test]
     public async Task RuntimeFailure_DoesNotExposeConnectionTicketToUser()
     {
         var js = new Mock<IJSRuntime>();
@@ -281,7 +320,7 @@ public sealed class VoiceStateTests
         public ChatApi Api { get; }
         public ChatState Chat { get; }
         public VoiceState Voice { get; }
-        public Fixture(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>? respond = null, IJSRuntime? js = null)
+        public Fixture(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>? respond = null, IJSRuntime? js = null, bool encrypted = false)
         {
             js ??= Mock.Of<IJSRuntime>();
             http = new HttpClient(new Handler(respond ?? ((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent)))))
@@ -292,7 +331,8 @@ public sealed class VoiceStateTests
             Chat.Encryption.Status.Approved = true;
             Chat.Encryption.Status.DeviceId = Guid.NewGuid();
             var services = new ServiceCollection();
-            services.AddLogging(); services.AddSingleton(js); services.AddBoltMediaBrowser();
+            services.AddLogging(); services.AddSingleton(js); services.AddBoltMediaBrowser(options =>
+            { if (encrypted) options.SecurityMode = MediaSecurityMode.AuthenticatedSFrame; });
             provider = services.BuildServiceProvider();
             Voice = new VoiceState(Chat, Api, provider.GetRequiredService<IServiceScopeFactory>(), new Navigation(), NullLoggerFactory.Instance, js);
         }

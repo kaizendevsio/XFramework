@@ -67,8 +67,18 @@ public sealed partial class VoiceState
     private async Task ConnectEncryptedGroupAsync(Attempt attempt)
     {
         var group = attempt.Group!;
-        var connection = await api.PostAsync<YapCallConnection>($"api/chat/calls/groups/{group.Id}/connect", ct: attempt.Lifetime.Token);
+        var media = attempt.Media!;
+        // Download/initialize crypto before minting the 30-second, single-use socket ticket.
+        // A cold mobile connection can take longer than that to load the WASM module.
+        attempt.Phase = "encryption-runtime";
+        var sender = MediaSender(group.Id, chat.User!.CredentialId);
+        await media.ConfigureSFrameAsync(group.Id, sender);
         CheckCurrent(attempt);
+        attempt.Phase = "connection-ticket";
+        var connection = await api.PostAsync<YapCallConnection>($"api/chat/calls/groups/{group.Id}/connect", ct: attempt.Lifetime.Token)
+            ?? throw new InvalidOperationException("The call connection was not supplied.");
+        CheckCurrent(attempt);
+        if (connection.ClientId != sender) throw new InvalidOperationException("Unexpected call identity.");
         attempt.Connection = connection;
         var endpoint = navigation.ToAbsoluteUri(connection.Url);
         var origin = navigation.ToAbsoluteUri("/");
@@ -78,11 +88,9 @@ public sealed partial class VoiceState
             connection.ClientId, "Yap encrypted voice", new BoltClientOptions { MinConnections = 1, MaxConnections = 1, MaxFrameBytes = 65536 }, logs.CreateLogger("Yap.Voice"));
         attempt.Disconnected = () => { if (Current(attempt)) _ = EndAfterCallbackAsync(attempt); };
         client.Disconnected += attempt.Disconnected;
-        var media = attempt.Media!;
         await media.InitializeAsync(client);
         CheckCurrent(attempt);
-        await media.ConfigureSFrameAsync(group.Id, connection.ClientId);
-        CheckCurrent(attempt);
+        attempt.Phase = "call-transport";
         await client.ConnectAsync(attempt.Lifetime.Token);
         CheckCurrent(attempt);
         await media.JoinHostedGroupAsync(group.Id);
@@ -162,12 +170,13 @@ public sealed partial class VoiceState
             BitConverter.ToUInt64(RandomNumberGenerator.GetBytes(8)).ToString(CultureInfo.InvariantCulture), RandomNumberGenerator.GetBytes(32));
         var epoch = attempt.Epoch = new GroupEpoch(group.Revision, ChatEncryption.CallRosterBinding(group), local,
             group.Participants.Where(x => x.Accepted && !x.Left && x.CredentialId != localId).Select(x => x.CredentialId).ToArray());
+        attempt.Phase = "call-keys";
         Status = epoch.Peers.Length == 0 ? RingingStatus : "Securing call..."; Notify();
-        await LoadVideoLadderAsync(attempt);
         // Close the managed send gate synchronously, before an older media operation can finish.
         var pause = attempt.Media!.PauseSFrameAsync();
         await RunEpochMediaAsync(attempt, epoch, () => pause);
         old?.ClearKeys();
+        await LoadVideoLadderAsync(attempt);
         if (!CurrentEpoch(attempt, epoch)) return;
         if (epoch.Peers.Length == 0) return;
         _ = ExpireEpochAsync(attempt, epoch);
@@ -321,7 +330,7 @@ public sealed partial class VoiceState
         if (attempt.Ladder is not null || attempt.VideoProbe is not { } probe) return;
         try
         {
-            var capabilities = await probe;
+            var capabilities = await probe.WaitAsync(TimeSpan.FromSeconds(5), attempt.Lifetime.Token);
             if (!Current(attempt)) return;
             var ladder = new VideoCodecLadder();
             foreach (var codec in capabilities.Codecs)

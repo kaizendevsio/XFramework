@@ -35,7 +35,7 @@ function context(script, { failDownload = false, windows = [], network = () => n
                 if (!buckets.has(name)) buckets.set(name, new Map());
                 const entries = buckets.get(name);
                 return {
-                    addAll: async requests => { downloads.push(...requests); if (failDownload) throw Error('Integrity mismatch'); },
+                    addAll: async requests => { downloads.push(...requests); if (failDownload) throw Error('Integrity mismatch'); for (const r of requests) entries.set(key(r), new FakeResponse(200, 'verified')); },
                     match: async request => entries.get(key(request)),
                     put: async (request, response) => { entries.set(key(request), response); },
                     keys: async () => [...entries.keys()].map(url => ({ url })),
@@ -443,3 +443,15 @@ for (const [name, script] of Object.entries(workers)) {
         assert.equal(signal.aborted, true, 'an abandoned fetch must not outlive the push event');
     });
 }
+
+
+test('retrying an interrupted install reuses only verified assets in the new version cache', async () => {
+    const f = fixture();
+    f.buckets.get('yap-shell-new').set('index.html', new FakeResponse(200, 'verified'));
+    await f.run('install');
+    assert.equal(f.downloads.some(r => r.url === 'index.html'), false);
+    assert.equal(f.downloads.length, 3);
+    await f.run('install');
+    assert.equal(f.downloads.length, 3, 'a completed verified batch is not downloaded twice');
+    assert.deepEqual(f.deleted, [], 'old app remains usable until successful activation');
+});

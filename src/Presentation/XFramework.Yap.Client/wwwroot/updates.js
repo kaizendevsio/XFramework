@@ -2,14 +2,18 @@
 // explicit so a deployment cannot reload a recording or an attachment in progress.
 (() => {
     let registration, checking, lastCheck = -Infinity, changed = false, applying = false;
-    let reloading = false, blocked = false, dismissed = false;
+    let reloading = false, blocked = false, dismissed = null, installed = null;
     const workers = new WeakSet();
+    const candidate = () => registration?.waiting || (installed?.state === 'installed' ? installed : null);
+    const available = () => candidate() || (changed ? navigator.serviceWorker.controller : null);
+    const record = (phase, type) => window.yap.diagnostics?.record('update.state', { phase, type });
     const busy = () => !!(document.querySelector('[data-update-busy="true"]') || window.yapRecording);
     const notice = () => {
         const element = document.getElementById('app-update');
         if (!element) return;
         blocked = blocked && busy();
-        element.hidden = dismissed || !(registration?.waiting || changed);
+        const update = available();
+        element.hidden = !update || dismissed === update;
         element.querySelector('.toast-text').textContent = blocked
             ? 'Finish sending, or remove your attachment or recording, before updating.'
             : 'A new version of Yap is ready.';
@@ -19,7 +23,12 @@
         const worker = registration?.installing;
         if (worker && !workers.has(worker)) {
             workers.add(worker);
-            worker.addEventListener('statechange', () => notice());
+            worker.addEventListener('statechange', () => {
+                if (worker.state === 'installed' && (navigator.serviceWorker.controller || registration.active)) installed = worker;
+                if (worker.state === 'redundant') lastCheck = -Infinity;
+                record(worker.state);
+                notice();
+            });
         }
         notice();
     };
@@ -33,15 +42,20 @@
                     registration = await self.yapWorker.register();
                     registration.addEventListener('updatefound', observeWorker);
                     observeWorker(); // Registration may already have an installing worker.
-                } else await registration.update();
+                }
+                // Also check when another feature registered this worker earlier in this page.
+                if (!registration.installing) await registration.update();
                 notice();
-            } catch { /* Offline, an incomplete deployment or disabled workers: keep the current app. */ }
+            } catch (error) {
+                record('check-failed', error?.name || 'Error');
+                // Keep the current shell and account data. The next foreground/timer retries.
+            }
         })();
         try { await checking; } finally { checking = null; }
     }
     window.yap.updates = {
         check,
-        dismiss() { dismissed = true; notice(); },
+        dismiss() { dismissed = available(); notice(); },
         notice,
         apply() {
             if (busy()) {
@@ -50,9 +64,10 @@
                 return;
             }
             if (changed) { reload(); return; }
-            if (!registration?.waiting || applying) return;
+            const worker = candidate();
+            if (!worker || applying) return;
             applying = true;
-            registration.waiting.postMessage('activate');
+            worker.postMessage('activate');
         }
     };
     if ('serviceWorker' in navigator) {
@@ -67,6 +82,8 @@
         addEventListener('pageshow', check);
         addEventListener('online', check);
         document.addEventListener('visibilitychange', check);
-        setInterval(check, 5 * 60000);
+        setInterval(check, 60000);
+        // Deferred scripts normally run before load, but restored/dynamically loaded pages may not.
+        if (document.readyState === 'complete') void check();
     }
 })();

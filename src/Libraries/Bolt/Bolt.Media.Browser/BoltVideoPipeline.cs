@@ -89,10 +89,10 @@ public sealed class BoltVideoPipeline(IJSRuntime js, ILogger<BoltVideoPipeline> 
         if (pipeline is not null) await pipeline.InvokeVoidAsync("removeRemote", streamId.ToString("D"));
     }
 
-    public async ValueTask DecodeFrameAsync(Guid streamId, byte[] data, uint timestampMicroseconds, bool isKeyframe)
+    public async ValueTask DecodeFrameAsync(Guid streamId, byte[] data, uint timestampMicroseconds, bool isKeyframe, bool discontinuity = false)
     {
         if (pipeline is null) return;
-        await pipeline.InvokeAsync<bool>("decodeFrame", streamId.ToString("D"), data, timestampMicroseconds, isKeyframe);
+        await pipeline.InvokeAsync<bool>("decodeFrame", streamId.ToString("D"), data, timestampMicroseconds, isKeyframe, discontinuity);
     }
 
     public async ValueTask<bool> ApplyTierAsync(VideoTier tier)

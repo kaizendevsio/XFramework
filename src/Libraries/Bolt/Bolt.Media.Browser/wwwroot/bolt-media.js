@@ -387,13 +387,8 @@ export async function probeVideoCodecs(maxHeight = 1080) {
                 const supported = await VideoEncoder.isConfigSupported(encoderConfig(codec, width, height, 2000, 30));
                 if (!supported?.supported) continue;
                 if (best === 0) best = height;
-                if (!hardware) {
-                    try {
-                        const accelerated = await VideoEncoder.isConfigSupported(
-                            encoderConfig(codec, width, height, 2000, 30, 'require-hardware'));
-                        hardware = accelerated?.supported === true;
-                    } catch { /* require-hardware is allowed to throw; it just means "no". */ }
-                }
+                // WebCodecs has no require-hardware mode. prefer-hardware is only a hint,
+                // so isConfigSupported cannot prove acceleration; retain conservative limits.
             } catch { /* An unsupported configuration is an answer, not a failure. */ }
         }
         for (const height of heights) {
@@ -479,7 +474,7 @@ class VideoPipeline {
         if (!config) throw new Error('This device cannot encode video for calls.');
         this._closeEncoder();
         this.config = config;
-        this.frameId = 0;
+        // The published stream survives camera off/on; its frame IDs must too.
         this.pendingKeyframe = true;
         this.encoder = new VideoEncoder({
             output: (chunk) => this._onEncoded(chunk),
@@ -823,18 +818,28 @@ class VideoPipeline {
         this.remotes.delete(streamId);
     }
 
-    decodeFrame(streamId, data, timestamp, isKeyframe) {
+    decodeFrame(streamId, data, timestamp, isKeyframe, discontinuity = false) {
         const remote = this.remotes.get(streamId);
         if (!remote || remote.decoder?.state !== 'configured') return false;
         // A decoder that has not seen a keyframe yet cannot use deltas; feeding them wastes work.
         if (!remote.primed && !isKeyframe) return false;
-        if (remote.decoder.decodeQueueSize >= 6) return false;
+        if (remote.decoder.decodeQueueSize >= 6 || (discontinuity && !isKeyframe)) {
+            this._recoverDecoder(streamId, remote);
+            return false;
+        }
         try {
             remote.decoder.decode(new EncodedVideoChunk(
                 { type: isKeyframe ? 'key' : 'delta', timestamp, data }));
             remote.primed = true;
             return true;
-        } catch { remote.primed = false; return false; }
+        } catch { this._recoverDecoder(streamId, remote); return false; }
+    }
+
+    _recoverDecoder(streamId, remote) {
+        if (remote.decoder?.state !== 'closed') remote.decoder?.close();
+        this._openDecoder(streamId, remote);
+        // Ignore dependent deltas until a new reference picture arrives.
+        void this.hostRef?.invokeMethodAsync('OnVideoDecodeFailed', streamId);
     }
 
     _render(remote, frame) {

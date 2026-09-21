@@ -33,6 +33,35 @@ public sealed class VideoCallTests
     // ── Codec negotiation ──
 
     [Test]
+    public void MissingWholePicture_IsReportedEvenWhenNoPartialFragmentsArrived()
+    {
+        var assembler = new VideoFrameAssembler();
+        var first = assembler.Add(VideoFrameFragments.Split(new byte[10], 1, 0, true)[0]);
+        var afterLoss = assembler.Add(VideoFrameFragments.Split(new byte[10], 3, 2, false)[0]);
+        var next = assembler.Add(VideoFrameFragments.Split(new byte[10], 4, 3, true)[0]);
+        Assert.Multiple(() =>
+        {
+            Assert.That(first!.Value.Discontinuity, Is.False);
+            Assert.That(afterLoss!.Value.Discontinuity, Is.True);
+            Assert.That(next!.Value.Discontinuity, Is.False);
+        });
+    }
+
+    [Test]
+    public void NegotiatedCodecKeepsItsSoftwareAndDeviceCeiling()
+    {
+        var ladder = new VideoCodecLadder();
+        ladder.Record(new(VideoCodec.Av1, true, true, false, 720));
+        ladder.Record(new(VideoCodec.H264, true, true, true, 540));
+        Assert.Multiple(() =>
+        {
+            Assert.That(ladder.EncodingCeiling(VideoCodec.Av1), Is.EqualTo(360));
+            Assert.That(ladder.EncodingCeiling(VideoCodec.H264), Is.EqualTo(540));
+            Assert.That(ladder.EncodingCeiling(VideoCodec.None), Is.Zero);
+        });
+    }
+
+    [Test]
     public void HardwareAv1_IsPreferredWhenEveryPeerCanDecodeIt()
     {
         var ladder = Ladder(Full(VideoCodec.Av1), Full(VideoCodec.Vp9), Full(VideoCodec.H264));

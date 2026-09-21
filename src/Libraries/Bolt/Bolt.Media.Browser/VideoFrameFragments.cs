@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 namespace Bolt.Media.Browser;
 
 /// <summary>A reassembled encoded picture, ready for the decoder.</summary>
-public readonly record struct VideoFramePayload(byte[] Data, uint TimestampMicroseconds, bool IsKeyframe);
+public readonly record struct VideoFramePayload(byte[] Data, uint TimestampMicroseconds, bool IsKeyframe, bool Discontinuity = false);
 
 /// <summary>
 /// Splits an encoded picture into SFrame-sized pieces and puts it back together.
@@ -118,11 +118,12 @@ public sealed class VideoFrameAssembler
         var offset = 0;
         foreach (var part in slot.Parts) { part!.CopyTo(data, offset); offset += part.Length; }
         pending.Remove(frameId);
+        var discontinuity = hasCompleted && unchecked(frameId - lastCompleted) != 1;
         lastCompleted = frameId; hasCompleted = true;
         // Fragments of older pictures still in flight are now useless; their picture can never be shown in order.
         foreach (var stale in pending.Where(x => unchecked(x.Key - frameId) > 0x8000_0000u).Select(x => x.Key).ToArray())
         { pending.Remove(stale); Incomplete++; }
-        return new(data, slot.Timestamp, slot.Keyframe);
+        return new(data, slot.Timestamp, slot.Keyframe, discontinuity);
     }
 
     public void Reset() { pending.Clear(); hasCompleted = false; Incomplete = 0; }

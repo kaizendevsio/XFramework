@@ -12,6 +12,8 @@ public sealed partial class BoltMediaService
     private readonly Dictionary<Guid, VideoFrameAssembler> _videoAssemblers = [];
     private readonly Dictionary<Guid, RemoteVideoStream> _remoteVideo = [];
     private Channel<List<byte[]>>? _videoSend;
+    private int _videoDeviceCeiling = 1080;
+    private bool _videoNeedsKeyframe;
     private Task _videoPump = Task.CompletedTask;
     private CancellationTokenSource? _videoLoop;
     private VideoAdaptation? _adaptation;
@@ -58,7 +60,8 @@ public sealed partial class BoltMediaService
             throw new InvalidOperationException("The call's encryption keys are not active yet.");
 
         var adaptation = _adaptation ??= new VideoAdaptation(_options.VideoStartTier);
-        adaptation.SetCeiling(Math.Min(ceilingHeight, _options.VideoMaxHeight));
+        _videoDeviceCeiling = Math.Min(ceilingHeight, _options.VideoMaxHeight);
+        adaptation.SetCeiling(_videoDeviceCeiling);
         var tier = adaptation.Current ?? VideoAdaptation.Ladder[0];
         if (_videoCodec != codec || !_video.IsCapturing)
         {
@@ -86,7 +89,7 @@ public sealed partial class BoltMediaService
     public async Task SetVideoParticipantsAsync(int senders)
     {
         if (_adaptation is not { } adaptation) return;
-        if (adaptation.SetCeiling(Math.Min(_options.VideoMaxHeight, VideoAdaptation.HeightCapForParticipants(senders))) &&
+        if (adaptation.SetCeiling(Math.Min(_videoDeviceCeiling, VideoAdaptation.HeightCapForParticipants(senders))) &&
             adaptation.Current is { } tier)
         { await _video.ApplyTierAsync(tier); OnVideoTierChanged?.Invoke(tier); }
     }
@@ -166,11 +169,20 @@ public sealed partial class BoltMediaService
         if (_activeVideoStreamId == Guid.Empty) return;
         if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame && _sframe?.IsReady != true) return;
         var fragments = VideoFrameFragments.Split(data, frameId, timestamp, isKeyframe);
-        if (fragments.Count == 0) { _videoDropped++; return; }
+        if (_videoNeedsKeyframe && !isKeyframe) { _videoDropped++; return; }
+        if (fragments.Count == 0) { VideoDropped(); return; }
         var channel = _videoSend;
         if (channel is null) return;
         // A whole picture is queued or dropped as one: half a picture on the wire is wasted bandwidth.
-        if (!channel.Writer.TryWrite(fragments)) _videoDropped++;
+        if (!channel.Writer.TryWrite(fragments)) VideoDropped();
+        else if (isKeyframe) _videoNeedsKeyframe = false;
+    }
+
+    private void VideoDropped()
+    {
+        _videoDropped++;
+        _videoNeedsKeyframe = true;
+        _ = _video.RequestKeyframeAsync();
     }
 
     private async Task PumpVideoAsync(Channel<List<byte[]>> channel, CancellationToken ct)
@@ -211,7 +223,7 @@ public sealed partial class BoltMediaService
         VideoFrameAssembler? assembler;
         lock (_remoteVideo) assembler = _videoAssemblers.GetValueOrDefault(streamId);
         if (assembler?.Add(fragment.Span) is not { } picture) return;
-        await _video.DecodeFrameAsync(streamId, picture.Data, picture.TimestampMicroseconds, picture.IsKeyframe);
+        await _video.DecodeFrameAsync(streamId, picture.Data, picture.TimestampMicroseconds, picture.IsKeyframe, picture.Discontinuity);
     }
 
     private async Task ReleaseRemoteVideoAsync(Guid streamId)
@@ -229,7 +241,7 @@ public sealed partial class BoltMediaService
     {
         if (_videoLoop is not null) return;
         _videoSend ??= Channel.CreateBounded<List<byte[]>>(new BoundedChannelOptions(3)
-        { FullMode = BoundedChannelFullMode.DropWrite, SingleReader = true });
+        { FullMode = BoundedChannelFullMode.Wait, SingleReader = false });
         var loop = _videoLoop = new CancellationTokenSource();
         _videoPump = PumpVideoAsync(_videoSend, loop.Token);
         _ = AdaptAsync(loop.Token);
@@ -302,6 +314,7 @@ public sealed partial class BoltMediaService
         _videoCodec = VideoCodec.None;
         _videoAllowedKbps = 0;
         _videoDropped = 0;
+        _videoNeedsKeyframe = false;
         if (remotes.Length != 0) OnRemoteVideoChanged?.Invoke();
     }
 }

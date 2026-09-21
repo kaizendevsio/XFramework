@@ -91,7 +91,10 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
     let element = null;
 
     class Encoder {
-        static async isConfigSupported(config) { return { supported: !!support(config, 'encode'), config }; }
+        static async isConfigSupported(config) {
+            assert.ok(['no-preference', 'prefer-hardware', 'prefer-software'].includes(config.hardwareAcceleration));
+            return { supported: !!support(config, 'encode'), config };
+        }
         constructor(callbacks) { this.callbacks = callbacks; this.state = 'unconfigured'; this.encodeQueueSize = 0; }
         configure(config) { this.state = 'configured'; this.config = config; }
         encode(frame, options) {
@@ -184,21 +187,21 @@ const init = (f, codec = 'h264') => f.p.initEncoder(codec, tier.width, tier.heig
 
 // ── Codec probing ──
 
-test('probing reports hardware and software encoders separately per codec', async () => {
-    // A device with hardware H.264, software VP9 at 720p and no AV1 at all.
+test('probing reports codec limits without treating an acceleration preference as proof', async () => {
+    // H.264 accepts every preference; WebCodecs still cannot prove hardware use.
     const f = fixture({ support: (config, kind) => {
         const is = name => config.codec.startsWith(name);
         if (is('av01')) return false;
-        if (is('vp09')) return kind === 'decode' || (config.hardwareAcceleration !== 'require-hardware' && config.height <= 720);
+        if (is('vp09')) return kind === 'decode' || (config.height <= 720);
         return true;
     } });
     const probed = await f.sandbox.probe(1080);
     const by = Object.fromEntries(probed.map(x => [x.codec, x]));
     assert.deepEqual(plain(by.av1), { codec: 'av1', encode: false, decode: false, hardware: false, maxHeight: 0 });
     assert.equal(by.vp9.encode, true);
-    assert.equal(by.vp9.hardware, false, 'require-hardware was refused, so VP9 is software here');
+    assert.equal(by.vp9.hardware, false, 'acceleration is unknown, so use conservative limits');
     assert.equal(by.vp9.maxHeight, 720);
-    assert.equal(by.h264.hardware, true);
+    assert.equal(by.h264.hardware, false, 'support for a preference does not guarantee hardware');
     assert.equal(by.h264.maxHeight, 1080);
 });
 
@@ -695,4 +698,26 @@ test('the Safari path never rotates: the element has already done it', async () 
     assert.equal(f.stats.encoded.length, 1);
     assert.equal(f.stats.encoded[0].frame.source, f.video, 'straight from the element, as #541 arranged');
     assert.ok(f.canvases.every(c => c.ops.length === 0), 'rotating here would turn an upright picture sideways');
+});
+
+
+test('camera off/on preserves frame numbers on the existing stream', async () => {
+    const f = fixture(); await init(f); await f.p.startCapture(f.host, {});
+    f.p.encoder.encode({ timestamp: 1 }, { keyFrame: true });
+    f.p.stopCapture(); await init(f); await f.p.startCapture(f.host, {});
+    f.p.encoder.encode({ timestamp: 2 }, { keyFrame: true });
+    assert.deepEqual(f.stats.invoked.filter(x => x[0] === 'OnVideoEncoded').map(x => x[3]), [1, 2]);
+});
+
+for (const reason of ['backlog', 'missing-picture']) test(`decoder recovers from ${reason} before accepting deltas`, async () => {
+    const f = fixture(); await init(f); f.p.addRemote('s1', f.canvas, 'h264', f.host);
+    assert.equal(f.p.decodeFrame('s1', new Uint8Array([1]), 100, true), true);
+    const before = f.p.remotes.get('s1').decoder;
+    if (reason === 'backlog') before.decodeQueueSize = 6;
+    assert.equal(f.p.decodeFrame('s1', new Uint8Array([1]), 200, false, reason === 'missing-picture'), false);
+    assert.equal(before.state, 'closed');
+    assert.deepEqual(f.stats.invoked.at(-1), ['OnVideoDecodeFailed', 's1']);
+    assert.equal(f.p.decodeFrame('s1', new Uint8Array([1]), 300, false), false);
+    assert.equal(f.p.decodeFrame('s1', new Uint8Array([1]), 400, true), true);
+    assert.equal(f.p.decodeFrame('s1', new Uint8Array([1]), 500, false), true);
 });
