@@ -2,30 +2,41 @@
 // explicit so a deployment cannot reload a recording or an attachment in progress.
 (() => {
     let registration, checking, lastCheck = -Infinity, changed = false, applying = false;
-    let reloading = false, blocked = false, dismissed = null, installed = null;
+    let reloading = false, blocked = false, dismissed = null, installed = null, failed = false;
     const workers = new WeakSet();
     const candidate = () => registration?.waiting || (installed?.state === 'installed' ? installed : null);
     const available = () => candidate() || (changed ? navigator.serviceWorker.controller : null);
+    const downloading = () => registration?.installing && (navigator.serviceWorker.controller || registration.active)
+        ? registration.installing : null;
+    const timeout = task => new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Update check timed out')), 20000);
+        Promise.resolve(task).then(resolve, reject).finally(() => clearTimeout(timer));
+    });
     const record = (phase, type) => window.yap.diagnostics?.record('update.state', { phase, type });
     const busy = () => !!(document.querySelector('[data-update-busy="true"]') || window.yapRecording);
     const notice = () => {
         const element = document.getElementById('app-update');
         if (!element) return;
         blocked = blocked && busy();
-        const update = available();
+        const update = available() || downloading() || (failed ? registration : null);
         element.hidden = !update || dismissed === update;
+        const action = element.querySelector('.toast-action');
+        if (action) { action.disabled = !!downloading() && !available(); action.textContent = failed && !available() ? 'Retry' : 'Update'; }
         element.querySelector('.toast-text').textContent = blocked
             ? 'Finish sending, or remove your attachment or recording, before updating.'
-            : 'A new version of Yap is ready.';
+            : available() ? 'A new version of Yap is ready.'
+            : downloading() ? 'Downloading the Yap update…'
+            : 'Update download paused. Try again when connected.';
     };
     const reload = () => { if (!reloading) { reloading = true; window.yap.diagnostics?.record('page.reload-requested', { reason: 'app-update' }); location.reload(); } };
     const observeWorker = () => {
         const worker = registration?.installing;
         if (worker && !workers.has(worker)) {
+            failed = false;
             workers.add(worker);
             worker.addEventListener('statechange', () => {
                 if (worker.state === 'installed' && (navigator.serviceWorker.controller || registration.active)) installed = worker;
-                if (worker.state === 'redundant') lastCheck = -Infinity;
+                if (worker.state === 'redundant') { lastCheck = -Infinity; failed = true; }
                 record(worker.state);
                 notice();
             });
@@ -38,13 +49,14 @@
         lastCheck = Date.now();
         checking = (async () => {
             try {
-                if (!registration) {
-                    registration = await self.yapWorker.register();
+                const next = await timeout(self.yapWorker.register());
+                if (registration !== next) {
+                    registration = next;
                     registration.addEventListener('updatefound', observeWorker);
-                    observeWorker(); // Registration may already have an installing worker.
                 }
+                observeWorker(); // Registration may already have an installing worker.
                 // Also check when another feature registered this worker earlier in this page.
-                if (!registration.installing) await registration.update();
+                if (!registration.installing) await timeout(registration.update());
                 notice();
             } catch (error) {
                 record('check-failed', error?.name || 'Error');
@@ -55,7 +67,7 @@
     }
     window.yap.updates = {
         check,
-        dismiss() { dismissed = available(); notice(); },
+        dismiss() { dismissed = available() || downloading() || registration; notice(); },
         notice,
         apply() {
             if (busy()) {
@@ -65,6 +77,7 @@
             }
             if (changed) { reload(); return; }
             const worker = candidate();
+            if (!worker && failed) { failed = false; lastCheck = -Infinity; void check(); return; }
             if (!worker || applying) return;
             applying = true;
             worker.postMessage('activate');

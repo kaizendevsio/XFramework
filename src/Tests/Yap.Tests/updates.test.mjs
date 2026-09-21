@@ -14,21 +14,23 @@ function fixture({ waiting = false, installing = false, controlled = true } = {}
         async update() { checks++; if (fail) throw Error('Offline'); } };
     const registered = [];
     const serviceWorker = { ...events(), controller: controlled ? {} : null,
+        async getRegistration() { return registration; },
         async register(url, options) { registrations++; registered.push(url); assert.equal(options.updateViaCache, 'none'); return registration; } };
-    const label = { textContent: '' }, notice = { hidden: true, querySelector: selector => { assert.equal(selector, ".toast-text"); return label; } };
+    const label = { textContent: '' }, action = {}, notice = { hidden: true, querySelector: selector => selector === '.toast-action' ? action : label };
     const document = { ...events(), hidden: false, getElementById: () => notice, querySelector: () => busy ? {} : null };
     const window = { ...events(), yap: {} }, navigator = { onLine: true, serviceWorker };
     let interval;
     const self = {};
     const context = vm.createContext({ self, window, navigator, document, location: { reload() { reloads++; } },
-        Date: { now: () => now }, WeakSet, addEventListener: window.addEventListener.bind(window),
+        Date: { now: () => now }, WeakSet, setTimeout, clearTimeout, AbortSignal,
+        fetch: async () => ({ ok: true, text: async () => JSON.stringify({ version: "release" }) }), addEventListener: window.addEventListener.bind(window),
         setInterval(fn, ms) { assert.equal(ms, 60000); interval = fn; } });
     // Every registration site shares one helper, so updates cannot install a different worker than
     // push and the recovery page and leave them replacing each other at the same scope.
     vm.runInContext(read('worker-registration.js'), context);
     vm.runInContext(source, context);
     return { window, document, navigator, registration, worker, notice, label, serviceWorker, registered,
-        api: window.yap.updates, tick: () => now += 60001, interval: () => interval(),
+        action, api: window.yap.updates, tick: () => now += 60001, interval: () => interval(),
         busy: value => busy = value, fail: value => fail = value,
         counts: () => ({ checks, registrations, reloads }) };
 }
@@ -53,7 +55,9 @@ test('long-lived apps check on foreground, reconnect and timer; duplicate events
 test('already-installing and waiting updates show a notice without reloading', async () => {
     const f = fixture({ installing: true });
     await f.window.emit('load');
-    assert.equal(f.notice.hidden, true);
+    assert.equal(f.notice.hidden, false);
+    assert.equal(f.action.disabled, true);
+    assert.match(f.label.textContent, /Downloading/);
     f.registration.waiting = f.worker;
     await f.worker.emit('statechange');
     assert.equal(f.notice.hidden, false);
@@ -124,4 +128,14 @@ test('dismissing one update does not hide a later release', async () => {
     f.registration.waiting = { state: 'installed', postMessage() {} };
     f.api.notice();
     assert.equal(f.notice.hidden, false);
+});
+
+
+test('a failed update download offers retry without clearing storage or reloading', async () => {
+    const f = fixture({installing:true}); await f.window.emit('load');
+    f.worker.state = 'redundant'; f.registration.installing = null;
+    await f.worker.emit('statechange');
+    assert.equal(f.notice.hidden, false); assert.equal(f.action.textContent, 'Retry');
+    assert.equal(f.action.disabled, false); assert.match(f.label.textContent, /paused/);
+    assert.equal(f.counts().reloads, 0);
 });

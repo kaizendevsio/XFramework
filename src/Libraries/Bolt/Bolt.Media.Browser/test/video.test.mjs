@@ -821,3 +821,27 @@ test('removing the preview moves Safari capture off the detached UI node and exp
     assert.equal(f.stats.opened.length, 1);
     f.p.stopCapture();
 });
+
+
+test('60fps pacing tolerates alternating early and late camera arrivals without halving cadence', () => {
+    const f = fixture(); f.p.config = { framerate: 60 };
+    let accepted = 0;
+    for (let i = 0; i < 120; i++)
+        if (f.p._acceptCaptureTime(Math.round(i * 1e6 / 60 + (i % 2 ? 1200 : -1200)))) accepted++;
+    assert.ok(accepted >= 118, `only ${accepted}/120 camera frames accepted`);
+});
+
+test('Safari fresh frame callbacks survive a repeated or reset media clock', async () => {
+    const f = fixture({ capture: 'rvfc' }); await init(f); await f.p.startCapture(f.host, {});
+    for (let i = 0; i < 30; i++) f.p._encodeElementFrame(f.video, { mediaTime: 0 }, i * 1000 / 30);
+    assert.equal(f.stats.encoded.length, 30);
+    assert.ok(f.stats.encoded.every((x, i, all) => !i || x.frame.timestamp > all[i - 1].frame.timestamp));
+    f.p.stopCapture();
+});
+
+test('render scales decoded display pixels into the canvas rather than using coded raster size', () => {
+    const f = fixture(); const canvas = f.sandbox.document.createElement('canvas');
+    f.p.addRemote('s', canvas, 'h264', f.host);
+    f.p._render(f.p.remotes.get('s'), {displayWidth: 1440, displayHeight: 1920, close() {}});
+    assert.deepEqual(canvas.ops.at(-1).slice(2), [0, 0, 1440, 1920]);
+});

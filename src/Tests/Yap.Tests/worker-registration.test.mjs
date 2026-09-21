@@ -20,7 +20,7 @@ function fixture({ modules = true, existing = null, offline = false } = {}) {
             return { script: url };
         }
     } };
-    vm.runInContext(source, vm.createContext({ self, navigator }));
+    vm.runInContext(source, vm.createContext({ self, navigator, setTimeout, clearTimeout }));
     return { api: self.yapWorker, attempts };
 }
 
@@ -62,4 +62,21 @@ test('an offline attempt is not remembered, so the module worker is tried again 
     await assert.rejects(f.api.register());
     assert.deepEqual(f.attempts.map(x => x.url),
         ['service-worker.module.js', 'service-worker.js', 'service-worker.module.js', 'service-worker.js']);
+});
+
+
+test('a new manifest versions the top-level worker on the same scope; offline checks retain it', async () => {
+    let version = 'one', offline = false;
+    const urls = [], self = {}, existing = {};
+    const navigator = { serviceWorker: { getRegistration: async () => existing,
+        register: async url => { urls.push(url); return existing; } } };
+    vm.runInContext(source, vm.createContext({ self, navigator, AbortSignal, setTimeout, clearTimeout,
+        fetch: async (_url, options) => {
+            assert.equal(options.cache, 'no-store');
+            if (offline) throw new TypeError('Offline');
+            return {ok:true, text:async()=>`self.assetsManifest = ${JSON.stringify({version})};`};
+        } }));
+    await self.yapWorker.register(); version = 'two'; await self.yapWorker.register();
+    offline = true; assert.equal(await self.yapWorker.register(), existing);
+    assert.deepEqual(urls, ['service-worker.module.js?build=one', 'service-worker.module.js?build=two']);
 });

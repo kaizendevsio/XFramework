@@ -9,6 +9,8 @@ python scripts/yap/video-benchmark/server.py
 ```
 
 Open http://127.0.0.1:8788 in Chromium. In the browser console run `await runBench()`.
+Pass `await runBench(false, 1440, 60)` to measure the new default request. The result includes actual encoded/rendered fps and capture counts.
+
 Reload, then run `await runBench(true)` to compare async-only SFrame interop. Close the page and stop the server when finished.
 
 This uses a synthetic 1080p canvas camera, the production Safari-style capture/encoder/decoder, production Blazor WASM fragment assembly and SFrame Rust WASM encryption, and a loopback WebSocket echo. It does not use real credentials, contact another user, or require camera permission. The payload stays encrypted during the WebSocket round trip. The async-only comparison wraps JS references to exercise the former async bridge; all other code stays identical.
