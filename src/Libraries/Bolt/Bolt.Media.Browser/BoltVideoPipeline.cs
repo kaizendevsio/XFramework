@@ -106,6 +106,9 @@ public sealed class BoltVideoPipeline(IJSRuntime js, ILogger<BoltVideoPipeline> 
     public async ValueTask<VideoSendStats> StatsAsync()
         => pipeline is null ? new(0, 0, 0, 0) : await pipeline.InvokeAsync<VideoSendStats>("getStats");
 
+    public async ValueTask<VideoDiagnostics?> DiagnosticsAsync(bool enabled)
+        => pipeline is null ? null : await pipeline.InvokeAsync<VideoDiagnostics?>("getDiagnostics", enabled);
+
     [JSInvokable]
     public void OnVideoEncoded(byte[] data, bool isKeyframe, uint frameId, uint timestamp)
         => OnEncoded?.Invoke(data, isKeyframe, frameId, timestamp);

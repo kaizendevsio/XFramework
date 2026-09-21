@@ -14,7 +14,7 @@ const source = readFileSync(new URL('../wwwroot/bolt-media.js', import.meta.url)
 // Safari (MediaStreamTrackProcessor is worker-only there, so undefined on the page) and 'none' is
 // a browser too old for either.
 function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 8, battery = null, cameras = 1,
-    capture = 'processor', frameFromElement = true } = {}) {
+    capture = 'processor', frameFromElement = true, clock = () => performance.now() } = {}) {
     const listeners = new Map();
     const stats = { encoded: [], decoded: [], stopped: 0, opened: [], invoked: [], closedFrames: 0, frames: [] };
 
@@ -121,7 +121,7 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
     };
     let track = null;
     const sandbox = {
-        console, URL, Uint8Array, Float32Array, Math, Date, JSON, Promise, Set, Map, Number, performance, isSecureContext: true,
+        console, URL, Uint8Array, Float32Array, Math, Date, JSON, Promise, Set, Map, Number, performance: { now: clock }, isSecureContext: true,
         AudioEncoder: class { static async isConfigSupported() { return { supported: true }; } },
         AudioDecoder: class { static async isConfigSupported() { return { supported: true }; } },
         AudioContext: class {}, AudioWorkletNode: class {},
@@ -844,4 +844,75 @@ test('render scales decoded display pixels into the canvas rather than using cod
     f.p.addRemote('s', canvas, 'h264', f.host);
     f.p._render(f.p.remotes.get('s'), {displayWidth: 1440, displayHeight: 1920, close() {}});
     assert.deepEqual(canvas.ops.at(-1).slice(2), [0, 0, 1440, 1920]);
+});
+
+
+test('on-screen diagnostics measure independent capture and encoder rates without altering adaptation', async () => {
+    let now = 0;
+    const f = fixture({ capture: 'rvfc', clock: () => now });
+    await f.p.initEncoder('h264', 1280, 720, 1500, 30, 2);
+    await f.p.startCapture(f.host, {});
+    assert.equal(f.p.debugSample, null, 'timing stays off until requested');
+    assert.equal(f.p.getDiagnostics().captureFps, null, 'first snapshot is not a measured zero');
+    for (let i = 0; i < 30; i++) f.video.emit(i / 30);
+    now = 1000;
+    const before = plain(f.p.stats);
+    const info = f.p.getDiagnostics();
+    assert.equal(info.captureFps, 30);
+    assert.equal(info.encodedFps, 30);
+    assert.equal(info.encodedKbps, 30 * 8 * 8 / 1000);
+    assert.equal(info.acceleration, 'prefer-hardware');
+    assert.equal(info.strategy, 'rvfc');
+    assert.deepEqual(plain(f.p.stats), before, 'debug polling does not consume adaptation statistics');
+    now = 2000;
+    const stalled = f.p.getDiagnostics();
+    assert.equal(stalled.captureFps, 0);
+    assert.equal(stalled.encodedFps, 0);
+    assert.equal(stalled.encodedKbps, 0);
+    assert.equal(stalled.encoderDelayMs, null);
+    assert.equal(f.p.getDiagnostics(false), null);
+    assert.equal(f.p.debugSample, null);
+    assert.equal(f.p.encodePending.size, 0);
+    now = 10000;
+    assert.equal(f.p.getDiagnostics().encodedFps, null, 'reopening starts a fresh measurement');
+    await f.p.dispose();
+});
+
+test('receive-only diagnostics distinguish received frames, rendered frames and decoder preference', () => {
+    let now = 0;
+    const f = fixture({ clock: () => now });
+    f.p.addRemote('incoming', f.canvas, 'h264', f.host);
+    assert.equal(f.p.getDiagnostics().remotes[0].receivedFps, null);
+    f.p.decodeFrame('incoming', new Uint8Array(100), 123, true);
+    now = 25;
+    const remote = f.p.remotes.get('incoming');
+    remote.decoder.callbacks.output({ timestamp: 123, displayWidth: 720, displayHeight: 1280, close() {} });
+    f.p.decodeFrame('incoming', new Uint8Array(100), 124, false);
+    remote.software = true;
+    now = 1000;
+    const info = f.p.getDiagnostics();
+    assert.equal(info.capturing, false);
+    assert.equal(info.remotes[0].receivedFps, 2);
+    assert.equal(info.remotes[0].renderedFps, 1);
+    assert.equal(info.remotes[0].decoderDelayMs, 25);
+    assert.equal(info.remotes[0].pendingFrames, 1);
+    assert.equal(info.remotes[0].acceleration, 'prefer-software');
+    assert.equal(info.remotes[0].width, 720);
+    assert.equal(info.remotes[0].height, 1280);
+    now = 2000;
+    assert.equal(f.p.getDiagnostics().remotes[0].renderedFps, 0);
+    f.p.removeRemote('incoming');
+    assert.equal(f.p.getDiagnostics().remotes.length, 0);
+});
+
+test('diagnostic encoder timing remains bounded when native output stalls', async () => {
+    const f = fixture();
+    await f.p.initEncoder('h264', 1280, 720, 1500, 30, 2);
+    f.p.encoder.encode = () => {};
+    f.p.getDiagnostics();
+    for (let i = 0; i < 100; i++) f.p._encode({ timestamp: i }, false);
+    assert.equal(f.p.encodePending.size, 32);
+    f.p.getDiagnostics(false);
+    f.p._encode({ timestamp: 101 }, false);
+    assert.equal(f.p.encodePending.size, 0);
 });

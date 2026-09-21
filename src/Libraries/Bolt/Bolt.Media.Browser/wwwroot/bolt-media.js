@@ -464,6 +464,10 @@ class VideoPipeline {
         this.encodeCount = 0;
         this.renderCount = 0;
         this.lastOutputAt = 0;
+        this.encodedBytes = 0;
+        this.debugSample = null;
+        this.encodePending = new Map();
+        this.encodeDelayMs = null;
         this.diagnosticWindow = { since: 0, capture: 0, encode: 0, render: 0 };
         // What the ladder asked for, kept apart from what the encoder is actually configured with:
         // the raster is the tier reshaped to whatever the camera is currently handing us, and that
@@ -513,6 +517,10 @@ class VideoPipeline {
         const now = Date.now();
         this.lastOutputAt = now;
         this.encodeCount++;
+        this.encodedBytes += chunk.byteLength;
+        const submitted = this.encodePending.get(chunk.timestamp);
+        this.encodePending.delete(chunk.timestamp);
+        if (submitted !== undefined) this.encodeDelayMs = performance.now() - submitted;
         if (this.window.since === 0) this.window.since = now;
         this.window.frames++; this.window.bytes += data.byteLength;
         const elapsed = now - this.window.since;
@@ -649,7 +657,7 @@ class VideoPipeline {
             const now = Date.now();
             const keyFrame = this.pendingKeyframe || now - this.lastKeyframe >= this.keyframeIntervalMs;
             if (keyFrame) { this.lastKeyframe = now; this.pendingKeyframe = false; }
-            this.encoder.encode(frame, { keyFrame });
+            this._encode(frame, keyFrame);
         } finally { frame.close(); }
     }
 
@@ -706,9 +714,56 @@ class VideoPipeline {
                 const now = Date.now();
                 const keyFrame = this.pendingKeyframe || now - this.lastKeyframe >= this.keyframeIntervalMs;
                 if (keyFrame) { this.lastKeyframe = now; this.pendingKeyframe = false; }
-                this.encoder.encode(frame, { keyFrame });
+                this._encode(frame, keyFrame);
             } finally { frame.close(); }
         }
+    }
+
+    _encode(frame, keyFrame) {
+        // Timing is opt-in and bounded even if the native encoder stops producing output.
+        if (this.debugSample) {
+            if (this.encodePending.size >= 32) this.encodePending.delete(this.encodePending.keys().next().value);
+            this.encodePending.set(frame.timestamp, performance.now());
+        }
+        this.encoder.encode(frame, { keyFrame });
+    }
+
+    // Independent of adaptation's getStats window: opening diagnostics must not alter adaptation.
+    getDiagnostics(enabled = true) {
+        if (!enabled) {
+            this.debugSample = null;
+            this.encodePending.clear();
+            this.encodeDelayMs = null;
+            return null;
+        }
+        const now = performance.now(), previous = this.debugSample;
+        const elapsed = previous ? now - previous.at : 0;
+        const rate = (count, before) => elapsed > 0 && before !== undefined ? Math.max(0, count - before) * 1000 / elapsed : null;
+        const camera = this.mediaStream?.getVideoTracks()[0]?.getSettings?.() ?? {};
+        const remotes = [...this.remotes.values()].map(remote => {
+            const before = previous?.remotes.get(remote.streamId);
+            const renderedFps = rate(remote.rendered, before?.rendered);
+            return { streamId: remote.streamId, codec: remote.bitstreamCodec || remote.codec,
+                width: remote.width, height: remote.height,
+                receivedFps: rate(remote.received, before?.received), renderedFps,
+                receivedKbps: before && elapsed > 0 ? rate(remote.bytes, before.bytes) * 8 / 1000 : null,
+                decoderQueue: remote.decoder?.decodeQueueSize ?? 0, pendingFrames: remote.pending.size,
+                decoderDelayMs: renderedFps > 0 ? remote.decodeDelayMs : null,
+                acceleration: remote.software ? 'prefer-software' : 'no-preference', resets: remote.resets };
+        });
+        const encodedFps = rate(this.encodeCount, previous?.encode);
+        const result = { capturing: this.captureRunning, strategy: this.strategy(), codec: this.config?.codec || this.codec,
+            width: this.captureRunning ? this.config?.width ?? 0 : 0, height: this.captureRunning ? this.config?.height ?? 0 : 0,
+            targetFps: this.captureRunning ? this.config?.framerate ?? 0 : 0,
+            cameraWidth: camera.width ?? 0, cameraHeight: camera.height ?? 0, cameraFps: camera.frameRate ?? null,
+            captureFps: rate(this.captureCount, previous?.capture), encodedFps,
+            encodedKbps: previous && elapsed > 0 ? rate(this.encodedBytes, previous.bytes) * 8 / 1000 : null,
+            encoderQueue: this.encoder?.encodeQueueSize ?? 0,
+            encoderDelayMs: encodedFps > 0 ? this.encodeDelayMs : null,
+            acceleration: this.config?.hardwareAcceleration || 'no-preference', dropped: this.stats.dropped, remotes };
+        this.debugSample = { at: now, capture: this.captureCount, encode: this.encodeCount, bytes: this.encodedBytes,
+            remotes: new Map([...this.remotes.values()].map(r => [r.streamId, { received: r.received, rendered: r.rendered, bytes: r.bytes }])) };
+        return result;
     }
 
     _acceptCaptureTime(timestamp) {
@@ -839,7 +894,8 @@ class VideoPipeline {
         const context = canvas?.getContext?.('2d', { alpha: false, desynchronized: true });
         if (!context) return false;
         const remote = { streamId, canvas, context, codec: codec || 'h264', decoder: null, width: 0, height: 0,
-            primed: false, pending: new Map(), lateFrames: 0, software: false, fallbackTried: false };
+            primed: false, pending: new Map(), lateFrames: 0, software: false, fallbackTried: false,
+            received: 0, rendered: 0, bytes: 0, resets: 0, decodeDelayMs: null };
         this._openDecoder(streamId, remote);
         this.remotes.set(streamId, remote);
         return true;
@@ -874,6 +930,7 @@ class VideoPipeline {
     decodeFrame(streamId, data, timestamp, isKeyframe, discontinuity = false) {
         const remote = this.remotes.get(streamId);
         if (!remote || remote.decoder?.state !== 'configured') return false;
+        remote.received++; remote.bytes += data.byteLength;
         if (isKeyframe && remote.codec === 'h264') {
             const codec = h264BitstreamCodec(data);
             if (codec && codec !== remote.bitstreamCodec) {
@@ -899,6 +956,7 @@ class VideoPipeline {
     }
 
     _recoverDecoder(streamId, remote) {
+        remote.resets++;
         if (remote.decoder?.state !== 'closed') remote.decoder?.close();
         this._openDecoder(streamId, remote);
         // Ignore dependent deltas until a new reference picture arrives.
@@ -910,12 +968,16 @@ class VideoPipeline {
             this.renderCount++;
             const submitted = remote.pending.get(frame.timestamp);
             remote.pending.delete(frame.timestamp);
-            if (submitted !== undefined) void this._considerDecoderLatency(remote, frame, performance.now() - submitted);
+            if (submitted !== undefined) {
+                remote.decodeDelayMs = performance.now() - submitted;
+                void this._considerDecoderLatency(remote, frame, remote.decodeDelayMs);
+            }
             if (remote.width !== frame.displayWidth || remote.height !== frame.displayHeight) {
                 remote.width = remote.canvas.width = frame.displayWidth;
                 remote.height = remote.canvas.height = frame.displayHeight;
             }
             remote.context.drawImage(frame, 0, 0, remote.width, remote.height);
+            remote.rendered++;
         } catch { /* A detached canvas is a closed tile, not a call failure. */ }
         finally { frame.close(); }
     }
@@ -967,6 +1029,8 @@ class VideoPipeline {
     }
 
     _closeEncoder() {
+        this.encodePending.clear();
+        this.encodeDelayMs = null;
         if (this.encoder && this.encoder.state !== 'closed') { try { this.encoder.close(); } catch { } }
         this.encoder = null;
     }
@@ -975,6 +1039,7 @@ class VideoPipeline {
         globalThis.document?.removeEventListener('visibilitychange', this.hidden);
         globalThis.removeEventListener?.('pagehide', this.hidden);
         this.stopCapture();
+        this.getDiagnostics(false);
         this._closeEncoder();
         for (const streamId of [...this.remotes.keys()]) this.removeRemote(streamId);
         this.hostRef = null;

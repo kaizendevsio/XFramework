@@ -1,0 +1,24 @@
+.video-debug {
+    position: absolute;
+    z-index: 7;
+    top: 78px;
+    left: 12px;
+    width: min(350px, calc(100% - 24px));
+    max-height: min(44%, 360px);
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 10px 12px;
+    border: 1px solid #586171;
+    border-radius: 12px;
+    background: #111722;
+    color: #f1f5fa;
+    text-align: left;
+    font: 11px/1.5 ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+    box-sizing: border-box;
+}
+.debug-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.debug-heading button { min-height: 44px; min-width: 44px; background: transparent; color: inherit; border: 1px solid #586171; border-radius: 8px; }
+.debug-stream { margin: 6px 0; padding: 6px 0; border-top: 1px solid #394253; }
+p { color: #bac8da; margin: 8px 0 0; }

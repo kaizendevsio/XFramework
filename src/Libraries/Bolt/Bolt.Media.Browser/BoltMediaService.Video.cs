@@ -31,6 +31,12 @@ public sealed partial class BoltMediaService
 
     public double? MeasuredVideoFps { get; private set; }
 
+    public async ValueTask<VideoDiagnostics?> GetVideoDiagnosticsAsync(bool enabled)
+    {
+        var snapshot = await _video.DiagnosticsAsync(enabled);
+        return snapshot is null ? null : snapshot with { SendQueue = _videoSend?.Reader.Count ?? 0 };
+    }
+
     public bool IsCameraOn => _video.IsCapturing;
     public VideoCodec ActiveVideoCodec => _videoCodec;
     public VideoTier? ActiveVideoTier => _adaptation?.Current;
