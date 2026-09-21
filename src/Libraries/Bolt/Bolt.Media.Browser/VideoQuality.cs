@@ -27,7 +27,7 @@ public readonly record struct VideoConditions(int AllowedKbps, double MeasuredFp
 /// </summary>
 public sealed class VideoAdaptation
 {
-    /// <summary>Rungs, worst first. 1080p is the top because above it the encode cost stops buying visible detail on a phone.</summary>
+    /// <summary>Resolution rungs, worst first. The user preference and measured conditions bound the active tier.</summary>
     public static readonly VideoTier[] Ladder =
     [
         new(426, 240, 15, 180),
@@ -35,7 +35,9 @@ public sealed class VideoAdaptation
         new(960, 540, 25, 800),
         new(1280, 720, 30, 1500),
         new(1600, 900, 30, 2400),
-        new(1920, 1080, 30, 3800)
+        new(1920, 1080, 30, 3800),
+        new(2560, 1440, 30, 6500),
+        new(3840, 2160, 30, 14000)
     ];
 
     /// <summary>Observation windows of pressure before a drop, of calm before a climb, and of
@@ -50,10 +52,18 @@ public sealed class VideoAdaptation
     private int index;
     private int bad, good, starved, suspendedFor;
 
-    public VideoAdaptation(int startIndex = 3) => index = Math.Clamp(startIndex, 0, Ladder.Length - 1);
+    private int maxFramerate;
+    public VideoAdaptation(int startIndex = 3, int maxFramerate = 30)
+    {
+        index = Math.Clamp(startIndex, 0, Ladder.Length - 1);
+        this.maxFramerate = maxFramerate == 60 ? 60 : 30;
+    }
+    private VideoTier Tier(int i) => maxFramerate == 60 && Ladder[i].Height >= 720
+        ? Ladder[i] with { Framerate = 60, BitrateKbps = Ladder[i].BitrateKbps * 3 / 2 } : Ladder[i];
+    public static int IndexForHeight(int height) => Math.Max(0, Array.FindLastIndex(Ladder, x => x.Height <= height));
 
     /// <summary>Current rung, or null while video is suspended for lack of bandwidth.</summary>
-    public VideoTier? Current => Suspended ? null : Ladder[index];
+    public VideoTier? Current => Suspended ? null : Tier(index);
     public int Index => index;
     public int Ceiling => ceiling;
     public bool Suspended { get; private set; }
@@ -77,7 +87,7 @@ public sealed class VideoAdaptation
     /// <summary>Feed one observation window. Returns the new tier when the picture must change.</summary>
     public VideoTier? Observe(VideoConditions conditions)
     {
-        var tier = Ladder[index];
+        var tier = Tier(index);
         var starving = conditions.AllowedKbps is > 0 and < SuspendKbps;
         starved = starving ? starved + 1 : 0;
         if (Suspended)
@@ -101,19 +111,21 @@ public sealed class VideoAdaptation
         {
             good = 0;
             if (++bad < DownAfter || index == 0) return null;
-            bad = 0; index--;
-            return Ladder[index];
+            bad = 0;
+            if (maxFramerate > 30) { maxFramerate = 30; return Tier(index); }
+            index--;
+            return Tier(index);
         }
 
         bad = 0;
         var next = Math.Min(index + 1, ceiling);
         var roomToClimb = next > index && conditions.EncodeBacklog == 0 && conditions.SendBacklog <= 1 &&
             (conditions.MeasuredFps == 0 || conditions.MeasuredFps >= tier.Framerate * 0.85) &&
-            conditions.AllowedKbps >= Ladder[next].BitrateKbps * 130 / 100;
+            conditions.AllowedKbps >= Tier(next).BitrateKbps * 130 / 100;
         if (!roomToClimb) { good = 0; return null; }
         if (++good < UpAfter) return null;
         good = 0; index = next;
-        return Ladder[index];
+        return Tier(index);
     }
 
     /// <summary>
@@ -122,7 +134,7 @@ public sealed class VideoAdaptation
     /// </summary>
     public static int HeightCapForParticipants(int senders) => senders switch
     {
-        <= 2 => 1080,
+        <= 2 => 2160,
         3 => 720,
         _ => 540
     };

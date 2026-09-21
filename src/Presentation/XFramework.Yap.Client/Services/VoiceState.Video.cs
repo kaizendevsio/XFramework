@@ -1,5 +1,6 @@
 using Bolt.Media.Browser;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 using Yap.Contracts;
 
 namespace Yap.Client.Services;
@@ -9,6 +10,53 @@ public sealed record VideoTile(Guid StreamId, Guid CredentialId);
 
 public sealed partial class VoiceState
 {
+    public int PreferredVideoHeight { get; private set; } = 1080;
+    public int PreferredVideoFramerate { get; private set; } = 30;
+    private bool videoPreferenceLoaded;
+    public async Task LoadVideoPreferenceAsync()
+    {
+        if (videoPreferenceLoaded) return;
+        videoPreferenceLoaded = true;
+        try
+        {
+            var preference = await js.InvokeAsync<int[]>("yap.videoPreference");
+            if (preference is { Length: 2 })
+            {
+                PreferredVideoHeight = ValidVideoHeight(preference[0]);
+                PreferredVideoFramerate = preference[1] == 60 ? 60 : 30;
+            }
+        }
+        catch { /* Storage may be unavailable. Keep the default. */ }
+    }
+    private static int ValidVideoHeight(int height) => height is 360 or 540 or 720 or 1080 or 1440 or 2160 ? height : 1080;
+
+    public async Task SetVideoPreferenceAsync(int height, int framerate)
+    {
+        if (CameraBusy) return;
+        videoPreferenceLoaded = true;
+        PreferredVideoHeight = ValidVideoHeight(height);
+        PreferredVideoFramerate = framerate == 60 ? 60 : 30;
+        try { await js.InvokeVoidAsync("yap.setVideoPreference", PreferredVideoHeight, PreferredVideoFramerate); } catch { }
+        if (active is { CameraOn: false, Media: { } inactiveCamera }) inactiveCamera.ResetVideoPreference();
+        if (active is { CameraOn: true, Media: { } media } attempt && Current(attempt))
+        {
+            attempt.CameraBusy = true; Notify();
+            try
+            {
+                await media.StopVideoAsync();
+                media.ResetVideoPreference();
+                await media.StartVideoAsync(attempt.Group!.Id, attempt.Codec, attempt.CodecCeiling,
+                    attempt.Device, attempt.Facing, PreferredVideoHeight, PreferredVideoFramerate);
+                CheckCurrent(attempt);
+                await media.SetVideoParticipantsAsync(attempt.Tiles.Count + 1);
+                VideoQuality = media.ActiveVideoTier;
+            }
+            catch (Exception error) when (Current(attempt)) { await StopCameraAsync(attempt, CameraMessage(error)); }
+            finally { attempt.CameraBusy = false; }
+        }
+        Notify();
+    }
+
     /// <summary>The server offers video for encrypted group calls.</summary>
     public bool VideoAvailable { get; private set; }
     /// <summary>This device's camera is on and sending. False unless the user turned it on.</summary>
@@ -83,7 +131,7 @@ public sealed partial class VoiceState
         attempt.CameraBusy = true; Notify();
         try
         {
-            var state = await media.StartVideoAsync(attempt.Group!.Id, attempt.Codec, attempt.CodecCeiling, deviceId, facing);
+            var state = await media.StartVideoAsync(attempt.Group!.Id, attempt.Codec, attempt.CodecCeiling, deviceId, facing, PreferredVideoHeight, PreferredVideoFramerate);
             attempt.Facing = state.FacingMode; attempt.Device = state.DeviceId;
         }
         catch (Exception error) when (Current(attempt)) { await StopCameraAsync(attempt, CameraMessage(error)); }
@@ -115,7 +163,7 @@ public sealed partial class VoiceState
         media.OnLocalVideoStopped += attempt.VideoStopped;
         media.OnVideoTierChanged -= attempt.TierChanged;
         media.OnVideoTierChanged += attempt.TierChanged;
-        var state = await media.StartVideoAsync(attempt.Group.Id, attempt.Codec, attempt.CodecCeiling, null, attempt.Facing);
+        var state = await media.StartVideoAsync(attempt.Group.Id, attempt.Codec, attempt.CodecCeiling, null, attempt.Facing, PreferredVideoHeight, PreferredVideoFramerate);
         if (!Current(attempt)) { await media.StopVideoAsync(); return; }
         attempt.Facing = state.FacingMode; attempt.Device = state.DeviceId;
         attempt.CameraOn = true;
@@ -169,13 +217,16 @@ public sealed partial class VoiceState
     private void NegotiateVideo(Attempt attempt, GroupEpoch epoch)
     {
         if (!VideoAvailable || attempt.Ladder is not { } ladder) { attempt.Codec = VideoCodec.None; return; }
-        var height = Math.Min(attempt.Ceiling,
-            Bolt.Media.Browser.VideoAdaptation.HeightCapForParticipants(epoch.Peers.Length + 1));
-        var codec = ladder.Negotiate(epoch.Peers.Select(peer => epoch.PeerCodecs.GetValueOrDefault(peer, [])), height);
-        // Fall back through the ladder before giving up: a peer without AV1 should still get VP9 or H.264.
-        if (codec == VideoCodec.None && height > 360)
-            codec = ladder.Negotiate(epoch.Peers.Select(peer => epoch.PeerCodecs.GetValueOrDefault(peer, [])), 360);
-        attempt.CodecCeiling = Math.Min(height, ladder.EncodingCeiling(codec));
+        var height = Math.Min(PreferredVideoHeight, Math.Min(attempt.Ceiling,
+            Bolt.Media.Browser.VideoAdaptation.HeightCapForParticipants(epoch.Peers.Length + 1)));
+        var codec = VideoCodec.None;
+        foreach (var tier in Bolt.Media.Browser.VideoAdaptation.Ladder.Reverse().Where(x => x.Height <= height))
+        {
+            codec = ladder.Negotiate(epoch.Peers.Select(peer => epoch.PeerCodecs.GetValueOrDefault(peer, [])), tier.Height);
+            if (codec != VideoCodec.None) break;
+        }
+        var peerCeiling = epoch.Peers.Select(peer => epoch.PeerVideoHeights.GetValueOrDefault(peer, 1080)).DefaultIfEmpty(1080).Min();
+        attempt.CodecCeiling = Math.Min(peerCeiling, Math.Min(attempt.Ceiling, ladder.EncodingCeiling(codec)));
         var previous = attempt.Codec;
         attempt.Codec = codec;
         attempt.CodecNotice = codec == VideoCodec.None

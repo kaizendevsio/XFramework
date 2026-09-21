@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 namespace Bolt.Media.Browser;
 
 /// <summary>A reassembled encoded picture, ready for the decoder.</summary>
-public readonly record struct VideoFramePayload(byte[] Data, uint TimestampMicroseconds, bool IsKeyframe, bool Discontinuity = false);
+public readonly record struct VideoFramePayload(byte[] Data, uint TimestampMicroseconds, bool IsKeyframe, bool Discontinuity = false, uint FrameId = 0);
 
 /// <summary>
 /// Splits an encoded picture into SFrame-sized pieces and puts it back together.

@@ -213,6 +213,50 @@ public sealed class BoltMediaEnablementSafetyTests
         connection.CompleteSendChannel();
     }
 
+    [Test]
+    public async Task LocalVideo_ReceivesCongestionAndKeyframeFeedback_AfterQualityChange()
+    {
+        await using var client = CreateClientWithConnection(out var connection);
+        await using var media = new BoltMediaClient(client, NullLogger<BoltMediaClient>.Instance);
+        var callId = await media.StartCallAsync("peer");
+        var stream = new BoltMediaStream(connection, Guid.NewGuid(), callId, false);
+        media.RegisterMediaStream(stream).Should().BeTrue();
+        var bitrates = new List<int>();
+        var keyframes = 0;
+        stream.OnBitrateChanged += bitrates.Add;
+        stream.OnKeyframeNeeded += () => keyframes++;
+        media.ConfigureVideoFeedback(stream.StreamId, 3_800);
+        media.ConfigureVideoFeedback(stream.StreamId, 21_000);
+
+        foreach (var hint in new[] { QualityHint.Increase, QualityHint.Decrease, QualityHint.KeyframeNeeded })
+        {
+            var writer = new ArrayBufferWriter<byte>();
+            BoltCodec.WriteMediaFeedback(writer, stream.StreamId, 200, 0, 0, 0, hint);
+            var frame = writer.WrittenMemory.ToArray();
+            typeof(BoltMediaClient).GetMethod("HandleMediaFeedback", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(media, [connection, frame, frame.Length]);
+        }
+
+        bitrates.Should().Equal(23_100, 17_325); // A healthy 4K stream is not clamped to the old 10 Mbps limit.
+        keyframes.Should().Be(1);
+        connection.CompleteSendChannel();
+    }
+
+    [Test]
+    public async Task VideoFeedback_FragmentBursts_DoNotLookLikePictureJitter_ButStillDetectLoss()
+    {
+        var connection = new BoltConnection(new NoopConnection());
+        await using var controller = new AdaptiveBitrateController(connection, Guid.NewGuid(), 3_800, false);
+        for (uint sequence = 1; sequence <= 200; sequence++)
+            controller.RecordFrameReceived(sequence, 90_000);
+
+        var quality = typeof(AdaptiveBitrateController).GetMethod("DetermineQualityHint", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        quality.Invoke(controller, null).Should().Be(QualityHint.Increase);
+        controller.RecordFrameReceived(240, 90_000);
+        quality.Invoke(controller, null).Should().Be(QualityHint.KeyframeNeeded);
+        connection.CompleteSendChannel();
+    }
+
     private static Channel<MediaFrameData> GetInboundChannel(BoltMediaStream stream) =>
         (Channel<MediaFrameData>)typeof(BoltMediaStream)
             .GetField("_inbound", BindingFlags.Instance | BindingFlags.NonPublic)!

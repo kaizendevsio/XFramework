@@ -41,10 +41,16 @@
                 <button class="vbtn @(Voice.Muted ? "on" : "")" disabled="@(Voice.ConnectedAt is null)" aria-pressed="@Voice.Muted" @onclick="Voice.ToggleMuteAsync"><span class="k"><Icon Name="mic" Size="22" /></span>@(Voice.Muted ? "Unmute" : "Mute")</button>
                 <button class="vbtn @(Voice.CameraOn ? "on" : "")" disabled="@(Voice.CameraBusy || Voice.ConnectedAt is null)" aria-pressed="@Voice.CameraOn" @onclick="Voice.ToggleCameraAsync"><span class="k"><Icon Name="video" Size="22" /></span>@(Voice.CameraOn ? "Camera" : "Camera on")</button>
                 <button class="vbtn" disabled="@(!Voice.CameraOn || Voice.CameraBusy)" @onclick="Voice.SwitchCameraAsync"><span class="k"><Icon Name="flip" Size="22" /></span>Flip</button>
-                <button class="vbtn @(outputOpen ? "on" : "")" aria-expanded="@outputOpen.ToString().ToLowerInvariant()" @onclick="ToggleOutputAsync"><span class="k"><Icon Name="volume" Size="22" /></span>Audio</button>
+                <button class="vbtn @(outputOpen ? "on" : "")" aria-expanded="@outputOpen.ToString().ToLowerInvariant()" @onclick="ToggleOutputAsync"><span class="k"><Icon Name="volume" Size="22" /></span>Settings</button>
                 <button class="vbtn end" @onclick="() => Voice.EndAsync()"><span class="k"><Icon Name="phone" Class="rot135" Size="22" /></span>End</button>
             </div>
-            @if (outputOpen) { @AudioOutputPicker @CameraPicker }
+            @if (outputOpen)
+            {
+                <div class="video-call-settings">
+                    @AudioOutputPicker @CameraPicker
+                    <div class="call-audio-output"><VideoQualitySettings /></div>
+                </div>
+            }
             @if (playbackSuspended && Voice.ConnectedAt is not null)
             { <button class="btn" @onclick="ResumeAudioAsync">Tap to resume call audio</button> }
         </div></div>
@@ -120,7 +126,7 @@
     // Count 0 still renders one tile - the caller's avatar - so it shares the single-tile layout.
     private string GridClass => Voice.RemoteVideo.Count switch { <= 1 => "one", 2 => "two", _ => "many" };
     private string QualityLabel => Voice.VideoQuality is { } tier && Voice.CameraOn
-        ? $" · {tier.Height}p {Voice.VideoCodecName}" : "";
+        ? $" · {tier.Height}p {tier.Framerate}fps {Voice.VideoCodecName}" : "";
     private async Task CheckPlaybackAsync()
     {
         try { playbackSuspended = await Voice.GetPlaybackStateAsync() is "suspended" or "interrupted"; }

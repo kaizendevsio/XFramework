@@ -65,9 +65,9 @@ public class BoltMediaBrowserTests
         options.AudioBitrateKbps.Should().Be(128);
         options.AudioSampleRate.Should().Be(48_000);
         options.AudioChannels.Should().Be(1);
-        options.VideoMaxHeight.Should().Be(1080);
-        // The ladder opens at 720p30 and climbs; see VideoAdaptation for why it does not open at 1080p.
-        VideoAdaptation.Ladder[options.VideoStartTier].Height.Should().Be(720);
+        options.VideoMaxHeight.Should().Be(2160);
+        VideoAdaptation.Ladder[options.VideoStartTier].Height.Should().Be(1080);
+        VideoAdaptation.Ladder[options.VideoStartTier].Framerate.Should().Be(30);
         options.KeyframeIntervalSeconds.Should().Be(2);
         options.EnableEncryption.Should().BeTrue();
         options.EnableFec.Should().BeTrue();

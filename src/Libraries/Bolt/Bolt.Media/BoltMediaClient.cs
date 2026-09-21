@@ -195,6 +195,19 @@ public sealed class BoltMediaClient : IAsyncDisposable
         return _activeCalls.ContainsKey(stream.CallId) && _mediaStreams.TryAdd(stream.StreamId, stream);
     }
 
+    /// <summary>Attach feedback to the local video stream, not just the receiver's stream copy.</summary>
+    public void ConfigureVideoFeedback(Guid streamId, int bitrateKbps)
+    {
+        if (!_mediaStreams.TryGetValue(streamId, out var stream) || stream.IsAudio) return;
+        if (_bitrateControllers.TryGetValue(streamId, out var existing))
+        { existing.SetVideoTarget(bitrateKbps); return; }
+        var controller = new AdaptiveBitrateController(_client.GetPrimaryConnection(), streamId, bitrateKbps, false);
+        controller.OnBitrateChanged += stream.RaiseBitrateChanged;
+        controller.OnKeyframeRequested += stream.RaiseKeyframeNeeded;
+        _bitrateControllers[streamId] = controller;
+        // Local streams consume feedback; only remote streams start the reporting timer.
+    }
+
     public async Task<BoltMediaStream> SendScreenShareConfigAsync(Guid callId, int width = 1920, int height = 1080, int bitrateKbps = 3000, CancellationToken ct = default)
     {
         var streamId = Guid.NewGuid();
@@ -228,7 +241,7 @@ public sealed class BoltMediaClient : IAsyncDisposable
             _ = stream.EnqueueFrameAsync(header.SequenceNumber, header.Timestamp, payload, header.Flags);
 
             if (_bitrateControllers.TryGetValue(header.StreamId, out var controller))
-                controller.RecordFrameReceived(header.SequenceNumber);
+                controller.RecordFrameReceived(header.SequenceNumber, header.Timestamp);
         }
     }
 
@@ -270,7 +283,7 @@ public sealed class BoltMediaClient : IAsyncDisposable
         controller.OnBitrateChanged += kbps => stream.RaiseBitrateChanged(kbps);
         controller.OnKeyframeRequested += () => stream.RaiseKeyframeNeeded();
 
-        if (!isAudio) stream.EnableBandwidthProbing(config.BitrateKbps);
+        if (!isAudio && AuthenticatedStreamEncryptionFactory is null) stream.EnableBandwidthProbing(config.BitrateKbps);
 
         if (_activeCalls.TryGetValue(config.CallId, out var call))
         {

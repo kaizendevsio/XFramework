@@ -1,5 +1,7 @@
 @inject IJSRuntime JS
 @inject VoiceState Voice
+<h3 class="set-group">Video quality</h3>
+<div class="set-list"><VideoQualitySettings /></div>
 <h3 class="set-group">Microphone</h3>
 <div class="set-list">
     <button type="button" class="set-row set-action" disabled="@(checkingMicrophone || Voice.IsCalling)" @onclick="EnableMicrophoneAsync">
