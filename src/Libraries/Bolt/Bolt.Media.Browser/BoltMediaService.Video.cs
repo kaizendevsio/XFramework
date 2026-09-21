@@ -39,11 +39,16 @@ public sealed partial class BoltMediaService
     public Task<MediaDeviceInfo[]> CamerasAsync() => _video.CamerasAsync();
     public Task AttachLocalPreviewAsync(ElementReference element) => _video.AttachPreviewAsync(element);
     public Task DetachLocalPreviewAsync() => _video.DetachPreviewAsync();
-    public Task<bool> AttachRemoteVideoAsync(Guid streamId, ElementReference canvas)
+    public async Task<bool> AttachRemoteVideoAsync(Guid streamId, ElementReference canvas)
     {
         RemoteVideoStream? remote;
         lock (_remoteVideo) remote = _remoteVideo.GetValueOrDefault(streamId);
-        return remote is null ? Task.FromResult(false) : _video.AddRemoteAsync(streamId, canvas, VideoCodecLadder.Name(remote.Codec));
+        if (remote is null) return false;
+        var attached = await _video.AddRemoteAsync(streamId, canvas, VideoCodecLadder.Name(remote.Codec));
+        // The first picture may have arrived before Blazor mounted the canvas; a new decoder
+        // needs a reference picture immediately, including after expanding a minimized call.
+        if (attached && _mediaClient is { } client) await client.RequestRemoteKeyframeAsync(streamId);
+        return attached;
     }
 
     /// <summary>
@@ -86,9 +91,16 @@ public sealed partial class BoltMediaService
         _mediaClient!.ConfigureVideoFeedback(_activeVideoStreamId, tier.BitrateKbps);
         Volatile.Write(ref _videoAllowedKbps, tier.BitrateKbps);
         AttachVideoHandlers();
-        var state = await _video.StartCaptureAsync(deviceId, facingMode);
-        StartAdaptationLoop();
-        return state;
+        _videoNeedsKeyframe = true;
+        StartAdaptationLoop(); // Camera callbacks can arrive before startCapture's promise resolves.
+        try { return await _video.StartCaptureAsync(deviceId, facingMode); }
+        catch
+        {
+            StopAdaptationLoop();
+            DrainVideoSend();
+            await _videoPump;
+            throw;
+        }
     }
 
     public void ResetVideoPreference() => _adaptation = null;
