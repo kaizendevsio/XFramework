@@ -257,6 +257,22 @@ public sealed class BoltMediaEnablementSafetyTests
         connection.CompleteSendChannel();
     }
 
+    [Test]
+    public async Task Feedback_RecoversAfterTransientLoss_AndDoesNotRepeatStaleAdvice()
+    {
+        var connection = new BoltConnection(new NoopConnection());
+        await using var controller = new AdaptiveBitrateController(connection, Guid.NewGuid(), 3800, false);
+        var quality = typeof(AdaptiveBitrateController).GetMethod("DetermineQualityHint", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        controller.RecordFrameReceived(1, 0);
+        controller.RecordFrameReceived(200, 0);
+        quality.Invoke(controller, null).Should().Be(QualityHint.KeyframeNeeded);
+        quality.Invoke(controller, null).Should().Be(QualityHint.Maintain);
+        for (uint i = 201; i <= 400; i++) controller.RecordFrameReceived(i, 0);
+        quality.Invoke(controller, null).Should().Be(QualityHint.Increase);
+        quality.Invoke(controller, null).Should().Be(QualityHint.Maintain);
+        connection.CompleteSendChannel();
+    }
+
     private static Channel<MediaFrameData> GetInboundChannel(BoltMediaStream stream) =>
         (Channel<MediaFrameData>)typeof(BoltMediaStream)
             .GetField("_inbound", BindingFlags.Instance | BindingFlags.NonPublic)!

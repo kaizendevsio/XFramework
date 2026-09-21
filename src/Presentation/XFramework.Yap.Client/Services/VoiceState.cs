@@ -94,19 +94,19 @@ public sealed partial class VoiceState : IAsyncDisposable
         return StartGroupAsync(thread, person.Name, [person]);
     }
 
-    /// <summary>Answer. <paramref name="video"/> is the only way answering can ever open the camera.</summary>
-    public Task AcceptAsync(bool video = false)
+    /// <summary>Accept the advertised call type; false explicitly answers audio-only. No camera opens before acceptance.</summary>
+    public Task AcceptAsync(bool? video = null)
     {
         var attempt = active;
         if (attempt is null || !Incoming || attempt.Starting || !Current(attempt)) return Task.CompletedTask;
-        attempt.Starting = true; attempt.WantsVideo = video && VideoAvailable;
+        attempt.Starting = true; attempt.WantsVideo = (video ?? IncomingHasVideo) && VideoAvailable;
         Error = null; Status = "Connecting..."; Incoming = false; Notify();
         return attempt.Setup = AcceptGroupCoreAsync(attempt);
     }
 
-    /// <summary>The caller's camera is on, so the incoming screen offers to answer with video.</summary>
+    /// <summary>Video invitation intent is available before keys or camera activation.</summary>
     public bool IncomingHasVideo => Incoming && active?.Group is { } group &&
-        group.Participants.Any(x => x.Video && !x.Left && x.CredentialId != chat.User?.CredentialId);
+        (group.VideoRequested || group.Participants.Any(x => x.Video && !x.Left && x.CredentialId != chat.User?.CredentialId));
     private async Task ReceiveAsync(YapCallEvent item)
     {
         if (disposed || chat.User is null || chat.NeedsLogin || api.Account != chat.Scope) return;

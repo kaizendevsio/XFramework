@@ -38,6 +38,7 @@ public sealed partial class BoltMediaService
     public Task<VideoCapabilities> CheckVideoCapabilitiesAsync() => _video.CheckCapabilitiesAsync();
     public Task<MediaDeviceInfo[]> CamerasAsync() => _video.CamerasAsync();
     public Task AttachLocalPreviewAsync(ElementReference element) => _video.AttachPreviewAsync(element);
+    public Task DetachLocalPreviewAsync() => _video.DetachPreviewAsync();
     public Task<bool> AttachRemoteVideoAsync(Guid streamId, ElementReference canvas)
     {
         RemoteVideoStream? remote;
@@ -186,7 +187,7 @@ public sealed partial class BoltMediaService
     {
         if (_activeVideoStreamId == Guid.Empty) return;
         if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame && _sframe?.IsReady != true) return;
-        if (_videoNeedsKeyframe && !isKeyframe) { _videoDropped++; return; }
+        if (_videoNeedsKeyframe && !isKeyframe) return;
         if (data.Length == 0 || VideoFrameFragments.FragmentCount(data.Length) > VideoFrameFragments.MaxFragments) { VideoDropped(); return; }
         var channel = _videoSend;
         if (channel is null) return;
@@ -198,6 +199,7 @@ public sealed partial class BoltMediaService
     private void VideoDropped()
     {
         _videoDropped++;
+        if (_videoNeedsKeyframe) return;
         _videoNeedsKeyframe = true;
         _ = _video.RequestKeyframeAsync();
     }

@@ -33,6 +33,12 @@ public sealed class BoltMediaStream : IAsyncDisposable
 {
     private BoltConnection _connection;
     private readonly Channel<MediaFrameData> _inbound;
+    // At most two maximum-sized video pictures; decrypt one packet per stream at a time.
+    // A websocket read can contain >32 fragments. Async fan-out exhausted the shared SFrame gate.
+    private readonly Channel<(uint Sequence, uint Timestamp, byte[] Data, byte Flags)> _received =
+        Channel.CreateBounded<(uint, uint, byte[], byte)>(new BoundedChannelOptions(192)
+        { SingleReader = true, FullMode = BoundedChannelFullMode.DropOldest });
+    private readonly Task _receivePump;
     private uint _nextSequence;
     private uint _timestampCounter;
     private readonly uint _timestampIncrement;
@@ -117,13 +123,29 @@ public sealed class BoltMediaStream : IAsyncDisposable
         CallId = callId;
         IsAudio = isAudio;
         _timestampIncrement = isAudio ? 960u : 3000u;
-        _inbound = Channel.CreateBounded<MediaFrameData>(new BoundedChannelOptions(100)
+        _inbound = Channel.CreateBounded<MediaFrameData>(new BoundedChannelOptions(isAudio ? 100 : 192)
         {
             FullMode = BoundedChannelFullMode.DropOldest
         });
+        _receivePump = ReceiveAsync();
     }
 
     // ── Feature enablement ───────────────────────────────────────
+
+    /// <summary>Bound and serialize ingress before asynchronous decryption.</summary>
+    internal void QueueReceivedFrame(uint sequence, uint timestamp, byte[] data, byte flags)
+    {
+        if (!_closed) _received.Writer.TryWrite((sequence, timestamp, data, flags));
+    }
+
+    private async Task ReceiveAsync()
+    {
+        await foreach (var packet in _received.Reader.ReadAllAsync())
+        {
+            if (_closed) break;
+            await EnqueueFrameAsync(packet.Sequence, packet.Timestamp, packet.Data, packet.Flags);
+        }
+    }
 
     /// <summary>Enable FEC (XOR parity across frame groups).</summary>
     public void EnableFec(int groupSize = 4)
@@ -522,6 +544,8 @@ public sealed class BoltMediaStream : IAsyncDisposable
     {
         if (_closed) return;
         _closed = true;
+        _received.Writer.TryComplete();
+        await _receivePump;
         _inbound.Writer.TryComplete();
         if (_nackTracker != null) await _nackTracker.DisposeAsync();
         if (_prober != null) await _prober.DisposeAsync();

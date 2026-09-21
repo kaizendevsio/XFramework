@@ -24,6 +24,7 @@ public sealed class AdaptiveBitrateController : IAsyncDisposable
     private uint _highestSeqReceived;
     private uint _expectedSeq;
     private uint _cumulativeLost;
+    private uint _reportedSequence, _reportedLost;
     private long _lastArrivalTicks;
     private uint? _lastMediaTimestamp;
     private double _jitterSmoothed; // Smoothed jitter in ticks (EWA)
@@ -176,22 +177,17 @@ public sealed class AdaptiveBitrateController : IAsyncDisposable
 
     private QualityHint DetermineQualityHint()
     {
-        // High loss rate -> decrease or request keyframe
-        if (_highestSeqReceived > 0)
-        {
-            var lossRate = (double)_cumulativeLost / (_highestSeqReceived + 1);
-
-            if (lossRate > 0.10)
-                return QualityHint.KeyframeNeeded;
-
-            if (lossRate > 0.03 || _jitterSmoothed > 50)
-                return QualityHint.Decrease;
-        }
-
-        // Low jitter and low loss -> can increase
-        if (_jitterSmoothed < 10 && _cumulativeLost == 0 && _highestSeqReceived > 100)
-            return QualityHint.Increase;
-
+        // Feedback describes only new packets. A transient loss must not cut the bitrate
+        // every 250ms for the rest of the call (including while the camera is paused).
+        var packets = unchecked(_highestSeqReceived - _reportedSequence);
+        var lost = unchecked(_cumulativeLost - _reportedLost);
+        _reportedSequence = _highestSeqReceived;
+        _reportedLost = _cumulativeLost;
+        if (packets == 0) return QualityHint.Maintain;
+        var lossRate = (double)lost / packets;
+        if (lossRate > 0.10) return QualityHint.KeyframeNeeded;
+        if (lossRate > 0.03 || _jitterSmoothed > 50) return QualityHint.Decrease;
+        if (_jitterSmoothed < 10 && lost == 0 && _highestSeqReceived > 100) return QualityHint.Increase;
         return QualityHint.Maintain;
     }
 

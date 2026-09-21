@@ -7,10 +7,10 @@ public sealed record YapCallConnection(Guid CallId, string Url, string ClientId,
 public sealed record YapCallEvent(string Type, YapCallInvite Invite, Guid? CredentialId = null,
     YapGroupCall? Group = null, YapGroupControlEvent? Control = null);
 
-public sealed record StartYapGroupCall(Guid ThreadId, Guid DeviceId, Guid[] Recipients);
+public sealed record StartYapGroupCall(Guid ThreadId, Guid DeviceId, Guid[] Recipients, bool VideoRequested = false);
 public sealed record AcceptYapGroupCall(Guid DeviceId);
 public sealed record YapGroupCall(Guid Id, Guid ThreadId, Guid CallerId, string CallerName,
-    long Revision, DateTimeOffset ExpiresAt, YapGroupParticipant[] Participants);
+    long Revision, DateTimeOffset ExpiresAt, YapGroupParticipant[] Participants, bool VideoRequested = false);
 /// <summary>Video is roster state, exactly like Muted: it says whether that participant's camera is on,
 /// never what it is sending. The picture itself is end-to-end encrypted and the relay cannot see it.</summary>
 public sealed record YapGroupParticipant(Guid CredentialId, Guid DeviceId, bool Accepted, bool Ready, bool Left, bool Muted, bool Video = false);

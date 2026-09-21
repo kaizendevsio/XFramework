@@ -143,6 +143,11 @@ public sealed partial class VoiceState
         if (active?.Media is { } media && CameraOn) { try { await media.AttachLocalPreviewAsync(element); } catch { /* The tile went away mid-render. */ } }
     }
 
+    public async Task DetachLocalPreviewAsync()
+    {
+        if (active?.Media is { } media) { try { await media.DetachLocalPreviewAsync(); } catch { /* The call ended during render. */ } }
+    }
+
     public async Task AttachRemoteVideoAsync(Guid streamId, ElementReference canvas)
     {
         if (active?.Media is { } media) { try { await media.AttachRemoteVideoAsync(streamId, canvas); } catch { /* Same. */ } }

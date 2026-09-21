@@ -780,3 +780,44 @@ test('decoder delay tracking releases timestamps after rendering and stays bound
     remote.decoder.callbacks.output({ timestamp: 99, displayWidth: 1280, displayHeight: 720, close() {} });
     assert.equal(remote.pending.has(99), false);
 });
+
+
+test('Safari capture hands frame callbacks to the visible preview without reopening the camera', async () => {
+    const f = fixture({ capture: 'rvfc' });
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    const hidden = f.video;
+    const stale = [...hidden.callbacks.values()][0];
+    const preview = new hidden.constructor(); preview.attached = true;
+    f.p.attachPreview(preview);
+    assert.equal(hidden.callbacks.size, 0);
+    stale(0, {mediaTime: 0});
+    assert.equal(f.stats.encoded.length, 0, "cancelled callbacks cannot restart capture on the old node");
+    assert.equal(hidden.attached, false);
+    assert.equal(f.p.captureVideo, preview);
+    preview.emit(1 / 30);
+    preview.emit(2 / 30);
+    assert.equal(f.stats.encoded.length, 2);
+    assert.equal(f.stats.opened.length, 1);
+    f.p.stopCapture();
+    assert.equal(preview.callbacks.size, 0);
+    assert.equal(preview.attached, true, 'the UI owns its preview DOM node');
+    assert.equal(preview.srcObject, null);
+});
+
+
+test('removing the preview moves Safari capture off the detached UI node and expanding rebinds it', async () => {
+    const f = fixture({ capture: 'rvfc' }); await init(f); await f.p.startCapture(f.host, {});
+    const preview = new f.video.constructor(); preview.attached = true;
+    f.p.attachPreview(preview); preview.emit(1 / 30);
+    f.p.attachPreview(null);
+    assert.equal(preview.callbacks.size, 0);
+    const temporary = f.p.captureVideo;
+    assert.equal(temporary.attached, true);
+    temporary.emit(2 / 30);
+    f.p.attachPreview(preview); preview.emit(3 / 30);
+    assert.equal(temporary.callbacks.size, 0);
+    assert.equal(f.stats.encoded.length, 3);
+    assert.equal(f.stats.opened.length, 1);
+    f.p.stopCapture();
+});

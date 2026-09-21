@@ -18,7 +18,7 @@ public sealed partial class YapCallGateway
     internal const int MaxVideoSenders = 4;
 
     // Admission requires the explicit encrypted-group configuration and approved devices.
-    internal async Task<YapGroupCall> StartGroupAsync(ClaimsPrincipal user, Guid thread, IReadOnlyCollection<Guid> recipients, CancellationToken ct = default, Guid deviceId = default)
+    internal async Task<YapGroupCall> StartGroupAsync(ClaimsPrincipal user, Guid thread, IReadOnlyCollection<Guid> recipients, CancellationToken ct = default, Guid deviceId = default, bool videoRequested = false)
     {
         RequireGroupLifecycle();
         var (tenant, caller) = Identity(user);
@@ -28,7 +28,7 @@ public sealed partial class YapCallGateway
         var members = await CurrentMembersAsync(user, thread, ct);
         if (recipients.Any(x => !members.Contains(x))) throw new YapApiException(403, "Only current conversation members can join.");
         await VerifyCallDeviceAsync(user, deviceId, ct);
-        var room = new GroupRoom(Guid.NewGuid(), tenant, thread, caller, user.Identity?.Name ?? "Someone");
+        var room = new GroupRoom(Guid.NewGuid(), tenant, thread, caller, user.Identity?.Name ?? "Someone") { VideoRequested = videoRequested && VideoEnabled };
         room.Members.Add(caller, new GroupMember { Session = user.FindFirstValue(YapAuth.SessionClaim), Accepted = true, DeviceId = deviceId });
         foreach (var id in recipients) room.Members.Add(id, new GroupMember());
         YapGroupCall snapshot;
@@ -289,7 +289,7 @@ public sealed partial class YapCallGateway
     private void RemoveGroupTickets(Guid call, Guid credential)
     { foreach (var key in tickets.Where(x => x.Value.CallId == call && x.Value.User == credential).Select(x => x.Key).ToArray()) tickets.Remove(key); }
     private static YapGroupCall Snapshot(GroupRoom room) => new(room.Id, room.Thread, room.Caller, room.CallerName, room.Revision, room.InviteExpires,
-        room.Members.Select(x => new YapGroupParticipant(x.Key, x.Value.DeviceId, x.Value.Accepted, x.Value.Ready, x.Value.Left, x.Value.Muted, x.Value.Video)).ToArray());
+        room.Members.Select(x => new YapGroupParticipant(x.Key, x.Value.DeviceId, x.Value.Accepted, x.Value.Ready, x.Value.Left, x.Value.Muted, x.Value.Video)).ToArray(), room.VideoRequested);
     private sealed class GroupRoom(Guid id, Guid tenant, Guid thread, Guid caller, string callerName)
     {
         public Guid Id { get; } = id;
@@ -302,6 +302,7 @@ public sealed partial class YapCallGateway
         public DateTimeOffset Expires { get; } = DateTimeOffset.UtcNow.AddHours(1);
         public Dictionary<Guid, GroupMember> Members { get; } = [];
         public Dictionary<(Guid Sender, Guid Recipient, string Kind), YapGroupControlEvent> Controls { get; } = [];
+        public bool VideoRequested;
         public bool Started;
         public DateTimeOffset? ConnectedAt;
     }

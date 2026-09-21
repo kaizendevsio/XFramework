@@ -164,11 +164,12 @@ public sealed class VideoCallTests
     }
 
     [Test]
-    public void AFrameRateFarBelowTheTier_CountsAsStrainEvenWhenNothingIsQueued()
+    public void SlowCameraWithoutQueuePressure_DoesNotLowerResolution()
     {
         var adaptation = new VideoAdaptation(3);
         adaptation.Observe(new(20_000, 12, 0, 0));
-        Assert.That(adaptation.Observe(new(20_000, 12, 0, 0))!.Value.Height, Is.EqualTo(540));
+        for (var i = 0; i < 60; i++) Assert.That(adaptation.Observe(new(20_000, 12, 0, 0)), Is.Null);
+        Assert.That(adaptation.Current!.Value.Height, Is.EqualTo(720));
     }
 
     [Test]
@@ -384,21 +385,32 @@ public sealed class VideoCallTests
         Assert.That(withVideo.Voice.VideoAvailable, Is.True);
     }
 
-    // The camera is a privacy surface: nothing in the answer path may open it.
+    // Explicit audio-only acceptance must never opt in to the camera.
     [Test]
-    public async Task AnsweringACall_NeverTurnsTheCameraOn()
+    public async Task AnsweringAudioOnly_NeverTurnsTheCameraOn()
     {
         await using var fixture = new VideoFixture(video: true);
         await fixture.Voice.InitializeAsync();
         await fixture.DeliverAsync(fixture.GroupEvent(fixture.Invite(), callerVideo: true));
         Assert.That(fixture.Voice.IncomingHasVideo, Is.True, "the incoming screen should still offer to answer with video");
-        await fixture.Voice.AcceptAsync();
+        await fixture.Voice.AcceptAsync(false);
         Assert.Multiple(() =>
         {
             Assert.That(fixture.Voice.CameraOn, Is.False);
             Assert.That(fixture.Voice.RemoteVideo, Is.Empty);
             Assert.That(fixture.Voice.AnyVideo, Is.False);
         });
+    }
+
+    [Test]
+    public async Task IncomingVideoIntent_IsShownBeforeTheCallersCameraIsOn()
+    {
+        await using var fixture = new VideoFixture(video: true);
+        await fixture.Voice.InitializeAsync();
+        var incoming = fixture.GroupEvent(fixture.Invite());
+        await fixture.DeliverAsync(incoming with { Group = incoming.Group! with { VideoRequested = true } });
+        Assert.That(fixture.Voice.IncomingHasVideo, Is.True);
+        Assert.That(fixture.Voice.CameraOn, Is.False, "an invitation must not open the camera before acceptance");
     }
 
     [Test]

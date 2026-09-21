@@ -29,6 +29,17 @@ namespace Yap.Tests;
 [TestFixture]
 public sealed class YapCallGatewayTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task VideoIntent_IsAvailableToRecipientBeforeAnyCameraIsActive(bool video)
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        var room = await f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId], deviceId: f.AliceDevice, videoRequested: video);
+        Assert.That(room.VideoRequested, Is.EqualTo(video));
+        Assert.That(f.Gateway.GroupRoster(f.Bob, room.Id).VideoRequested, Is.EqualTo(video));
+        Assert.That(room.Participants.All(x => !x.Video), Is.True);
+    }
+
     [Test]
     public async Task HistoryFailure_DoesNotBlockHangupAndRetriesTheSameOutcome()
     {
