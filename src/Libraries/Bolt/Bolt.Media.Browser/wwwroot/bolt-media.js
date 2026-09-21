@@ -576,26 +576,29 @@ class VideoPipeline {
     /// picks by feature detection, because a browser that has both should use the cheaper one.
     useCaptureStrategy(strategy) { this.captureStrategy = strategy || null; }
 
-    /// The Safari path: an off-screen <video> carrying the camera stream, one callback per decoded
+    /// The Safari path: the visible preview (or a temporary element until it mounts), one callback per decoded
     /// frame, painted at the encoder size so sensor rotation cannot leak into the bitstream.
     _startFrameCallbacks(stream, generation) {
-        const video = this.captureVideo = globalThis.document.createElement('video');
+        const video = this.captureVideo = this.preview || globalThis.document.createElement('video');
+        this.ownsCaptureVideo = video !== this.preview;
         video.srcObject = stream;
         video.muted = video.defaultMuted = true;
         video.autoplay = video.playsInline = true;
         video.setAttribute('playsinline', '');
         // iOS only keeps decoding for an element the page actually has: a detached or display:none
         // video is allowed to stall, and a stalled element never fires the frame callback.
-        video.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none';
-        globalThis.document.body?.appendChild(video);
+        if (this.ownsCaptureVideo) {
+            video.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0.01;pointer-events:none';
+            globalThis.document.body?.appendChild(video);
+        }
         const onFrame = (_now, metadata) => {
             this.captureCallbackId = 0;
             // A callback queued before stopCapture must not push a frame from the previous session.
-            if (!this.captureRunning || generation !== this.captureGeneration) return;
+            if (!this.captureRunning || generation !== this.captureGeneration || this.captureVideo !== video) return;
             try { this._encodeElementFrame(video, metadata); }
             finally {
                 // Re-arm in finally: one bad frame must not silently end the whole capture.
-                if (this.captureRunning && generation === this.captureGeneration)
+                if (this.captureRunning && generation === this.captureGeneration && this.captureVideo === video)
                     this.captureCallbackId = video.requestVideoFrameCallback(onFrame);
             }
         };
@@ -604,7 +607,7 @@ class VideoPipeline {
             // A muted element fed by getUserMedia is exempt from autoplay rules everywhere this
             // path runs, so a refusal means no frame will ever arrive: end it, don't send black.
             console.error('Bolt video capture element:', error);
-            if (generation === this.captureGeneration) this.stopCapture('capture');
+            if (generation === this.captureGeneration && this.captureVideo === video) this.stopCapture('capture');
         });
     }
 
@@ -660,7 +663,8 @@ class VideoPipeline {
         this.captureCallbackId = 0;
         try { video.pause?.(); } catch { }
         video.srcObject = null;
-        video.remove?.();
+        if (this.ownsCaptureVideo) video.remove?.();
+        this.ownsCaptureVideo = false;
     }
 
     async _readLoop(generation) {
@@ -706,9 +710,15 @@ class VideoPipeline {
     }
 
     attachPreview(element) {
+        if (this.preview === (element || null)) return;
+        // Safari can stop rVFC on an invisible duplicate even while the visible preview plays.
+        // Read the displayed camera element itself, and cancel the old callback before rebinding.
+        const rebind = this.captureRunning && this.strategy() === 'rvfc';
+        if (rebind) this._stopFrameCallbacks();
         this.preview = element || null;
         // srcObject shows the camera without a second decode; drawing it would double the cost.
         if (this.preview) this.preview.srcObject = this.mediaStream;
+        if (rebind) this._startFrameCallbacks(this.mediaStream, this.captureGeneration);
     }
 
     setPreviewEnabled(enabled) { if (this.preview) this.preview.srcObject = enabled ? this.mediaStream : null; }

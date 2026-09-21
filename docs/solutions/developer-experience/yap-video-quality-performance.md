@@ -74,3 +74,33 @@ The prior review's mid-call codec-family-change/published-stream mismatch remain
 - Browser JavaScript suites: 348 passed (Yap UI, encryption and Bolt media).
 - Real Chromium: orientation pixel comparison, 1080p portrait encode/decode, native/software buffering comparison and automatic fallback.
 - Still required: physical iPhone/Android orientation, camera switching, 1080p/4K support, sustained calls and thermal behavior on mobile networks.
+
+
+## 1.3.60: quality collapse, fragment loss, and Safari capture
+
+Follow-up to the Android/iOS device reports on 21 September 2026. The reports do not contain stage timings, so these fixes address reproduced code defects and a Safari capture risk; they do not prove the exact cause of every frozen phone call.
+
+- **Fragment loss reproduced:** the client dispatched every incoming fragment as an independent asynchronous decrypt operation. The shared SFrame bridge admits 32 pending operations, while a legal video picture has up to 96 fragments. Holding the first JS operation during a 96-packet burst delivered only 32 packets through the old pattern; the new bounded, ordered ingress delivered all 96 in sequence. Real decryption/authentication failures still fail closed. Per-stream ciphertext and video playback queues remain bounded to 192 packets (two maximum-sized pictures each), and over-capacity live traffic still drops oldest packets.
+- **Quality collapse:** receiver feedback used lifetime packet loss, repeatedly penalizing one old loss event. Feedback now uses packets/loss since the previous report; idle reports maintain rather than repeat stale advice. Camera cadence alone no longer lowers resolution: low-light exposure or browser scheduling can lower cadence with no overload. An actually full encoder queue, send drops or current receiver feedback still lower quality. Waiting for a replacement keyframe no longer counts each discarded dependent picture as another congestion event or repeatedly requests a keyframe.
+- **Safari capture:** local preview and encoding previously used two separate video elements; the encoding element was invisible. Encoding now follows the visible preview when mounted, cancels callbacks on the old element, and preserves ownership of the UI's video node. This removes reliance on the invisible duplicate while the user sees a live preview. Safari visibility policies make that a plausible stall path, but the physical iPhone-to-Android symptom still needs retesting. See [WebKit video policies](https://webkit.org/blog/6784/new-video-policies-for-ios/).
+- **First-picture recovery:** start the bounded send pump before camera capture can emit a keyframe. Mounting a remote canvas requests a fresh keyframe so startup/expansion does not wait for the periodic interval.
+- **Accepting video:** video intent is carried in the initial invitation, independently of current camera roster state. The primary button says **Accept video**, with **Audio only** as an explicit alternative. No camera opens just because an invitation arrives; camera setup follows acceptance and encrypted epoch readiness. Legacy invitations can still indicate video through camera roster state.
+- **Interop:** synchronous SFrame Rust operations use in-process JS interop where the WASM runtime supports it, keeping the existing lock, pending bound, sender binding and epoch checks. Other runtimes retain async interop. Raw video pixels continue through native WebCodecs rather than .NET.
+
+### Follow-up measurements
+
+The [reproducible benchmark](../../../scripts/yap/video-benchmark/README.md) adds actual Blazor WASM fragmentation, SFrame encrypt/decrypt and a local WebSocket echo to the codec pipeline. Windows Chromium, synthetic moving 1920x1080 camera, 1080p30 requested, 12-second runs, non-AOT measurement host. Both runs triggered the existing conditional software decoder fallback.
+
+| Measurement | In-process SFrame | Async-only comparison |
+|---|---:|---:|
+| Settled capture-to-render median / p95 | 15.9 / 27.6 ms | 19.0 / 26.3 ms |
+| Full-run fragment + crypto + interop + echo median / p95 | 3.1 / 5.4 ms | 3.4 / 6.1 ms |
+| Encoded / rendered pictures | 271 / 267 | 272 / 268 |
+| Sender queue drops / errors | 0 / 0 | 0 / 0 |
+
+The small interop difference does not establish a dramatic speedup; run-to-run scheduling noise remains. Camera scheduling yielded about 22?23 encoded fps, so this does not prove sustained 30fps. Settled timing excludes the first three seconds; tails and decoder resets explain the difference between encoded and rendered counts. These are loopback measurements, not Funnel or phone-to-phone latency. There is no claim that the actual Bolt relay, simultaneous audio, cellular networks, or physical iOS were benchmarked.
+
+The relay review found opaque forwarding with bounded queues and recipient pressure handling; group authorization is renewed at five-second intervals. There is no server codec/transcoding workload for AOT to remove. Actual remote relay timing and device thermal/codec behavior remain unmeasured. Preserve authorization/roster consistency while measuring those costs; this change does not weaken the routing gate.
+
+
+Validation for this follow-up: 103 Bolt media/video/SFrame/group tests, 245 Yap client tests, 53 gateway tests, and 86 browser media tests passed. The client and standalone benchmark build successfully. Remaining acceptance work is a sustained two-phone call (iOS sending to Android, camera off/on, audio-only answer, minimizing/expanding, and genuine bandwidth reduction).

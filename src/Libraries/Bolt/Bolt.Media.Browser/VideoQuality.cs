@@ -18,9 +18,8 @@ public readonly record struct VideoConditions(int AllowedKbps, double MeasuredFp
 ///
 /// There is no SFU transcoding here, so the sender alone decides the picture every receiver gets.
 /// It reacts to three independent pressures - the receiver's allowed bitrate, this device's encode
-/// backlog, and the frame rate actually achieved - because any one of them alone misreads the
-/// situation: a phone that is thermally throttled still reports plenty of bandwidth, and a good
-/// encoder on a bad link still reports a full frame rate.
+/// backlog, and dropped sends. Low camera cadence alone does not establish pressure; measured
+/// frame rate only gates upward probing. Low-light exposure can reduce cadence without overload.
 ///
 /// Down is fast (two bad windows) and up is slow (twelve good windows), so a brief dip costs a
 /// second of sharpness while a genuine recovery is not mistaken for one.
@@ -103,9 +102,9 @@ public sealed class VideoAdaptation
         }
         if (starved >= SuspendAfter) { Suspended = true; bad = good = 0; suspendedFor = 0; return null; }
 
-        // A queue in front of the encoder is this device saying it cannot keep up, whatever the link allows.
-        var strained = conditions.EncodeBacklog >= 3 || conditions.SendBacklog >= 8 ||
-            (conditions.MeasuredFps > 0 && conditions.MeasuredFps < tier.Framerate * 0.6) ||
+        // Slow camera cadence (for example low-light exposure) is not congestion. Require
+        // an actual full encoder queue, dropped sends, or current receiver feedback.
+        var strained = conditions.EncodeBacklog >= 2 || conditions.SendBacklog >= 8 ||
             (conditions.AllowedKbps > 0 && conditions.AllowedKbps < tier.BitrateKbps * 85 / 100);
         if (strained)
         {

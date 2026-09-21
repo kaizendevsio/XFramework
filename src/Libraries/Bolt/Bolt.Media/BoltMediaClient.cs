@@ -238,7 +238,7 @@ public sealed class BoltMediaClient : IAsyncDisposable
         if (_mediaStreams.TryGetValue(header.StreamId, out var stream))
         {
             var payload = header.GetPayload(buffer.AsSpan(0, length)).ToArray();
-            _ = stream.EnqueueFrameAsync(header.SequenceNumber, header.Timestamp, payload, header.Flags);
+            stream.QueueReceivedFrame(header.SequenceNumber, header.Timestamp, payload, header.Flags);
 
             if (_bitrateControllers.TryGetValue(header.StreamId, out var controller))
                 controller.RecordFrameReceived(header.SequenceNumber, header.Timestamp);

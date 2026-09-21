@@ -9,6 +9,62 @@ namespace Bolt.Tests;
 [TestFixture]
 public sealed class BoltSFrameInteropTests
 {
+    [TestCase(false, 96)]
+    [TestCase(true, 32)]
+    public async Task VideoFragmentBurst_OrderedIngressVersusPreviousFanOut(bool previousFanOut, int expected)
+    {
+        var (bridge, session) = Create(); await using var owned = bridge;
+        var call = Guid.NewGuid();
+        await bridge.ConfigureAsync(call, "alice");
+        await bridge.InstallEpochAsync("1", new string('a', 64), new("alice", "1", new byte[32]),
+            [new("bob", "2", new byte[32])]);
+        await bridge.ActivateEpochAsync("1", new string('a', 64));
+        var held = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        session.InvokeAsync<byte[]>("decrypt", Arg.Any<object?[]>()).Returns(args =>
+            new ValueTask<byte[]>(Decrypt((byte[])((object?[])args[1]!)[1]!)));
+        async Task<byte[]> Decrypt(byte[] data) { await held.Task; return data; }
+        var connection = new Bolt.Client.BoltConnection(new NoopConnection());
+        await using var stream = new Bolt.Media.BoltMediaStream(connection, Guid.NewGuid(), call, false);
+        stream.SetEncryption(bridge.ForStream(call, "bob"));
+        var enqueue = typeof(Bolt.Media.BoltMediaStream).GetMethod("QueueReceivedFrame",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        var pending = new List<Task>();
+        for (uint sequence = 0; sequence < 96; sequence++)
+        {
+            if (previousFanOut) pending.Add(stream.EnqueueFrameAsync(sequence, 90_000u, new byte[4096], 0x10).AsTask());
+            else enqueue.Invoke(stream, [sequence, 90_000u, new byte[4096], (byte)0x10]);
+        }
+        held.SetResult();
+        await Task.WhenAll(pending);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var received = new List<uint>();
+        await foreach (var packet in stream.ReadFramesAsync(timeout.Token))
+        {
+            received.Add(packet.SequenceNumber);
+            if (received.Count == expected) break;
+        }
+        var expectedSequences = Enumerable.Range(0, expected).Select(x => (uint)x);
+        if (previousFanOut)
+            received.Should().BeEquivalentTo(expectedSequences); // Concurrent continuations can reorder the legacy path.
+        else
+            received.Should().Equal(expectedSequences);
+        TestContext.Out.WriteLine($"96-fragment picture, legacy fan-out={previousFanOut}: {received.Count}/96 delivered.");
+        connection.CompleteSendChannel();
+    }
+
+    private sealed class NoopConnection : Bolt.Protocol.Transport.IBoltConnection
+    {
+        public bool SupportsDatagrams => false;
+        public bool IsConnected => true;
+        public Bolt.Protocol.Transport.BoltTransport TransportType => Bolt.Protocol.Transport.BoltTransport.WebSocket;
+        public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) => ValueTask.CompletedTask;
+        public ValueTask<(int BytesRead, bool EndOfMessage)> ReceiveAsync(Memory<byte> buffer, CancellationToken ct = default)
+            => ValueTask.FromResult((0, true));
+        public ValueTask SendDatagramAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) => ValueTask.CompletedTask;
+        public ValueTask CloseAsync(CancellationToken ct = default) => ValueTask.CompletedTask;
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
     private static (BoltSFrameInterop Bridge, IJSObjectReference Session) Create()
     {
         var js = Substitute.For<IJSRuntime>();

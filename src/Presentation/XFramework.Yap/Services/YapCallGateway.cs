@@ -345,7 +345,7 @@ public static class YapCallEndpoints
         api.MapPost("/groups", (StartYapGroupCall request, HttpContext context, YapCallGateway gateway, CancellationToken ct) =>
         {
             if (request.DeviceId == Guid.Empty || request.Recipients is null) throw new YapApiException(400, "An approved device is required.");
-            return gateway.StartGroupAsync(context.User, request.ThreadId, request.Recipients, ct, request.DeviceId);
+            return gateway.StartGroupAsync(context.User, request.ThreadId, request.Recipients, ct, request.DeviceId, request.VideoRequested);
         });
         api.MapGet("/groups/{id:guid}", (Guid id, HttpContext context, YapCallGateway gateway) => gateway.GroupRoster(context.User, id));
         api.MapPost("/groups/{id:guid}/accept", (Guid id, AcceptYapGroupCall request, HttpContext context, YapCallGateway gateway, CancellationToken ct) =>

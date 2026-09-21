@@ -37,7 +37,7 @@ public sealed partial class VoiceState
         {
             var device = ApprovedDevice();
             await PrepareAsync(attempt);
-            var group = await api.PostAsync<YapGroupCall>("api/chat/calls/groups", new StartYapGroupCall(thread, device, recipients), attempt.Lifetime.Token);
+            var group = await api.PostAsync<YapGroupCall>("api/chat/calls/groups", new StartYapGroupCall(thread, device, recipients, attempt.WantsVideo), attempt.Lifetime.Token);
             attempt.Group = group;
             attempt.Invite = InviteFor(group);
             CheckCurrent(attempt);

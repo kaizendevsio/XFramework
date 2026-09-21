@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.59";
+    public const string Version = "1.3.60";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "21 September 2026", [
+            "Video calls preserve picture quality more reliably and recover from bursts of encrypted video packets.",
+            "iPhone video capture uses the visible preview, and incoming video calls offer Accept video or Audio only."]),
+        ("1.3.59", "21 September 2026", [
             "Video orientation is corrected across phones, with quality settings from 360p to 4K and up to 60 fps. The default is 1080p at 30 fps.",
             "Video adapts more reliably under load and can recover from excessive decoder buffering."]),
         ("1.3.58", "21 September 2026", [

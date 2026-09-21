@@ -83,8 +83,8 @@
                 <div class="callrow2">
                     <button class="cbtn end" @onclick="() => Voice.EndAsync()"><span class="k"><Icon Name="phone" Class="rot135" Size="26" /></span>Decline</button>
                     @if (Voice.VideoAvailable && Voice.IncomingHasVideo)
-                    { <button class="cbtn accept" @onclick="() => Voice.AcceptAsync(true)"><span class="k"><Icon Name="video" Size="26" /></span>Video</button> }
-                    <button class="cbtn accept" @onclick="() => Voice.AcceptAsync()"><span class="k"><Icon Name="phone" Size="26" /></span>Accept</button>
+                    { <button class="cbtn accept" @onclick="() => Voice.AcceptAsync(false)"><span class="k"><Icon Name="phone" Size="26" /></span>Audio only</button> }
+                    <button class="cbtn accept" @onclick="() => Voice.AcceptAsync()"><span class="k"><Icon Name="@(Voice.IncomingHasVideo ? "video" : "phone")" Size="26" /></span>@(Voice.IncomingHasVideo ? "Accept video" : "Accept")</button>
                 </div>
             }
             else
@@ -189,7 +189,7 @@
         // render of a call, and again after anything hands Blazor a different dialog element.
         if(Voice.IsCalling && !Voice.Minimized && opened != dialog.Id){opened=dialog.Id;await JS.InvokeVoidAsync("yap.openCall",dialog);}
         // Minimizing removes the dialog and everything captured inside it, so drop the bindings too.
-        if(!Voice.IsCalling || Voice.Minimized){Release(); return;}
+        if(!Voice.IsCalling || Voice.Minimized){if (previewAttached is not null) await Voice.DetachLocalPreviewAsync(); Release(); return;}
         // Canvases and the preview element exist only after their first render; bind each once per node.
         if (Voice.CameraOn && Video) { if (previewAttached != preview.Id) { previewAttached = preview.Id; await Voice.AttachLocalPreviewAsync(preview); } }
         else previewAttached = null;

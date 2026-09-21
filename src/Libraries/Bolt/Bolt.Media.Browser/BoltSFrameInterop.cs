@@ -90,12 +90,16 @@ public sealed class BoltSFrameInterop(IJSRuntime js) : IAsyncDisposable
                 if (sending)
                 {
                     if (senderId != _localSenderId) throw new InvalidOperationException("Cannot encrypt as another sender.");
-                    result = await _session.InvokeAsync<byte[]>("encrypt", data, streamId.ToString("D"), sequence, timestamp);
+                    result = _session is IJSInProcessObjectReference local
+                        ? local.Invoke<byte[]>("encrypt", data, streamId.ToString("D"), sequence, timestamp)
+                        : await _session.InvokeAsync<byte[]>("encrypt", data, streamId.ToString("D"), sequence, timestamp);
                 }
                 else
                 {
                     if (!_remoteSenders.Contains(senderId)) throw new InvalidOperationException("Sender is not in this epoch.");
-                    result = await _session.InvokeAsync<byte[]>("decrypt", senderId, data, streamId.ToString("D"), sequence, timestamp);
+                    result = _session is IJSInProcessObjectReference local
+                        ? local.Invoke<byte[]>("decrypt", senderId, data, streamId.ToString("D"), sequence, timestamp)
+                        : await _session.InvokeAsync<byte[]>("decrypt", senderId, data, streamId.ToString("D"), sequence, timestamp);
                 }
                 if (!_ready || generation != Interlocked.Read(ref _generation))
                 {
