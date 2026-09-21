@@ -41,16 +41,33 @@
 
 /* Video: the stage fills the dialog and the controls float over it. */
 .vidscreen { display: flex; flex-direction: column; position: relative; height: 100%; padding: 0; overflow: hidden; }
+/* The base .vidgrid in app.css is a 2x2 from the prototype, which is a whole wasted row for one
+   caller and an empty bottom half for two. Each of these must therefore clear *both* axes, not just
+   the one it changes: leaving grid-template-rows at "1fr 1fr" is what parked two callers in the top
+   half of the stage under a black band. */
 .vidgrid.one { grid-template-columns: 1fr; grid-template-rows: 1fr; }
-.vidgrid.many { grid-template-columns: repeat(2, 1fr); grid-auto-rows: 1fr; }
+/* Stacked, not side by side: at 375px wide two columns are two slivers. */
+.vidgrid.two { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+.vidgrid.many { grid-template-columns: 1fr 1fr; grid-template-rows: none; grid-auto-rows: 1fr; }
+/* An odd tile last in a two-column grid would sit beside a hole; let it take the whole row. */
+.vidgrid.many > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 .vidtile canvas {
+    /* A canvas defaults to 300x150 and ignores its element box otherwise, so the size is explicit. */
+    display: block;
     width: 100%;
     height: 100%;
-    /* Contain, not cover: a call must not silently crop someone out of their own frame. */
+    /* Contain, not cover: a call must not silently crop someone out of their own frame. The tile is
+       the whole stage now, so a landscape sender letterboxes symmetrically instead of leaving the
+       black rectangle in one quarter of a 2x2 that the bands were being read as. */
     object-fit: contain;
     background: #000;
 }
-.pip video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+/* Cover, not contain: the self-view is a thumbnail for checking framing, and a letterboxed one
+   wastes most of it. The remote tiles are the ones that must not crop anybody. */
+.pip video { width: 100%; height: 100%; object-fit: cover; }
+/* Only the front camera. A mirrored back camera reverses any text it is pointed at, and the stream
+   the far side receives is not mirrored on either. */
+.pip.mirror video { transform: scaleX(-1); }
 .vidnotice {
     position: relative;
     z-index: 6;

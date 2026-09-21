@@ -22,10 +22,48 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
         constructor(source, init) {
             if (source?.isVideoElement && !frameFromElement) throw new TypeError('unsupported source');
             this.source = source; this.timestamp = init?.timestamp; this.closed = false;
+            // A frame built from another frame or from a canvas is the size of what it was built
+            // from; the rotation in the init dict overrides the source's, which is how the pipeline
+            // neutralises metadata before applying its own transform.
+            this.rotation = init?.rotation ?? source?.rotation ?? 0;
+            this.flip = init?.flip ?? source?.flip ?? false;
+            this.displayWidth = source?.displayWidth ?? source?.width ?? source?.videoWidth ?? 0;
+            this.displayHeight = source?.displayHeight ?? source?.height ?? source?.videoHeight ?? 0;
             stats.frames.push(this);
         }
         close() { this.closed = true; stats.closedFrames++; }
     }
+
+    /// A canvas that remembers what was drawn on it, so a test can read the transform the pipeline
+    /// applied rather than trusting that it called something.
+    const canvases = [];
+    const makeCanvas = () => {
+        const canvas = { width: 0, height: 0, ops: [], isCanvas: true };
+        canvas.context = {
+            save: () => canvas.ops.push(['save']),
+            restore: () => canvas.ops.push(['restore']),
+            translate: (x, y) => canvas.ops.push(['translate', x, y]),
+            rotate: angle => canvas.ops.push(['rotate', angle]),
+            scale: (x, y) => canvas.ops.push(['scale', x, y]),
+            drawImage: (...args) => canvas.ops.push(['drawImage', ...args])
+        };
+        canvas.getContext = () => canvas.context;
+        canvases.push(canvas);
+        return canvas;
+    };
+
+    /// One camera frame as MediaStreamTrackProcessor would hand it over: sensor-oriented pixels
+    /// with the display rotation carried alongside as metadata.
+    const queue = [];
+    let waiting = null;
+    const pushFrame = ({ displayWidth = 1280, displayHeight = 720, rotation = 0, flip = false, timestamp = 0 } = {}) => {
+        const frame = { displayWidth, displayHeight, rotation, flip, timestamp, closed: false, camera: true,
+            close() { this.closed = true; stats.closedFrames++; } };
+        stats.frames.push(frame);
+        if (waiting) { const resolve = waiting; waiting = null; resolve({ value: frame, done: false }); }
+        else queue.push(frame);
+        return frame;
+    };
 
     // Stands in for the <video> the fallback reads through: one pending frame callback at a time,
     // fired by hand so a test controls exactly when a frame arrives.
@@ -92,8 +130,7 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
         document: { hidden: false, addEventListener: (name, handler) => listeners.set(name, handler),
             removeEventListener: name => listeners.delete(name),
             body: { appendChild: node => { node.attached = true; } },
-            createElement: name => name === 'video' ? (element = new FakeVideoElement())
-                : { width: 0, height: 0, getContext: () => ({ drawImage() { } }) } },
+            createElement: name => name === 'video' ? (element = new FakeVideoElement()) : makeCanvas() },
         addEventListener: (name, handler) => listeners.set(name, handler),
         removeEventListener: name => listeners.delete(name),
         navigator: {
@@ -114,7 +151,13 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
     };
     if (capture === 'processor') sandbox.MediaStreamTrackProcessor = class {
         constructor({ track }) {
-            this.readable = { getReader: () => ({ read: () => new Promise(() => { }), cancel() { } }) };
+            this.readable = { getReader: () => ({
+                // Resolves as soon as a test pushes a frame, and otherwise waits forever - which is
+                // exactly what a camera that has produced nothing yet does.
+                read: () => queue.length ? Promise.resolve({ value: queue.shift(), done: false })
+                    : new Promise(resolve => { waiting = resolve; }),
+                cancel() { waiting = null; }
+            }) };
             this.track = track;
         }
     };
@@ -127,11 +170,12 @@ this.probe = probeVideoCodecs;
 this.ceiling = videoDeviceCeiling;
 this.capabilities = checkVideoCapabilities;
 this.strategyOf = typeof videoCaptureStrategy === 'function' ? videoCaptureStrategy : () => 'absent';
-this.codecString = videoCodecString;`, sandbox);
+this.codecString = videoCodecString;
+this.fitTier = fitTierToSource;`, sandbox);
 
     const host = { invokeMethodAsync: async (...args) => { stats.invoked.push(args); } };
     const canvas = { width: 0, height: 0, getContext: () => ({ drawImage() {} }) };
-    return { p: sandbox.pipeline, sandbox, stats, listeners, host, canvas,
+    return { p: sandbox.pipeline, sandbox, stats, listeners, host, canvas, pushFrame, canvases,
         get track() { return track; }, get video() { return element; } };
 }
 
@@ -493,4 +537,162 @@ test('a browser that can capture but encodes nothing still blames the device, no
     const capabilities = await f.sandbox.capabilities();
     assert.equal(capabilities.supported, false);
     assert.match(capabilities.reason, /no video encoder/i);
+});
+
+
+// ── Aspect ratio ──
+// A ladder tier is a bitrate budget written as a landscape box. VideoEncoder does not letterbox a
+// frame that does not match its configured raster, it *scales* it, so a portrait phone encoded into
+// 1280x720 arrives genuinely squashed - and the receiver then letterboxes the squash, which is the
+// stretched picture between black bands that was reported from a real device.
+
+test('a tier is reshaped to the camera aspect rather than squashing it into a landscape box', () => {
+    const f = fixture();
+    const fit = f.sandbox.fitTier;
+    assert.deepEqual(plain(fit(1280, 720, 720, 1280)), { width: 720, height: 1280 }, 'a portrait phone stays portrait');
+    assert.deepEqual(plain(fit(1280, 720, 1280, 720)), { width: 1280, height: 720 }, '16:9 already fits the tier');
+    assert.deepEqual(plain(fit(1280, 720, 640, 480)), { width: 960, height: 720 }, '4:3 narrows, it does not stretch');
+    assert.deepEqual(plain(fit(640, 360, 720, 1280)), { width: 360, height: 640 }, 'the short edge is the quality knob');
+    assert.deepEqual(plain(fit(1280, 720, 0, 0)), { width: 1280, height: 720 }, 'no camera yet means no reshaping');
+});
+
+test('a portrait camera is encoded portrait on the Chromium path', async () => {
+    const f = fixture();
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    assert.equal(f.p.encoder.config.width, 1280, 'before any frame, the tier is all there is to go on');
+    f.pushFrame({ displayWidth: 720, displayHeight: 1280 });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(f.p.encoder.config.width, 720);
+    assert.equal(f.p.encoder.config.height, 1280);
+    // The reshape happens before this same frame is encoded, so the keyframe the new raster needs
+    // is the frame that caused it - the far side never sees the new size against an old reference.
+    assert.equal(f.stats.encoded.at(-1).options.keyFrame, true);
+    assert.equal(f.stats.encoded.at(-1).config.height, 1280);
+});
+
+test('a portrait camera is encoded portrait on the Safari path too', async () => {
+    const f = fixture({ capture: 'rvfc' });
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    f.video.videoWidth = 720; f.video.videoHeight = 1280;
+    f.video.emit(0);
+    assert.equal(f.p.encoder.config.width, 720);
+    assert.equal(f.p.encoder.config.height, 1280);
+});
+
+test('the ladder still moves, and each tier lands at the camera aspect', async () => {
+    const f = fixture();
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    f.pushFrame({ displayWidth: 720, displayHeight: 1280 });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(f.p.applyTier(640, 360, 400, 20), true, 'adaptation is untouched by the reshaping');
+    assert.equal(f.p.encoder.config.width, 360);
+    assert.equal(f.p.encoder.config.height, 640);
+    assert.equal(f.p.encoder.config.bitrate, 400000);
+});
+
+test('turning the phone over mid-call re-fits the encoder', async () => {
+    const f = fixture();
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    f.pushFrame({ displayWidth: 720, displayHeight: 1280 });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(f.p.encoder.config.height, 1280);
+    f.pushFrame({ displayWidth: 1280, displayHeight: 720 });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(f.p.encoder.config.width, 1280);
+    assert.equal(f.p.encoder.config.height, 720, 'landscape again, not stuck on the portrait raster');
+});
+
+test('switching camera does not fit the new one to the old one aspect', async () => {
+    const f = fixture();
+    await init(f);
+    await f.p.startCapture(f.host, { facingMode: 'user' });
+    f.pushFrame({ displayWidth: 720, displayHeight: 1280 });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(f.p.sourceHeight, 1280);
+    await f.p.startCapture(f.host, { facingMode: 'environment' });
+    assert.equal(f.p.sourceWidth, 0, 'the back camera has its own shape and is measured fresh');
+    assert.equal(f.p.sourceHeight, 0);
+});
+
+// ── Orientation ──
+// Android looked rotated and iOS did not, because the two capture strategies differ: Chromium's
+// MediaStreamTrackProcessor yields sensor-oriented pixels with the rotation as metadata that
+// VideoEncoder then drops, while Safari's rVFC reads a <video> element that has already applied it.
+
+test('a rotated Android frame is turned upright before it is encoded', async () => {
+    const f = fixture();
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    const camera = f.pushFrame({ displayWidth: 720, displayHeight: 1280, rotation: 90 });
+    await new Promise(resolve => setImmediate(resolve));
+
+    const drawn = f.canvases.find(c => c.ops.length);
+    assert.ok(drawn, 'a rotated frame has to be redrawn: the encoder ignores the metadata');
+    assert.equal(drawn.width, 720, 'the canvas is the upright size, not the sensor size');
+    assert.equal(drawn.height, 1280);
+    const rotate = drawn.ops.find(op => op[0] === 'rotate');
+    assert.ok(rotate, 'the rotation must be baked into the pixels');
+    assert.equal(Math.round((rotate[1] * 180) / Math.PI), 90, 'clockwise by the reported rotation');
+    const translate = drawn.ops.find(op => op[0] === 'translate');
+    assert.deepEqual(translate, ['translate', 360, 640], 'turned about the centre of the upright canvas');
+    const draw = drawn.ops.find(op => op[0] === 'drawImage');
+    assert.deepEqual(draw.slice(2), [-640, -360, 1280, 720], 'a quarter turn swaps the source extent');
+
+    assert.equal(camera.closed, true, 'the sensor frame is released once its pixels have been copied');
+    const encoded = f.stats.encoded.at(-1).frame;
+    assert.notEqual(encoded, camera, 'what reaches the encoder is the upright copy');
+    assert.equal(encoded.source, drawn);
+    assert.equal(f.p.encoder.config.width, 720, 'and the raster follows the upright shape');
+    assert.equal(f.p.encoder.config.height, 1280);
+});
+
+test('the frame own metadata is neutralised so the rotation is applied once, not twice', async () => {
+    const f = fixture();
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    f.pushFrame({ displayWidth: 720, displayHeight: 1280, rotation: 270 });
+    await new Promise(resolve => setImmediate(resolve));
+    // drawImage honours rotation metadata on Chromium, so the frame handed to it must claim none.
+    const drawn = f.canvases.find(c => c.ops.length);
+    const source = drawn.ops.find(op => op[0] === 'drawImage')[1];
+    assert.equal(source.rotation, 0, 'drawImage would otherwise turn it a second time');
+    assert.equal(source.flip, false);
+    assert.equal(source.closed, true, 'the neutralised view is released with the frame it borrowed');
+});
+
+test('an upright Chromium frame is encoded with no copy at all', async () => {
+    const f = fixture();
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    const camera = f.pushFrame({ displayWidth: 1280, displayHeight: 720 });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(f.stats.encoded.at(-1).frame, camera, 'no rotation means no canvas and no pixel copy');
+    assert.ok(f.canvases.every(c => c.ops.length === 0));
+    assert.equal(camera.closed, true);
+});
+
+test('a mirrored frame is unmirrored into the pixels as well', async () => {
+    const f = fixture();
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    f.pushFrame({ displayWidth: 1280, displayHeight: 720, flip: true });
+    await new Promise(resolve => setImmediate(resolve));
+    const drawn = f.canvases.find(c => c.ops.length);
+    assert.ok(drawn, 'flip is metadata too, and the encoder drops it the same way');
+    assert.deepEqual(drawn.ops.find(op => op[0] === 'scale'), ['scale', -1, 1]);
+});
+
+test('the Safari path never rotates: the element has already done it', async () => {
+    const f = fixture({ capture: 'rvfc' });
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    f.video.videoWidth = 720; f.video.videoHeight = 1280;
+    f.video.emit(0);
+    assert.equal(f.stats.encoded.length, 1);
+    assert.equal(f.stats.encoded[0].frame.source, f.video, 'straight from the element, as #541 arranged');
+    assert.ok(f.canvases.every(c => c.ops.length === 0), 'rotating here would turn an upright picture sideways');
 });

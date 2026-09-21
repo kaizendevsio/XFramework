@@ -256,19 +256,16 @@ input,textarea{font:inherit;color:inherit}
 .cbtn.accept .k{background:var(--ok);color:var(--on-accent);border-color:transparent}
 .callrow2{display:flex;gap:56px;justify-content:center;width:100%}
 
-/* video */
-.vidstage{position:absolute;inset:0;background:linear-gradient(160deg,#2b45c4,#1a1a33 48%,#7a1a55)}
-.vidstage.two{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:4px;background:#0a0c14}
+/* video. The prototype's .vidstage and its 2x2 .vidstage.two lived here too; nothing renders them,
+   and leaving a second hardcoded 2x2 around invites the same bug the .vidgrid modifiers just fixed. */
 .vidtile{position:relative;display:grid;place-items:center;overflow:hidden}
 .vidtile.t1{background:linear-gradient(150deg,#2b45c4,#171a30)}
 .vidtile.t2{background:linear-gradient(150deg,#0e9b8c,#10262b)}
-.vidtile.t3{background:linear-gradient(150deg,#c3268a,#2a1024)}
-.vidtile.t4{background:linear-gradient(150deg,#2f6ae0,#101c33)}
 .nmtag{position:absolute;left:8px;bottom:8px;display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:8px;background:rgba(8,10,20,.5);backdrop-filter:blur(6px);font-size:10.5px;font-weight:650;color:#fff}
 .pip{position:absolute;right:14px;top:118px;width:104px;height:150px;border-radius:20px;overflow:hidden;background:linear-gradient(150deg,#ff8a5c,#c3268a);box-shadow:0 14px 30px rgba(0,0,0,.45);border:1.5px solid rgba(255,255,255,.22);display:grid;place-items:center;z-index:6}
 .pip .lbl{position:absolute;left:7px;bottom:7px;font-size:9.5px;font-weight:700;color:rgba(255,255,255,.9)}
 .vidtop{position:relative;z-index:6;display:flex;align-items:center;gap:10px;padding:10px 16px 16px;color:#fff;background:linear-gradient(to bottom,rgba(8,10,20,.55),rgba(8,10,20,0))}
-.vidgrid{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:4px;background:#0a0c14}
+.vidgrid{flex:1;min-height:0;display:grid;grid-template-columns:1fr;grid-template-rows:1fr;gap:4px;background:#0a0c14}
 .vidtop .mid{flex:1;min-width:0;text-align:center}
 .vidtop .n{font-size:15px;font-weight:750;letter-spacing:-.02em}
 .vidtop .s{font-size:11.5px;color:rgba(255,255,255,.72);font-weight:600;font-variant-numeric:tabular-nums}

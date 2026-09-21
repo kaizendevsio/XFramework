@@ -33,7 +33,7 @@
                 }
             </div>
             @if (Voice.CameraOn)
-            { <div class="pip"><video @ref="preview" autoplay muted playsinline></video><span class="lbl">You</span></div> }
+            { <div class="pip @(Voice.CameraFacing == "user" ? "mirror" : "")"><video @ref="preview" autoplay muted playsinline></video><span class="lbl">You</span></div> }
             @if (Voice.VideoNotice is { } notice)
             { <p class="vidnotice" role="status">@notice</p> }
             <div class="vidbar liquid-glass">
@@ -117,7 +117,8 @@
     // The video screen replaces the avatar screen only once there is a picture to show; a
     // camera-off participant in a video call still sees the call they answered.
     private bool Video => Voice.AnyVideo && !Voice.Incoming;
-    private string GridClass => Voice.RemoteVideo.Count > 1 ? "many" : "one";
+    // Count 0 still renders one tile - the caller's avatar - so it shares the single-tile layout.
+    private string GridClass => Voice.RemoteVideo.Count switch { <= 1 => "one", 2 => "two", _ => "many" };
     private string QualityLabel => Voice.VideoQuality is { } tier && Voice.CameraOn
         ? $" · {tier.Height}p {Voice.VideoCodecName}" : "";
     private async Task CheckPlaybackAsync()
