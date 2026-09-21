@@ -10,8 +10,8 @@ public sealed record VideoTile(Guid StreamId, Guid CredentialId);
 
 public sealed partial class VoiceState
 {
-    public int PreferredVideoHeight { get; private set; } = 1080;
-    public int PreferredVideoFramerate { get; private set; } = 30;
+    public int PreferredVideoHeight { get; private set; } = 1440;
+    public int PreferredVideoFramerate { get; private set; } = 60;
     private bool videoPreferenceLoaded;
     public async Task LoadVideoPreferenceAsync()
     {
@@ -28,7 +28,7 @@ public sealed partial class VoiceState
         }
         catch { /* Storage may be unavailable. Keep the default. */ }
     }
-    private static int ValidVideoHeight(int height) => height is 360 or 540 or 720 or 1080 or 1440 or 2160 ? height : 1080;
+    private static int ValidVideoHeight(int height) => height is 360 or 540 or 720 or 1080 or 1440 or 2160 ? height : 1440;
 
     public async Task SetVideoPreferenceAsync(int height, int framerate)
     {
@@ -66,6 +66,7 @@ public sealed partial class VoiceState
     public string? VideoNotice { get; private set; }
     /// <summary>What the send ladder settled on, for the quality readout. Null while nothing is sent.</summary>
     public VideoTier? VideoQuality { get; private set; }
+    public double? MeasuredVideoFps => active?.Media?.MeasuredVideoFps;
     public string VideoCodecName => active is { Codec: not VideoCodec.None } attempt
         ? VideoCodecLadder.Name(attempt.Codec).ToUpperInvariant() : "";
 

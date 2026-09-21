@@ -457,6 +457,14 @@ class VideoPipeline {
         this.deviceId = '';
         this.lastRequest = null;
         this.lastCaptureTimestamp = null;
+        this.nextCaptureTimestamp = null;
+        this.lastElementTime = null;
+        this.lastElementClock = null;
+        this.captureCount = 0;
+        this.encodeCount = 0;
+        this.renderCount = 0;
+        this.lastOutputAt = 0;
+        this.diagnosticWindow = { since: 0, capture: 0, encode: 0, render: 0 };
         // What the ladder asked for, kept apart from what the encoder is actually configured with:
         // the raster is the tier reshaped to whatever the camera is currently handing us, and that
         // shape changes on a camera switch and when the phone is turned over mid-call.
@@ -503,6 +511,8 @@ class VideoPipeline {
         const data = new Uint8Array(chunk.byteLength);
         chunk.copyTo(data);
         const now = Date.now();
+        this.lastOutputAt = now;
+        this.encodeCount++;
         if (this.window.since === 0) this.window.since = now;
         this.window.frames++; this.window.bytes += data.byteLength;
         const elapsed = now - this.window.since;
@@ -555,6 +565,8 @@ class VideoPipeline {
         this.pendingKeyframe = true;
         this.window = { since: 0, frames: 0, bytes: 0 };
         this.lastCaptureTimestamp = null;
+        this.nextCaptureTimestamp = null;
+        this.lastElementTime = this.lastElementClock = null;
         this.dotNetRef = dotNetRef;
         if (this.preview) this.preview.srcObject = stream;
         // The camera can be revoked from the browser's own UI; that must end the send, not hang it.
@@ -591,11 +603,11 @@ class VideoPipeline {
             video.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0.01;pointer-events:none';
             globalThis.document.body?.appendChild(video);
         }
-        const onFrame = (_now, metadata) => {
+        const onFrame = (now, metadata) => {
             this.captureCallbackId = 0;
             // A callback queued before stopCapture must not push a frame from the previous session.
             if (!this.captureRunning || generation !== this.captureGeneration || this.captureVideo !== video) return;
-            try { this._encodeElementFrame(video, metadata); }
+            try { this._encodeElementFrame(video, metadata, now); }
             finally {
                 // Re-arm in finally: one bad frame must not silently end the whole capture.
                 if (this.captureRunning && generation === this.captureGeneration && this.captureVideo === video)
@@ -613,7 +625,8 @@ class VideoPipeline {
 
     /// One VideoFrame per callback, closed on every path. The fallback allocates a frame per
     /// picture, so a single missed close() exhausts the frame pool within seconds.
-    _encodeElementFrame(video, metadata) {
+    _encodeElementFrame(video, metadata, callbackTime = performance.now()) {
+        this.captureCount++;
         if (!this.encoder || this.encoder.state !== 'configured') return;
         // Same rule as the reader loop: drop the newest frame rather than queue latency.
         if (this.encoder.encodeQueueSize >= 2) { this.stats.dropped++; return; }
@@ -621,7 +634,14 @@ class VideoPipeline {
         // _upright on this path: the element paints the rotation itself, so it is already upright.
         this._noteSource(video.videoWidth, video.videoHeight);
         const seconds = metadata?.mediaTime ?? video.currentTime ?? 0;
-        const timestamp = Math.max(0, Math.round(seconds * 1e6));
+        let timestamp = Math.max(0, Math.round(seconds * 1e6));
+        // A live element may repeat/reset its media clock when its preview is rebound.
+        // rVFC itself identifies a new presented frame: keep the encoding clock moving
+        // instead of rejecting every subsequent frame until that media clock catches up.
+        if (this.lastElementTime !== null && timestamp <= this.lastElementTime)
+            timestamp = this.lastElementTime + Math.max(1, Math.round((callbackTime - this.lastElementClock) * 1000));
+        this.lastElementTime = timestamp;
+        this.lastElementClock = callbackTime;
         if (!this._acceptCaptureTime(timestamp)) return;
         const frame = this._elementFrame(video, timestamp);
         if (!frame) return;
@@ -648,7 +668,7 @@ class VideoPipeline {
             { canvas.width = this.config.width; canvas.height = this.config.height; }
             this.captureContext ??= canvas.getContext('2d', { alpha: false, desynchronized: true });
             this.captureContext.drawImage(video, 0, 0, canvas.width, canvas.height);
-            return new VideoFrame(canvas, { timestamp });
+            return new VideoFrame(canvas, { timestamp, duration: Math.round(1e6 / this.config.framerate) });
         } catch { return null; }
     }
 
@@ -674,6 +694,7 @@ class VideoPipeline {
                 const { value, done } = await this.captureReader.read();
                 if (done) break;
                 frame = value;
+                this.captureCount++;
             } catch { break; }
             try {
                 if (!this.encoder || this.encoder.state !== 'configured') continue;
@@ -692,8 +713,12 @@ class VideoPipeline {
 
     _acceptCaptureTime(timestamp) {
         const interval = 1e6 / (this.config?.framerate || 30);
-        if (this.lastCaptureTimestamp !== null && timestamp >= this.lastCaptureTimestamp &&
-            timestamp - this.lastCaptureTimestamp < interval * 0.9) return false;
+        if (this.lastCaptureTimestamp !== null && timestamp <= this.lastCaptureTimestamp) return false;
+        if (this.nextCaptureTimestamp !== null && timestamp < this.nextCaptureTimestamp - interval * 0.1) return false;
+        // Advance the deadline, not the previous arrival time. Otherwise normal jitter
+        // on a 60fps camera repeatedly drops frames and makes the output closer to 30fps.
+        this.nextCaptureTimestamp = this.nextCaptureTimestamp === null || timestamp > this.nextCaptureTimestamp + interval
+            ? timestamp + interval : this.nextCaptureTimestamp + interval;
         this.lastCaptureTimestamp = timestamp;
         return true;
     }
@@ -706,6 +731,16 @@ class VideoPipeline {
 
     getStats() {
         this.stats.backlog = this.encoder?.encodeQueueSize ?? 0;
+        const now = Date.now();
+        if (now - this.lastOutputAt > 2000) this.stats.fps = 0;
+        const window = this.diagnosticWindow;
+        if (now - window.since >= 5000) {
+            for (const [phase, count] of [['capture', this.captureCount - window.capture],
+                ['encode', this.encodeCount - window.encode], ['render', this.renderCount - window.render]])
+                globalThis.yap?.diagnostics?.record('video.pipeline', { phase, count, ms: window.since ? now - window.since : 0,
+                    width: this.config?.width ?? 0, height: this.config?.height ?? 0, pending: this.stats.backlog });
+            this.diagnosticWindow = { since: now, capture: this.captureCount, encode: this.encodeCount, render: this.renderCount };
+        }
         return { fps: this.stats.fps, kbps: this.stats.kbps, dropped: this.stats.dropped, backlog: this.stats.backlog };
     }
 
@@ -872,6 +907,7 @@ class VideoPipeline {
 
     _render(remote, frame) {
         try {
+            this.renderCount++;
             const submitted = remote.pending.get(frame.timestamp);
             remote.pending.delete(frame.timestamp);
             if (submitted !== undefined) void this._considerDecoderLatency(remote, frame, performance.now() - submitted);
@@ -879,7 +915,7 @@ class VideoPipeline {
                 remote.width = remote.canvas.width = frame.displayWidth;
                 remote.height = remote.canvas.height = frame.displayHeight;
             }
-            remote.context.drawImage(frame, 0, 0);
+            remote.context.drawImage(frame, 0, 0, remote.width, remote.height);
         } catch { /* A detached canvas is a closed tile, not a call failure. */ }
         finally { frame.close(); }
     }

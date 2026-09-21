@@ -12,7 +12,8 @@ function fixture({ waiting = true, fail = false, online = true } = {}) {
     const registration = { waiting: waiting ? worker : null, async update() { if (fail) throw Error('download-failed'); } };
     const self = {};
     const sandbox = { self, document: { getElementById: id => id === 'recover' ? button : notice },
-        navigator: { onLine: online, serviceWorker: { async register(url, options) { registered.push(url); assert.equal(options.updateViaCache, 'none'); return registration; } } },
+        navigator: { onLine: online, serviceWorker: { async getRegistration() { return registration; }, async register(url, options) { registered.push(url); assert.equal(options.updateViaCache, 'none'); return registration; } } },
+        AbortSignal, async fetch() { return { ok: true, async text() { return '{"version":"recovery-test"}'; } }; },
         window: {}, location: { replace: url => navigations.push(url) }, setTimeout, clearTimeout };
     const context = vm.createContext(sandbox);
     // The recovery page shares the app's one registration helper, so it cannot install a different
@@ -27,6 +28,7 @@ test('explicit recovery activates a waiting update and reopens without touching 
     await f.button.onclick();
     assert.deepEqual(f.messages, ['activate']);
     assert.deepEqual(f.navigations, ['/']);
+    assert.deepEqual(f.registered, ['service-worker.module.js?build=recovery-test']);
     assert.equal(f.listeners.size, 0);
 });
 

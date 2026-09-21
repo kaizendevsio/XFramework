@@ -62,9 +62,9 @@
     object-fit: contain;
     background: #000;
 }
-/* Cover, not contain: the self-view is a thumbnail for checking framing, and a letterboxed one
-   wastes most of it. The remote tiles are the ones that must not crop anybody. */
-.pip video { width: 100%; height: 100%; object-fit: cover; }
+.vidtile { min-width: 0; min-height: 0; }
+.vidtile canvas { min-width: 0; min-height: 0; }
+.pip video { width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: contain; background: #000; }
 /* Only the front camera. A mirrored back camera reverses any text it is pointed at, and the stream
    the far side receives is not mirrored on either. */
 .pip.mirror video { transform: scaleX(-1); }

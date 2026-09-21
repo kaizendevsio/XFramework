@@ -3,12 +3,12 @@
     <label>Video resolution
         <select aria-label="Video resolution" value="@Voice.PreferredVideoHeight" disabled="@Voice.CameraBusy" @onchange="HeightAsync">
             <option value="360">360p</option><option value="540">540p</option><option value="720">720p</option>
-            <option value="1080">1080p (default)</option><option value="1440">1440p</option><option value="2160">4K</option>
+            <option value="1080">1080p</option><option value="1440">1440p (default)</option><option value="2160">4K</option>
         </select>
     </label>
     <label>Frame rate
         <select aria-label="Video frame rate" value="@Voice.PreferredVideoFramerate" disabled="@Voice.CameraBusy" @onchange="RateAsync">
-            <option value="30">30 fps (default)</option><option value="60">60 fps</option>
+            <option value="30">30 fps</option><option value="60">60 fps (default)</option>
         </select>
     </label>
     <p>Maximum sending quality. Actual quality adapts to your camera, device and connection. Higher quality uses more data and battery.</p>

@@ -29,6 +29,8 @@ public sealed partial class BoltMediaService
     /// <summary>The send ladder moved. Null means video is suspended to protect the audio.</summary>
     public event Action<VideoTier?>? OnVideoTierChanged;
 
+    public double? MeasuredVideoFps { get; private set; }
+
     public bool IsCameraOn => _video.IsCapturing;
     public VideoCodec ActiveVideoCodec => _videoCodec;
     public VideoTier? ActiveVideoTier => _adaptation?.Current;
@@ -110,6 +112,7 @@ public sealed partial class BoltMediaService
     public async Task StopVideoAsync()
     {
         StopAdaptationLoop();
+        MeasuredVideoFps = null;
         await _video.StopCaptureAsync();
         DrainVideoSend();
         await _videoPump;
@@ -299,6 +302,7 @@ public sealed partial class BoltMediaService
                 // A suspended ladder must keep observing: it is the only thing that can resume it.
                 if (_adaptation is not { } adaptation || (!_video.IsCapturing && !adaptation.Suspended)) continue;
                 var stats = await _video.StatsAsync();
+                MeasuredVideoFps = stats.Fps;
                 var backlog = _videoSend is { } channel ? channel.Reader.Count : 0;
                 var conditions = new VideoConditions(Volatile.Read(ref _videoAllowedKbps), stats.Fps, stats.Backlog, backlog + _videoDropped);
                 _videoDropped = 0;
@@ -344,6 +348,7 @@ public sealed partial class BoltMediaService
         foreach (var streamId in remotes)
         { try { await _video.RemoveRemoteAsync(streamId); } catch (JSException) { /* The page is going away. */ } }
         _adaptation = null;
+        MeasuredVideoFps = null;
         _videoCodec = VideoCodec.None;
         _videoAllowedKbps = 0;
         _videoDropped = 0;

@@ -9,7 +9,7 @@ window.yap = {
     videoPreference() {
         try { const value = JSON.parse(localStorage.getItem('yap-video-quality'));
             if (Array.isArray(value) && value.length === 2) return value; } catch {}
-        return [1080, 30];
+        return [1440, 60];
     },
     setVideoPreference(height, fps) {
         try { localStorage.setItem('yap-video-quality', JSON.stringify([height, fps])); } catch {}

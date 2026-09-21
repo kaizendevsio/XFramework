@@ -104,3 +104,27 @@ The relay review found opaque forwarding with bounded queues and recipient press
 
 
 Validation for this follow-up: 103 Bolt media/video/SFrame/group tests, 245 Yap client tests, 53 gateway tests, and 86 browser media tests passed. The client and standalone benchmark build successfully. Remaining acceptance work is a sustained two-phone call (iOS sending to Android, camera off/on, audio-only answer, minimizing/expanding, and genuine bandwidth reduction).
+
+
+## 1.3.61 ? update visibility, framing and measured cadence
+
+Yap now requests 1440p/60 by default. Explicit saved quality choices remain in place. This is a request bounded by the existing device/codec/network adaptation, not a promise that a camera produces 60 pictures per second. The call header now labels **sending** quality and displays measured encoder output fps (zero after a stalled output), rather than the configured maximum.
+
+The old capture gate compared each new timestamp against the last accepted arrival. Alternating early/late 60fps callbacks could therefore drop roughly half the source frames. The gate now advances a sampling deadline; a regression injects alternating 1.2ms jitter and retains at least 118 of 120 frames. Safari element capture also keeps a monotonic timestamp when new frame callbacks report a repeated/reset media clock, and supplies a frame duration to the encoder. This fixes that reproducible failure mode; it does **not** prove that clock repetition caused the reported iPhone-to-Android freeze. Opt-in `video.pipeline` breadcrumbs record capture, encode and render counts every five seconds, without media data or participant identifiers. Physical-device logs/retesting remain necessary to locate any remaining freeze.
+
+Video tiles and canvases have zero intrinsic minimums, preventing high-resolution canvas dimensions from forcing grid overflow. Both remote video and self-preview use `object-fit: contain`; render draws explicitly to display dimensions. The full camera frame remains visible instead of using the former self-preview crop.
+
+Update checks fetch the published asset manifest without HTTP caching and version the top-level service-worker URL with its build identity, preserving the same scope. Checks therefore do not rely solely on detecting changes to transitive module imports. Installing updates display a download notice, redundant installs offer Retry, and update-check waits are bounded. Calls/unsent media still prevent activation. No account, encryption-key or media cache is cleared. A local real-Chromium test verified version `one` controlling a document, version `two` waiting with a visible Update button, and activation through that button. It does not reproduce the user's physical Android failure or prove its original cause.
+
+### Local measurements and limits
+
+12-second encrypted loopback runs through the checked-in benchmark (synthetic canvas, production SFrame/Blazor/WebCodecs, local WebSocket echo, **not** the Bolt relay or phones):
+
+| Request | Encoded / rendered fps | Capture-to-render p50 / p95 | Crypto + interop + echo p50 / p95 |
+| --- | --- | --- | --- |
+| 1080p/30 | 28.4 / 28.0 | 18.6 / 24.9 ms | 3.8 / 6.1 ms |
+| 1440p/60 | 1.5 / 1.5 | 1232.8 / 2264.3 ms | 16.8 / 89.3 ms |
+
+Both runs reported zero sender queue drops and no thrown errors. The 1440p/60 hardware configuration was unsupported on this Chromium host and used `no-preference`; 1080p/30 accepted `prefer-hardware`. This identifies a large cost outside encryption/echo on this test host, but does not isolate capture versus encode versus decode or establish physical-phone performance. The benchmark has no adaptation loop, so it deliberately continues testing the requested size. The application retains its adaptation loop. 1080p/30 used the existing measured decoder software fallback. Percentiles exclude the first three seconds; totals include startup/shutdown. Do not present these numbers as internet or phone-to-phone latency, or claim native 60fps from a configuration value.
+
+Validation: 179 browser-JS/unit tests, 92 targeted Bolt tests, 245 Yap client tests and 201 Yap gateway tests passed. A Chromium layout fixture verified canvas bounds, visible controls, and contain fitting for both views. iOS-to-Android freeze resolution is not yet confirmed.

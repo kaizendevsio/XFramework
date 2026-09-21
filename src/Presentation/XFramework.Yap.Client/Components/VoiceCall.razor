@@ -126,7 +126,7 @@
     // Count 0 still renders one tile - the caller's avatar - so it shares the single-tile layout.
     private string GridClass => Voice.RemoteVideo.Count switch { <= 1 => "one", 2 => "two", _ => "many" };
     private string QualityLabel => Voice.VideoQuality is { } tier && Voice.CameraOn
-        ? $" · {tier.Height}p {tier.Framerate}fps {Voice.VideoCodecName}" : "";
+        ? $" · {tier.Height}p {(Voice.MeasuredVideoFps is { } fps ? $"{fps:0} fps" : "Measuring?")} {Voice.VideoCodecName}" : "";
     private async Task CheckPlaybackAsync()
     {
         try { playbackSuspended = await Voice.GetPlaybackStateAsync() is "suspended" or "interrupted"; }
