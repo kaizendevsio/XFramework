@@ -83,7 +83,7 @@ public sealed partial class VoiceState
         attempt.CameraBusy = true; Notify();
         try
         {
-            var state = await media.StartVideoAsync(attempt.Group!.Id, attempt.Codec, attempt.Ceiling, deviceId, facing);
+            var state = await media.StartVideoAsync(attempt.Group!.Id, attempt.Codec, attempt.CodecCeiling, deviceId, facing);
             attempt.Facing = state.FacingMode; attempt.Device = state.DeviceId;
         }
         catch (Exception error) when (Current(attempt)) { await StopCameraAsync(attempt, CameraMessage(error)); }
@@ -115,7 +115,7 @@ public sealed partial class VoiceState
         media.OnLocalVideoStopped += attempt.VideoStopped;
         media.OnVideoTierChanged -= attempt.TierChanged;
         media.OnVideoTierChanged += attempt.TierChanged;
-        var state = await media.StartVideoAsync(attempt.Group.Id, attempt.Codec, attempt.Ceiling, null, attempt.Facing);
+        var state = await media.StartVideoAsync(attempt.Group.Id, attempt.Codec, attempt.CodecCeiling, null, attempt.Facing);
         if (!Current(attempt)) { await media.StopVideoAsync(); return; }
         attempt.Facing = state.FacingMode; attempt.Device = state.DeviceId;
         attempt.CameraOn = true;
@@ -175,6 +175,7 @@ public sealed partial class VoiceState
         // Fall back through the ladder before giving up: a peer without AV1 should still get VP9 or H.264.
         if (codec == VideoCodec.None && height > 360)
             codec = ladder.Negotiate(epoch.Peers.Select(peer => epoch.PeerCodecs.GetValueOrDefault(peer, [])), 360);
+        attempt.CodecCeiling = Math.Min(height, ladder.EncodingCeiling(codec));
         var previous = attempt.Codec;
         attempt.Codec = codec;
         attempt.CodecNotice = codec == VideoCodec.None

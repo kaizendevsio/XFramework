@@ -132,8 +132,9 @@ public sealed partial class VoiceState : IAsyncDisposable
     {
         if (!Current(attempt)) return Task.CompletedTask;
         var reason = Regex.Replace(error.Message, @"(?:https?|wss?)://\S+|(?i:ticket)=[^&\s]+", "[redacted endpoint]");
-        logs.CreateLogger("Yap.Voice").LogWarning("Voice call failed ({ErrorType}): {Reason}", error.GetType().Name,
+        logs.CreateLogger("Yap.Voice").LogWarning("Voice call failed in {Phase} ({ErrorType}): {Reason}", attempt.Phase, error.GetType().Name,
             attempt.Group is null ? reason : "Encrypted call could not complete");
+        _ = RecordFailureAsync(attempt.Phase, error.GetType().Name);
         Error = error.Message switch
         {
             "Open Yap using its HTTPS address to use voice calls." => error.Message,
@@ -144,6 +145,12 @@ public sealed partial class VoiceState : IAsyncDisposable
         };
         return EndAttemptAsync(attempt, true);
     }
+    private async Task RecordFailureAsync(string phase, string type)
+    {
+        try { await js.InvokeVoidAsync("yap.diagnostics.record", "call.failed", new { phase, type }); }
+        catch { /* Diagnostics must not hold up call cleanup. */ }
+    }
+
     public Task EndAsync(bool notify = true) => active is { } attempt ? EndAttemptAsync(attempt, notify) : Task.CompletedTask;
     private async Task EndAttemptAsync(Attempt attempt, bool notify)
     {
@@ -228,6 +235,7 @@ public sealed partial class VoiceState : IAsyncDisposable
         public SemaphoreSlim MediaGate { get; } = new(1, 1);
         public Dictionary<(Guid, string), YapGroupControlEvent> PendingControls { get; } = [];
         public bool Starting, Ended, Muting, Notified;
+        public string Phase = "microphone";
 
         // ── Video. Everything here stays inert until the user turns the camera on. ──
         public bool WantsVideo, CameraOn, CameraBusy;
@@ -239,6 +247,7 @@ public sealed partial class VoiceState : IAsyncDisposable
         public string? VideoBlocked;
         /// <summary>Tallest picture this device said it can encode, before any call-size cap.</summary>
         public int Ceiling = 720;
+        public int CodecCeiling = 720;
         public VideoCodecLadder? Ladder;
         public Task<VideoCapabilities>? VideoProbe;
         public IReadOnlyList<VideoTile> Tiles = [];

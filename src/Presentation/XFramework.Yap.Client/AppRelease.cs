@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.57";
+    public const string Version = "1.3.58";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
-        (Version, "16 September 2026", [
+        (Version, "21 September 2026", [
+            "Call setup is more reliable on a slow first connection, and video recovers after dropped frames or restarting the camera.",
+            "Update notices recover more reliably, and interrupted update downloads resume without clearing your saved data."]),
+        ("1.3.57", "16 September 2026", [
             "The video call screen is no longer see-through, and the picture fills the screen at the right shape.",
             "Video from Android phones is no longer sideways, and portrait video is no longer stretched."]),
         ("1.3.56", "16 September 2026", [

@@ -9,7 +9,7 @@ public enum VideoCodec { None = 0, Av1 = 1, Vp9 = 2, H264 = 3 }
 /// <param name="Codec">The codec family.</param>
 /// <param name="Encode">The encoder accepted a configuration at <paramref name="MaxHeight"/>.</param>
 /// <param name="Decode">The decoder accepted a configuration at <paramref name="MaxHeight"/>.</param>
-/// <param name="Hardware">A <c>require-hardware</c> probe succeeded, so encoding will not burn the CPU.</param>
+/// <param name="Hardware">Whether hardware encoding is known. A WebCodecs preference hint alone cannot establish this.</param>
 /// <param name="MaxHeight">Tallest probed frame the encoder accepted, 0 when it accepted none.</param>
 public sealed record VideoCodecSupport(VideoCodec Codec, bool Encode, bool Decode, bool Hardware, int MaxHeight);
 
@@ -44,6 +44,10 @@ public sealed class VideoCodecLadder
 
     /// <summary>Codecs this device can decode, in compression order. This is what peers are told.</summary>
     public VideoCodec[] Decodable => Preference.Where(codec => support.GetValueOrDefault(codec)?.Decode == true).ToArray();
+
+    /// <summary>Maximum safe height for the selected encoder, including software limits.</summary>
+    public int EncodingCeiling(VideoCodec codec) => support.GetValueOrDefault(codec) is { Encode: true } local
+        ? Math.Min(local.MaxHeight, local.Hardware ? 1080 : SoftwareCeiling(codec)) : 0;
 
     /// <summary>
     /// Pick the codec to encode with: the first in compression order that this device can encode

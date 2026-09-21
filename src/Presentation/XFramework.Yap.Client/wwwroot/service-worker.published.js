@@ -39,7 +39,16 @@ async function photo(request, account) {
 }
 self.addEventListener('install', event => event.waitUntil((async () => {
     const cache = await caches.open(name);
-    await cache.addAll(assets.map(asset => new Request(asset.url, { integrity: asset.hash, cache: 'no-cache' })));
+    // Mobile browsers can suspend an install mid-download. Keep verified batches in the new
+    // version's isolated cache so the next attempt resumes instead of downloading the WASM
+    // runtime again. Do not activate unless every required asset is present.
+    for (let offset = 0; offset < assets.length; offset += 4) {
+        const missing = [];
+        for (const asset of assets.slice(offset, offset + 4))
+            if (!await cache.match(asset.url))
+                missing.push(new Request(asset.url, { integrity: asset.hash, cache: 'no-cache' }));
+        if (missing.length) await cache.addAll(missing);
+    }
 })()));
 self.addEventListener('activate', event => event.waitUntil((async () => {
     for (const key of await caches.keys()) if (key.startsWith(prefix) && key !== name) await caches.delete(key);

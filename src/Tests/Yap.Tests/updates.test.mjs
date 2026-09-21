@@ -9,7 +9,7 @@ function fixture({ waiting = false, installing = false, controlled = true } = {}
     const events = () => ({ handlers: {}, addEventListener(name, fn) { (this.handlers[name] ??= []).push(fn); },
         async emit(name) { for (const fn of this.handlers[name] ?? []) await fn(); } });
     let now = 0, checks = 0, registrations = 0, reloads = 0, busy = false, fail = false;
-    const worker = { ...events(), messages: [], postMessage(value) { this.messages.push(value); } };
+    const worker = { ...events(), state: waiting ? 'installed' : 'installing', messages: [], postMessage(value) { this.messages.push(value); } };
     const registration = { ...events(), waiting: waiting ? worker : null, installing: installing ? worker : null,
         async update() { checks++; if (fail) throw Error('Offline'); } };
     const registered = [];
@@ -22,7 +22,7 @@ function fixture({ waiting = false, installing = false, controlled = true } = {}
     const self = {};
     const context = vm.createContext({ self, window, navigator, document, location: { reload() { reloads++; } },
         Date: { now: () => now }, WeakSet, addEventListener: window.addEventListener.bind(window),
-        setInterval(fn, ms) { assert.equal(ms, 300000); interval = fn; } });
+        setInterval(fn, ms) { assert.equal(ms, 60000); interval = fn; } });
     // Every registration site shares one helper, so updates cannot install a different worker than
     // push and the recovery page and leave them replacing each other at the same scope.
     vm.runInContext(read('worker-registration.js'), context);
@@ -37,17 +37,17 @@ test('long-lived apps check on foreground, reconnect and timer; duplicate events
     const f = fixture();
     await f.window.emit('load');
     await f.window.emit('pageshow');
-    assert.deepEqual(f.counts(), { checks: 0, registrations: 1, reloads: 0 });
+    assert.deepEqual(f.counts(), { checks: 1, registrations: 1, reloads: 0 });
     f.tick(); await f.document.emit('visibilitychange');
     f.tick(); await f.window.emit('online');
     f.tick(); await f.interval();
-    assert.equal(f.counts().checks, 3);
+    assert.equal(f.counts().checks, 4);
     f.tick(); f.document.hidden = true; await f.interval();
     f.document.hidden = false; f.navigator.onLine = false; await f.interval();
-    assert.equal(f.counts().checks, 3);
+    assert.equal(f.counts().checks, 4);
     f.navigator.onLine = true; f.fail(true); await f.window.emit('online');
     f.tick(); f.fail(false); await f.window.emit('online');
-    assert.equal(f.counts().checks, 5);
+    assert.equal(f.counts().checks, 6);
 });
 
 test('already-installing and waiting updates show a notice without reloading', async () => {
@@ -105,4 +105,23 @@ test('update toast can be dismissed without activating or reloading', async () =
     assert.equal(f.notice.hidden, true); f.tick(); await f.interval();
     assert.equal(f.notice.hidden, true); assert.equal(f.counts().reloads, 0);
     assert.deepEqual(f.worker.messages, []);
+});
+
+
+test('installed state shows the update before waiting is populated by the browser', async () => {
+    const f = fixture({ installing: true }); await f.window.emit('load');
+    f.worker.state = 'installed';
+    await f.worker.emit('statechange');
+    assert.equal(f.registration.waiting, null);
+    assert.equal(f.notice.hidden, false);
+    f.api.apply();
+    assert.deepEqual(f.worker.messages, ['activate']);
+});
+
+test('dismissing one update does not hide a later release', async () => {
+    const f = fixture({ waiting: true }); await f.window.emit('load');
+    f.api.dismiss();
+    f.registration.waiting = { state: 'installed', postMessage() {} };
+    f.api.notice();
+    assert.equal(f.notice.hidden, false);
 });
