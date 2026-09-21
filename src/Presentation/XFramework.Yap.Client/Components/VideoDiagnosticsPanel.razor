@@ -1,0 +1,42 @@
+@using Bolt.Media.Browser
+<aside class="video-debug" aria-label="Video diagnostics">
+    <div class="debug-heading"><strong>Video diagnostics</strong><button type="button" @onclick="OnClose" aria-label="Hide video diagnostics">Hide</button></div>
+    @if (Snapshot is { } info)
+    {
+        <div class="debug-stream">
+            <strong>Outgoing · @(info.Capturing ? "camera on" : "camera off")</strong>
+            <div>Requested: @(RequestedHeight)p / @RequestedFps fps</div>
+            @if (info.Capturing)
+            {
+                <div>Camera: @Size(info.CameraWidth, info.CameraHeight) / @Number(info.CameraFps) fps setting</div>
+                <div>Encoder: @Size(info.Width, info.Height) / @Number(info.TargetFps) fps · @info.Codec</div>
+                <div>Capture → encoded: @Number(info.CaptureFps) → @Number(info.EncodedFps) fps</div>
+                <div>Encoded: @Number(info.EncodedKbps) kbps · last encode: @Number(info.EncoderDelayMs) ms</div>
+                <div>Queue: encoder @info.EncoderQueue / send @info.SendQueue · capture pressure drops: @info.Dropped</div>
+                <div>Path: @info.Strategy · @info.Acceleration</div>
+            }
+        </div>
+        @for (var i = 0; i < info.Remotes.Length; i++)
+        {
+            var remote = info.Remotes[i];
+            <div class="debug-stream" @key="remote.StreamId">
+                <strong>Incoming @(i + 1) · @Size(remote.Width, remote.Height) · @remote.Codec</strong>
+                <div>Received → rendered: @Number(remote.ReceivedFps) → @Number(remote.RenderedFps) fps</div>
+                <div>Received: @Number(remote.ReceivedKbps) kbps · last decode: @Number(remote.DecoderDelayMs) ms</div>
+                <div>Queue: decoder @remote.DecoderQueue / pending @remote.PendingFrames · resets: @remote.Resets</div>
+                <div>Decoder preference: @remote.Acceleration</div>
+            </div>
+        }
+        @if (info.Remotes.Length == 0) { <div>No incoming video stream.</div> }
+    }
+    else { <div>Collecting video measurements…</div> }
+    <p>Updates every second. — means no sample. Hardware preference does not confirm GPU use. Rates exclude transport overhead; delays are local codec timings, not call latency.</p>
+</aside>
+@code {
+    [Parameter] public VideoDiagnostics? Snapshot { get; set; }
+    [Parameter] public int RequestedHeight { get; set; }
+    [Parameter] public int RequestedFps { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    private static string Number(double? value) => value is { } number ? number.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) : "—";
+    private static string Size(int width, int height) => width > 0 && height > 0 ? $"{width}×{height}" : "—";
+}

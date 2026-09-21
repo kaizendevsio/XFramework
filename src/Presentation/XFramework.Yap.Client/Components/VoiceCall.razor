@@ -36,6 +36,8 @@
             { <div class="pip @(Voice.CameraFacing == "user" ? "mirror" : "")"><video @ref="preview" autoplay muted playsinline></video><span class="lbl">You</span></div> }
             @if (Voice.VideoNotice is { } notice)
             { <p class="vidnotice" role="status">@notice</p> }
+            @if (debugVideo && !outputOpen)
+            { <VideoDiagnosticsPanel Snapshot="videoDiagnostics" RequestedHeight="Voice.PreferredVideoHeight" RequestedFps="Voice.PreferredVideoFramerate" OnClose="ToggleDiagnosticsAsync" /> }
             <div class="vidbar liquid-glass">
                 <GlassLayer />
                 <button class="vbtn @(Voice.Muted ? "on" : "")" disabled="@(Voice.ConnectedAt is null)" aria-pressed="@Voice.Muted" @onclick="Voice.ToggleMuteAsync"><span class="k"><Icon Name="mic" Size="22" /></span>@(Voice.Muted ? "Unmute" : "Mute")</button>
@@ -49,6 +51,7 @@
                 <div class="video-call-settings">
                     @AudioOutputPicker @CameraPicker
                     <div class="call-audio-output"><VideoQualitySettings /></div>
+                    <div class="call-audio-output"><label class="setting-toggle"><span>Show video diagnostics</span><input type="checkbox" role="switch" checked="@debugVideo" @onchange="ToggleDiagnosticsAsync" /><span class="switch-track" aria-hidden="true"></span></label></div>
                 </div>
             }
             @if (playbackSuspended && Voice.ConnectedAt is not null)
@@ -120,6 +123,29 @@
     private readonly CancellationTokenSource lifetime = new();
     private bool outputOpen, outputBusy;
     private bool playbackSuspended;
+    private bool debugVideo;
+    private Bolt.Media.Browser.VideoDiagnostics? videoDiagnostics;
+    private async Task ToggleDiagnosticsAsync()
+    {
+        debugVideo = !debugVideo;
+        videoDiagnostics = null;
+        if (debugVideo) outputOpen = false;
+        else { try { await Voice.GetVideoDiagnosticsAsync(false); } catch { } }
+    }
+    private async Task RefreshDiagnosticsAsync()
+    {
+        if (!debugVideo || Voice.Minimized || !Video)
+        {
+            if (videoDiagnostics is not null) { videoDiagnostics = null; try { await Voice.GetVideoDiagnosticsAsync(false); } catch { } }
+            return;
+        }
+        try
+        {
+            var snapshot = await Voice.GetVideoDiagnosticsAsync(true);
+            if (debugVideo && Voice.IsCalling && !Voice.Minimized) videoDiagnostics = snapshot;
+        }
+        catch { videoDiagnostics = null; }
+    }
     // The video screen replaces the avatar screen only once there is a picture to show; a
     // camera-off participant in a video call still sees the call they answered.
     private bool Video => Voice.AnyVideo && !Voice.Incoming;
@@ -141,10 +167,10 @@
     private string? outputError;
     private string Elapsed => Voice.Status == "Connected" && Voice.ConnectedAt is { } time ? (DateTimeOffset.UtcNow - time).ToString(@"mm\:ss") : Voice.Status;
     protected override void OnInitialized(){ Voice.Changed += Changed; _ = Tick(); }
-    private void Changed() => _ = InvokeAsync(() => { if (!Voice.IsCalling) { outputOpen = false; outputs = null; outputError = null; playbackSuspended = false; Release(); } StateHasChanged(); });
+    private void Changed() => _ = InvokeAsync(() => { if (!Voice.IsCalling) { outputOpen = false; outputs = null; outputError = null; playbackSuspended = false; debugVideo = false; videoDiagnostics = null; Release(); } StateHasChanged(); });
     private void Release(){ canvases.Clear(); attached.Clear(); previewAttached = null; opened = null; }
     // Ringing counts: the output picker is usable before the call connects, so it must refresh then too.
-    private async Task Tick(){ try { while(!lifetime.IsCancellationRequested){await Task.Delay(1000,lifetime.Token);if(Voice.IsCalling)await InvokeAsync(async () => { if (outputOpen && !outputBusy) await RefreshOutputsAsync(); await CheckPlaybackAsync(); StateHasChanged(); });} }catch(OperationCanceledException){} }
+    private async Task Tick(){ try { while(!lifetime.IsCancellationRequested){await Task.Delay(1000,lifetime.Token);if(Voice.IsCalling)await InvokeAsync(async () => { if (outputOpen && !outputBusy) await RefreshOutputsAsync(); await CheckPlaybackAsync(); await RefreshDiagnosticsAsync(); StateHasChanged(); });} }catch(OperationCanceledException){} }
     private async Task ToggleOutputAsync() { outputOpen = !outputOpen; if (outputOpen) { outputError = null; await RefreshOutputsAsync(); await RefreshCamerasAsync(); } }
     private async Task RefreshOutputsAsync()
     {
@@ -201,5 +227,9 @@
     }
     private void Minimize(){Voice.Minimized=true;}
     private void Expand(){Voice.Minimized=false;}
-    public ValueTask DisposeAsync(){Voice.Changed-=Changed;lifetime.Cancel();lifetime.Dispose();return ValueTask.CompletedTask;}
+    public async ValueTask DisposeAsync()
+    {
+        Voice.Changed -= Changed; lifetime.Cancel(); lifetime.Dispose();
+        if (debugVideo) { try { await Voice.GetVideoDiagnosticsAsync(false); } catch { } }
+    }
 }

@@ -67,6 +67,8 @@ public sealed partial class VoiceState
     /// <summary>What the send ladder settled on, for the quality readout. Null while nothing is sent.</summary>
     public VideoTier? VideoQuality { get; private set; }
     public double? MeasuredVideoFps => active?.Media?.MeasuredVideoFps;
+    public async ValueTask<VideoDiagnostics?> GetVideoDiagnosticsAsync(bool enabled)
+        => active?.Media is { } media ? await media.GetVideoDiagnosticsAsync(enabled) : null;
     public string VideoCodecName => active is { Codec: not VideoCodec.None } attempt
         ? VideoCodecLadder.Name(attempt.Codec).ToUpperInvariant() : "";
 

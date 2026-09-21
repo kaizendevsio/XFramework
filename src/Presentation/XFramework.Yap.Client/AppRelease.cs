@@ -2,10 +2,12 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.61";
+    public const string Version = "1.3.62";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "22 September 2026", [
+            "Video calls have an optional on-screen diagnostics panel with measured frame rates, codec preferences and queue timings."]),
+        ("1.3.61", "22 September 2026", [
             "Update downloads are visible and can be retried without clearing your saved data.",
             "Video defaults to 1440p at 60 fps, shows measured sending fps, and keeps the full camera frame visible."]),
         ("1.3.60", "21 September 2026", [
