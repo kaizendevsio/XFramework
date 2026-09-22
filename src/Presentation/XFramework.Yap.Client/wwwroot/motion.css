@@ -2,7 +2,7 @@
 html[data-nav-direction=back]{--motion-enter:-32px;--motion-exit:18px}
 /* Capture the opaque phone backdrop with the UI. A transparent screen capture
    lets sharp underlying content show through backdrop-filtered glass in Chromium. */
-.screen{view-transition-name:yap-screen}
+.screen{view-transition-name:yap-screen;background:var(--surface)}
 .shell-tabs{view-transition-name:yap-tabs}
 ::view-transition-group(yap-tabs),::view-transition-old(yap-tabs),::view-transition-new(yap-tabs){animation:none;mix-blend-mode:normal}
 ::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
