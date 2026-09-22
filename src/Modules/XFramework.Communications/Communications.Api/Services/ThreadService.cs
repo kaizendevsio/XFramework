@@ -1884,7 +1884,7 @@ public sealed partial class ThreadService(
 
             var caller = callerResult.Data!;
             var queryText = request.Query.Trim();
-            if (queryText.Length == 0)
+            if (queryText.Length == 0 && !request.CallsOnly)
                 return Result<SearchMessagesResponse>.Failure("Search query is required", 400);
 
             var memberships = await dataContext.Query<MessageThreadMember>()
@@ -1920,6 +1920,13 @@ public sealed partial class ThreadService(
                 .Where(m => m.TenantId == caller.TenantId)
                 .Where(m => !m.IsDeleted && m.IsEnabled)
                 .Where(m => m.Text.ToLower().Contains(normalizedQuery));
+            if (request.CallsOnly)
+            {
+                var activeThreads = (await dataContext.Query<MessageThread>()
+                    .Where(t => t.TenantId == caller.TenantId && allowedThreadIds.Contains(t.Id) && !t.IsDeleted && t.IsEnabled)
+                    .ToListAsync(ct)).Select(t => t.Id).ToList();
+                baseQuery = baseQuery.Where(m => m.TemplateType == CallSummaryType && activeThreads.Contains(m.MessageThreadId));
+            }
             if (blockedSenderMemberIds.Count > 0)
                 baseQuery = baseQuery.Where(m => !blockedSenderMemberIds.Contains(m.MessageThreadMemberId));
             if (hiddenMessageIds.Count > 0)
@@ -1928,6 +1935,7 @@ public sealed partial class ThreadService(
             var totalCount = await baseQuery.CountAsync(ct);
             var messages = await baseQuery
                 .OrderByDescending(m => m.CreatedAt)
+                .ThenByDescending(m => m.Id)
                 .Skip(pageIndex * pageSize)
                 .Take(pageSize)
                 .ToListAsync(ct);
@@ -1940,13 +1948,26 @@ public sealed partial class ThreadService(
 
             var memberMap = members.ToDictionary(m => m.Id);
 
+            var pageThreads = messages.Select(x => x.MessageThreadId).Distinct().ToList();
+            var callThreads = request.CallsOnly ? (await dataContext.Query<MessageThread>()
+                .Where(t => t.TenantId == caller.TenantId && pageThreads.Contains(t.Id))
+                .ToListAsync(ct)).ToDictionary(t => t.Id) : new Dictionary<Guid, MessageThread>();
+            var directs = request.CallsOnly ? (await dataContext.Query<MessageDirectThread>()
+                .Where(t => t.TenantId == caller.TenantId && pageThreads.Contains(t.MessageThreadId) && !t.IsDeleted && t.IsEnabled)
+                .ToListAsync(ct)).ToDictionary(t => t.MessageThreadId) : new Dictionary<Guid, MessageDirectThread>();
             return Result<SearchMessagesResponse>.Success(new SearchMessagesResponse
             {
                 Items = messages.Select(message =>
                 {
                     memberMap.TryGetValue(message.MessageThreadMemberId, out var sender);
+                    callThreads.TryGetValue(message.MessageThreadId, out var callThread);
+                    directs.TryGetValue(message.MessageThreadId, out var direct);
                     return new SearchMessageItemResponse
                     {
+                        ThreadName = callThread?.Name ?? string.Empty,
+                        HasCustomName = callThread?.HasCustomName ?? false,
+                        IsDirect = direct is not null,
+                        OtherCredentialId = direct is null ? null : direct.FirstCredentialId == caller.CredentialId ? direct.SecondCredentialId : direct.FirstCredentialId,
                         ThreadId = message.MessageThreadId,
                         MessageId = message.Id,
                         SenderCredentialId = sender?.CredentialId ?? Guid.Empty,

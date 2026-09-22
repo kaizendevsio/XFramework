@@ -45,6 +45,7 @@ public interface ICommunicationsChatClient
 
 public interface ICommunicationsChatSession
 {
+    Task<QueryResponse<SearchMessagesResponse>> GetCallHistoryAsync(int pageIndex = 0, CancellationToken ct = default);
     Task<QueryResponse<StorageDownloadUrlResponse>> GetThreadPhotoDownloadUrlAsync(Guid threadId, CancellationToken ct = default);
     Task<QueryResponse<StorageUploadSessionResponse>> CreateAttachmentUploadAsync(CreateChatAttachmentUploadRequest request, CancellationToken ct = default);
     Task<QueryResponse<StorageDownloadUrlResponse>> GetAttachmentDownloadUrlAsync(Guid threadId, Guid messageId, Guid fileId, CancellationToken ct = default);
@@ -407,6 +408,10 @@ internal sealed class CommunicationsChatSession(
     public Task<QueryResponse<GetThreadMessagesResponse>> GetMessageProjectionsAsync(Guid threadId, List<Guid> messageIds, CancellationToken ct = default) =>
         InvokeAsync(callCt => wrapper.GetThreadMessagesAsync(Prepare(new GetThreadMessagesRequest
         { ThreadId = threadId, MessageIds = messageIds.ToArray(), PageSize = 50, SuppressDeliveryAcknowledgement = true }), callCt), ct);
+
+    public Task<QueryResponse<SearchMessagesResponse>> GetCallHistoryAsync(int pageIndex = 0, CancellationToken ct = default) =>
+        InvokeAsync(callCt => wrapper.SearchMessagesAsync(Prepare(new SearchMessagesRequest
+        { CallsOnly = true, PageIndex = pageIndex, PageSize = 30 }), callCt), ct);
 
     public Task<QueryResponse<SearchMessagesResponse>> SearchMessagesAsync(
         string query,

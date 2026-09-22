@@ -36,9 +36,11 @@ public sealed partial class ThreadServiceSecurityTests
 {
     private static readonly AsyncLocal<TrustedInvocationContext?> TrustedContext = new();
 
-    [TestCase(false, "Missed voice call")]
-    [TestCase(true, "Voice call \u00b7 2:05")]
-    public async Task RecordCall_StoresOneOutcomeInEncryptedThread(bool connected, string expected)
+    [TestCase(false, false, "Missed voice call")]
+    [TestCase(false, true, "Missed video call")]
+    [TestCase(true, false, "Voice call \u00b7 2:05")]
+    [TestCase(true, true, "Video call \u00b7 2:05")]
+    public async Task RecordCall_StoresOneOutcomeInEncryptedThread(bool connected, bool video, string expected)
     {
         var tenant = Guid.NewGuid(); var actor = Guid.NewGuid(); var thread = Guid.NewGuid();
         var member = Member(Guid.NewGuid(), thread, actor, tenant);
@@ -48,7 +50,7 @@ public sealed partial class ThreadServiceSecurityTests
         TrustedContext.Value = new FakeTrustedServiceInvocationResolver(tenant, serviceName: XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceNames.Yap).Current;
         var end = DateTimeOffset.UtcNow;
         var request = new RecordCallRequest { CallId = Guid.NewGuid(), ThreadId = thread, CallerId = actor,
-            ConnectedAt = connected ? end.AddSeconds(-125) : null, EndedAt = end,
+            ConnectedAt = connected ? end.AddSeconds(-125) : null, EndedAt = end, Video = video,
             Metadata = new() { RequestedTenantId = tenant } };
         var first = await service.RecordCallAsync(request);
         Assert.That(first.IsSuccess, Is.True, first.Message);

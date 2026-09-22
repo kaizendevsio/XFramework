@@ -28,6 +28,7 @@ public sealed partial class ChatState
             // The identity and backup are already committed. Cleanup is retryable after a crash.
             var files = await store.EncryptionResetFilesAsync(Scope);
             await js.InvokeVoidAsync("yap.device.clearAccountFiles", Scope, files);
+            callHistoryVersion++;
             await store.ClearEncryptionHistoryAsync(Scope);
             Selected = null; Conversations = []; PendingCount = 0;
             await Encryption.AcknowledgeResetAsync(User);

@@ -2,10 +2,15 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.62";
+    public const string Version = "1.3.63";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "22 September 2026", [
+            "Video decoding prefers hardware, with a software recovery path up to 1440p.",
+            "A new Calls tab and call cards make it easy to return voice and video calls.",
+            "Navigation stays in place between pages, favorites have larger avatars, and the inbox opens before background loading finishes.",
+            "Install Yap from the browser with a prompt or guided home-screen instructions."]),
+        ("1.3.62", "22 September 2026", [
             "Video calls have an optional on-screen diagnostics panel with measured frame rates, codec preferences and queue timings."]),
         ("1.3.61", "22 September 2026", [
             "Update downloads are visible and can be retried without clearing your saved data.",

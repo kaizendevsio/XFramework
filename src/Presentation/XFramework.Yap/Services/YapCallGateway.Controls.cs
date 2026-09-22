@@ -75,6 +75,7 @@ public sealed partial class YapCallGateway
             if (video && room.Members.Count(x => x.Value.Video && !x.Value.Left && x.Key != credential) >= MaxVideoSenders)
                 throw new YapApiException(409, "This call already has as many cameras as it can carry.");
             room.Members[credential].Video = video;
+            room.HadVideo |= video;
             PublishGroupLocked(room, "group-roster");
         }
     }

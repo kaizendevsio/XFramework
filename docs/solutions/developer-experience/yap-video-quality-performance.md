@@ -130,6 +130,12 @@ Both runs reported zero sender queue drops and no thrown errors. The 1440p/60 ha
 Validation: 179 browser-JS/unit tests, 92 targeted Bolt tests, 245 Yap client tests and 201 Yap gateway tests passed. A Chromium layout fixture verified canvas bounds, visible controls, and contain fitting for both views. iOS-to-Android freeze resolution is not yet confirmed.
 
 
+## 1.3.63 - hardware preference and software recovery through 1440p
+
+Incoming streams now configure `prefer-hardware` first. A rejected configuration or asynchronous hardware decoder error falls back to `no-preference` for that stream; stale errors from replaced decoders are ignored. These are browser hints, not confirmation of a GPU or hardware codec.
+
+The H264 decoder fallback now permits pictures up to 2560 x 1440 pixels, including portrait orientation and the 1440 x 1920 camera format. It still requires 12 consecutive submission-to-output delays above 100 ms, probes software support, requests a fresh keyframe, and tries software only once per remote stream. Sustained delay on software or growth beyond the pixel limit returns to the native/default path. Larger pictures, brief stalls and unsupported software configurations retain native/default decoding. This extends eligibility; it does not force software decoding, change requested camera quality, or guarantee 60 fps. Physical phone verification remains necessary.
+
 ## 1.3.62 - on-screen video diagnostics
 
 During a video call, Settings > Show video diagnostics opens an opt-in panel. Hide switches it off; it also resets when the call ends. The existing one-second call UI tick samples only while the video screen is expanded. This is a compact overlay inside Yap's existing custom call surface, using its existing switch control rather than introducing a separate dialog or data grid.

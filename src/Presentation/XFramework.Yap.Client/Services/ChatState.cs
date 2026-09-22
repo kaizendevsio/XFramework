@@ -59,6 +59,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         .Select(x => Selected?.People.FirstOrDefault(p => p.Id == x.Key) ?? new Person(x.Key, "Someone", "")).ToList();
     public UserSession? User { get; private set; }
     public bool Ready { get; private set; }
+    public bool LoadingConversations { get; private set; }
     public bool Online { get; private set; } = true;
     public bool NeedsLogin { get; private set; }
     public bool Busy { get; private set; }
@@ -123,15 +124,36 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         await js.InvokeVoidAsync("yap.diagnostics.record", "startup.stage", new { phase = "saved-account" });
         var saved = await store.SettingAsync("user");
         if (saved is not null) User = JsonSerializer.Deserialize<UserSession>(saved);
-        await js.InvokeVoidAsync("yap.diagnostics.record", "startup.stage", new { phase = "saved-conversations" });
-        if (User is not null) { Conversations = await store.ConversationsAsync(Scope); await LoadDeliveredAsync(); }
         Online = await js.InvokeAsync<bool>("yap.device.online");
         reference = DotNetObjectReference.Create(this);
         await js.InvokeVoidAsync("yap.device.watch", reference);
+        LoadingConversations = User is not null;
         Ready = true;
         Notify();
         // Opening cached conversations must not wait for network sync or key registration.
-        polling = SynchronizeAndPollAsync();
+        polling = RestoreAndSynchronizeAsync();
+    }
+
+    private async Task RestoreAndSynchronizeAsync()
+    {
+        // Ready has already notified the UI. The browser SQLite read and network work run behind it.
+        var scope = Scope;
+        var initialConversations = Conversations;
+        try
+        {
+            if (User is not null)
+            {
+                await js.InvokeVoidAsync("yap.diagnostics.record", "startup.stage", new { phase = "saved-conversations" });
+                var saved = await store.ConversationsAsync(scope, lifetime.Token);
+                if (Scope == scope && ReferenceEquals(Conversations, initialConversations) && Conversations.Count == 0)
+                    Conversations = saved;
+                if (Scope == scope) await LoadDeliveredAsync();
+            }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+        catch (Exception ex) { Report(ex); }
+        finally { LoadingConversations = false; Notify(); }
+        await SynchronizeAndPollAsync();
     }
 
     private async Task SynchronizeAndPollAsync()
@@ -687,6 +709,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
 
     private async Task ForgetDeletedConversationAsync(Guid thread)
     {
+        callHistoryVersion++;
         foreach (var item in (await store.PendingAsync(Scope)).Where(x => x.ThreadId == thread && x.FileKey is not null))
             await js.InvokeVoidAsync("yap.device.removeFile", item.FileKey);
         await store.RemoveConversationAsync(Scope, thread, lifetime.Token, discardPending: true);
@@ -711,6 +734,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
                 if ((await store.PendingAsync(Scope)).Any(x => x.ThreadId == thread))
                     throw new InvalidOperationException("Wait for this conversation's messages to finish sending before removing it.");
                 await api.PostAsync("api/chat/thread-actions", new ThreadAction(thread, everyone ? "delete-for-everyone" : "delete-for-me", true));
+                callHistoryVersion++;
                 await store.RemoveConversationAsync(Scope, thread, lifetime.Token);
                 Conversations.RemoveAll(x => x.Id == thread);
                 if (Selected?.Id == thread) { Selected = null; typing.Clear(); await WatchEventsAsync(); }
@@ -1149,6 +1173,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             await js.InvokeVoidAsync("yap.encryption.passwordClear");
             Encryption.Reset(); EncryptionEnabled = false;
             await store.SetSettingAsync("pendingLogout", "true");
+            callHistoryVersion++;
             await store.ClearPrivateAsync();
             User = null; Selected = null; Conversations = []; Defaults = null; PendingCount = 0; NeedsLogin = false;
             messageUpdates.Clear(); deliveredPending.Clear();

@@ -30,13 +30,14 @@ public sealed partial class ThreadService
             return Result.Failure("Conversation not found", 404);
 
         var duration = request.ConnectedAt is { } connected ? (int)(request.EndedAt - connected).TotalSeconds : 0;
-        var text = request.ConnectedAt is null ? "Missed voice call"
-            : $"Voice call · {duration / 60}:{duration % 60:00}";
+        var kind = request.Video ? "video" : "voice";
+        var text = request.ConnectedAt is null ? $"Missed {kind} call"
+            : $"{(request.Video ? "Video" : "Voice")} call · {duration / 60}:{duration % 60:00}";
         dataContext.Add(new Message
         {
             Id = request.CallId, TenantId = tenant, MessageThreadId = request.ThreadId,
             MessageThreadMemberId = member.Id, Text = text, TemplateType = CallSummaryType,
-            TemplateVariablesJson = System.Text.Json.JsonSerializer.Serialize(new { request.ConnectedAt, request.EndedAt }),
+            TemplateVariablesJson = System.Text.Json.JsonSerializer.Serialize(new { request.ConnectedAt, request.EndedAt, request.Video }),
             CreatedAt = request.EndedAt.UtcDateTime, IsEnabled = true, ConcurrencyStamp = Guid.NewGuid()
         });
         AddOutboxEvent(MessageRealtimeEvents.MessageCreated, tenant, request.ThreadId, request.CallId,

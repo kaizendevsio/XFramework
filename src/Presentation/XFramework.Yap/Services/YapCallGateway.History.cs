@@ -11,12 +11,12 @@ public sealed partial class YapCallGateway
 
     // The call ID is also the message ID. Retries and competing socket/leave callbacks
     // therefore create exactly one history entry in Communications.
-    private void QueueCallHistory(Guid tenant, Guid thread, Guid call, Guid caller, DateTimeOffset? connected)
+    private void QueueCallHistory(Guid tenant, Guid thread, Guid call, Guid caller, DateTimeOffset? connected, bool video = false)
     {
         pendingHistory.TryAdd(call, new RecordCallRequest
         {
             CallId = call, ThreadId = thread, CallerId = caller,
-            ConnectedAt = connected, EndedAt = DateTimeOffset.UtcNow, Metadata = YapPush.Metadata(tenant)
+            ConnectedAt = connected, EndedAt = DateTimeOffset.UtcNow, Video = video, Metadata = YapPush.Metadata(tenant)
         });
         _ = Task.Run(FlushCallHistoryAsync);
     }
@@ -46,6 +46,6 @@ public sealed partial class YapCallGateway
     private void RemoveGroupLocked(GroupRoom room)
     {
         if (groups.Remove(room.Id))
-            QueueCallHistory(room.Tenant, room.Thread, room.Id, room.Caller, room.ConnectedAt);
+            QueueCallHistory(room.Tenant, room.Thread, room.Id, room.Caller, room.ConnectedAt, room.VideoRequested || room.HadVideo);
     }
 }

@@ -80,6 +80,8 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         await db.Conversations.Where(x => x.Scope == scope && x.Id == thread).ExecuteDeleteAsync(ct);
         await db.Messages.Where(x => x.Scope == scope && x.ThreadId == thread).ExecuteDeleteAsync(ct);
+        var callPrefix = $"calls:{scope}:";
+        await db.Settings.Where(x => x.Key.StartsWith(callPrefix)).ExecuteDeleteAsync(ct); // culture-ok: SQL prefix filter
         if (discardPending) await db.Outbox.Where(x => x.Scope == scope && x.ThreadId == thread).ExecuteDeleteAsync(ct);
         var prefix = thread.ToString("N") + ":";
         await db.Drafts.Where(x => x.Scope == scope && x.Key.StartsWith(prefix)).ExecuteDeleteAsync(ct); // culture-ok: an expression tree EF turns into SQL LIKE, never a .NET comparison
@@ -237,6 +239,8 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         await using var transaction = await db.Database.BeginTransactionAsync();
         await db.Outbox.Where(x => x.Scope == scope).ExecuteDeleteAsync();
         await db.Messages.Where(x => x.Scope == scope).ExecuteDeleteAsync();
+        var callPrefix = $"calls:{scope}:";
+        await db.Settings.Where(x => x.Key.StartsWith(callPrefix)).ExecuteDeleteAsync(); // culture-ok: SQL prefix filter
         foreach (var row in await db.Conversations.Where(x => x.Scope == scope).ToListAsync())
         {
             var conversation = JsonSerializer.Deserialize<Conversation>(row.Json, Json)!;
@@ -258,7 +262,7 @@ public sealed class OfflineStore(IDbContextFactory<OfflineDatabase> factory)
         await db.Conversations.ExecuteDeleteAsync(ct);
         await db.Drafts.ExecuteDeleteAsync(ct);
         await db.Attachments.ExecuteDeleteAsync(ct);
-        await db.Settings.Where(x => x.Key == "user").ExecuteDeleteAsync(ct);
+        await db.Settings.Where(x => x.Key == "user" || x.Key.StartsWith("calls:")).ExecuteDeleteAsync(ct); // culture-ok: SQL prefix filter
         await transaction.CommitAsync(ct);
         return true;
     }, ct);
