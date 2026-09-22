@@ -1,0 +1,24 @@
+@inject ChatState State
+@inject VoiceState Voice
+@inject BrowserTime Times
+<article class="call-card" data-message-id="@Message.Id">
+    <div class="call-card-summary"><Icon Name="@(Video ? "video" : "phone")" Size="22" /><span>@CallHistory.Label(Message)<small>@Times.DayMonth(Message.CreatedAt) · @Times.Clock(Message.CreatedAt)</small></span></div>
+    <button class="call-back" disabled="@(calling || Voice.IsCalling || !State.Online || !State.SessionReady)" @onclick="CallAsync"><Icon Name="@(Video ? "video" : "phone")" Size="18" />@(Video ? "Video call back" : "Call back")</button>
+</article>
+@code {
+    [Parameter, EditorRequired] public ChatMessage Message { get; set; } = default!;
+    private bool Video => CallHistory.IsVideo(Message);
+    private bool calling;
+    private async Task CallAsync()
+    {
+        calling = true;
+        try
+        {
+            await Voice.InitializeAsync();
+            var conversation = await State.ConversationDetailsAsync(Message.ThreadId);
+            await Voice.StartGroupAsync(conversation.Id, conversation.Name, conversation.People, Video);
+        }
+        catch(Exception ex) { State.Report(ex); }
+        finally { calling = false; }
+    }
+}

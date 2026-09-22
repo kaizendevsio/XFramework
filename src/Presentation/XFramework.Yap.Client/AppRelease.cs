@@ -6,7 +6,10 @@ public static class AppRelease
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "22 September 2026", [
-            "1440p video calls can recover from persistent decoder buffering using a software fallback."]),
+            "Video decoding prefers hardware, with a software recovery path up to 1440p.",
+            "A new Calls tab and call cards make it easy to return voice and video calls.",
+            "Navigation stays in place between pages, favorites have larger avatars, and the inbox opens before background loading finishes.",
+            "Install Yap from the browser with a prompt or guided home-screen instructions."]),
         ("1.3.62", "22 September 2026", [
             "Video calls have an optional on-screen diagnostics panel with measured frame rates, codec preferences and queue timings."]),
         ("1.3.61", "22 September 2026", [

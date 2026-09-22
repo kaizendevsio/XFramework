@@ -126,6 +126,7 @@ public sealed class CommunicationsChatClientTests
                 EnsureChatDefaultsRequest or GetChatReferenceDataRequest => Task.FromResult(new QueryResponse<ChatReferenceDataResponse>()),
                 GetMessageReactionsRequest => Task.FromResult(new QueryResponse<PaginatedResult<MessageReactionResponse>>()),
                 GetThreadMessagesRequest => Task.FromResult(new QueryResponse<GetThreadMessagesResponse>()),
+                SearchMessagesRequest => Task.FromResult(new QueryResponse<SearchMessagesResponse>()),
                 MarkMessagesDeliveredRequest => Task.FromResult(new CmdResponse()),
                 CreateChatAttachmentUploadRequest => Task.FromResult(new QueryResponse<StorageUploadSessionResponse>()),
                 GetChatAttachmentDownloadUrlRequest => Task.FromResult(new QueryResponse<StorageDownloadUrlResponse>()),
@@ -139,6 +140,9 @@ public sealed class CommunicationsChatClientTests
         await session.GetChatReferenceDataAsync(cancellation.Token);
         await session.GetReactionsAsync(thread, message, 2, 10, cancellation.Token);
         await session.GetRepliesAsync(thread, message, 3, 20, cancellation.Token);
+        await session.GetCallHistoryAsync(2, cancellation.Token);
+        var history = requests.OfType<SearchMessagesRequest>().Single();
+        Assert.That((history.CallsOnly, history.PageIndex, history.PageSize, history.Query), Is.EqualTo((true, 2, 30, "")));
         await session.CreateAttachmentUploadAsync(new CreateChatAttachmentUploadRequest
             { ThreadId = thread, FileName = "report.txt", ContentType = "text/plain", TotalSizeBytes = 50 }, cancellation.Token);
         var file = Guid.NewGuid();

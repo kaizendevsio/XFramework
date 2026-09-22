@@ -749,7 +749,7 @@ class VideoPipeline {
                 receivedKbps: before && elapsed > 0 ? rate(remote.bytes, before.bytes) * 8 / 1000 : null,
                 decoderQueue: remote.decoder?.decodeQueueSize ?? 0, pendingFrames: remote.pending.size,
                 decoderDelayMs: renderedFps > 0 ? remote.decodeDelayMs : null,
-                acceleration: remote.software ? 'prefer-software' : 'no-preference', resets: remote.resets };
+                acceleration: remote.acceleration || 'no-preference', resets: remote.resets };
         });
         const encodedFps = rate(this.encodeCount, previous?.encode);
         const result = { capturing: this.captureRunning, strategy: this.strategy(), codec: this.config?.codec || this.codec,
@@ -905,19 +905,30 @@ class VideoPipeline {
         remote.primed = false;
         remote.pending.clear();
         remote.lateFrames = 0;
-        remote.decoder = new VideoDecoder({
+        remote.acceleration = remote.software ? 'prefer-software' : remote.hardwareFailed ? 'no-preference' : 'prefer-hardware';
+        const decoder = new VideoDecoder({
             output: (frame) => this._render(remote, frame),
             error: (error) => {
+                if (this.remotes.get(streamId) !== remote || remote.decoder !== decoder) return;
                 console.error('Bolt video decoder:', error);
                 // A decoder that errored is closed for good. Rebuild it and wait for the next
                 // keyframe; the C# side asks the sender for one rather than showing a frozen tile.
                 remote.software = false;
+                if (remote.acceleration === 'prefer-hardware') remote.hardwareFailed = true;
                 if (this.remotes.get(streamId) === remote) this._openDecoder(streamId, remote);
                 void this.hostRef?.invokeMethodAsync('OnVideoDecodeFailed', streamId);
             }
         });
-        remote.decoder.configure({ codec: remote.bitstreamCodec || videoCodecString(remote.codec, 1080), hardwareAcceleration: remote.software ? 'prefer-software' : 'no-preference',
-            optimizeForLatency: true });
+        remote.decoder = decoder;
+        try {
+            remote.decoder.configure({ codec: remote.bitstreamCodec || videoCodecString(remote.codec, 1080),
+                hardwareAcceleration: remote.acceleration, optimizeForLatency: true });
+        } catch (error) {
+            if (remote.acceleration !== 'prefer-hardware') throw error;
+            remote.decoder.close();
+            remote.hardwareFailed = true;
+            this._openDecoder(streamId, remote);
+        }
     }
 
     removeRemote(streamId) {

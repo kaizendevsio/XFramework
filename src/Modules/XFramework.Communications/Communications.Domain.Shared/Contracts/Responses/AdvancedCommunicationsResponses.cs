@@ -31,6 +31,10 @@ public partial record SearchMessageItemResponse
     public Guid SenderCredentialId { get; set; }
     public string Text { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
+    public string ThreadName { get; set; } = string.Empty;
+    public Guid? OtherCredentialId { get; set; }
+    public bool IsDirect { get; set; }
+    public bool HasCustomName { get; set; }
 }
 
 [MemoryPackable]

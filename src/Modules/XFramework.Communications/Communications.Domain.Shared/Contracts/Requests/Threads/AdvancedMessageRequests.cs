@@ -47,6 +47,7 @@ public partial record SearchMessagesRequest : RequestBase,
     public Guid? ThreadId { get; set; }
     public int PageIndex { get; set; }
     public int PageSize { get; set; } = 20;
+    public bool CallsOnly { get; set; }
 }
 
 [MemoryPackable]

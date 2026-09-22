@@ -1,0 +1,37 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject VoiceState Voice
+@if (show && !Voice.IsCalling && !status.Installed)
+{
+    <BottomSheet Title="Install Yap" OnClose="DismissAsync"><div class="picker install-guide">
+        <p>Keep Yap on your home screen for quicker access to your conversations.</p>
+        @if (status.Native) { <button class="btn" @onclick="InstallAsync">Install Yap</button> }
+        else if (status.Platform == "ios") { <p>In Safari, tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>, and tap <strong>Add</strong>. If needed, first open this page in Safari.</p> }
+        else { <p>Open your browser menu and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>. Availability depends on your browser.</p> }
+        <button class="btn ghost" @onclick="DismissAsync">Not now</button>
+    </div></BottomSheet>
+}
+@code {
+    public sealed record InstallStatus(bool Installed, string Platform, bool Native, bool Dismissed);
+    private InstallStatus status = new(false, "other", false, true);
+    private DotNetObjectReference<InstallPrompt>? reference;
+    private bool show;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        reference = DotNetObjectReference.Create(this);
+        await InstallChanged(await JS.InvokeAsync<InstallStatus>("yap.installSupport.watch", reference));
+    }
+    [JSInvokable] public Task InstallChanged(InstallStatus value) => InvokeAsync(() =>
+    {
+        status = value;
+        if (value.Installed) show = false;
+        else if (!value.Dismissed && (value.Platform is "ios" or "android" || value.Native) && Nav.ToBaseRelativePath(Nav.Uri) == "") show = true;
+        StateHasChanged();
+    });
+    [JSInvokable] public Task OpenInstall(InstallStatus value) => InvokeAsync(() => { status = value; show = !value.Installed; StateHasChanged(); });
+    private async Task DismissAsync() { show = false; await JS.InvokeVoidAsync("yap.installSupport.dismiss"); }
+    private async Task InstallAsync() { await JS.InvokeVoidAsync("yap.device.install"); await DismissAsync(); }
+    public async ValueTask DisposeAsync() { try { await JS.InvokeVoidAsync("yap.installSupport.unwatch"); } catch(JSDisconnectedException) {} reference?.Dispose(); }
+}

@@ -1,0 +1,17 @@
+# Yap call history, installation and early inbox rendering
+
+Yap 1.3.63 keeps the bottom navigation in `MainLayout`, beside `.screen`. Only `.screen` participates in the sliding page transition; `yap-tabs` has no transition animation. Inbox, Calls, Saved and Settings reserve scrolling space for the floating navigation. Favorites use the existing Avatar component in a centered grid, with names beneath.
+
+The Calls tab uses actor-bound Communications message search with `CallsOnly=true`. The service filters on the trusted `CallSummary` template, current tenant, active membership, enabled conversation, hidden messages and blocked senders before counting and paging. Ordinary message text cannot become a call record. Results include conversation context without requiring a detail request per row. Call cards use the existing encrypted group call path for callbacks.
+
+The gateway records video intent and whether any participant ever enabled a camera. Turning the camera off before leaving preserves that history. The trusted history writer persists `Video` with the outcome and emits voice/video labels. Older records retain their original labels: past video calls that were recorded as voice cannot be reliably reclassified. No database migration or encryption-key change is needed.
+
+Calls pages are cached under the account scope for offline viewing. Deleting a conversation, resetting local encryption history or logging out clears those pages. A response racing with deletion or logout cannot repopulate the cache. Offline and unbound sessions cannot start callbacks.
+
+Installation reuses Yap's existing BottomSheet. Supporting Android browsers can offer their native prompt after `beforeinstallprompt`; iOS receives Share / Add to Home Screen instructions. Installed apps suppress the suggestion and dismissal pauses automatic suggestions for seven days. Settings can reopen the guide. See [browser installation guidance](https://web.dev/learn/pwa/installation) and [Apple's home-screen instructions](https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/ios).
+
+Startup still requires usable device storage and restoration of the saved account. It then announces `Ready`, rendering the inbox shell before reading cached conversations or restoring receipt state. Network synchronization, key registration and preview decryption continue behind the UI. Cached conversation restoration cannot replace a newer inbox or a different account. This removes work from the splash path; it does not claim a faster cryptographic operation or a measured phone boot-time improvement.
+
+These surfaces extend Yap's existing custom mobile components rather than introducing Portal's Blueprint dependency into the small WASM client. Call history is a mobile card list, not a data table.
+
+Regression coverage includes call type at hang-up, trusted record writing, history access and pagination, account-scoped cache cleanup, early readiness while storage is blocked, native-install availability, dismissal, and the rendered shell/card structure. Desktop mobile-sized rendering verifies layout; physical iOS/Android installation and hardware decoder selection still depend on each browser.

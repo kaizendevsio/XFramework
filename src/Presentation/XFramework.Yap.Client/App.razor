@@ -1,3 +1,4 @@
+@implements IDisposable
 @inject DatabaseStartup Startup
 @inject NavigationManager Nav
 @inject ChatState State
@@ -32,7 +33,14 @@ else
     private string? failure;
     private bool waitingForDatabase;
     private string startupText = "Opening device storage…";
-    protected override Task OnInitializedAsync() => StartAsync();
+    protected override Task OnInitializedAsync() { State.Changed += Changed; return StartAsync(); }
+    private void Changed()
+    {
+        if (!State.Ready) return;
+        State.Changed -= Changed;
+        _ = InvokeAsync(StateHasChanged);
+    }
+    public void Dispose() => State.Changed -= Changed;
     private async Task StartAsync()
     {
         failure = null;

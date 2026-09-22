@@ -9,4 +9,5 @@ public partial record RecordCallRequest : RequestBase, ICommand<CmdResponse>, IB
     public Guid CallerId { get; set; }
     public DateTimeOffset? ConnectedAt { get; set; }
     public DateTimeOffset EndedAt { get; set; }
+    public bool Video { get; set; }
 }

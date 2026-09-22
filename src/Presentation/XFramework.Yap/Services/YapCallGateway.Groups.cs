@@ -303,6 +303,7 @@ public sealed partial class YapCallGateway
         public Dictionary<Guid, GroupMember> Members { get; } = [];
         public Dictionary<(Guid Sender, Guid Recipient, string Kind), YapGroupControlEvent> Controls { get; } = [];
         public bool VideoRequested;
+        public bool HadVideo;
         public bool Started;
         public DateTimeOffset? ConnectedAt;
     }

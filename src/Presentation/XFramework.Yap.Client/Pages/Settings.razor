@@ -107,8 +107,8 @@
         }
         @if (!installed)
         {
-            <button type="button" class="set-row set-action" disabled="@(!canInstall)" @onclick="InstallAsync">
-                <span class="set-key"><Icon Name="download" Size="19" /><span class="set-label">Install Yap<small>@(canInstall ? "Add Yap to your home screen" : "In Safari, use Share, then Add to Home Screen")</small></span></span>
+            <button type="button" class="set-row set-action" @onclick="InstallAsync">
+                <span class="set-key"><Icon Name="download" Size="19" /><span class="set-label">Install Yap<small>Add Yap to your home screen</small></span></span>
             </button>
         }
         <button type="button" class="set-row set-action" @onclick="() => gestures = !gestures" aria-expanded="@gestures.ToString().ToLowerInvariant()">
@@ -161,7 +161,6 @@
     }
 </div>
 </ChildContent>
-<Footer>@if (Section is null) { <TabBar Current="settings" /> }</Footer>
 </ScrollSurface>
 @if (signOut)
 {
@@ -237,7 +236,7 @@
 
     private async Task InstallAsync()
     {
-        await JS.InvokeVoidAsync("yap.device.install");
+        await JS.InvokeVoidAsync("yap.installSupport.open");
         canInstall = await JS.InvokeAsync<bool>("yap.device.canInstall");
     }
 

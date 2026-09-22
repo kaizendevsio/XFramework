@@ -10,7 +10,7 @@
 html,body{height:100%;min-height:0;overflow:hidden;overscroll-behavior:none;touch-action:pan-x pan-y}
 body{display:block;padding:0;margin:0;background:var(--surface)}
 #app{display:block;height:100%;min-height:0}
-.app-shell{position:fixed;left:0;right:0;top:var(--viewport-top,0px);bottom:0;height:auto;padding:var(--safe-top) env(safe-area-inset-right,0px) 0 env(safe-area-inset-left,0px);display:flex;flex-direction:column;background:var(--surface);overflow:hidden;view-transition-name:yap-screen}
+.app-shell{position:fixed;left:0;right:0;top:var(--viewport-top,0px);bottom:0;height:auto;padding:var(--safe-top) env(safe-area-inset-right,0px) 0 env(safe-area-inset-left,0px);display:flex;flex-direction:column;background:var(--surface);overflow:hidden;view-transition-name:none}
 .screen{min-height:0;flex:1;overflow:hidden}
 .app-shell{background:var(--surface)}
 .scroll-surface{height:100%;min-height:0}
@@ -240,3 +240,20 @@ button,a,label,nav,.avatar,.appbar,.bottomnav{-webkit-user-select:none;user-sele
 .active-call{position:fixed;top:calc(8px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:200;display:flex;gap:8px;padding:10px 18px;border-radius:24px;background:var(--accent);color:var(--on-accent)}
 
 .message-date{display:flex;align-items:center;gap:12px;margin:20px 0 16px;color:var(--dim);font-size:12px;text-align:center}.message-date::before,.message-date::after{content:"";height:1px;flex:1;background:var(--border)}.message-date time{max-width:75%}.menu-message-time{display:block;text-align:center;color:var(--dim);font-size:12px;line-height:1.4;padding:0 12px}
+/* Top-level tabs belong to the shell, never to the moving page snapshot. */
+.shell-tabs{position:absolute;bottom:0;left:0;right:0;z-index:25;pointer-events:none}
+.shell-tabs .bottomnav{pointer-events:auto;max-width:calc(100vw - 24px)}
+.shell-tabs .bottomnav a{width:64px;flex:0 1 64px}
+.with-tabs .scroll-content>.body{padding-bottom:calc(88px + var(--chrome-bottom))}
+.favorite-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:16px;padding:10px 0 24px}
+.favorite-person{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;position:relative;padding:12px 4px}
+.favorite-person .avatar{width:76px;height:76px;font-size:25px}
+.favorite-person>span:not(.avatar):not(.badge){max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650}
+.favorite-person .badge{position:absolute;top:5px;right:12px}
+.favorite-grid .inbox-menu-trigger{top:0;right:0}
+.call-card{width:min(340px,100%);margin:12px auto;padding:16px;border-radius:20px;background:var(--surface2);border:1px solid var(--border2)}
+.call-card-summary{display:flex;align-items:center;gap:12px;font-weight:650}
+.call-card-summary span{min-width:0}.call-card small{display:block;color:var(--dim);font-size:12px;font-weight:400;margin-top:5px}
+.call-back{display:flex;gap:9px;align-items:center;justify-content:center;width:100%;min-height:44px;margin-top:14px;border-radius:12px;background:var(--surface3);color:var(--accent-ink);font-weight:650}
+.call-list-item{margin-bottom:22px}.call-person{display:flex;gap:12px;align-items:center}.call-list-item .call-card{width:100%}
+.inbox-skeleton{display:grid;gap:16px;padding:16px 0}.inbox-skeleton span{display:block;height:60px;border-radius:18px;background:var(--surface2)}

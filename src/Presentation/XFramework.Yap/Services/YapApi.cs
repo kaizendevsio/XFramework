@@ -170,6 +170,20 @@ public static class YapApi
                     mine ? "You" : person?.Name ?? "Workspace member", mine, person?.AvatarUrl);
             }).ToList(), data.TotalCount);
         });
+        api.MapGet("/calls/history", async (int? page, ICommunicationsChatClient client, IChatDirectory directory, CancellationToken ct) =>
+        {
+            var session = await client.ForCurrentActorAsync(ct: ct);
+            var data = Require(await session.GetCallHistoryAsync(Page(page), ct));
+            var ids = data.Items.Select(x => x.SenderCredentialId).Concat(data.Items.Where(x => x.OtherCredentialId.HasValue).Select(x => x.OtherCredentialId!.Value)).Distinct().ToArray();
+            var people = await directory.ResolveAsync(ids, ct);
+            return new ChatPage<CallHistoryItem>(data.Items.Select(x => new CallHistoryItem(new ApiMessage
+            {
+                Id = x.MessageId, ThreadId = x.ThreadId, SenderId = x.SenderCredentialId,
+                Text = x.Text, IsCallSummary = true, Mine = x.SenderCredentialId == session.CredentialId, CreatedAt = x.CreatedAt,
+                Sender = people.FirstOrDefault(p => p.Id == x.SenderCredentialId)?.Name ?? "Workspace member"
+            }, x.IsDirect && !x.HasCustomName ? people.FirstOrDefault(p => p.Id == x.OtherCredentialId)?.Name ?? "Direct message" : x.ThreadName,
+                !x.IsDirect, x.IsDirect ? people.FirstOrDefault(p => p.Id == x.OtherCredentialId)?.AvatarUrl : null)).ToList(), data.TotalCount);
+        });
         api.MapGet("/saved", async (int? page, ICommunicationsChatClient client, IChatDirectory directory, CancellationToken ct) =>
         {
             var session = await client.ForCurrentActorAsync(ct: ct);

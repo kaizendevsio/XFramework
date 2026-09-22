@@ -40,6 +40,19 @@ public sealed class YapCallGatewayTests
         Assert.That(room.Participants.All(x => !x.Video), Is.True);
     }
 
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    public async Task History_RemembersVideoIntentAndCameraUpgrade(bool requested, bool upgraded)
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        var room = await f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId], deviceId: f.AliceDevice, videoRequested: requested);
+        if (upgraded) { f.Gateway.VideoGroup(f.Alice, room.Id, true); f.Gateway.VideoGroup(f.Alice, room.Id, false); }
+        await f.Gateway.LeaveGroupAsync(f.Alice, room.Id);
+        Assert.That(await f.HistoryArrived.WaitAsync(TimeSpan.FromSeconds(5)), Is.True);
+        Assert.That(f.History.Single().Video, Is.EqualTo(requested || upgraded));
+    }
+
     [Test]
     public async Task HistoryFailure_DoesNotBlockHangupAndRetriesTheSameOutcome()
     {

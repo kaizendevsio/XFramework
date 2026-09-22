@@ -1,0 +1,57 @@
+@page "/calls"
+@implements IDisposable
+@inject ChatState State
+@inject VoiceState Voice
+<PageTitle>Calls · Yap</PageTitle>
+<ScrollSurface><Header><div class="appbar plain liquid-glass"><GlassLayer /><h1>Calls</h1><span class="sp"></span><a class="iconbtn" href="/new" aria-label="Start a conversation"><Icon Name="edit" /></a></div></Header>
+<ChildContent><div class="body calls-panel">
+@if (State.User is null) { <p class="empty">Sign in to see your calls.</p><a class="btn" href="/login">Sign in</a> }
+else if (loading && items.Count == 0) { <div class="inbox-skeleton" aria-label="Loading calls"><span></span><span></span><span></span></div> }
+else if (items.Count == 0) { <p class="empty">No calls yet. Start a call from a conversation.</p> }
+@if (!State.Online) { <p class="muted">Offline · showing saved call history</p> }
+@foreach (var item in items)
+{
+    <div class="call-list-item" @key="item.Message.Id"><a class="call-person" href="@($"/chat/{item.Message.ThreadId}?message={item.Message.Id}")"><Avatar Initials="@ChatMessage.InitialsFor(item.ConversationName)" ImageUrl="@item.AvatarUrl" Size="a48" /><strong>@item.ConversationName</strong></a><CallCard Message="item.Message" /></div>
+}
+@if (items.Count < total && State.Online) { <button class="btn ghost" disabled="@loading" @onclick="MoreAsync">Load more calls</button> }
+</div></ChildContent></ScrollSurface>
+@code {
+    private List<CallHistoryItem> items = [];
+    private int page, total;
+    private bool loading, live, wasCalling, disposed, reload;
+    private string scope = "", calls = "";
+    private string CallStamp => string.Join(',', State.Conversations.Where(c => c.LastMessage?.IsCallSummary == true).Select(c => c.LastMessage!.Id).Order());
+    protected override Task OnInitializedAsync()
+    { State.Changed += Changed; Voice.Changed += CallChanged; scope = State.Scope; calls = CallStamp; live = State.SessionReady && State.Online; wasCalling = Voice.IsCalling; return LoadAsync(true); }
+    private void Changed() => _ = InvokeAsync(async () =>
+    {
+        if (disposed) return;
+        var nowLive = State.SessionReady && State.Online;
+        var stamp = CallStamp;
+        var refresh = scope != State.Scope || (!live && nowLive) || calls != stamp;
+        if (scope != State.Scope) { items.Clear(); total = 0; }
+        scope = State.Scope; live = nowLive; calls = stamp;
+        if (refresh) await LoadAsync(true);
+        StateHasChanged();
+    });
+    private void CallChanged() { var ended = wasCalling && !Voice.IsCalling; wasCalling = Voice.IsCalling; if (ended) _ = RefreshAfterCallAsync(); }
+    private async Task RefreshAfterCallAsync() { await Task.Delay(1000); if (!disposed) await InvokeAsync(async () => { await LoadAsync(true); StateHasChanged(); }); }
+    private Task MoreAsync() => LoadAsync(false);
+    private async Task LoadAsync(bool reset)
+    {
+        if (disposed) return;
+        if (loading) { reload |= reset; return; }
+        loading = true;
+        var account = State.Scope;
+        try
+        {
+            var requestedPage = reset ? 0 : page + 1;
+            var result = await State.CallsAsync(requestedPage);
+            if (!disposed && account == State.Scope) { page = requestedPage; total = result.TotalCount; items = reset ? result.Items : items.Concat(result.Items).DistinctBy(x => x.Message.Id).ToList(); }
+        }
+        catch(Exception ex) { State.Report(ex); }
+        finally { loading = false; }
+        if (reload) { reload = false; await LoadAsync(true); }
+    }
+    public void Dispose() { disposed = true; State.Changed -= Changed; Voice.Changed -= CallChanged; }
+}
