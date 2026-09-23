@@ -14,14 +14,33 @@
             window.yap.haptics?.buzz('press');
             dialog.showModal();
             const place = () => {
-                const height = stack.getBoundingClientRect().height;
                 const viewportHeight = window.visualViewport?.height || window.innerHeight;
-                const top = source?.getBoundingClientRect().top ?? viewportHeight / 2;
-                stack.style.setProperty('--menu-top', `${Math.max(16, Math.min(top - 70, viewportHeight - height - 24))}px`);
+                const offset = window.visualViewport?.offsetTop || 0;
+                dialog.style.setProperty('--menu-viewport-height', `${viewportHeight}px`);
+                dialog.style.setProperty('--menu-viewport-top', `${offset}px`);
+                // offsetHeight ignores the entry transform, so placement stays steady during animation.
+                const height = stack.offsetHeight;
+                const bubble = source?.querySelector('.bub,.photo-open') || source;
+                const top = (bubble?.getBoundingClientRect().top ?? viewportHeight / 2 + offset) - offset;
+                stack.style.setProperty('--menu-top', `${Math.max(16, Math.min(top, viewportHeight - height - 16))}px`);
             };
             const observer = new ResizeObserver(place);
-            observer.observe(stack); observers.set(dialog, observer); place();
+            observer.observe(stack);
+            window.visualViewport?.addEventListener('resize', place);
+            window.visualViewport?.addEventListener('scroll', place);
+            window.addEventListener('resize', place);
+            observers.set(dialog, { observer, place }); place();
         },
-        close(dialog) { observers.get(dialog)?.disconnect(); observers.delete(dialog); if (dialog?.open) dialog.close(); }
+        close(dialog) {
+            const state = observers.get(dialog);
+            if (state) {
+                state.observer.disconnect();
+                window.visualViewport?.removeEventListener('resize', state.place);
+                window.visualViewport?.removeEventListener('scroll', state.place);
+                window.removeEventListener('resize', state.place);
+                observers.delete(dialog);
+            }
+            if (dialog?.open) dialog.close();
+        }
     };
 })();

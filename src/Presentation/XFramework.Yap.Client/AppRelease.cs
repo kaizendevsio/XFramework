@@ -6,7 +6,7 @@ public static class AppRelease
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "23 September 2026", [
-            "Hold a message for actions, with haptic feedback where supported.",
+            "Hold a message for a clear preview and compact action menu, with haptic feedback where supported. Delivery details are under Info.",
             "Call cards are smaller and the Calls page has comfortable side margins.",
             "Startup shows only the logo and spinner, then opens the inbox shell before device storage loads."]),
         ("1.3.63", "22 September 2026", [

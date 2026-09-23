@@ -14,6 +14,8 @@ Starting in 1.3.64, the static splash contains only the logo and spinner. After 
 
 Message actions require a 450 ms hold for pointer input, with one haptic pulse through the existing browser capability and user-preference helper. Scrolling, cancellation or hiding the page cancels the hold. Ordinary taps do not open actions; keyboard/assistive activation and desktop context menus remain supported. Compact call cards preserve a 44 px callback target, and the Calls page owns its horizontal gutter.
 
+The message menu keeps the selected message and its timestamp above a flat, rounded action list with leading icons. Reactions remain available, while delivery/read details load only when Info is opened. The background is dimmed and blurred; entry and exit animate opacity and transforms. The menu follows the visual viewport when the keyboard changes its available height, and the action list scrolls on short screens. Actions retain their existing capability/ownership conditions. Saved-message instructions link directly to Save message; there is no nested More menu.
+
 These surfaces extend Yap's existing custom mobile components rather than introducing Portal's Blueprint dependency into the small WASM client. Call history is a mobile card list, not a data table.
 
 Regression coverage includes call type at hang-up, trusted record writing, history access and pagination, account-scoped cache cleanup, early readiness while storage is blocked, native-install availability, dismissal, and the rendered shell/card structure. Desktop mobile-sized rendering verifies layout; physical iOS/Android installation and hardware decoder selection still depend on each browser.
