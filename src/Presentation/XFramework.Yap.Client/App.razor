@@ -1,10 +1,9 @@
-@implements IDisposable
 @inject DatabaseStartup Startup
 @inject NavigationManager Nav
 @inject ChatState State
 @inject ILogger<App> Logger
 @inject IJSRuntime JS
-@if (!State.Ready || failure is not null)
+@if (waitingForDatabase || failure is not null)
 {
     <div class="toast-host"><UpdateNotice /></div>
     <div class="startup-recovery"><a href="/api/app-recovery" data-enhance-nav="false">Taking a while? Open recovery</a></div>
@@ -13,34 +12,23 @@
 {
     <main class="loading"><Brand /><h1>Device storage unavailable</h1><p>@failure</p><button class="btn" @onclick="() => Nav.NavigateTo(Nav.Uri, true)">Try again</button><a href="diagnostics.html">Open diagnostic logs</a></main>
 }
-else if (!State.Ready)
-{
-    @if (waitingForDatabase)
-    {
-        <StartupSplash Text="Waiting for the other Yap tab…"><p class="startup-help">Close the other tab to continue. Your saved conversations are safe.</p></StartupSplash>
-    }
-    else
-    {
-        <StartupSplash Text="@startupText" />
-    }
-}
 else
 {
     <Router AppAssembly="typeof(App).Assembly"><Found Context="route"><RouteView RouteData="route" DefaultLayout="typeof(MainLayout)" /></Found>
     <NotFound><LayoutView Layout="typeof(MainLayout)"><div class="body"><h1>Page not found</h1><a class="btn" href="/">Back to chats</a></div></LayoutView></NotFound></Router>
+    @if (waitingForDatabase) { <div class="startup-wait" role="status">Close the other Yap tab to continue. Your saved conversations are safe.</div> }
 }
 @code {
     private string? failure;
     private bool waitingForDatabase;
-    private string startupText = "Opening device storage…";
-    protected override Task OnInitializedAsync() { State.Changed += Changed; return StartAsync(); }
-    private void Changed()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!State.Ready) return;
-        State.Changed -= Changed;
-        _ = InvokeAsync(StateHasChanged);
+        if (!firstRender) return;
+        // The inbox shell is mounted before storage or account restoration begins.
+        await JS.InvokeVoidAsync("yap.afterPaint");
+        await StartAsync();
+        StateHasChanged();
     }
-    public void Dispose() => State.Changed -= Changed;
     private async Task StartAsync()
     {
         failure = null;
@@ -52,7 +40,6 @@ else
                 StateHasChanged();
             }
             waitingForDatabase = false;
-            startupText = "Loading saved conversations…";
             StateHasChanged();
             await State.InitializeAsync();
             await JS.InvokeVoidAsync("yap.diagnostics.record", "startup.complete");

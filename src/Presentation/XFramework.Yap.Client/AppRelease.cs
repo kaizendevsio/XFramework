@@ -2,10 +2,14 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.63";
+    public const string Version = "1.3.64";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
-        (Version, "22 September 2026", [
+        (Version, "23 September 2026", [
+            "Hold a message for actions, with haptic feedback where supported.",
+            "Call cards are smaller and the Calls page has comfortable side margins.",
+            "Startup shows only the logo and spinner, then opens the inbox shell before device storage loads."]),
+        ("1.3.63", "22 September 2026", [
             "Video decoding prefers hardware, with a software recovery path up to 1440p.",
             "A new Calls tab and call cards make it easy to return voice and video calls.",
             "Navigation stays in place between pages, favorites have larger avatars, and the inbox opens before background loading finishes.",

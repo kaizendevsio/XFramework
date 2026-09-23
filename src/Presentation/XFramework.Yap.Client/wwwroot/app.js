@@ -1,5 +1,10 @@
 // Browser preferences and DOM helpers; app state and interactions live in C#.
 window.yap = {
+    // Yield through one paint before opening SQLite. A hidden tab must not block startup.
+    afterPaint: () => new Promise(resolve => {
+        const fallback = setTimeout(resolve, 100);
+        requestAnimationFrame(() => setTimeout(() => { clearTimeout(fallback); resolve(); }, 0));
+    }),
     getTheme: () => document.documentElement.dataset.theme,
     applyTheme(theme) {
         document.documentElement.dataset.theme = theme;

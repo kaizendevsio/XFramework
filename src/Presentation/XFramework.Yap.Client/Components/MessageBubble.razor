@@ -14,7 +14,7 @@ else
         @if (ShowSender && !Message.Mine) { <span class="who">@Message.Sender</span> }
         @if (ShowText || Message.Quote is not null)
         {
-        <button class="bub" @onclick="() => OnSelect.InvokeAsync(Message)" aria-label="@($"Message from {Message.Sender}: {Message.Text}. Open actions")"><span class="bubble-content">
+        <button class="bub" @onclick="ActivateActions" @oncontextmenu="() => OnSelect.InvokeAsync(Message)" @oncontextmenu:preventDefault aria-haspopup="dialog" aria-label="@($"Message from {Message.Sender}: {Message.Text}. Hold for actions")"><span class="bubble-content">
             @if (Message.Quote is not null) { <span class="quote"><span class="qn">@Message.Quote.Sender</span>@Message.Quote.Text</span> }
             @if (ShowText) { @Message.Text }
         </span></button>
@@ -63,6 +63,8 @@ else
     [Parameter] public EventCallback<ChatMessage> OnThread { get; set; }
     [Parameter] public EventCallback<ChatMessage> OnReply { get; set; }
     [Parameter] public EventCallback<string> OnReact { get; set; }
+    // Keyboard and assistive activation has no pointer click count. Pointer users hold instead.
+    private Task ActivateActions(MouseEventArgs args) => args.Detail == 0 ? OnSelect.InvokeAsync(Message) : Task.CompletedTask;
     private bool ShowText => !Message.HasAttachments && Message.Attachments.Count == 0 || Message.Attachments.Count > 0 && !Message.Attachments.Any(f => f.Name == Message.Text);
     private bool HasReaders => Message.Mine && State.Selected?.Allows(ChatFeature.ReadReceipts) != false && Readers.Count > 0 && !MessageReceipts.IsSending(Message);
     private bool ShowDelivery => !HasReaders && MessageReceipts.ShowStatus(Message, Latest, DateTime.UtcNow);
