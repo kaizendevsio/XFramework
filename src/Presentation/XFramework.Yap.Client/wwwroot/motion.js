@@ -68,12 +68,13 @@
     }, true);
     document.addEventListener('pointerdown', e => {
         if (e.target.closest('.conversation-menu')) { suppressUntil = 0; clear(); return; }
-        if (e.pointerType === 'mouse' || !e.isPrimary || e.button !== 0) { clear(); return; }
+        if (!e.isPrimary || e.button !== 0) { clear(); return; }
         if (e.target.closest('input,textarea,select,.photo-viewer')) return;
         clear();
         const handle = e.target.closest('[data-sheet-drag]');
         const bubble = e.target.closest('.bub,.photo-open');
         const message = bubble?.closest('[data-swipe-reply]');
+        if (e.pointerType === 'mouse' && !message) return;
         const panel = e.target.closest('[data-swipe-tabs]');
         const conversation = e.target.closest('[data-conversation-menu]');
         const element = handle?.closest('.sheet') || message || conversation || panel;
@@ -90,8 +91,7 @@
                 element.classList.add('is-holding');
                 suppressClick();
                 if (g.kind === 'conversation') element.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX:g.x, clientY:g.y }));
-                else if (bubble.matches('.photo-open')) bubble.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-                else bubble.click();
+                else bubble.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
             }, 450);
         }
         if (handle) element.setPointerCapture(e.pointerId);
@@ -139,7 +139,13 @@
     });
     document.addEventListener('pointercancel', clear);
     document.addEventListener('visibilitychange', () => { if (document.hidden) { clear(); complete(); } });
-    document.addEventListener('contextmenu', e => { if (e.target.closest('.bub,.photo-open') && gesture) e.preventDefault(); });
+    document.addEventListener('contextmenu', e => {
+        // Mobile native context menus can race our hold timer. Only the recognized hold
+        // opens actions; a desktop right-click without a pointer hold still works.
+        if (e.isTrusted && e.target.closest('.bub,.photo-open') && (gesture || performance.now() < suppressUntil)) {
+            e.preventDefault(); e.stopImmediatePropagation();
+        }
+    }, true);
 
     // Blazor removes conditional DOM immediately. Retain only a short-lived,
     // inert visual copy for the exit; actions and state never wait for animation.

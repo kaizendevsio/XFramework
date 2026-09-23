@@ -6,6 +6,7 @@
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject VoiceState Voice
+@inject BrowserTime Times
 <PageTitle>@(ParentId.HasValue ? "Thread" : State.Selected?.Name ?? "Conversation") · Yap</PageTitle>
 @if (State.User is null) { <div class="body"><p>Sign in to open this conversation.</p><a class="btn" href="/login">Sign in</a></div> }
 else
@@ -54,31 +55,29 @@ else
 @if (mode == "message" && selected is not null)
 {
 <MessageMenu Message="selected" OnClose="() => mode = null">
-    @if (State.Selected?.Allows(ChatFeature.Reactions) != false) { <div class="menu-reactions">@foreach (var reaction in State.Defaults?.Reactions ?? []) { <button aria-label="@($"React {reaction.Emoji}")" disabled="@(!State.Online || State.NeedsLogin)" @onclick="() => ReactAsync(reaction.Emoji)">@reaction.Emoji</button> }</div> }
-    <div class="menu-message-preview"><span data-menu-photo></span><span class="menu-preview-label">@(selected.HasAttachments ? selected.Attachments.Any(MessageMedia.IsVideo) ? "Video" : "Attachment" : selected.Text)</span></div>
-    <MessageStatus @key="selected.Id" Message="selected" />
+    <div class="menu-message-preview"><span data-menu-photo></span><span class="menu-preview-label">@(selected.HasAttachments ? selected.Attachments.Any(MessageMedia.IsVideo) ? "Video" : "Attachment" : selected.Text)</span><time class="menu-preview-time" datetime="@BrowserTime.Iso(selected.CreatedAt)">@Times.Full(selected.CreatedAt)</time></div>
+    @if (State.Selected?.Allows(ChatFeature.Reactions) != false && State.Defaults?.Reactions.Count > 0) { <div class="menu-reactions">@foreach (var reaction in State.Defaults.Reactions) { <button aria-label="@($"React {reaction.Emoji}")" disabled="@(!State.Online || State.NeedsLogin)" @onclick="() => ReactAsync(reaction.Emoji)">@reaction.Emoji</button> }</div> }
     <div class="menu-actions">
-    @if (State.Selected?.Allows(ChatFeature.Replies) != false) { <button @onclick="() => ReplyTo(selected)">Reply<Icon Name="reply" Size="20" /></button> }
-    @if (!selected.HasAttachments) { <button @onclick="CopyAsync">Copy<Icon Name="file" Size="20" /></button> }
-    @if (selected.Mine) { <button class="danger" @onclick='() => mode = "delete"'>Delete<Icon Name="trash" Size="20" /></button> }
-    <button aria-expanded="@moreActions.ToString().ToLowerInvariant()" @onclick="() => moreActions = !moreActions">More<Icon Name="more" Size="20" /></button>
-    @if (moreActions) {
-    @if (State.Selected?.Allows(ChatFeature.Threads) != false) { <button class="sheetitem" @onclick="() => OpenThreadAsync(selected)"><Icon Name="thread" Size="20" />Reply in thread</button> }
-    <button class="sheetitem" @onclick='() => mode = "forward"'><Icon Name="arrow" Size="20" />Forward text</button>
-    <button class="sheetitem" @onclick="CopyAsync"><Icon Name="file" Size="20" />Copy text</button>
-    <button class="sheetitem" @onclick="FilesAsync"><Icon Name="file" Size="20" />Attachments</button>
-    <button class="sheetitem" @onclick='() => ActionAsync(selected.Pinned ? "unpin" : "pin")'><Icon Name="plus" Size="20" />@(selected.Pinned ? "Unpin message" : "Pin message")</button>
-    <button class="sheetitem" @onclick='() => ActionAsync(selected.Saved ? "unsave" : "save")'><Icon Name="file" Size="20" />@(selected.Saved ? "Unsave message" : "Save message")</button>
-    @if (selected.Mine && !selected.HasAttachments && State.CanEditMessage(selected)) { <button class="sheetitem" @onclick='() => { edit = selected.Text; mode = "edit"; }'><Icon Name="edit" Size="20" />Edit message</button> }
-    }
+    @if (State.Selected?.Allows(ChatFeature.Replies) != false) { <button @onclick="() => ReplyTo(selected)"><Icon Name="reply" Size="22" /><span>Reply</span></button> }
+    <button @onclick='() => mode = "forward"'><Icon Name="arrow" Size="22" /><span>Forward text</span></button>
+    <button @onclick="CopyAsync"><Icon Name="file" Size="22" /><span>Copy text</span></button>
+    <button @onclick='() => ActionAsync(selected.Saved ? "unsave" : "save")'><Icon Name="bookmark" Size="22" /><span>@(selected.Saved ? "Unsave message" : "Save message")</span></button>
+    @if (selected.Mine && !selected.HasAttachments && State.CanEditMessage(selected)) { <button @onclick='() => { edit = selected.Text; mode = "edit"; }'><Icon Name="edit" Size="22" /><span>Edit message</span></button> }
+    @if (selected.Mine) { <button class="danger" @onclick='() => mode = "delete"'><Icon Name="trash" Size="22" /><span>Delete</span></button> }
+    @if (State.Selected?.Allows(ChatFeature.Threads) != false) { <button @onclick="() => OpenThreadAsync(selected)"><Icon Name="thread" Size="22" /><span>Reply in thread</span></button> }
+    @if (selected.HasAttachments || selected.Attachments.Count > 0) { <button @onclick="FilesAsync"><Icon Name="clip" Size="22" /><span>Attachments</span></button> }
+    <button @onclick='() => ActionAsync(selected.Pinned ? "unpin" : "pin")'><Icon Name="plus" Size="22" /><span>@(selected.Pinned ? "Unpin message" : "Pin message")</span></button>
+    <button @onclick='() => mode = "info"'><Icon Name="info" Size="22" /><span>Info</span></button>
     </div>
 </MessageMenu>
 }
 @if (mode is not null && mode is not ("message" or "search"))
 {
-<BottomSheet Title="@(mode == "details" ? "Conversation" : mode == "files" ? "Attachments" : mode == "edit" ? "Edit message" : "Message actions")" OnClose="() => mode = null">
+<BottomSheet Title="@(mode == "info" ? "Message info" : mode == "details" ? "Conversation" : mode == "files" ? "Attachments" : mode == "edit" ? "Edit message" : "Message actions")" OnClose="() => mode = null">
 @if (mode == "files" && selected is not null)
 { <div class="picker">@foreach (var file in selected.Attachments) { <button class="row" @onclick="() => State.OpenFileAsync(selected, file)"><Icon Name="file" /><span>@file.Name <small>@(file.Size / 1024) KB</small></span></button> }<p class="muted">Opened files are saved on this device for offline use.</p></div> }
+else if (mode == "info" && selected is not null)
+{ <div class="picker"><MessageStatus @key="selected.Id" Message="selected" /></div> }
 else if (mode == "edit")
 { <div class="picker"><textarea aria-label="Edit message" @bind="edit" @bind:event="oninput" maxlength="4000"></textarea><button class="btn" @onclick='() => ActionAsync("edit", edit)'>Save changes</button></div> }
 else if (mode == "delete")
@@ -111,7 +110,6 @@ else if (mode == "forward")
     private string query = "";
     private ElementReference searchInput;
     private bool focusSearch;
-    private bool moreActions;
     protected override void OnInitialized() { State.Changed += Changed; State.ConversationRemoved += Removed; Voice.Changed += Changed; Nav.LocationChanged += LocationChanged; }
     // Both routes have identical component parameters. Blazor can skip their render,
     // so changes to the URI-derived details view must explicitly invalidate it.
@@ -137,7 +135,7 @@ else if (mode == "forward")
         if (focusSearch && Searching) { focusSearch = false; try { await searchInput.FocusAsync(); } catch (Exception ex) { State.Report(ex); } }
         if (focus.HasValue) { var id = focus; focus = null; await JS.InvokeVoidAsync("yap.showMessage", id); }
     }
-    private void Select(ChatMessage message) { selected = message; moreActions = false; mode = "message"; _ = ExpireEditAsync(message); }
+    private void Select(ChatMessage message) { selected = message; mode = "message"; _ = ExpireEditAsync(message); }
     // A borderline message must lose Edit while the menu is still open. One timer per
     // selection is enough: the deadline never moves once the message exists.
     private async Task ExpireEditAsync(ChatMessage message)

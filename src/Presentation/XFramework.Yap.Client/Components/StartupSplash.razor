@@ -1,10 +1,4 @@
-<main class="startup-splash" role="status" aria-live="polite">
+<main class="startup-splash" role="status" aria-label="Starting Yap">
     <Brand />
-    <p>@Text</p>
     <span class="spinner" aria-hidden="true"></span>
-    @ChildContent
 </main>
-@code {
-    [Parameter] public string Text { get; set; } = "Starting Yap…";
-    [Parameter] public RenderFragment? ChildContent { get; set; }
-}

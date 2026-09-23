@@ -5,13 +5,13 @@
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 <PageTitle>Yap · A little closer.</PageTitle>
-@if (State.User is null) { <div class="authbody"><div class="authbrand"><Brand /><p>A little closer.</p></div><h1>Good conversations start here.</h1><p>Your people, one conversation away.</p><a class="btn" href="/login">Sign in</a><a class="btn ghost" href="/register">Create an account</a></div> }
+@if (State.Ready && State.User is null) { <div class="authbody"><div class="authbrand"><Brand /><p>A little closer.</p></div><h1>Good conversations start here.</h1><p>Your people, one conversation away.</p><a class="btn" href="/login">Sign in</a><a class="btn ghost" href="/register">Create an account</a></div> }
 else
 {
-<ScrollSurface><Header><div class="appbar plain liquid-glass inbox-header"><GlassLayer /><Brand /><span class="sp"></span><button class="iconbtn" aria-label="Search conversations" aria-expanded="@searchVisible.ToString().ToLowerInvariant()" @onclick="ToggleSearch"><Icon Name="search" /></button></div>
+<ScrollSurface><Header><div class="appbar plain liquid-glass inbox-header"><GlassLayer /><Brand /><span class="sp"></span><button class="iconbtn" disabled="@(!State.Ready)" aria-label="Search conversations" aria-expanded="@searchVisible.ToString().ToLowerInvariant()" @onclick="ToggleSearch"><Icon Name="search" /></button></div>
 @if (searchVisible) { <label class="searchbar liquid-glass search-field"><GlassLayer /><Icon Name="search" Size="18" /><input @ref="searchInput" type="search" enterkeyhint="search" autocomplete="off" aria-label="Search conversations and messages" placeholder="Search conversations and messages" @bind="search" @bind:event="oninput" @onkeydown="SearchKeyDown" />@if (search.Length > 0) { <button class="iconbtn search-clear" aria-label="Clear search" @onclick="ClearSearch"><Icon Name="close" Size="16" /></button> }</label> }
 
-</Header><ChildContent><div class="body inbox-panel" aria-label="Conversations">
+</Header><ChildContent><div class="body inbox-panel" aria-label="Conversations" aria-busy="@((!State.Ready || State.LoadingConversations).ToString().ToLowerInvariant())">
 @* While searching, favourites stop being a useful split: everything on screen is a match. *@
 @foreach (var section in Filtered.GroupBy(chat => search.Length == 0 && chat.IsFavorite))
 {
@@ -33,12 +33,12 @@ else
 }
 </div>
 }
-@if (State.LoadingConversations) { <div class="inbox-skeleton" aria-label="Loading saved conversations"><span></span><span></span><span></span></div> }
-@if (!State.LoadingConversations && !Filtered.Any() && search.Length == 0) { <p class="empty">No conversations yet. Start one with your people.</p> }
+@if (!State.Ready || State.LoadingConversations) { <div class="inbox-skeleton" aria-label="Loading conversations"><span></span><span></span><span></span></div> }
+@if (State.Ready && !State.LoadingConversations && !Filtered.Any() && search.Length == 0) { <p class="empty">No conversations yet. Start one with your people.</p> }
 <MessageSearch Query="@search" OnOpen="OpenHit" />
 @if (State.HasMoreConversations) { <button class="btn ghost" disabled="@(!State.Online || State.Busy)" @onclick="State.LoadMoreConversationsAsync">Load more conversations</button> }
 </div></ChildContent></ScrollSurface>
-<button class="fab liquid-glass" aria-label="New conversation" disabled="@(!State.Online || State.NeedsLogin)" @onclick='() => Nav.NavigateTo("/new")'><GlassLayer /><Icon Name="edit" /></button>
+<button class="fab liquid-glass" aria-label="New conversation" disabled="@(!State.Ready || !State.Online || State.NeedsLogin)" @onclick='() => Nav.NavigateTo("/new")'><GlassLayer /><Icon Name="edit" /></button>
 }
 @if (menu is { } chosen)
 {

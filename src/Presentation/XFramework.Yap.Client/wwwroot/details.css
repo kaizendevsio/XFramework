@@ -1,6 +1,6 @@
 /* Full-page, grouped settings. Keep the scrolling body free of backdrop filters. */
 .startup-splash{height:100dvh;min-height:320px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:24px;text-align:center;box-sizing:border-box}
-.startup-splash .yap-brand{font-size:40px}.startup-splash p{color:var(--dim);font-size:14px;margin:0;min-height:20px}.startup-splash .startup-help{max-width:320px;font-size:12px}
+.startup-splash .yap-brand{font-size:40px}
 .conversation-screen{height:100%;min-height:0}.conversation-screen[hidden]{display:none}
 .conversation-avatar{padding:0;flex:none;border-radius:50%}
 .details-body{padding-inline:20px!important}.conversation-details{max-width:620px;margin:0 auto;padding-bottom:32px}
