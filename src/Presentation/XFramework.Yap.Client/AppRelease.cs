@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.69";
+    public const string Version = "1.3.70";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "27 September 2026", [
+            "Avatars show a green dot when someone is active and an orange dot when they have been away for a little while.",
+            "While someone is attaching a photo, video, file or voice message, you see it in the conversation header. This follows the conversation's typing indicator setting."]),
+        ("1.3.69", "27 September 2026", [
             "Notifications recover on their own: if a phone's push registration is dropped, Yap registers it again the next time you open the app."]),
         ("1.3.68", "26 September 2026", [
             "Pressing and holding in the message menu and other pop-ups no longer selects text or opens the Android search sheet."]),
