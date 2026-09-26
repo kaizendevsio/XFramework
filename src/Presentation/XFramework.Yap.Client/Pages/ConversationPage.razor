@@ -12,8 +12,10 @@ else
 {
     var chat = State.Selected?.Id == Id ? State.Selected : State.Conversations.FirstOrDefault(x => x.Id == Id) ?? new Conversation { Id = Id };
     <div class="conversation-screen" hidden="@(ShowingDetails || Searching)"><ScrollSurface><Header><div class="appbar liquid-glass"><GlassLayer /><a class="iconbtn" href="@(ParentId.HasValue ? $"/chat/{Id}" : "/")" aria-label="Go back"><Icon Name="back" /></a>
-        @if (!ParentId.HasValue) { <button class="conversation-avatar" aria-label="Conversation details" @onclick="OpenDetails"><Avatar Initials="@chat.Initials" ImageUrl="@chat.AvatarUrl" Color="@chat.Color" /></button> }
+        @if (!ParentId.HasValue) { var presence = State.PresenceOf(chat); <button class="conversation-avatar" aria-label="@(PresenceDot.Label(presence) is { } status ? $"Conversation details, {status}" : "Conversation details")" @onclick="OpenDetails"><Avatar Initials="@chat.Initials" ImageUrl="@chat.AvatarUrl" Color="@chat.Color" Presence="presence" /></button> }
         <button class="mid conversation-title" aria-label="Conversation settings" @onclick="OpenDetails"><h1 style="font-size:16px">@(ParentId.HasValue ? "Thread" : chat.Name)</h1><span class="muted" style="font-size:12px">@(ParentId.HasValue ? $"{chat.Name} · {Parent?.ReplyTotal ?? 0} replies" : State.ConversationSubtitle(chat))</span></button>
+        @* The title button's own name hides its subtitle from a screen reader; an activity is announced here instead. *@
+        @if (!ParentId.HasValue) { <span class="activity-live" role="status">@State.ActivityText(chat)</span> }
         <button class="iconbtn" aria-label="Search messages" @onclick="OpenSearch"><Icon Name="search" /></button>
         @if(Voice.VideoAvailable){<button class="iconbtn" aria-label="Start video call" disabled="@(!State.Online || State.NeedsLogin || Voice.IsCalling)" @onclick="() => CallAsync(true)"><Icon Name="video" /></button>}
         @if(Voice.Enabled){<button class="iconbtn" aria-label="Start voice call" disabled="@(!State.Online || State.NeedsLogin || Voice.IsCalling)" @onclick="() => CallAsync(false)"><Icon Name="phone" /></button>}

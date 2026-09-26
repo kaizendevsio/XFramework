@@ -110,9 +110,16 @@ input,textarea{font:inherit;color:inherit}
 .g5{background:linear-gradient(140deg,#ffb03a,#f08a00)}
 .g6{background:linear-gradient(140deg,#f45ea8,#c3268a)}
 .g7{background:linear-gradient(140deg,#9aa4b8,#5f6b80)}
-.presence{position:absolute;right:-1px;bottom:-1px;width:12px;height:12px;border-radius:50%;background:var(--ok);border:2.5px solid var(--surface)}
-.presence.away{background:var(--warn)}
-.presence.off{background:var(--faint)}
+/* Presence dot, bottom-right. Fixed status hues, never the accent (--ok aliases it). Every size is a
+   share of the avatar, so the dot and its ring scale with it; the ring is the surface colour the
+   avatar sits on, so it parts the dot from a photo without an outline. Absolute: no layout shift. */
+:root{--presence-active:#31a24c;--presence-away:#f08c00;--presence-ring:var(--surface)}
+:root[data-theme=dark]{--presence-active:#3fbf5c;--presence-away:#f59f00}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--presence-active:#3fbf5c;--presence-away:#f59f00}}
+.presence{position:absolute;right:0;bottom:0;z-index:1;width:30%;height:30%;min-width:10px;min-height:10px;border-radius:50%;background:var(--presence-ring);pointer-events:none}
+.presence::after{content:"";position:absolute;inset:17%;border-radius:50%;background:var(--presence-active)}
+.presence.away::after{background:var(--presence-away)}
+.activity-live{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 
 .badge{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--pink);color:var(--on-pink);font-size:11px;font-weight:750;display:grid;place-items:center}
 .tag{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:7px;background:var(--surface2);color:var(--dim);font-size:11px;font-weight:650}

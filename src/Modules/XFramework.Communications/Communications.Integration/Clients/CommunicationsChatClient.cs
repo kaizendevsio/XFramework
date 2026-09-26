@@ -173,6 +173,8 @@ public interface ICommunicationsChatSession
         CancellationToken ct = default);
 
     Task PublishTypingAsync(Guid threadId, bool isTyping, CancellationToken ct = default);
+    /// <summary>Publishes typing or an attachment in progress (kind and count only) on the typing channel.</summary>
+    Task PublishTypingAsync(Guid threadId, bool isTyping, CommunicationsTypingActivity activity, int count, CancellationToken ct = default);
     Task PublishPresenceAsync(bool isOnline, CancellationToken ct = default);
 }
 
@@ -578,10 +580,15 @@ internal sealed class CommunicationsChatSession(
         InvokeAsync(callCt => wrapper.SubscribePresenceAsync(TenantId, handler, GetAccessTokenAsync, callCt), ct);
 
     public Task PublishTypingAsync(Guid threadId, bool isTyping, CancellationToken ct = default) =>
+        PublishTypingAsync(threadId, isTyping, CommunicationsTypingActivity.Typing, 0, ct);
+
+    public Task PublishTypingAsync(Guid threadId, bool isTyping, CommunicationsTypingActivity activity, int count, CancellationToken ct = default) =>
         InvokeAsync(callCt => wrapper.PublishCommunicationsTypingAsync(Prepare(new PublishCommunicationsTypingRequest
         {
             ThreadId = threadId,
-            IsTyping = isTyping
+            IsTyping = isTyping,
+            Activity = activity,
+            Count = count
         }), callCt), ct);
 
     public Task PublishPresenceAsync(bool isOnline, CancellationToken ct = default) =>

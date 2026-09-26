@@ -1002,7 +1002,8 @@ public sealed partial class ThreadServiceSecurityTests
         IDataContext dataContext,
         ICommunicationsTemplateService? templateService = null,
         IStorageServiceWrapper? storage = null,
-        CommunicationsOutboxSignal? signal = null, Microsoft.EntityFrameworkCore.DbContext? database = null)
+        CommunicationsOutboxSignal? signal = null, Microsoft.EntityFrameworkCore.DbContext? database = null,
+        TestTransientRealtimePublisher? publisher = null)
     {
         TrustedContext.Value = null;
         var resolver = new CommunicationsRequestContextResolver(
@@ -1017,7 +1018,7 @@ public sealed partial class ThreadServiceSecurityTests
             new CommunicationsPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())),
             new CommunicationsActionRateLimiter(),
             new CommunicationsModerationService(dataContext, resolver),
-            new TestTransientRealtimePublisher(),
+            publisher ?? new TestTransientRealtimePublisher(),
             new EmptyReactionSummaryReader(),
             new EmptyReplySummaryReader(),
             NullLogger<ThreadService>.Instance,
@@ -1470,7 +1471,8 @@ public sealed partial class ThreadServiceSecurityTests
 
     private sealed class TestTransientRealtimePublisher : ICommunicationsTransientRealtimePublisher
     {
-        public Task PublishTypingAsync(CommunicationsTypingState state, CancellationToken ct = default) => Task.CompletedTask;
+        public List<CommunicationsTypingState> Typing { get; } = [];
+        public Task PublishTypingAsync(CommunicationsTypingState state, CancellationToken ct = default) { Typing.Add(state); return Task.CompletedTask; }
 
         public Task PublishPresenceAsync(CommunicationsPresenceState state, CancellationToken ct = default) => Task.CompletedTask;
     }

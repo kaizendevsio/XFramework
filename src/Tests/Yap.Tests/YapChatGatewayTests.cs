@@ -54,13 +54,14 @@ public sealed class YapChatGatewayTests
         await publish!(new() { TenantId = tenant, ThreadId = thread, CredentialId = actor, IsTyping = true });
         await publish(new() { TenantId = Guid.NewGuid(), ThreadId = thread, CredentialId = other, IsTyping = true });
         await publish(new() { TenantId = tenant, ThreadId = Guid.NewGuid(), CredentialId = other, IsTyping = true });
-        await publish(new() { TenantId = tenant, ThreadId = thread, CredentialId = other, IsTyping = true });
+        await publish(new() { TenantId = tenant, ThreadId = thread, CredentialId = other, IsTyping = true, Activity = CommunicationsTypingActivity.Photo, Count = 2 });
 
         var packet = await ReceiveAsync(socket);
         Assert.That(BoltCodec.TryReadRequest(packet, out var frame, out _), Is.True);
         var pushed = JsonSerializer.Deserialize<ChatSocketEvent>(frame.GetPayload(packet), new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         Assert.That(pushed.Kind, Is.EqualTo("typing"));
-        Assert.That(pushed.Body!.Value.Deserialize<TypingUpdate>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.CredentialId, Is.EqualTo(other));
+        var update = pushed.Body!.Value.Deserialize<TypingUpdate>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        Assert.That(update, Is.EqualTo(new TypingUpdate(thread, other, true, ChatActivity.Photo, 2)), "Kind and count only, on the typing channel.");
         // One lookup admits the watch; only the other participant's event needs a fresh
         // authorization lookup. Self echoes never consume the message projection queue.
         fixture.Wrapper.Verify(x => x.GetThreadAsync(It.IsAny<GetThreadRequest>(), It.IsAny<CancellationToken>()), Times.Exactly(2));

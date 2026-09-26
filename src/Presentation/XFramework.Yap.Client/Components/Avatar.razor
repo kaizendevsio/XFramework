@@ -1,9 +1,14 @@
-<span class="avatar @Size @Color">@if (!string.IsNullOrWhiteSpace(ImageUrl) && !failed) { <img src="@ImageUrl" alt="" draggable="false" @onerror="() => failed = true" /> } else { @Initials }@if (Online){<span class="presence"></span>}</span>
+<span class="avatar @Size @Color">@if (!string.IsNullOrWhiteSpace(ImageUrl) && !failed) { <img src="@ImageUrl" alt="" draggable="false" @onerror="() => failed = true" /> } else { @Initials }@if (PresenceDot.CssClass(Presence) is { } dot){<span class="presence @dot" role="img" aria-label="@PresenceDot.Label(Presence)"></span>}</span>
 @code {
+    // The presence dot is absolutely placed inside the avatar's own box, so showing, hiding or
+    // recolouring it never moves anything. Its role="img" name joins the name of whatever link or
+    // button holds the avatar, so "Active now" / "Away" is heard with the person.
     [Parameter] public string Initials { get; set; } = "JE";
     [Parameter] public string Color { get; set; } = "g1";
     [Parameter] public string Size { get; set; } = "a40";
-    [Parameter] public bool Online { get; set; }
+    /// <summary>Offline (the default) draws no dot. Callers pass ChatState.PresenceOf, which is
+    /// already offline for your own avatar, for groups and for anyone hiding their status.</summary>
+    [Parameter] public PresenceStatus Presence { get; set; }
     [Parameter] public string? ImageUrl { get; set; }
     private bool failed;
     private string? previousImage;

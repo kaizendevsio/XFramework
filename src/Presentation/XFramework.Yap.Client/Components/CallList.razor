@@ -17,7 +17,7 @@
         <li class="call-group @(group.Missed ? "missed" : "") @(open ? "open" : "")" @key="group.Key">
             <div class="call-row">
                 <button type="button" class="call-row-main" aria-expanded="@(open ? "true" : "false")" aria-controls="@detail" aria-label="@RowLabel(group, open)" @onclick="() => Toggle(group.Key)">
-                    <Avatar Initials="@ChatMessage.InitialsFor(name)" ImageUrl="@latest.AvatarUrl" Size="a48" />
+                    <Avatar Initials="@ChatMessage.InitialsFor(name)" ImageUrl="@latest.AvatarUrl" Size="a48" Presence="@State.PresenceOfConversation(group.ThreadId)" />
                     <span class="call-row-text">
                         <span class="call-name">@name</span>
                         <span class="call-meta"><Icon Name="@Glyph(group.Direction)" Size="15" Class="call-dir" />@if (group.Video) { <Icon Name="video" Size="15" Class="call-kind" /> }@if (group.Calls.Count > 1) { <span class="call-count">(@group.Calls.Count)</span> }<span class="call-when">@Times.Recent(latest.Message.CreatedAt)</span></span>
@@ -72,7 +72,9 @@
     private string RowLabel(CallGroup group, bool open)
     {
         var count = group.Calls.Count == 1 ? "" : $", {group.Calls.Count} calls";
-        return $"{group.Latest.ConversationName}{count}, {CallHistory.Describe(group.Latest.Message)}, {Times.Recent(group.Latest.Message.CreatedAt)}. {(open ? "Hide" : "Show")} call details";
+        // The row's own name replaces its content's, so the avatar's status is spoken here.
+        var status = PresenceDot.Label(State.PresenceOfConversation(group.ThreadId)) is { } label ? $", {label}" : "";
+        return $"{group.Latest.ConversationName}{status}{count}, {CallHistory.Describe(group.Latest.Message)}, {Times.Recent(group.Latest.Message.CreatedAt)}. {(open ? "Hide" : "Show")} call details";
     }
     private Task Toggle(Guid key)
     {

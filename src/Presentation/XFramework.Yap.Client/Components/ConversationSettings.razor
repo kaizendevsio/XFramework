@@ -43,7 +43,7 @@
     @foreach (var person in Conversation.People)
     {
         <div class="conversation-member" @key="person.Id">
-            <div class="row"><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" ImageUrl="@person.AvatarUrl" Size="a34" /><span class="mid"><b>@person.Name</b><small>@(person.Role is "Admin" or "Owner" ? "Admin" : "Member")@(State.IsActive(person) ? " · Active now" : "")</small></span>
+            <div class="row"><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" ImageUrl="@person.AvatarUrl" Size="a34" Presence="@State.PresenceOf(person)" /><span class="mid"><b>@person.Name</b><small>@(person.Role is "Admin" or "Owner" ? "Admin" : "Member")@(State.IsActive(person) ? " · Active now" : "")</small></span>
             @if (!Locked) { <button class="iconbtn" aria-label="@($"Edit {person.Name}")" @onclick="() => Edit(person)"><Icon Name="edit" Size="18" /></button> }</div>
             @if (editing == person.Id)
             {

@@ -50,6 +50,11 @@ public sealed class Conversation
     public int Features { get; set; } = 127;
     public bool CanManage { get; set; }
     public bool ShareActiveStatus { get; set; } = true;
+    /// <summary>A direct conversation's other member, from the inbox list. Null for groups.</summary>
+    public Guid? PeerId { get; set; }
+    /// <summary>The peer's latest heartbeat, present only while they share active status in this chat.</summary>
+    public DateTime? PeerLastActiveAt { get; set; }
+    public DateTime? PeerActiveUntil { get; set; }
     public bool Allows(ChatFeature feature) => (Features & (int)feature) != 0;
     public string Initials => ChatMessage.InitialsFor(Name);
     public string Color => Group ? "g3" : "g1";
@@ -111,7 +116,9 @@ public sealed record MessageAction(Guid ThreadId, Guid MessageId, string Action,
     Guid? ReactionTypeId = null, Guid? ReactionId = null, string? EncryptedEnvelope = null,
     Guid? EncryptionSenderDeviceId = null, long? SenderDirectoryRevision = null, Dictionary<Guid, long>? RecipientDirectoryRevisions = null);
 public sealed record ReadMessages(Guid ThreadId, List<Guid> MessageIds);
-public sealed record ThreadAction(Guid ThreadId, string Action, bool Value);
+/// <summary><paramref name="Activity"/> and <paramref name="Count"/> only apply to the "typing" action:
+/// the kind of attachment being sent and how many, never a name, size or content.</summary>
+public sealed record ThreadAction(Guid ThreadId, string Action, bool Value, ChatActivity Activity = ChatActivity.Typing, int Count = 0);
 public sealed record AttachMessageFile(Guid ThreadId, Guid MessageId, Guid StorageId);
 public sealed record BeginUpload(string FileName, string ContentType, long TotalBytes);
 public sealed record UploadTicket(Guid UploadId, int ChunkSizeBytes, int TotalParts);
@@ -135,7 +142,9 @@ public sealed record SearchHit(Guid ThreadId, Guid MessageId, string Text, DateT
     string Sender = "", bool Mine = false, string? AvatarUrl = null);
 /// <summary>A bookmarked message plus the conversation context the saved list shows around it.</summary>
 public sealed record SavedMessage(ChatMessage Message, string ConversationName, bool Group, DateTime SavedAt, string? ConversationAvatarUrl = null);
-public sealed record TypingUpdate(Guid ThreadId, Guid CredentialId, bool IsTyping);
+public sealed record TypingUpdate(Guid ThreadId, Guid CredentialId, bool IsTyping, ChatActivity Activity = ChatActivity.Typing, int Count = 0);
+/// <summary>What a member is composing, on the typing channel. Values match Communications' typing activity.</summary>
+public enum ChatActivity { Typing = 0, Photo = 1, Video = 2, File = 3, VoiceMessage = 4, Recording = 5 }
 /// <summary>One person's reaction. The badges on a bubble only count; this says who, and is fetched
 /// for one message at a time so a busy conversation never carries the roster on every page.</summary>
 public sealed record MessageReactor(Guid Id, string Emoji, Person Person, DateTime ReactedAt, bool Mine);
