@@ -138,7 +138,7 @@ internal sealed class BoltMediaSendQueue
                     while (_feedback.Count >= Math.Max(1, _options.FeedbackMaxQueuedFrames))
                     {
                         Release(_feedback.Dequeue());
-                        _droppedFeedback++;
+                        DroppedFeedback();
                     }
                     _feedback.Enqueue(Copy(frame, now, streamId));
                     return BoltMediaEnqueueResult.Accepted;
@@ -155,7 +155,7 @@ internal sealed class BoltMediaSendQueue
                     Remember(state, sequence);
                     if (frame.Length > _options.AudioMaxQueuedBytes)
                     {
-                        _droppedAudio++;
+                        DroppedAudio();
                         return BoltMediaEnqueueResult.Dropped;
                     }
 
@@ -167,7 +167,7 @@ internal sealed class BoltMediaSendQueue
                         var dropped = _audio.Dequeue();
                         _audioBytes -= dropped.Length;
                         Release(dropped);
-                        _droppedAudio++;
+                        DroppedAudio();
                     }
 
                     _audio.Enqueue(Copy(frame, now, streamId));
@@ -209,7 +209,7 @@ internal sealed class BoltMediaSendQueue
         {
             if (state.AwaitingKeyframe || IsVideoCongested(now, frame.Length))
             {
-                _droppedVideo++;
+                DroppedVideo();
                 return BoltMediaEnqueueResult.Dropped;
             }
 
@@ -219,7 +219,7 @@ internal sealed class BoltMediaSendQueue
 
         if (state.AwaitingKeyframe && !keyStart)
         {
-            _droppedVideo++;
+            DroppedVideo();
             return new(false, ShouldRequestKeyframe(state, now));
         }
 
@@ -231,7 +231,7 @@ internal sealed class BoltMediaSendQueue
             {
                 state.AwaitingKeyframe = true;
                 NoteCongestion(state, now);
-                _droppedVideo++;
+                DroppedVideo();
                 return new(false, ShouldRequestKeyframe(state, now));
             }
             // A fresh keyframe that fits once stale pictures are gone skips the receiver ahead.
@@ -258,7 +258,7 @@ internal sealed class BoltMediaSendQueue
                 if (now - item.EnqueuedAt <= _options.AudioMaxQueueDelayMs)
                     return true;
                 Release(item);
-                _droppedAudio++;
+                DroppedAudio();
             }
 
             if (_video.First is { } first)
@@ -313,6 +313,11 @@ internal sealed class BoltMediaSendQueue
             _streams.Clear();
         }
     }
+
+    // Every drop is counted here and exported as bolt.server.media.relay_drops{lane}.
+    private void DroppedAudio() { _droppedAudio++; BoltServerMetrics.RecordMediaRelayDrop("audio"); }
+    private void DroppedVideo() { _droppedVideo++; BoltServerMetrics.RecordMediaRelayDrop("video"); }
+    private void DroppedFeedback() { _droppedFeedback++; BoltServerMetrics.RecordMediaRelayDrop("feedback"); }
 
     private StreamState State(Guid streamId, bool awaitKeyframe)
     {
@@ -384,7 +389,7 @@ internal sealed class BoltMediaSendQueue
                 _videoBytes -= node.Value.Length;
                 Release(node.Value);
                 _video.Remove(node);
-                _droppedVideo++;
+                DroppedVideo();
             }
             node = next;
         }

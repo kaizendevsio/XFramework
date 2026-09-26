@@ -2103,7 +2103,6 @@ public sealed partial class BoltServer : IDisposable
         }
 
         var lane = route.MediaType == MediaType.Audio ? BoltMediaLane.Audio : BoltMediaLane.Video;
-        var laneName = lane == BoltMediaLane.Audio ? "audio" : "video";
         var needsKeyframe = false;
 
         // Simulcast-aware routing: if this stream has a layer ID, only forward to
@@ -2129,10 +2128,8 @@ public sealed partial class BoltServer : IDisposable
                 if (recipient.IsUnderPressure && length > 25 && (buffer[25] & 0x40) != 0)
                     continue;
 
-                var result = recipient.TryEnqueueMedia(frame, lane, streamId, sequence, keyStart, pictureAware: isMediaFrame);
-                if (!result.Queued)
-                    BoltServerMetrics.RecordMediaRelayDrop(laneName);
-                needsKeyframe |= result.RequestKeyframe;
+                // Drops are counted by the receiver's queue (bolt.server.media.relay_drops).
+                needsKeyframe |= recipient.TryEnqueueMedia(frame, lane, streamId, sequence, keyStart, pictureAware: isMediaFrame).RequestKeyframe;
             }
         }
 
@@ -2369,8 +2366,7 @@ public sealed partial class BoltServer : IDisposable
             return;
         if (route.Sender.MediaQueue is not null)
         {
-            if (!route.Sender.TryEnqueueMedia(span, BoltMediaLane.Feedback, streamId).Queued)
-                BoltServerMetrics.RecordMediaRelayDrop("feedback");
+            route.Sender.TryEnqueueMedia(span, BoltMediaLane.Feedback, streamId);
             return;
         }
         await route.Sender.SendAsync(buffer.AsMemory(0, length), ct);

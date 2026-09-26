@@ -4,8 +4,6 @@ name: Call network harness
 # (Yap's options) across a tc-netem shaped Linux TCP link, for the base branch and for this branch.
 # See src/Tests/Bolt.CallResilience.Harness/README.md. Runs when the relay changes, or on demand.
 on:
-  push:
-    branches: [claude/call-resilience-p0]
   workflow_dispatch:
     inputs:
       seconds:
