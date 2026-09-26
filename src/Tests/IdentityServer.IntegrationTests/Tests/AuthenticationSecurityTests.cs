@@ -409,6 +409,7 @@ public sealed class AuthenticationSecurityTests : IntegrationTestBase
             var session = await db.Set<Session>().IgnoreQueryFilters()
                 .SingleAsync(item => item.Id == auth.Response!.SessionId!.Value);
             session.ExpiresAt.Should().BeNull("an installed app's device session has no absolute expiry");
+            session.RefreshTokenExpiresAt.Should().BeAfter(DateTime.UtcNow.AddDays(90), "the app keeps devices through 90 idle days");
         }
 
         var refresh = await IntegrationTestFixture.ServiceWrapper.RefreshToken(new RefreshTokenRequest
@@ -425,7 +426,7 @@ public sealed class AuthenticationSecurityTests : IntegrationTestBase
             .SingleAsync(item => item.Id == auth.Response.SessionId.Value);
         persisted.Status.Should().Be(CurrentSessionState.Active);
         persisted.ExpiresAt.Should().BeNull("refresh must not reintroduce a cap");
-        persisted.RefreshTokenExpiresAt.Should().BeAfter(DateTime.UtcNow.AddDays(7), "the idle bound still slides on each rotation");
+        persisted.RefreshTokenExpiresAt.Should().BeAfter(DateTime.UtcNow.AddDays(90), "the idle bound still slides on each rotation");
     }
 
     [Test]
@@ -439,6 +440,7 @@ public sealed class AuthenticationSecurityTests : IntegrationTestBase
         var session = await db.Set<Session>().IgnoreQueryFilters()
             .SingleAsync(item => item.Id == auth.Response!.SessionId!.Value);
         session.ExpiresAt.Should().BeCloseTo(DateTime.UtcNow.AddHours(24), TimeSpan.FromMinutes(5));
+        session.RefreshTokenExpiresAt.Should().BeBefore(DateTime.UtcNow.AddDays(15), "other clients keep the configured refresh lifetime");
     }
 
     [Test]

@@ -47,6 +47,22 @@ public sealed class SessionLifetimeTests
         AuthService.NewSessionExpiry(new AuthenticateIdentityRequest(), Service(), Now)
             .Should().Be(Now.AddHours(24));
 
+    [Test]
+    public void PersistentSession_RefreshTokenOutlivesTheNinetyDayIdleWindow()
+    {
+        // Yap keeps a device signed in through 90 idle days, so the token it refreshes with
+        // must still be valid when the device comes back on day 89.
+        var expiry = AuthService.RefreshTokenExpiry(sessionExpiresAt: null, issuedExpiry: Now.AddDays(14), Now);
+        expiry.Should().BeOnOrAfter(Now.AddDays(90).AddHours(1));
+    }
+
+    [Test]
+    public void CappedSessions_KeepTheConfiguredRefreshTokenLifetime()
+    {
+        AuthService.RefreshTokenExpiry(Now.AddHours(24), Now.AddDays(14), Now).Should().Be(Now.AddDays(14));
+        AuthService.RefreshTokenExpiry(Now.AddDays(30), Now.AddDays(14), Now).Should().Be(Now.AddDays(14));
+    }
+
     private static TrustedInvocationContext Service() => new(
         Actor: null,
         Service: new TrustedServiceIdentity("XFramework.Yap", XFrameworkServiceNames.IdentityServer, new HashSet<string>(), GenerationId: null),

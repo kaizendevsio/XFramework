@@ -181,17 +181,30 @@ public sealed class YapSessionsTests
     }
 
     [Test]
-    public async Task TouchAsync_IdleBeyondTheWindow_EndsTheSignIn()
+    public async Task TouchAsync_EightyNineIdleDays_StaySignedIn()
     {
         var clock = new Clock(DateTimeOffset.UtcNow);
         using var provider = new ServiceCollection().BuildServiceProvider();
         var (sessions, _) = Build(provider, clock);
         var user = await sessions.CreateAsync(Session());
 
-        clock.Advance(TimeSpan.FromDays(6));
-        Assert.That(await sessions.TouchAsync(user), Is.Not.Null, "Six idle days stay inside the idle window");
+        clock.Advance(TimeSpan.FromDays(89));
+        Assert.That(await sessions.TouchAsync(user), Is.EqualTo(clock.GetUtcNow().AddDays(90)),
+            "89 idle days stay inside the window, and that use buys another full 90 days");
         // The window runs from that last use, not from sign-in.
-        clock.Advance(TimeSpan.FromDays(7) + TimeSpan.FromMinutes(1));
+        clock.Advance(TimeSpan.FromDays(89));
+        Assert.That(await sessions.ContainsAsync(user), Is.True);
+    }
+
+    [Test]
+    public async Task TouchAsync_NinetyOneIdleDays_EndTheSignIn()
+    {
+        var clock = new Clock(DateTimeOffset.UtcNow);
+        using var provider = new ServiceCollection().BuildServiceProvider();
+        var (sessions, _) = Build(provider, clock);
+        var user = await sessions.CreateAsync(Session());
+
+        clock.Advance(TimeSpan.FromDays(91));
         Assert.That(await sessions.TouchAsync(user), Is.Null);
         Assert.That(await sessions.ContainsAsync(user), Is.False);
     }
@@ -278,7 +291,7 @@ public sealed class YapSessionsTests
         var user = await sessions.CreateAsync(Session());
         var key = $"yap:session:{user.FindFirstValue(YapAuth.SessionClaim)}";
 
-        Assert.That(cache.Ttl(key), Is.EqualTo(TimeSpan.FromDays(7)), "A fresh sign-in expires on the idle window");
+        Assert.That(cache.Ttl(key), Is.EqualTo(TimeSpan.FromDays(90)), "A fresh sign-in expires on the idle window");
         foreach (var day in (int[])[6, 12, 18, 24, 30, 36])
         {
             clock.Advance(TimeSpan.FromDays(6));
@@ -286,7 +299,7 @@ public sealed class YapSessionsTests
             Assert.Multiple(() =>
             {
                 Assert.That(cache.Ttl(key), Is.EqualTo(rolled - clock.GetUtcNow()), $"Day {day} TTL must track the rolled deadline");
-                Assert.That(cache.Ttl(key), Is.EqualTo(TimeSpan.FromDays(7)), $"Day {day} use buys a full idle window");
+                Assert.That(cache.Ttl(key), Is.EqualTo(TimeSpan.FromDays(90)), $"Day {day} use buys a full idle window");
             });
         }
     }

@@ -23,11 +23,11 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
     // sign-in only ever ends on disuse, never on age: each use pushes the idle deadline out
     // again, and there is no absolute cap. Sign-out, upstream revocation and credential
     // changes still end it immediately. The upstream session is persistent too (see
-    // YapAuth), so the one other bound is IdentityServer's refresh token: it lives 14 days
-    // and slides on each rotation. This window is half of that, leaving room for clock skew,
-    // a backgrounded app and a transient refresh failure, so a returning device always
-    // arrives with something left to refresh with.
-    public static readonly TimeSpan IdleWindow = TimeSpan.FromDays(7);
+    // YapAuth), so the one other bound is IdentityServer's refresh token for such sessions:
+    // it lives 120 days and slides on each rotation. This window sits inside that with room
+    // for clock skew, a backgrounded app and a transient refresh failure, so a returning
+    // device always arrives with something left to refresh with.
+    public static readonly TimeSpan IdleWindow = TimeSpan.FromDays(90);
 
     // Rolling on every request would write the shared store on every request. The deadline
     // only moves once it has drifted this far, which costs one write per active hour.
