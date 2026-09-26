@@ -115,34 +115,50 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         // Initialize audio pipeline
         await _audio.InitializeAsync(_options.AudioSampleRate, _options.AudioChannels, _options.AudioBitrateKbps, OpusSettings);
 
-        // Create media client and wire events
-        _mediaClient = new BoltMediaClient(client, _logger);
+        _mediaClient = CreateMediaClient(client);
+
+        _initialized = true;
+        _logger.LogInformation("BoltMediaService initialized");
+    }
+
+    /// <summary>
+    /// Wrap <paramref name="client"/> and wire every event. Used for the first transport and again for
+    /// each resumed one (<see cref="AttachTransport"/>), so both are wired identically.
+    /// </summary>
+    private BoltMediaClient CreateMediaClient(BoltClient client)
+    {
+        var mediaClient = new BoltMediaClient(client, _logger)
+        {
+            // A hosted SFrame call outlives its socket: the host resumes it on a new connection and
+            // decides itself when the call is over. Tearing down keys and capture here would make
+            // every network blip a hang-up.
+            EndCallsOnDisconnect = _options.SecurityMode != MediaSecurityMode.AuthenticatedSFrame
+        };
         if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame)
         {
             if (_sframe is null) throw new InvalidOperationException("SFrame browser services are not registered.");
-            _mediaClient.AuthenticatedStreamEncryptionFactory = _sframe.ForStream;
+            mediaClient.AuthenticatedStreamEncryptionFactory = _sframe.ForStream;
         }
 
-        _mediaClient.OnIncomingCall += async info =>
+        mediaClient.OnIncomingCall += async info =>
         {
             if (OnIncomingCall is not null) await OnIncomingCall(info);
         };
-        _mediaClient.OnCallAnswered += HandleCallAnsweredAsync;
-        _mediaClient.OnCallRejected += async (callId, reason) =>
+        mediaClient.OnCallAnswered += HandleCallAnsweredAsync;
+        mediaClient.OnCallRejected += async (callId, reason) =>
         {
             await StopPipelinesAsync();
             if (OnCallRejected is not null) await OnCallRejected(callId, reason);
         };
-        _mediaClient.OnCallEnded += async callId =>
+        mediaClient.OnCallEnded += async callId =>
         {
             await StopPipelinesAsync();
             if (OnCallEnded is not null) await OnCallEnded(callId);
         };
-        _mediaClient.OnKeyframeRequested += streamId => { _ = _video.RequestKeyframeAsync(); };
-        _mediaClient.OnMediaStreamConfigured += stream => { RegisterRemoteVideo(stream); StartPlaybackLoop(stream); };
-
-        _initialized = true;
-        _logger.LogInformation("BoltMediaService initialized");
+        mediaClient.OnKeyframeRequested += streamId => { _ = _video.RequestKeyframeAsync(); };
+        mediaClient.OnMediaStreamConfigured += stream => { RegisterRemoteVideo(stream); StartPlaybackLoop(stream); };
+        mediaClient.OnHeartbeat += (_, stamp) => OnHeartbeatEcho?.Invoke(stamp);
+        return mediaClient;
     }
 
     private OpusEncoderSettings OpusSettings =>
