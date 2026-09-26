@@ -20,4 +20,7 @@ public partial record ThreadListItemResponse
     public Guid? PhotoStorageFileId { get; set; }
     // Opaque content and its verification context; only a recipient device can make a preview.
     public ThreadMessageItemResponse? EncryptedLastMessage { get; set; }
+    /// <summary>True only when this is a direct conversation and the peer shares their active status in it.
+    /// Appended last for MemoryPack compatibility; an older server reads as "not shared", never as a leak.</summary>
+    public bool OtherSharesActiveStatus { get; set; }
 }

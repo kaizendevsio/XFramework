@@ -105,6 +105,8 @@
         await StopTypingAsync();
         await CancelRecordingAsync();
         await RemoveFileAsync();
+        // Leaving the conversation withdraws "Sending a photo…" even if an upload carries on.
+        await State.EndActivityAsync(ThreadId);
         // The picker owns a document-level flag while it is up; leaving the conversation
         // must not leave the shell laid out for a keyboard that is no longer there.
         if (emoji.Open) { emoji.Close(); await JS.InvokeVoidAsync("yap.emojiKeyboard.hide", editor, false); }
@@ -143,17 +145,28 @@
     }
     private async Task StartRecordingAsync()
     {
-        try { await JS.InvokeVoidAsync("yap.device.startRecording"); recording = true; }
+        try { await JS.InvokeVoidAsync("yap.device.startRecording"); recording = true; _ = State.BeginActivityAsync(ThreadId, ChatActivity.Recording); }
         catch { State.Report(new InvalidOperationException("Allow microphone access to record a voice message.")); }
     }
     private async Task FinishRecordingAsync()
     {
         busy = true;
-        try { var picked = await JS.InvokeAsync<ChatState.PickedFile?>("yap.device.stopRecording", Guid.NewGuid().ToString("N"), false, ChatLimits.StagedFileBytes); await RemoveFileAsync(); file = picked; }
-        catch (Exception ex) { State.Report(ex); }
+        try
+        {
+            var picked = await JS.InvokeAsync<ChatState.PickedFile?>("yap.device.stopRecording", Guid.NewGuid().ToString("N"), false, ChatLimits.StagedFileBytes);
+            await RemoveFileAsync(); file = picked;
+            _ = picked is null ? State.EndActivityAsync(ThreadId) : State.BeginActivityAsync(ThreadId, ChatActivity.VoiceMessage);
+        }
+        catch (Exception ex) { State.Report(ex); _ = State.EndActivityAsync(ThreadId); }
         finally { busy = recording = false; }
     }
-    private async Task CancelRecordingAsync() { if (recording) await JS.InvokeVoidAsync("yap.device.stopRecording", "", true, ChatLimits.StagedFileBytes); recording = false; }
+    private async Task CancelRecordingAsync()
+    {
+        if (!recording) return;
+        if (file is null) _ = State.EndActivityAsync(ThreadId);
+        await JS.InvokeVoidAsync("yap.device.stopRecording", "", true, ChatLimits.StagedFileBytes);
+        recording = false;
+    }
 
     private async Task PickAsync(InputFileChangeEventArgs e, InputFile? source)
     {
@@ -170,6 +183,8 @@
             var picked = await JS.InvokeAsync<ChatState.PickedFile>("yap.device.pickFile", source!.Element,
                 Guid.NewGuid().ToString("N"), ChatLimits.StagedFileBytes, ChatLimits.MaxFileBytes);
             file = picked;
+            // Only the kind and count are announced, never the name or size.
+            _ = State.BeginActivityAsync(ThreadId, ChatState.ActivityFor(picked.ContentType));
             if (!picked.Staged && !State.EncryptionEnabled) await StreamAsync(picked);
         }
         catch (Exception ex) { State.Report(ex); await RemoveFileAsync(); }
@@ -226,6 +241,7 @@
         previewFailed = false;
         if (file is not { } previous) return;
         file = null;
+        _ = State.EndActivityAsync(ThreadId);
         if (previous.UploadId is { } session) await AbortAsync(session);
         await JS.InvokeVoidAsync("yap.device.removeFile", previous.Key);
     }

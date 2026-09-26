@@ -1,3 +1,4 @@
+using Communications.Domain.Shared.Contracts.Realtime;
 using Communications.Domain.Shared.Contracts.Requests.Threads;
 using Communications.Integration.Clients;
 using Yap.Contracts;
@@ -34,6 +35,17 @@ internal static class YapChatCommands
     internal static async Task TypingAsync(ThreadAction request, ICommunicationsChatSession session, CancellationToken ct)
     {
         if (request.ThreadId == Guid.Empty || request.Action != "typing") throw new YapApiException(400, "Choose a conversation.");
-        await session.PublishTypingAsync(request.ThreadId, request.Value, ct);
+        if (!Enum.IsDefined(request.Activity)) throw new YapApiException(400, "Choose a supported activity.");
+        if (request.Activity == ChatActivity.Typing) await session.PublishTypingAsync(request.ThreadId, request.Value, ct);
+        else await session.PublishTypingAsync(request.ThreadId, request.Value, (CommunicationsTypingActivity)request.Activity, request.Count, ct);
+    }
+
+    /// <summary>Projects a typing-channel event for the browser: only the kind and count of an
+    /// attachment in progress, and an unknown kind from a newer module reads as plain typing.</summary>
+    internal static TypingUpdate Typing(CommunicationsTypingState state)
+    {
+        var activity = Enum.IsDefined((ChatActivity)state.Activity) ? (ChatActivity)state.Activity : ChatActivity.Typing;
+        var count = activity is ChatActivity.Typing or ChatActivity.Recording ? 0 : Math.Clamp(state.Count, 1, 99);
+        return new TypingUpdate(state.ThreadId, state.CredentialId, state.IsTyping, activity, count);
     }
 }

@@ -99,13 +99,13 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     public void DismissError() { Error = null; Notify(); }
     public static bool IsConnectionFailure(Exception ex) => ex is HttpRequestException or TaskCanceledException
         || ex is ChatApiException { Status: 408 or 429 or >= 500 };
-    private void SetOffline() { Online = false; typing.Clear(); }
+    private void SetOffline() { Online = false; ClearTyping(); }
     // The server answered, so the device is online; it is the sign-in that is gone. Every
     // guarded path stops calling the server until the person signs in again.
     private bool EndedSession(Exception ex)
     {
         if (ex is not ChatApiException { SessionEnded: true }) return false;
-        NeedsLogin = true; Online = true; Error = null; typing.Clear();
+        NeedsLogin = true; Online = true; Error = null; ClearTyping();
         return true;
     }
     public void Report(Exception ex)
@@ -248,9 +248,16 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         catch (Exception ex) { reconciliationFailures++; Report(ex); }
     }
 
-    [JSInvokable] public void TypingChanged(Guid thread, Guid credential, bool active)
+    [JSInvokable] public void TypingChanged(Guid thread, Guid credential, bool active, ChatActivity activity = ChatActivity.Typing, int count = 0)
     {
         if (!Online || NeedsLogin || Selected?.Id != thread || User?.CredentialId == credential) return;
+        // The host already drops typing for a conversation with it switched off; a stale event must not slip through either.
+        if (!Selected.Allows(ChatFeature.Typing)) return;
+        if (activity != ChatActivity.Typing)
+        {
+            if (Enum.IsDefined(activity)) { ActivityChanged(thread, credential, active, activity, count); Notify(); }
+            return;
+        }
         if (active) { typing[credential] = DateTime.UtcNow.AddSeconds(6); _ = ExpireTypingAsync(thread, credential); }
         else typing.TryRemove(credential, out _);
         Notify();
@@ -387,7 +394,8 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         var scope = Scope;
         pages = 1; historyOffset = 0; replyParent = null; cachedCount = 0;
         foreach (var old in Conversations) old.Messages.Clear();
-        typing.Clear(); acknowledged.Clear();
+        ClearTyping(); acknowledged.Clear();
+        if (outgoingActivity is { } announced && announced.Thread != id) _ = EndActivityAsync(announced.Thread);
         var conversation = Conversations.FirstOrDefault(x => x.Id == id) ?? new Conversation { Id = id };
         Selected = conversation;
         OpeningConversation = true;
@@ -480,6 +488,11 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         conversation.Preview = summary?.Preview ?? "Start a conversation";
         conversation.LastMessage = summary?.LastMessage;
         conversation.Muted = summary?.Muted ?? false;
+        // The roster just fetched is the freshest word on the peer, and it already honours their
+        // per-conversation choice to hide active status; the inbox dot follows the header.
+        if (!conversation.Group && conversation.People.FirstOrDefault(x => x.Id != User?.CredentialId) is { } peer)
+        { conversation.PeerId = peer.Id; conversation.PeerActiveUntil = peer.ActiveUntil; conversation.PeerLastActiveAt = peer.LastActiveAt; }
+        else if (!conversation.Group) conversation.PeerId = summary?.PeerId;
         var fetched = new List<ChatMessage>();
         fetched.AddRange(result.Items); conversation.MessageTotal = result.TotalCount;
         await DecryptMessagesAsync(fetched);
@@ -519,7 +532,8 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         Selected?.Messages.Clear();
         foreach (var conversation in Conversations) conversation.Messages.Clear();
         Selected = null;
-        typing.Clear();
+        ClearTyping();
+        _ = EndActivityAsync(id);
         _ = WatchEventsAsync();
     }
 
@@ -727,7 +741,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         await store.RemoveConversationAsync(Scope, thread, lifetime.Token, discardPending: true);
         ForgetDelivered(thread); await SaveDeliveredAsync();
         Conversations.RemoveAll(x => x.Id == thread);
-        if (Selected?.Id == thread) { Selected = null; typing.Clear(); }
+        if (Selected?.Id == thread) { Selected = null; ClearTyping(); }
         PendingCount = (await store.PendingAsync(Scope)).Count;
         Error = null;
         ConversationRemoved?.Invoke(thread);
@@ -749,7 +763,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
                 callHistoryVersion++;
                 await store.RemoveConversationAsync(Scope, thread, lifetime.Token);
                 Conversations.RemoveAll(x => x.Id == thread);
-                if (Selected?.Id == thread) { Selected = null; typing.Clear(); await WatchEventsAsync(); }
+                if (Selected?.Id == thread) { Selected = null; ClearTyping(); await WatchEventsAsync(); }
             }
             finally { sync.Release(); Notify(); }
             });
@@ -793,6 +807,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             throw;
         }
         finally { stagingMessages.Remove(id); messageMutationVersion++; if (entered) localChanges.Release(); Notify(); }
+        if (file is not null) BindActivity(thread, id);
         sendRequested = true;
         if (sending is not { IsCompleted: false }) sending = SynchronizeSendsAsync();
     }
@@ -960,6 +975,8 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
                     stop = true;
                     break;
                 }
+                // Sent, refused or waiting to retry: either way the attachment is no longer on its way now.
+                finally { await FinishActivityAsync(item.Id); }
             }
         }
         if (rosterChanged && allowRosterRetry) await FlushCoreAsync(allowRosterRetry: false);
@@ -1191,7 +1208,8 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             await store.ClearPrivateAsync();
             User = null; Selected = null; Conversations = []; Defaults = null; PendingCount = 0; NeedsLogin = false;
             messageUpdates.Clear(); deliveredPending.Clear();
-            typing.Clear(); publishingThread = null;
+            ClearTyping(); publishingThread = null;
+            Interlocked.Increment(ref activityVersion); outgoingActivity = null; activityMessage = null;
             api.Account = "";
             await js.InvokeVoidAsync("yap.push.presence", "", "");
             await js.InvokeVoidAsync("yap.device.events", "");

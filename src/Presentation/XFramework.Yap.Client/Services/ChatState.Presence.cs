@@ -23,8 +23,31 @@ public sealed partial class ChatState
 
     public bool IsActive(Person person) => Online && !NeedsLogin && person.ActiveUntil > DateTime.UtcNow;
 
+    // Presence dots. A cached heartbeat means nothing while this device is offline or signed out,
+    // and neither your own avatar nor a group's ever carries one.
+    public PresenceStatus PresenceOf(Person person) =>
+        !Online || NeedsLogin || person.Id == User?.CredentialId ? PresenceStatus.Offline
+        : PresenceDot.Of(person.ActiveUntil, person.LastActiveAt, DateTime.UtcNow);
+
+    public PresenceStatus PresenceOf(Conversation conversation) =>
+        !Online || NeedsLogin || conversation.Group || conversation.PeerId is not { } peer || peer == User?.CredentialId ? PresenceStatus.Offline
+        : PresenceDot.Of(conversation.PeerActiveUntil, conversation.PeerLastActiveAt, DateTime.UtcNow);
+
+    /// <summary>For a row that names a conversation (a call, say) rather than holding it.</summary>
+    public PresenceStatus PresenceOfConversation(Guid conversationId) =>
+        (Selected?.Id == conversationId ? Selected : Conversations.FirstOrDefault(x => x.Id == conversationId)) is { } conversation
+            ? PresenceOf(conversation) : PresenceStatus.Offline;
+
+    /// <summary>For a person picker. Active status is shared per conversation, so only a direct chat
+    /// with this person can say it; without one there is no dot rather than a guess.</summary>
+    public PresenceStatus PresenceOfPerson(Guid credentialId) =>
+        Conversations.FirstOrDefault(x => !x.Group && !x.Removed && x.PeerId == credentialId) is { } direct
+            ? PresenceOf(Selected?.Id == direct.Id ? Selected : direct) : PresenceStatus.Offline;
+
     public string ConversationSubtitle(Conversation conversation)
     {
+        // An attachment in progress takes the status line's place while it lasts.
+        if (ActivityText(conversation) is { } activity) return activity;
         var active = conversation.People.Count(person => person.Id != User?.CredentialId && IsActive(person));
         if (conversation.Group) return active > 0 ? $"{active} active now" : $"{conversation.Members} members";
         if (active > 0) return "Active now";

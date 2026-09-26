@@ -339,7 +339,7 @@ public sealed class YapChatGateway : IDisposable
                 if (!lifetime.IsCancellationRequested && value.TenantId == session.TenantId && value.ThreadId == thread.Value &&
                     value.CredentialId != session.CredentialId)
                     connection.Enqueue(new ChatSocketEvent(Guid.NewGuid(), 0, "typing", value.ThreadId,
-                    Body: JsonSerializer.SerializeToElement(new TypingUpdate(value.ThreadId, value.CredentialId, value.IsTyping), Json)));
+                    Body: JsonSerializer.SerializeToElement(YapChatCommands.Typing(value), Json)));
                 return Task.CompletedTask;
             }, lifetime.Token);
         }

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using IdentityServer.Domain.Shared;
 using Communications.Domain.Shared;
+using Communications.Domain.Shared.Contracts.Realtime;
 using Communications.Domain.Shared.Contracts.Requests.Attachments;
 using Communications.Domain.Shared.Contracts.Requests.Delete;
 using Communications.Domain.Shared.Contracts.Requests.Edit;
@@ -373,6 +374,10 @@ public sealed partial class ThreadService(
                 .GroupByAsync(m => m.MessageThreadId, ct);
 
             var memberCountMap = memberGroups.ToDictionary(g => g.Key, g => g.Items.Count);
+            // A direct peer's own per-conversation choice decides whether their active status may be shown.
+            var sharingPeers = memberGroups
+                .Where(g => directPeers.TryGetValue(g.Key, out var peer) && g.Items.Any(m => m.CredentialId == peer && !m.HideActiveStatus))
+                .Select(g => g.Key).ToHashSet();
 
             // Get messages for these threads to find last message per thread.
             // The inbox previews the timeline, so a thread reply is never the preview.
@@ -440,7 +445,8 @@ public sealed partial class ThreadService(
                     IsMuted = membership?.IsMuted == true,
                     IsArchived = membership?.IsArchived == true,
                     IsDirect = directThreadIds.Contains(t.Id),
-                    OtherCredentialId = directPeers.TryGetValue(t.Id, out var peer) ? peer : null
+                    OtherCredentialId = directPeers.TryGetValue(t.Id, out var peer) ? peer : null,
+                    OtherSharesActiveStatus = sharingPeers.Contains(t.Id)
                 };
             }).ToList();
 
@@ -3353,6 +3359,9 @@ public sealed partial class ThreadService(
                 return CallerFailure<CmdResponse>(callerResult);
 
             var caller = callerResult.Data!;
+            if (!Enum.IsDefined(request.Activity))
+                return Result<CmdResponse>.Failure("Unknown typing activity", 400);
+            // Attachment activity shares typing's gate: a conversation with typing off reveals neither.
             if (!await FeatureEnabledAsync(caller.TenantId, request.ThreadId, ConversationFeatures.Typing, ct))
                 return Result<CmdResponse>.Forbidden("Typing are disabled for this conversation");
             var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
@@ -3369,7 +3378,9 @@ public sealed partial class ThreadService(
                 ThreadId = request.ThreadId,
                 CredentialId = caller.CredentialId,
                 IsTyping = request.IsTyping,
-                OccurredAt = DateTime.UtcNow
+                OccurredAt = DateTime.UtcNow,
+                Activity = request.Activity,
+                Count = TypingActivityCount(request.Activity, request.Count)
             }, ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
@@ -3384,6 +3395,11 @@ public sealed partial class ThreadService(
             return OperationFailure<CmdResponse>(ex, "Error publishing typing state");
         }
     }
+
+    /// <summary>Only a small count travels with an attachment activity; typing carries none.</summary>
+    internal const int MaxTypingActivityCount = 99;
+    internal static int TypingActivityCount(CommunicationsTypingActivity activity, int count) =>
+        activity is CommunicationsTypingActivity.Typing or CommunicationsTypingActivity.Recording ? 0 : Math.Clamp(count, 1, MaxTypingActivityCount);
 
     public async Task<Result<CmdResponse>> PublishPresenceAsync(PublishCommunicationsPresenceRequest request, CancellationToken ct = default)
     {

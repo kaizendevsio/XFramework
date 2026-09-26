@@ -67,14 +67,24 @@ public static class YapApi
             var data = Require(await session.GetDeletedThreadsAsync(Page(page), ct));
             return new ChatPage<Guid>(data.Items, data.TotalCount);
         });
-        api.MapGet("/conversations", async (int? page, ICommunicationsChatClient client, IChatDirectory directory, CancellationToken ct) =>
+        api.MapGet("/conversations", async (int? page, ICommunicationsChatClient client, IChatDirectory directory, YapPresence presence, CancellationToken ct) =>
         {
             var session = await client.ForCurrentActorAsync(ct: ct);
             var data = Require(await session.GetThreadsAsync(Page(page), 30, ct));
             var people = await directory.ResolveAsync(data.Items.Where(x => x.OtherCredentialId.HasValue)
                 .Select(x => x.OtherCredentialId!.Value).Distinct().ToArray(), ct);
+            // The same heartbeat the conversation header reads, for direct peers only and only while
+            // that peer shares active status in the conversation. The list is already refreshed on
+            // every sync and live hint, so presence rides it rather than adding a poll of its own.
+            var sharing = data.Items.Where(x => x.IsDirect && x.OtherSharesActiveStatus && x.OtherCredentialId.HasValue)
+                .Select(x => x.OtherCredentialId!.Value).Distinct().ToArray();
+            var seen = (await Task.WhenAll(sharing.Select(async id => (id, last: await presence.LastActiveAtAsync(session.TenantId, id, ct)))))
+                .ToDictionary(x => x.id, x => x.last);
             return new ChatPage<Conversation>(data.Items.Select(x => new Conversation
             {
+                PeerId = x.IsDirect ? x.OtherCredentialId : null,
+                PeerLastActiveAt = x.IsDirect && x.OtherSharesActiveStatus && x.OtherCredentialId is { } shown ? seen.GetValueOrDefault(shown) : null,
+                PeerActiveUntil = x.IsDirect && x.OtherSharesActiveStatus && x.OtherCredentialId is { } live ? seen.GetValueOrDefault(live)?.Add(YapPresence.Lifetime) : null,
                 Id = x.Id, Name = x.IsDirect && !x.HasCustomName ? people.FirstOrDefault(p => p.Id == x.OtherCredentialId)?.Name ?? "Direct message" : x.Name,
                 Group = !x.IsDirect, Members = x.MemberCount, Unread = x.UnreadCount,
                 AvatarUrl = x.IsDirect ? people.FirstOrDefault(p => p.Id == x.OtherCredentialId)?.AvatarUrl : YapProfile.GroupPhoto(x.Id, x.PhotoStorageFileId, session.TenantId, session.CredentialId),
@@ -399,7 +409,7 @@ public static class YapApi
                 Require(await session.GetThreadAsync(thread.Value, lifetime.Token));
                 await session.SubscribeTypingAsync(thread.Value, state =>
                 {
-                    hints.Writer.TryWrite($"event: typing\ndata: {JsonSerializer.Serialize(new TypingUpdate(state.ThreadId, state.CredentialId, state.IsTyping))}\n\n");
+                    hints.Writer.TryWrite($"event: typing\ndata: {JsonSerializer.Serialize(YapChatCommands.Typing(state))}\n\n");
                     return Task.CompletedTask;
                 }, lifetime.Token);
             }

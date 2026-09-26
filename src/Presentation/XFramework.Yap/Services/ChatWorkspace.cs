@@ -86,7 +86,8 @@ public sealed class ChatWorkspace(ICommunicationsChatClient client, IChatDirecto
             await LoadMessagesAsync();
             await Session.SubscribeTypingAsync(id, state =>
             {
-                if (state.CredentialId != CredentialId && Selected?.Id == state.ThreadId)
+                // This view shows typing only; attachment activity on the same channel is not typing.
+                if (state.CredentialId != CredentialId && Selected?.Id == state.ThreadId && state.Activity == CommunicationsTypingActivity.Typing)
                 {
                     lock (typingMembers)
                     {
