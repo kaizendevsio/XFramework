@@ -172,6 +172,20 @@
         copy.querySelector('.exit-backdrop')?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 180, fill: 'forwards' });
         animation.finished.catch(() => {}).finally(() => copy.remove());
     };
+    // With View Transitions, motion.css animates the tab bar's snapshot. Without the API the
+    // bar would vanish or appear in one frame, so it gets the same fade and slide here. Only
+    // insertion and removal animate: between tabbed pages Blazor keeps the element, so it stays still.
+    const fallbackMotion = () => document.documentElement.classList.contains('motion-fallback') && !reduced();
+    const tabsFrames = [{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }];
+    const retireTabs = (element, parent) => {
+        if (document.hidden || !parent?.isConnected) return;
+        const copy = element.cloneNode(true);
+        for (const node of [copy, ...copy.querySelectorAll('[id]')]) node.removeAttribute('id');
+        copy.setAttribute('aria-hidden', 'true'); copy.inert = true; copy.dataset.exitGhost = '';
+        parent.append(copy);
+        copy.animate([...tabsFrames].reverse(), { duration: 180, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'forwards' })
+            .finished.catch(() => {}).finally(() => copy.remove());
+    };
     const observe = () => {
         const app = document.getElementById('app'); if (!app) return;
         const composers = new Map();
@@ -204,8 +218,15 @@
         };
         let syncFrame;
         new MutationObserver(records => {
-            for (const record of records) for (const node of record.removedNodes)
-                if (node.nodeType === 1 && node.matches('.message-menu-dialog,.sheet-dialog,.toast,.replyto,.conversation-menu')) retire(node);
+            for (const record of records) {
+                for (const node of record.removedNodes) {
+                    if (node.nodeType !== 1) continue;
+                    if (node.matches('.message-menu-dialog,.sheet-dialog,.toast,.replyto,.conversation-menu')) retire(node);
+                    else if (node.matches('.shell-tabs:not([data-exit-ghost])') && fallbackMotion()) retireTabs(node, record.target);
+                }
+                for (const node of record.addedNodes)
+                    if (node.nodeType === 1 && node.matches('.shell-tabs:not([data-exit-ghost])') && fallbackMotion()) node.animate(tabsFrames, { duration: 220, easing: 'cubic-bezier(.22,1,.36,1)' });
+            }
             if (!syncFrame) syncFrame = requestAnimationFrame(() => { syncFrame = 0; syncComposers(); });
         }).observe(app, { childList: true, subtree: true });
         syncComposers();
