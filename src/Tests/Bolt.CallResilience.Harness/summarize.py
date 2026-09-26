@@ -18,9 +18,9 @@ def main(directory):
     root = pathlib.Path(directory)
     names = sorted({p.name.split(".")[0] for p in root.rglob("*.relay.log")})
     rows = [
-        "| run | outcome | audio one-way ms p50 / p90 / p99 / max | audio delivered | longest audio gap | "
-        "decodable pictures | video frozen s | keyframes | relay drops (audio / video) |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| run | outcome | audio one-way ms p50 / p90 / p99 / max | after 20 s: p50 / p99 / max | audio delivered | "
+        "longest audio gap | decodable pictures | video frozen s | keyframes | relay drops (audio / video) |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     rate_rows = [
         "| run | settled video kbps (median) | settled estimate kbps | final picture | converged at | "
@@ -31,11 +31,13 @@ def main(directory):
         relay = summary(next(root.rglob(f"{name}.relay.log")))
         receiver = summary(next(iter(root.rglob(f"{name}.receiver.log")), root / "missing"))
         delay = receiver.get("audioDelayMs", {})
+        settled = receiver.get("audioDelayAfter20sMs", {})
         counters = relay.get("counters", {})
         drops = f"{counters.get('media.relay_drops[audio]', 0)} / {counters.get('media.relay_drops[video]', 0)}"
         rows.append(
             f"| {name} | {relay.get('outcome', 'no summary')} | "
             f"{delay.get('p50', '-')} / {delay.get('p90', '-')} / {delay.get('p99', '-')} / {delay.get('max', '-')} | "
+            f"{settled.get('p50', '-')} / {settled.get('p99', '-')} / {settled.get('max', '-')} | "
             f"{receiver.get('audioDelivered', '-')}% | {receiver.get('longestAudioGapMs', '-')} ms | "
             f"{receiver.get('picturesDecodable', '-')} of {relay.get('videoPicturesSent', '-')} | "
             f"{receiver.get('frozenSeconds', '-')} | {receiver.get('keyframes', '-')} | {drops} |"

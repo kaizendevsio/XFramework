@@ -15,6 +15,8 @@ on:
     paths:
       - src/Libraries/Bolt/Bolt.Server/**
       - src/Libraries/Bolt/Bolt.Protocol/**
+      - src/Libraries/Bolt/Bolt.Client/**
+      - src/Libraries/Bolt/Bolt.Media/**
       - src/Tests/Bolt.CallResilience.Harness/**
       - .github/workflows/call-network-harness.yml
 

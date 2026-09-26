@@ -442,6 +442,8 @@ internal static class Receiver
         var clock = Stopwatch.StartNew();
         var kinds = new Dictionary<Guid, MediaType>();
         var audioDelays = new List<long>();
+        // The same, from 20 s on: an overload start (or any start) is a transient; this is the call after it.
+        var settledAudioDelays = new List<long>();
         var videoDelays = new List<long>();
         var window = new Window();
         long? firstAudioSequence = null, lastAudioSequence = null, lastAudioArrival = null, firstMediaAt = null;
@@ -507,6 +509,7 @@ internal static class Receiver
                     if (payload[8] == Payload.Audio)
                     {
                         audioDelays.Add(delay); window.Audio.Add(delay); audioReceived++;
+                        if (firstMediaAt is { } started && clock.ElapsedMilliseconds - started >= 20_000) settledAudioDelays.Add(delay);
                         firstAudioSequence ??= header.SequenceNumber;
                         lastAudioSequence = header.SequenceNumber;
                         var arrival = clock.ElapsedMilliseconds;
@@ -568,6 +571,7 @@ internal static class Receiver
             audioReceived,
             audioDelivered = span > 0 ? Math.Round(100.0 * audioReceived / span, 1) : 0,
             audioDelayMs = new { p50 = Percentile(audioDelays, .5), p90 = Percentile(audioDelays, .9), p99 = Percentile(audioDelays, .99), max = Percentile(audioDelays, 1) },
+            audioDelayAfter20sMs = new { p50 = Percentile(settledAudioDelays, .5), p99 = Percentile(settledAudioDelays, .99), max = Percentile(settledAudioDelays, 1) },
             longestAudioGapMs = longestAudioGap,
             silentSeconds,
             videoDelayMsP50 = Percentile(videoDelays, .5),
