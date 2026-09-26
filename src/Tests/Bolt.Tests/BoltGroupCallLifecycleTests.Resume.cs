@@ -90,7 +90,8 @@ public sealed partial class BoltGroupCallLifecycleTests
         Assert.That(() => departures.Count, Is.EqualTo(1).After(5000, 10));
         Assert.Multiple(() =>
         {
-            Assert.That(departures.Single(), Is.EqualTo(new BoltGroupDeparture(f.Call, "c", expected)));
+            Assert.That(departures.Single() with { Participant = null }, Is.EqualTo(new BoltGroupDeparture(f.Call, "c", expected)));
+            Assert.That(departures.Single().Participant?.FindFirst("bolt_media_client_id")?.Value, Is.EqualTo("c"), "the departed connection's own principal");
             Assert.That(removed, Is.EqualTo(new[] { "c" }), "the reason-less notification still fires for existing hosts");
         });
     }

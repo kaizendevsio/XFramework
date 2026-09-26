@@ -65,5 +65,9 @@ public enum BoltGroupDepartureReason
     Unauthorized
 }
 
-/// <summary>One participant's departure from the relay's room, with the reason it happened.</summary>
-public sealed record BoltGroupDeparture(Guid CallId, string ClientId, BoltGroupDepartureReason Reason);
+/// <summary>
+/// One participant's departure from the relay's room, with the reason it happened. <c>Participant</c> is
+/// the principal of the connection that departed, so a host can tell a superseded connection of a
+/// resumed participant from the participant itself.
+/// </summary>
+public sealed record BoltGroupDeparture(Guid CallId, string ClientId, BoltGroupDepartureReason Reason, ClaimsPrincipal? Participant = null);

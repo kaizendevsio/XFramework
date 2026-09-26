@@ -255,7 +255,7 @@ public sealed partial class BoltServer
         {
             try { GroupParticipantRemoved?.Invoke(call.CallId, clientId); }
             catch { /* Host notifications do not restore removed media access. */ }
-            try { GroupParticipantDeparted?.Invoke(new BoltGroupDeparture(call.CallId, clientId, reason)); }
+            try { GroupParticipantDeparted?.Invoke(new BoltGroupDeparture(call.CallId, clientId, reason, participant.User)); }
             catch { /* Same. */ }
         }
     }
