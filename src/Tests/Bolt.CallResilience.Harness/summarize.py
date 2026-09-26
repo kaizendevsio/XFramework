@@ -67,7 +67,7 @@ def main(directory):
         holds = relay.get("resume", {}) or {}
         held = ", ".join(f"{round(h['resumedAtS'] - h['awayAtS'], 1)} s" for h in holds.get("holds", [])) or "-"
         event = receiver.get("eventKind", "-")
-        if receiver.get("eventSeconds") is not None:
+        if receiver.get("eventSeconds"):
             event += f" {receiver['eventSeconds']} s"
         state = "gave up" if receiver.get("gaveUp") else "in call"
         rows.append(

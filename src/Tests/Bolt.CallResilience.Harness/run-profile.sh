@@ -80,7 +80,9 @@ case $expect in
       exit 1
     fi ;;
 esac
-if [ "$expect" = resume-retired ] && ! docker logs "$relay" 2>&1 | grep -q "Retiring Bolt connection"; then
+# Read the log once: with pipefail, `docker logs | grep -q` fails whenever grep stops reading early.
+relay_log=$(docker logs "$relay" 2>&1 || true)
+if [ "$expect" = resume-retired ] && ! grep -q "Retiring Bolt connection" <<<"$relay_log"; then
   echo "$name: the relay never retired the stalled receiver" >&2
   exit 1
 fi

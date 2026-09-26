@@ -68,6 +68,7 @@ internal static class ResumingReceiver
                 break;
             }
             var resumedAt = clock.Elapsed.TotalSeconds;
+            events.Resumed(Env.NowMs());
             Env.Log($"RESUMED t={resumedAt:F2} attempts={reconnector.Attempts} from={next.LocalEndPoint}");
             resumes.Add(new { lostAtS = Math.Round(lostAt, 2), resumedAtS = Math.Round(resumedAt, 2),
                 timeToResumeMs = (long)((resumedAt - lostAt) * 1000), attempts = reconnector.Attempts, reason, from = next.LocalEndPoint });
@@ -75,6 +76,9 @@ internal static class ResumingReceiver
         }
 
         var (eventStart, eventEnd) = events.Window();
+        // After an IP change the old path may still hand over what was already in flight; what counts
+        // is media on the connection that replaced it.
+        var backFrom = events.Kind == "ip-change" && events.ResumedAtMs is { } resumedMs && eventEnd is { } changed ? Math.Max(resumedMs, changed) : eventEnd;
         Env.Log("SUMMARY " + JsonSerializer.Serialize(new
         {
             side = "receiver",
@@ -84,8 +88,8 @@ internal static class ResumingReceiver
             gaveUp,
             resumes,
             eventKind = events.Kind,
-            audioBackAfterMs = metrics.FirstAudioAfter(eventEnd) is { } audio && eventEnd is { } e1 ? audio - e1 : (long?)null,
-            videoBackAfterMs = metrics.FirstPictureAfter(eventEnd) is { } picture && eventEnd is { } e2 ? picture - e2 : (long?)null,
+            audioBackAfterMs = metrics.FirstAudioAfter(backFrom) is { } audio && eventEnd is { } e1 ? audio - e1 : (long?)null,
+            videoBackAfterMs = metrics.FirstPictureAfter(backFrom) is { } picture && eventEnd is { } e2 ? picture - e2 : (long?)null,
             eventSeconds = eventStart is { } s && eventEnd is { } e ? Math.Round((e - s) / 1000.0, 1) : (double?)null,
             audioReceived = metrics.AudioReceived,
             audioDelivered = metrics.AudioDelivered,
@@ -298,6 +302,10 @@ internal static class ResumingReceiver
         }
 
         public void StallEnded() => end = Env.NowMs();
+
+        /// <summary>The first resume after the disturbance began, in unix ms.</summary>
+        public long? ResumedAtMs { get; private set; }
+        public void Resumed(long unixMs) { if (start is { } began ? unixMs >= began : File.Exists("/tmp/outage-start")) ResumedAtMs ??= unixMs; }
 
         public (long? Start, long? End) Window()
         {
