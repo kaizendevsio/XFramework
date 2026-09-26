@@ -13,6 +13,8 @@ on:
     paths:
       - src/Libraries/Bolt/Bolt.Server/**
       - src/Libraries/Bolt/Bolt.Protocol/**
+      - src/Libraries/Bolt/Bolt.Media/CallLinkMonitor.cs
+      - src/Libraries/Bolt/Bolt.Media/CallReconnector.cs
       - src/Tests/Bolt.CallResilience.Harness/**
       - .github/workflows/call-network-harness.yml
 
@@ -50,6 +52,15 @@ jobs:
           - { name: stress-512k-1000ms-720p, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: survive, settings: "VIDEO_KBPS=1500 FPS=30 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
           - { name: stress-4g-1080p, target: head, relaynet: "delay 50ms 10ms rate 2mbit loss 0.5%", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: survive, settings: "VIDEO_KBPS=3800 FPS=30 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
           - { name: stress-4g-outage-2s-720p, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 2, expect: survive, settings: "VIDEO_KBPS=1500 FPS=30 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          # resume: the receiver's seat is held for 45 s and it comes back with a fresh ticket (Phase 2)
+          - { name: resume-4g-outage-10s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 10, expect: resume, settings: "RESUME=1 GRACE_S=45 VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          - { name: resume-4g-outage-30s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 30, expect: resume, settings: "RESUME=1 GRACE_S=45 VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          - { name: resume-4g-outage-75s-beyond-grace, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 75, expect: end-clean, settings: "RESUME=1 GRACE_S=45 VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          - { name: resume-512k-1000ms-1pct-outage-10s, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: 60, for: 10, expect: resume, settings: "RESUME=1 GRACE_S=45 VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          - { name: resume-4g-ip-change, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: resume, settings: "RESUME=1 GRACE_S=45 IPCHANGE_AT_S=60 VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          - { name: resume-4g-relay-retired, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: resume-retired, settings: "RESUME=1 GRACE_S=45 RX_STALL_AT_S=60 RX_STALL_FOR_S=30 VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          # without resume (Phase 0 behaviour), for contrast: any real disconnect ends the call
+          - { name: noresume-4g-outage-30s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 30, expect: any, settings: "VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

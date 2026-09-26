@@ -24,7 +24,7 @@ var mode = args.FirstOrDefault() ?? "relay";
 return mode switch
 {
     "relay" => await Relay.RunAsync(),
-    "receiver" => await Receiver.RunAsync(),
+    "receiver" => Env.Int("RESUME", 0) == 1 ? await ResumingReceiver.RunAsync() : await Receiver.RunAsync(),
     _ => Usage()
 };
 
@@ -138,10 +138,15 @@ internal static class Relay
 
         string? outcome = null;
         var unsentLimited = false;
+        // RESUME=1: the receiver's seat is held across reconnects (ResumeHost); losing its socket is
+        // expected, and only the seat running out (or the sender going) ends the call.
+        var host = Env.Int("RESUME", 0) == 1 ? new ResumeHost(server, call, clock, Env.Int("GRACE_S", 45)) : null;
+        host?.Map(app);
+        if (host is not null) ResumeHost.TryWatchDepartures(server, departure => Env.Log($"DEPARTED t={T()} {departure}"));
         server.GroupParticipantRemoved += (_, id) =>
         {
             Env.Log($"REMOVED t={T()} client={id}");
-            outcome ??= $"{id} removed at {T()}s";
+            if (host is null || id != "receiver") outcome ??= $"{id} removed at {T()}s";
         };
         app.Map("/ws", async (HttpContext context) =>
         {
@@ -187,7 +192,8 @@ internal static class Relay
         Env.Log("SUMMARY " + JsonSerializer.Serialize(new
         {
             side = "relay",
-            outcome = outcome ?? "survived",
+            outcome = outcome ?? host?.Outcome ?? "survived",
+            resume = host?.Summary(),
             seconds,
             audioSent = sender.AudioSent,
             videoPicturesSent = sender.VideoSent,

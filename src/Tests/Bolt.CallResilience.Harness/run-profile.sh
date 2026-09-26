@@ -6,7 +6,10 @@
 #   RECEIVER_EGRESS_NETEM  shapes the receiver's uplink (its ACKs), e.g. "delay 500ms 20ms"
 #   OUTAGE_AT              seconds after both participants joined to drop every packet both ways (-1: no outage)
 #   OUTAGE_SECONDS         length of that outage
-#   EXPECT                 "survive" fails the run unless the call lasted; "any" only records it
+#   EXPECT                 "survive" fails the run unless the call lasted; "any" only records it;
+#                          "resume" (RESUME=1) needs the call to last and the receiver to have resumed;
+#                          "resume-retired" also needs the relay to have retired the receiver first;
+#                          "end-clean" needs the held seat to expire (after the grace) and the receiver to give up
 #   ENV=VALUE              harness settings passed to the relay (SECONDS, VIDEO_KBPS, FPS, AUDIO_PAYLOAD, KF_MS, ...)
 set -euo pipefail
 name=$1 image=$2 relaynet=$3 recvnet=$4 outage_at=$5 outage_for=$6 expect=$7
@@ -32,7 +35,7 @@ trap cleanup EXIT
 docker network create "$net" >/dev/null
 docker run -d --name "$relay" --network "$net" --network-alias relay --cap-add NET_ADMIN "${envs[@]}" "$image" \
   sh -c "tc qdisc add dev eth0 root netem $relaynet && exec dotnet Bolt.CallResilience.Harness.dll relay" >/dev/null
-docker run -d --name "$receiver" --network "$net" --cap-add NET_ADMIN -e "SECONDS=$seconds" "$image" \
+docker run -d --name "$receiver" --network "$net" --cap-add NET_ADMIN "${envs[@]}" -e "SECONDS=$seconds" "$image" \
   sh -c "tc qdisc add dev eth0 root netem $recvnet && exec dotnet Bolt.CallResilience.Harness.dll receiver" >/dev/null
 
 waitfor() { # container pattern timeout
@@ -48,19 +51,42 @@ if ((outage_at >= 0)); then
   sleep "$outage_at"
   docker exec "$relay" tc qdisc change dev eth0 root netem $relaynet loss 100% || true
   docker exec "$receiver" tc qdisc change dev eth0 root netem $recvnet loss 100% || true
+  # The containers share the host clock, so the receiver can time its recovery from these.
+  docker exec "$receiver" sh -c 'date +%s%3N > /tmp/outage-start' || true
   echo "$name: outage for ${outage_for}s at ${outage_at}s"
   sleep "$outage_for"
   docker exec "$relay" tc qdisc change dev eth0 root netem $relaynet || true
   docker exec "$receiver" tc qdisc change dev eth0 root netem $recvnet || true
+  docker exec "$receiver" sh -c 'date +%s%3N > /tmp/outage-end' || true
 fi
 waitfor "$relay" "^SUMMARY" $((seconds + 60))
 timeout 60 docker wait "$receiver" >/dev/null || true
 docker logs "$relay" 2>&1 | grep "^SUMMARY" | sed "s/^/$name relay: /"
 docker logs "$receiver" 2>&1 | grep "^SUMMARY" | sed "s/^/$name receiver: /" || true
 
-if [ "$expect" = survive ]; then
-  if ! docker logs "$relay" 2>&1 | grep "^SUMMARY" | grep -q '"outcome":"survived"'; then
-    echo "$name: the call did not survive" >&2
+relay_summary=$(docker logs "$relay" 2>&1 | grep "^SUMMARY" || true)
+receiver_summary=$(docker logs "$receiver" 2>&1 | grep "^SUMMARY" || true)
+case $expect in
+  survive | resume | resume-retired)
+    if ! grep -q '"outcome":"survived"' <<<"$relay_summary"; then
+      echo "$name: the call did not survive" >&2
+      exit 1
+    fi ;;
+esac
+case $expect in
+  resume | resume-retired)
+    if ! grep -q '"gaveUp":false' <<<"$receiver_summary" || grep -q '"resumes":\[\]' <<<"$receiver_summary"; then
+      echo "$name: the receiver did not resume" >&2
+      exit 1
+    fi ;;
+esac
+if [ "$expect" = resume-retired ] && ! docker logs "$relay" 2>&1 | grep -q "Retiring Bolt connection"; then
+  echo "$name: the relay never retired the stalled receiver" >&2
+  exit 1
+fi
+if [ "$expect" = end-clean ]; then
+  if ! grep -q 'seat expired' <<<"$relay_summary" || ! grep -q '"gaveUp":true' <<<"$receiver_summary"; then
+    echo "$name: the call did not end cleanly after the grace period" >&2
     exit 1
   fi
 fi

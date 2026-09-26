@@ -19,4 +19,11 @@
         <ProjectReference Include="$(BoltServerProject)" />
     </ItemGroup>
 
+    <ItemGroup>
+        <!-- The app's own link monitor and resume pacing (BCL-only files), so the simulated phone
+             reconnects exactly as the real one does. Always this checkout's copy, whatever relay. -->
+        <Compile Include="..\..\Libraries\Bolt\Bolt.Media\CallLinkMonitor.cs" Link="Shared\CallLinkMonitor.cs" />
+        <Compile Include="..\..\Libraries\Bolt\Bolt.Media\CallReconnector.cs" Link="Shared\CallReconnector.cs" />
+    </ItemGroup>
+
 </Project>
