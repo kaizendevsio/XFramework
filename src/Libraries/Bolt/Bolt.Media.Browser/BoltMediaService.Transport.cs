@@ -41,8 +41,11 @@ public sealed partial class BoltMediaService
         _activeVideoStreamId = Guid.Empty;
         lock (_configuredCalls) _configuredCalls.Clear();
         DrainVideoSend();
-        // Whatever is next on the wire must be decodable by itself.
-        _pacer?.ExpectKeyframe();
+        // The pacer and rate loop belong to the lost transport (the pacer sends on its client, the controller's
+        // delay and capacity history describe its path). Keep only the controller, for the resumed transport to
+        // start from its stable rate; see StartSendPath.
+        _resumeFrom = _rateLoop?.Controller ?? _resumeFrom;
+        await StopSendPathAsync();
 
         var loops = _streamPlaybackTasks.Values.ToArray();
         foreach (var loop in loops)
@@ -74,18 +77,39 @@ public sealed partial class BoltMediaService
 
     /// <summary>
     /// Publish the camera stream again after a resume, bound to the active SFrame epoch, and start it
-    /// on a keyframe. The capture itself never stopped; nothing reopens a camera here.
+    /// on a keyframe. The capture itself never stopped (unless the rate loop had suspended video for
+    /// bandwidth, which the new path gets to try again); nothing reopens a camera the user turned off.
+    /// The encoder moves to the picture the resumed rate fits before that keyframe, so the first
+    /// picture on the new path is not one sized for the old path's peak.
     /// </summary>
     public async Task<bool> ResumeVideoStreamAsync(Guid callId)
     {
         EnsureInitialized();
         if (_mediaClient is not { } client || _activeVideoStreamId != Guid.Empty || _videoCodec == VideoCodec.None) return false;
         if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame && !IsSFrameReady) return false;
+        StartSendPath();
+        if (_adaptation is { } adaptation)
+        {
+            var wasSuspended = adaptation.Suspended;
+            adaptation.Suspended = false;
+            if (adaptation.Current is { } placed && await _video.ApplyTierAsync(placed)) _appliedTier = placed;
+            if (wasSuspended && _videoLoop is not null && !_video.IsCapturing) await _video.StartCaptureAsync();
+            OnVideoTierChanged?.Invoke(adaptation.Current);
+        }
         await StartVideoStreamAsync(callId);
         var tier = _adaptation?.Current ?? VideoAdaptation.Ladder[Math.Clamp(_options.VideoStartTier, 0, VideoAdaptation.Ladder.Length - 1)];
         client.ConfigureVideoFeedback(_activeVideoStreamId, tier.BitrateKbps);
         _pacer?.ExpectKeyframe();
-        await _video.RequestKeyframeAsync();
+        // At once, past the encoder's one-per-second coalescing: receivers have nothing to decode until it lands.
+        await _video.RequestKeyframeAsync(force: true);
         return true;
     }
+
+    /// <summary>
+    /// The send path is in trouble the way a person hears it: the queuing delay the rate controller acts on
+    /// is above its own high-delay threshold, or it suspended the camera to keep the voice. The same
+    /// thresholds drive the controller, so "Poor connection" and the rate never disagree about the link.
+    /// </summary>
+    public bool SendPathPoor => SendRate is { } rate && _rateLoop is { } loop &&
+                                (rate.DelayMs >= loop.Controller.Options.HighDelayMs || _adaptation?.Suspended == true);
 }

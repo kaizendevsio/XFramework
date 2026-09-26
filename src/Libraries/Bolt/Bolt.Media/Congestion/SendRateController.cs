@@ -46,6 +46,19 @@ public sealed class SendRateOptions
     public int AudioLowBelowKbps { get; init; } = 260;
     public int AudioHighAboveKbps { get; init; } = 2_500;
     public int AudioHighAfterCalmMs { get; init; } = 20_000;
+    /// <summary>
+    /// After an outage (the transport was replaced, or every receiver went quiet for <see cref="ReturnAfterSilenceMs"/>
+    /// and came back calm) the estimate restarts from <see cref="RestartFraction"/> of the pre-outage stable rate,
+    /// never below this floor. 0 means the resume point of video (<see cref="ResumeVideoKbps"/> plus audio). The new
+    /// path is untested (a resume may be on another network), so neither the old peak nor the cut the outage caused
+    /// is a good start.
+    /// </summary>
+    public int RestartFloorKbps { get; init; }
+    public double RestartFraction { get; init; } = 0.5;
+    /// <summary>Receiver silence at least this long, ended by a calm report, is an outage the path came back from.</summary>
+    public int ReturnAfterSilenceMs { get; init; } = 5_000;
+    /// <summary>Time constant of the stable rate: the calm operating point, not a probe's peak.</summary>
+    public int StableTimeConstantMs { get; init; } = 10_000;
     /// <summary>Bolt, SFrame and WS/TLS/TCP bytes on every audio packet, and packets per second.</summary>
     public int AudioOverheadBytes { get; init; } = 130;
     public int AudioPacketsPerSecond { get; init; } = 50;
@@ -165,6 +178,9 @@ public sealed class SendRateController
     private int _resumeHoldMs;
     private bool _remoteSeen;
     private int _audioKbps;
+    /// <summary>The calm operating point (see <see cref="StableKbps"/>), and the estimate at the last calm tick.</summary>
+    private double _stable, _lastCalmEstimate;
+    private long? _lastFreshReceiverAt;
 
     public SendRateController(int initialTotalKbps, SendRateOptions? options = null)
     {
@@ -172,6 +188,35 @@ public sealed class SendRateController
         _estimate = Math.Clamp(initialTotalKbps, _options.MinTotalKbps, _options.MaxTotalKbps);
         _resumeHoldMs = _options.ResumeHoldMs;
         _audioKbps = _options.AudioNormalKbps;
+        _stable = _lastCalmEstimate = _estimate;
+    }
+
+    /// <summary>
+    /// The rate this path was last calm at: a slow average of the estimate over calm windows only, capped by the
+    /// estimate of the last calm window. Congested windows and the cuts an outage causes never lower it directly, and
+    /// a probe's short-lived peak barely raises it; a path that settles lower after congestion pulls it down.
+    /// </summary>
+    /// <summary>How often the path was started over after an outage (see <see cref="SendRateOptions.ReturnAfterSilenceMs"/>); the loop restarts the ladder with it.</summary>
+    public int Restarts { get; private set; }
+
+    public int StableKbps => (int)Math.Round(Math.Min(_stable, _lastCalmEstimate));
+
+    /// <summary>Where a new or returning path starts: <see cref="SendRateOptions.RestartFraction"/> of the stable rate, above the floor.</summary>
+    public static int RestartKbps(int stableKbps, SendRateOptions options, int audioWireKbps)
+    {
+        var floor = options.RestartFloorKbps > 0 ? options.RestartFloorKbps : options.ResumeVideoKbps + audioWireKbps + 16;
+        return Math.Clamp((int)Math.Round(Math.Max(floor, stableKbps * options.RestartFraction)), options.MinTotalKbps, options.MaxTotalKbps);
+    }
+
+    /// <summary>
+    /// A controller for a transport that replaced one lost to an outage (a resumed call): it starts from
+    /// <see cref="RestartKbps"/> of the old controller's stable rate, with none of the old path's delay history,
+    /// congestion point or suspension. The caller also brings a new pacer, so queue and capacity state start empty.
+    /// </summary>
+    public static SendRateController Resume(SendRateController previous, int audioWireKbps)
+    {
+        var options = previous._options;
+        return new SendRateController(RestartKbps(previous.StableKbps, options, audioWireKbps), options);
     }
 
     public SendRateOptions Options => _options;
@@ -207,6 +252,15 @@ public sealed class SendRateController
         // them queue behind our own media), so silence during a queue means the queue is still there and growing.
         var silent = receiver is null && sample.Receiver is { } quiet && now - quiet.ReceivedAtMs <= SilentReceiverMs ? quiet : (ReceiverSignal?)null;
         if (relay is not null || receiver is not null) _remoteSeen = true;
+        if (receiver is { } back)
+        {
+            // Every receiver went quiet for a long time and reports again, calmly: that was an outage (a receiver
+            // resuming on a new connection, maybe a new network), not a queue. Start that path over.
+            if (_lastFreshReceiverAt is { } lastHeard && back.ReceivedAtMs - lastHeard >= _options.ReturnAfterSilenceMs &&
+                back.QueueDelayMs < _options.TargetDelayMs)
+                RestartAfterOutage(now, AudioWireKbps(sample));
+            _lastFreshReceiverAt = Math.Max(_lastFreshReceiverAt ?? back.ReceivedAtMs, back.ReceivedAtMs);
+        }
         // Increases need someone downstream saying the path is fine, unless nobody downstream ever reports.
         var informed = silent is null &&
                        (relay is not null || receiver is not null || (!_remoteSeen && now - _startedAt >= _options.RemoteGraceMs));
@@ -263,6 +317,8 @@ public sealed class SendRateController
         {
             signal = RateSignal.Normal;
             _calmSince ??= now;
+            _lastCalmEstimate = _estimate;
+            if (dt > 0) _stable += (_estimate - _stable) * Math.Min(1, dt * 1000 / Math.Max(1, _options.StableTimeConstantMs));
             if (now - _calmSince.Value >= _options.IncreaseAfterMs) _cutStreak = 0;
             if (informed && now - _calmSince.Value >= _options.IncreaseAfterMs && now - _lastDecreaseAt >= _options.IncreaseAfterMs)
                 Increase(dt, sample);
@@ -275,6 +331,27 @@ public sealed class SendRateController
 
         _estimate = Math.Clamp(_estimate, _options.MinTotalKbps, _options.MaxTotalKbps);
         return Allocate(now, sample, signal, delay);
+    }
+
+    private void RestartAfterOutage(long now, int audioWireKbps)
+    {
+        _estimate = RestartKbps(StableKbps, _options, audioWireKbps);
+        Restarts++;
+        _history.Clear();
+        _lastCongestionKbps = 0;
+        _congestedOnce = false;
+        _lastDecreaseAt = long.MinValue / 2;
+        _delayAtDecrease = 0;
+        _risingStreak = _cutStreak = 0;
+        _calmSince = null;
+        _lowVideoSince = null;
+        _resumeHoldMs = _options.ResumeHoldMs;
+        // Video comes back with the path when the restart affords it; otherwise the usual resume rule applies.
+        if (_suspended && _estimate - audioWireKbps >= _options.ResumeVideoKbps)
+        {
+            _suspended = false;
+            _resumedAt = now;
+        }
     }
 
     /// <summary>

@@ -48,6 +48,8 @@ public sealed partial class BoltMediaService : IAsyncDisposable
     private SendRateLoop? _rateLoop;
     private CancellationTokenSource? _rateCts;
     private Task _rateTask = Task.CompletedTask;
+    /// <summary>The rate controller of a transport lost to an outage, until the resumed transport starts its own from it.</summary>
+    private SendRateController? _resumeFrom;
 
     /// <summary>The send estimate and its split, as the last rate-loop tick decided it.</summary>
     public SendRateDecision? SendRate { get; private set; }
@@ -351,6 +353,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
     private void StartSendPath()
     {
         if (_pacer is not null || _mediaClient is not { } media) return;
+        // The pacer is bound to this transport's client: a resumed call gets a new pacer on its new client.
         var client = media.Client;
         _signals.Clear();
         var pacer = _pacer = new MediaSendPacer(
@@ -364,15 +367,30 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         pacer.KeyframeNeeded += () => _ = _video.RequestKeyframeAsync(force: true);
         pacer.Start();
         var audio = _options.AudioBitrateKbps;
-        var controller = new SendRateController(
-            (_adaptation?.Current?.BitrateKbps ?? VideoAdaptation.Ladder[Math.Clamp(_options.VideoStartTier, 0, VideoAdaptation.Ladder.Length - 1)].BitrateKbps) + AudioWireKbps,
-            new SendRateOptions
-            {
-                AudioNormalKbps = audio,
-                AudioLowKbps = Math.Min(24, audio),
-                AudioHighKbps = _options.AdaptiveAudioBitrate ? Math.Max(40, audio) : audio,
-            });
-        var loop = _rateLoop = new SendRateLoop(pacer, controller, _adaptation?.Rates ?? new VideoRateLadder(), _signals);
+        var startTierKbps = VideoAdaptation.Ladder[Math.Clamp(_options.VideoStartTier, 0, VideoAdaptation.Ladder.Length - 1)].BitrateKbps;
+        SendRateController controller;
+        var ladder = _adaptation?.Rates ?? new VideoRateLadder();
+        if (_resumeFrom is { } previous)
+        {
+            // A resume: the new path starts from half the old path's stable rate (never below the call's start
+            // tier), with fresh delay, queue and capacity state, and the picture placed to fit before the first
+            // keyframe goes out, not at the old peak.
+            _resumeFrom = null;
+            controller = SendRateController.Resume(previous, AudioWireKbps);
+            ladder.Restart(controller.EstimateKbps - AudioWireKbps);
+            pacer.ExpectKeyframe();
+        }
+        else
+            controller = new SendRateController(
+                (_adaptation?.Current?.BitrateKbps ?? startTierKbps) + AudioWireKbps,
+                new SendRateOptions
+                {
+                    AudioNormalKbps = audio,
+                    AudioLowKbps = Math.Min(24, audio),
+                    AudioHighKbps = _options.AdaptiveAudioBitrate ? Math.Max(40, audio) : audio,
+                    RestartFloorKbps = startTierKbps + AudioWireKbps,
+                });
+        var loop = _rateLoop = new SendRateLoop(pacer, controller, ladder, _signals);
         var cts = _rateCts = new CancellationTokenSource();
         _rateTask = RateLoopAsync(loop, cts.Token);
     }
@@ -432,6 +450,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         }
         await Task.WhenAll(loops.Select(loop => loop.Completion));
         await StopSendPathAsync();
+        _resumeFrom = null;
         _activeAudioStreamId = Guid.Empty;
         _activeVideoStreamId = Guid.Empty;
         _hasVideo = false;

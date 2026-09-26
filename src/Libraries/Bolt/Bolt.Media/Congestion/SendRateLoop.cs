@@ -138,6 +138,7 @@ public sealed class SendRateLoop
     private int _audioKbps;
     private bool _suspended;
     private int _cpuStrained, _cpuCalm;
+    private int _restarts;
 
     public SendRateLoop(MediaSendPacer pacer, SendRateController controller, VideoRateLadder ladder, SendPathSignals? signals = null)
     {
@@ -182,8 +183,13 @@ public sealed class SendRateLoop
         var suspend = decision.VideoSuspended && !_suspended;
         var resume = !decision.VideoSuspended && _suspended;
         _suspended = decision.VideoSuspended;
+        // The controller started the path over after an outage: so does the picture, without the old path's up-backoff.
+        var restarted = Controller.Restarts != _restarts;
+        _restarts = Controller.Restarts;
         VideoSetting? video = null;
-        if (!_suspended)
+        if (!_suspended && restarted)
+            video = Ladder.Restart(decision.VideoKbps);
+        else if (!_suspended)
         {
             video = Ladder.Place(decision.VideoKbps, nowMs, congested: decision.Signal != RateSignal.Normal);
             if ((resume || cpuChanged) && video is null) video = Ladder.Current;

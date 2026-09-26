@@ -28,6 +28,12 @@ public sealed record CallLinkOptions
     /// <summary>A smoothed heartbeat round trip at or above this is also "Poor connection".</summary>
     public int PoorRttMs { get; init; } = 1200;
     /// <summary>
+    /// The send rate controller's own verdict (its queuing delay above its high-delay threshold, or video suspended
+    /// for bandwidth) must hold this long before it shows as "Poor connection", and be gone this long before it
+    /// clears: the controller acts on a spike in a quarter second, a person should not see every spike.
+    /// </summary>
+    public int SendPathHoldMs { get; init; } = 3000;
+    /// <summary>
     /// How long the phone keeps trying to resume. It matches the server's seat hold, so a phone never
     /// gives up on a seat that is still being held for it (or keeps trying one that is gone).
     /// </summary>
@@ -57,6 +63,7 @@ public sealed class CallLinkMonitor(CallLinkOptions? options = null)
     private long? _lostAt, _probeSince, _probeDeadline;
     private double? _srtt;
     private bool _answered;
+    private long? _pathPoorSince, _pathFineSince;
 
     public CallLinkOptions Options { get; } = options ?? new CallLinkOptions();
     public CallLinkState State { get; private set; } = CallLinkState.Connected;
@@ -88,8 +95,27 @@ public sealed class CallLinkMonitor(CallLinkOptions? options = null)
             _lastInbound = now;
             _lostAt = _probeSince = _probeDeadline = null;
             _answered = false;
+            // A new transport has a new send path; its controller says for itself whether it is poor.
+            _pathPoorSince = _pathFineSince = null;
         }
     }
+
+    /// <summary>
+    /// What the send rate controller makes of the path at <paramref name="now"/> (see <see cref="CallLinkOptions.SendPathHoldMs"/>).
+    /// It can only make the call "Poor connection": whether the transport is dead is decided by silence alone, so
+    /// a congested link the controller is managing is never torn down, and a dead one is never kept for being slow.
+    /// </summary>
+    public void SendPath(bool poor, long now)
+    {
+        lock (_gate)
+        {
+            if (poor) { _pathPoorSince ??= now; _pathFineSince = null; }
+            else { _pathFineSince ??= now; _pathPoorSince = null; }
+        }
+    }
+
+    /// <summary>Whether the send path counts as poor now, with the hold on both edges.</summary>
+    public bool SendPathPoor { get { lock (_gate) return PathPoorLocked(long.MaxValue / 2); } }
 
     /// <summary>Something arrived from the relay at <paramref name="at"/>.</summary>
     public void Inbound(long at)
@@ -142,8 +168,10 @@ public sealed class CallLinkMonitor(CallLinkOptions? options = null)
             }
             var slow = _srtt is { } rtt && rtt >= Options.PoorRttMs;
             var quiet = _answered && silence >= DegradedAfterLocked();
-            if (State == CallLinkState.Connected && (slow || quiet)) State = CallLinkState.Degraded;
-            else if (State == CallLinkState.Degraded && !quiet && (_srtt is not { } smoothed || smoothed < Options.PoorRttMs * 0.8))
+            var congested = PathPoorLocked(now);
+            if (State == CallLinkState.Connected && (slow || quiet || congested)) State = CallLinkState.Degraded;
+            else if (State == CallLinkState.Degraded && !quiet && !congested && !PathRecoveringLocked(now) &&
+                     (_srtt is not { } smoothed || smoothed < Options.PoorRttMs * 0.8))
                 State = CallLinkState.Connected;
             return State;
         }
@@ -188,6 +216,10 @@ public sealed class CallLinkMonitor(CallLinkOptions? options = null)
         _lostAt ??= now;
         _probeSince = _probeDeadline = null;
     }
+
+    private bool PathPoorLocked(long now) => _pathPoorSince is { } since && now - since >= Options.SendPathHoldMs;
+    /// <summary>The controller's poor verdict cleared less than a hold ago: not yet good enough to clear the notice.</summary>
+    private bool PathRecoveringLocked(long now) => _pathFineSince is { } since && now - since < Options.SendPathHoldMs;
 
     private int Scaled(double multiple) => _srtt is { } rtt ? (int)Math.Min(int.MaxValue, Math.Ceiling(rtt * multiple)) : 0;
     private int DegradedAfterLocked() => Math.Max(Options.DegradedSilenceMs, Scaled(3));

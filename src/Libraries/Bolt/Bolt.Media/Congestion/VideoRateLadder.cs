@@ -171,6 +171,25 @@ public sealed class VideoRateLadder
         return Current;
     }
 
+    /// <summary>
+    /// Start over on a new path (a resumed call): the largest rung the budget fits, at 30 fps, with no memory of
+    /// the old path's failed steps up. Unlike a step down in <see cref="Place"/>, this sets no up-backoff: the
+    /// sizes the old path could not hold say nothing about the new one.
+    /// </summary>
+    public VideoSetting Restart(int budgetKbps)
+    {
+        var index = Ceiling;
+        while (index > 0 && budgetKbps < Rungs[index].MinKbps) index--;
+        _index = index;
+        _at60 = false;
+        _upSince = null;
+        _upBlockedUntil = long.MinValue / 2;
+        _lastUpAt = long.MinValue / 2;
+        _upBackoffMs = UpBackoffMs;
+        _bitrate = Math.Clamp(budgetKbps, Rungs[index].MinKbps, Rungs[index].MaxKbps);
+        return Current;
+    }
+
     private (int Index, bool Sixty)? NextUp(int index, bool sixty, int ceiling)
     {
         // Size first, up to the ceiling; 60 fps only on top of that, at 720p or more, with half as much again.

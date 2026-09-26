@@ -136,6 +136,43 @@ public sealed partial class BoltGroupCallLifecycleTests
         });
     }
 
+    /// <summary>
+    /// Phases 1 and 2 together: a sender that resumes on a new connection republishes its camera, and the
+    /// relay's congestion reports (0x27) and heartbeat echoes (0x0E) follow it to that connection. The old
+    /// connection hears nothing more, and receivers get the new stream from a keyframe.
+    /// </summary>
+    [Test]
+    public async Task ResumedSender_GetsCongestionReportsAndHeartbeatsOnItsNewConnection()
+    {
+        await using var f = await Fixture.CreateAsync();
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var before = await f.VideoConfig("a");
+        await f.SendVideo("a", before, keyframe: true);
+        Assert.That(() => f.Peers["a"].Congestion(before), Is.Not.Empty.After(3000, 10));
+
+        var old = f.Peers["a"];
+        await old.DisposeAsync();
+        await f.Tasks["a"].WaitAsync(TimeSpan.FromSeconds(3));
+        var oldFrames = old.Sent.Count;
+        var fresh = await ReconnectAsync(f, "a");
+        Assert.That(await f.Join("a"), Is.True);
+        var after = await f.VideoConfig("a");
+        await f.SendVideo("a", after, keyframe: true);
+        await f.SendVideo("a", after, keyframe: false);
+        await fresh.ProcessAsync(Heartbeat(f.Call, 42));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(() => fresh.Congestion(after), Is.Not.Empty.After(3000, 10), "reports reach the resumed connection");
+            Assert.That(() => fresh.Signals(SignalType.Heartbeat), Is.EqualTo(1).After(2000, 10), "the heartbeat is echoed on it");
+            Assert.That(() => f.Peers["b"].Media(after).Select(x => x.Keyframe).FirstOrDefault(), Is.True.After(3000, 10),
+                "the republished stream starts on a keyframe");
+            Assert.That(fresh.Congestion(before), Is.Empty, "nothing about the retired stream reaches the new connection");
+        });
+        Assert.That(old.Sent.Count, Is.EqualTo(oldFrames), "the dead connection is sent nothing more");
+    }
+
     /// <summary>Give <paramref name="id"/> a new connection, the way a phone opens a new socket after a resume ticket.</summary>
     private static async Task<Peer> ReconnectAsync(Fixture f, string id)
     {

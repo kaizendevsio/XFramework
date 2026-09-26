@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using Bolt.Client;
 using Bolt.Media.Browser;
+using Bolt.Media.Congestion;
 using Bolt.Protocol;
 using Bolt.Protocol.Transport;
 using Microsoft.Extensions.DependencyInjection;
@@ -99,6 +100,102 @@ public sealed class BoltMediaServiceResumeTests
         await second.DisposeAsync();
     }
 
+    /// <summary>
+    /// Phases 1 and 2 together. The pacer sends on its transport's client, so a resume must bring a new one:
+    /// otherwise every frame after a resume goes to the dead connection. The new rate loop starts from the old
+    /// path's stable rate (halved, above the start tier), not from its peak, with fresh signals and state.
+    /// </summary>
+    [Test]
+    public async Task Resume_SendsOnTheNewTransport_AndRestartsTheRateFromTheOldPathsStableRate()
+    {
+        await using var f = await Fixture.CreateAsync();
+        await f.Media.StartHostedAudioAsync(f.Call);
+        var firstLoop = RateLoop(f.Media)!;
+        await EncodeAudioAsync(f.Media);
+        Assert.That(() => f.FirstTransport.MediaFrames(), Is.GreaterThan(0).After(2000, 10), "audio flows on the first transport");
+
+        await f.Media.SuspendTransportAsync();
+        Assert.That(RateLoop(f.Media), Is.Null, "the lost transport's pacer and rate loop are gone with it");
+        var (second, transport) = Fixture.Client();
+        f.Media.AttachTransport(second);
+        await f.Media.JoinHostedGroupAsync(f.Call);
+        await f.Media.StartHostedAudioAsync(f.Call);
+        var oldFrames = f.FirstTransport.MediaFrames();
+        await EncodeAudioAsync(f.Media);
+
+        var loop = RateLoop(f.Media)!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(() => transport.MediaFrames(), Is.GreaterThan(0).After(2000, 10), "audio flows on the resumed transport");
+            Assert.That(f.FirstTransport.MediaFrames(), Is.EqualTo(oldFrames), "and nothing more on the dead one");
+            Assert.That(loop, Is.Not.SameAs(firstLoop));
+            Assert.That(loop.Pacer, Is.Not.SameAs(firstLoop.Pacer), "a new pacer, on the new client");
+            Assert.That(loop.Controller, Is.Not.SameAs(firstLoop.Controller), "a new controller: no delay history from the old path");
+            Assert.That(loop.Controller.EstimateKbps,
+                Is.EqualTo(SendRateController.RestartKbps(firstLoop.Controller.StableKbps, firstLoop.Controller.Options, 84)),
+                "starting from the old path's stable rate");
+        });
+        await second.DisposeAsync();
+    }
+
+    [Test]
+    public async Task Resume_PlacesThePictureBeforeTheFirstKeyframe_AndForcesThatKeyframe()
+    {
+        await using var f = await Fixture.CreateAsync();
+        await f.Media.StartHostedAudioAsync(f.Call);
+        await f.Media.StartVideoAsync(f.Call, VideoCodec.H264, 1080);
+        // The old path had climbed to 1080p (its rate loop paused, so nothing moves the ladder meanwhile).
+        var rates = (CancellationTokenSource)typeof(BoltMediaService).GetField("_rateCts", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(f.Media)!;
+        await rates.CancelAsync();
+        await (Task)typeof(BoltMediaService).GetField("_rateTask", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(f.Media)!;
+        var ladder = RateLoop(f.Media)!.Ladder;
+        for (long now = 0; now < 60_000; now += 250) ladder.Place(5_000, now, false);
+        Assert.That(ladder.Current.Rung.Height, Is.EqualTo(1080));
+
+        await f.Media.SuspendTransportAsync();
+        var (second, transport) = Fixture.Client();
+        f.Media.AttachTransport(second);
+        await f.Media.JoinHostedGroupAsync(f.Call);
+        await f.Media.StartHostedAudioAsync(f.Call);
+        var keyframes = f.Js.Calls.Count(x => x == "requestKeyframe");
+        Assert.That(await f.Media.ResumeVideoStreamAsync(f.Call), Is.True);
+
+        var restart = RateLoop(f.Media)!.Controller.EstimateKbps;
+        Assert.Multiple(() =>
+        {
+            Assert.That(f.Media.ActiveVideoTier?.Height, Is.LessThan(1080), "not the old path's peak");
+            Assert.That(f.Media.ActiveVideoTier?.BitrateKbps, Is.LessThanOrEqualTo(Math.Max(restart - 84, 120)), "the picture fits the restart estimate");
+            Assert.That(f.Js.Calls.Count(x => x == "requestKeyframe"), Is.GreaterThan(keyframes), "a keyframe is asked for at once");
+            Assert.That(RateLoop(f.Media)!.Pacer.WouldAccept(false, 0), Is.False, "and nothing but it goes out first");
+            Assert.That(RateLoop(f.Media)!.Pacer.WouldAccept(true, 0), Is.True);
+        });
+        await second.DisposeAsync();
+    }
+
+    [Test]
+    public async Task SendPathPoor_UsesTheControllersOwnHighDelayThreshold()
+    {
+        await using var f = await Fixture.CreateAsync();
+        Assert.That(f.Media.SendPathPoor, Is.False, "no send path, no verdict");
+        await f.Media.StartHostedAudioAsync(f.Call);
+        var high = RateLoop(f.Media)!.Controller.Options.HighDelayMs;
+        var rate = typeof(BoltMediaService).GetProperty(nameof(BoltMediaService.SendRate))!;
+        rate.SetValue(f.Media, new SendRateDecision(300, 32, 180, false, RateSignal.Overuse, high));
+        Assert.That(f.Media.SendPathPoor, Is.True, "a queue the controller calls high is a poor connection");
+        rate.SetValue(f.Media, new SendRateDecision(300, 32, 180, false, RateSignal.Hold, high - 1));
+        Assert.That(f.Media.SendPathPoor, Is.False, "below it, it is the controller's business alone");
+    }
+
+    private static Bolt.Media.Congestion.SendRateLoop? RateLoop(BoltMediaService media) =>
+        (Bolt.Media.Congestion.SendRateLoop?)typeof(BoltMediaService).GetField("_rateLoop", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(media);
+
+    /// <summary>What the browser's Opus encoder hands over for one 20 ms packet.</summary>
+    private static async Task EncodeAudioAsync(BoltMediaService media)
+    {
+        var handler = typeof(BoltMediaService).GetMethod("OnAudioEncodedForStream", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        for (uint i = 1; i <= 3; i++) await (Task)handler.Invoke(media, [new byte[80], i * 960])!;
+    }
+
     [Test]
     public async Task AttachTransport_RequiresWss()
     {
@@ -162,6 +259,7 @@ public sealed class BoltMediaServiceResumeTests
     {
         public ConcurrentQueue<byte[]> Sent { get; } = new();
         public List<Guid> AudioConfigs() => Configs(MediaType.Audio);
+        public int MediaFrames() => Sent.Count(x => x.Length > 0 && x[0] == (byte)FrameType.MediaFrame);
         public List<Guid> Configs(MediaType type)
         {
             var deadline = DateTime.UtcNow.AddSeconds(2);

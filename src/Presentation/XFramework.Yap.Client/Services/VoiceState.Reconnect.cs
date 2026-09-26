@@ -12,7 +12,8 @@ public sealed record CallEndedNotice(string Title, string Detail, Guid ThreadId,
 /// <summary>
 /// Resumable calls, client side.
 ///
-/// Connected → Degraded ("Poor connection": the relay has gone quiet for a while, or answers slowly)
+/// Connected → Degraded ("Poor connection": the relay has gone quiet for a while, answers slowly, or the
+/// send rate controller has held its queuing delay above its high-delay threshold / suspended the camera)
 /// → Reconnecting (the transport is gone) → Connected again, or Failed once the seat's grace period
 /// runs out or the server refuses the resume. <see cref="CallLinkMonitor"/> decides from heartbeat
 /// echoes and inbound frames, with thresholds scaled by the round trip; <see cref="CallReconnector"/>
@@ -306,6 +307,8 @@ public sealed partial class VoiceState
                 if (now - lastTick > 3_000) { link.Inbound(now); link.Probe(now); }
                 lastTick = now;
                 if (media.LastInboundTick is { } inbound) link.Inbound(inbound);
+                // One view of the link: the rate controller's verdict can make it "Poor connection", never "Reconnecting".
+                link.SendPath(media.SendPathPoor, now);
                 if (now - lastHeartbeat >= link.Options.HeartbeatIntervalMs)
                 {
                     lastHeartbeat = now;

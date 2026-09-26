@@ -256,6 +256,42 @@ public sealed class CallLinkMonitorTests
         Assert.That(await outcome.WaitAsync(TimeSpan.FromSeconds(5)), Is.EqualTo(CallResumeOutcome.Cancelled));
     }
 
+    /// <summary>
+    /// One view of the link: the send rate controller's verdict (a standing queue above its high-delay threshold,
+    /// or video suspended for bandwidth) shows as "Poor connection" once it holds, clears only once it has been gone
+    /// as long, and never makes a link that keeps delivering "Reconnecting".
+    /// </summary>
+    [Test]
+    public void ACongestedSendPath_IsPoorConnection_WithHysteresis_AndNeverReconnecting()
+    {
+        var link = Answered(rtt: 100);
+        long now = 0;
+        void Tick(bool poor)
+        {
+            now += 250;
+            link.Inbound(now);
+            if (now % 2_000 == 0) link.Echo(now - 100, now);
+            link.SendPath(poor, now);
+            Assert.That(link.Evaluate(now), Is.Not.EqualTo(CallLinkState.Reconnecting), $"t={now}");
+        }
+
+        for (var i = 0; i < 8; i++) Tick(poor: true);
+        Assert.That(link.State, Is.EqualTo(CallLinkState.Connected), "a two-second spike the controller handles is not shown");
+        for (var i = 0; i < 8; i++) Tick(poor: true);
+        Assert.That(link.State, Is.EqualTo(CallLinkState.Degraded), "a queue the controller keeps fighting is");
+        for (var i = 0; i < 240; i++) Tick(poor: true);
+        Assert.That(link.State, Is.EqualTo(CallLinkState.Degraded), "a minute of congestion stays a poor connection, not a dead one");
+        for (var i = 0; i < 8; i++) Tick(poor: false);
+        Assert.That(link.State, Is.EqualTo(CallLinkState.Degraded), "the notice does not flap off on a good moment");
+        Tick(poor: true);
+        for (var i = 0; i < 13; i++) Tick(poor: false);
+        Assert.That(link.State, Is.EqualTo(CallLinkState.Connected), "it clears once the path has been fine for the hold");
+
+        link.SendPath(true, now);
+        link.Connected(now + 1);
+        Assert.That(link.SendPathPoor, Is.False, "a new transport starts without the old path's verdict");
+    }
+
     private static CallLinkMonitor Answered(double rtt)
     {
         var link = new CallLinkMonitor();
