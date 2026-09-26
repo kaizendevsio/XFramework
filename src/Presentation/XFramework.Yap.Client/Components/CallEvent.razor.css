@@ -1,0 +1,16 @@
+/* One line, centred, borderless: 32px of pill inside ~44px of row, like a call line in Messages. */
+.call-event-row{display:flex;justify-content:center;margin:6px 0;padding-inline:8px}
+.call-event{display:inline-flex;align-items:center;gap:7px;max-width:100%;min-height:32px;padding:6px 14px 6px 11px;border:0;border-radius:999px;background:color-mix(in srgb,var(--text) 6%,transparent);color:var(--text);font:inherit;font-size:13px;line-height:18px;cursor:pointer;transition:background-color .16s ease,scale .16s ease}
+.call-event:not(:disabled):hover{background:color-mix(in srgb,var(--text) 10%,transparent)}
+.call-event:not(:disabled):active{scale:.97;background:color-mix(in srgb,var(--accent) 18%,transparent)}
+/* Offline or already in a call: still a readable record, just not a button that looks dead. */
+.call-event:disabled{opacity:1;cursor:default}
+/* The accent on the icon is the call-back affordance; offline it falls back to a plain record. */
+.call-event ::deep .call-event-kind{flex:none;color:var(--accent-ink)}
+.call-event:disabled ::deep .call-event-kind{color:var(--dim)}
+.call-event-label{min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.call-event-time{flex:none;color:var(--dim);font-variant-numeric:tabular-nums}
+.call-event-time::before{content:"·";margin-inline-end:7px}
+.call-event.missed ::deep .call-event-kind,.call-event.missed .call-event-label{color:var(--danger)}
+@media(prefers-reduced-motion:reduce){.call-event{transition:none}.call-event:not(:disabled):active{scale:none}}
+@media(forced-colors:active){.call-event{border:1px solid ButtonText}}

@@ -1,0 +1,83 @@
+@* The Recents list: calls grouped by conversation under Today / Yesterday / Earlier. A row expands in
+   place to that group's individual calls and the ways to reach the conversation again. *@
+@inject ChatState State
+@inject VoiceState Voice
+@inject BrowserTime Times
+@if (sections.Count > 0)
+{
+<div class="call-list">
+@foreach (var day in sections)
+{
+    <section class="call-section" aria-label="@day.Label">
+    <h2 class="call-section-title">@day.Label</h2>
+    <ul class="call-groups">
+    @foreach (var group in day.Groups)
+    {
+        var latest = group.Latest; var name = latest.ConversationName; var open = Expanded == group.Key; var detail = $"call-detail-{group.Key:N}";
+        <li class="call-group @(group.Missed ? "missed" : "") @(open ? "open" : "")" @key="group.Key">
+            <div class="call-row">
+                <button type="button" class="call-row-main" aria-expanded="@(open ? "true" : "false")" aria-controls="@detail" aria-label="@RowLabel(group, open)" @onclick="() => Toggle(group.Key)">
+                    <Avatar Initials="@ChatMessage.InitialsFor(name)" ImageUrl="@latest.AvatarUrl" Size="a48" />
+                    <span class="call-row-text">
+                        <span class="call-name">@name</span>
+                        <span class="call-meta"><Icon Name="@Glyph(group.Direction)" Size="15" Class="call-dir" />@if (group.Video) { <Icon Name="video" Size="15" Class="call-kind" /> }@if (group.Calls.Count > 1) { <span class="call-count">(@group.Calls.Count)</span> }<span class="call-when">@Times.Recent(latest.Message.CreatedAt)</span></span>
+                    </span>
+                </button>
+                <button type="button" class="call-row-call" disabled="@(!CanCall)" aria-label="@($"{(group.Video ? "Video call" : "Voice call")} {name}")" @onclick="() => CallAsync(group.ThreadId, group.Video)"><Icon Name="@(group.Video ? "video" : "phone")" Size="22" /></button>
+            </div>
+            @if (open)
+            {
+                <div class="call-detail" id="@detail" role="region" aria-label="@($"Calls with {name}")">
+                    <div class="call-actions">
+                        <button type="button" disabled="@(!CanCall)" aria-label="@($"Voice call {name}")" @onclick="() => CallAsync(group.ThreadId, false)"><span class="call-action-mark"><Icon Name="phone" Size="20" /></span>Voice call</button>
+                        <button type="button" disabled="@(!CanCall)" aria-label="@($"Video call {name}")" @onclick="() => CallAsync(group.ThreadId, true)"><span class="call-action-mark"><Icon Name="video" Size="20" /></span>Video call</button>
+                        <a href="@($"/chat/{group.ThreadId}?message={latest.Message.Id}")" aria-label="@($"Message {name}")"><span class="call-action-mark"><Icon Name="chat" Size="20" /></span>Message</a>
+                    </div>
+                    <ol class="call-log" aria-label="@($"{group.Calls.Count} {(group.Calls.Count == 1 ? "call" : "calls")}")">
+                    @foreach (var call in group.Calls)
+                    {
+                        var message = call.Message; var direction = CallHistory.Direction(message); var duration = CallHistory.Duration(message);
+                        <li class="@(direction == CallDirection.Missed ? "missed" : "")" @key="message.Id">
+                            <Icon Name="@Glyph(direction)" Size="16" Class="call-dir" />
+                            <span class="call-log-what">@CallHistory.Describe(message)@if (duration is not null) { <span class="call-log-duration">@duration</span> }</span>
+                            <time datetime="@BrowserTime.Iso(message.CreatedAt)">@Times.DayMonth(message.CreatedAt) · @Times.Clock(message.CreatedAt)</time>
+                        </li>
+                    }
+                    </ol>
+                </div>
+            }
+        </li>
+    }
+    </ul>
+    </section>
+}
+</div>
+}
+@code {
+    /// <summary>Call history newest first, exactly as loaded; grouping is presentation only.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<CallHistoryItem> Items { get; set; } = [];
+    /// <summary>The expanded group's <see cref="CallGroup.Key"/>; one row open at a time, like Recents.</summary>
+    [Parameter] public Guid? Expanded { get; set; }
+    [Parameter] public EventCallback<Guid?> ExpandedChanged { get; set; }
+    private IReadOnlyList<CallSection> sections = [];
+    private bool CanCall => CallBack.Available(State, Voice);
+    // Regrouped on every render from the parent: that is what moves a call from Today to Yesterday.
+    protected override void OnParametersSet() => sections = CallLog.Group(Items, Times.CallSection);
+    private static string Glyph(CallDirection direction) => direction switch
+    {
+        CallDirection.Incoming => "call-in",
+        CallDirection.Missed => "call-missed",
+        _ => "call-out"
+    };
+    private string RowLabel(CallGroup group, bool open)
+    {
+        var count = group.Calls.Count == 1 ? "" : $", {group.Calls.Count} calls";
+        return $"{group.Latest.ConversationName}{count}, {CallHistory.Describe(group.Latest.Message)}, {Times.Recent(group.Latest.Message.CreatedAt)}. {(open ? "Hide" : "Show")} call details";
+    }
+    private Task Toggle(Guid key)
+    {
+        Expanded = Expanded == key ? null : key;
+        return ExpandedChanged.InvokeAsync(Expanded);
+    }
+    private Task CallAsync(Guid thread, bool video) => CallBack.StartAsync(State, Voice, thread, video);
+}

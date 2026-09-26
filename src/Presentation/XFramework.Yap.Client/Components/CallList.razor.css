@@ -1,0 +1,39 @@
+/* Recents, not a feed: compact borderless rows on a 16px gutter. The list sits 8px in so a pressed or
+   expanded row can round its own corners and still keep its content on the gutter. */
+.call-list{padding-inline:8px}
+.call-section{margin-bottom:6px}
+.call-section-title{margin:14px 0 4px;padding-inline:8px;font-size:13px;font-weight:650;letter-spacing:.02em;color:var(--dim)}
+.call-groups{list-style:none;margin:0;padding:0}
+.call-group{border-radius:24px;transition:background-color .2s ease}
+.call-group.open{background:color-mix(in srgb,var(--text) 5%,transparent);margin-block:4px}
+.call-row{display:flex;align-items:center;gap:4px;min-height:68px}
+.call-row-main{flex:1;min-width:0;display:flex;align-items:center;gap:14px;padding:10px 8px;border:0;border-radius:20px;background:transparent;color:inherit;font:inherit;text-align:start;cursor:pointer;transition:background-color .16s ease}
+.call-row-main:active{background:color-mix(in srgb,var(--text) 7%,transparent)}
+@media(hover:hover){.call-group:not(.open) .call-row-main:hover{background:color-mix(in srgb,var(--text) 4%,transparent)}}
+.call-row-main ::deep .avatar{width:48px;height:48px}
+.call-row-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.call-name{font-size:16px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.call-meta{display:flex;align-items:center;gap:5px;min-width:0;font-size:13.5px;color:var(--dim);white-space:nowrap}
+.call-meta ::deep .ic{flex:none}
+.call-count{font-variant-numeric:tabular-nums}
+.call-when{overflow:hidden;text-overflow:ellipsis}
+.call-group.missed .call-name,.call-group.missed .call-meta ::deep .call-dir{color:var(--danger)}
+.call-row-call{flex:none;width:48px;height:48px;margin-inline-end:4px;border:0;border-radius:50%;display:grid;place-items:center;background:transparent;color:var(--accent-ink);cursor:pointer;transition:background-color .16s ease,scale .16s ease}
+.call-row-call:not(:disabled):active{scale:.92;background:color-mix(in srgb,var(--accent) 22%,transparent)}
+@media(hover:hover){.call-row-call:not(:disabled):hover{background:color-mix(in srgb,var(--accent) 14%,transparent)}}
+.call-detail{padding:0 8px 12px;animation:call-detail-in .2s ease-out}
+.call-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:2px 0 10px}
+.call-actions>button,.call-actions>a{display:flex;flex-direction:column;align-items:center;gap:6px;padding:6px 4px;border:0;border-radius:16px;background:transparent;color:var(--text);font:inherit;font-size:12.5px;font-weight:600;text-decoration:none;cursor:pointer}
+.call-action-mark{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--accent-ink);transition:background-color .16s ease,scale .16s ease}
+.call-actions>:not(:disabled):active .call-action-mark{scale:.92;background:color-mix(in srgb,var(--accent) 32%,transparent)}
+.call-log{list-style:none;margin:0;padding:8px 0 0;display:flex;flex-direction:column;gap:2px;border-top:1px solid color-mix(in srgb,var(--text) 7%,transparent)}
+.call-log li{display:flex;align-items:center;gap:10px;min-height:36px;padding-inline:6px;font-size:13.5px}
+.call-log li ::deep .call-dir{flex:none;color:var(--dim)}
+.call-log li.missed ::deep .call-dir,.call-log li.missed .call-log-what{color:var(--danger)}
+.call-log-what{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.call-log-duration{margin-inline-start:6px;color:var(--dim);font-variant-numeric:tabular-nums}
+.call-log-duration::before{content:"·";margin-inline-end:6px}
+.call-log time{flex:none;color:var(--dim);font-size:12.5px;font-variant-numeric:tabular-nums}
+@keyframes call-detail-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.call-detail{animation:none}.call-group,.call-row-main,.call-row-call,.call-action-mark{transition:none}}
+@media(forced-colors:active){.call-group.open{outline:1px solid CanvasText}.call-action-mark{border:1px solid ButtonText}}

@@ -76,3 +76,17 @@ test('a date inside daylight saving uses that day\'s offset, not a fixed one', (
     assert.equal(api.clock(july), '1:00 PM');     // BST
     assert.equal(api.clock(january), '12:00 PM'); // GMT
 });
+
+test('call history sections and row stamps are decided in the viewer\'s calendar', () => {
+    const api = load('UTC', noon);
+    assert.equal(api.callSection(noon - 5 * 60000), 'Today');
+    assert.equal(api.callSection(noon - 86400000), 'Yesterday');
+    assert.equal(api.callSection(noon - 3 * 86400000), 'Earlier');
+    assert.equal(api.recent(noon - 20000), 'Just now');
+    assert.equal(api.recent(noon - 12 * 60000), '12 min ago');
+    assert.equal(api.recent(noon - 3 * 3600000), '9:00 AM');
+    assert.equal(api.recent(noon - 86400000), '12:00 PM');
+    assert.equal(api.recent(noon - 3 * 86400000), api.stamp(noon - 3 * 86400000));
+    // 23:30Z yesterday-in-UTC is already today in Tokyo.
+    assert.equal(load('Asia/Tokyo', lateUtc).callSection(lateUtc - 10 * 3600000), 'Yesterday');
+});

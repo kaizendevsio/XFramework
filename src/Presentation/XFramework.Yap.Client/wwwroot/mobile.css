@@ -251,9 +251,4 @@ button,a,label,nav,.avatar,.appbar,.bottomnav{-webkit-user-select:none;user-sele
 .favorite-person>span:not(.avatar):not(.badge){max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650}
 .favorite-person .badge{position:absolute;top:5px;right:12px}
 .favorite-grid .inbox-menu-trigger{top:0;right:0}
-.call-card{width:min(340px,100%);margin:12px auto;padding:16px;border-radius:20px;background:var(--surface2);border:1px solid var(--border2)}
-.call-card-summary{display:flex;align-items:center;gap:12px;font-weight:650}
-.call-card-summary span{min-width:0}.call-card small{display:block;color:var(--dim);font-size:12px;font-weight:400;margin-top:5px}
-.call-back{display:flex;gap:9px;align-items:center;justify-content:center;width:100%;min-height:44px;margin-top:14px;border-radius:12px;background:var(--surface3);color:var(--accent-ink);font-weight:650}
-.call-list-item{margin-bottom:22px}.call-person{display:flex;gap:12px;align-items:center}.call-list-item .call-card{width:100%}
 .inbox-skeleton{display:grid;gap:16px;padding:16px 0}.inbox-skeleton span{display:block;height:60px;border-radius:18px;background:var(--surface2)}
