@@ -36,6 +36,12 @@ public sealed class BrowserTime(IJSRuntime js)
     /// <summary>A search hit's stamp: today is a time, this week a weekday, older a date.</summary>
     public string Stamp(DateTime utc) => Call("stamp", utc);
 
+    /// <summary>"Today" / "Yesterday" / "Earlier": the call history's section headings.</summary>
+    public string CallSection(DateTime utc) => Call("callSection", utc);
+
+    /// <summary>A call row's stamp: "Just now", "12 min ago", a clock time today, a day before that.</summary>
+    public string Recent(DateTime utc) => Call("recent", utc);
+
     /// <summary>The machine-readable instant for a &lt;time datetime&gt; attribute. "O" is defined to
     /// ignore the culture, so this one format is still safe to produce here.</summary>
     public static string Iso(DateTime utc) => AsUtc(utc).ToString("O");

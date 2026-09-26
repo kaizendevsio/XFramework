@@ -1,0 +1,16 @@
+/* The Calls tab frame: gutter, empty state and loading rows. The list itself is CallList. */
+/* An empty tab says what will appear and offers the way to make it appear. */
+.calls-empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;max-width:300px;margin:12vh auto 0;padding-inline:16px}
+.calls-empty-mark{width:76px;height:76px;margin-bottom:6px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent-ink)}
+.calls-empty h2{margin:0;font-size:19px;font-weight:700;letter-spacing:-.01em}
+.calls-empty p{margin:0;color:var(--dim);font-size:14px;line-height:1.45}
+.calls-empty-action{margin-top:10px;padding:11px 20px;border-radius:999px;background:color-mix(in srgb,var(--accent) 24%,transparent);color:var(--text);font-size:14px;font-weight:650;text-decoration:none}
+.calls-offline{margin:4px 16px 2px;font-size:12.5px;color:var(--dim)}
+.calls-more{width:auto;margin:12px 16px 0}
+
+.calls-skeleton{display:grid;gap:4px;padding:12px 8px 0}
+.calls-skeleton-row{display:flex;align-items:center;gap:14px;height:68px;padding-inline:8px}
+.calls-skeleton-row i{flex:none;width:48px;height:48px;border-radius:50%;background:var(--surface2)}
+.calls-skeleton-row b{flex:1;max-width:60%;height:14px;border-radius:7px;background:var(--surface2);box-shadow:0 20px 0 -3px var(--surface2)}
+
+@media(min-width:800px){.calls-panel{max-width:720px;width:100%;margin-inline:auto;padding-inline:12px}}

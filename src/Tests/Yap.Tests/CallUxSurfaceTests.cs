@@ -16,7 +16,7 @@ namespace Yap.Tests;
 public sealed class CallUxSurfaceTests
 {
     [Test]
-    public async Task Shell_KeepsFourTabsOutsidePage_AndRendersFavoritesAndCallCards()
+    public async Task Shell_KeepsFourTabsOutsidePage_AndRendersFavoritesAndCallEvents()
     {
         var services = new ServiceCollection().AddLogging();
         var js = new Mock<IJSInProcessRuntime>();
@@ -47,7 +47,7 @@ public sealed class CallUxSurfaceTests
                 b.OpenElement(2, "h1"); b.AddContent(3, "Calls"); b.CloseElement();
                 foreach (var text in new[] { "Video call · 2:05", "Missed video call", "Voice call · 0:42" })
                 {
-                    b.OpenComponent<CallCard>(4);
+                    b.OpenComponent<CallEvent>(4);
                     b.AddAttribute(5, "Message", new ChatMessage { Id = Guid.NewGuid(), ThreadId = Guid.NewGuid(), Text = text, IsCallSummary = true, CreatedAt = DateTime.UtcNow });
                     b.CloseComponent();
                 }
@@ -55,9 +55,9 @@ public sealed class CallUxSurfaceTests
             };
             var calls = await renderer.RenderComponentAsync<MainLayout>(ParameterView.FromDictionary(new Dictionary<string, object?> { ["Body"] = cards }));
             var callHtml = calls.ToHtmlString();
-            Assert.That(callHtml, Does.Contain("Video call back"));
-            Assert.That(callHtml, Does.Contain("Missed video call"));
-            Assert.That(callHtml, Does.Contain("Call back"));
+            Assert.That(callHtml, Does.Contain("aria-label=\"Video call, 2 minutes 5 seconds, "), "Durations are spoken, not read as \"two colon oh five\".");
+            Assert.That(callHtml, Does.Contain(">Missed video call</span>"));
+            Assert.That(callHtml, Does.Contain("class=\"call-event missed\""));
             await SaveArtifactAsync("calls", callHtml);
         });
     }
