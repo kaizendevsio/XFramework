@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Reflection;
 using System.Security.Claims;
 using System.Threading.Channels;
@@ -165,18 +166,181 @@ public sealed class BoltGroupCallLifecycleTests
         Assert.That(await f.Join("c"), Is.True);
     }
 
+    // ── Slow and stalled receivers ──
+
+    [Test]
+    public async Task SlowReceiver_DoesNotStallTheSenderOrOtherReceivers()
+    {
+        // Yap's control-queue timeout, with the progress watchdog far away.
+        await using var f = await Fixture.CreateAsync(configure: o => { o.SendEnqueueTimeoutMs = 50; o.TransportSendStallTimeoutMs = 10_000; });
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var stream = await f.Config("a");
+        Assert.That(() => f.Peers["c"].Count(FrameType.MediaConfig), Is.EqualTo(1).After(3000, 10));
+        f.Peers["c"].Block();
+        var started = Stopwatch.StartNew();
+        for (var i = 0; i < 20; i++) await f.Send("a", stream);
+        Assert.Multiple(() =>
+        {
+            Assert.That(started.ElapsedMilliseconds, Is.LessThan(1000), "the sender's receive loop never waits for a receiver");
+            Assert.That(() => f.Peers["b"].Media(stream), Has.Count.EqualTo(20).After(3000, 10));
+            Assert.That(f.Tasks["a"].IsCompleted, Is.False);
+        });
+        await Task.Delay(300); // Far beyond the old 50/250 ms deadline that retired a receiver.
+        Assert.That(f.Participants(), Does.Contain("c"));
+        f.Peers["c"].Release();
+        Assert.That(() => f.Peers["c"].Media(stream).Select(x => x.Sequence), Does.Contain(20u).After(3000, 10));
+    }
+
+    [Test]
+    public async Task StalledReceiver_IsRetiredOnlyAfterTheStallWindow()
+    {
+        await using var f = await Fixture.CreateAsync(configure: o => { o.SendEnqueueTimeoutMs = 50; o.TransportSendStallTimeoutMs = 1_500; });
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var stream = await f.Config("a");
+        Assert.That(() => f.Peers["c"].Count(FrameType.MediaConfig), Is.EqualTo(1).After(3000, 10));
+        f.Peers["c"].Block();
+        var stalled = Stopwatch.StartNew();
+        await f.Send("a", stream);
+        await Task.Delay(700);
+        Assert.That(f.Participants(), Does.Contain("c"), "a write that is merely slow is not a dead link");
+        Assert.That(() => f.Tasks["c"].IsCompleted, Is.True.After(5000, 20));
+        Assert.That(stalled.ElapsedMilliseconds, Is.GreaterThanOrEqualTo(1400));
+        Assert.That(f.Participants(), Is.EquivalentTo(new[] { "a", "b" }));
+    }
+
+    [Test]
+    public async Task CongestedReceiver_KeepsAudio_DropsWholePicturesUntilAKeyframe_AndAsksTheSender()
+    {
+        await using var f = await Fixture.CreateAsync(configure: o =>
+        {
+            o.TransportSendStallTimeoutMs = 10_000;
+            o.MediaSendQueue.VideoMaxQueuedBytes = 3_000;
+            o.MediaSendQueue.VideoMaxQueueDelayMs = 60_000;
+            o.MediaSendQueue.AudioMaxQueueDelayMs = 60_000;
+        });
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var audio = await f.Config("a");
+        var video = await f.VideoConfig("a");
+        await f.SendVideo("a", video, keyframe: true);
+        Assert.That(() => f.Peers["c"].Media(video), Has.Count.EqualTo(1).After(3000, 10));
+
+        f.Peers["c"].Block();
+        await f.SendVideo("a", video, keyframe: false); // 2: taken by the blocked write
+        Assert.That(() => f.Peers["b"].Media(video), Has.Count.EqualTo(2).After(3000, 10));
+        await Task.Delay(50);
+        await f.SendVideo("a", video, keyframe: false); // 3: queued
+        await f.SendVideo("a", video, keyframe: false); // 4: queued
+        await f.SendVideo("a", video, keyframe: false); // 5: over budget - 3, 4 and 5 go
+        for (var i = 0; i < 3; i++) await f.Send("a", audio);
+        await f.SendVideo("a", video, keyframe: false); // 6: undecodable without 3-5
+        Assert.That(() => f.Peers["a"].KeyRequests(video), Is.GreaterThanOrEqualTo(1).After(3000, 10),
+            "the relay asks the sender for a fresh reference picture");
+
+        f.Peers["c"].Release();
+        await f.SendVideo("a", video, keyframe: true);  // 7
+        await f.SendVideo("a", video, keyframe: false); // 8
+        Assert.That(() => f.Peers["c"].Media(video).Select(x => x.Sequence), Is.EqualTo(new uint[] { 1, 2, 7, 8 }).After(3000, 10));
+        Assert.That(() => f.Peers["c"].Media(audio), Has.Count.EqualTo(3).After(3000, 10), "audio is never dropped for video");
+        Assert.That(() => f.Peers["b"].Media(video), Has.Count.EqualTo(8).After(3000, 10), "a healthy receiver loses nothing");
+    }
+
+    [Test]
+    public async Task LateVideoReceiver_WaitsForAKeyframe_AndTheRelayRequestsOne()
+    {
+        await using var f = await Fixture.CreateAsync();
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        await f.Join("a"); await f.Join("b");
+        var video = await f.VideoConfig("a");
+        await f.SendVideo("a", video, keyframe: true);
+        await f.SendVideo("a", video, keyframe: false);
+        Assert.That(await f.Join("c"), Is.True);
+        await f.SendVideo("a", video, keyframe: false);
+        Assert.That(() => f.Peers["a"].KeyRequests(video), Is.EqualTo(1).After(3000, 10));
+        await f.SendVideo("a", video, keyframe: true);
+        await f.SendVideo("a", video, keyframe: false);
+        Assert.That(() => f.Peers["c"].Media(video).Select(x => x.Keyframe), Is.EqualTo(new[] { true, false }).After(3000, 10),
+            "a decoder must never be fed a delta it has no reference for");
+        Assert.That(() => f.Peers["b"].Media(video), Has.Count.EqualTo(5).After(3000, 10));
+    }
+
+    // ── Re-authorization ──
+
+    [Test]
+    public async Task UnreachablePolicy_KeepsTheParticipant_UntilADefinitiveRefusal()
+    {
+        await using var f = await Fixture.CreateAsync();
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var stream = await f.Config("a");
+        f.Policy.Unreachable.UnionWith(f.Peers.Keys);
+        f.ExpireLease();
+        await f.Send("a", stream);
+        Assert.That(() => f.RenewalIdle, Is.True.After(3000, 10));
+        await f.Send("a", stream);
+        Assert.Multiple(() =>
+        {
+            Assert.That(f.Participants(), Is.EquivalentTo(f.Peers.Keys), "a hub reconnect must not end the call");
+            Assert.That(() => f.Peers["c"].Media(stream), Has.Count.EqualTo(2).After(3000, 10));
+        });
+
+        f.Policy.Unreachable.Clear();
+        f.Policy.Accepted.Remove("c");
+        f.ExpireLease();
+        await f.Send("a", stream);
+        Assert.That(() => f.Participants(), Is.EquivalentTo(new[] { "a", "b" }).After(3000, 10), "a refusal still removes");
+    }
+
+    [Test]
+    public async Task UnreachablePolicy_BeyondTheGrace_RemovesOnlyThatParticipant()
+    {
+        await using var f = await Fixture.CreateAsync(configure: o => o.GroupAuthorizationGraceSeconds = 0);
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var stream = await f.Config("a");
+        f.Policy.Unreachable.Add("c");
+        f.ExpireLease();
+        await f.Send("a", stream);
+        Assert.That(() => f.Participants(), Is.EquivalentTo(new[] { "a", "b" }).After(3000, 10));
+    }
+
+    [Test]
+    public async Task SlowAuthorizationRenewal_DoesNotHoldBackMedia()
+    {
+        await using var f = await Fixture.CreateAsync();
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var stream = await f.Config("a");
+        f.Policy.DelayMs = 2_000;
+        f.ExpireLease();
+        var sent = Stopwatch.StartNew();
+        await f.Send("a", stream);
+        await f.Send("a", stream);
+        Assert.That(() => f.Peers["b"].Media(stream), Has.Count.EqualTo(2).After(1000, 5));
+        Assert.That(sent.ElapsedMilliseconds, Is.LessThan(1500), "four policy RPCs per renewal used to stall every frame of the call");
+        Assert.That(() => f.RenewalIdle, Is.True.After(5000, 20));
+        Assert.That(f.Participants(), Is.EquivalentTo(f.Peers.Keys));
+    }
+
     private static byte[] Frame(Action<IBufferWriter<byte>> write)
     { var writer = new ArrayBufferWriter<byte>(); write(writer); return writer.WrittenSpan.ToArray(); }
 
     private sealed class Policy(Guid call) : IBoltCallAuthorizer, IBoltGroupCallAuthorizer
     {
         public HashSet<string> Accepted { get; } = [];
+        /// <summary>Participants whose check throws, like a policy RPC over a hub link that is reconnecting.</summary>
+        public HashSet<string> Unreachable { get; } = [];
         public Action? OnAuthorize;
+        public int DelayMs;
         public ValueTask<bool> AuthorizeAsync(BoltCallAuthorizationContext context, CancellationToken ct = default) => ValueTask.FromResult(false);
-        public ValueTask<bool> AuthorizeParticipantAsync(Guid id, string clientId, ClaimsPrincipal user, CancellationToken ct = default)
+        public async ValueTask<bool> AuthorizeParticipantAsync(Guid id, string clientId, ClaimsPrincipal user, CancellationToken ct = default)
         {
             OnAuthorize?.Invoke();
-            return ValueTask.FromResult(id == call && Accepted.Contains(clientId) && user.FindFirstValue("bolt_media_client_id") == clientId);
+            if (DelayMs > 0) await Task.Delay(DelayMs, ct);
+            if (Unreachable.Contains(clientId)) throw new IOException("The policy backend is unreachable.");
+            return id == call && Accepted.Contains(clientId) && user.FindFirstValue("bolt_media_client_id") == clientId;
         }
     }
     private sealed class Fixture : IAsyncDisposable
@@ -186,12 +350,15 @@ public sealed class BoltGroupCallLifecycleTests
         public BoltServer Server { get; private set; } = null!;
         public Dictionary<string, Peer> Peers { get; } = [];
         public Dictionary<string, Task> Tasks { get; } = [];
-        public static async Task<Fixture> CreateAsync(bool policyEnabled = true, int limit = 8, int participants = 3)
+        public static async Task<Fixture> CreateAsync(bool policyEnabled = true, int limit = 8, int participants = 3,
+            Action<BoltServerOptions>? configure = null)
         {
             var f = new Fixture(); f.Policy = new(f.Call);
-            f.Server = new(NullLogger<BoltServer>.Instance, new BoltServerOptions
+            var options = new BoltServerOptions
             { MediaEnabled = true, AuthenticatedMediaOnly = true, RequireSecureTransport = true, CallAuthorizer = f.Policy,
-                GroupCallAuthorizer = policyEnabled ? f.Policy : null, MaxCallParticipants = limit });
+                GroupCallAuthorizer = policyEnabled ? f.Policy : null, MaxCallParticipants = limit };
+            configure?.Invoke(options);
+            f.Server = new(NullLogger<BoltServer>.Instance, options);
             foreach (var id in Enumerable.Range(0, participants).Select(index => ((char)('a' + index)).ToString()))
             {
                 var peer = new Peer(); f.Peers[id] = peer;
@@ -215,8 +382,30 @@ public sealed class BoltGroupCallLifecycleTests
             var sequence = sequences[stream] = sequences.GetValueOrDefault(stream) + 1;
             return Peers[id].ProcessAsync(Frame(w => BoltCodec.WriteMediaFrame(w, stream, sequence, 960 * sequence, 0, [0xF8, 0xFF, 0xFE])));
         }
+        public async Task<Guid> VideoConfig(string id)
+        {
+            var stream = Guid.NewGuid();
+            await Peers[id].ProcessAsync(Frame(w => BoltCodec.WriteMediaConfig(w, stream, Call, MediaType.Video, CodecId.H264, 426, 240, 180, 0, [])));
+            return stream;
+        }
+        /// <summary>One single-fragment picture; a keyframe carries the clear keyframe flag like a real first fragment.</summary>
+        public Task SendVideo(string id, Guid stream, bool keyframe, int bytes = 1000)
+        {
+            var sequence = sequences[stream] = sequences.GetValueOrDefault(stream) + 1;
+            return Peers[id].ProcessAsync(Frame(w => BoltCodec.WriteMediaFrame(w, stream, sequence, 3000 * sequence, keyframe ? (byte)0x01 : (byte)0, new byte[bytes])));
+        }
+        public ServerCallState CallState => ((ConcurrentDictionary<Guid, ServerCallState>)typeof(BoltServer)
+            .GetField("_activeCalls", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(Server)!)[Call];
+        public string[] Participants() { lock (CallState.Participants) return CallState.Participants.Select(x => x.ClientId!).ToArray(); }
+        /// <summary>Make the next media frame find the authorization lease due.</summary>
+        public void ExpireLease() => Volatile.Write(ref CallState.LastMediaAuthorizationTick, Environment.TickCount64 - 60_000);
+        public bool RenewalIdle => Volatile.Read(ref CallState.AuthorizationRenewalRunning) == 0 &&
+            Environment.TickCount64 - Volatile.Read(ref CallState.LastMediaAuthorizationTick) < 30_000;
         public async ValueTask DisposeAsync()
-        { foreach (var peer in Peers.Values) await peer.DisposeAsync(); await Task.WhenAll(Tasks.Values).WaitAsync(TimeSpan.FromSeconds(5)); Server.Dispose(); }
+        {
+            foreach (var peer in Peers.Values) { peer.Release(); await peer.DisposeAsync(); }
+            await Task.WhenAll(Tasks.Values).WaitAsync(TimeSpan.FromSeconds(5)); Server.Dispose();
+        }
     }
     private sealed class Peer : IBoltConnection
     {
@@ -233,7 +422,19 @@ public sealed class BoltGroupCallLifecycleTests
             await inbound.Writer.WriteAsync((frame, null)); await inbound.Writer.WriteAsync((null, barrier));
             await barrier.Task.WaitAsync(TimeSpan.FromSeconds(3));
         }
-        public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) { Sent.Enqueue(data.ToArray()); return ValueTask.CompletedTask; }
+        private TaskCompletionSource? blocked;
+        /// <summary>From now on every write waits, as on a link whose socket buffer is full.</summary>
+        public void Block() => blocked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        public void Release() => blocked?.TrySetResult();
+        public List<(uint Sequence, bool Keyframe)> Media(Guid stream) => Sent
+            .Where(x => x[0] == (byte)FrameType.MediaFrame && BoltCodec.TryReadMediaFrame(x, out var h) && h.StreamId == stream)
+            .Select(x => { BoltCodec.TryReadMediaFrame(x, out var h); return (h.SequenceNumber, h.IsKeyframe); }).ToList();
+        public int KeyRequests(Guid stream) => Sent.Count(x => BoltCodec.TryReadMediaKeyRequest(x, out var id) && id == stream);
+        public async ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
+        {
+            if (blocked is { } gate) await gate.Task.WaitAsync(ct);
+            Sent.Enqueue(data.ToArray());
+        }
         public async ValueTask<(int BytesRead, bool EndOfMessage)> ReceiveAsync(Memory<byte> buffer, CancellationToken ct = default)
         {
             while (await inbound.Reader.WaitToReadAsync(ct))
