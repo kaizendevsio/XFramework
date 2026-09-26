@@ -947,3 +947,19 @@ for (const rejected of ['configure', 'error']) test(`hardware decoder ${rejected
     assert.equal(remote.hardwareFailed, true);
     assert.equal(f.p.decodeFrame('s', new Uint8Array([1]), 1, true), true);
 });
+
+test('keyframes are sent on demand, coalesced to one a second, with a long safety interval', async () => {
+    const f = fixture();
+    await f.p.initEncoder('h264', tier.width, tier.height, tier.bitrate, tier.framerate, 10);
+    const p = f.p;
+    assert.equal(p._takeKeyframe(1_000), true, 'a fresh encoder starts on a keyframe');
+    assert.equal(p._takeKeyframe(1_033), false);
+    p.requestKeyframe(); p.requestKeyframe(); p.requestKeyframe();
+    assert.equal(p._takeKeyframe(1_066), false, 'a request right after a keyframe waits instead of bursting again');
+    assert.equal(p._takeKeyframe(2_000), true, 'three requests are served by one keyframe');
+    assert.equal(p._takeKeyframe(2_033), false);
+    assert.equal(p._takeKeyframe(11_999), false, 'no unrequested keyframe before the safety interval');
+    assert.equal(p._takeKeyframe(12_000), true);
+    await p.applyTier(640, 360, 400, 20);
+    assert.equal(p._takeKeyframe(12_010), true, 'a reconfigured encoder cannot wait for the rate limit');
+});

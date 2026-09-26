@@ -339,3 +339,23 @@ test('mute retains the microphone, unmute does not recapture, and hangup release
     assert.equal(f.stats.stopped, 1);
     assert.equal(f.p.captureRunning, false);
 });
+
+test('Opus asks for in-band FEC and DTX, and keeps them across a bitrate change', async () => {
+    const f = fixture();
+    await f.p.initEncoder(48000, 1, 32, { inbandFec: true, packetLossPercent: 5, dtx: true });
+    assert.equal(JSON.stringify(f.p.encoder.config.opus), JSON.stringify({ useinbandfec: true, usedtx: true, packetlossperc: 5 }));
+    assert.equal(f.p.encoder.config.bitrate, 32000, '32 kbps voice leaves a mobile link room for video');
+    f.p.reconfigureBitrate(48000, 1, 24);
+    assert.equal(f.p.encoder.config.bitrate, 24000);
+    assert.equal(f.p.encoder.config.opus.useinbandfec, true, 'a rate change must not silently drop FEC');
+    await f.p.dispose();
+});
+
+test('a browser that rejects the Opus tuning still gets a working plain encoder', async () => {
+    const f = fixture();
+    f.sandbox.AudioEncoder.isConfigSupported = async config => ({ supported: !config.opus });
+    await f.p.initEncoder(48000, 1, 32, { inbandFec: true, packetLossPercent: 5, dtx: true });
+    assert.equal(f.p.encoder.config.opus, undefined);
+    assert.equal(f.p.encoder.config.bitrate, 32000);
+    await f.p.dispose();
+});
