@@ -1,4 +1,4 @@
-:root{--glass-tint:#ffffff45;--glass-sheet:#f7f7f74d;--glass-shine:#ffffff69;--glass-edge:#ffffff65;--glass-rim:#fffffff0;--glass-shadow:0 8px 28px -12px #32323238,0 2px 5px #3232320c}
+:root{--glass-chrome-blur:max(var(--glass-blur,2px),18px);--glass-tint:#ffffff45;--glass-sheet:#f7f7f74d;--glass-shine:#ffffff69;--glass-edge:#ffffff65;--glass-rim:#fffffff0;--glass-shadow:0 8px 28px -12px #32323238,0 2px 5px #3232320c}
 :root[data-theme=dark]{--glass-tint:#28282855;--glass-sheet:#24242455;--glass-shine:#ffffff22;--glass-edge:#ffffff26;--glass-rim:#ffffff59;--glass-shadow:0 8px 28px -12px #0009,0 2px 5px #0003}
 body{background:var(--page)}
 .phone{background:var(--surface)}
@@ -42,7 +42,13 @@ body{background:var(--page)}
 .scroll-header,.scroll-footer{position:absolute;left:0;right:0;z-index:10;pointer-events:none}
 .scroll-header{top:0}.scroll-footer{bottom:0}
 .scroll-header>*,.scroll-footer>*{pointer-events:auto}
-.scroll-header .appbar{margin:0;border-radius:0;padding:12px 16px;border:0;box-shadow:none}
+/* Scroll-header app bars are frosted page chrome in every section, so they carry their own
+   tint. A custom Settings tint still wins through --glass-custom-tint. */
+.scroll-header .appbar{margin:0;border-radius:0;padding:12px 16px;border:0;box-shadow:none;--glass-tint:color-mix(in srgb,var(--page) 70%,transparent)}
+/* Chrome that content scrolls beneath - app bars, composer, tab bar, compose button - needs a
+   floor on the blur: the 2px default lens leaves rows legible through it. A stronger Settings
+   blur still raises it; every other glass surface keeps the preset as is. */
+:is(.scroll-header .appbar,.scroll-footer .inputrow,.bottomnav,.fab)>.glass-optics .glass-backdrop{-webkit-backdrop-filter:blur(var(--glass-chrome-blur)) saturate(1.35);backdrop-filter:blur(var(--glass-chrome-blur)) saturate(1.35)}
 .scroll-footer .composer{margin:0 8px 8px;border-radius:26px;padding-bottom:13px}
 .pagebar.liquid-glass{backdrop-filter:none}
 .phone:has(.scroll-surface) .screen{position:absolute;inset:46px 0 0}
