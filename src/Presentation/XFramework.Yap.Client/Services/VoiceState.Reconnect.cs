@@ -159,45 +159,47 @@ public sealed partial class VoiceState
             await media.JoinHostedGroupAsync(group.Id);
             attempt.Client = client; attempt.Disconnected = handler; attempt.Connection = connection;
 
-            var roster = await api.GetAsync<YapGroupCall>($"api/chat/calls/groups/{group.Id}", ct);
-            CheckCurrent(attempt);
-            var self = roster.Participants.SingleOrDefault(x => x.CredentialId == chat.User!.CredentialId);
-            if (self is null || self.Left) return CallResumeAttempt.Refused;
-            attempt.TransportReady = true;
-            if (attempt.Epoch is { } epoch && roster.Revision == epoch.Revision)
+            if (attempt.Epoch is { Active: true } epoch && attempt.HostedAudioStarted && group.Revision == epoch.Revision)
             {
-                attempt.Group = roster;
-                if (epoch.Active && attempt.HostedAudioStarted)
-                {
-                    // Same roster, same epoch: rejoin the relay's room and publish again. No key changes hands.
-                    await api.PostAsync($"api/chat/calls/groups/{group.Id}/ready", new YapGroupReady(epoch.Revision), ct);
-                    CheckCurrent(attempt);
-                    if (await RunEpochMediaAsync(attempt, epoch, () => media.StartHostedAudioAsync(group.Id)))
-                    { if (attempt.CameraOn) await RunEpochMediaAsync(attempt, epoch, () => media.ResumeVideoStreamAsync(group.Id)); }
-                    else
-                    {
-                        // The roster moved on in the meantime. The socket is good; join the new epoch on it.
-                        attempt.HostedAudioStarted = false;
-                        attempt.ResumeVideo = attempt.CameraOn;
-                        _ = RejoinEpochAsync(attempt, null);
-                    }
-                }
+                // The usual resume: nothing about the roster changed. Rejoin the relay's room straight
+                // away and publish again, with no key changing hands. A roster that did move on answers
+                // 409, handled below; a seat that is gone answers 404.
+                attempt.TransportReady = true;
+                await api.PostAsync($"api/chat/calls/groups/{group.Id}/ready", new YapGroupReady(epoch.Revision), ct);
+                CheckCurrent(attempt);
+                if (await RunEpochMediaAsync(attempt, epoch, () => media.StartHostedAudioAsync(group.Id)))
+                { if (attempt.CameraOn) await RunEpochMediaAsync(attempt, epoch, () => media.ResumeVideoStreamAsync(group.Id)); }
                 else
                 {
-                    // The transport went while this epoch was still being set up. Its keys stand (a sender
-                    // never changes key within an epoch); finish it the normal way now there is a socket.
+                    // The roster moved on in the meantime. The socket is good; join the new epoch on it.
+                    attempt.HostedAudioStarted = false;
                     attempt.ResumeVideo = attempt.CameraOn;
-                    epoch.Active = false;
-                    _ = FinishEpochAsync(attempt, epoch);
+                    _ = RejoinEpochAsync(attempt, null);
                 }
             }
             else
             {
-                // The roster moved on while this device was away (or the epoch never finished): join the
-                // current epoch properly. It completes as the keys arrive, on its own.
-                attempt.HostedAudioStarted = false;
+                var roster = await api.GetAsync<YapGroupCall>($"api/chat/calls/groups/{group.Id}", ct);
+                CheckCurrent(attempt);
+                var self = roster.Participants.SingleOrDefault(x => x.CredentialId == chat.User!.CredentialId);
+                if (self is null || self.Left) return CallResumeAttempt.Refused;
+                attempt.TransportReady = true;
                 attempt.ResumeVideo = attempt.CameraOn;
-                _ = RejoinEpochAsync(attempt, roster);
+                if (attempt.Epoch is { } unfinished && roster.Revision == unfinished.Revision)
+                {
+                    // The transport went while this epoch was still being set up. Its keys stand (a sender
+                    // never changes key within an epoch); finish it the normal way now there is a socket.
+                    attempt.Group = roster;
+                    unfinished.Active = false;
+                    _ = FinishEpochAsync(attempt, unfinished);
+                }
+                else
+                {
+                    // The roster moved on while this device was away: join the current epoch properly.
+                    // It completes as the keys arrive, on its own.
+                    attempt.HostedAudioStarted = false;
+                    _ = RejoinEpochAsync(attempt, roster);
+                }
             }
             // A socket that died during the rejoin raised its Disconnected before it was ours to watch.
             if (!client.IsConnected) throw new IOException("The resumed connection closed while rejoining.");
