@@ -2,10 +2,12 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.65";
+    public const string Version = "1.3.66";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "26 September 2026", [
+            "The inbox header now matches the app background exactly, with no darker band."]),
+        ("1.3.65", "26 September 2026", [
             "The inbox header is flat again.",
             "Pressing and holding no longer selects text or opens the Android search sheet; use Copy in the message menu."]),
         ("1.3.64", "26 September 2026", [
