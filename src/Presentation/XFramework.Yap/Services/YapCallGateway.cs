@@ -5,6 +5,7 @@ using Bolt.Protocol;
 using Bolt.Protocol.Transport;
 using Bolt.Server;
 using Communications.Integration.Clients;
+using Microsoft.AspNetCore.Connections.Features;
 using Communications.Integration.Drivers;
 using XFramework.Integration.Security;
 using Yap.Contracts;
@@ -21,6 +22,7 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
     private readonly IServiceScopeFactory scopes;
     private readonly ILogger pushLogger;
     private readonly Timer cleanup;
+    private readonly int relaySocketUnsentBytes;
 
     /// <summary>How long a ringing invite stays valid; push TTLs are matched to it.</summary>
     internal static readonly TimeSpan InviteLifetime = TimeSpan.FromSeconds(60);
@@ -42,6 +44,7 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
         // Video is on wherever encrypted groups are, and can still be switched off per environment.
         videoEnabled = enableGroupLifecycle && configuration.GetValue("Yap:Calls:Video", true);
         Enabled = configuration.GetValue<bool>("Yap:Calls:Enabled");
+        relaySocketUnsentBytes = Math.Clamp(configuration.GetValue("Yap:Calls:RelaySocketUnsentBytes", 32 * 1024), 0, 4 * 1024 * 1024);
         var requiredMode = enableGroupLifecycle ? "EndToEndEncrypted" : "TrustedServerTls";
         if (Enabled && configuration["Yap:Calls:SecurityMode"] != requiredMode)
             throw new InvalidOperationException($"Yap calls require the explicit {requiredMode} security mode.");
@@ -194,6 +197,7 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
             var principal = new ClaimsPrincipal(identity);
             using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted, active.Lifetime.Token);
             lifetime.CancelAfter(TimeSpan.FromHours(1));
+            LimitUnsentBytes(context);
             using var socket = await context.WebSockets.AcceptWebSocketAsync();
             await using var transport = new ReadyTransport(new WebSocketBoltConnection(socket), () =>
             { lock (gate) active.Registered.Add(credential); });
@@ -269,6 +273,16 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
         if (members is null)
             return IsDefinitiveRefusal(status) ? BoltGroupAuthorizationDecision.Denied : BoltGroupAuthorizationDecision.Unavailable;
         return members.Contains(member) ? BoltGroupAuthorizationDecision.Allowed : BoltGroupAuthorizationDecision.Denied;
+    }
+
+    /// <summary>
+    /// Keeps the kernel from hiding seconds of media behind a slow phone: the backlog stays in the
+    /// relay's per-receiver queues, where audio is served first and stale video is dropped.
+    /// </summary>
+    private void LimitUnsentBytes(HttpContext context)
+    {
+        if (relaySocketUnsentBytes > 0)
+            BoltSocketTuning.TryLimitUnsentBytes(context.Features.Get<IConnectionSocketFeature>()?.Socket, relaySocketUnsentBytes);
     }
 
     public static bool HasSameOrigin(HttpRequest request) => Uri.TryCreate(request.Headers.Origin.ToString(), UriKind.Absolute, out var origin) &&

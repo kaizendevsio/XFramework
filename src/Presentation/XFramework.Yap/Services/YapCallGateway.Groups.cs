@@ -214,6 +214,7 @@ public sealed partial class YapCallGateway
             identity.AddClaim(new("yap_call_id", room.Id.ToString()));
             using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted, member.Lifetime.Token);
             lifetime.CancelAfter(TimeSpan.FromHours(1));
+            LimitUnsentBytes(context);
             using var socket = await context.WebSockets.AcceptWebSocketAsync();
             await using var transport = new ReadyTransport(new WebSocketBoltConnection(socket), () => { lock (gate) member.Registered = !member.Left; });
             await Server.HandleConnectionAsync(transport, new ClaimsPrincipal(identity), lifetime.Token, isSecureTransport: true);
