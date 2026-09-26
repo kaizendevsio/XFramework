@@ -89,6 +89,12 @@ public enum SignalType : byte
     KeyExchange = 0x0C,
     /// <summary>Server-to-client notification: exactly one 16-byte stream ID was removed from a host-managed room.</summary>
     StreamEnded = 0x0D,
+    /// <summary>
+    /// Transport liveness probe: a client sends at most 16 opaque bytes (typically its own send
+    /// time) and the relay echoes exactly that frame back to the sender alone. It carries no media
+    /// and no identity, and it is answered whether or not the sender is currently in a call.
+    /// </summary>
+    Heartbeat = 0x0E,
 }
 
 /// <summary>Quality hint from receiver to sender.</summary>

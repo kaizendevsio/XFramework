@@ -2305,7 +2305,7 @@ public sealed partial class BoltServer : IDisposable
                 {
                     // Missing codec configuration makes future audio unusable for this receiver.
                     // Remove that receiver without failing the healthy sender's connection.
-                    await RemoveGroupParticipantCoreAsync(callState, recipient, ct);
+                    await RemoveGroupParticipantCoreAsync(callState, recipient, ct, BoltGroupDepartureReason.Disconnected);
                 }
             }
         }
@@ -2388,12 +2388,19 @@ public sealed partial class BoltServer : IDisposable
             return;
         }
 
+        // Transport liveness, answered to the sender alone and independent of any call state.
+        if (header.SignalType == SignalType.Heartbeat)
+        {
+            EchoHeartbeat(sender, buffer, length, header);
+            return;
+        }
+
         // Group consent and direct transport negotiation are still experimental.
         if (_activeCalls.TryGetValue(header.CallId, out var group) && group.HostManagedGroup)
         {
             // The host admits accepted participants. A peer can leave itself, never mutate another member or hold/end the room.
             if (header.SignalType == SignalType.End)
-                await LeaveGroupCallAsync(header.CallId, sender.ClientId, ct);
+                await LeaveGroupCallAsync(header.CallId, sender, BoltGroupDepartureReason.Left, ct);
             return;
         }
         if (_authenticatedMediaOnly && header.SignalType is SignalType.AddParticipant or
@@ -4283,7 +4290,8 @@ public sealed partial class BoltServer : IDisposable
 
             if (callState.HostManagedGroup)
             {
-                await LeaveGroupCallAsync(callId, connection.ClientId, CancellationToken.None);
+                // A transport loss, not a hangup: the host decides whether the seat is held for a resume.
+                await LeaveGroupCallAsync(callId, connection, BoltGroupDepartureReason.Disconnected, CancellationToken.None);
                 continue;
             }
 

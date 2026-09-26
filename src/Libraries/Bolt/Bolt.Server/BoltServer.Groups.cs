@@ -12,6 +12,13 @@ public sealed partial class BoltServer
     public event Action<Guid, string>? GroupParticipantRemoved;
 
     /// <summary>
+    /// The same notification with its reason. A host that holds seats across reconnects must end the
+    /// seat only for <see cref="BoltGroupDepartureReason.Unauthorized"/> or an explicit leave, never
+    /// because a socket closed.
+    /// </summary>
+    public event Action<BoltGroupDeparture>? GroupParticipantDeparted;
+
+    /// <summary>
     /// Host-only admission after explicit user acceptance and authenticated transport registration.
     /// This lifecycle API supplies no encryption keys and is disabled without a group authorization policy.
     /// </summary>
@@ -85,7 +92,22 @@ public sealed partial class BoltServer
         try
         {
             var participant = GetParticipantSnapshot(call).FirstOrDefault(x => x.ClientId == clientId);
-            if (participant is not null) await RemoveGroupParticipantCoreAsync(call, participant, ct);
+            if (participant is not null) await RemoveGroupParticipantCoreAsync(call, participant, ct, BoltGroupDepartureReason.Left);
+        }
+        finally { call.GroupGate.Release(); }
+    }
+
+    /// <summary>
+    /// Remove exactly this connection, never "whoever has its client ID": after a resume the same
+    /// participant is already back on a newer connection, and the old one's cleanup must not evict it.
+    /// </summary>
+    private async Task LeaveGroupCallAsync(Guid callId, BoltHubConnection connection, BoltGroupDepartureReason reason, CancellationToken ct)
+    {
+        if (!_activeCalls.TryGetValue(callId, out var call) || !call.HostManagedGroup) return;
+        await call.GroupGate.WaitAsync(ct);
+        try
+        {
+            if (IsCallParticipant(call, connection)) await RemoveGroupParticipantCoreAsync(call, connection, ct, reason);
         }
         finally { call.GroupGate.Release(); }
     }
@@ -190,13 +212,14 @@ public sealed partial class BoltServer
                     _logger.LogInformation(
                         "Removing {ClientId} from call {CallId}: authorization {Decision}",
                         participant.ClientId, call.CallId, decision == BoltGroupAuthorizationDecision.Denied ? "refused" : "unavailable beyond grace");
-                    await RemoveGroupParticipantCoreAsync(call, participant, ct);
+                    await RemoveGroupParticipantCoreAsync(call, participant, ct, BoltGroupDepartureReason.Unauthorized);
                     break;
             }
         }
     }
 
-    private async Task RemoveGroupParticipantCoreAsync(ServerCallState call, BoltHubConnection participant, CancellationToken ct)
+    private async Task RemoveGroupParticipantCoreAsync(ServerCallState call, BoltHubConnection participant, CancellationToken ct,
+        BoltGroupDepartureReason reason)
     {
         var removedStreams = new List<Guid>();
         lock (call.SyncRoot)
@@ -228,8 +251,13 @@ public sealed partial class BoltServer
                     catch { /* A failed notification cannot interrupt the already committed removal. */ }
                 }
         }
-        try { if (participant.ClientId is { } clientId) GroupParticipantRemoved?.Invoke(call.CallId, clientId); }
-        catch { /* Host notifications do not restore removed media access. */ }
+        if (participant.ClientId is { } clientId)
+        {
+            try { GroupParticipantRemoved?.Invoke(call.CallId, clientId); }
+            catch { /* Host notifications do not restore removed media access. */ }
+            try { GroupParticipantDeparted?.Invoke(new BoltGroupDeparture(call.CallId, clientId, reason)); }
+            catch { /* Same. */ }
+        }
     }
 
     private void CleanupEmptyGroupCall(ServerCallState call)
