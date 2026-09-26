@@ -394,7 +394,26 @@ public sealed partial class YapCallGateway
     /// </summary>
     private void GroupParticipantDeparted(BoltGroupDeparture departure)
     {
-        if (departure.Reason == BoltGroupDepartureReason.Disconnected) return;
+        if (departure.Reason == BoltGroupDepartureReason.Disconnected)
+        {
+            // Usually the socket is already gone and its own ending holds the seat. If the relay gave up
+            // on a connection that is still open (a control send it could not deliver), close it too:
+            // a socket outside the relay's room would carry heartbeats and nothing else, forever. Its
+            // ending then holds the seat and the phone resumes.
+            CancellationTokenSource? stale = null;
+            lock (gate)
+            {
+                if (groups.TryGetValue(departure.CallId, out var room) &&
+                    room.Members.Keys.FirstOrDefault(x => ClientId(departure.CallId, x) == departure.ClientId) is var credential &&
+                    credential != Guid.Empty && room.Members[credential] is { Left: false, Connected: true } member &&
+                    (departure.Participant is not { } principal || IsCurrentConnection(principal, member)))
+                    stale = member.Connection;
+            }
+            // Off the relay's thread: it may be inside its own cleanup of this very connection.
+            if (stale is not null)
+                _ = Task.Run(() => { try { stale.Cancel(); } catch (ObjectDisposedException) { /* It ended meanwhile. */ } });
+            return;
+        }
         GroupMember[] cancel;
         lock (gate)
         {

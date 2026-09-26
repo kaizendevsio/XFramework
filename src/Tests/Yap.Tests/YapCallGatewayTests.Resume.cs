@@ -291,6 +291,22 @@ public sealed partial class YapCallGatewayTests
     }
 
     [Test]
+    public async Task RelayDroppingAStillOpenSocket_ClosesIt_SoThePhoneResumes()
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        await using var call = await LiveCall.StartAsync(f);
+        var member = Member(f, call.Id, f.BobId);
+        var current = new ClaimsIdentity(f.Bob.Identity as ClaimsIdentity);
+        current.AddClaim(new("yap_connection", member.GetType().GetField("Generation")!.GetValue(member)!.ToString()));
+        typeof(YapCallGateway).GetMethod("GroupParticipantDeparted", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(f.Gateway, [new BoltGroupDeparture(call.Id, YapCallGateway.ClientId(call.Id, f.BobId), BoltGroupDepartureReason.Disconnected, new ClaimsPrincipal(current))]);
+
+        Assert.That(() => call.Bob.Closed, Is.True.After(5000, 20), "a socket outside the relay's room is not left open");
+        var roster = await UntilAsync(() => f.Gateway.GroupRoster(f.Alice, call.Id), x => Bob(x).Reconnecting);
+        Assert.That(Bob(roster).Left, Is.False, "and its seat is held for the resume, not given up");
+    }
+
+    [Test]
     public async Task ReconnectGraceAndCallLength_AreConfigurable_WithSaneDefaults()
     {
         await using var f = await Fixture.CreateAsync(groupLifecycle: true);
