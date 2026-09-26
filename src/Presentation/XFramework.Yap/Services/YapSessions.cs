@@ -20,17 +20,14 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
     IServiceScopeFactory scopes, TimeProvider clock)
 {
     // An installed phone messenger must not sign you out while you keep using it, so the
-    // sign-in rolls: use pushes the idle deadline out again, and the absolute cap is the
-    // backstop a lost or stolen device cannot outlive. Both numbers are bounded by what
-    // IdentityServer will actually honour, because a longer promise here only trades
-    // "signed out at eight hours" for "inexplicably broken at N days":
-    //   - the refresh token lives 14 days and slides on each rotation, so a returning
-    //     device must arrive well inside that or it has nothing left to refresh with;
-    //   - the upstream session carries a hard 30-day cap (RememberMe, see YapAuth) that no
-    //     refresh extends, so this cap sits inside it with room for clock skew and ends the
-    //     session with Yap's own message rather than an upstream 401.
-    public static readonly TimeSpan IdleWindow = TimeSpan.FromDays(7);
-    private static readonly TimeSpan AbsoluteLifetime = TimeSpan.FromDays(28);
+    // sign-in only ever ends on disuse, never on age: each use pushes the idle deadline out
+    // again, and there is no absolute cap. Sign-out, upstream revocation and credential
+    // changes still end it immediately. The upstream session is persistent too (see
+    // YapAuth), so the one other bound is IdentityServer's refresh token for such sessions:
+    // it lives 120 days and slides on each rotation. This window sits inside that with room
+    // for clock skew, a backgrounded app and a transient refresh failure, so a returning
+    // device always arrives with something left to refresh with.
+    public static readonly TimeSpan IdleWindow = TimeSpan.FromDays(90);
 
     // Rolling on every request would write the shared store on every request. The deadline
     // only moves once it has drifted this far, which costs one write per active hour.
@@ -50,7 +47,7 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
         await ReadAsync(key, ct) is not null;
 
     /// <summary>Records use and returns the deadline the sign-in now holds, or null once the
-    /// idle window lapsed, the absolute cap was reached, or sign-out revoked it.</summary>
+    /// idle window lapsed or sign-out revoked it.</summary>
     public async ValueTask<DateTimeOffset?> TouchAsync(ClaimsPrincipal? user, CancellationToken ct = default)
     {
         if (user?.Identity?.IsAuthenticated != true || user.FindFirstValue(YapAuth.SessionClaim) is not { } key ||
@@ -75,8 +72,7 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
             TenantId = tenant, CredentialId = credential, SessionId = session,
             AccessToken = response.AccessToken, RefreshToken = response.RefreshToken,
             ExpiresAt = clock.GetUtcNow().AddSeconds(response.ExpiresIn),
-            ActiveUntil = clock.GetUtcNow().Add(IdleWindow),
-            SignedOutAt = clock.GetUtcNow().Add(AbsoluteLifetime)
+            ActiveUntil = clock.GetUtcNow().Add(IdleWindow)
         }, ct);
         return new ClaimsPrincipal(new ClaimsIdentity([
             new Claim(ClaimTypes.NameIdentifier, credential.ToString()),
@@ -161,12 +157,10 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
 
     private static string CacheKey(string key) => $"yap:session:{key}";
 
-    // Use pushes the idle deadline out, but never past the cap the sign-in started with.
-    // Returns whether the move is worth a write.
+    // Use pushes the idle deadline out. Returns whether the move is worth a write.
     private bool Roll(Entry entry)
     {
         var rolled = clock.GetUtcNow().Add(IdleWindow);
-        if (rolled > entry.SignedOutAt) rolled = entry.SignedOutAt;
         if (rolled - entry.ActiveUntil < RollSlack) return false;
         entry.ActiveUntil = rolled;
         return true;
@@ -183,8 +177,7 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
             // Entries written before sign-ins rolled carry no idle deadline. Honour the one
             // deadline they do have instead of signing everybody out on the rollout.
             if (entry.ActiveUntil == default) entry.ActiveUntil = entry.SignedOutAt;
-            // A rewritten entry must never outlive the sign-in it belongs to.
-            return entry.ActiveUntil <= clock.GetUtcNow() || entry.SignedOutAt <= clock.GetUtcNow() ? null : entry;
+            return entry.ActiveUntil <= clock.GetUtcNow() ? null : entry;
         }
         catch (System.Security.Cryptography.CryptographicException)
         {
@@ -214,9 +207,10 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
         public string RefreshToken { get; set; } = "";
         /// <summary>When the access token needs refreshing.</summary>
         public DateTimeOffset ExpiresAt { get; set; }
-        /// <summary>The rolling idle deadline: use pushes it out, never past <see cref="SignedOutAt"/>.</summary>
+        /// <summary>The rolling idle deadline: each use pushes it out again.</summary>
         public DateTimeOffset ActiveUntil { get; set; }
-        /// <summary>The absolute cap on this sign-in. Neither use nor a token refresh extends it.</summary>
+        /// <summary>Read only from entries written before sign-ins rolled, which carry no
+        /// <see cref="ActiveUntil"/>. Sign-ins no longer have an absolute cap.</summary>
         public DateTimeOffset SignedOutAt { get; set; }
     }
 }

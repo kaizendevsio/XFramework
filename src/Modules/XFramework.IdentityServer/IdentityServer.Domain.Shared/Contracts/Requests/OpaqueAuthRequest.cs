@@ -16,4 +16,7 @@ public partial record OpaqueAuthRequest : RequestBase,
     public string? RecoveryArchive { get; set; }
     public override string ToString() => nameof(OpaqueAuthRequest);
     public string? LegacyPassword { get; set; }
+    /// <summary>Applied to the session a successful <c>login-finish</c> creates; see
+    /// <see cref="AuthenticateIdentityRequest.PersistentSession"/>.</summary>
+    public bool PersistentSession { get; set; }
 }

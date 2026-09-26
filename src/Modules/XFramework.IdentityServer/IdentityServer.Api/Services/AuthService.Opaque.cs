@@ -25,8 +25,7 @@ public sealed partial class AuthService
             return Result<OpaqueAuthResponse>.Success(new() { Mode = enabled ? "opaque" : "legacy", UserName = owner.UserName,
                 Client = $"{tenantId:D}:{owner.Id:D}" });
         }
-        var login = new AuthenticateIdentityRequest { UserName = request.UserName, RoleId = request.RoleId,
-            AuthorizationType = AuthorizationType.Username, Metadata = request.Metadata };
+        var login = OpaqueLoginRequest(request);
         if (request.Stage is "options" or "login-start" or "register-start" or "enroll-start" or "change-start")
         {
             var limit = await AcquireAuthenticationRateLimitAsync(login, ct);
@@ -191,6 +190,14 @@ public sealed partial class AuthService
         catch (OpaqueExchanges.CapacityException) { return Result<OpaqueAuthResponse>.Failure("Too many attempts. Try again shortly.", 429); }
         catch (DbUpdateConcurrencyException) { return Result<OpaqueAuthResponse>.Conflict("Account changed. Sign in again."); }
     }
+
+    /// <summary>The ordinary authentication an OPAQUE exchange drives once its proof checks out.
+    /// It carries the caller's session kind, or every OPAQUE sign-in gets the default cap.</summary>
+    public static AuthenticateIdentityRequest OpaqueLoginRequest(OpaqueAuthRequest request) => new()
+    {
+        UserName = request.UserName, RoleId = request.RoleId, AuthorizationType = AuthorizationType.Username,
+        PersistentSession = request.PersistentSession, Metadata = request.Metadata
+    };
 
     private IQueryable<OpaqueCredential> OpaqueCredentialQuery(Guid tenant, Guid credential) =>
         _dbContext.Set<OpaqueCredential>().IgnoreQueryFilters().AsNoTracking()

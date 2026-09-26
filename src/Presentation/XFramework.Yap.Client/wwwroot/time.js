@@ -27,19 +27,35 @@
     const monthYear = ms => formatter('monthYear', { month: 'short', year: 'numeric' }).format(ms);
     const longDate = ms => formatter('longDate', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(ms);
     const full = ms => formatter('full', { dateStyle: 'long', timeStyle: 'short' }).format(ms);
+    // Dates read as a person would say them; a same-day hit only needs a clock time.
+    const stamp = ms => {
+        const days = daysAgo(ms);
+        if (days === 0) return clock(ms);
+        if (days === 1) return 'Yesterday';
+        if (days < 7) return weekday(ms);
+        return new Date(ms).getFullYear() === new Date().getFullYear() ? dayMonth(ms) : monthYear(ms);
+    };
     // "Today"/"Yesterday" stay English on purpose: every other string in this app is English, and a
     // half-translated screen reads worse than a consistent one. What had to move to the browser is
     // the zone and the locale's own conventions (12h vs 24h, day/month order), not the vocabulary.
     window.yap.time = {
         clock, dayKey, dayMonth, full,
         daySeparator(ms) { const days = daysAgo(ms); return days === 0 ? 'Today' : days === 1 ? 'Yesterday' : longDate(ms); },
-        // Dates read as a person would say them; a same-day hit only needs a clock time.
-        stamp(ms) {
+        stamp,
+        // Call history headings: Recents only needs to know how far back, not the exact date.
+        callSection(ms) { const days = daysAgo(ms); return days <= 0 ? 'Today' : days === 1 ? 'Yesterday' : 'Earlier'; },
+        // A call row's stamp: the last hour counts in minutes, the rest of today is a clock time, and
+        // older calls say the day (their section heading already says roughly when).
+        recent(ms) {
             const days = daysAgo(ms);
-            if (days === 0) return clock(ms);
-            if (days === 1) return 'Yesterday';
-            if (days < 7) return weekday(ms);
-            return new Date(ms).getFullYear() === new Date().getFullYear() ? dayMonth(ms) : monthYear(ms);
+            if (days <= 0) {
+                const minutes = Math.floor((Date.now() - ms) / 60000);
+                if (minutes < 1) return 'Just now';
+                if (minutes < 60) return `${minutes} min ago`;
+                return clock(ms);
+            }
+            if (days === 1) return clock(ms);
+            return stamp(ms);
         }
     };
 })();

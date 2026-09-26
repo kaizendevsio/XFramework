@@ -1,0 +1,35 @@
+@* A call inside a conversation reads like a system line, not a message: one centred pill, the whole of
+   which calls the conversation back. *@
+@inject ChatState State
+@inject VoiceState Voice
+@inject BrowserTime Times
+<div class="call-event-row" data-message-id="@Message.Id">
+    <button type="button" class="call-event @(Missed ? "missed" : "")" disabled="@(!Callable)" aria-label="@Spoken" @onclick="CallAsync">
+        <Icon Name="@Glyph" Size="16" Class="call-event-kind" />
+        <span class="call-event-label">@CallHistory.Label(Message)</span>
+        <time class="call-event-time" datetime="@BrowserTime.Iso(Message.CreatedAt)">@Times.Clock(Message.CreatedAt)</time>
+    </button>
+</div>
+@code {
+    [Parameter, EditorRequired] public ChatMessage Message { get; set; } = default!;
+    private bool Video => CallHistory.IsVideo(Message);
+    private bool Missed => CallHistory.Direction(Message) == CallDirection.Missed;
+    private bool Callable => !calling && CallBack.Available(State, Voice);
+    private string Glyph => Missed ? "call-missed" : Video ? "video" : "phone";
+    private string Spoken
+    {
+        get
+        {
+            var duration = CallHistory.SpokenDuration(Message);
+            var what = duration is null ? CallHistory.Label(Message) : $"{CallHistory.Kind(Message)}, {duration}";
+            return $"{what}, {Times.Clock(Message.CreatedAt)}" + (Callable ? $". {(Video ? "Video call" : "Call")} back" : "");
+        }
+    }
+    private bool calling;
+    private async Task CallAsync()
+    {
+        calling = true;
+        try { await CallBack.StartAsync(State, Voice, Message.ThreadId, Video); }
+        finally { calling = false; }
+    }
+}

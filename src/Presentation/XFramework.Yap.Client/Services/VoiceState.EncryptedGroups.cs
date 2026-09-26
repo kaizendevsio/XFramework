@@ -13,6 +13,7 @@ public sealed partial class VoiceState
     public IReadOnlyList<YapGroupParticipant> Participants => active?.Group?.Participants.Where(x => !x.Left).ToArray() ?? [];
     public string ParticipantName(Guid credential) => credential == chat.User?.CredentialId ? "You" :
         chat.Selected?.People.FirstOrDefault(x => x.Id == credential)?.Name ?? "Participant";
+    public bool IsSelf(Guid credential) => credential == chat.User?.CredentialId;
     public string? ParticipantAvatar(Guid credential) => chat.Selected?.People.FirstOrDefault(x => x.Id == credential)?.AvatarUrl;
 
     public Task StartGroupAsync(Guid thread, string name, IReadOnlyList<Person> people, bool video = false)
