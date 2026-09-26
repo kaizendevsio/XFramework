@@ -92,10 +92,10 @@ public static class YapAuth
             {
                 UserName = username, Password = password, RoleId = role,
                 AuthorizationType = AuthorizationType.Username, GenerateToken = true,
-                // An app installed to a home screen is a remembered device. Without this
-                // IdentityServer stamps a 24-hour cap on the upstream session that no refresh
-                // extends, and Yap's rolling sign-in would die there instead of at its own cap.
-                RememberMe = true,
+                // An app installed to a home screen is the user's own device, so it holds a
+                // persistent session. Without this IdentityServer stamps an absolute cap on the
+                // upstream session that no refresh extends, and the device is signed out there.
+                PersistentSession = true,
                 Metadata = new RequestMetadata { RequestedTenantId = tenant, RequestId = Guid.NewGuid(), OperationName = "Yap login" }
             }, ct);
             if (!response.IsSuccess || response.Response?.Credential?.TenantId != tenant)

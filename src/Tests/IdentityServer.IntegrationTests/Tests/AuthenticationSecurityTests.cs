@@ -395,6 +395,55 @@ public sealed class AuthenticationSecurityTests : IntegrationTestBase
     }
 
     [Test]
+    public async Task Bolt_PersistentSession_HasNoAbsoluteCap_AndRefreshKeepsItOpen()
+    {
+        var seeded = await SeedAuthenticationGraph();
+        var request = CreateAuthRequest(seeded.TenantId, seeded.RoleTypeId, seeded.Username, seeded.Password);
+        request.PersistentSession = true;
+        var auth = await IntegrationTestFixture.ServiceWrapper.AuthenticateIdentity(request);
+        auth.HttpStatusCode.Should().Be(HttpStatusCode.OK, auth.Message);
+
+        await using (var db = CreateDbContext())
+        {
+            // Nothing to run down: the refresh token's sliding lifetime is the only idle bound.
+            var session = await db.Set<Session>().IgnoreQueryFilters()
+                .SingleAsync(item => item.Id == auth.Response!.SessionId!.Value);
+            session.ExpiresAt.Should().BeNull("an installed app's device session has no absolute expiry");
+            session.RefreshTokenExpiresAt.Should().BeAfter(DateTime.UtcNow.AddDays(90), "the app keeps devices through 90 idle days");
+        }
+
+        var refresh = await IntegrationTestFixture.ServiceWrapper.RefreshToken(new RefreshTokenRequest
+        {
+            AccessToken = auth.Response!.AccessToken,
+            RefreshToken = auth.Response.RefreshToken,
+            SessionId = auth.Response.SessionId!.Value,
+            Metadata = request.Metadata
+        });
+
+        refresh.HttpStatusCode.Should().Be(HttpStatusCode.OK, refresh.Message);
+        await using var verifyDb = CreateDbContext();
+        var persisted = await verifyDb.Set<Session>().IgnoreQueryFilters()
+            .SingleAsync(item => item.Id == auth.Response.SessionId.Value);
+        persisted.Status.Should().Be(CurrentSessionState.Active);
+        persisted.ExpiresAt.Should().BeNull("refresh must not reintroduce a cap");
+        persisted.RefreshTokenExpiresAt.Should().BeAfter(DateTime.UtcNow.AddDays(90), "the idle bound still slides on each rotation");
+    }
+
+    [Test]
+    public async Task Bolt_DefaultSession_KeepsItsTwentyFourHourCap()
+    {
+        var seeded = await SeedAuthenticationGraph();
+        var auth = await IntegrationTestFixture.ServiceWrapper.AuthenticateIdentity(
+            CreateAuthRequest(seeded.TenantId, seeded.RoleTypeId, seeded.Username, seeded.Password));
+        auth.HttpStatusCode.Should().Be(HttpStatusCode.OK, auth.Message);
+        await using var db = CreateDbContext();
+        var session = await db.Set<Session>().IgnoreQueryFilters()
+            .SingleAsync(item => item.Id == auth.Response!.SessionId!.Value);
+        session.ExpiresAt.Should().BeCloseTo(DateTime.UtcNow.AddHours(24), TimeSpan.FromMinutes(5));
+        session.RefreshTokenExpiresAt.Should().BeBefore(DateTime.UtcNow.AddDays(15), "other clients keep the configured refresh lifetime");
+    }
+
+    [Test]
     public async Task Bolt_RefreshToken_RotatesRefreshTokenExpiration()
     {
         var seeded = await SeedAuthenticationGraph();

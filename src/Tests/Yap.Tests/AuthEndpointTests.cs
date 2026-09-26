@@ -29,7 +29,8 @@ public sealed class AuthEndpointTests
     [Test]
     public async Task LoginAndLogout_RequireAntiforgeryAndIssueOnlyAuthenticatedSession()
     {
-        await using var app = UiFixture.Create(0);
+        Moq.Mock<IdentityServer.Integration.Drivers.IIdentityServerServiceWrapper>? identity = null;
+        await using var app = UiFixture.Create(0, mock => identity = mock);
         await app.StartAsync();
         using var handler = new HttpClientHandler { AllowAutoRedirect = false, CookieContainer = new CookieContainer() };
         using var client = new HttpClient(handler) { BaseAddress = new Uri(app.Urls.Single()) };
@@ -41,6 +42,10 @@ public sealed class AuthEndpointTests
         var login = await client.PostAsync("/auth/login", Form(page!.AntiforgeryToken));
         Assert.That(login.StatusCode, Is.EqualTo(HttpStatusCode.Redirect));
         Assert.That(login.Headers.Location?.OriginalString, Is.EqualTo("/"));
+        // Without this IdentityServer caps the upstream session at a fixed age no refresh
+        // extends, and the device is signed out however recently it was used.
+        Assert.That(identity!.Invocations.Select(i => i.Arguments[0]).OfType<IdentityServer.Domain.Shared.Contracts.Requests.AuthenticateIdentityRequest>()
+            .Single().PersistentSession, Is.True, "An installed app's sign-in must be a persistent device session");
         var cookie = handler.CookieContainer.GetCookies(client.BaseAddress)["Yap.Session"]!;
         Assert.That(cookie.Expires.ToUniversalTime(), Is.GreaterThan(DateTime.UtcNow), "Sign-in must survive browser process recovery");
         Assert.That(cookie.HttpOnly, Is.True);
