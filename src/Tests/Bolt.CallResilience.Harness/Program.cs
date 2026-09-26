@@ -137,6 +137,7 @@ internal static class Relay
         using var server = new BoltServer(app.Services.GetRequiredService<ILogger<BoltServer>>(), options);
 
         string? outcome = null;
+        var unsentLimited = false;
         server.GroupParticipantRemoved += (_, id) =>
         {
             Env.Log($"REMOVED t={T()} client={id}");
@@ -145,6 +146,8 @@ internal static class Relay
         app.Map("/ws", async (HttpContext context) =>
         {
             var id = context.Request.Query["id"].ToString();
+            // Yap limits the kernel's unsent backlog on call sockets; relays without the helper skip it.
+            unsentLimited |= LimitUnsentBytes(context, Env.Int("UNSENT_BYTES", 32 * 1024));
             using var socket = await context.WebSockets.AcceptWebSocketAsync();
             var principal = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", id), new Claim("bolt_media_client_id", id)], "harness"));
             await server.HandleConnectionAsync(new WebSocketBoltConnection(socket), principal, context.RequestAborted, isSecureTransport: true);
@@ -170,7 +173,7 @@ internal static class Relay
             Env.Log("SUMMARY " + JsonSerializer.Serialize(new { side = "relay", outcome = "join failed" }));
             return 1;
         }
-        Env.Log($"RELAY joined t={T()}");
+        Env.Log($"RELAY joined t={T()} unsentLimited={unsentLimited}");
         clock.Restart();
         sender.Start(call, profile);
 
@@ -193,6 +196,10 @@ internal static class Relay
             counters
         }));
         await sender.DisposeAsync();
+        // Close the calls with a handshake and give the close frames time to cross the shaped link;
+        // a container that just exits takes its queued packets (and the receiver's FIN) with it.
+        server.Dispose();
+        await Task.Delay(3000);
         await app.StopAsync(TimeSpan.FromSeconds(2));
         return 0;
     }
@@ -206,6 +213,13 @@ internal static class Relay
             await Task.Delay(200);
         }
         return false;
+    }
+
+    private static bool LimitUnsentBytes(HttpContext context, int bytes)
+    {
+        var tuning = typeof(BoltServer).Assembly.GetType("Bolt.Server.BoltSocketTuning");
+        var socket = context.Features.Get<Microsoft.AspNetCore.Connections.Features.IConnectionSocketFeature>()?.Socket;
+        return tuning?.GetMethod("TryLimitUnsentBytes")?.Invoke(null, [socket, bytes]) is true;
     }
 
     private static bool TrySet(object target, string property, object value)
@@ -379,9 +393,11 @@ internal static class Receiver
         var end = "socket closed";
         var buffer = new byte[128 * 1024];
         var lastTick = 0L;
+        // Stop on our own if the relay's close never arrives (it can be lost with a dead link).
+        using var patience = new CancellationTokenSource(TimeSpan.FromSeconds(Env.Int("SECONDS", 180) + 150));
         try
         {
-            while (await Frames.ReceiveAsync(socket, buffer, CancellationToken.None) is { } message)
+            while (await Frames.ReceiveAsync(socket, buffer, patience.Token) is { } message)
             {
                 var now = Env.NowMs();
                 foreach (var frame in Frames.Unbatch(message))

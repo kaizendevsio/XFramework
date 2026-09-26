@@ -32,7 +32,7 @@ trap cleanup EXIT
 docker network create "$net" >/dev/null
 docker run -d --name "$relay" --network "$net" --network-alias relay --cap-add NET_ADMIN "${envs[@]}" "$image" \
   sh -c "tc qdisc add dev eth0 root netem $relaynet && exec dotnet Bolt.CallResilience.Harness.dll relay" >/dev/null
-docker run -d --name "$receiver" --network "$net" --cap-add NET_ADMIN "$image" \
+docker run -d --name "$receiver" --network "$net" --cap-add NET_ADMIN -e "SECONDS=$seconds" "$image" \
   sh -c "tc qdisc add dev eth0 root netem $recvnet && exec dotnet Bolt.CallResilience.Harness.dll receiver" >/dev/null
 
 waitfor() { # container pattern timeout
@@ -46,12 +46,12 @@ waitfor() { # container pattern timeout
 waitfor "$relay" "RELAY joined" 120
 if ((outage_at >= 0)); then
   sleep "$outage_at"
-  docker exec "$relay" tc qdisc change dev eth0 root netem $relaynet loss 100%
-  docker exec "$receiver" tc qdisc change dev eth0 root netem $recvnet loss 100%
+  docker exec "$relay" tc qdisc change dev eth0 root netem $relaynet loss 100% || true
+  docker exec "$receiver" tc qdisc change dev eth0 root netem $recvnet loss 100% || true
   echo "$name: outage for ${outage_for}s at ${outage_at}s"
   sleep "$outage_for"
-  docker exec "$relay" tc qdisc change dev eth0 root netem $relaynet
-  docker exec "$receiver" tc qdisc change dev eth0 root netem $recvnet
+  docker exec "$relay" tc qdisc change dev eth0 root netem $relaynet || true
+  docker exec "$receiver" tc qdisc change dev eth0 root netem $recvnet || true
 fi
 waitfor "$relay" "^SUMMARY" $((seconds + 60))
 timeout 60 docker wait "$receiver" >/dev/null || true
