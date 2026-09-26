@@ -100,8 +100,17 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     public static bool IsConnectionFailure(Exception ex) => ex is HttpRequestException or TaskCanceledException
         || ex is ChatApiException { Status: 408 or 429 or >= 500 };
     private void SetOffline() { Online = false; typing.Clear(); }
+    // The server answered, so the device is online; it is the sign-in that is gone. Every
+    // guarded path stops calling the server until the person signs in again.
+    private bool EndedSession(Exception ex)
+    {
+        if (ex is not ChatApiException { SessionEnded: true }) return false;
+        NeedsLogin = true; Online = true; Error = null; typing.Clear();
+        return true;
+    }
     public void Report(Exception ex)
     {
+        if (EndedSession(ex)) { Notify(); return; }
         if (IsConnectionFailure(ex)) { SetOffline(); Notify(); return; }
         Console.Error.WriteLine($"Yap action failed: {ex}");
         _ = RecordErrorAsync(ex);
@@ -171,7 +180,9 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     private async Task PollAsync()
     {
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(20));
-        try { while (await timer.WaitForNextTickAsync(lifetime.Token)) await SynchronizeAsync(); }
+        // An ended sign-in only returns through the sign-in page, which synchronizes itself;
+        // polling meanwhile would just repeat requests the server already refused.
+        try { while (await timer.WaitForNextTickAsync(lifetime.Token)) if (!NeedsLogin) await SynchronizeAsync(); }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
     }
 
@@ -429,6 +440,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
 
     private async Task HandleApiFailureAsync(ChatApiException error)
     {
+        if (EndedSession(error)) return;
         if (IsConnectionFailure(error)) { SetOffline(); return; }
         Error = error.Message;
         if (error.Status != 401) return;

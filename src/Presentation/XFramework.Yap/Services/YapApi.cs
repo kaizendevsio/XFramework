@@ -16,7 +16,8 @@ public static class YapApi
 {
     public static void MapYapApi(this WebApplication app)
     {
-        app.MapGet("/api/session", async (HttpContext context, IAntiforgery antiforgery, IChatDirectory directory, IConfiguration configuration, CancellationToken ct) =>
+        app.MapGet("/api/session", async (HttpContext context, IAntiforgery antiforgery, IChatDirectory directory, YapSessions sessions,
+            IConfiguration configuration, CancellationToken ct) =>
         {
             context.Response.Headers.CacheControl = "no-store";
             var user = context.User.Identity?.IsAuthenticated == true
@@ -26,6 +27,13 @@ public static class YapApi
             if (user is not null)
             {
                 try { user = user with { AvatarUrl = (await directory.ResolveAsync([user.CredentialId], ct)).FirstOrDefault()?.AvatarUrl }; }
+                // The browser asks here whether it is still signed in, so a refused sign-in must
+                // not be reported as a live one. Only a refused refresh settles that.
+                catch (Exception ex) when (ex is UnauthorizedAccessException or YapApiException { Status: 401 })
+                {
+                    try { if (await sessions.ConfirmRejectionAsync(context.User, ct)) user = null; }
+                    catch (Exception) when (!ct.IsCancellationRequested) { /* Unconfirmed: keep the sign-in. */ }
+                }
                 catch { /* A directory outage must not invalidate a saved sign-in. */ }
             }
             return Results.Ok(new SessionResponse(user, antiforgery.GetAndStoreTokens(context).RequestToken!, configuration.GetValue("Yap:Encryption:Enabled", true)));
@@ -494,8 +502,34 @@ public sealed class YapApiException(int status, string message) : Exception(mess
 // still matched to the authenticated cookie and every file request checks membership.
 public sealed class MediaAccountQuery;
 
-public sealed class YapApiFilter(IAntiforgery antiforgery, ILogger<YapApiFilter> logger) : IEndpointFilter
+public sealed class YapApiFilter(IAntiforgery antiforgery, YapSessions sessions, ILogger<YapApiFilter> logger) : IEndpointFilter
 {
+    /// <summary>The one answer that tells the browser to sign in again. The header, not the
+    /// status alone, carries it: a bare 401 never proves the sign-in ended.</summary>
+    public static IResult SessionEnded(HttpContext context)
+    {
+        if (!context.Response.HasStarted) context.Response.Headers[SessionSignal.Header] = SessionSignal.Ended;
+        return Results.Problem("Your session ended. Sign in again.", statusCode: 401);
+    }
+
+    // A downstream 401 (an expired or revoked upstream session, a refused actor token) is put
+    // to IdentityServer at once with a refresh. Refused, the sign-in ends here and the browser
+    // is told so. Otherwise the call is retryable: the tokens rotated, or the refresh could not
+    // be reached, and neither is the browser being offline or signed out.
+    internal static async Task<IResult> RejectedAsync(HttpContext context, YapSessions sessions, ILogger logger)
+    {
+        try
+        {
+            if (await sessions.ConfirmRejectionAsync(context.User, context.RequestAborted)) return SessionEnded(context);
+        }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested) { return Results.Empty; }
+        // Unconfirmed is not ended: the refresh could not be reached, so the sign-in stays.
+        catch (Exception ex)
+        { logger.LogInformation("Yap could not confirm a refused sign-in. FailureType={FailureType}", ex.GetType().Name); }
+        return context.Response.HasStarted ? Results.Empty
+            : Results.Problem("Reconnecting to chat. Try again shortly.", statusCode: 503);
+    }
+
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext invocation, EndpointFilterDelegate next)
     {
         var context = invocation.HttpContext;
@@ -512,8 +546,9 @@ public sealed class YapApiFilter(IAntiforgery antiforgery, ILogger<YapApiFilter>
             return await next(invocation);
         }
         catch (AntiforgeryValidationException) { return Results.Problem("Refresh your session and try again.", statusCode: 400); }
+        catch (YapApiException ex) when (ex.Status == 401) { return await RejectedAsync(context, sessions, logger); }
         catch (YapApiException ex) { return Results.Problem(ex.Message, statusCode: ex.Status); }
-        catch (UnauthorizedAccessException) { return Results.Problem("Your session ended. Sign in again.", statusCode: 401); }
+        catch (UnauthorizedAccessException) { return await RejectedAsync(context, sessions, logger); }
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested) { return Results.Empty; }
         catch (Exception ex)
         {

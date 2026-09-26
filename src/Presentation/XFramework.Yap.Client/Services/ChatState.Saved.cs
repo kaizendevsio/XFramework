@@ -48,6 +48,11 @@ public sealed partial class ChatState
             if (page == 0 && scope == Scope && version == savedVersion) savedPage = (scope, DateTime.UtcNow, result with { Items = [.. result.Items] });
             return result;
         }
+        catch (ChatApiException ex) when (ex.SessionEnded)
+        {
+            EndedSession(ex); Notify();
+            return await CachedSavedMessagesAsync(page);
+        }
         catch (Exception ex) when (IsConnectionFailure(ex))
         {
             SetOffline(); Notify();

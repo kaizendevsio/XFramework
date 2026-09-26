@@ -58,6 +58,30 @@ public sealed class ChatApiTests
         Assert.That(calls, Is.EqualTo(1));
     }
 
+    [TestCase(null, false)]
+    [TestCase("ended", true)]
+    public void SendAsync_OnlyTheExplicitSignalMeansTheSessionEnded(string? signal, bool ended)
+    {
+        using var http = new HttpClient(new Handler(_ =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.Unauthorized);
+            if (signal is not null) response.Headers.Add(Yap.Contracts.SessionSignal.Header, signal);
+            return response;
+        })) { BaseAddress = new("https://yap.test/") };
+        var error = Assert.ThrowsAsync<ChatApiException>(() => new ChatApi(http).GetAsync<int>("api/test"))!;
+        Assert.That(error.SessionEnded, Is.EqualTo(ended));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void SocketRequest_CarriesTheSessionEndedSignal(bool ended)
+    {
+        using var http = new HttpClient(new Handler(_ => throw new AssertionException("The socket answered"))) { BaseAddress = new("https://yap.test/") };
+        var api = new ChatApi(http) { SocketRequest = (_, _, _) => Task.FromResult<Yap.Contracts.ChatSocketResponse?>(new(401, null, ended)) };
+        var error = Assert.ThrowsAsync<ChatApiException>(() => api.PostAsync("api/chat/read", new { }))!;
+        Assert.That(error.SessionEnded, Is.EqualTo(ended));
+    }
+
     private sealed class Handler(Func<HttpRequestMessage, HttpResponseMessage> handle) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) => Task.FromResult(handle(request));

@@ -39,6 +39,58 @@ public sealed class YapSessionsTests
     }
 
     [Test]
+    public async Task ConfirmRejection_FreshAccessTokenButRefusedRefresh_EndsTheSessionAtOnce()
+    {
+        // The reported outage: the upstream session expired while the access token had minutes
+        // left, so nothing refreshed until it lapsed and every call failed in between.
+        var response = Session(); response.ExpiresIn = 1800;
+        var identity = new Mock<IIdentityServerServiceWrapper>();
+        identity.Setup(i => i.RefreshToken(It.IsAny<RefreshTokenRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new QueryResponse<RefreshTokenResponse> { HttpStatusCode = HttpStatusCode.Unauthorized });
+        using var provider = new ServiceCollection().AddSingleton(identity.Object).BuildServiceProvider();
+        var (sessions, _) = Build(provider); var user = await sessions.CreateAsync(response);
+
+        Assert.That(await sessions.ConfirmRejectionAsync(user, default), Is.True);
+        Assert.That(await sessions.ContainsAsync(user), Is.False);
+        Assert.ThrowsAsync<UnauthorizedAccessException>(async () => await sessions.GetActorAsync(user, default));
+        Assert.That(await sessions.ConfirmRejectionAsync(user, default), Is.True);
+        identity.Verify(i => i.RefreshToken(It.IsAny<RefreshTokenRequest>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [TestCase(HttpStatusCode.ServiceUnavailable)]
+    [TestCase(HttpStatusCode.TooManyRequests)]
+    public async Task ConfirmRejection_RefreshUnavailable_KeepsTheSession(HttpStatusCode status)
+    {
+        var identity = new Mock<IIdentityServerServiceWrapper>();
+        identity.Setup(i => i.RefreshToken(It.IsAny<RefreshTokenRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new QueryResponse<RefreshTokenResponse> { HttpStatusCode = status });
+        using var provider = new ServiceCollection().AddSingleton(identity.Object).BuildServiceProvider();
+        var (sessions, _) = Build(provider); var user = await sessions.CreateAsync(Session());
+
+        Assert.ThrowsAsync<HttpRequestException>(() => sessions.ConfirmRejectionAsync(user, default));
+        Assert.That(await sessions.ContainsAsync(user), Is.True);
+    }
+
+    [Test]
+    public async Task ConfirmRejection_ConcurrentRefusals_RotateOnceAndKeepTheSession()
+    {
+        var response = Session();
+        var identity = new Mock<IIdentityServerServiceWrapper>();
+        identity.Setup(i => i.RefreshToken(It.IsAny<RefreshTokenRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ChatFixture.Ok(new RefreshTokenResponse
+            { SessionId = response.SessionId!.Value, AccessToken = "renewed", RefreshToken = "renewed-refresh", ExpiresIn = 1800 }));
+        using var provider = new ServiceCollection().AddSingleton(identity.Object).BuildServiceProvider();
+        var (sessions, _) = Build(provider); var user = await sessions.CreateAsync(response);
+
+        var ended = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => sessions.ConfirmRejectionAsync(user, default)));
+
+        Assert.That(ended, Is.All.False);
+        Assert.That((await sessions.GetActorAsync(user, default)).AccessToken, Is.EqualTo("renewed"));
+        identity.Verify(i => i.RefreshToken(It.IsAny<RefreshTokenRequest>(), It.IsAny<CancellationToken>()), Times.Once,
+            "Rotation stays single-flight, and a refusal just after one does not rotate again.");
+    }
+
+    [Test]
     public async Task BrowserDisconnectDuringRefresh_PersistsRotatedTokensForRecovery()
     {
         using var browser = new CancellationTokenSource();

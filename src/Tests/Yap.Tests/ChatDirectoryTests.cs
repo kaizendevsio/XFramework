@@ -47,4 +47,27 @@ public sealed class ChatDirectoryTests
         Assert.That(queriedIds, Is.EquivalentTo(ids));
         tokenScope.Verify(s => s.Push(actor.AccessToken!), Times.Once);
     }
+
+    // The driver's wording for a refused __db_query__ (ServiceWrapperGenerator). A refused
+    // sign-in must reach the host as the 401 it is; anything else stays a service failure.
+    [TestCase(401, true)]
+    [TestCase(503, false)]
+    public void ResolveAsync_RefusedActorToken_SurfacesAsUnauthorized(int status, bool refused)
+    {
+        var actor = new CommunicationsChatActor(Guid.NewGuid(), Guid.NewGuid(), AccessToken: "test-actor-token");
+        var actors = new Mock<ICommunicationsChatActorProvider>();
+        actors.Setup(a => a.GetCurrentActorAsync(It.IsAny<CancellationToken>())).ReturnsAsync(actor);
+        var tokenScope = new Mock<IActorAccessTokenScope>();
+        tokenScope.Setup(s => s.Push(actor.AccessToken!)).Returns(Mock.Of<IDisposable>());
+        var wrapper = new Mock<IIdentityServerServiceWrapper>();
+        wrapper.Setup(w => w.ExecuteQueryAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException($"DataContext query request failed with status {status} ({(System.Net.HttpStatusCode)status})."));
+        using var services = new ServiceCollection().AddSingleton(wrapper.Object).BuildServiceProvider();
+        var directory = new ChatDirectory(services, actors.Object, tokenScope.Object);
+
+        var error = Assert.CatchAsync(() => directory.ResolveAsync([Guid.NewGuid()], CancellationToken.None));
+
+        if (refused) Assert.That(error, Is.TypeOf<YapApiException>().With.Property(nameof(YapApiException.Status)).EqualTo(401));
+        else Assert.That(error, Is.TypeOf<InvalidOperationException>());
+    }
 }
