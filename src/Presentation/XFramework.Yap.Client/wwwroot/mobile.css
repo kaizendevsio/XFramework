@@ -47,7 +47,8 @@ input,textarea,select,.inputbox input,.searchbar input{font-size:16px!important}
 /* Yap behaves like an app: a long press never starts text selection (which also opens Android's
    tap-to-search sheet). Copy lives in the message menu; only editors stay selectable. */
 *{-webkit-tap-highlight-color:transparent}
-body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+/* Chromium's UA sheet resets modal dialogs (the message menu, sheets) to user-select:text, so they are named here. */
+body,dialog,[popover]{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 :root:not([data-input=keyboard]) :is(button,a,input,textarea,select,summary,[tabindex]):is(:focus,:focus-visible){outline:none}
 [tabindex="-1"]:focus{outline:none}
 :root[data-input=keyboard] :is(button,a,input,textarea,select,[tabindex="0"]):focus-visible{outline:2px solid var(--accent-ink);outline-offset:3px}

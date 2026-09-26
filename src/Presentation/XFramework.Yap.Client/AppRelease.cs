@@ -2,10 +2,12 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.67";
+    public const string Version = "1.3.68";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "26 September 2026", [
+            "Pressing and holding in the message menu and other pop-ups no longer selects text or opens the Android search sheet."]),
+        ("1.3.67", "26 September 2026", [
             "When your session really has ended, Yap now asks you to sign in instead of saying it can't reach the server, and stops retrying in the background."]),
         ("1.3.66", "26 September 2026", [
             "The inbox header now matches the app background exactly, with no darker band."]),
