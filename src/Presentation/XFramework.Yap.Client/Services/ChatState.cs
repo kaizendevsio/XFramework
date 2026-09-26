@@ -1055,6 +1055,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
     {
         if (!Online || NeedsLogin) { Error = "Connect and sign in to change a message."; Notify(); return; }
         if (!activeActions.Add(message.Id)) return;
+        if (action is "save" or "unsave") ForgetSavedPage();
         Action? rollback = null;
         try
         {
@@ -1080,7 +1081,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
         catch (ChatApiException ex) when (ex.Status == 409 && action is "react" or "unreact" or "pin" or "unpin" or "save" or "unsave")
         { optimisticMessages.Remove(message.Id); messageMutationVersion++; await SynchronizeAsync(); }
         catch (Exception ex) { optimisticMessages.Remove(message.Id); messageMutationVersion++; rollback?.Invoke(); Report(ex); }
-        finally { optimisticMessages.Remove(message.Id); activeActions.Remove(message.Id); Notify(); }
+        finally { optimisticMessages.Remove(message.Id); activeActions.Remove(message.Id); if (action is "save" or "unsave") ForgetSavedPage(); Notify(); }
     }
 
     public async Task<List<Person>> SearchPeopleAsync(string text) => !Online || text.Trim().Length < 2 ? []
@@ -1174,6 +1175,7 @@ public sealed partial class ChatState(OfflineStore store, ChatApi api, IJSRuntim
             Encryption.Reset(); EncryptionEnabled = false;
             await store.SetSettingAsync("pendingLogout", "true");
             callHistoryVersion++;
+            ForgetSavedPage(); callsPage = null;
             await store.ClearPrivateAsync();
             User = null; Selected = null; Conversations = []; Defaults = null; PendingCount = 0; NeedsLogin = false;
             messageUpdates.Clear(); deliveredPending.Clear();

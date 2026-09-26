@@ -1,23 +1,80 @@
+@implements IAsyncDisposable
 @inject IJSRuntime JS
 <div class="set-stack diagnostics">
     <label class="setting-toggle"><span>Enable diagnostic logging</span><input type="checkbox" role="switch" checked="@enabled" @onchange="ToggleAsync" /><span class="switch-track" aria-hidden="true"></span></label>
-    <p>Logs stay on this device and survive a reload. They include app errors, connection status and image sizes, without messages, passwords or photo contents.</p>
+    <p>Logs stay on this device and survive a reload. They include app errors, connection status, image sizes and memory use, without messages, passwords or photo contents.</p>
     <div class="row"><button class="btn ghost" @onclick="CopyAsync">Copy logs</button><button class="btn ghost" @onclick="ClearAsync">Clear logs</button></div>
     @if (notice is not null) { <p role="status">@notice</p> }
     @if (report is not null) { <textarea aria-label="Diagnostic logs" readonly rows="10" value="@report"></textarea> }
+    @if (enabled && health is { } now)
+    {
+        <div class="memory-readout" aria-label="Memory">
+            <strong>Memory · this session</strong>
+            <div>WebAssembly memory: @Mb(now.WasmMB) · .NET heap: @Mb(now.ManagedMB ?? managed)</div>
+            <div>JavaScript heap: @(now.JsHeapMB is { } js ? Mb(js) + " (Chrome includes WebAssembly memory)" : "not reported by this browser")</div>
+            <div>Page elements: @now.DomNodes · glass layers: @now.GlassLayers</div>
+            <div>Navigations: @now.Navigations · page transitions: @now.Transitions (@(now.TransitionsEnabled == true ? "on" : "off")) · open @Duration(now.UptimeS)</div>
+        </div>
+        @if (previous is { } last)
+        {
+            <div class="memory-readout" role="status">
+                <strong>@(last.Abrupt == true ? last.Visible ? "Previous session ended unexpectedly while open" : "Previous session ended while in the background" : "Previous session closed normally")</strong>
+                <div>After @last.Navigations navigations and @Duration(last.UptimeS) · WebAssembly @Mb(last.WasmMB) · .NET @Mb(last.ManagedMB) · JavaScript @Mb(last.JsHeapMB)</div>
+                <div>Page elements: @last.DomNodes · glass layers: @last.GlassLayers · page transitions: @last.Transitions@(last.Time is { } time ? $" · last measured {time}" : "")</div>
+            </div>
+        }
+        <div class="set-row">
+            <span class="set-label">Page transitions<small>Auto turns them off in Safari and on iPhone and iPad, where each one keeps its screenshot in memory</small></span>
+            <span class="segmented" role="group" aria-label="Page transitions">
+                @foreach (var option in new[] { ("auto", "Auto"), ("on", "On"), ("off", "Off") })
+                { <button type="button" class="@(transitions == option.Item1 ? "on" : "")" aria-pressed="@((transitions == option.Item1).ToString().ToLowerInvariant())" @onclick="() => TransitionsAsync(option.Item1)">@option.Item2</button> }
+            </span>
+        </div>
+    }
     <p>If the app cannot open, use the <a href="diagnostics.html">recovery log page</a>. Enable logging, reproduce the problem, then copy the logs here.</p>
 </div>
 @code {
     private bool enabled;
     private string? notice, report;
+    private SessionHealth? health, previous;
+    private double? managed;
+    private string transitions = "auto";
+    private readonly CancellationTokenSource lifetime = new();
     protected override async Task OnAfterRenderAsync(bool firstRender)
-    { if (firstRender) { enabled = await JS.InvokeAsync<bool>("yap.diagnostics.enabled"); StateHasChanged(); } }
-    private async Task ToggleAsync(ChangeEventArgs e) { enabled = e.Value is true; await JS.InvokeVoidAsync("yap.diagnostics.setEnabled", enabled); }
+    {
+        if (!firstRender) return;
+        enabled = await JS.InvokeAsync<bool>("yap.diagnostics.enabled");
+        transitions = await JS.InvokeAsync<string>("yap.motion.transitions.preference");
+        await RefreshAsync();
+        StateHasChanged();
+        _ = PollAsync();
+    }
+    // Refreshes only while this panel is on screen; the timer ends with the component.
+    private async Task PollAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+        try { while (await timer.WaitForNextTickAsync(lifetime.Token)) if (enabled) await InvokeAsync(async () => { await RefreshAsync(); StateHasChanged(); }); }
+        catch (OperationCanceledException) { }
+        catch (JSDisconnectedException) { }
+    }
+    private async Task RefreshAsync()
+    {
+        if (!enabled) return;
+        managed = Math.Round(MemoryDiagnostics.Snapshot().HeapBytes / 104857.6) / 10;
+        health = await JS.InvokeAsync<SessionHealth>("yap.diagnostics.health.snapshot", lifetime.Token);
+        previous = await JS.InvokeAsync<SessionHealth?>("yap.diagnostics.health.previous", lifetime.Token);
+    }
+    private async Task ToggleAsync(ChangeEventArgs e) { enabled = e.Value is true; await JS.InvokeVoidAsync("yap.diagnostics.setEnabled", enabled); await RefreshAsync(); }
+    private async Task TransitionsAsync(string value) => transitions = await JS.InvokeAsync<string>("yap.motion.transitions.setPreference", value);
+    private static string Mb(double? value) => value is { } number ? number.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " MB" : "—";
+    private static string Duration(int seconds) => seconds < 120 ? $"{seconds} s" : $"{seconds / 60} min";
     private async Task CopyAsync()
     {
         var copied = await JS.InvokeAsync<bool>("yap.diagnostics.copy");
         notice = copied ? "Logs copied. You can paste them into your support conversation." : "Select and copy the logs below.";
         report = copied ? null : await JS.InvokeAsync<string>("yap.diagnostics.report");
     }
-    private async Task ClearAsync() { await JS.InvokeVoidAsync("yap.diagnostics.clear"); report = null; notice = "Saved logs cleared."; }
+    private async Task ClearAsync() { await JS.InvokeVoidAsync("yap.diagnostics.clear"); report = null; previous = null; notice = "Saved logs cleared."; }
+    // Cancelled, not disposed: a refresh already in flight may still read the token.
+    public ValueTask DisposeAsync() { lifetime.Cancel(); return ValueTask.CompletedTask; }
 }

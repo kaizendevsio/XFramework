@@ -10,9 +10,22 @@
         return ({'':0,dashboard:0,screens:0,login:1,signup:2,settings:1,chat:1,group:1,thread:2,call:2,'video-call':3})[route] ?? 1;
     };
     const complete = () => { if (pending) { clearTimeout(pending.timer); pending.resolve(); pending = null; } };
+    // WebKit keeps the snapshot buffers of every view transition: measured in Playwright WebKit
+    // (Safari 26.4 engine) at ~28 MB per transition on a 430x932 @3x viewport, never released,
+    // even for a one-element page. Yap captures three groups per navigation, so each tab switch
+    // cost ~33-44 MB until the iPhone's WebContent process was killed and the app reloaded.
+    // Every iOS browser is WebKit, so Apple engines navigate without them unless a person opts
+    // back in from Diagnostics ("on") to compare on their own device.
+    const preferenceKey = 'yap-view-transitions';
+    const appleEngine = () => /^Apple/.test(navigator.vendor || '');
+    const preference = () => { try { const value = localStorage.getItem(preferenceKey); return value === 'on' || value === 'off' ? value : 'auto'; } catch { return 'auto'; } };
+    const transitionsEnabled = () => { const value = preference(); return value === 'on' || value === 'auto' && !appleEngine(); };
+    let started = 0, navigations = 0;
     window.yap.motion = {
         begin(from, to) {
             if (new URL(from, location.href).pathname === new URL(to, location.href).pathname) return;
+            navigations++;
+            window.yap.diagnostics?.health?.navigated();
             const previous = pending;
             complete();
             previous?.transition?.skipTransition();
@@ -22,6 +35,9 @@
                 return;
             }
             document.documentElement.classList.remove('motion-fallback');
+            // Rows and panels keep their own @starting-style entrances; only the page snapshot goes.
+            if (!transitionsEnabled()) return;
+            started++;
             return new Promise(ready => {
                 const entry = { resolve: () => {}, timer: null, transition: null };
                 // Do not await transition.finished here: Blazor must be allowed
@@ -41,6 +57,16 @@
             });
         },
         complete,
+        transitions: {
+            started: () => started,
+            navigations: () => navigations,
+            enabled: transitionsEnabled,
+            preference,
+            setPreference(value) {
+                try { value === 'on' || value === 'off' ? localStorage.setItem(preferenceKey, value) : localStorage.removeItem(preferenceKey); } catch {}
+                return preference();
+            }
+        },
         // Kept pure for boundary checks without a browser or device.
         intent(dx, dy) {
             if (Math.max(Math.abs(dx), Math.abs(dy)) < 10) return 'pending';

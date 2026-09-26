@@ -105,6 +105,53 @@ public sealed class SavedMessagesTests
         });
     }
 
+    [Test]
+    public async Task SwitchingBackToSaved_ReusesTheRecentFirstPage_UntilABookmarkChanges()
+    {
+        var thread = Guid.NewGuid();
+        var reads = 0;
+        var row = Saved(thread, "Ship it on Friday");
+        await using var fixture = await StateFixture.CreateAsync(request => request.RequestUri!.AbsolutePath switch
+        {
+            "/api/chat/saved" => Task.FromResult<HttpResponseMessage?>(StateFixture.Json(new ChatPage<SavedMessage>([row], ++reads))),
+            "/api/chat/message-actions" => Task.FromResult<HttpResponseMessage?>(new HttpResponseMessage(HttpStatusCode.NoContent)),
+            _ => Task.FromResult<HttpResponseMessage?>(null)
+        });
+
+        var first = await fixture.State.SavedMessagesAsync();
+        first.Items.Clear();
+        var again = await fixture.State.SavedMessagesAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(reads, Is.EqualTo(1), "A tab switch must not re-download, re-decrypt and re-store the same page.");
+            Assert.That(again.Items.Single().Message.Id, Is.EqualTo(row.Message.Id), "A caller changing its list cannot empty the reused page.");
+        });
+
+        Assert.That(await fixture.State.UnsaveAsync(row.Message), Is.True);
+        await fixture.State.SavedMessagesAsync();
+        Assert.That(reads, Is.EqualTo(2), "Changing a bookmark here reads the server again.");
+        await fixture.State.SavedMessagesAsync(1);
+        Assert.That(reads, Is.EqualTo(3), "Only the first page is reused.");
+    }
+
+    [Test]
+    public async Task SwitchingBackToCalls_ReusesTheRecentFirstPage()
+    {
+        var reads = 0;
+        var call = new CallHistoryItem(new() { Id = Guid.NewGuid(), ThreadId = Guid.NewGuid(), Text = "Voice call · 1:05", IsCallSummary = true }, "Alex", false);
+        await using var fixture = await StateFixture.CreateAsync(request => Task.FromResult(request.RequestUri!.AbsolutePath == "/api/chat/calls/history"
+            ? StateFixture.Json(new ChatPage<CallHistoryItem>([call], ++reads)) : null));
+
+        await fixture.State.CallsAsync();
+        var again = await fixture.State.CallsAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(reads, Is.EqualTo(1));
+            Assert.That(again.Items.Single().Message.Id, Is.EqualTo(call.Message.Id));
+        });
+    }
+
     private static SavedMessage Saved(Guid thread, string text, string? envelope = null) => new(
         new ChatMessage { Id = Guid.NewGuid(), ThreadId = thread, Text = text, Saved = true, EncryptedEnvelope = envelope, CreatedAt = DateTime.UtcNow },
         "Sarah Mensah", false, DateTime.UtcNow);

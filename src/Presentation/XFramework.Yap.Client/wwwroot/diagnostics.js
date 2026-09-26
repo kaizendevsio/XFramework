@@ -39,19 +39,72 @@
         count: document.querySelectorAll('.message-media img').length });
     window.yap.diagnostics = {
         enabled: () => enabled,
-        setEnabled(value) { enabled = value; try { localStorage.setItem(flag, String(value)); } catch {} if (value) record('logging.enabled', { ...snapshot(), version }); },
+        setEnabled(value) { enabled = value; try { localStorage.setItem(flag, String(value)); } catch {} if (value) record('logging.enabled', { ...snapshot(), version }); schedule(); },
         record,
         error: (phase, error) => record('error', { phase, type: errorType(error) }),
         version(value) { version = value; record('app.ready', { version }); },
-        clear() { entries = []; save(); },
+        clear() { entries = []; save(); previous = null; try { localStorage.removeItem(previousKey); } catch {} },
         report() {
             record('snapshot', snapshot());
-            return JSON.stringify({ app: 'Yap', version, browser: navigator.userAgent, enabled,
+            return JSON.stringify({ app: 'Yap', version, browser: navigator.userAgent, enabled, health: health.snapshot(), previousSession: previous,
                 note: 'Breadcrumbs only. A browser process crash may end without a JavaScript error. No message contents or credentials are recorded.', entries }, null, 2);
         },
         async copy() { const report = this.report(); try { await navigator.clipboard.writeText(report); return true; } catch { return false; } }
     };
+    // Session health: sizes and counts only, written only while logging is on. iOS kills a
+    // WebContent process that runs out of memory without any event, so the last record is
+    // kept current and marked clean on pagehide; a record that was never marked clean when
+    // the next page starts means the previous session ended abruptly.
+    const healthKey = 'yap-session-health-v1', previousKey = 'yap-session-previous-v1';
+    const started = Date.now();
+    let managed = null, lastWrite = 0, sampler = 0, previous = null;
+    const mb = bytes => typeof bytes === 'number' && bytes > 0 ? Math.round(bytes / 104857.6) / 10 : null;
+    const wasmBytes = () => {
+        try { const runtime = globalThis.getDotnetRuntime?.(0); return runtime?.Module?.HEAP8?.buffer?.byteLength ?? runtime?.localHeapViewU8?.().buffer.byteLength ?? null; }
+        catch { return null; }
+    };
+    const measure = () => {
+        const motion = window.yap.motion?.transitions;
+        return { navigations: motion?.navigations() ?? 0, transitions: motion?.started() ?? 0, transitionsEnabled: motion?.enabled() ?? null,
+            wasmMB: mb(wasmBytes()), jsHeapMB: mb(performance.memory?.usedJSHeapSize), managedMB: mb(managed),
+            domNodes: document.getElementsByTagName?.('*').length ?? 0, glassLayers: document.querySelectorAll('[data-liquid-glass]').length,
+            uptimeS: Math.round((Date.now() - started) / 1000), visible: document.visibilityState !== 'hidden' };
+    };
+    const write = clean => {
+        if (!enabled) return;
+        lastWrite = Date.now();
+        try { localStorage.setItem(healthKey, JSON.stringify({ version, time: new Date().toISOString(), clean, ...measure() })); } catch {}
+    };
+    const refreshManaged = async () => {
+        try { managed = (await globalThis.DotNet?.invokeMethodAsync('XFramework.Yap.Client', 'YapManagedMemory'))?.heapBytes ?? managed; } catch {}
+    };
+    const sample = async () => { if (document.visibilityState === 'hidden') return; await refreshManaged(); write(false); };
+    const schedule = () => {
+        clearInterval(sampler); sampler = 0;
+        if (enabled) { sampler = setInterval(sample, 10000); write(false); }
+    };
+    try {
+        const saved = JSON.parse(get(healthKey) || 'null');
+        if (saved && typeof saved === 'object') {
+            previous = { ...saved, abrupt: saved.clean !== true };
+            localStorage.setItem(previousKey, JSON.stringify(previous));
+            localStorage.removeItem(healthKey);
+        } else previous = JSON.parse(get(previousKey) || 'null');
+    } catch {}
+    const health = {
+        snapshot: () => ({ ...measure(), enabled }),
+        previous: () => previous,
+        // Called by motion.js on every route change; throttled so rapid tab switching stays cheap.
+        navigated() { if (enabled && Date.now() - lastWrite > 1000) write(false); },
+        refreshManaged
+    };
     record('page.start', { ...snapshot(), kind: performance.getEntriesByType('navigation')[0]?.type || 'unknown' });
+    if (previous?.abrupt && enabled) record('session.abrupt', { count: previous.navigations, ms: previous.uptimeS * 1000,
+        bytes: Math.round((previous.wasmMB ?? 0) * 1048576), kind: previous.visible ? 'foreground' : 'background' });
+    addEventListener('pagehide', () => write(true));
+    document.addEventListener('visibilitychange', () => write(false));
+    window.yap.diagnostics.health = health;
+    schedule();
     addEventListener('pageshow', e => record('page.show', { ...snapshot(), persisted: e.persisted }));
     addEventListener('pagehide', e => record('page.hide', { persisted: e.persisted }));
     for (const event of ['online', 'offline']) addEventListener(event, () => record('network.' + event));

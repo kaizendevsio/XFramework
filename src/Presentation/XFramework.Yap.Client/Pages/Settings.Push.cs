@@ -18,6 +18,7 @@ public partial class Settings
     [Inject] private ChatApi Api { get; set; } = default!;
 
     private PushConfig? pushConfig;
+    private static (string Scope, PushConfig Config)? knownConfig;
     private string pushState = "unsupported";
     private bool pushSubscribed, pushBusy, previewText;
     private string? pushNotice;
@@ -66,7 +67,11 @@ public partial class Settings
 
         try
         {
-            pushConfig = await Api.GetAsync<PushConfig>("api/chat/push/config");
+            // Server configuration: once it is known to be on, it is not re-read on every visit.
+            // "Off" can mean a Notifications outage, so that answer is asked again next time.
+            var scope = OfflineStore.Scope(State.User);
+            pushConfig = knownConfig is { } known && known.Scope == scope ? known.Config : await Api.GetAsync<PushConfig>("api/chat/push/config");
+            knownConfig = pushConfig.Enabled ? (scope, pushConfig) : null;
             pushSubscribed = pushConfig.Enabled && await JS.InvokeAsync<string?>("yap.push.endpoint") is not null;
         }
         catch (ChatApiException)
