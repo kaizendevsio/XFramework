@@ -131,6 +131,10 @@ public sealed partial class BoltServer : IDisposable
     private readonly int _sendQueueCapacity;
     private readonly long _sendQueueByteCapacity;
     private readonly int _sendEnqueueTimeoutMs;
+    private readonly int _transportSendStallTimeoutMs;
+    private readonly BoltMediaSendQueueOptions _mediaSendQueueOptions;
+    private readonly long _groupAuthorizationRenewalIntervalMs;
+    private readonly long _groupAuthorizationGraceMs;
     private readonly TimeSpan _transportCloseTimeout;
     private readonly int _maxPendingRpcCalls;
     private readonly int _maxPendingRpcCallsPerPrincipal;
@@ -208,6 +212,10 @@ public sealed partial class BoltServer : IDisposable
         _sendEnqueueTimeoutMs = options.SendEnqueueTimeoutMs > 0
             ? options.SendEnqueueTimeoutMs
             : _invocationTimeoutMs;
+        _transportSendStallTimeoutMs = Math.Max(0, options.TransportSendStallTimeoutMs);
+        _mediaSendQueueOptions = options.MediaSendQueue;
+        _groupAuthorizationRenewalIntervalMs = Math.Max(250, options.GroupAuthorizationRenewalIntervalMs);
+        _groupAuthorizationGraceMs = Math.Max(0, options.GroupAuthorizationGraceSeconds) * 1000L;
         _transportCloseTimeout = TimeSpan.FromMilliseconds(Math.Max(1, options.TransportCloseTimeoutMs));
         _maxPendingRpcCalls = Math.Max(1, options.MaxPendingRpcCalls);
         _maxPendingRpcCallsPerPrincipal = Math.Min(
@@ -389,13 +397,26 @@ public sealed partial class BoltServer : IDisposable
             await CloseTransportAsync(transport);
             return;
         }
-        using var connectionCts = CreateConnectionCancellation(user, ct);
+        using var connectionCts = CancellationTokenSource.CreateLinkedTokenSource(ct, _shutdownCts.Token);
         var connectionCt = connectionCts.Token;
+        // Credential expiry and the lifetime cap close the transport with a close handshake, so the
+        // peer sees an orderly end (and reconnects with a fresh credential) instead of an aborted
+        // socket. From that instant no further inbound frame from the expired principal is processed.
+        var expiry = new ConnectionExpiry(transport, connectionCts, _transportCloseTimeout);
+        var lifetime = GetConnectionLifetime(user);
+        if (lifetime == TimeSpan.Zero)
+            connectionCts.Cancel();
+        using var expiryTimer = lifetime > TimeSpan.Zero
+            ? new Timer(static state => ((ConnectionExpiry)state!).Expire(), expiry,
+                lifetime < MaxTimerDueTime ? lifetime : MaxTimerDueTime, Timeout.InfiniteTimeSpan)
+            : null;
         var connection = new BoltHubConnection(
             transport,
             _sendQueueCapacity,
             _sendEnqueueTimeoutMs,
-            _sendQueueByteCapacity)
+            _sendQueueByteCapacity,
+            _transportSendStallTimeoutMs,
+            _mediaEnabled ? _mediaSendQueueOptions : null)
         {
             User = user
         };
@@ -493,14 +514,15 @@ public sealed partial class BoltServer : IDisposable
                     largeBuffer = null;
                     try
                     {
-                        await ProcessFrameAsync(connection, assembledFrame, totalLength, connectionCt);
+                        if (!expiry.Expired)
+                            await ProcessFrameAsync(connection, assembledFrame, totalLength, connectionCt);
                     }
                     finally
                     {
                         _receiveBufferPool.Return(assembledFrame);
                     }
                 }
-                else
+                else if (!expiry.Expired)
                 {
                     await ProcessFrameAsync(connection, frameBytes, totalLength, connectionCt);
                 }
@@ -561,9 +583,11 @@ public sealed partial class BoltServer : IDisposable
         catch { }
     }
 
-    private CancellationTokenSource CreateConnectionCancellation(ClaimsPrincipal? user, CancellationToken ct)
+    private static readonly TimeSpan MaxTimerDueTime = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
+
+    /// <summary>Time until the credential's exp or the lifetime cap; infinite when neither applies.</summary>
+    private TimeSpan GetConnectionLifetime(ClaimsPrincipal? user)
     {
-        var cts = CancellationTokenSource.CreateLinkedTokenSource(ct, _shutdownCts.Token);
         var lifetime = _maxConnectionLifetime;
 
         var expirationValue = user?.FindFirstValue("exp");
@@ -584,10 +608,35 @@ public sealed partial class BoltServer : IDisposable
             }
         }
 
-        if (lifetime != Timeout.InfiniteTimeSpan)
-            cts.CancelAfter(lifetime);
+        return lifetime;
+    }
 
-        return cts;
+    private sealed class ConnectionExpiry(IBoltConnection transport, CancellationTokenSource connectionCts, TimeSpan closeTimeout)
+    {
+        private int _expired;
+
+        public bool Expired => Volatile.Read(ref _expired) != 0;
+
+        public void Expire()
+        {
+            if (Interlocked.Exchange(ref _expired, 1) == 0)
+                _ = CloseAsync();
+        }
+
+        private async Task CloseAsync()
+        {
+            try
+            {
+                using var closeCts = new CancellationTokenSource(closeTimeout);
+                await transport.CloseAsync(closeCts.Token);
+            }
+            catch { /* The cancellation below still ends the connection. */ }
+            finally
+            {
+                try { connectionCts.Cancel(); }
+                catch (ObjectDisposedException) { }
+            }
+        }
     }
 
     private async Task ProcessFrameAsync(BoltHubConnection connection, byte[] buffer, int length, CancellationToken ct)
@@ -1999,25 +2048,12 @@ public sealed partial class BoltServer : IDisposable
     }
 
     /// <summary>
-    /// Hot path for MediaFrame and FecFrame: header-only decode (streamId from bytes 1-16),
-    /// look up route, forward raw bytes to all recipients. Skip sender.
-    /// If media processors are registered, write a copy to the tap channel.
+    /// Hot path for MediaFrame and FecFrame: header-only decode, route lookup, then a non-blocking
+    /// hand-off to each recipient's media lanes. Nothing here awaits a recipient, and host-managed
+    /// groups no longer take the group gate per frame, so one slow receiver (or a slow policy
+    /// check) cannot stall the sender or anyone else in the call.
     /// </summary>
     private async Task RouteMediaFrameAsync(BoltHubConnection sender, byte[] buffer, int length, CancellationToken ct)
-    {
-        if (BoltCodec.TryReadMediaFrameHeader(buffer.AsSpan(0, length), out var stream) &&
-            _activeMediaStreams.TryGetValue(stream, out var route) &&
-            _activeCalls.TryGetValue(route.CallId, out var call) && call.HostManagedGroup)
-        {
-            await call.GroupGate.WaitAsync(ct);
-            try { await RouteMediaFrameCoreAsync(sender, buffer, length, ct); }
-            finally { call.GroupGate.Release(); }
-            return;
-        }
-        await RouteMediaFrameCoreAsync(sender, buffer, length, ct);
-    }
-
-    private async Task RouteMediaFrameCoreAsync(BoltHubConnection sender, byte[] buffer, int length, CancellationToken ct)
     {
         if (_requireEncryptedMedia && (!BoltCodec.TryReadMediaFrame(buffer.AsSpan(0, length), out var encryptedFrame) ||
             !encryptedFrame.IsEncrypted || encryptedFrame.PayloadLength > 5155))
@@ -2053,42 +2089,24 @@ public sealed partial class BoltServer : IDisposable
             return;
         }
 
-        var data = buffer.AsMemory(0, length);
-
-        if (_authenticatedMediaOnly && !await RenewMediaAuthorizationAsync(owningCall, ct))
-            return;
+        if (_authenticatedMediaOnly)
+        {
+            if (owningCall.HostManagedGroup)
+            {
+                // The lease renews in the background on the last decisions; media keeps flowing.
+                ScheduleGroupAuthorizationRenewal(owningCall);
+                if (!IsCallMediaActive(owningCall))
+                    return;
+            }
+            else if (!await RenewMediaAuthorizationAsync(owningCall, ct))
+            {
+                return;
+            }
+        }
         if (!IsCallParticipant(owningCall, sender) || !_activeMediaStreams.TryGetValue(streamId, out var currentRoute) || !ReferenceEquals(route, currentRoute))
             return;
 
-        // Simulcast-aware routing: if this stream has a layer ID, only forward to
-        // recipients whose preferred layer matches (or who have no preference = forward all)
-        var isSimulcast = route.SimulcastLayerId.HasValue;
-
-        foreach (var recipient in route.GetRecipientSnapshot())
-        {
-            if (recipient.StreamId == sender.StreamId || !recipient.IsAlive || !IsCallParticipant(owningCall, recipient))
-                continue;
-
-            // Simulcast filtering: skip if recipient prefers a different layer
-            if (isSimulcast && _activeCalls.TryGetValue(route.CallId, out var callState))
-            {
-                if (callState.RecipientPreferredLayer.TryGetValue(recipient.StreamId, out var preferred)
-                    && preferred != route.SimulcastLayerId!.Value)
-                    continue; // Recipient prefers a different layer — skip
-            }
-
-            // Backpressure: skip drop-eligible media frames if recipient is congested
-            if (recipient.IsUnderPressure)
-            {
-                // Check if frame is drop-eligible (flag 0x40)
-                if (owningCall.HostManagedGroup || (length > 25 && (buffer[25] & 0x40) != 0))
-                    continue; // Drop this frame — recipient can't keep up
-            }
-
-            try { await recipient.SendAsync(data, ct); }
-            catch (Exception) when (owningCall.HostManagedGroup && !ct.IsCancellationRequested)
-            { /* A congested receiver cannot disconnect the group's sender or block other recipients. */ }
-        }
+        FanOutMediaFrame(route, owningCall, sender, streamId, buffer, length);
 
         // Tap: send a copy to media processors (non-blocking, drops if full)
         if (!_requireEncryptedMedia && _mediaProcessors.Count > 0)
@@ -2101,6 +2119,82 @@ public sealed partial class BoltServer : IDisposable
         }
     }
 
+    private void FanOutMediaFrame(
+        MediaStreamRoute route,
+        ServerCallState owningCall,
+        BoltHubConnection sender,
+        Guid streamId,
+        byte[] buffer,
+        int length)
+    {
+        var frame = buffer.AsSpan(0, length);
+        var isMediaFrame = (FrameType)buffer[0] == FrameType.MediaFrame;
+        var sequence = 0u;
+        var keyStart = false;
+        if (isMediaFrame && BoltCodec.TryReadMediaFrame(frame, out var header))
+        {
+            sequence = header.SequenceNumber;
+            keyStart = header.IsKeyframe;
+        }
+        else
+        {
+            isMediaFrame = false;
+        }
+
+        var lane = route.MediaType == MediaType.Audio ? BoltMediaLane.Audio : BoltMediaLane.Video;
+        var laneName = lane == BoltMediaLane.Audio ? "audio" : "video";
+        var needsKeyframe = false;
+
+        // Simulcast-aware routing: if this stream has a layer ID, only forward to
+        // recipients whose preferred layer matches (or who have no preference = forward all)
+        var isSimulcast = route.SimulcastLayerId.HasValue;
+
+        // Holding the participant list while enqueueing (never while sending) keeps removal atomic:
+        // once a member is removed, not one more frame is queued for it.
+        lock (owningCall.Participants)
+        {
+            foreach (var recipient in route.GetRecipientSnapshot())
+            {
+                if (recipient.StreamId == sender.StreamId || !recipient.IsAlive || !IsCallParticipant(owningCall, recipient))
+                    continue;
+
+                // Simulcast filtering: skip if recipient prefers a different layer
+                if (isSimulcast &&
+                    owningCall.RecipientPreferredLayer.TryGetValue(recipient.StreamId, out var preferred) &&
+                    preferred != route.SimulcastLayerId!.Value)
+                    continue;
+
+                // Legacy drop-eligible frames still yield to a congested control queue.
+                if (recipient.IsUnderPressure && length > 25 && (buffer[25] & 0x40) != 0)
+                    continue;
+
+                var result = recipient.TryEnqueueMedia(frame, lane, streamId, sequence, keyStart, pictureAware: isMediaFrame);
+                if (!result.Queued)
+                    BoltServerMetrics.RecordMediaRelayDrop(laneName);
+                needsKeyframe |= result.RequestKeyframe;
+            }
+        }
+
+        if (needsKeyframe && lane == BoltMediaLane.Video)
+            RequestKeyframeFromSender(route, streamId);
+    }
+
+    /// <summary>
+    /// A receiver lost pictures (or joined mid-stream): ask the stream's sender for a keyframe on the
+    /// relay's own authority. Coalesced per stream; the sender's encoder rate-limits as well.
+    /// </summary>
+    private void RequestKeyframeFromSender(MediaStreamRoute route, Guid streamId)
+    {
+        var now = Environment.TickCount64;
+        var last = Interlocked.Read(ref route.LastKeyframeRequestTick);
+        if (now - last < 500 || Interlocked.CompareExchange(ref route.LastKeyframeRequestTick, now, last) != last)
+            return;
+        var writer = new ArrayBufferWriter<byte>(BoltCodec.MediaKeyRequestSize);
+        BoltCodec.WriteMediaKeyRequest(writer, streamId);
+        if (route.Sender.IsAlive && route.Sender.TryEnqueueMedia(writer.WrittenSpan, BoltMediaLane.Feedback, streamId).Queued)
+            BoltServerMetrics.RecordMediaRelayKeyframeRequest();
+    }
+
     /// <summary>
     /// Handle MediaConfig: register the media stream in the routing table and forward to recipients.
     /// </summary>
@@ -2109,10 +2203,11 @@ public sealed partial class BoltServer : IDisposable
         if (BoltCodec.TryReadMediaConfig(buffer.AsSpan(0, length), out var config) &&
             _activeCalls.TryGetValue(config.CallId, out var call) && call.HostManagedGroup)
         {
+            ScheduleGroupAuthorizationRenewal(call);
             await call.GroupGate.WaitAsync(ct);
             try
             {
-                if (await RenewGroupAuthorizationAsync(call, ct))
+                if (IsCallMediaActive(call))
                     await HandleMediaConfigCoreAsync(sender, buffer, length, ct);
             }
             finally { call.GroupGate.Release(); }
@@ -2245,6 +2340,8 @@ public sealed partial class BoltServer : IDisposable
         {
             if (recipient.IsAlive && IsCallParticipant(callState, recipient))
             {
+                // A (re)published stream starts a fresh sequence and picture history for every receiver.
+                recipient.MediaQueue?.ForgetStream(config.StreamId);
                 try { await recipient.SendAsync(data, ct); }
                 catch (Exception) when (callState.HostManagedGroup && !ct.IsCancellationRequested)
                 {
@@ -2305,9 +2402,17 @@ public sealed partial class BoltServer : IDisposable
             }
         }
 
-        // Feedback goes back to the stream's sender
-        if (route.Sender.IsAlive)
-            await route.Sender.SendAsync(buffer.AsMemory(0, length), ct);
+        // Feedback goes back to the stream's sender. It is lossy by nature, so it takes the sender's
+        // bounded feedback lane and never waits: a stalled sender must not stall this receiver.
+        if (!route.Sender.IsAlive)
+            return;
+        if (route.Sender.MediaQueue is not null)
+        {
+            if (!route.Sender.TryEnqueueMedia(span, BoltMediaLane.Feedback, streamId).Queued)
+                BoltServerMetrics.RecordMediaRelayDrop("feedback");
+            return;
+        }
+        await route.Sender.SendAsync(buffer.AsMemory(0, length), ct);
     }
 
     // ── Call signaling ──
@@ -5015,9 +5120,15 @@ public sealed class BoltHubConnection
         }
     }
 
+    // Wakes the send loop for queued media without a second awaitable; never sent or released.
+    private static readonly PendingSend MediaWakeMarker = new([], 0, null);
+
     private readonly IBoltConnection _transport;
     private readonly Channel<PendingSend> _sendChannel;
     private readonly TimeSpan _sendEnqueueTimeout;
+    private readonly TimeSpan _transportSendTimeout;
+    private readonly BoltMediaSendQueue? _media;
+    private int _mediaWakePending;
     private readonly long _sendQueueByteCapacity;
     private readonly object _pendingByteCapacitySync = new();
     private TaskCompletionSource? _pendingByteCapacityChanged;
@@ -5064,14 +5175,42 @@ public sealed class BoltHubConnection
     /// <summary>Backpressure threshold: send feedback signal to reduce sender rate (2MB).</summary>
     public const long BackpressureFeedbackThreshold = 2 * 1024 * 1024;
 
-    /// <summary>True if this connection is under backpressure (pending > drop threshold).</summary>
-    public bool IsUnderPressure => PendingBytes > BackpressureDropThreshold;
+    /// <summary>
+    /// True if this connection is under backpressure. The threshold is the smaller of
+    /// <see cref="BackpressureDropThreshold"/> and three quarters of the byte capacity: a queue can
+    /// never hold more than its capacity, so a threshold at or above it could never fire.
+    /// </summary>
+    public bool IsUnderPressure => PendingBytes > PressureThresholdBytes;
+
+    internal long PressureThresholdBytes => Math.Min(BackpressureDropThreshold, Math.Max(1, _sendQueueByteCapacity * 3 / 4));
+
+    /// <summary>Longest a single transport write may make no progress before the connection is retired.</summary>
+    public TimeSpan TransportSendTimeout => _transportSendTimeout;
+
+    /// <summary>The relay's prioritized per-receiver media queue; null when the host does not route media.</summary>
+    internal BoltMediaSendQueue? MediaQueue => _media;
 
     public BoltHubConnection(
         IBoltConnection transport,
         int sendQueueCapacity = 4096,
         int sendEnqueueTimeoutMs = 0,
         long sendQueueByteCapacity = 16L * 1024 * 1024)
+        : this(transport, sendQueueCapacity, sendEnqueueTimeoutMs, sendQueueByteCapacity, transportSendTimeoutMs: 0, mediaSendQueue: null)
+    {
+    }
+
+    /// <param name="transportSendTimeoutMs">
+    /// Progress watchdog: the connection is retired only when one physical write makes no progress
+    /// for this long. 0 keeps the historical behaviour of reusing <paramref name="sendEnqueueTimeoutMs"/>.
+    /// </param>
+    /// <param name="mediaSendQueue">Enables the non-blocking, prioritized media lanes used by the relay.</param>
+    public BoltHubConnection(
+        IBoltConnection transport,
+        int sendQueueCapacity,
+        int sendEnqueueTimeoutMs,
+        long sendQueueByteCapacity,
+        int transportSendTimeoutMs,
+        BoltMediaSendQueueOptions? mediaSendQueue)
     {
         _transport = transport;
         QuotaKey = StreamId;
@@ -5079,6 +5218,10 @@ public sealed class BoltHubConnection
         _sendEnqueueTimeout = sendEnqueueTimeoutMs > 0
             ? TimeSpan.FromMilliseconds(sendEnqueueTimeoutMs)
             : TimeSpan.Zero;
+        _transportSendTimeout = transportSendTimeoutMs > 0
+            ? TimeSpan.FromMilliseconds(transportSendTimeoutMs)
+            : _sendEnqueueTimeout;
+        _media = mediaSendQueue is null ? null : new BoltMediaSendQueue(mediaSendQueue);
         _sendChannel = Channel.CreateBounded<PendingSend>(
             new BoundedChannelOptions(Math.Max(1, sendQueueCapacity))
             {
@@ -5097,13 +5240,20 @@ public sealed class BoltHubConnection
         SendLoop = Task.Run(async () =>
         {
             Exception? terminalFailure = null;
-            var sendDeadlineCts = _sendEnqueueTimeout > TimeSpan.Zero
+            var sendDeadlineCts = _transportSendTimeout > TimeSpan.Zero
                 ? CancellationTokenSource.CreateLinkedTokenSource(ct)
                 : null;
             try
             {
                 await foreach (var pending in _sendChannel.Reader.ReadAllAsync(ct))
                 {
+                    if (ReferenceEquals(pending, MediaWakeMarker))
+                    {
+                        Volatile.Write(ref _mediaWakePending, 0);
+                        await DrainMediaAsync();
+                        continue;
+                    }
+
                     Task? transportSend = null;
                     PendingSend[]? batchItems = null;
                     var batchCount = 1;
@@ -5142,13 +5292,7 @@ public sealed class BoltHubConnection
                             sendBuffer = batchBuffer;
                         }
 
-                        var sendToken = ct;
-                        if (sendDeadlineCts is not null)
-                        {
-                            sendDeadlineCts.CancelAfter(_sendEnqueueTimeout);
-                            sendToken = sendDeadlineCts.Token;
-                        }
-
+                        var sendToken = ArmSendDeadline();
                         var sendOperation = _transport.SendAsync(sendBuffer.AsMemory(0, sendLength), sendToken);
                         if (sendOperation.IsCompletedSuccessfully)
                         {
@@ -5165,10 +5309,7 @@ public sealed class BoltHubConnection
                         sendDeadlineCts?.IsCancellationRequested == true &&
                         !ct.IsCancellationRequested)
                     {
-                        Interlocked.Increment(ref _transportSendTimeoutCount);
-                        var timeout = new BoltTransportSendTimeoutException(
-                            $"Bolt transport send timed out after {_sendEnqueueTimeout.TotalMilliseconds:0} ms.",
-                            ex);
+                        var timeout = CreateSendTimeout(ex);
                         CompleteBatch(batchItems, batchCount, pending, completion => completion.SetException(timeout));
                         throw timeout;
                     }
@@ -5190,13 +5331,7 @@ public sealed class BoltHubConnection
                     }
                     finally
                     {
-                        if (sendDeadlineCts is not null &&
-                            !sendDeadlineCts.TryReset() &&
-                            !ct.IsCancellationRequested)
-                        {
-                            sendDeadlineCts.Dispose();
-                            sendDeadlineCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                        }
+                        ResetSendDeadline();
                         if (batchItems is not null)
                         {
                             for (var i = 0; i < batchCount; i++)
@@ -5220,6 +5355,9 @@ public sealed class BoltHubConnection
                             ReleasePendingSend(pending);
                         }
                     }
+
+                    // Control frames keep strict priority; media fills the gaps between them.
+                    await DrainMediaAsync();
                 }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
@@ -5238,8 +5376,11 @@ public sealed class BoltHubConnection
             finally
             {
                 sendDeadlineCts?.Dispose();
+                _media?.Close();
                 while (_sendChannel.Reader.TryRead(out var pending))
                 {
+                    if (ReferenceEquals(pending, MediaWakeMarker))
+                        continue;
                     if (terminalFailure is not null)
                         pending.TransportCompletion?.SetException(terminalFailure);
                     else
@@ -5247,7 +5388,116 @@ public sealed class BoltHubConnection
                     ReleasePendingSend(pending);
                 }
             }
+
+            CancellationToken ArmSendDeadline()
+            {
+                if (sendDeadlineCts is null)
+                    return ct;
+                sendDeadlineCts.CancelAfter(_transportSendTimeout);
+                return sendDeadlineCts.Token;
+            }
+
+            void ResetSendDeadline()
+            {
+                if (sendDeadlineCts is not null &&
+                    !sendDeadlineCts.TryReset() &&
+                    !ct.IsCancellationRequested)
+                {
+                    sendDeadlineCts.Dispose();
+                    sendDeadlineCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                }
+            }
+
+            // One media frame per physical write, highest lane first, until a control frame is waiting.
+            async ValueTask DrainMediaAsync()
+            {
+                if (_media is null)
+                    return;
+                while (!_sendChannel.Reader.TryPeek(out _) && _media.TryDequeue(out var item))
+                {
+                    Task? mediaSend = null;
+                    try
+                    {
+                        if (!_transport.IsConnected)
+                            throw CreateTransportFailure("Bolt transport disconnected before queued media was sent.");
+                        var sendToken = ArmSendDeadline();
+                        var operation = _transport.SendAsync(item.Memory, sendToken);
+                        if (operation.IsCompletedSuccessfully)
+                        {
+                            operation.GetAwaiter().GetResult();
+                        }
+                        else
+                        {
+                            mediaSend = operation.AsTask();
+                            await mediaSend.WaitAsync(sendToken);
+                        }
+                    }
+                    catch (OperationCanceledException ex) when (
+                        sendDeadlineCts?.IsCancellationRequested == true &&
+                        !ct.IsCancellationRequested)
+                    {
+                        throw CreateSendTimeout(ex);
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    catch (BoltTransportSendException) { throw; }
+                    catch (Exception ex) { throw CreateTransportFailure("Bolt transport send failed.", ex); }
+                    finally
+                    {
+                        ResetSendDeadline();
+                        if (mediaSend is { IsCompleted: false })
+                            _ = ReleaseMediaWhenTransportCompletesAsync(mediaSend, item);
+                        else
+                            BoltMediaSendQueue.Release(item);
+                    }
+                }
+            }
         });
+    }
+
+    private BoltTransportSendTimeoutException CreateSendTimeout(OperationCanceledException ex)
+    {
+        Interlocked.Increment(ref _transportSendTimeoutCount);
+        return new BoltTransportSendTimeoutException(
+            $"Bolt transport send timed out after {_transportSendTimeout.TotalMilliseconds:0} ms without progress.",
+            ex);
+    }
+
+    private static async Task ReleaseMediaWhenTransportCompletesAsync(Task transportSend, BoltMediaSendQueue.Item item)
+    {
+        try { await transportSend; }
+        catch { }
+        finally { BoltMediaSendQueue.Release(item); }
+    }
+
+    /// <summary>
+    /// Offer a relayed media frame to this receiver without waiting. Returns whether it was queued
+    /// and whether the receiver now needs a keyframe from the stream's sender.
+    /// </summary>
+    internal BoltMediaEnqueueResult TryEnqueueMedia(
+        ReadOnlySpan<byte> frame,
+        BoltMediaLane lane,
+        Guid streamId,
+        uint sequence = 0,
+        bool keyStart = false,
+        bool pictureAware = true)
+    {
+        if (_media is null || IsClosing || SendFailure is not null)
+            return BoltMediaEnqueueResult.Dropped;
+        var result = _media.TryEnqueue(frame, lane, streamId, sequence, keyStart, pictureAware);
+        if (result.Queued)
+            SignalMediaWork();
+        return result;
+    }
+
+    private void SignalMediaWork()
+    {
+        // At most one wake marker is in flight. If the control queue is full the loop is busy
+        // anyway and drains media after each control frame, so a failed write needs no retry.
+        if (Interlocked.Exchange(ref _mediaWakePending, 1) == 0 &&
+            !_sendChannel.Writer.TryWrite(MediaWakeMarker))
+        {
+            Volatile.Write(ref _mediaWakePending, 0);
+        }
     }
 
     private static void CompleteBatch(
@@ -5606,6 +5856,9 @@ internal sealed class MediaStreamRoute
     /// <summary>What this route carries. A group participant may own one route per media type.</summary>
     public MediaType MediaType { get; init; }
 
+    /// <summary>Last relay-originated keyframe request to <see cref="Sender"/>; coalesces requests across receivers.</summary>
+    public long LastKeyframeRequestTick = long.MinValue / 2;
+
     public bool ContainsRecipient(BoltHubConnection connection)
     {
         lock (_sync)
@@ -5672,6 +5925,10 @@ internal sealed class ServerCallState
     public readonly SemaphoreSlim GroupGate = new(1, 1);
     public bool HostManagedGroup { get; init; }
     public long LastMediaAuthorizationTick;
+    public int AuthorizationRenewalRunning;
+
+    /// <summary>Last successful authorization per participant StreamId; bounds how long an unavailable policy is tolerated.</summary>
+    public ConcurrentDictionary<string, long> ParticipantAuthorizedAt { get; } = new();
 
     public object SyncRoot { get; } = new();
     public Guid CallId { get; init; }

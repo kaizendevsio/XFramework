@@ -31,6 +31,12 @@ internal static class BoltServerMetrics
         Meter.CreateCounter<long>("bolt.server.rate_limit.byte_rejections");
     private static readonly Counter<long> PushRateRejections =
         Meter.CreateCounter<long>("bolt.server.rate_limit.push_rejections");
+    private static readonly Counter<long> GroupAuthorizationUnavailable =
+        Meter.CreateCounter<long>("bolt.server.media.group_authorization_unavailable");
+    private static readonly Counter<long> MediaRelayDrops =
+        Meter.CreateCounter<long>("bolt.server.media.relay_drops");
+    private static readonly Counter<long> MediaRelayKeyframeRequests =
+        Meter.CreateCounter<long>("bolt.server.media.relay_keyframe_requests");
     private static readonly Histogram<double> RpcDuration =
         Meter.CreateHistogram<double>("bolt.server.rpc.duration", "ms");
     private static readonly Histogram<long> ReplayDeferredBytes =
@@ -54,6 +60,13 @@ internal static class BoltServerMetrics
 
     public static void RecordRouteMiss(string frameType) =>
         RouteMisses.Add(1, new KeyValuePair<string, object?>("frame_type", frameType));
+
+    public static void RecordGroupAuthorizationUnavailable() => GroupAuthorizationUnavailable.Add(1);
+
+    public static void RecordMediaRelayDrop(string lane) =>
+        MediaRelayDrops.Add(1, new KeyValuePair<string, object?>("lane", lane));
+
+    public static void RecordMediaRelayKeyframeRequest() => MediaRelayKeyframeRequests.Add(1);
 
     public static void RecordTransportSendFailure(string reason) =>
         TransportSendFailures.Add(1, new KeyValuePair<string, object?>("reason", reason));

@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Bolt.Protocol;
@@ -52,7 +53,13 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
             GroupCallAuthorizer = enableGroupLifecycle ? this : null,
             MaxCallParticipants = enableGroupLifecycle ? 8 : 2, MaxMediaStreamsPerPrincipal = 2,
             MaxFrameBytes = 64 * 1024, SendQueueCapacity = 64, SendQueueByteCapacity = 1024 * 1024,
+            // Control frames still may not wait long for a queue slot; media never waits at all
+            // (per-receiver lanes drop video first). A receiver is retired only when its socket makes
+            // no progress for the whole stall window, so a slow or briefly dead mobile link survives.
             SendEnqueueTimeoutMs = enableGroupLifecycle ? 250 : 0,
+            TransportSendStallTimeoutMs = Math.Clamp(configuration.GetValue("Yap:Calls:RelayStallTimeoutSeconds", 15), 1, 120) * 1000,
+            // How long a seat survives while its periodic re-check cannot be answered (backend outage).
+            GroupAuthorizationGraceSeconds = Math.Clamp(configuration.GetValue("Yap:Calls:AuthorizationGraceSeconds", 120), 0, 600),
             MaxConnectionsPerPrincipal = 2, MaxConnectionLifetimeSeconds = 3600
         });
         Server.GroupParticipantRemoved += GroupParticipantRemoved;
@@ -233,6 +240,16 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
 
     private async Task<HashSet<Guid>> CurrentMembersAsync(ClaimsPrincipal user, Guid thread, CancellationToken ct)
     {
+        var (_, members) = await ReadMembersAsync(user, thread, ct);
+        return members ?? throw new YapApiException(403, "Calls are available only to current conversation members.");
+    }
+
+    /// <summary>
+    /// The thread's current members as seen by <paramref name="user"/>, or null when the service did
+    /// not return them; the status then says whether that was a refusal or an unavailable service.
+    /// </summary>
+    private async Task<(HttpStatusCode Status, HashSet<Guid>? Members)> ReadMembersAsync(ClaimsPrincipal user, Guid thread, CancellationToken ct)
+    {
         await using var scope = scopes.CreateAsyncScope();
         var services = scope.ServiceProvider;
         var client = new CommunicationsChatClient(services.GetRequiredService<ICommunicationsServiceWrapper>(),
@@ -240,9 +257,18 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
             services.GetRequiredService<IActorAccessTokenScope>());
         var session = await client.ForCurrentActorAsync(ct: ct);
         var response = await session.GetThreadAsync(thread, ct);
-        if (!response.IsSuccess || response.Response is null || !response.Response.Members.Any(x => x.CredentialId == session.CredentialId))
-            throw new YapApiException(403, "Calls are available only to current conversation members.");
-        return response.Response.Members.Select(x => x.CredentialId).ToHashSet();
+        if (!response.IsSuccess || response.Response is null) return (response.HttpStatusCode, null);
+        // A thread returned to someone who is not among its members is a refusal, whatever the status says.
+        if (!response.Response.Members.Any(x => x.CredentialId == session.CredentialId)) return (HttpStatusCode.Forbidden, null);
+        return (response.HttpStatusCode, response.Response.Members.Select(x => x.CredentialId).ToHashSet());
+    }
+
+    private async Task<BoltGroupAuthorizationDecision> CheckMembershipAsync(ClaimsPrincipal user, Guid thread, Guid member, CancellationToken ct)
+    {
+        var (status, members) = await ReadMembersAsync(user, thread, ct);
+        if (members is null)
+            return IsDefinitiveRefusal(status) ? BoltGroupAuthorizationDecision.Denied : BoltGroupAuthorizationDecision.Unavailable;
+        return members.Contains(member) ? BoltGroupAuthorizationDecision.Allowed : BoltGroupAuthorizationDecision.Denied;
     }
 
     public static bool HasSameOrigin(HttpRequest request) => Uri.TryCreate(request.Headers.Origin.ToString(), UriKind.Absolute, out var origin) &&

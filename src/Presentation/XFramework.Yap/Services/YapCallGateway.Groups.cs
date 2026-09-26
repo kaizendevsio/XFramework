@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Bolt.Protocol.Transport;
+using Bolt.Server;
 using Yap.Contracts;
 
 [assembly: InternalsVisibleTo("Yap.Tests")]
@@ -141,20 +142,50 @@ public sealed partial class YapCallGateway
         if (!groupLifecycleEnabled || participant.Identity?.IsAuthenticated != true) return false;
         var (tenant, credential) = Identity(participant);
         GroupRoom room;
-        lock (gate)
-        {
-            if (!groups.TryGetValue(callId, out room!) || room.Tenant != tenant || room.Expires <= DateTimeOffset.UtcNow ||
-                !room.Members.TryGetValue(credential, out var member) || member.Left || !member.Accepted || !member.Registered ||
-                !member.Connected || member.Session != participant.FindFirstValue(YapAuth.SessionClaim) ||
-                clientId != ClientId(callId, credential) || participant.FindFirstValue("bolt_media_client_id") != clientId ||
-                participant.FindFirstValue("yap_call_id") != callId.ToString()) return false;
-        }
+        lock (gate) if (!IsSeated(callId, clientId, participant, tenant, credential, out room)) return false;
         await VerifyMembershipAsync(participant, room.Thread, credential, ct);
         await VerifyCallDeviceAsync(participant, room.Members[credential].DeviceId, ct);
-        lock (gate) return groups.TryGetValue(callId, out var current) && ReferenceEquals(room, current) && room.Expires > DateTimeOffset.UtcNow &&
-            room.Members.TryGetValue(credential, out var member) && !member.Left && member.Connected && member.Registered && member.Accepted &&
-            member.Session == participant.FindFirstValue(YapAuth.SessionClaim);
+        lock (gate) return IsStillSeated(room, callId, participant, credential);
     }
+
+    /// <summary>
+    /// The relay's periodic re-check. Local seat facts and definitive downstream refusals remove the
+    /// participant; an unreachable or failing directory only reports that the answer is unavailable,
+    /// so a hub reconnect or a slow backend cannot end a call that is otherwise still allowed.
+    /// </summary>
+    public async ValueTask<BoltGroupAuthorizationDecision> RenewParticipantAsync(Guid callId, string clientId, ClaimsPrincipal participant, CancellationToken ct = default)
+    {
+        if (!groupLifecycleEnabled || participant.Identity?.IsAuthenticated != true) return BoltGroupAuthorizationDecision.Denied;
+        var (tenant, credential) = Identity(participant);
+        GroupRoom room;
+        Guid deviceId;
+        lock (gate)
+        {
+            if (!IsSeated(callId, clientId, participant, tenant, credential, out room)) return BoltGroupAuthorizationDecision.Denied;
+            deviceId = room.Members[credential].DeviceId;
+        }
+        try
+        {
+            var membership = await CheckMembershipAsync(participant, room.Thread, credential, ct);
+            if (membership != BoltGroupAuthorizationDecision.Allowed) return membership;
+            var device = await CheckCallDeviceAsync(participant, deviceId, ct);
+            if (device != BoltGroupAuthorizationDecision.Allowed) return device;
+        }
+        catch (Exception error) { return Classify(error); }
+        lock (gate) return IsStillSeated(room, callId, participant, credential) ? BoltGroupAuthorizationDecision.Allowed : BoltGroupAuthorizationDecision.Denied;
+    }
+
+    private bool IsSeated(Guid callId, string clientId, ClaimsPrincipal participant, Guid tenant, Guid credential, out GroupRoom room) =>
+        groups.TryGetValue(callId, out room!) && room.Tenant == tenant && room.Expires > DateTimeOffset.UtcNow &&
+        room.Members.TryGetValue(credential, out var member) && !member.Left && member.Accepted && member.Registered &&
+        member.Connected && member.Session == participant.FindFirstValue(YapAuth.SessionClaim) &&
+        clientId == ClientId(callId, credential) && participant.FindFirstValue("bolt_media_client_id") == clientId &&
+        participant.FindFirstValue("yap_call_id") == callId.ToString();
+
+    private bool IsStillSeated(GroupRoom room, Guid callId, ClaimsPrincipal participant, Guid credential) =>
+        groups.TryGetValue(callId, out var current) && ReferenceEquals(room, current) && room.Expires > DateTimeOffset.UtcNow &&
+        room.Members.TryGetValue(credential, out var member) && !member.Left && member.Connected && member.Registered && member.Accepted &&
+        member.Session == participant.FindFirstValue(YapAuth.SessionClaim);
 
     private async Task AcceptGroupSocketAsync(HttpContext context, string token)
     {

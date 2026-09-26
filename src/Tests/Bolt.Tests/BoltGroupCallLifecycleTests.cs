@@ -138,12 +138,17 @@ public sealed class BoltGroupCallLifecycleTests
         f.Policy.Accepted.Remove(revoked);
         var calls = (ConcurrentDictionary<Guid, ServerCallState>)typeof(BoltServer).GetField("_activeCalls", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(f.Server)!;
         calls[f.Call].LastMediaAuthorizationTick = Environment.TickCount64 - 5001;
+        // The due lease starts a background re-check; the frame that noticed it is not held back.
+        await f.Send("a", stream);
+        Assert.That(() => calls[f.Call].Participants.Select(x => x.ClientId).ToArray(),
+            Is.EquivalentTo(f.Peers.Keys.Where(x => x != revoked)).After(3000, 10));
+        var before = f.Peers.ToDictionary(x => x.Key, x => x.Value.Count(FrameType.MediaFrame));
         await f.Send("a", stream);
         Assert.Multiple(() =>
         {
-            Assert.That(f.Peers["b"].Count(FrameType.MediaFrame), Is.EqualTo(revoked == "a" ? 0 : 1));
-            Assert.That(f.Peers["c"].Count(FrameType.MediaFrame), Is.Zero);
-            Assert.That(calls[f.Call].Participants.Select(x => x.ClientId), Is.EquivalentTo(f.Peers.Keys.Where(x => x != revoked)));
+            // Once the refusal is applied the revoked member neither sends nor receives.
+            Assert.That(() => f.Peers["b"].Count(FrameType.MediaFrame) - before["b"], Is.EqualTo(revoked == "a" ? 0 : 1).After(1000, 10));
+            Assert.That(f.Peers["c"].Count(FrameType.MediaFrame) - before["c"], Is.Zero);
         });
     }
 
@@ -203,7 +208,13 @@ public sealed class BoltGroupCallLifecycleTests
             await Peers[id].ProcessAsync(Frame(w => BoltCodec.WriteMediaConfig(w, stream, Call, MediaType.Audio, CodecId.Opus, 48000, 1, 128, 0, [])));
             return stream;
         }
-        public Task Send(string id, Guid stream) => Peers[id].ProcessAsync(Frame(w => BoltCodec.WriteMediaFrame(w, stream, 1, 960, 0, [0xF8, 0xFF, 0xFE])));
+        private readonly Dictionary<Guid, uint> sequences = [];
+        // Real senders number every frame; the relay treats a repeated number as a stale retransmission.
+        public Task Send(string id, Guid stream)
+        {
+            var sequence = sequences[stream] = sequences.GetValueOrDefault(stream) + 1;
+            return Peers[id].ProcessAsync(Frame(w => BoltCodec.WriteMediaFrame(w, stream, sequence, 960 * sequence, 0, [0xF8, 0xFF, 0xFE])));
+        }
         public async ValueTask DisposeAsync()
         { foreach (var peer in Peers.Values) await peer.DisposeAsync(); await Task.WhenAll(Tasks.Values).WaitAsync(TimeSpan.FromSeconds(5)); Server.Dispose(); }
     }
