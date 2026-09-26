@@ -32,6 +32,7 @@
     <Project Path="src/Libraries/Bolt/Bolt.Server/Bolt.Server.csproj" />
   </Folder>
   <Folder Name="/Libraries/Bolt/Tests/">
+    <Project Path="src/Tests/Bolt.CallResilience.Harness/Bolt.CallResilience.Harness.csproj" />
     <Project Path="src/Tests/Bolt.Tests/Bolt.Tests.csproj" />
   </Folder>
   <Folder Name="/Libraries/UI/">

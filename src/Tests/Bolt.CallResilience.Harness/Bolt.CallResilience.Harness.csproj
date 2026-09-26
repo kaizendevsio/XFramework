@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <!--
+      Opt-in network resilience harness for the call relay: the real Bolt.Server group relay, with
+      Yap's options, over a real Linux TCP link shaped by tc netem. Not a unit test and not run by
+      `dotnet test`; see README.md. BoltServerProject can point at another checkout (for example the
+      base branch) to measure a before/after with the same harness.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>false</IsTestProject>
+        <BoltServerProject Condition="'$(BoltServerProject)' == ''">..\..\Libraries\Bolt\Bolt.Server\Bolt.Server.csproj</BoltServerProject>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="$(BoltServerProject)" />
+    </ItemGroup>
+
+</Project>
