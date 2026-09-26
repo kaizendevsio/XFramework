@@ -172,8 +172,15 @@ public sealed partial class VoiceState
                     // Same roster, same epoch: rejoin the relay's room and publish again. No key changes hands.
                     await api.PostAsync($"api/chat/calls/groups/{group.Id}/ready", new YapGroupReady(epoch.Revision), ct);
                     CheckCurrent(attempt);
-                    if (!await RunEpochMediaAsync(attempt, epoch, () => media.StartHostedAudioAsync(group.Id))) return CallResumeAttempt.Retry;
-                    if (attempt.CameraOn) await RunEpochMediaAsync(attempt, epoch, () => media.ResumeVideoStreamAsync(group.Id));
+                    if (await RunEpochMediaAsync(attempt, epoch, () => media.StartHostedAudioAsync(group.Id)))
+                    { if (attempt.CameraOn) await RunEpochMediaAsync(attempt, epoch, () => media.ResumeVideoStreamAsync(group.Id)); }
+                    else
+                    {
+                        // The roster moved on in the meantime. The socket is good; join the new epoch on it.
+                        attempt.HostedAudioStarted = false;
+                        attempt.ResumeVideo = attempt.CameraOn;
+                        _ = RejoinEpochAsync(attempt, null);
+                    }
                 }
                 else
                 {
@@ -192,6 +199,8 @@ public sealed partial class VoiceState
                 attempt.ResumeVideo = attempt.CameraOn;
                 _ = RejoinEpochAsync(attempt, roster);
             }
+            // A socket that died during the rejoin raised its Disconnected before it was ours to watch.
+            if (!client.IsConnected) throw new IOException("The resumed connection closed while rejoining.");
             if (attempt.MuteDirty) _ = SyncMuteAsync(attempt);
             RefreshFrozenTiles(attempt);
             return CallResumeAttempt.Resumed;
@@ -201,7 +210,7 @@ public sealed partial class VoiceState
             await AbandonAsync(attempt, client, handler);
             return CallResumeAttempt.Refused;
         }
-        catch (ChatApiException error) when (error.Status == 409 && Current(attempt) && client is not null && attempt.TransportReady)
+        catch (ChatApiException error) when (error.Status == 409 && Current(attempt) && client is { IsConnected: true } && attempt.TransportReady)
         {
             // The roster changed between reading it and rejoining: the socket is fine, the epoch is not.
             attempt.HostedAudioStarted = false;
