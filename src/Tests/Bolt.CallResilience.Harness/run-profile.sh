@@ -8,6 +8,9 @@
 #   OUTAGE_SECONDS         length of that outage
 #   EXPECT                 "survive" fails the run unless the call lasted; "any" only records it
 #   ENV=VALUE              harness settings passed to the relay (SECONDS, VIDEO_KBPS, FPS, AUDIO_PAYLOAD, KF_MS, ...)
+#
+# NETEM_STEPS (environment, optional) changes the downlink mid-call, e.g. a bandwidth step down and back up:
+#   NETEM_STEPS="60=delay 50ms 10ms rate 512kbit|120=delay 50ms 10ms rate 4mbit"
 set -euo pipefail
 name=$1 image=$2 relaynet=$3 recvnet=$4 outage_at=$5 outage_for=$6 expect=$7
 shift 7
@@ -44,6 +47,20 @@ waitfor() { # container pattern timeout
 }
 
 waitfor "$relay" "RELAY joined" 120
+steps_pid=
+if [ -n "${NETEM_STEPS:-}" ]; then
+  (
+    started=$SECONDS
+    IFS='|' read -r -a steps <<<"$NETEM_STEPS"
+    for step in "${steps[@]}"; do
+      at=${step%%=*} shape=${step#*=}
+      while ((SECONDS - started < at)); do sleep 1; done
+      docker exec "$relay" tc qdisc change dev eth0 root netem $shape || true
+      echo "$name: downlink is now '$shape' at ${at}s"
+    done
+  ) &
+  steps_pid=$!
+fi
 if ((outage_at >= 0)); then
   sleep "$outage_at"
   docker exec "$relay" tc qdisc change dev eth0 root netem $relaynet loss 100% || true
@@ -54,6 +71,7 @@ if ((outage_at >= 0)); then
   docker exec "$receiver" tc qdisc change dev eth0 root netem $recvnet || true
 fi
 waitfor "$relay" "^SUMMARY" $((seconds + 60))
+if [ -n "$steps_pid" ]; then wait "$steps_pid" || true; fi
 timeout 60 docker wait "$receiver" >/dev/null || true
 docker logs "$relay" 2>&1 | grep "^SUMMARY" | sed "s/^/$name relay: /"
 docker logs "$receiver" 2>&1 | grep "^SUMMARY" | sed "s/^/$name receiver: /" || true

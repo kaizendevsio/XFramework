@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Turns harness logs (<name>.relay.log / <name>.receiver.log) into one Markdown table."""
+"""Turns harness logs (<name>.relay.log / <name>.receiver.log) into Markdown tables."""
 import json
 import pathlib
 import sys
@@ -22,6 +22,11 @@ def main(directory):
         "decodable pictures | video frozen s | keyframes | relay drops (audio / video) |",
         "|---|---|---|---|---|---|---|---|---|",
     ]
+    rate_rows = [
+        "| run | settled video kbps (median) | settled estimate kbps | final picture | converged at | "
+        "picture changes (after settling) | video suspended s | picture timeline |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
     for name in names:
         relay = summary(next(root.rglob(f"{name}.relay.log")))
         receiver = summary(next(iter(root.rglob(f"{name}.receiver.log")), root / "missing"))
@@ -35,7 +40,19 @@ def main(directory):
             f"{receiver.get('picturesDecodable', '-')} of {relay.get('videoPicturesSent', '-')} | "
             f"{receiver.get('frozenSeconds', '-')} | {receiver.get('keyframes', '-')} | {drops} |"
         )
+        rate = relay.get("rate")
+        if rate:
+            converged = rate.get("convergedAtS")
+            rate_rows.append(
+                f"| {name} | {rate.get('settledVideoKbpsMedian', '-')} | {rate.get('settledEstimateKbpsMedian', '-')} | "
+                f"{rate.get('finalRung', '-')} | {f'{converged:.1f} s' if converged is not None else '-'} | "
+                f"{rate.get('rungChanges', '-')} ({rate.get('rungChangesAfterSettle', '-')}) | "
+                f"{rate.get('suspendedSeconds', '-')} | {rate.get('rungTimeline', '')} |"
+            )
     print("\n".join(rows))
+    if len(rate_rows) > 2:
+        print("\nAdaptive sender (runs with ADAPTIVE=1):\n")
+        print("\n".join(rate_rows))
 
 
 if __name__ == "__main__":

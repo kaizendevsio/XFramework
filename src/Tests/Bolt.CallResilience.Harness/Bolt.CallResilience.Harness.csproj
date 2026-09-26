@@ -5,6 +5,10 @@
       Yap's options, over a real Linux TCP link shaped by tc netem. Not a unit test and not run by
       `dotnet test`; see README.md. BoltServerProject can point at another checkout (for example the
       base branch) to measure a before/after with the same harness.
+
+      HarnessAdaptive (default true) also builds the adaptive sender, which runs the browser client's
+      real send path from Bolt.Media. Bolt.Media brings this checkout's Bolt.Protocol, so a build
+      against another checkout's relay must set HarnessAdaptive=false and use the constant sender.
     -->
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
@@ -13,10 +17,13 @@
         <IsPackable>false</IsPackable>
         <IsTestProject>false</IsTestProject>
         <BoltServerProject Condition="'$(BoltServerProject)' == ''">..\..\Libraries\Bolt\Bolt.Server\Bolt.Server.csproj</BoltServerProject>
+        <HarnessAdaptive Condition="'$(HarnessAdaptive)' == ''">true</HarnessAdaptive>
+        <DefineConstants Condition="'$(HarnessAdaptive)' == 'true'">$(DefineConstants);HARNESS_ADAPTIVE</DefineConstants>
     </PropertyGroup>
 
     <ItemGroup>
         <ProjectReference Include="$(BoltServerProject)" />
+        <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Media\Bolt.Media.csproj" Condition="'$(HarnessAdaptive)' == 'true'" />
     </ItemGroup>
 
 </Project>

@@ -2,6 +2,8 @@ name: Call network harness
 
 # Opt-in measurement of the call relay on degraded mobile links: the real Bolt.Server group relay
 # (Yap's options) across a tc-netem shaped Linux TCP link, for the base branch and for this branch.
+# The branch runs the browser client's real send path (pacer, rate control, picture ladder) over a
+# synthetic encoder; the base runs a constant sender (its relay predates the congestion reports).
 # See src/Tests/Bolt.CallResilience.Harness/README.md. Runs when the relay changes, or on demand.
 on:
   workflow_dispatch:
@@ -32,24 +34,27 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # before: the base relay with the previous client defaults (1080p30 start, Opus 128k, keyframe every 2 s)
-          - { name: before-512k-1000ms-1pct, target: base, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: any, settings: "VIDEO_KBPS=3800 FPS=30 AUDIO_PAYLOAD=347 KF_MS=2000 KF_ON_DEMAND=0" }
-          - { name: before-512k-500ms-1pct, target: base, relaynet: "delay 250ms 10ms rate 512kbit loss 1%", recvnet: "delay 250ms 10ms", at: -1, for: 0, expect: any, settings: "VIDEO_KBPS=3800 FPS=30 AUDIO_PAYLOAD=347 KF_MS=2000 KF_ON_DEMAND=0" }
-          - { name: before-4g-2mbit, target: base, relaynet: "delay 50ms 10ms rate 2mbit loss 0.5%", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: any, settings: "VIDEO_KBPS=3800 FPS=30 AUDIO_PAYLOAD=347 KF_MS=2000 KF_ON_DEMAND=0" }
-          - { name: before-4g-outage-2s, target: base, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 2, expect: any, settings: "VIDEO_KBPS=3800 FPS=30 AUDIO_PAYLOAD=347 KF_MS=2000 KF_ON_DEMAND=0" }
-          - { name: before-4g-outage-10s, target: base, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 10, expect: any, settings: "VIDEO_KBPS=3800 FPS=30 AUDIO_PAYLOAD=347 KF_MS=2000 KF_ON_DEMAND=0" }
-          - { name: before-4g-auth-blip, target: base, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: any, settings: "VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=347 KF_MS=2000 KF_ON_DEMAND=0 AUTH_FAIL_AT_S=60 AUTH_FAIL_FOR_S=8" }
-          # after: this branch with the new client defaults (240p15 start, Opus 32k, keyframes on demand)
-          - { name: after-512k-1000ms-1pct, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: survive, settings: "VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
-          - { name: after-512k-500ms-1pct, target: head, relaynet: "delay 250ms 10ms rate 512kbit loss 1%", recvnet: "delay 250ms 10ms", at: -1, for: 0, expect: survive, settings: "VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
-          - { name: after-4g-2mbit, target: head, relaynet: "delay 50ms 10ms rate 2mbit loss 0.5%", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: survive, settings: "VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
-          - { name: after-4g-outage-2s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 2, expect: survive, settings: "VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
-          - { name: after-4g-outage-10s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 10, expect: any, settings: "VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
-          - { name: after-4g-auth-blip, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: survive, settings: "VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1 AUTH_FAIL_AT_S=60 AUTH_FAIL_FOR_S=8" }
-          # stress: this branch while the sender still offers far more video than the link carries
-          - { name: stress-512k-1000ms-720p, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: survive, settings: "VIDEO_KBPS=1500 FPS=30 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
-          - { name: stress-4g-1080p, target: head, relaynet: "delay 50ms 10ms rate 2mbit loss 0.5%", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: survive, settings: "VIDEO_KBPS=3800 FPS=30 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
-          - { name: stress-4g-outage-2s-720p, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 2, expect: survive, settings: "VIDEO_KBPS=1500 FPS=30 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          # before: the base relay (phase 0) with a constant sender. Phase 0 clients start at 240p15 and never move fast
+          # enough to matter, so "240p" is phase 0 as shipped and "720p"/"1080p" is the same overload offer phase 1 starts from.
+          - { name: before-512k-1000ms-240p, target: base, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: any, steps: "", settings: "VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          - { name: before-512k-1000ms-720p, target: base, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: any, steps: "", settings: "VIDEO_KBPS=1500 FPS=30 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          - { name: before-512k-500ms-240p, target: base, relaynet: "delay 250ms 10ms rate 512kbit loss 1%", recvnet: "delay 250ms 10ms", at: -1, for: 0, expect: any, steps: "", settings: "VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          - { name: before-512k-500ms-1080p, target: base, relaynet: "delay 250ms 10ms rate 512kbit loss 1%", recvnet: "delay 250ms 10ms", at: -1, for: 0, expect: any, steps: "", settings: "VIDEO_KBPS=3800 FPS=30 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          - { name: before-4g-2mbit, target: base, relaynet: "delay 50ms 10ms rate 2mbit loss 0.5%", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: any, steps: "", settings: "VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          - { name: before-step-4m-512k-4m, target: base, relaynet: "delay 50ms 10ms rate 4mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: any, steps: "60=delay 50ms 10ms rate 512kbit|120=delay 50ms 10ms rate 4mbit", settings: "VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          # after: this branch with the adaptive sender (the browser client's real pacer, rate controller and ladder),
+          # starting from an overload offer where the profile says so
+          - { name: after-512k-1000ms-from720p, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=720" }
+          - { name: after-512k-1000ms-from1080p, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=1080" }
+          - { name: after-512k-500ms-from720p, target: head, relaynet: "delay 250ms 10ms rate 512kbit loss 1%", recvnet: "delay 250ms 10ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=720" }
+          - { name: after-512k-500ms-from1080p, target: head, relaynet: "delay 250ms 10ms rate 512kbit loss 1%", recvnet: "delay 250ms 10ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=1080" }
+          - { name: after-512k-500ms-from720p-nosvc, target: head, relaynet: "delay 250ms 10ms rate 512kbit loss 1%", recvnet: "delay 250ms 10ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=720 SVC=0" }
+          - { name: after-4g-2mbit, target: head, relaynet: "delay 50ms 10ms rate 2mbit loss 0.5%", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240" }
+          - { name: after-8mbit-40ms, target: head, relaynet: "delay 20ms 5ms rate 8mbit", recvnet: "delay 20ms 5ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240" }
+          - { name: after-step-4m-512k-4m, target: head, relaynet: "delay 50ms 10ms rate 4mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: survive, steps: "60=delay 50ms 10ms rate 512kbit|120=delay 50ms 10ms rate 4mbit", settings: "ADAPTIVE=1 START_HEIGHT=240" }
+          - { name: after-4g-outage-2s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 2, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240" }
+          - { name: after-4g-outage-10s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 10, expect: any, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240" }
+          - { name: after-4g-auth-blip, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 AUTH_FAIL_AT_S=60 AUTH_FAIL_FOR_S=8" }
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -80,13 +85,16 @@ jobs:
         run: |
           set -euo pipefail
           project="$PWD/src/Libraries/Bolt/Bolt.Server/Bolt.Server.csproj"
+          adaptive=true
           if [ "$TARGET" = base ]; then
-            # The same harness, compiled against the base branch's relay.
+            # The same harness, compiled against the base branch's relay. The adaptive sender needs this
+            # branch's Bolt.Media (and with it this branch's protocol), so the base uses the constant one.
             git worktree add "$RUNNER_TEMP/base" "${BASE_SHA:-origin/develop}"
             project="$RUNNER_TEMP/base/src/Libraries/Bolt/Bolt.Server/Bolt.Server.csproj"
+            adaptive=false
           fi
           dotnet publish src/Tests/Bolt.CallResilience.Harness/Bolt.CallResilience.Harness.csproj \
-            --configuration Release --output "$RUNNER_TEMP/harness" "-p:BoltServerProject=$project"
+            --configuration Release --output "$RUNNER_TEMP/harness" "-p:BoltServerProject=$project" "-p:HarnessAdaptive=$adaptive"
           docker build --tag bolt-call-harness --file src/Tests/Bolt.CallResilience.Harness/Dockerfile "$RUNNER_TEMP/harness"
 
       - name: Run call
@@ -99,6 +107,7 @@ jobs:
           OUTAGE_FOR: ${{ matrix.for }}
           EXPECT: ${{ matrix.expect }}
           RUN_SETTINGS: ${{ matrix.settings }}
+          NETEM_STEPS: ${{ matrix.steps }}
           RUN_SECONDS: ${{ github.event.inputs.seconds || '180' }}
           LOG_DIR: ${{ runner.temp }}/logs
         run: |

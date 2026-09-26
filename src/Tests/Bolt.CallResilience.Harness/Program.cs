@@ -4,6 +4,8 @@
 //             publishes Opus-sized audio and fragmented video exactly as the browser client does
 //             (clear MediaFrame headers, opaque payloads standing in for SFrame ciphertext), and
 //             a policy that authorizes both participants (optionally failing for a window).
+//             ADAPTIVE=1 makes that sender the browser client's real send path (pacer, rate
+//             controller, picture ladder) over a synthetic encoder; see AdaptiveSender.cs.
 //   receiver  A participant on the far side of a tc-netem shaped link. It measures one-way delay
 //             (both containers share the host clock), audio continuity and decodable video.
 //
@@ -47,14 +49,16 @@ internal static class Env
 /// <summary>
 /// Payload the harness puts where SFrame ciphertext would be. The relay never reads it.
 /// [0..8) send time (unix ms), [8] kind (0 audio, 1 video), [9] keyframe, [10..14) picture id,
-/// [14..16) fragment index, [16..18) fragment count.
+/// [14..16) fragment index, [16..18) fragment count, [18] temporal layer, [19..23) the picture this one
+/// refers to (uint.MaxValue for a keyframe), so the receiver can tell exactly which pictures decode.
 /// </summary>
 internal static class Payload
 {
-    public const int HeaderSize = 18;
+    public const int HeaderSize = 23;
     public const byte Audio = 0, Video = 1;
 
-    public static byte[] Create(int size, byte kind, bool keyframe = false, uint picture = 0, int index = 0, int count = 1)
+    public static byte[] Create(int size, byte kind, bool keyframe = false, uint picture = 0, int index = 0, int count = 1,
+        int layer = 0, uint? reference = null)
     {
         var payload = new byte[Math.Max(HeaderSize, size)];
         BinaryPrimitives.WriteInt64LittleEndian(payload, Env.NowMs());
@@ -63,6 +67,8 @@ internal static class Payload
         BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(10), picture);
         BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(14), (ushort)index);
         BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(16), (ushort)count);
+        payload[18] = (byte)layer;
+        BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(19), keyframe ? uint.MaxValue : reference ?? picture - 1);
         return payload;
     }
 }
@@ -165,7 +171,25 @@ internal static class Relay
             KeyframeOnDemand: Env.Int("KF_ON_DEMAND", 1) == 1);
         Env.Log($"RELAY start {JsonSerializer.Serialize(profile)} deadlineMs={options.SendEnqueueTimeoutMs} stallApplied={stallApplied} seconds={seconds}");
 
+#if HARNESS_ADAPTIVE
+        var adaptive = Env.Int("ADAPTIVE", 0) == 1;
+        var adaptiveProfile = new AdaptiveProfile(
+            StartHeight: Env.Int("START_HEIGHT", 240),
+            AudioKbps: Env.Int("AUDIO_KBPS", 32),
+            KeyframeRatio: Env.Int("KF_RATIO", 6),
+            KeyframeIntervalMs: Env.Int("KF_MS", 10_000),
+            TemporalLayers: Env.Int("SVC", 1) == 1,
+            Overshoot: Env.Int("OVERSHOOT_PCT", 100) / 100.0);
+        await using var adaptiveSender = adaptive ? new AdaptiveSender(clock) : null;
+        if (adaptive) Env.Log($"RELAY adaptive {JsonSerializer.Serialize(adaptiveProfile)}");
+#else
+        const bool adaptive = false;
+#endif
         await using var sender = new Sender(clock);
+#if HARNESS_ADAPTIVE
+        if (adaptiveSender is not null) await adaptiveSender.ConnectAsync(new Uri("ws://127.0.0.1:8080/ws?id=sender"));
+        else
+#endif
         await sender.ConnectAsync(new Uri("ws://127.0.0.1:8080/ws?id=sender"));
         if (!await JoinAsync(server, call, "sender", TimeSpan.FromSeconds(10)) ||
             !await JoinAsync(server, call, "receiver", TimeSpan.FromSeconds(120)))
@@ -175,26 +199,60 @@ internal static class Relay
         }
         Env.Log($"RELAY joined t={T()} unsentLimited={unsentLimited}");
         clock.Restart();
+#if HARNESS_ADAPTIVE
+        if (adaptiveSender is not null) adaptiveSender.Start(call, adaptiveProfile);
+        else
+#endif
         sender.Start(call, profile);
+
+        long AudioSent() =>
+#if HARNESS_ADAPTIVE
+            adaptiveSender?.AudioSent ??
+#endif
+            sender.AudioSent;
+        long VideoSent() =>
+#if HARNESS_ADAPTIVE
+            adaptiveSender?.VideoSent ??
+#endif
+            sender.VideoSent;
+        long Keyframes() =>
+#if HARNESS_ADAPTIVE
+            adaptiveSender?.Keyframes ??
+#endif
+            sender.Keyframes;
+        long KeyRequests() =>
+#if HARNESS_ADAPTIVE
+            adaptiveSender?.KeyRequests ??
+#endif
+            sender.KeyRequests;
 
         while (clock.Elapsed.TotalSeconds < seconds)
         {
             await Task.Delay(1000);
-            Env.Log($"RELAY t={T():F0} sentAudio={sender.AudioSent} sentVideo={sender.VideoSent} keyframes={sender.Keyframes} " +
-                    $"keyRequests={sender.KeyRequests} {string.Join(' ', counters.OrderBy(x => x.Key).Select(x => $"{x.Key}={x.Value}"))}");
+            Env.Log($"RELAY t={T():F0} sentAudio={AudioSent()} sentVideo={VideoSent()} keyframes={Keyframes()} " +
+                    $"keyRequests={KeyRequests()} {string.Join(' ', counters.OrderBy(x => x.Key).Select(x => $"{x.Key}={x.Value}"))}");
         }
 
+        object? rate = null;
+#if HARNESS_ADAPTIVE
+        rate = adaptiveSender?.Report(seconds);
+#endif
         Env.Log("SUMMARY " + JsonSerializer.Serialize(new
         {
             side = "relay",
             outcome = outcome ?? "survived",
             seconds,
-            audioSent = sender.AudioSent,
-            videoPicturesSent = sender.VideoSent,
-            keyframesSent = sender.Keyframes,
-            keyframeRequestsReceived = sender.KeyRequests,
+            adaptive,
+            audioSent = AudioSent(),
+            videoPicturesSent = VideoSent(),
+            keyframesSent = Keyframes(),
+            keyframeRequestsReceived = KeyRequests(),
+            rate,
             counters
         }));
+#if HARNESS_ADAPTIVE
+        if (adaptiveSender is not null) await adaptiveSender.DisposeAsync();
+#endif
         await sender.DisposeAsync();
         // Close the calls with a handshake and give the close frames time to cross the shaped link;
         // a container that just exits takes its queued packets (and the receiver's FIN) with it.
@@ -340,7 +398,8 @@ internal sealed class Sender(Stopwatch clock) : IAsyncDisposable
                 var timestamp = (uint)(now * 90);
                 for (var index = 0; index < count; index++)
                 {
-                    var payload = Payload.Create(Math.Min(FragmentPayload, size - index * FragmentPayload), Payload.Video, isKey, picture, index, count);
+                    var payload = Payload.Create(Math.Min(FragmentPayload, size - index * FragmentPayload), Payload.Video, isKey, picture, index, count,
+                        layer: 0, reference: picture - 1);
                     var sequence = ++_videoSequence;
                     var flags = (byte)(0x10 | (isKey && index == 0 ? 0x01 : 0));
                     await SendAsync(Frames.Write(w => BoltCodec.WriteMediaFrame(w, _video, sequence, timestamp, flags, payload)));
@@ -388,8 +447,38 @@ internal static class Receiver
         long? firstAudioSequence = null, lastAudioSequence = null, lastAudioArrival = null, firstMediaAt = null;
         long audioReceived = 0, longestAudioGap = 0, silentSeconds = 0, frozenSeconds = 0;
         long picturesComplete = 0, picturesDecodable = 0, keyframes = 0;
+        var layerPictures = new long[4];
         var pending = new Dictionary<uint, int>();
+        // Pictures a decoder showed, so a later picture can be checked against the one it refers to.
+        var decodable = new HashSet<uint>();
+        var decodableOrder = new Queue<uint>();
         uint? lastDecodable = null;
+#if HARNESS_ADAPTIVE
+        // Like the browser client's receive side: a delay report per stream every 250 ms, back to the sender.
+        var feedback = new ConcurrentDictionary<Guid, ReceiverFeedback>();
+        var sendLock = new SemaphoreSlim(1, 1);
+        using var feedbackStop = new CancellationTokenSource();
+        var feedbackLoop = Task.Run(async () =>
+        {
+            try
+            {
+                while (!feedbackStop.IsCancellationRequested)
+                {
+                    await Task.Delay(250, feedbackStop.Token);
+                    foreach (var stream in feedback.Values)
+                    {
+                        byte[]? report;
+                        lock (stream) report = stream.Build(Environment.TickCount64);
+                        if (report is null) continue;
+                        await sendLock.WaitAsync(feedbackStop.Token);
+                        try { await socket.SendAsync(report, WebSocketMessageType.Binary, true, feedbackStop.Token); }
+                        finally { sendLock.Release(); }
+                    }
+                }
+            }
+            catch { /* The call ended. */ }
+        });
+#endif
         var end = "socket closed";
         var buffer = new byte[128 * 1024];
         var lastTick = 0L;
@@ -407,6 +496,11 @@ internal static class Receiver
                     if (frame[0] != (byte)FrameType.MediaFrame || !BoltCodec.TryReadMediaFrame(frame, out var header)) continue;
                     var payload = header.GetPayload(frame);
                     if (payload.Length < Payload.HeaderSize) continue;
+#if HARNESS_ADAPTIVE
+                    var isAudioStream = payload[8] == Payload.Audio;
+                    var tracker = feedback.GetOrAdd(header.StreamId, id => new ReceiverFeedback(id, isAudioStream));
+                    lock (tracker) tracker.Observe(header.SequenceNumber, header.Timestamp, frame.Length, Environment.TickCount64);
+#endif
                     firstMediaAt ??= clock.ElapsedMilliseconds;
                     var delay = now - BinaryPrimitives.ReadInt64LittleEndian(payload);
                     window.Bytes += frame.Length;
@@ -431,8 +525,16 @@ internal static class Receiver
                     picturesComplete++;
                     var isKey = payload[9] == 1;
                     if (isKey) keyframes++;
-                    // Without temporal layers a delta needs the picture right before it.
-                    if (isKey || lastDecodable == picture - 1) { lastDecodable = picture; picturesDecodable++; window.Decodable++; }
+                    // A picture decodes if it is a keyframe or the picture it refers to decoded. Without temporal
+                    // layers that is the one right before it; with them, the last lower-layer picture.
+                    var reference = BinaryPrimitives.ReadUInt32LittleEndian(payload[19..]);
+                    if (isKey || decodable.Contains(reference))
+                    {
+                        lastDecodable = picture; picturesDecodable++; window.Decodable++;
+                        layerPictures[Math.Min(3, (int)payload[18])]++;
+                        decodable.Add(picture); decodableOrder.Enqueue(picture);
+                        if (decodableOrder.Count > 4096) decodable.Remove(decodableOrder.Dequeue());
+                    }
                 }
 
                 var second = clock.ElapsedMilliseconds / 1000;
@@ -452,6 +554,10 @@ internal static class Receiver
             }
         }
         catch (Exception error) { end = $"{error.GetType().Name}: {error.Message}"; }
+#if HARNESS_ADAPTIVE
+        feedbackStop.Cancel();
+        await feedbackLoop;
+#endif
 
         var span = firstAudioSequence is { } first && lastAudioSequence is { } last ? last - first + 1 : 0;
         Env.Log("SUMMARY " + JsonSerializer.Serialize(new
@@ -467,6 +573,7 @@ internal static class Receiver
             videoDelayMsP50 = Percentile(videoDelays, .5),
             picturesComplete,
             picturesDecodable,
+            decodableByLayer = layerPictures,
             keyframes,
             frozenSeconds
         }));
