@@ -257,12 +257,13 @@ public sealed class VideoCallTests
     }
 
     [Test]
-    public void DefaultStartsAt1080p30_AndPreferenceCapsUpscaling()
+    public void DefaultStartsAt240p15_AndClimbsNoHigherThanThePreference()
     {
+        // A call starts inside a 512 kbps mobile budget; the preference is only a ceiling.
         var adaptation = new VideoAdaptation(new MediaServiceOptions().VideoStartTier);
         adaptation.SetCeiling(1080);
-        Assert.That(adaptation.Current, Is.EqualTo(new VideoTier(1920, 1080, 30, 3800)));
-        for (var i = 0; i < 30; i++) adaptation.Observe(Good(50000));
+        Assert.That(adaptation.Current, Is.EqualTo(new VideoTier(426, 240, 15, 180)));
+        for (var i = 0; i < 100; i++) adaptation.Observe(Good(50000));
         Assert.That(adaptation.Current!.Value.Height, Is.EqualTo(1080));
     }
 

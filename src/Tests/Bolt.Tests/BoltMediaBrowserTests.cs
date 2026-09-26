@@ -62,13 +62,18 @@ public class BoltMediaBrowserTests
     {
         var options = new MediaServiceOptions();
 
-        options.AudioBitrateKbps.Should().Be(128);
+        // Mobile-safe start: Opus voice at 32 kbps with FEC and DTX, video from 240p15 upwards.
+        options.AudioBitrateKbps.Should().Be(32);
+        options.AudioInbandFec.Should().BeTrue();
+        options.AudioDtx.Should().BeTrue();
+        options.AudioPacketLossPercent.Should().BeInRange(1, 20);
         options.AudioSampleRate.Should().Be(48_000);
         options.AudioChannels.Should().Be(1);
         options.VideoMaxHeight.Should().Be(2160);
-        VideoAdaptation.Ladder[options.VideoStartTier].Height.Should().Be(1080);
-        VideoAdaptation.Ladder[options.VideoStartTier].Framerate.Should().Be(30);
-        options.KeyframeIntervalSeconds.Should().Be(2);
+        VideoAdaptation.Ladder[options.VideoStartTier].Height.Should().Be(240);
+        VideoAdaptation.Ladder[options.VideoStartTier].Framerate.Should().Be(15);
+        // Keyframes are on demand; the periodic one is only a safety net.
+        options.KeyframeIntervalSeconds.Should().Be(10);
         options.EnableEncryption.Should().BeTrue();
         options.EnableFec.Should().BeTrue();
         options.FecAudioGroupSize.Should().Be(4);

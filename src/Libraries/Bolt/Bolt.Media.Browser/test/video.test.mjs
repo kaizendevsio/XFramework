@@ -350,7 +350,7 @@ test('a tier change reconfigures the encoder and forces a fresh keyframe', async
     assert.equal(await f.p.applyTier(640, 360, 400, 20), true);
     assert.equal(f.p.encoder.config.height, 360);
     assert.equal(f.p.encoder.config.bitrate, 400000);
-    assert.equal(f.p.pendingKeyframe, true, 'the far side cannot decode a new size against an old reference');
+    assert.equal(f.p.forceKeyframe, true, 'the far side cannot decode a new size against an old reference');
 });
 
 test('stats report the measured frame rate and the encoder backlog', async () => {

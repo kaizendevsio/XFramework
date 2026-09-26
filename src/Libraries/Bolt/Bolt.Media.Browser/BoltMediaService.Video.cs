@@ -73,9 +73,13 @@ public sealed partial class BoltMediaService
         if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame && !IsSFrameReady)
             throw new InvalidOperationException("The call's encryption keys are not active yet.");
 
-        var requestedHeight = preferredHeight ?? VideoAdaptation.Ladder[Math.Clamp(_options.VideoStartTier, 0, VideoAdaptation.Ladder.Length - 1)].Height;
-        var adaptation = _adaptation ??= new VideoAdaptation(VideoAdaptation.IndexForHeight(requestedHeight), preferredFramerate);
-        _videoDeviceCeiling = Math.Min(requestedHeight, Math.Min(ceilingHeight, _options.VideoMaxHeight));
+        // Every call starts on a mobile-safe rung and climbs on measured headroom. The user's
+        // preference is how high it may climb, never where it starts: starting at 1080p on a
+        // 512 kbps link filled the relay's queue within a second.
+        var startHeight = VideoAdaptation.Ladder[Math.Clamp(_options.VideoStartTier, 0, VideoAdaptation.Ladder.Length - 1)].Height;
+        _videoDeviceCeiling = Math.Min(preferredHeight ?? _options.VideoMaxHeight, Math.Min(ceilingHeight, _options.VideoMaxHeight));
+        var adaptation = _adaptation ??= new VideoAdaptation(
+            VideoAdaptation.IndexForHeight(Math.Min(startHeight, _videoDeviceCeiling)), preferredFramerate);
         adaptation.SetCeiling(_videoDeviceCeiling);
         var tier = adaptation.Current ?? VideoAdaptation.Ladder[0];
         if (_videoCodec != codec || !_video.IsCapturing)

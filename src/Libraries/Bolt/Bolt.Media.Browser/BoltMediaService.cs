@@ -71,7 +71,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
     /// and resume browser audio. Encoding waits until an answered call has a stream.</summary>
     public async Task PrepareVoiceAsync()
     {
-        await _audio.InitializeAsync(_options.AudioSampleRate, _options.AudioChannels, _options.AudioBitrateKbps);
+        await _audio.InitializeAsync(_options.AudioSampleRate, _options.AudioChannels, _options.AudioBitrateKbps, OpusSettings);
         await _audio.StartCaptureAsync(_options.AudioSampleRate, _options.AudioChannels, transmit: false);
     }
 
@@ -113,7 +113,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
             throw new InvalidOperationException("Authenticated transport media requires a WSS endpoint.");
 
         // Initialize audio pipeline
-        await _audio.InitializeAsync(_options.AudioSampleRate, _options.AudioChannels, _options.AudioBitrateKbps);
+        await _audio.InitializeAsync(_options.AudioSampleRate, _options.AudioChannels, _options.AudioBitrateKbps, OpusSettings);
 
         // Create media client and wire events
         _mediaClient = new BoltMediaClient(client, _logger);
@@ -144,6 +144,9 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         _initialized = true;
         _logger.LogInformation("BoltMediaService initialized");
     }
+
+    private OpusEncoderSettings OpusSettings =>
+        new(_options.AudioInbandFec, _options.AudioPacketLossPercent, _options.AudioDtx);
 
     // ── Call API ──
 

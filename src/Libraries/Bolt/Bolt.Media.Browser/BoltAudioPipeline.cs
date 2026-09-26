@@ -2,6 +2,15 @@ namespace Bolt.Media.Browser;
 
 public sealed record VoiceCapabilities(bool Supported, string? Reason, bool NativeCodecs = false);
 
+/// <summary>Opus encoder tuning, applied where the encoder supports it and ignored otherwise.</summary>
+/// <param name="InbandFec">Opus in-band forward error correction.</param>
+/// <param name="PacketLossPercent">Loss the FEC is tuned for, 0-100.</param>
+/// <param name="Dtx">Discontinuous transmission during silence.</param>
+public sealed record OpusEncoderSettings(bool InbandFec, int PacketLossPercent, bool Dtx)
+{
+    public static readonly OpusEncoderSettings Default = new(false, 0, false);
+}
+
 /// <summary>
 /// Audio capture → WebCodecs encode → C# callback, and C# → WebCodecs decode → AudioContext playback.
 /// Bridges browser audio APIs to <see cref="BoltMediaStream"/>.
@@ -42,7 +51,11 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
     }
 
     /// <summary>Load JS module, initialize Opus encoder and decoder.</summary>
-    public async Task InitializeAsync(int sampleRate = 48_000, int channels = 1, int bitrateKbps = 128)
+    public Task InitializeAsync(int sampleRate = 48_000, int channels = 1, int bitrateKbps = 128) =>
+        InitializeAsync(sampleRate, channels, bitrateKbps, OpusEncoderSettings.Default);
+
+    /// <summary>Load JS module, initialize Opus encoder (with FEC/DTX where supported) and decoder.</summary>
+    public async Task InitializeAsync(int sampleRate, int channels, int bitrateKbps, OpusEncoderSettings opus)
     {
         if (_pipeline is not null) return;
         _module ??= await _js.InvokeAsync<IJSObjectReference>(
@@ -57,14 +70,14 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
             if (!capabilities.Supported) throw new NotSupportedException(capabilities.Reason);
             if (capabilities.NativeCodecs)
             {
-                await _pipeline.InvokeVoidAsync("initEncoder", sampleRate, channels, bitrateKbps);
+                await _pipeline.InvokeVoidAsync("initEncoder", sampleRate, channels, bitrateKbps, opus);
                 await _pipeline.InvokeVoidAsync("initDecoder", sampleRate, channels);
             }
             else
             {
                 if (sampleRate != 48_000 || channels != 1)
                     throw new NotSupportedException("Managed voice requires 48 kHz mono audio.");
-                _managedCodec = new ManagedOpusCodec(bitrateKbps);
+                _managedCodec = new ManagedOpusCodec(bitrateKbps, opus);
                 await _pipeline.InvokeVoidAsync("initManaged");
             }
         }

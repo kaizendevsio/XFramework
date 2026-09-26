@@ -88,14 +88,14 @@ class AudioPipeline {
         return await this.getAudioOutputs();
     }
 
-    async initEncoder(sampleRate, channels, bitrate) {
+    async initEncoder(sampleRate, channels, bitrate, opus = null) {
         if (sampleRate !== 48000 || channels !== 1)
             throw new Error('Bolt browser voice currently requires 48 kHz mono audio.');
         if (typeof AudioEncoder === 'undefined' || typeof AudioDecoder === 'undefined')
             throw new Error('This browser does not support the audio codecs required for Bolt voice calls.');
-        const config = { codec: 'opus', sampleRate, numberOfChannels: channels, bitrate: bitrate * 1000 };
-        if (!(await AudioEncoder.isConfigSupported(config)).supported)
-            throw new Error('Opus audio encoding is unavailable in this browser.');
+        const config = await opusEncoderConfig(sampleRate, channels, bitrate, opus);
+        if (!config) throw new Error('Opus audio encoding is unavailable in this browser.');
+        this.encoderConfig = config;
         this.encoder?.close();
         this.encoder = new AudioEncoder({
             output: chunk => {
@@ -261,8 +261,9 @@ class AudioPipeline {
     }
 
     reconfigureBitrate(sampleRate, channels, bitrate) {
+        // Keep the FEC/DTX tuning the encoder was accepted with; only the rate changes.
         if (this.encoder?.state === 'configured')
-            this.encoder.configure({ codec: 'opus', sampleRate, numberOfChannels: channels, bitrate: bitrate * 1000 });
+            this.encoder.configure({ ...(this.encoderConfig ?? { codec: 'opus' }), sampleRate, numberOfChannels: channels, bitrate: bitrate * 1000 });
     }
 
     _playAudioData(data, streamId = 'default', receiver = this.receiver(streamId)) {
@@ -334,6 +335,24 @@ export function h264BitstreamCodec(data) {
     }
     return null;
 }
+
+/// Opus with in-band FEC and DTX where the browser accepts them, plain Opus otherwise. The tuning
+/// is an optimisation: a browser that rejects the opus dictionary still gets a working encoder.
+async function opusEncoderConfig(sampleRate, channels, bitrateKbps, opus) {
+    const base = { codec: 'opus', sampleRate, numberOfChannels: channels, bitrate: bitrateKbps * 1000 };
+    const tuning = opus && (opus.inbandFec || opus.dtx) ? {
+        useinbandfec: !!opus.inbandFec, usedtx: !!opus.dtx,
+        packetlossperc: Math.max(0, Math.min(100, Math.round(opus.packetLossPercent ?? 0)))
+    } : null;
+    for (const candidate of tuning ? [{ ...base, opus: tuning }, base] : [base]) {
+        try { if ((await AudioEncoder.isConfigSupported(candidate))?.supported) return candidate; }
+        catch { /* A throw is a refusal of this candidate; try the plainer one. */ }
+    }
+    return null;
+}
+
+/// Fastest a remote request can make this sender emit another keyframe.
+const KEYFRAME_REQUEST_GAP_MS = 1000;
 
 function encoderConfig(codec, width, height, bitrateKbps, framerate, hardware) {
     const config = {
@@ -447,10 +466,13 @@ class VideoPipeline {
         this.remotes = new Map();
         this.config = null;
         this.codec = 'h264';
-        this.keyframeIntervalMs = 2000;
+        this.keyframeIntervalMs = 10000;
         this.lastKeyframe = 0;
         this.frameId = 0;
-        this.pendingKeyframe = true;
+        // forceKeyframe: the encoder was (re)configured and cannot continue without one.
+        // pendingKeyframe: someone asked (new receiver, decoder reset, relay drop); coalesced.
+        this.forceKeyframe = true;
+        this.pendingKeyframe = false;
         this.window = { since: 0, frames: 0, bytes: 0 };
         this.stats = { fps: 0, kbps: 0, dropped: 0, backlog: 0 };
         this.facingMode = 'user';
@@ -483,7 +505,7 @@ class VideoPipeline {
 
     async initEncoder(codec, width, height, bitrateKbps, framerate, keyframeSeconds) {
         this.codec = codec || 'h264';
-        this.keyframeIntervalMs = Math.max(500, (keyframeSeconds || 2) * 1000);
+        this.keyframeIntervalMs = Math.max(500, (keyframeSeconds || 10) * 1000);
         this.tier = { width, height, bitrateKbps, framerate };
         ({ width, height } = fitTierToSource(width, height, this.sourceWidth, this.sourceHeight));
         // 'prefer-hardware' is not a hint that degrades gracefully: on a machine with no hardware
@@ -499,7 +521,7 @@ class VideoPipeline {
         this._closeEncoder();
         this.config = config;
         // The published stream survives camera off/on; its frame IDs must too.
-        this.pendingKeyframe = true;
+        this.forceKeyframe = true;
         this.encoder = new VideoEncoder({
             output: (chunk) => this._onEncoded(chunk),
             error: (error) => {
@@ -570,7 +592,7 @@ class VideoPipeline {
         this.deviceId = settings.deviceId || wanted.deviceId || '';
         this.facingMode = settings.facingMode || wanted.facingMode || 'user';
         this.captureRunning = true;
-        this.pendingKeyframe = true;
+        this.forceKeyframe = true;
         this.window = { since: 0, frames: 0, bytes: 0 };
         this.lastCaptureTimestamp = null;
         this.nextCaptureTimestamp = null;
@@ -654,10 +676,7 @@ class VideoPipeline {
         const frame = this._elementFrame(video, timestamp);
         if (!frame) return;
         try {
-            const now = Date.now();
-            const keyFrame = this.pendingKeyframe || now - this.lastKeyframe >= this.keyframeIntervalMs;
-            if (keyFrame) { this.lastKeyframe = now; this.pendingKeyframe = false; }
-            this._encode(frame, keyFrame);
+            this._encode(frame, this._takeKeyframe(Date.now()));
         } finally { frame.close(); }
     }
 
@@ -711,12 +730,20 @@ class VideoPipeline {
                 if (!this._acceptCaptureTime(frame.timestamp)) continue;
                 frame = this._upright(frame);
                 this._noteSource(frame.displayWidth, frame.displayHeight);
-                const now = Date.now();
-                const keyFrame = this.pendingKeyframe || now - this.lastKeyframe >= this.keyframeIntervalMs;
-                if (keyFrame) { this.lastKeyframe = now; this.pendingKeyframe = false; }
-                this._encode(frame, keyFrame);
+                this._encode(frame, this._takeKeyframe(Date.now()));
             } finally { frame.close(); }
         }
+    }
+
+    /// Keyframes are sent when the encoder needs one, when someone asked for one, and otherwise only
+    /// on a long safety interval. Requests are coalesced to one per KEYFRAME_REQUEST_GAP_MS: each
+    /// keyframe is a burst several times a delta picture, and a congested receiver asking for one per
+    /// lost picture would otherwise feed the congestion that lost it.
+    _takeKeyframe(now) {
+        const due = this.forceKeyframe || now - this.lastKeyframe >= this.keyframeIntervalMs ||
+            (this.pendingKeyframe && now - this.lastKeyframe >= KEYFRAME_REQUEST_GAP_MS);
+        if (due) { this.lastKeyframe = now; this.forceKeyframe = this.pendingKeyframe = false; }
+        return due;
     }
 
     _encode(frame, keyFrame) {
@@ -838,7 +865,7 @@ class VideoPipeline {
             next.bitrate === this.config.bitrate && next.framerate === this.config.framerate) return false;
         this.config = next;
         this.encoder.configure(next);
-        this.pendingKeyframe = true;
+        this.forceKeyframe = true;
         return true;
     }
 
