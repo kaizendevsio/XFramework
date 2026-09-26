@@ -83,7 +83,7 @@ connection: a ticket, a socket, registration, then `/ready` to rejoin the relay'
 
 The receiver's summary lists each resume (`timeToResumeMs` from noticing the loss to being back),
 `audioBackAfterMs` / `videoBackAfterMs` (from the network returning, or the app unfreezing, to the
-first audio packet / decodable picture), and whether it gave up. The relay's summary says whether
+first live audio packet / decodable picture, one delivered within 2 s of being sent), and whether it gave up. The relay's summary says whether
 the other side's call survived and how long the seat was held. `summarize.py` prints a second table
 for these runs. Expectations in `run-profile.sh`: `resume`, `resume-retired` and `end-clean`.
 

@@ -54,7 +54,8 @@ def main(directory):
         "",
         "Resumable calls: the receiver loses its connection and resumes it with a fresh ticket. "
         "\"Other side\" is the sender's call; \"back after network\" is from the network returning "
-        "(or the app unfreezing) to the first audio packet / decodable picture.",
+        "(or the app unfreezing) to the first live audio packet / decodable picture (delivered within 2 s of being sent, "
+        "so the backlog of the gap does not count).",
         "",
         "| run | event | other side | receiver | resumes | loss noticed -> resumed | audio back after network | "
         "picture back after network | longest audio gap | seat held (relay) |",

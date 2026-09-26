@@ -219,7 +219,10 @@ internal static class ResumingReceiver
     /// <summary>What reached the phone: audio continuity and delay, and pictures a decoder could show.</summary>
     private sealed class Metrics
     {
-        private readonly List<long> audioDelays = [], audioArrivals = [], decodableArrivals = [];
+        /// <summary>Delivered within this long of being sent counts as live, not as backlog draining after a gap.</summary>
+        private const long FreshMs = 2_000;
+        private readonly List<long> audioDelays = [];
+        private readonly List<(long Arrival, long Sent)> audioArrivals = [], decodableArrivals = [];
         private readonly Dictionary<uint, int> pending = [];
         private uint? firstAudio, lastAudio, lastDecodable;
         private long? lastAudioArrival;
@@ -233,8 +236,9 @@ internal static class ResumingReceiver
             var now = Env.NowMs();
             if (payload[8] == Payload.Audio)
             {
-                audioDelays.Add(now - BinaryPrimitives.ReadInt64LittleEndian(payload));
-                audioArrivals.Add(now);
+                var sent = BinaryPrimitives.ReadInt64LittleEndian(payload);
+                audioDelays.Add(now - sent);
+                audioArrivals.Add((now, sent));
                 AudioReceived++;
                 firstAudio ??= header.SequenceNumber;
                 lastAudio = header.SequenceNumber;
@@ -249,7 +253,8 @@ internal static class ResumingReceiver
             foreach (var stale in pending.Keys.Where(x => x < picture).ToArray()) pending.Remove(stale);
             var isKey = payload[9] == 1;
             if (isKey) Keyframes++;
-            if (isKey || lastDecodable == picture - 1) { lastDecodable = picture; PicturesDecodable++; decodableArrivals.Add(now); }
+            if (isKey || lastDecodable == picture - 1)
+            { lastDecodable = picture; PicturesDecodable++; decodableArrivals.Add((now, BinaryPrimitives.ReadInt64LittleEndian(payload))); }
         }
 
         public double AudioDelivered => firstAudio is { } first && lastAudio is { } last && last >= first
@@ -260,8 +265,12 @@ internal static class ResumingReceiver
             long P(double q) => sorted.Length == 0 ? -1 : sorted[(int)Math.Min(sorted.Length - 1, Math.Floor(sorted.Length * q))];
             return new { p50 = P(.5), p90 = P(.9), p99 = P(.99), max = P(1) };
         }
-        public long? FirstAudioAfter(long? unixMs) => unixMs is { } t ? audioArrivals.Where(x => x >= t).Select(x => (long?)x).FirstOrDefault() : null;
-        public long? FirstPictureAfter(long? unixMs) => unixMs is { } t ? decodableArrivals.Where(x => x >= t).Select(x => (long?)x).FirstOrDefault() : null;
+        /// <summary>When live audio (not the backlog of the gap) was first heard again after <paramref name="unixMs"/>.</summary>
+        public long? FirstAudioAfter(long? unixMs) => FirstFresh(audioArrivals, unixMs);
+        public long? FirstPictureAfter(long? unixMs) => FirstFresh(decodableArrivals, unixMs);
+        private static long? FirstFresh(List<(long Arrival, long Sent)> arrivals, long? unixMs) => unixMs is { } t
+            ? arrivals.Where(x => x.Arrival >= t && x.Arrival - x.Sent <= FreshMs).Select(x => (long?)x.Arrival).FirstOrDefault()
+            : null;
     }
 
     /// <summary>The run's one disturbance: a netem outage (timed by run-profile.sh), an IP change, or an app stall.</summary>
