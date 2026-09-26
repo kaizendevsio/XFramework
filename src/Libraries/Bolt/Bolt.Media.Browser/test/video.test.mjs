@@ -163,9 +163,13 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
         }
     };
     if (capture === 'rvfc') sandbox.HTMLVideoElement = FakeVideoElement;
+    // A WebSocket as the page has one, so the transport meter can wrap its send().
+    sandbox.WebSocket = class { constructor() { this.readyState = 1; this.bufferedAmount = 0; this.sent = 0; } send() { this.sent++; } };
     sandbox.globalThis = sandbox;
     vm.createContext(sandbox);
     vm.runInContext(source + `
+this.meter = socketBufferedAmount;
+this.temporalModeFor = temporalModeFor;
 this.pipeline = createVideoPipeline();
 this.probe = probeVideoCodecs;
 this.ceiling = videoDeviceCeiling;
@@ -350,7 +354,7 @@ test('a tier change reconfigures the encoder and forces a fresh keyframe', async
     assert.equal(await f.p.applyTier(640, 360, 400, 20), true);
     assert.equal(f.p.encoder.config.height, 360);
     assert.equal(f.p.encoder.config.bitrate, 400000);
-    assert.equal(f.p.pendingKeyframe, true, 'the far side cannot decode a new size against an old reference');
+    assert.equal(f.p.forceKeyframe, true, 'the far side cannot decode a new size against an old reference');
 });
 
 test('stats report the measured frame rate and the encoder backlog', async () => {
@@ -946,4 +950,104 @@ for (const rejected of ['configure', 'error']) test(`hardware decoder ${rejected
     assert.equal(remote.decoder.config.hardwareAcceleration, 'no-preference');
     assert.equal(remote.hardwareFailed, true);
     assert.equal(f.p.decodeFrame('s', new Uint8Array([1]), 1, true), true);
+});
+
+test('keyframes are sent on demand, coalesced to one a second, with a long safety interval', async () => {
+    const f = fixture();
+    await f.p.initEncoder('h264', tier.width, tier.height, tier.bitrate, tier.framerate, 10);
+    const p = f.p;
+    assert.equal(p._takeKeyframe(1_000), true, 'a fresh encoder starts on a keyframe');
+    assert.equal(p._takeKeyframe(1_033), false);
+    p.requestKeyframe(); p.requestKeyframe(); p.requestKeyframe();
+    assert.equal(p._takeKeyframe(1_066), false, 'a request right after a keyframe waits instead of bursting again');
+    assert.equal(p._takeKeyframe(2_000), true, 'three requests are served by one keyframe');
+    assert.equal(p._takeKeyframe(2_033), false);
+    assert.equal(p._takeKeyframe(11_999), false, 'no unrequested keyframe before the safety interval');
+    assert.equal(p._takeKeyframe(12_000), true);
+    await p.applyTier(640, 360, 400, 20);
+    assert.equal(p._takeKeyframe(12_010), true, 'a reconfigured encoder cannot wait for the rate limit');
+});
+
+// ── Phase 1: temporal layers, bitrate-only changes, forced keyframes, the transport meter ──
+
+test('temporal layers are asked for where the encoder accepts them, by frame rate', async () => {
+    const f = fixture();
+    await f.p.initEncoder('vp9', 1280, 720, 1500, 30, 10, true);
+    assert.equal(f.p.config.scalabilityMode, 'L1T3', 'L1T3 at 30 fps: the relay can shed half the pictures');
+    await f.p.applyTier(640, 360, 400, 15);
+    assert.equal(f.p.encoder.config.scalabilityMode, 'L1T2', 'L1T2 at 15 fps keeps a 7.5 fps base layer');
+    await f.p.applyTier(320, 180, 100, 10);
+    assert.equal(f.p.encoder.config.scalabilityMode, 'L1T1', 'no layers below 12 fps');
+    assert.equal(f.sandbox.temporalModeFor(30, new Set(['L1T2'])), 'L1T2', 'L1T2 where L1T3 is refused');
+});
+
+test('an encoder that refuses scalability modes (WebKit) keeps plain L1T1 and never claims a layer', async () => {
+    const f = fixture({ support: config => !config.scalabilityMode || config.scalabilityMode === 'L1T1' });
+    await f.p.initEncoder('h264', 1280, 720, 1500, 30, 10, true);
+    assert.equal(f.p.config.scalabilityMode, 'L1T1');
+    await f.p.startCapture(f.host, {});
+    f.p._onEncoded({ byteLength: 8, type: 'delta', timestamp: 1, copyTo(t) { t.fill(1); } }, { svc: { temporalLayerId: 2 } });
+    const sent = f.stats.invoked.filter(x => x[0] === 'OnVideoEncoded').at(-1);
+    assert.equal(sent[5], 0, 'without layers configured, metadata is ignored');
+});
+
+test('temporal layers off never probes them', async () => {
+    let probed = 0;
+    const f = fixture({ support: config => { if (config.scalabilityMode !== 'L1T1') probed++; return true; } });
+    await f.p.initEncoder('av1', 1280, 720, 1500, 30, 10, false);
+    assert.equal(f.p.config.scalabilityMode, 'L1T1');
+    assert.equal(probed, 0);
+});
+
+test('layer ids come from the encoder metadata, and a keyframe is always the base layer', async () => {
+    const f = fixture();
+    await f.p.initEncoder('vp9', 1280, 720, 1500, 30, 10, true);
+    await f.p.startCapture(f.host, {});
+    const chunk = type => ({ byteLength: 8, type, timestamp: 1, copyTo(t) { t.fill(1); } });
+    f.p._onEncoded(chunk('key'), { svc: { temporalLayerId: 2 } });
+    f.p._onEncoded(chunk('delta'), { svc: { temporalLayerId: 2 } });
+    f.p._onEncoded(chunk('delta'), { svc: { temporalLayerId: 1 } });
+    f.p._onEncoded(chunk('delta'), {});
+    const layers = f.stats.invoked.filter(x => x[0] === 'OnVideoEncoded').map(x => x[5]);
+    assert.deepEqual(layers, [0, 2, 1, 0], 'no metadata is the safe answer: base layer, never dropped as enhancement');
+});
+
+test('a bitrate change reconfigures the encoder without a keyframe and without touching the camera', async () => {
+    const f = fixture();
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    let constraints = 0;
+    f.track.applyConstraints = async () => { constraints++; };
+    f.p._takeKeyframe(1_000);
+    assert.equal(await f.p.applyTier(1280, 720, 1100, 30), true);
+    assert.equal(f.p.encoder.config.bitrate, 1_100_000);
+    assert.equal(f.p.forceKeyframe, false, 'the references still fit: a keyframe would only be a burst');
+    assert.equal(constraints, 0, 'the camera is not renegotiated for a bitrate');
+    assert.equal(await f.p.applyTier(640, 360, 400, 20), true);
+    assert.equal(f.p.forceKeyframe, true);
+    assert.equal(constraints, 1);
+});
+
+test('a forced keyframe request skips the one-a-second coalescing', async () => {
+    const f = fixture();
+    await f.p.initEncoder('h264', tier.width, tier.height, tier.bitrate, tier.framerate, 10);
+    const p = f.p;
+    assert.equal(p._takeKeyframe(1_000), true);
+    p.requestKeyframe();
+    assert.equal(p._takeKeyframe(1_100), false);
+    p.requestKeyframe(true);
+    assert.equal(p._takeKeyframe(1_150), true, 'this sender dropped a base picture: every receiver is stalled');
+});
+
+test('the transport meter sums what open sockets still buffer and forgets closed ones', () => {
+    const f = fixture();
+    const WebSocket = f.sandbox.WebSocket;
+    const a = new WebSocket(), b = new WebSocket(), idle = new WebSocket();
+    idle.bufferedAmount = 5_000; // never sent through: not counted
+    a.send('x'); b.send('y');
+    assert.equal(a.sent, 1, 'the wrapped send still sends');
+    a.bufferedAmount = 1_000; b.bufferedAmount = 500;
+    assert.equal(f.sandbox.meter(), 1_500);
+    b.readyState = 3;
+    assert.equal(f.sandbox.meter(), 1_000);
 });

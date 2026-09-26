@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Bolt.Client;
+using Bolt.Media.Congestion;
 using Bolt.Protocol;
 using Microsoft.AspNetCore.Components;
 
@@ -41,6 +42,18 @@ public sealed partial class BoltMediaService : IAsyncDisposable
     private bool _initialized;
     private readonly HashSet<Guid> _configuredCalls = [];
 
+    // Send path: one pacer and one rate loop per call, shared by the audio and video streams.
+    private readonly SendPathSignals _signals = new();
+    private MediaSendPacer? _pacer;
+    private SendRateLoop? _rateLoop;
+    private CancellationTokenSource? _rateCts;
+    private Task _rateTask = Task.CompletedTask;
+    /// <summary>The rate controller of a transport lost to an outage, until the resumed transport starts its own from it.</summary>
+    private SendRateController? _resumeFrom;
+
+    /// <summary>The send estimate and its split, as the last rate-loop tick decided it.</summary>
+    public SendRateDecision? SendRate { get; private set; }
+
     // ── Events for Blazor UI ──
 
     /// <summary>Incoming call. UI should show accept/reject prompt.</summary>
@@ -71,7 +84,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
     /// and resume browser audio. Encoding waits until an answered call has a stream.</summary>
     public async Task PrepareVoiceAsync()
     {
-        await _audio.InitializeAsync(_options.AudioSampleRate, _options.AudioChannels, _options.AudioBitrateKbps);
+        await _audio.InitializeAsync(_options.AudioSampleRate, _options.AudioChannels, _options.AudioBitrateKbps, OpusSettings);
         await _audio.StartCaptureAsync(_options.AudioSampleRate, _options.AudioChannels, transmit: false);
     }
 
@@ -113,37 +126,60 @@ public sealed partial class BoltMediaService : IAsyncDisposable
             throw new InvalidOperationException("Authenticated transport media requires a WSS endpoint.");
 
         // Initialize audio pipeline
-        await _audio.InitializeAsync(_options.AudioSampleRate, _options.AudioChannels, _options.AudioBitrateKbps);
+        await _audio.InitializeAsync(_options.AudioSampleRate, _options.AudioChannels, _options.AudioBitrateKbps, OpusSettings);
 
-        // Create media client and wire events
-        _mediaClient = new BoltMediaClient(client, _logger);
-        if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame)
-        {
-            if (_sframe is null) throw new InvalidOperationException("SFrame browser services are not registered.");
-            _mediaClient.AuthenticatedStreamEncryptionFactory = _sframe.ForStream;
-        }
-
-        _mediaClient.OnIncomingCall += async info =>
-        {
-            if (OnIncomingCall is not null) await OnIncomingCall(info);
-        };
-        _mediaClient.OnCallAnswered += HandleCallAnsweredAsync;
-        _mediaClient.OnCallRejected += async (callId, reason) =>
-        {
-            await StopPipelinesAsync();
-            if (OnCallRejected is not null) await OnCallRejected(callId, reason);
-        };
-        _mediaClient.OnCallEnded += async callId =>
-        {
-            await StopPipelinesAsync();
-            if (OnCallEnded is not null) await OnCallEnded(callId);
-        };
-        _mediaClient.OnKeyframeRequested += streamId => { _ = _video.RequestKeyframeAsync(); };
-        _mediaClient.OnMediaStreamConfigured += stream => { RegisterRemoteVideo(stream); StartPlaybackLoop(stream); };
+        _mediaClient = CreateMediaClient(client);
 
         _initialized = true;
         _logger.LogInformation("BoltMediaService initialized");
     }
+
+    /// <summary>
+    /// Wrap <paramref name="client"/> and wire every event. Used for the first transport and again for
+    /// each resumed one (<see cref="AttachTransport"/>), so both are wired identically.
+    /// </summary>
+    private BoltMediaClient CreateMediaClient(BoltClient client)
+    {
+        var mediaClient = new BoltMediaClient(client, _logger)
+        {
+            // A hosted SFrame call outlives its socket: the host resumes it on a new connection and
+            // decides itself when the call is over. Tearing down keys and capture here would make
+            // every network blip a hang-up.
+            EndCallsOnDisconnect = _options.SecurityMode != MediaSecurityMode.AuthenticatedSFrame
+        };
+        if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame)
+        {
+            if (_sframe is null) throw new InvalidOperationException("SFrame browser services are not registered.");
+            mediaClient.AuthenticatedStreamEncryptionFactory = _sframe.ForStream;
+        }
+
+        mediaClient.OnIncomingCall += async info =>
+        {
+            if (OnIncomingCall is not null) await OnIncomingCall(info);
+        };
+        mediaClient.OnCallAnswered += HandleCallAnsweredAsync;
+        mediaClient.OnCallRejected += async (callId, reason) =>
+        {
+            await StopPipelinesAsync();
+            if (OnCallRejected is not null) await OnCallRejected(callId, reason);
+        };
+        mediaClient.OnCallEnded += async callId =>
+        {
+            await StopPipelinesAsync();
+            if (OnCallEnded is not null) await OnCallEnded(callId);
+        };
+        mediaClient.OnKeyframeRequested += streamId => { _ = _video.RequestKeyframeAsync(); };
+        mediaClient.OnMediaStreamConfigured += stream => { RegisterRemoteVideo(stream); StartPlaybackLoop(stream); };
+        mediaClient.OnCongestionReport += report =>
+            _signals.OnCongestionReport(report, report.StreamId == _activeVideoStreamId, Environment.TickCount64);
+        mediaClient.OnReceiverFeedback += feedback =>
+            _signals.OnReceiverFeedback(feedback, feedback.StreamId == _activeVideoStreamId, Environment.TickCount64);
+        mediaClient.OnHeartbeat += (_, stamp) => OnHeartbeatEcho?.Invoke(stamp);
+        return mediaClient;
+    }
+
+    private OpusEncoderSettings OpusSettings =>
+        new(_options.AudioInbandFec, _options.AudioPacketLossPercent, _options.AudioDtx);
 
     // ── Call API ──
 
@@ -225,10 +261,12 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame)
             audioStream.SetEncryption(_sframe!.ForStream(callId, _sframeLocalSenderId!));
         else if (_options.EnableFec) audioStream.EnableFec(_options.FecAudioGroupSize);
+        // No-op over the WebSocket path: TCP already retransmits, and a gap there is a deliberate drop.
         audioStream.EnableNack(128);
-        // Audio is already Opus-encoded. PCM VAD/PLC must never inspect these bytes.
-        audioStream.OnBitrateChanged += kbps =>
-            _ = _audio.ReconfigureBitrateAsync(_options.AudioSampleRate, _options.AudioChannels, kbps);
+        // Audio is already Opus-encoded. PCM VAD/PLC must never inspect these bytes. Its rate follows the
+        // call's rate loop, not per-receiver loss hints: over TCP "loss" is a relay's deliberate drop.
+        StartSendPath();
+        audioStream.SetPacer(_pacer);
         if (!_mediaClient.RegisterMediaStream(audioStream))
         {
             await audioStream.DisposeAsync();
@@ -248,13 +286,14 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         if (OnCallAnswered is not null) await OnCallAnswered(callId);
     }
 
-    private async Task OnAudioEncodedForStream(byte[] data)
+    private async Task OnAudioEncodedForStream(byte[] data, uint timestamp)
     {
         if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame && _sframe?.IsReady != true) return;
         var stream = _mediaClient?.GetMediaStream(_activeAudioStreamId);
         if (stream is not null)
         {
-            try { await stream.SendFrameAsync(data, false); }
+            // The capture clock is the frame timestamp: receivers size their jitter buffer against it.
+            try { await stream.SendFrameAsync(data, false, captureTimestamp: timestamp); }
             catch (InvalidOperationException) when (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame)
             { /* A paused epoch or full bounded crypto queue drops audio, never sends plaintext. */ }
         }
@@ -278,7 +317,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
                     if (stream.IsAudio)
                         await _audio.DecodeFrameAsync(stream.StreamId, frame.Data, frame.Timestamp);
                     else
-                        await PlayVideoFragmentAsync(stream.StreamId, frame.Data);
+                        await PlayVideoFragmentAsync(stream, frame.Data);
                 }
             }
             catch (OperationCanceledException) { }
@@ -302,6 +341,100 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         });
     }
 
+    // ── Send path ──
+
+    /// <summary>Opus on the wire: the codec rate plus about 130 bytes of framing per 20 ms packet.</summary>
+    private int AudioWireKbps => _options.AudioBitrateKbps + 52;
+
+    /// <summary>
+    /// Start the call's pacer and rate loop: audio before video on the way out, the transport below kept short,
+    /// and the estimate driven by queue delay and the relay's and receivers' reports.
+    /// </summary>
+    private void StartSendPath()
+    {
+        if (_pacer is not null || _mediaClient is not { } media) return;
+        // The pacer is bound to this transport's client: a resumed call gets a new pacer on its new client.
+        var client = media.Client;
+        _signals.Clear();
+        var pacer = _pacer = new MediaSendPacer(
+            (frame, ct) => client.GetPrimaryConnection().SendAsync(frame, ct),
+            () =>
+            {
+                try { return client.GetPrimaryConnection().PendingBytes + _audio.TransportBufferedBytes(); }
+                catch (InvalidOperationException) { return 0; }
+            });
+        // The pacer dropped a base picture itself: every receiver is stalled until the next keyframe.
+        pacer.KeyframeNeeded += () => _ = _video.RequestKeyframeAsync(force: true);
+        pacer.Start();
+        var audio = _options.AudioBitrateKbps;
+        var startTierKbps = VideoAdaptation.Ladder[Math.Clamp(_options.VideoStartTier, 0, VideoAdaptation.Ladder.Length - 1)].BitrateKbps;
+        SendRateController controller;
+        var ladder = _adaptation?.Rates ?? new VideoRateLadder();
+        if (_resumeFrom is { } previous)
+        {
+            // A resume: the new path starts from half the old path's stable rate (never below the call's start
+            // tier), with fresh delay, queue and capacity state, and the picture placed to fit before the first
+            // keyframe goes out, not at the old peak.
+            _resumeFrom = null;
+            controller = SendRateController.Resume(previous, AudioWireKbps);
+            ladder.Restart(controller.EstimateKbps - AudioWireKbps);
+            pacer.ExpectKeyframe();
+        }
+        else
+            controller = new SendRateController(
+                (_adaptation?.Current?.BitrateKbps ?? startTierKbps) + AudioWireKbps,
+                new SendRateOptions
+                {
+                    AudioNormalKbps = audio,
+                    AudioLowKbps = Math.Min(24, audio),
+                    AudioHighKbps = _options.AdaptiveAudioBitrate ? Math.Max(40, audio) : audio,
+                    RestartFloorKbps = startTierKbps + AudioWireKbps,
+                });
+        var loop = _rateLoop = new SendRateLoop(pacer, controller, ladder, _signals);
+        var cts = _rateCts = new CancellationTokenSource();
+        _rateTask = RateLoopAsync(loop, cts.Token);
+    }
+
+    private async Task RateLoopAsync(SendRateLoop loop, CancellationToken ct)
+    {
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                await Task.Delay(Math.Max(100, _options.AdaptationIntervalMs), ct);
+                var tick = loop.Tick(Environment.TickCount64, _encodeBacklog);
+                SendRate = tick.Decision;
+                if (tick.AudioKbps is { } audio && _options.AdaptiveAudioBitrate)
+                    await _audio.ReconfigureBitrateAsync(_options.AudioSampleRate, _options.AudioChannels, audio);
+                await ApplyVideoAsync(tick);
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (JSException ex) { _logger.LogDebug(ex, "Send rate loop ended with the page"); }
+        catch (Exception ex) { _logger.LogWarning(ex, "Send rate loop ended"); }
+    }
+
+    private async Task StopSendPathAsync()
+    {
+        var cts = _rateCts;
+        _rateCts = null;
+        if (cts is not null)
+        {
+            try { await cts.CancelAsync(); } catch (ObjectDisposedException) { }
+            try { await _rateTask.WaitAsync(TimeSpan.FromSeconds(2)); } catch { /* A wedged tick must not hold up hangup. */ }
+            cts.Dispose();
+        }
+        _rateTask = Task.CompletedTask;
+        _rateLoop = null;
+        SendRate = null;
+        if (_pacer is { } pacer)
+        {
+            _pacer = null;
+            await pacer.DisposeAsync();
+        }
+        _signals.Clear();
+    }
+
     private async Task StopPipelinesAsync()
     {
         if (_sframe is not null)
@@ -316,6 +449,8 @@ public sealed partial class BoltMediaService : IAsyncDisposable
             catch (ObjectDisposedException) { /* The completed loop has already released its token. */ }
         }
         await Task.WhenAll(loops.Select(loop => loop.Completion));
+        await StopSendPathAsync();
+        _resumeFrom = null;
         _activeAudioStreamId = Guid.Empty;
         _activeVideoStreamId = Guid.Empty;
         _hasVideo = false;

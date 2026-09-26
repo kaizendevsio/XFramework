@@ -1,0 +1,149 @@
+# Call relay network harness
+
+An opt-in, repeatable measurement of what a degraded mobile link does to a Yap call. It runs the
+real `Bolt.Server` group relay with Yap's relay options (`YapCallGateway`) and two participants:
+
+- **sender** — inside the relay container, on loopback (an unshaped uplink). It publishes one audio
+  and one video stream the way the browser client does: clear MediaFrame headers (sequence,
+  timestamp, keyframe flag on a keyframe's first fragment, temporal layer), payloads the size of
+  SFrame ciphertext, pictures cut into 4 KB fragments, and the encoder's keyframe policy.
+  - By default it offers a constant load (`VIDEO_KBPS`, `FPS`).
+  - With `ADAPTIVE=1` it is the browser client's real send path from `Bolt.Media`: the pacer (audio
+    first, whole pictures), `SendRateController` fed by the relay's congestion reports and the
+    receiver's delay reports, and `VideoRateLadder` choosing size, frame rate and bitrate. Only the
+    encoder is a model: pictures at the chosen rate, keyframes `KF_RATIO` times a delta, temporal
+    layers L1T3/L1T2 sized like H.264's, and `OVERSHOOT_PCT` for an encoder that misses its target.
+- **receiver** — in a second container, behind `tc netem` on the relay's egress (the downlink to the
+  phone) and on its own egress (the uplink that carries its TCP ACKs).
+
+The receiver measures one-way delay (both containers share the host clock), audio continuity and
+how many pictures a decoder could actually show: every picture names the picture it refers to, so a
+relay or sender that dropped a reference shows up as undecodable pictures. In adaptive builds it
+also sends the browser receiver's delay report back every 250 ms. The relay reports whether anyone
+was retired or removed, plus its drop counters. Nothing is mocked below the WebSocket: this is real
+Linux TCP.
+
+## Run it in CI
+
+`.github/workflows/call-network-harness.yml` runs every profile in parallel and writes tables to the
+job summary:
+
+- **before**: the base branch's relay with the client defaults it shipped with (a constant sender);
+- **p0 / stress**: this relay with phase 0's constant 240p sender, and under a constant overload offer;
+- **after**: the adaptive sender (phase 1), including the send-buffer cap variants;
+- **resume**: resumable calls (phase 2) with the adaptive sender on the other side, plus the same
+  resumes with phase 2's constant sender for a like-for-like comparison, and one run without resume.
+
+It runs on pull requests that touch the relay, the Bolt client or media libraries, or the harness,
+or on demand from the Actions tab ("Call network harness", optional call length).
+
+## Run it locally
+
+Needs Docker on Linux (or a Linux Docker engine) with the `sch_netem` kernel module available.
+
+```bash
+dotnet publish src/Tests/Bolt.CallResilience.Harness -c Release -o out/harness
+docker build -t bolt-call-harness -f src/Tests/Bolt.CallResilience.Harness/Dockerfile out/harness
+
+# 512 kbps, 1 s RTT, 1% loss, a 240p15 + Opus 32 kbps call for three minutes
+bash src/Tests/Bolt.CallResilience.Harness/run-profile.sh m512 bolt-call-harness \
+  "delay 500ms 20ms rate 512kbit loss 1%" "delay 500ms 20ms" -1 0 survive \
+  SECONDS=180 VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000
+
+# a 10 s outage on a 2 Mbit 4G link, 60 s into the call
+bash src/Tests/Bolt.CallResilience.Harness/run-profile.sh outage10 bolt-call-harness \
+  "delay 50ms 10ms rate 2mbit" "delay 50ms 10ms" 60 10 any SECONDS=180
+
+# the adaptive sender starting from a 1080p offer on 512 kbps, 500 ms RTT, 1% loss
+bash src/Tests/Bolt.CallResilience.Harness/run-profile.sh adapt bolt-call-harness \
+  "delay 250ms 10ms rate 512kbit loss 1%" "delay 250ms 10ms" -1 0 survive ADAPTIVE=1 START_HEIGHT=1080
+
+# a bandwidth step down to 512 kbps at 60 s and back up at 120 s
+NETEM_STEPS="60=delay 50ms 10ms rate 512kbit|120=delay 50ms 10ms rate 4mbit" \
+  bash src/Tests/Bolt.CallResilience.Harness/run-profile.sh step bolt-call-harness \
+  "delay 50ms 10ms rate 4mbit" "delay 50ms 10ms" -1 0 survive ADAPTIVE=1
+
+python3 src/Tests/Bolt.CallResilience.Harness/summarize.py logs
+```
+
+To measure another relay with the same harness, publish with
+`-p:BoltServerProject=/path/to/other/checkout/src/Libraries/Bolt/Bolt.Server/Bolt.Server.csproj -p:HarnessAdaptive=false`.
+Options that relay does not have are skipped. The adaptive sender needs this checkout's `Bolt.Media`
+(and so its protocol), so a build against another relay uses the constant sender.
+
+## Settings (relay container environment)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `SECONDS` | 180 | Call length after both participants joined |
+| `VIDEO_KBPS`, `FPS` | 180, 15 | Constant sender: offered video (0 disables video) |
+| `KF_RATIO` | 6 | Keyframe size as a multiple of a delta picture |
+| `KF_MS` | 10000 | Safety keyframe interval |
+| `KF_ON_DEMAND` | 1 | Constant sender: honour keyframe requests from the relay/receivers, at most one per second |
+| `AUDIO_PAYLOAD` | 104 | Constant sender: audio payload bytes per 20 ms (104 = Opus 32 kbps + SFrame; 347 = Opus 128 kbps) |
+| `ADAPTIVE` | 0 | 1 runs the adaptive sender (the browser's send path) instead of the constant one |
+| `START_HEIGHT` | 240 | Adaptive: the picture to start from; 720 or 1080 is an overload offer on a mobile link |
+| `AUDIO_KBPS` | 32 | Adaptive: Opus rate before the rate loop moves it |
+| `SVC` | 1 | Adaptive: 0 encodes without temporal layers |
+| `OVERSHOOT_PCT` | 100 | Adaptive: encoder output as a percentage of its target |
+| `UNSENT_BYTES` | 32768 | `TCP_NOTSENT_LOWAT` on the relay's call sockets (`Yap:Calls:RelaySocketUnsentBytes`) |
+| `SNDBUF_BYTES` | 0 | `SO_SNDBUF` cap on the relay's call sockets, bounding TCP's bytes in flight (`Yap:Calls:RelaySocketSendBufferBytes`, off by default) |
+| `DEADLINE_MS` | 250 | `SendEnqueueTimeoutMs` (Yap's value) |
+| `STALL_MS` | 15000 | `TransportSendStallTimeoutMs`, the progress watchdog (newer relays only) |
+| `AUTH_DELAY_MS` | 30 | Latency of every participant authorization check |
+| `AUTH_FAIL_AT_S`, `AUTH_FAIL_FOR_S` | off | Make authorization throw for a window, like a hub reconnect |
+| `AUTH_GRACE_S` | 120 | `GroupAuthorizationGraceSeconds` (newer relays only) |
+
+`NETEM_STEPS` (in the environment of `run-profile.sh`, not the container) changes the downlink
+during the call: `"AT=NETEM|AT=NETEM"`, with AT in seconds after both participants joined.
+
+## Resumable calls (RESUME=1)
+
+With `RESUME=1` the relay container also plays the Yap gateway's resume contract (`ResumeHost.cs`):
+single-use tickets bound to the seat generation they replace, a seat held for `GRACE_S` (45) after
+its socket ends, a resume that supersedes a socket the server still thinks is alive, WebSocket
+keep-alive pings with a 20 s timeout, and the call ending only when a hold runs out. The relay is
+still the real `BoltServer`; the gateway's own implementation of these rules is tested in Yap.Tests.
+
+The receiver (`ResumingReceiver.cs`) then behaves like the phone: a heartbeat every 2 s, the app's
+own `CallLinkMonitor` to decide the link is dead (RTT-scaled), and the app's own `CallReconnector`
+to pace the resume attempts (both files are compiled in from `Bolt.Media`). Each attempt is a new TCP
+connection: a ticket, a socket, registration, then `/ready` to rejoin the relay's room. In adaptive
+builds it also sends the browser receiver's delay reports on each connection (fresh per connection,
+as the browser's are), so `ADAPTIVE=1 RESUME=1` runs the whole integrated call: the adaptive sender
+sees the receiver go silent, and the receiver's return.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `RESUME` | 0 | 1 holds the receiver's seat and lets it resume |
+| `GRACE_S` | 45 | Seat hold, and the receiver's give-up time |
+| `IPCHANGE_AT_S` | off | At this second the receiver's connection is blackholed both ways (iptables) and it continues from a second address |
+| `RX_STALL_AT_S`, `RX_STALL_FOR_S` | off | The receiver stops reading for a while (a frozen tab), so the relay's stall watchdog retires it |
+
+The receiver's summary lists each resume (`timeToResumeMs` from noticing the loss to being back),
+`audioBackAfterMs` / `videoBackAfterMs` (from the network returning, or the app unfreezing, to the
+first live audio packet / decodable picture, one delivered within 2 s of being sent), and whether it gave up. The relay's summary says whether
+the other side's call survived and how long the seat was held. `summarize.py` prints a second table
+for these runs. Expectations in `run-profile.sh`: `resume`, `resume-retired` and `end-clean`.
+
+## Reading the result
+
+`SUMMARY` lines are JSON. The relay's `outcome` is `survived` unless a participant was retired,
+removed or disconnected (with the time). On the receiver, `audioDelayMs` is the one-way delay
+distribution of every audio packet, `audioDelivered` the share of audio sequence numbers that
+arrived, `picturesDecodable` the pictures a decoder could show (a keyframe, or a picture whose
+reference it showed; `decodableByLayer` splits them by temporal layer), and `frozenSeconds` the
+seconds after the first picture with none.
+
+Adaptive runs add a `rate` object to the relay's summary: the settled video bitrate and estimate,
+the final picture, when the video bitrate settled, how often the picture size changed (in total and
+after the first 30 s), how long video was suspended, and the picture timeline. `RATE` lines log the
+controller once a second.
+
+What it does not model: cellular link-layer retransmission, the extra buffering of the production
+ingress path, a real encoder's rate control, a congested sender uplink (the sender is on loopback, so
+the relay's reports and the receiver's delay reports drive the adaptation; the pacer's uplink gate is
+covered by unit tests), a resume by the *sender* (its restart estimate is covered by unit tests), and
+browser network hints (`online`, network change) that let the app retry a resume the moment a
+network appears. netem's default queue (1000 packets) is deep: a link that shrinks while it is full,
+as in the step-down profile, holds seconds of data no sender can take back.

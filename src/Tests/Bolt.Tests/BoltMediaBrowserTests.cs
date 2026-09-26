@@ -62,13 +62,18 @@ public class BoltMediaBrowserTests
     {
         var options = new MediaServiceOptions();
 
-        options.AudioBitrateKbps.Should().Be(128);
+        // Mobile-safe start: Opus voice at 32 kbps with FEC and DTX, video from 240p15 upwards.
+        options.AudioBitrateKbps.Should().Be(32);
+        options.AudioInbandFec.Should().BeTrue();
+        options.AudioDtx.Should().BeTrue();
+        options.AudioPacketLossPercent.Should().BeInRange(1, 20);
         options.AudioSampleRate.Should().Be(48_000);
         options.AudioChannels.Should().Be(1);
         options.VideoMaxHeight.Should().Be(2160);
-        VideoAdaptation.Ladder[options.VideoStartTier].Height.Should().Be(1080);
-        VideoAdaptation.Ladder[options.VideoStartTier].Framerate.Should().Be(30);
-        options.KeyframeIntervalSeconds.Should().Be(2);
+        VideoAdaptation.Ladder[options.VideoStartTier].Height.Should().Be(240);
+        VideoAdaptation.Ladder[options.VideoStartTier].Framerate.Should().Be(15);
+        // Keyframes are on demand; the periodic one is only a safety net.
+        options.KeyframeIntervalSeconds.Should().Be(10);
         options.EnableEncryption.Should().BeTrue();
         options.EnableFec.Should().BeTrue();
         options.FecAudioGroupSize.Should().Be(4);
@@ -136,13 +141,25 @@ public class BoltMediaBrowserTests
     {
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var pipeline = new BoltAudioPipeline(Substitute.For<IJSRuntime>(), NullLogger<BoltAudioPipeline>.Instance);
-        pipeline.OnEncoded += _ => completion.Task;
+        uint? timestamp = null;
+        pipeline.OnEncoded += (_, at) => { timestamp = at; return completion.Task; };
 
-        var pending = pipeline.OnAudioEncoded([1, 2, 3]);
+        var pending = pipeline.OnAudioEncoded([1, 2, 3], 40_000);
 
         pending.IsCompleted.Should().BeFalse();
+        timestamp.Should().Be(1920u, "40 ms of capture time on the 48 kHz media clock");
         completion.SetResult();
         await pending;
+    }
+
+    [Test]
+    public void AudioPipeline_MediaClock_FollowsCaptureTime_AndWraps()
+    {
+        BoltAudioPipeline.MediaClock(0).Should().Be(0u);
+        BoltAudioPipeline.MediaClock(20_000).Should().Be(960u);
+        BoltAudioPipeline.MediaClock(-5).Should().Be(0u);
+        // 2^32 ticks at 48 kHz is about 24.8 hours; the clock wraps like any RTP timestamp.
+        BoltAudioPipeline.MediaClock((double)(1L << 32) * 1000 / 48 + 20_000).Should().Be(960u);
     }
 
     [Test]

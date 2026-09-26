@@ -58,6 +58,13 @@ public class BoltClientOptions
     /// </summary>
     public bool SendAccessTokenAsQueryString { get; set; }
 
+    /// <summary>
+    /// Reconnect automatically after every connection is lost. Default: enabled. Clients whose
+    /// endpoint carries a single-use credential (such as a call socket ticket) must disable it:
+    /// retrying a spent ticket can never succeed and only floods the server with rejections.
+    /// </summary>
+    public bool AutoReconnect { get; set; } = true;
+
     /// <summary>Minimum WebSocket connections to maintain. Default: 1.</summary>
     public int MinConnections { get; set; } = 1;
 

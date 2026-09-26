@@ -1,5 +1,6 @@
 using System.Buffers;
 using Bolt.Protocol;
+using Microsoft.Extensions.Logging;
 
 namespace Bolt.Server;
 
@@ -9,6 +10,13 @@ public sealed partial class BoltServer
 
     /// <summary>Notifies the host after a participant leaves or loses authorization.</summary>
     public event Action<Guid, string>? GroupParticipantRemoved;
+
+    /// <summary>
+    /// The same notification with its reason. A host that holds seats across reconnects must end the
+    /// seat only for <see cref="BoltGroupDepartureReason.Unauthorized"/> or an explicit leave, never
+    /// because a socket closed.
+    /// </summary>
+    public event Action<BoltGroupDeparture>? GroupParticipantDeparted;
 
     /// <summary>
     /// Host-only admission after explicit user acceptance and authenticated transport registration.
@@ -40,7 +48,7 @@ public sealed partial class BoltServer
             entered = true;
             if (!_activeCalls.TryGetValue(callId, out var current) || !ReferenceEquals(call, current) ||
                 !connection.IsAlive || !await AuthorizeGroupParticipantAsync(callId, connection, ct)) return false;
-            await RenewGroupAuthorizationAsync(call, ct, force: true);
+            await RenewGroupAuthorizationAsync(call, ct);
             if (IsCallParticipant(call, connection)) return true;
             if (GetParticipantSnapshot(call).Count >= Math.Min(8, _maxCallParticipants) ||
                 _activeCalls.Values.Count(x => GetParticipantSnapshot(x).Any(p => p.QuotaKey == connection.QuotaKey)) >= _maxActiveCallsPerPrincipal)
@@ -59,8 +67,8 @@ public sealed partial class BoltServer
                     !TryAddCallParticipant(call, connection)) return false;
                 foreach (var id in GetMediaStreamSnapshot(call))
                     if (_activeMediaStreams.TryGetValue(id, out var stream)) stream.AddRecipient(connection);
+                call.ParticipantAuthorizedAt[connection.StreamId] = Environment.TickCount64;
             }
-            call.LastMediaAuthorizationTick = Environment.TickCount64;
             return true;
         }
         finally
@@ -84,7 +92,22 @@ public sealed partial class BoltServer
         try
         {
             var participant = GetParticipantSnapshot(call).FirstOrDefault(x => x.ClientId == clientId);
-            if (participant is not null) await RemoveGroupParticipantCoreAsync(call, participant, ct);
+            if (participant is not null) await RemoveGroupParticipantCoreAsync(call, participant, ct, BoltGroupDepartureReason.Left);
+        }
+        finally { call.GroupGate.Release(); }
+    }
+
+    /// <summary>
+    /// Remove exactly this connection, never "whoever has its client ID": after a resume the same
+    /// participant is already back on a newer connection, and the old one's cleanup must not evict it.
+    /// </summary>
+    private async Task LeaveGroupCallAsync(Guid callId, BoltHubConnection connection, BoltGroupDepartureReason reason, CancellationToken ct)
+    {
+        if (!_activeCalls.TryGetValue(callId, out var call) || !call.HostManagedGroup) return;
+        await call.GroupGate.WaitAsync(ct);
+        try
+        {
+            if (IsCallParticipant(call, connection)) await RemoveGroupParticipantCoreAsync(call, connection, ct, reason);
         }
         finally { call.GroupGate.Release(); }
     }
@@ -97,26 +120,112 @@ public sealed partial class BoltServer
         catch { return false; }
     }
 
-    // GroupGate is held by the frame/config/admission path, including the authorization awaits.
-    private async Task<bool> RenewGroupAuthorizationAsync(ServerCallState call, CancellationToken ct, bool force = false)
+    /// <summary>
+    /// Admission path only (GroupGate held): re-check every participant now and apply the result.
+    /// The media path never waits for this; it uses <see cref="ScheduleGroupAuthorizationRenewal"/>.
+    /// </summary>
+    private async Task<bool> RenewGroupAuthorizationAsync(ServerCallState call, CancellationToken ct)
     {
-        if (!force && Environment.TickCount64 - call.LastMediaAuthorizationTick < 5000) return IsCallMediaActive(call);
-        // At most eight independent policy checks; do not serialize remote directory lookups
-        // and stall the audio fanout for the sum of every participant's round-trip time.
-        var results = await Task.WhenAll(GetParticipantSnapshot(call).Select(async participant =>
-            (Participant: participant, Allowed: participant.IsAlive && await AuthorizeGroupParticipantAsync(call.CallId, participant, ct))));
-        foreach (var result in results)
-            if (!result.Allowed) await RemoveGroupParticipantCoreAsync(call, result.Participant, ct);
-        call.LastMediaAuthorizationTick = Environment.TickCount64;
+        var decisions = await CheckGroupParticipantsAsync(call, ct);
+        await ApplyGroupAuthorizationAsync(call, decisions, ct);
+        Volatile.Write(ref call.LastMediaAuthorizationTick, Environment.TickCount64);
         return IsCallMediaActive(call);
     }
 
-    private async Task RemoveGroupParticipantCoreAsync(ServerCallState call, BoltHubConnection participant, CancellationToken ct)
+    /// <summary>
+    /// Media and configuration paths: start a background re-check when the lease is due. Frames keep
+    /// flowing on the last decisions meanwhile; only the removal itself takes the group gate.
+    /// </summary>
+    private void ScheduleGroupAuthorizationRenewal(ServerCallState call)
+    {
+        if (Environment.TickCount64 - Volatile.Read(ref call.LastMediaAuthorizationTick) < _groupAuthorizationRenewalIntervalMs ||
+            Interlocked.CompareExchange(ref call.AuthorizationRenewalRunning, 1, 0) != 0)
+            return;
+        _ = Task.Run(() => RunGroupAuthorizationRenewalAsync(call));
+    }
+
+    private async Task RunGroupAuthorizationRenewalAsync(ServerCallState call)
+    {
+        try
+        {
+            using var checkCts = CancellationTokenSource.CreateLinkedTokenSource(_shutdownCts.Token);
+            // A policy call that never answers is "unavailable", not a reason to stall renewal forever.
+            checkCts.CancelAfter(_invocationTimeoutMs);
+            var decisions = await CheckGroupParticipantsAsync(call, checkCts.Token);
+            await call.GroupGate.WaitAsync(_shutdownCts.Token);
+            try { await ApplyGroupAuthorizationAsync(call, decisions, _shutdownCts.Token); }
+            finally { call.GroupGate.Release(); }
+        }
+        catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested) { }
+        catch (ObjectDisposedException) when (Volatile.Read(ref _disposed) != 0) { }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Group authorization renewal failed for call {CallId}; participants keep their last decision", call.CallId);
+        }
+        finally
+        {
+            Volatile.Write(ref call.LastMediaAuthorizationTick, Environment.TickCount64);
+            Volatile.Write(ref call.AuthorizationRenewalRunning, 0);
+        }
+    }
+
+    // At most eight independent policy checks, run concurrently and without the group gate.
+    private async Task<(BoltHubConnection Participant, BoltGroupAuthorizationDecision Decision)[]> CheckGroupParticipantsAsync(
+        ServerCallState call, CancellationToken ct) =>
+        await Task.WhenAll(GetParticipantSnapshot(call).Select(async participant =>
+            (participant, await RenewGroupParticipantAsync(call.CallId, participant, ct))));
+
+    private async Task<BoltGroupAuthorizationDecision> RenewGroupParticipantAsync(
+        Guid callId, BoltHubConnection participant, CancellationToken ct)
+    {
+        if (_groupCallAuthorizer is null || !participant.IsAlive ||
+            participant.User?.Identity?.IsAuthenticated != true || string.IsNullOrEmpty(participant.ClientId))
+            return BoltGroupAuthorizationDecision.Denied;
+        try { return await _groupCallAuthorizer.RenewParticipantAsync(callId, participant.ClientId, participant.User, ct); }
+        catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested) { throw; }
+        // A timeout or an unreachable policy backend cannot prove a revocation.
+        catch { return BoltGroupAuthorizationDecision.Unavailable; }
+    }
+
+    private async Task ApplyGroupAuthorizationAsync(
+        ServerCallState call,
+        (BoltHubConnection Participant, BoltGroupAuthorizationDecision Decision)[] decisions,
+        CancellationToken ct)
+    {
+        var now = Environment.TickCount64;
+        foreach (var (participant, decision) in decisions)
+        {
+            if (!IsCallParticipant(call, participant)) continue;
+            switch (decision)
+            {
+                case BoltGroupAuthorizationDecision.Allowed:
+                    call.ParticipantAuthorizedAt[participant.StreamId] = now;
+                    break;
+                case BoltGroupAuthorizationDecision.Unavailable when
+                    now - call.ParticipantAuthorizedAt.GetValueOrDefault(participant.StreamId, now) < _groupAuthorizationGraceMs:
+                    BoltServerMetrics.RecordGroupAuthorizationUnavailable();
+                    _logger.LogWarning(
+                        "Group authorization for {ClientId} in call {CallId} is temporarily unavailable; keeping the participant",
+                        participant.ClientId, call.CallId);
+                    break;
+                default:
+                    _logger.LogInformation(
+                        "Removing {ClientId} from call {CallId}: authorization {Decision}",
+                        participant.ClientId, call.CallId, decision == BoltGroupAuthorizationDecision.Denied ? "refused" : "unavailable beyond grace");
+                    await RemoveGroupParticipantCoreAsync(call, participant, ct, BoltGroupDepartureReason.Unauthorized);
+                    break;
+            }
+        }
+    }
+
+    private async Task RemoveGroupParticipantCoreAsync(ServerCallState call, BoltHubConnection participant, CancellationToken ct,
+        BoltGroupDepartureReason reason)
     {
         var removedStreams = new List<Guid>();
         lock (call.SyncRoot)
         {
             lock (call.Participants) call.Participants.RemoveAll(x => x.StreamId == participant.StreamId);
+            call.ParticipantAuthorizedAt.TryRemove(participant.StreamId, out _);
             call.RecipientPreferredLayer.TryRemove(participant.StreamId, out _);
             call.SimulcastGroups.TryRemove(participant.StreamId, out _);
             foreach (var id in GetMediaStreamSnapshot(call))
@@ -142,8 +251,13 @@ public sealed partial class BoltServer
                     catch { /* A failed notification cannot interrupt the already committed removal. */ }
                 }
         }
-        try { if (participant.ClientId is { } clientId) GroupParticipantRemoved?.Invoke(call.CallId, clientId); }
-        catch { /* Host notifications do not restore removed media access. */ }
+        if (participant.ClientId is { } clientId)
+        {
+            try { GroupParticipantRemoved?.Invoke(call.CallId, clientId); }
+            catch { /* Host notifications do not restore removed media access. */ }
+            try { GroupParticipantDeparted?.Invoke(new BoltGroupDeparture(call.CallId, clientId, reason, participant.User)); }
+            catch { /* Same. */ }
+        }
     }
 
     private void CleanupEmptyGroupCall(ServerCallState call)

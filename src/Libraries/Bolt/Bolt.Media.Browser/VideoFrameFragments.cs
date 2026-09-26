@@ -3,7 +3,9 @@ using System.Buffers.Binary;
 namespace Bolt.Media.Browser;
 
 /// <summary>A reassembled encoded picture, ready for the decoder.</summary>
-public readonly record struct VideoFramePayload(byte[] Data, uint TimestampMicroseconds, bool IsKeyframe, bool Discontinuity = false, uint FrameId = 0);
+/// <param name="Layer">Temporal layer (0 = base, or a sender without layers).</param>
+public readonly record struct VideoFramePayload(byte[] Data, uint TimestampMicroseconds, bool IsKeyframe, bool Discontinuity = false, uint FrameId = 0,
+    int Layer = 0);
 
 /// <summary>
 /// Splits an encoded picture into SFrame-sized pieces and puts it back together.
@@ -14,8 +16,12 @@ public readonly record struct VideoFramePayload(byte[] Data, uint TimestampMicro
 /// through the same authenticated encryption as an audio packet.
 ///
 /// The fragment header travels inside the SFrame plaintext, so the relay cannot see or forge a
-/// picture boundary, a keyframe flag or a timestamp; tampering fails the AEAD tag like any other
-/// payload edit.
+/// picture boundary, a keyframe flag, a temporal layer or a timestamp; tampering fails the AEAD tag
+/// like any other payload edit. The relay gets its own copy of the layer in the clear MediaFrame
+/// flags, which only decides what it forwards: receivers decode by the authenticated one.
+///
+/// Header byte 0 is the version (high nibble), the keyframe (0x01) and last-fragment (0x02) bits and
+/// the temporal layer (bits 2-3). Receivers that predate layers ignore bits 2-3.
 /// </summary>
 public static class VideoFrameFragments
 {
@@ -27,6 +33,8 @@ public static class VideoFrameFragments
     public const int MaxFragments = 96;
     private const byte Version = 0x10;
     private const byte KeyframeFlag = 0x01, LastFlag = 0x02;
+    internal const byte LayerMask = 0x0C;
+    internal const int LayerShift = 2;
 
     public static int FragmentCount(int encodedLength) => Math.Max(1, (encodedLength + MaxPayload - 1) / MaxPayload);
 
@@ -34,8 +42,9 @@ public static class VideoFrameFragments
     /// Cut one encoded picture into wire fragments. Returns an empty list when the picture is
     /// larger than the reassembly bound: dropping it is correct, a partial picture is not.
     /// </summary>
-    public static List<byte[]> Split(ReadOnlySpan<byte> encoded, uint frameId, uint timestampMicroseconds, bool isKeyframe)
+    public static List<byte[]> Split(ReadOnlySpan<byte> encoded, uint frameId, uint timestampMicroseconds, bool isKeyframe, int layer = 0)
     {
+        var layerBits = (byte)((isKeyframe ? 0 : Math.Clamp(layer, 0, 3)) << LayerShift);
         var count = FragmentCount(encoded.Length);
         if (encoded.Length == 0 || count > MaxFragments) return [];
         var fragments = new List<byte[]>(count);
@@ -44,7 +53,7 @@ public static class VideoFrameFragments
             var offset = index * MaxPayload;
             var size = Math.Min(MaxPayload, encoded.Length - offset);
             var fragment = new byte[HeaderSize + size];
-            fragment[0] = (byte)(Version | (isKeyframe ? KeyframeFlag : 0) | (index == count - 1 ? LastFlag : 0));
+            fragment[0] = (byte)(Version | (isKeyframe ? KeyframeFlag : 0) | (index == count - 1 ? LastFlag : 0) | layerBits);
             fragment[1] = (byte)(count - 1);
             BinaryPrimitives.WriteUInt16LittleEndian(fragment.AsSpan(2), (ushort)index);
             BinaryPrimitives.WriteUInt32LittleEndian(fragment.AsSpan(4), frameId);
@@ -59,6 +68,12 @@ public static class VideoFrameFragments
 /// <summary>
 /// Reassembles one remote sender's fragments. Bounded on purpose: a sender that never finishes a
 /// picture, or that interleaves many, can only ever hold a few hundred kilobytes here.
+///
+/// A missing picture normally breaks the stream until a keyframe. A stream with temporal layers is
+/// different: the relay and the sender only ever drop a layer-L picture together with every later
+/// picture of layer L or above until the next base picture, so whatever still arrives refers only to
+/// pictures that arrived. There a gap is not a discontinuity, unless this receiver lost something itself
+/// (<see cref="MarkLocalLoss"/>), which no drop policy covered.
 /// </summary>
 public sealed class VideoFrameAssembler
 {
@@ -72,6 +87,7 @@ public sealed class VideoFrameAssembler
         public int Received, Total, Bytes;
         public uint Timestamp;
         public bool Keyframe;
+        public int Layer;
         public long Order;
     }
 
@@ -79,6 +95,13 @@ public sealed class VideoFrameAssembler
     private long sequence;
     private uint lastCompleted;
     private bool hasCompleted;
+    private bool localLoss;
+
+    /// <summary>The sender has marked at least one enhancement-layer picture.</summary>
+    public bool Layered { get; private set; }
+
+    /// <summary>This receiver dropped fragments itself; the next gap is a real break in the stream.</summary>
+    public void MarkLocalLoss() => localLoss = true;
 
     /// <summary>Frames discarded because a fragment never arrived. Surfaces as a loss signal.</summary>
     public int Incomplete { get; private set; }
@@ -112,21 +135,26 @@ public sealed class VideoFrameAssembler
         slot.Received++; slot.Bytes += payload.Length;
         slot.Timestamp = timestamp;
         if ((fragment[0] & KeyframeFlag) != 0) slot.Keyframe = true;
+        slot.Layer = (fragment[0] & VideoFrameFragments.LayerMask) >> VideoFrameFragments.LayerShift;
+        if (slot.Layer > 0) Layered = true;
         if (slot.Received != slot.Total) return null;
 
         var data = new byte[slot.Bytes];
         var offset = 0;
         foreach (var part in slot.Parts) { part!.CopyTo(data, offset); offset += part.Length; }
         pending.Remove(frameId);
-        var discontinuity = hasCompleted && unchecked(frameId - lastCompleted) != 1;
+        var gap = hasCompleted && unchecked(frameId - lastCompleted) != 1;
+        // With temporal layers a gap is a policy drop, and what arrived is decodable (see the class remarks).
+        var discontinuity = gap && (!Layered || localLoss);
+        if (slot.Keyframe || discontinuity) localLoss = false;
         lastCompleted = frameId; hasCompleted = true;
         // Fragments of older pictures still in flight are now useless; their picture can never be shown in order.
         foreach (var stale in pending.Where(x => unchecked(x.Key - frameId) > 0x8000_0000u).Select(x => x.Key).ToArray())
         { pending.Remove(stale); Incomplete++; }
-        return new(data, slot.Timestamp, slot.Keyframe, discontinuity);
+        return new(data, slot.Timestamp, slot.Keyframe, discontinuity, frameId, slot.Keyframe ? 0 : slot.Layer);
     }
 
-    public void Reset() { pending.Clear(); hasCompleted = false; Incomplete = 0; }
+    public void Reset() { pending.Clear(); hasCompleted = false; Incomplete = 0; localLoss = false; }
 
     private void DropOldest()
     {

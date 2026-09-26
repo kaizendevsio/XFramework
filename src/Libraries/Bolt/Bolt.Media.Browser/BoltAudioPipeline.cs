@@ -2,6 +2,15 @@ namespace Bolt.Media.Browser;
 
 public sealed record VoiceCapabilities(bool Supported, string? Reason, bool NativeCodecs = false);
 
+/// <summary>Opus encoder tuning, applied where the encoder supports it and ignored otherwise.</summary>
+/// <param name="InbandFec">Opus in-band forward error correction.</param>
+/// <param name="PacketLossPercent">Loss the FEC is tuned for, 0-100.</param>
+/// <param name="Dtx">Discontinuous transmission during silence.</param>
+public sealed record OpusEncoderSettings(bool InbandFec, int PacketLossPercent, bool Dtx)
+{
+    public static readonly OpusEncoderSettings Default = new(false, 0, false);
+}
+
 /// <summary>
 /// Audio capture → WebCodecs encode → C# callback, and C# → WebCodecs decode → AudioContext playback.
 /// Bridges browser audio APIs to <see cref="BoltMediaStream"/>.
@@ -18,8 +27,8 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
     private readonly Dictionary<Guid, ManagedOpusDecoder> _remoteCodecs = [];
     private const int MaxRemoteStreams = 8;
 
-    /// <summary>Fires when the audio encoder produces an encoded Opus frame.</summary>
-    public event Func<byte[], Task>? OnEncoded;
+    /// <summary>Fires when the audio encoder produces an encoded Opus frame, with its capture time on the 48 kHz media clock.</summary>
+    public event Func<byte[], uint, Task>? OnEncoded;
 
     public bool IsCapturing => _capturing;
     public async Task<string> GetPlaybackStateAsync() => _pipeline is null ? "closed"
@@ -42,7 +51,11 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
     }
 
     /// <summary>Load JS module, initialize Opus encoder and decoder.</summary>
-    public async Task InitializeAsync(int sampleRate = 48_000, int channels = 1, int bitrateKbps = 128)
+    public Task InitializeAsync(int sampleRate = 48_000, int channels = 1, int bitrateKbps = 128) =>
+        InitializeAsync(sampleRate, channels, bitrateKbps, OpusEncoderSettings.Default);
+
+    /// <summary>Load JS module, initialize Opus encoder (with FEC/DTX where supported) and decoder.</summary>
+    public async Task InitializeAsync(int sampleRate, int channels, int bitrateKbps, OpusEncoderSettings opus)
     {
         if (_pipeline is not null) return;
         _module ??= await _js.InvokeAsync<IJSObjectReference>(
@@ -57,14 +70,14 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
             if (!capabilities.Supported) throw new NotSupportedException(capabilities.Reason);
             if (capabilities.NativeCodecs)
             {
-                await _pipeline.InvokeVoidAsync("initEncoder", sampleRate, channels, bitrateKbps);
+                await _pipeline.InvokeVoidAsync("initEncoder", sampleRate, channels, bitrateKbps, opus);
                 await _pipeline.InvokeVoidAsync("initDecoder", sampleRate, channels);
             }
             else
             {
                 if (sampleRate != 48_000 || channels != 1)
                     throw new NotSupportedException("Managed voice requires 48 kHz mono audio.");
-                _managedCodec = new ManagedOpusCodec(bitrateKbps);
+                _managedCodec = new ManagedOpusCodec(bitrateKbps, opus);
                 await _pipeline.InvokeVoidAsync("initManaged");
             }
         }
@@ -130,7 +143,7 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
                 }
                 pcm = codec.Decode(data.Span);
             }
-            await _pipeline.InvokeVoidAsync("playPcm", pcm, streamId.ToString());
+            await _pipeline.InvokeVoidAsync("playPcm", pcm, streamId.ToString(), timestamp);
         }
         else
             await _pipeline.InvokeVoidAsync("decodeFrame", data.ToArray(), timestamp, streamId.ToString());
@@ -155,19 +168,37 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
         await _pipeline.InvokeVoidAsync("reconfigureBitrate", sampleRate, channels, newBitrateKbps);
     }
 
-    /// <summary>Called from JS when an encoded audio chunk is ready.</summary>
+    /// <summary>Called from JS when an encoded audio chunk is ready. <paramref name="captureMicroseconds"/> is its capture time.</summary>
     [JSInvokable]
-    public async Task OnAudioEncoded(byte[] data)
+    public async Task OnAudioEncoded(byte[] data, double captureMicroseconds)
     {
         if (OnEncoded is not { } handlers) return;
-        foreach (Func<byte[], Task> handler in handlers.GetInvocationList())
-            await handler(data);
+        var timestamp = MediaClock(captureMicroseconds);
+        foreach (Func<byte[], uint, Task> handler in handlers.GetInvocationList())
+            await handler(data, timestamp);
     }
 
     [JSInvokable]
-    public Task OnAudioPcm(byte[] pcm) => _managedCodec is null
+    public Task OnAudioPcm(byte[] pcm, double captureMicroseconds) => _managedCodec is null
         ? Task.CompletedTask
-        : OnAudioEncoded(_managedCodec.Encode(pcm));
+        : OnAudioEncoded(_managedCodec.Encode(pcm), captureMicroseconds);
+
+    /// <summary>
+    /// Capture time on the 48 kHz media clock. Sent as the frame timestamp, it lets receivers and the relay measure
+    /// delay against real time, including across DTX silences, which a per-packet counter would hide.
+    /// </summary>
+    public static uint MediaClock(double captureMicroseconds) =>
+        unchecked((uint)(ulong)Math.Max(0, Math.Round(captureMicroseconds * 48 / 1000)));
+
+    /// <summary>
+    /// Bytes the page's WebSockets hold that the network has not taken yet. Synchronous and cheap in WebAssembly;
+    /// 0 where the browser module is not in process.
+    /// </summary>
+    public long TransportBufferedBytes()
+    {
+        try { return _module is IJSInProcessObjectReference local ? (long)local.Invoke<double>("socketBufferedAmount") : 0; }
+        catch (JSException) { return 0; }
+    }
 
     public async Task StopPlaybackAsync()
     {

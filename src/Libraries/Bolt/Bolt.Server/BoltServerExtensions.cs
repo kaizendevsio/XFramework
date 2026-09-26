@@ -34,6 +34,27 @@ public class BoltServerOptions
     /// <summary>Max time to wait for a send queue slot. 0 uses InvocationTimeoutMs.</summary>
     public int SendEnqueueTimeoutMs { get; set; } = 0;
 
+    /// <summary>
+    /// Progress watchdog for physical writes: a connection is retired only when one write to its
+    /// transport makes no progress for this long. A slow or briefly stalled mobile link must not end
+    /// a call, so media hosts set this in seconds. 0 reuses the effective SendEnqueueTimeoutMs.
+    /// </summary>
+    public int TransportSendStallTimeoutMs { get; set; } = 0;
+
+    /// <summary>Per-receiver media lanes used when <see cref="MediaEnabled"/> is set.</summary>
+    public BoltMediaSendQueueOptions MediaSendQueue { get; } = new();
+
+    /// <summary>How often a host-managed group re-checks every participant's authorization. Default: 5000 ms.</summary>
+    public int GroupAuthorizationRenewalIntervalMs { get; set; } = 5_000;
+
+    /// <summary>
+    /// How long a participant keeps its seat while its periodic re-authorization cannot be decided
+    /// (the policy backend is unreachable or timed out). An explicit refusal still removes it at the
+    /// next check. This bounds revocation staleness during a backend outage. 0 removes on any failure.
+    /// Default: 120 seconds.
+    /// </summary>
+    public int GroupAuthorizationGraceSeconds { get; set; } = 120;
+
     /// <summary>Maximum time allowed for a graceful transport close before aborting. Default: 5000.</summary>
     public int TransportCloseTimeoutMs { get; set; } = 5_000;
 

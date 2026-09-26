@@ -672,8 +672,59 @@
 @keyframes call-live { 50% { opacity: .3; } }
 @keyframes call-pill-in { from { opacity: 0; translate: -50% -10px; } }
 
+/* ---------- A connection that dropped: calm, dim, and honest about it ---------- */
+
+/* This device is reconnecting, or its link is slow. One quiet pill above the controls, never a modal. */
+.call-notice.link-notice {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-variant-numeric: tabular-nums;
+}
+.link-notice .t { opacity: .7; font-weight: 500; }
+.link-notice.poor { color: color-mix(in srgb, currentColor 82%, transparent); }
+.link-dot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #f5a623;
+    animation: call-live 1.4s ease-in-out infinite;
+}
+
+/* Somebody else is reconnecting: their last picture stays, dimmed, with a name on it. */
+.vidtile.frozen canvas { filter: grayscale(.55) brightness(.5); transition: filter .4s var(--ease-out, ease); }
+.vidtile.away .tile-person,
+.call-participant.away { opacity: .55; }
+.tile-away {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    translate: -50% -50%;
+    max-width: calc(100% - 24px);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 18px;
+    background: rgba(24, 24, 28, .5);
+    -webkit-backdrop-filter: blur(16px) saturate(1.5);
+    backdrop-filter: blur(16px) saturate(1.5);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 650;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The call ended by itself: the same screen, stilled, with the way back to the person. */
+.is-ended .call-ended-reason { color: var(--text); font-weight: 600; }
+
 @media (prefers-reduced-motion: reduce) {
     .call-screen, .call-panel, .active-call, .active-call .live, .is-waiting .call-halo::before { animation: none; }
+    .link-dot { animation: none; }
+    .vidtile.frozen canvas { transition: none; }
     .pip, .vidtop, .call-tray, .call-notices, .vidgrid.two, .vidgrid.many, .call-btn .k,
     .voice-dialog[data-swapped] .vidgrid.one > .vidtile:has(canvas) { transition: none; }
 }

@@ -87,14 +87,14 @@ public sealed partial class YapCallGateway
         foreach (var member in room.Members.Values) member.Ready = false;
     }
 
-    private static YapCallEvent GroupEvent(GroupRoom room, Guid recipient, string type, YapGroupControlEvent? control = null) =>
+    private static YapCallEvent GroupEvent(GroupRoom room, Guid recipient, string type, YapGroupControlEvent? control = null, string? reason = null) =>
         new(type, new(room.Id, room.Thread, room.Caller, room.CallerName, recipient, room.InviteExpires),
-            control?.SenderId, Snapshot(room), control);
+            control?.SenderId, Snapshot(room), control, reason);
 
-    private void PublishGroupLocked(GroupRoom room, string type)
+    private void PublishGroupLocked(GroupRoom room, string type, string? reason = null)
     {
         foreach (var recipient in room.Members.Where(x => !x.Value.Left || type == "group-ended").Select(x => x.Key))
-            Publish(room.Tenant, recipient, GroupEvent(room, recipient, type));
+            Publish(room.Tenant, recipient, GroupEvent(room, recipient, type, reason: reason));
     }
 
     private void ReplayGroupsLocked(Guid tenant, Guid credential, Action<YapCallEvent> handler)

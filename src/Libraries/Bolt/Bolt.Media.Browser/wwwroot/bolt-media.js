@@ -1,6 +1,34 @@
 // Bolt Media — WebCodecs + Media Capture + Playback
 // Audio and Video pipelines for Blazor WASM interop
 
+// ─── Transport meter ────────────────────────────────
+// The .NET WebAssembly WebSocket hides bufferedAmount, and below it the browser queues whatever .NET hands
+// over: nothing there can be prioritized or dropped. The media pacer keeps that queue short, so it needs to
+// see it. Wrapping send() only records which sockets are in use; it changes nothing about what they send.
+
+const meteredSockets = new Set();
+export function installSocketMeter() {
+    const prototype = globalThis.WebSocket?.prototype;
+    if (!prototype || prototype.send?.boltMetered) return false;
+    const send = prototype.send;
+    const metered = function (data) { meteredSockets.add(this); return send.call(this, data); };
+    metered.boltMetered = true;
+    prototype.send = metered;
+    return true;
+}
+
+/// Bytes every open, metered WebSocket has accepted but not yet handed to the network. A shared uplink is
+/// shared by all of them, so they are summed.
+export function socketBufferedAmount() {
+    let total = 0;
+    for (const socket of meteredSockets) {
+        if (socket.readyState > 1) { meteredSockets.delete(socket); continue; }
+        total += socket.bufferedAmount || 0;
+    }
+    return total;
+}
+installSocketMeter();
+
 // ─── Audio Pipeline ─────────────────────────────────
 
 class AudioPipeline {
@@ -88,20 +116,22 @@ class AudioPipeline {
         return await this.getAudioOutputs();
     }
 
-    async initEncoder(sampleRate, channels, bitrate) {
+    async initEncoder(sampleRate, channels, bitrate, opus = null) {
         if (sampleRate !== 48000 || channels !== 1)
             throw new Error('Bolt browser voice currently requires 48 kHz mono audio.');
         if (typeof AudioEncoder === 'undefined' || typeof AudioDecoder === 'undefined')
             throw new Error('This browser does not support the audio codecs required for Bolt voice calls.');
-        const config = { codec: 'opus', sampleRate, numberOfChannels: channels, bitrate: bitrate * 1000 };
-        if (!(await AudioEncoder.isConfigSupported(config)).supported)
-            throw new Error('Opus audio encoding is unavailable in this browser.');
+        const config = await opusEncoderConfig(sampleRate, channels, bitrate, opus);
+        if (!config) throw new Error('Opus audio encoding is unavailable in this browser.');
+        this.encoderConfig = config;
         this.encoder?.close();
         this.encoder = new AudioEncoder({
             output: chunk => {
                 if (!this.captureRunning || !this.transmitting || !this.dotNetRef) return;
                 const data = new Uint8Array(chunk.byteLength);
                 chunk.copyTo(data);
+                // Capture time rides along: the far side measures its jitter against it, and DTX gaps show as gaps.
+                data.captureTime = chunk.timestamp;
                 if (this.encodedQueue.length >= 4) this.encodedQueue.shift();
                 this.encodedQueue.push(data);
                 void this._sendEncoded();
@@ -115,8 +145,10 @@ class AudioPipeline {
         if (this.sending) return;
         this.sending = true;
         try {
-            while (this.captureRunning && this.transmitting && this.dotNetRef && this.encodedQueue.length)
-                await this.dotNetRef.invokeMethodAsync(this.managed ? 'OnAudioPcm' : 'OnAudioEncoded', this.encodedQueue.shift());
+            while (this.captureRunning && this.transmitting && this.dotNetRef && this.encodedQueue.length) {
+                const item = this.encodedQueue.shift();
+                await this.dotNetRef.invokeMethodAsync(this.managed ? 'OnAudioPcm' : 'OnAudioEncoded', item, item.captureTime ?? 0);
+            }
         } catch (error) {
             console.error('Bolt audio send:', error);
             this.stopCapture();
@@ -180,6 +212,7 @@ class AudioPipeline {
                         const view = new DataView(bytes.buffer);
                         for (let i = 0; i < 960; i++)
                             view.setInt16(i * 2, Math.round(Math.max(-1, Math.min(1, data.samples[i])) * 32767), true);
+                        bytes.captureTime = data.timestamp;
                         if (this.encodedQueue.length >= 4) this.encodedQueue.shift();
                         this.encodedQueue.push(bytes);
                         void this._sendEncoded();
@@ -227,7 +260,7 @@ class AudioPipeline {
     receiver(streamId) {
         if (this.receivers.has(streamId)) return this.receivers.get(streamId);
         if (!this.playbackEnabled || this.receivers.size >= 8) return null;
-        const receiver = { decoder: null, sources: new Set(), nextPlayTime: 0, active: true };
+        const receiver = { decoder: null, sources: new Set(), nextPlayTime: 0, active: true, jitter: new PlayoutJitter() };
         if (!this.managed) {
             if (!this.decoderConfig) return null;
             receiver.decoder = new AudioDecoder({
@@ -261,17 +294,22 @@ class AudioPipeline {
     }
 
     reconfigureBitrate(sampleRate, channels, bitrate) {
+        // Keep the FEC/DTX tuning the encoder was accepted with; only the rate changes.
         if (this.encoder?.state === 'configured')
-            this.encoder.configure({ codec: 'opus', sampleRate, numberOfChannels: channels, bitrate: bitrate * 1000 });
+            this.encoder.configure({ ...(this.encoderConfig ?? { codec: 'opus' }), sampleRate, numberOfChannels: channels, bitrate: bitrate * 1000 });
     }
 
     _playAudioData(data, streamId = 'default', receiver = this.receiver(streamId)) {
         try {
             const context = this.audioContext;
             if (context && context.state !== 'running' && this.playbackEnabled) { void this.resumePlayback(false); return; }
-            // Do not accumulate delayed playback during suspension or a slow renderer.
-            if (!this.playbackEnabled || !receiver?.active || context?.state !== 'running' ||
-                receiver.nextPlayTime - context.currentTime > 0.2 || receiver.sources.size >= 16) return;
+            if (!this.playbackEnabled || !receiver?.active || context?.state !== 'running' || receiver.sources.size >= 32) return;
+            const now = context.currentTime;
+            const jitter = receiver.jitter ??= new PlayoutJitter();
+            if (Number.isFinite(data.timestamp)) jitter.observe(now, data.timestamp / 1e6);
+            const plan = jitter.plan(now, receiver.nextPlayTime);
+            // Past the latency cap the packet is dropped: a post-stall burst must not become standing delay.
+            if (plan.drop) return;
             const buffer = context.createBuffer(data.numberOfChannels, data.numberOfFrames, data.sampleRate);
             for (let ch = 0; ch < data.numberOfChannels; ch++) {
                 const samples = new Float32Array(data.numberOfFrames);
@@ -280,20 +318,26 @@ class AudioPipeline {
             }
             const source = context.createBufferSource();
             source.buffer = buffer;
+            if (source.playbackRate) source.playbackRate.value = plan.rate;
             source.connect(context.destination);
             source.onended = () => { this.sources.delete(source); receiver.sources.delete(source); source.disconnect(); };
             this.sources.add(source);
             receiver.sources.add(source);
-            receiver.nextPlayTime = Math.max(receiver.nextPlayTime, context.currentTime);
-            source.start(receiver.nextPlayTime);
-            receiver.nextPlayTime += buffer.duration;
+            source.start(plan.at);
+            receiver.nextPlayTime = plan.at + buffer.duration / plan.rate;
         } finally { data.close(); }
     }
 
-    playPcm(bytes, streamId = 'default') {
+    /// Current playout target per remote stream, in milliseconds (diagnostics and tests).
+    playoutTargets() {
+        return Object.fromEntries([...this.receivers.entries()].map(([id, r]) => [id, Math.round((r.jitter?.target ?? 0) * 1000)]));
+    }
+
+    playPcm(bytes, streamId = 'default', timestamp = undefined) {
         if (bytes.length !== 1920) return;
         const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
         this._playAudioData({ numberOfFrames: 960, numberOfChannels: 1, sampleRate: 48000,
+            timestamp: Number.isFinite(timestamp) ? Math.round(timestamp * 1e6 / 48000) : undefined,
             copyTo: samples => { for (let i = 0; i < 960; i++) samples[i] = view.getInt16(i * 2, true) / 32768; },
             close() {} }, streamId);
     }
@@ -309,6 +353,57 @@ class AudioPipeline {
         if (this.audioContext) this.audioContext.onstatechange = null;
         if (this.audioContext?.state !== 'closed') await this.audioContext?.close();
         this.encoder = this.audioContext = null;
+    }
+}
+
+// ─── Audio playout ──────────────────────────────────
+
+/// Adaptive playout for one remote voice stream.
+///
+/// Every packet's transit (arrival minus capture time; the clocks share no epoch, so only its spread matters)
+/// is measured against the smallest transit seen recently. The target delay is the 95th percentile of that
+/// spread, so a 500-1000 ms RTT path whose packets arrive in clumps plays smoothly instead of running dry
+/// between clumps. Playout re-buffers to the target after running dry, compresses (plays up to 5% fast) when
+/// it holds more than the target, stretches slightly when it runs low, and drops what arrives past a latency
+/// cap instead of letting a burst after a stall become standing delay.
+export class PlayoutJitter {
+    static MIN = 0.04; static MAX = 0.5; static INITIAL = 0.06; static EXCESS = 0.3;
+    static WINDOW = 5; static SAMPLES = 250;
+
+    constructor() {
+        this.target = PlayoutJitter.INITIAL;
+        this.spreads = [];
+        this.floor = Infinity; this.previousFloor = Infinity; this.windowStarted = -Infinity;
+        this.count = 0; this.underruns = 0;
+    }
+
+    observe(now, mediaSeconds) {
+        const transit = now - mediaSeconds;
+        if (now - this.windowStarted >= PlayoutJitter.WINDOW) {
+            this.previousFloor = this.floor; this.floor = Infinity; this.windowStarted = now;
+        }
+        this.floor = Math.min(this.floor, transit);
+        const spread = transit - Math.min(this.floor, this.previousFloor);
+        if (!Number.isFinite(spread)) return;
+        this.spreads.push(Math.max(0, spread));
+        if (this.spreads.length > PlayoutJitter.SAMPLES) this.spreads.shift();
+        if (++this.count % 25 === 0 || this.spreads.length === 10) {
+            const sorted = [...this.spreads].sort((a, b) => a - b);
+            const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
+            this.target = Math.max(PlayoutJitter.MIN, Math.min(PlayoutJitter.MAX, p95 + 0.02));
+        }
+    }
+
+    /// Where the next packet plays, at what rate, or whether it is dropped.
+    plan(now, nextPlayTime) {
+        const ahead = nextPlayTime - now;
+        if (ahead <= 0.005) {
+            if (nextPlayTime > 0) this.underruns++;
+            return { at: now + this.target, rate: 1, drop: false };
+        }
+        if (ahead > this.target + PlayoutJitter.EXCESS) return { at: nextPlayTime, rate: 1, drop: true };
+        const rate = ahead > this.target + 0.06 ? 1.05 : ahead < this.target * 0.5 ? 0.97 : 1;
+        return { at: nextPlayTime, rate, drop: false };
     }
 }
 
@@ -335,11 +430,29 @@ export function h264BitstreamCodec(data) {
     return null;
 }
 
-function encoderConfig(codec, width, height, bitrateKbps, framerate, hardware) {
+/// Opus with in-band FEC and DTX where the browser accepts them, plain Opus otherwise. The tuning
+/// is an optimisation: a browser that rejects the opus dictionary still gets a working encoder.
+async function opusEncoderConfig(sampleRate, channels, bitrateKbps, opus) {
+    const base = { codec: 'opus', sampleRate, numberOfChannels: channels, bitrate: bitrateKbps * 1000 };
+    const tuning = opus && (opus.inbandFec || opus.dtx) ? {
+        useinbandfec: !!opus.inbandFec, usedtx: !!opus.dtx,
+        packetlossperc: Math.max(0, Math.min(100, Math.round(opus.packetLossPercent ?? 0)))
+    } : null;
+    for (const candidate of tuning ? [{ ...base, opus: tuning }, base] : [base]) {
+        try { if ((await AudioEncoder.isConfigSupported(candidate))?.supported) return candidate; }
+        catch { /* A throw is a refusal of this candidate; try the plainer one. */ }
+    }
+    return null;
+}
+
+/// Fastest a remote request can make this sender emit another keyframe.
+const KEYFRAME_REQUEST_GAP_MS = 1000;
+
+function encoderConfig(codec, width, height, bitrateKbps, framerate, hardware, scalabilityMode = 'L1T1') {
     const config = {
         codec: videoCodecString(codec, Math.min(width, height), framerate), width, height,
         bitrate: Math.max(64, bitrateKbps) * 1000, framerate,
-        latencyMode: 'realtime', bitrateMode: 'variable', scalabilityMode: 'L1T1',
+        latencyMode: 'realtime', bitrateMode: 'variable', scalabilityMode,
         hardwareAcceleration: hardware ?? 'no-preference'
     };
     // Without a decoder description an H.264/H.265 bitstream has to be Annex B, and the
@@ -347,6 +460,25 @@ function encoderConfig(codec, width, height, bitrateKbps, framerate, hardware) {
     // WebKit rejects odd H.264 dimensions outright, so both sides are rounded to even.
     if (codec === 'h264') { config.avc = { format: 'annexb' }; config.width &= ~1; config.height &= ~1; }
     return config;
+}
+
+/// Temporal layers let the relay drop enhancement pictures for one slow receiver instead of every picture until
+/// a keyframe. L1T3 (base layer at a quarter of the frame rate) from 24 fps, L1T2 from 12 fps, none below: a
+/// base layer under 6 fps is not worth keeping. Only modes this encoder actually accepted are used.
+export function temporalModeFor(framerate, supported) {
+    const wanted = framerate >= 24 ? ['L1T3', 'L1T2'] : framerate >= 12 ? ['L1T2'] : [];
+    return wanted.find(mode => supported?.has?.(mode)) ?? 'L1T1';
+}
+
+/// Which temporal-layer modes this encoder accepts at this configuration. WebKit and some hardware encoders
+/// refuse them (or accept only some); a refusal is an answer, never an error.
+async function probeTemporalModes(config) {
+    const modes = new Set();
+    for (const mode of ['L1T2', 'L1T3']) {
+        try { if ((await VideoEncoder.isConfigSupported({ ...config, scalabilityMode: mode }))?.supported) modes.add(mode); }
+        catch { /* Unsupported. */ }
+    }
+    return modes;
 }
 
 /// Reshape a ladder tier to the camera's own aspect ratio.
@@ -447,10 +579,13 @@ class VideoPipeline {
         this.remotes = new Map();
         this.config = null;
         this.codec = 'h264';
-        this.keyframeIntervalMs = 2000;
+        this.keyframeIntervalMs = 10000;
         this.lastKeyframe = 0;
         this.frameId = 0;
-        this.pendingKeyframe = true;
+        // forceKeyframe: the encoder was (re)configured and cannot continue without one.
+        // pendingKeyframe: someone asked (new receiver, decoder reset, relay drop); coalesced.
+        this.forceKeyframe = true;
+        this.pendingKeyframe = false;
         this.window = { since: 0, frames: 0, bytes: 0 };
         this.stats = { fps: 0, kbps: 0, dropped: 0, backlog: 0 };
         this.facingMode = 'user';
@@ -481,9 +616,9 @@ class VideoPipeline {
         globalThis.addEventListener?.('pagehide', this.hidden);
     }
 
-    async initEncoder(codec, width, height, bitrateKbps, framerate, keyframeSeconds) {
+    async initEncoder(codec, width, height, bitrateKbps, framerate, keyframeSeconds, temporalLayers = false) {
         this.codec = codec || 'h264';
-        this.keyframeIntervalMs = Math.max(500, (keyframeSeconds || 2) * 1000);
+        this.keyframeIntervalMs = Math.max(500, (keyframeSeconds || 10) * 1000);
         this.tier = { width, height, bitrateKbps, framerate };
         ({ width, height } = fitTierToSource(width, height, this.sourceWidth, this.sourceHeight));
         // 'prefer-hardware' is not a hint that degrades gracefully: on a machine with no hardware
@@ -496,12 +631,16 @@ class VideoPipeline {
             catch { /* Treat a throw as unsupported and try the next acceleration. */ }
         }
         if (!config) throw new Error('This device cannot encode video for calls.');
+        // Temporal layers only where this encoder, at this acceleration, says yes; otherwise plain L1T1.
+        this.temporalModes = temporalLayers ? await probeTemporalModes(config) : new Set();
+        const mode = temporalModeFor(framerate, this.temporalModes);
+        if (mode !== 'L1T1') config = { ...config, scalabilityMode: mode };
         this._closeEncoder();
         this.config = config;
         // The published stream survives camera off/on; its frame IDs must too.
-        this.pendingKeyframe = true;
+        this.forceKeyframe = true;
         this.encoder = new VideoEncoder({
-            output: (chunk) => this._onEncoded(chunk),
+            output: (chunk, metadata) => this._onEncoded(chunk, metadata),
             error: (error) => {
                 console.error('Bolt video encoder:', error);
                 this.stopCapture('encoder');
@@ -511,7 +650,7 @@ class VideoPipeline {
         return { width: config.width, height: config.height, codec: config.codec };
     }
 
-    _onEncoded(chunk) {
+    _onEncoded(chunk, metadata) {
         const data = new Uint8Array(chunk.byteLength);
         chunk.copyTo(data);
         const now = Date.now();
@@ -532,8 +671,12 @@ class VideoPipeline {
         if (!this.captureRunning || !this.dotNetRef) return;
         // Frame IDs are the reassembly key on the far side; they must not restart mid-call.
         const frameId = (this.frameId = (this.frameId + 1) >>> 0);
-        void this.dotNetRef.invokeMethodAsync('OnVideoEncoded', data, chunk.type === 'key',
-            frameId, Math.max(0, Math.round(chunk.timestamp)) >>> 0);
+        const key = chunk.type === 'key';
+        // A layer is only claimed when the encoder was asked for layers and says which one this is.
+        const layered = this.config?.scalabilityMode && this.config.scalabilityMode !== 'L1T1';
+        const layer = key || !layered ? 0 : Math.max(0, Math.min(3, metadata?.svc?.temporalLayerId ?? 0));
+        void this.dotNetRef.invokeMethodAsync('OnVideoEncoded', data, key,
+            frameId, Math.max(0, Math.round(chunk.timestamp)) >>> 0, layer);
     }
 
     /// Opening the camera is the only place getUserMedia is called with video, and it happens
@@ -570,7 +713,7 @@ class VideoPipeline {
         this.deviceId = settings.deviceId || wanted.deviceId || '';
         this.facingMode = settings.facingMode || wanted.facingMode || 'user';
         this.captureRunning = true;
-        this.pendingKeyframe = true;
+        this.forceKeyframe = true;
         this.window = { since: 0, frames: 0, bytes: 0 };
         this.lastCaptureTimestamp = null;
         this.nextCaptureTimestamp = null;
@@ -654,10 +797,7 @@ class VideoPipeline {
         const frame = this._elementFrame(video, timestamp);
         if (!frame) return;
         try {
-            const now = Date.now();
-            const keyFrame = this.pendingKeyframe || now - this.lastKeyframe >= this.keyframeIntervalMs;
-            if (keyFrame) { this.lastKeyframe = now; this.pendingKeyframe = false; }
-            this._encode(frame, keyFrame);
+            this._encode(frame, this._takeKeyframe(Date.now()));
         } finally { frame.close(); }
     }
 
@@ -711,12 +851,20 @@ class VideoPipeline {
                 if (!this._acceptCaptureTime(frame.timestamp)) continue;
                 frame = this._upright(frame);
                 this._noteSource(frame.displayWidth, frame.displayHeight);
-                const now = Date.now();
-                const keyFrame = this.pendingKeyframe || now - this.lastKeyframe >= this.keyframeIntervalMs;
-                if (keyFrame) { this.lastKeyframe = now; this.pendingKeyframe = false; }
-                this._encode(frame, keyFrame);
+                this._encode(frame, this._takeKeyframe(Date.now()));
             } finally { frame.close(); }
         }
+    }
+
+    /// Keyframes are sent when the encoder needs one, when someone asked for one, and otherwise only
+    /// on a long safety interval. Requests are coalesced to one per KEYFRAME_REQUEST_GAP_MS: each
+    /// keyframe is a burst several times a delta picture, and a congested receiver asking for one per
+    /// lost picture would otherwise feed the congestion that lost it.
+    _takeKeyframe(now) {
+        const due = this.forceKeyframe || now - this.lastKeyframe >= this.keyframeIntervalMs ||
+            (this.pendingKeyframe && now - this.lastKeyframe >= KEYFRAME_REQUEST_GAP_MS);
+        if (due) { this.lastKeyframe = now; this.forceKeyframe = this.pendingKeyframe = false; }
+        return due;
     }
 
     _encode(frame, keyFrame) {
@@ -816,10 +964,13 @@ class VideoPipeline {
     /// Change picture size, rate or bitrate in place. A reconfigure needs a fresh keyframe or the
     /// far side decodes the new size against the old reference.
     async applyTier(width, height, bitrateKbps, framerate) {
+        const before = this.tier;
         this.tier = { width, height, bitrateKbps, framerate };
         const changed = this._configureForSource();
         const track = this.mediaStream?.getVideoTracks()[0];
-        if (changed && track?.applyConstraints) {
+        // A bitrate change is the encoder's business alone; only a new size or rate asks the camera.
+        const reshaped = !before || before.width !== width || before.height !== height || before.framerate !== framerate;
+        if (changed && reshaped && track?.applyConstraints) {
             try { await track.applyConstraints({ width: { ideal: width }, height: { ideal: height },
                 frameRate: { ideal: framerate, max: framerate } }); }
             catch { /* Keep the working track; encoder pacing still enforces the limit. */ }
@@ -833,16 +984,22 @@ class VideoPipeline {
         if (!this.encoder || this.encoder.state !== 'configured' || !this.config || !this.tier) return false;
         const fitted = fitTierToSource(this.tier.width, this.tier.height, this.sourceWidth, this.sourceHeight);
         const next = encoderConfig(this.codec, fitted.width, fitted.height,
-            this.tier.bitrateKbps, this.tier.framerate, this.config.hardwareAcceleration);
-        if (next.width === this.config.width && next.height === this.config.height &&
-            next.bitrate === this.config.bitrate && next.framerate === this.config.framerate) return false;
+            this.tier.bitrateKbps, this.tier.framerate, this.config.hardwareAcceleration,
+            temporalModeFor(this.tier.framerate, this.temporalModes));
+        const reshaped = next.width !== this.config.width || next.height !== this.config.height ||
+            next.framerate !== this.config.framerate || next.scalabilityMode !== this.config.scalabilityMode;
+        if (!reshaped && next.bitrate === this.config.bitrate) return false;
         this.config = next;
         this.encoder.configure(next);
-        this.pendingKeyframe = true;
+        // A new size cannot be decoded against an old reference. A bitrate change keeps the references: an
+        // encoder that restarts anyway says so by emitting a keyframe, which the far side sees as one.
+        if (reshaped) this.forceKeyframe = true;
         return true;
     }
 
-    requestKeyframe() { this.pendingKeyframe = true; }
+    /// A receiver or relay asked for a keyframe (coalesced to one a second), or, with force, this sender dropped
+    /// a base picture itself and every receiver is stalled until the next keyframe.
+    requestKeyframe(force = false) { if (force) this.forceKeyframe = true; else this.pendingKeyframe = true; }
 
     /// Record the shape of the frames now arriving and re-fit the encoder if it changed. This is
     /// what carries a camera switch (front 4:3 to back 16:9) and a phone turned over mid-call.

@@ -243,6 +243,70 @@ public sealed class BoltMediaEnablementSafetyTests
     }
 
     [Test]
+    public async Task LocalStreams_GetTheRelaysCongestionReports_OthersAreIgnored()
+    {
+        await using var client = CreateClientWithConnection(out var connection);
+        await using var media = new BoltMediaClient(client, NullLogger<BoltMediaClient>.Instance);
+        var callId = await media.StartCallAsync("peer");
+        var stream = new BoltMediaStream(connection, Guid.NewGuid(), callId, false);
+        media.RegisterMediaStream(stream).Should().BeTrue();
+        var reports = new List<MediaCongestionData>();
+        var feedback = new List<MediaFeedbackData>();
+        media.OnCongestionReport += reports.Add;
+        media.OnReceiverFeedback += feedback.Add;
+        foreach (var target in new[] { stream.StreamId, Guid.NewGuid() })
+        {
+            var writer = new ArrayBufferWriter<byte>();
+            BoltCodec.WriteMediaCongestion(writer, new MediaCongestionData { StreamId = target, QueueDelayMs = 120 });
+            var frame = writer.WrittenMemory.ToArray();
+            typeof(BoltMediaClient).GetMethod("HandleMediaCongestion", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(media, [connection, frame, frame.Length]);
+            writer = new ArrayBufferWriter<byte>();
+            BoltCodec.WriteMediaFeedback(writer, target, 1, 0, 0, 0, QualityHint.Maintain, 80, 300);
+            frame = writer.WrittenMemory.ToArray();
+            typeof(BoltMediaClient).GetMethod("HandleMediaFeedback", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(media, [connection, frame, frame.Length]);
+        }
+        reports.Select(x => x.StreamId).Should().Equal(stream.StreamId);
+        feedback.Should().ContainSingle().Which.QueueDelayMs.Should().Be(80);
+        connection.CompleteSendChannel();
+    }
+
+    [Test]
+    public async Task RemoteKeyframeRequests_AreRateLimitedPerStream_UnlessADecoderHasNothingAtAll()
+    {
+        var transport = new CountingConnection();
+        var client = new BoltClient(new Uri("ws://localhost/bolt"), "media-test", "Media Test", new BoltClientOptions(), NullLogger<BoltClient>.Instance);
+        var connection = new BoltConnection(transport);
+        connection.StartSendLoop(CancellationToken.None);
+        ((List<BoltConnection>)typeof(BoltClient).GetField("_connections", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(client)!).Add(connection);
+        await using var media = new BoltMediaClient(client, NullLogger<BoltMediaClient>.Instance);
+        var callId = await media.StartCallAsync("peer");
+        var stream = new BoltMediaStream(connection, Guid.NewGuid(), callId, false);
+        media.RegisterMediaStream(stream).Should().BeTrue();
+        for (var i = 0; i < 5; i++) await media.RequestRemoteKeyframeAsync(stream.StreamId);
+        await media.RequestRemoteKeyframeAsync(stream.StreamId, force: true);
+        await Task.Delay(100);
+        transport.Count(FrameType.MediaKeyRequest).Should().Be(2, "one per second per stream, plus the forced one");
+        connection.CompleteSendChannel();
+        await client.DisposeAsync();
+    }
+
+    [Test]
+    public async Task ReceiverDelayReport_IsOnlySentForAStreamThatIsFlowing()
+    {
+        var connection = new BoltConnection(new NoopConnection());
+        await using var controller = new AdaptiveBitrateController(connection, Guid.NewGuid(), 400, isAudio: true);
+        var now = Environment.TickCount64;
+        controller.DelayReport(now).Should().BeNull("nothing arrived yet");
+        uint ts = 0;
+        for (uint sequence = 1; sequence <= 20; sequence++, ts += 960) controller.RecordFrameReceived(sequence, ts, 100);
+        controller.DelayReport(now + 250).Should().NotBeNull();
+        controller.DelayReport(now + 500).Should().BeNull("a stream that went quiet has no current delay to report");
+        connection.CompleteSendChannel();
+    }
+
+    [Test]
     public async Task VideoFeedback_FragmentBursts_DoNotLookLikePictureJitter_ButStillDetectLoss()
     {
         var connection = new BoltConnection(new NoopConnection());
@@ -320,6 +384,22 @@ public sealed class BoltMediaEnablementSafetyTests
         public byte[] Encrypt(ReadOnlySpan<byte> plaintext, uint sequenceNumber, Guid streamId) => plaintext.ToArray();
         public byte[] Decrypt(ReadOnlySpan<byte> ciphertextWithTag, uint sequenceNumber, Guid streamId) => ciphertextWithTag.ToArray();
         public void Dispose() { }
+    }
+
+    /// <summary>Records what is sent, one frame per write.</summary>
+    private sealed class CountingConnection : IBoltConnection
+    {
+        private readonly System.Collections.Concurrent.ConcurrentQueue<byte[]> _sent = new();
+        public int Count(FrameType type) => _sent.Count(x => x.Length > 0 && x[0] == (byte)type);
+        public bool SupportsDatagrams => false;
+        public bool IsConnected => true;
+        public BoltTransport TransportType => BoltTransport.WebSocket;
+        public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) { _sent.Enqueue(data.ToArray()); return ValueTask.CompletedTask; }
+        public ValueTask<(int BytesRead, bool EndOfMessage)> ReceiveAsync(Memory<byte> buffer, CancellationToken ct = default) =>
+            new(Task.Delay(Timeout.Infinite, ct).ContinueWith(_ => (0, true), TaskScheduler.Default));
+        public ValueTask SendDatagramAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) => ValueTask.CompletedTask;
+        public ValueTask CloseAsync(CancellationToken ct = default) => ValueTask.CompletedTask;
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private sealed class NoopConnection : IBoltConnection

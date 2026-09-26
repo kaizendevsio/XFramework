@@ -12,7 +12,7 @@ public sealed class ManagedOpusCodec : IDisposable
     private readonly IOpusEncoder _encoder;
     private readonly ManagedOpusDecoder _decoder;
 
-    public ManagedOpusCodec(int bitrateKbps = 128)
+    public ManagedOpusCodec(int bitrateKbps = 128, OpusEncoderSettings? opus = null)
     {
         // Select managed implementations explicitly: WASM must never probe native DLLs.
 #pragma warning disable CS0618
@@ -20,6 +20,12 @@ public sealed class ManagedOpusCodec : IDisposable
         _decoder = new ManagedOpusDecoder();
 #pragma warning restore CS0618
         _encoder.Complexity = 3;
+        if (opus is not null)
+        {
+            _encoder.UseInbandFEC = opus.InbandFec;
+            _encoder.PacketLossPercent = Math.Clamp(opus.PacketLossPercent, 0, 100);
+            _encoder.UseDTX = opus.Dtx;
+        }
         SetBitrate(bitrateKbps);
     }
 

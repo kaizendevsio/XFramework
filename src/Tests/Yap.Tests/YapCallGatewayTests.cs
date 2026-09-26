@@ -27,7 +27,7 @@ using XFramework.Integration.Security;
 namespace Yap.Tests;
 
 [TestFixture]
-public sealed class YapCallGatewayTests
+public sealed partial class YapCallGatewayTests
 {
     [TestCase(false)]
     [TestCase(true)]
@@ -600,6 +600,87 @@ public sealed class YapCallGatewayTests
         Assert.That(Assert.ThrowsAsync<YapApiException>(() => f.Gateway.ConnectAsync(f.Bob, invite.Id, default))!.Status, Is.EqualTo(404));
     }
 
+    // ── Periodic re-authorization: only a definitive refusal may end a call ──
+
+    [Test]
+    public async Task Renewal_HealthySeat_IsAllowed()
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        var (room, bob) = await SeatedBobAsync(f);
+        Assert.That(await f.Gateway.RenewParticipantAsync(room, YapCallGateway.ClientId(room, f.BobId), bob),
+            Is.EqualTo(BoltGroupAuthorizationDecision.Allowed));
+    }
+
+    [TestCase(HttpStatusCode.ServiceUnavailable)]
+    [TestCase(HttpStatusCode.InternalServerError)]
+    [TestCase(HttpStatusCode.GatewayTimeout)]
+    [TestCase(HttpStatusCode.Unauthorized)]
+    public async Task Renewal_ChatServiceOutage_IsUnavailable_NotARefusal(HttpStatusCode status)
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        var (room, bob) = await SeatedBobAsync(f);
+        f.ThreadStatus = status;
+        Assert.That(await f.Gateway.RenewParticipantAsync(room, YapCallGateway.ClientId(room, f.BobId), bob),
+            Is.EqualTo(BoltGroupAuthorizationDecision.Unavailable));
+        // Admission stays fail-closed on the very same answer.
+        Assert.That(() => f.Gateway.AuthorizeParticipantAsync(room, YapCallGateway.ClientId(room, f.BobId), bob).AsTask(),
+            Throws.InstanceOf<YapApiException>());
+    }
+
+    [Test]
+    public async Task Renewal_UnreachableHubOrDirectory_IsUnavailable()
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        var (room, bob) = await SeatedBobAsync(f);
+        var client = YapCallGateway.ClientId(room, f.BobId);
+        f.ThreadFailure = new IOException("Bolt RPC failed: the hub connection is reconnecting.");
+        Assert.That(await f.Gateway.RenewParticipantAsync(room, client, bob), Is.EqualTo(BoltGroupAuthorizationDecision.Unavailable));
+        f.ThreadFailure = null;
+        f.DirectoryStatus = HttpStatusCode.ServiceUnavailable;
+        Assert.That(await f.Gateway.RenewParticipantAsync(room, client, bob), Is.EqualTo(BoltGroupAuthorizationDecision.Unavailable));
+    }
+
+    [TestCase("thread-forbidden")]
+    [TestCase("thread-gone")]
+    [TestCase("removed-from-thread")]
+    [TestCase("device-revoked")]
+    [TestCase("left-call")]
+    public async Task Renewal_DefinitiveRefusal_IsDenied(string refusal)
+    {
+        await using var f = await Fixture.CreateAsync(groupLifecycle: true);
+        var (room, bob) = await SeatedBobAsync(f);
+        switch (refusal)
+        {
+            case "thread-forbidden": f.ThreadStatus = HttpStatusCode.Forbidden; break;
+            case "thread-gone": f.ThreadStatus = HttpStatusCode.NotFound; break;
+            case "removed-from-thread": f.Members.RemoveAll(x => x.CredentialId == f.BobId); break;
+            case "device-revoked": f.RevokedDevices.Add(f.BobDevice); break;
+            case "left-call": await f.Gateway.LeaveGroupAsync(f.Bob, room); break;
+        }
+        Assert.That(await f.Gateway.RenewParticipantAsync(room, YapCallGateway.ClientId(room, f.BobId), bob),
+            Is.EqualTo(BoltGroupAuthorizationDecision.Denied));
+    }
+
+    /// <summary>A three-person room with Bob accepted, connected and registered, as the relay sees him.</summary>
+    private static async Task<(Guid Room, ClaimsPrincipal Bob)> SeatedBobAsync(Fixture f)
+    {
+        var room = await f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId, f.CharlieId], deviceId: f.AliceDevice);
+        await f.Gateway.AcceptGroupAsync(f.Bob, room.Id, deviceId: f.BobDevice);
+        var groups = (System.Collections.IDictionary)typeof(YapCallGateway)
+            .GetField("groups", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(f.Gateway)!;
+        var state = groups[room.Id]!;
+        var member = ((System.Collections.IDictionary)state.GetType().GetProperty("Members")!.GetValue(state)!)[f.BobId]!;
+        member.GetType().GetField("Connected")!.SetValue(member, true);
+        member.GetType().GetField("Registered")!.SetValue(member, true);
+        var identity = new ClaimsIdentity(f.Bob.Identity as ClaimsIdentity);
+        identity.AddClaim(new("bolt_media_client_id", YapCallGateway.ClientId(room.Id, f.BobId)));
+        identity.AddClaim(new("yap_call_id", room.Id.ToString()));
+        // The seat generation the relay's connection was admitted as (the first connection is 1).
+        member.GetType().GetField("Generation")!.SetValue(member, 1);
+        identity.AddClaim(new("yap_connection", "1"));
+        return (room.Id, new ClaimsPrincipal(identity));
+    }
+
     // Invite expiry is wall-clock. Rather than sleeping out a 60 second invite, the stored one is
     // rewritten with a deadline in the past so the real guards run against a real expired call.
     private static void Expire(YapCallGateway gateway, Guid callId)
@@ -626,6 +707,10 @@ public sealed class YapCallGatewayTests
         public ConcurrentQueue<RecordCallRequest> History { get; } = new();
         public SemaphoreSlim HistoryArrived { get; } = new(0);
         public bool FailHistory;
+        /// <summary>What the Communications and IdentityServer lookups answer, to model outages and refusals.</summary>
+        public HttpStatusCode ThreadStatus = HttpStatusCode.OK;
+        public Exception? ThreadFailure;
+        public HttpStatusCode DirectoryStatus = HttpStatusCode.OK;
         public SemaphoreSlim HistoryFailed { get; } = new(0);
         public SemaphoreSlim PushArrived { get; } = new(0);
         public List<ThreadMemberResponse> Members { get; } = [];
@@ -651,8 +736,12 @@ public sealed class YapCallGatewayTests
                     return new CmdResponse { HttpStatusCode = HttpStatusCode.OK };
                 });
             wrapper.Setup(x => x.GetThreadAsync(It.IsAny<GetThreadRequest>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(() => new QueryResponse<GetThreadResponse> { HttpStatusCode = HttpStatusCode.OK,
-                    Response = new GetThreadResponse { Id = fixture.Thread, Members = fixture.Members } });
+                .Returns(() => fixture.ThreadFailure is { } failure
+                    ? Task.FromException<QueryResponse<GetThreadResponse>>(failure)
+                    : Task.FromResult(fixture.ThreadStatus == HttpStatusCode.OK
+                        ? new QueryResponse<GetThreadResponse> { HttpStatusCode = HttpStatusCode.OK,
+                            Response = new GetThreadResponse { Id = fixture.Thread, Members = fixture.Members } }
+                        : new QueryResponse<GetThreadResponse> { HttpStatusCode = fixture.ThreadStatus }));
             var actorScope = new Mock<IActorAccessTokenScope>();
             var identity = new Mock<IIdentityServerServiceWrapper>();
             var notifications = new Mock<INotificationsServiceWrapper>();
@@ -681,6 +770,8 @@ public sealed class YapCallGatewayTests
             identity.Setup(x => x.GetEncryptionDirectory(It.IsAny<GetEncryptionDirectoryRequest>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((GetEncryptionDirectoryRequest request, CancellationToken _) =>
                 {
+                    if (fixture.DirectoryStatus != HttpStatusCode.OK)
+                        return new QueryResponse<EncryptionDirectoryResponse> { HttpStatusCode = fixture.DirectoryStatus };
                     var device = request.CredentialId == alice.Credential.Id ? fixture.AliceDevice : request.CredentialId == bob.Credential.Id ? fixture.BobDevice : fixture.CharlieDevice;
                     return new QueryResponse<EncryptionDirectoryResponse> { HttpStatusCode = HttpStatusCode.OK, Response = new()
                     { TenantId = alice.Credential.TenantId, CredentialId = request.CredentialId,

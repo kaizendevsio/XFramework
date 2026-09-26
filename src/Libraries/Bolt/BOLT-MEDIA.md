@@ -64,10 +64,12 @@ The intended SFU path forwards encoded payloads without codec decoding. The curr
 |------|------|-------------|---------|
 | MediaConfig | 0x20 | 52 bytes + extension | Codec/resolution negotiation |
 | MediaFrame | 0x21 | 30 bytes + payload | Encoded audio/video frame |
-| MediaFeedback | 0x22 | 32 bytes (fixed) | Receiver reports loss, jitter, RTT |
+| MediaFeedback | 0x22 | 32 bytes, or 40 with a delay report | Receiver reports loss, jitter, RTT; optionally its end-to-end queuing delay and received rate |
 | MediaKeyRequest | 0x23 | 17 bytes (fixed) | Request keyframe from sender |
 | CallSignal | 0x24 | 22 bytes + payload | Call lifecycle signaling |
 | FecFrame | 0x25 | 26 bytes + payload | XOR parity for error correction |
+| NackRequest | 0x26 | 19 bytes + 4 per sequence | Retransmission request (never sent over a WebSocket) |
+| MediaCongestion | 0x27 | 32 bytes (fixed) | Relay-to-sender congestion report; only a relay originates it |
 
 ### MediaFrame Header (30 bytes)
 
@@ -77,7 +79,17 @@ The intended SFU path forwards encoded payloads without codec decoding. The curr
 
 - **sequenceNumber** — monotonic per-stream, for ordering + gap detection
 - **timestamp** — RTP-style media clock (48kHz for audio, 90kHz for video)
-- **flags** — bit 0: keyframe, bit 1: end-of-picture, bit 2: marker, bit 3: FEC-protected, bit 4-5: priority, bit 6: drop-eligible, bit 7: compressed
+- **flags** — bit 0: keyframe (first fragment of a keyframe), bits 1-2: temporal layer of a video picture (0 = base), bit 3: FEC-protected, bit 4: encrypted, bit 6: drop-eligible, bit 7: compressed. Bit 2 means "silence indicator" on the legacy unencrypted audio path.
+
+The flags and the timestamp are clear and not covered by the SFrame AAD (which binds call, epoch, roster, sender, stream, sequence and timestamp values the receiver checks). They only steer what a relay forwards: receivers take the keyframe flag and the temporal layer from the fragment header inside the ciphertext, so a relay that rewrites them can only drop more or less, which it can do anyway. The relay learns each picture's layer, a coarse view of the frame structure comparable to WebRTC's dependency descriptor.
+
+### Congestion control on the WebSocket path
+
+A call on TCP never loses media, so congestion shows as delay and as the relay's drops.
+
+- **Relay.** Each receiver's queue sheds a stream's top temporal layer when it is 20% full, every enhancement layer at 40%, and the base layer (then everything until a keyframe) only when it overflows. A shed layer comes back only at a base-layer picture, so every forwarded picture's references were forwarded too. Every 250 ms (500 ms for audio) the relay tells each sender, per stream, about the worst receiver: its queue delay, the sender-to-relay queuing delay, the stream's share of what that receiver drained while backlogged, drops, base-layer losses and the layer limit (`MediaCongestion`).
+- **Receiver.** Every 250 ms it adds its end-to-end queuing delay (one-way delay above its recent minimum, against the sender's capture clock) and what it received to its `MediaFeedback`.
+- **Sender.** `MediaSendPacer` holds audio and video above the transport, sends audio first, keeps the connection's queue and the browser's WebSocket buffer short, and drops whole pictures (enhancement layers first). `SendRateController` turns the three views into one estimate (fast down, slow probing up, hysteresis), and `VideoRateLadder` into a picture size, frame rate and bitrate.
 
 ### CallSignal Types
 

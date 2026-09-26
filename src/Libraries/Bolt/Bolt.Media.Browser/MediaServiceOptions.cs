@@ -14,18 +14,41 @@ public enum MediaSecurityMode
 public sealed class MediaServiceOptions
 {
     public MediaSecurityMode SecurityMode { get; set; } = MediaSecurityMode.EndToEndEncrypted;
-    public int AudioBitrateKbps { get; set; } = 128;
+    /// <summary>
+    /// Opus voice bitrate. 32 kbps is full-quality wideband speech and leaves a 512 kbps mobile link
+    /// room for video; 128 kbps cost a third of that link on its own.
+    /// </summary>
+    public int AudioBitrateKbps { get; set; } = 32;
+    /// <summary>Ask Opus for in-band FEC where the encoder supports it (WebCodecs <c>useinbandfec</c>).</summary>
+    public bool AudioInbandFec { get; set; } = true;
+    /// <summary>Expected loss the FEC is tuned for, in percent (WebCodecs <c>packetlossperc</c>).</summary>
+    public int AudioPacketLossPercent { get; set; } = 5;
+    /// <summary>Discontinuous transmission: silence costs (almost) nothing on the wire.</summary>
+    public bool AudioDtx { get; set; } = true;
     public int AudioSampleRate { get; set; } = 48_000;
     public int AudioChannels { get; set; } = 1;
 
     /// <summary>Tallest picture this build will ever ask an encoder for. Devices cap themselves below it.</summary>
     public int VideoMaxHeight { get; set; } = 2160;
-    /// <summary>Default to 1080p30; measured pressure lowers quality automatically.</summary>
-    public int VideoStartTier { get; set; } = 5;
-    /// <summary>Seconds between forced keyframes. Short enough for a late joiner, long enough not to flood.</summary>
-    public int KeyframeIntervalSeconds { get; set; } = 2;
-    /// <summary>How often the send ladder looks at measured conditions.</summary>
-    public int AdaptationIntervalMs { get; set; } = 1_000;
+    /// <summary>
+    /// Ladder rung every call starts on: 240p15, which fits a mobile link. The user's preference is a
+    /// ceiling the ladder climbs towards on measured headroom, never where a call begins.
+    /// </summary>
+    public int VideoStartTier { get; set; } = 0;
+    /// <summary>
+    /// Safety interval between unrequested keyframes. Keyframes are otherwise sent on demand: a new
+    /// receiver, a decoder reset or a relay that dropped pictures asks for one.
+    /// </summary>
+    public int KeyframeIntervalSeconds { get; set; } = 10;
+    /// <summary>How often the send rate loop reads its signals and moves the encoders.</summary>
+    public int AdaptationIntervalMs { get; set; } = 250;
+    /// <summary>
+    /// Encode temporal layers (L1T2/L1T3) where the browser's encoder accepts them, so the relay can shed
+    /// enhancement pictures for one slow receiver instead of every picture until a keyframe.
+    /// </summary>
+    public bool TemporalLayers { get; set; } = true;
+    /// <summary>Let the rate loop move Opus between its low, normal and high rates. Off keeps <see cref="AudioBitrateKbps"/>.</summary>
+    public bool AdaptiveAudioBitrate { get; set; } = true;
 
     /// <summary>Legacy option retained for source compatibility. SecurityMode is authoritative;
     /// setting this to false cannot opt into transport-only security.</summary>

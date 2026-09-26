@@ -24,8 +24,8 @@ public sealed class BoltVideoPipeline(IJSRuntime js, ILogger<BoltVideoPipeline> 
     private DotNetObjectReference<BoltVideoPipeline>? self;
     private bool capturing;
 
-    /// <summary>An encoded picture: payload, keyframe flag, sender-assigned frame ID, capture time in µs.</summary>
-    public event Action<byte[], bool, uint, uint>? OnEncoded;
+    /// <summary>An encoded picture: payload, keyframe flag, sender-assigned frame ID, capture time in µs, temporal layer.</summary>
+    public event Action<byte[], bool, uint, uint, int>? OnEncoded;
     /// <summary>The browser released the camera: "hidden", "ended", "denied" or "encoder".</summary>
     public event Action<string>? OnCaptureStopped;
     /// <summary>A remote decoder failed; the caller should ask that sender for a keyframe.</summary>
@@ -51,10 +51,11 @@ public sealed class BoltVideoPipeline(IJSRuntime js, ILogger<BoltVideoPipeline> 
     public async Task<MediaDeviceInfo[]> CamerasAsync()
         => await (await ModuleAsync()).InvokeAsync<MediaDeviceInfo[]>("enumerateVideoInputs");
 
-    public async Task InitializeEncoderAsync(string codec, VideoTier tier, int keyframeSeconds = 2)
+    /// <param name="temporalLayers">Encode temporal layers (L1T2/L1T3) where the encoder accepts them.</param>
+    public async Task InitializeEncoderAsync(string codec, VideoTier tier, int keyframeSeconds = 2, bool temporalLayers = false)
     {
         var active = await PipelineAsync();
-        await active.InvokeAsync<object>("initEncoder", codec, tier.Width, tier.Height, tier.BitrateKbps, tier.Framerate, keyframeSeconds);
+        await active.InvokeAsync<object>("initEncoder", codec, tier.Width, tier.Height, tier.BitrateKbps, tier.Framerate, keyframeSeconds, temporalLayers);
     }
 
     /// <summary>Opens the camera. The only call in this library that asks for video input.</summary>
@@ -98,9 +99,10 @@ public sealed class BoltVideoPipeline(IJSRuntime js, ILogger<BoltVideoPipeline> 
     public async ValueTask<bool> ApplyTierAsync(VideoTier tier)
         => pipeline is not null && await pipeline.InvokeAsync<bool>("applyTier", tier.Width, tier.Height, tier.BitrateKbps, tier.Framerate);
 
-    public async ValueTask RequestKeyframeAsync()
+    /// <param name="force">Skip the one-a-second coalescing: this sender dropped a base picture itself.</param>
+    public async ValueTask RequestKeyframeAsync(bool force = false)
     {
-        if (pipeline is not null) await pipeline.InvokeVoidAsync("requestKeyframe");
+        if (pipeline is not null) await pipeline.InvokeVoidAsync("requestKeyframe", force);
     }
 
     public async ValueTask<VideoSendStats> StatsAsync()
@@ -110,8 +112,8 @@ public sealed class BoltVideoPipeline(IJSRuntime js, ILogger<BoltVideoPipeline> 
         => pipeline is null ? null : await pipeline.InvokeAsync<VideoDiagnostics?>("getDiagnostics", enabled);
 
     [JSInvokable]
-    public void OnVideoEncoded(byte[] data, bool isKeyframe, uint frameId, uint timestamp)
-        => OnEncoded?.Invoke(data, isKeyframe, frameId, timestamp);
+    public void OnVideoEncoded(byte[] data, bool isKeyframe, uint frameId, uint timestamp, int temporalLayer)
+        => OnEncoded?.Invoke(data, isKeyframe, frameId, timestamp, Math.Clamp(temporalLayer, 0, 3));
 
     [JSInvokable]
     public void OnVideoCaptureStopped(string reason)

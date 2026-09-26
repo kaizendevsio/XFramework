@@ -42,7 +42,7 @@ function fixture() {
         navigator: { mediaDevices: { getUserMedia: async () => stream } }
     };
     vm.createContext(sandbox);
-    vm.runInContext(source + '\nthis.pipeline = createAudioPipeline(); this.check = checkVoiceCapabilities;', sandbox);
+    vm.runInContext(source + '\nthis.pipeline = createAudioPipeline(); this.check = checkVoiceCapabilities; this.Jitter = PlayoutJitter;', sandbox);
     return { p: sandbox.pipeline, sandbox, stats, stream, listeners };
 }
 async function initialized(f) { await f.p.initEncoder(48000, 1, 128); await f.p.initDecoder(48000, 1); }
@@ -181,7 +181,8 @@ test('wire clock converts to microseconds and decoder queue stays bounded', asyn
 test('playback stays bounded and hangup stops scheduled audio', async () => {
     const f = fixture(); await initialized(f);
     for (let i = 0; i < 100; i++) f.p._playAudioData(audio(f.stats));
-    assert.ok(f.stats.played.length <= 11); assert.equal(f.stats.closedFrames, 100);
+    // The playout target plus its latency cap (0.06 + 0.3 s) of 20 ms packets, then drops.
+    assert.ok(f.stats.played.length <= 19); assert.equal(f.stats.closedFrames, 100);
     const sources = [...f.p.sources]; f.p.stopPlayback();
     assert.ok(sources.every(s => s.stopped)); assert.equal(f.p.sources.size, 0);
     f.p._playAudioData(audio(f.stats)); assert.equal(f.stats.closedFrames, 101);
@@ -312,7 +313,7 @@ test('group playback overlaps speakers instead of serializing them and remains b
     for (let speaker = 0; speaker < 8; speaker++)
         for (let frame = 0; frame < 100; frame++) f.p.playPcm(pcm, `speaker-${speaker}`);
     assert.equal(f.p.receivers.size, 8);
-    assert.ok(f.p.sources.size <= 8 * 11);
+    assert.ok(f.p.sources.size <= 8 * 19);
     const sources = [...f.p.sources];
     f.p.stopPlayback();
     assert.equal(f.p.sources.size, 0); assert.equal(f.p.receivers.size, 0);
@@ -338,4 +339,73 @@ test('mute retains the microphone, unmute does not recapture, and hangup release
     f.p.stopCapture();
     assert.equal(f.stats.stopped, 1);
     assert.equal(f.p.captureRunning, false);
+});
+
+test('Opus asks for in-band FEC and DTX, and keeps them across a bitrate change', async () => {
+    const f = fixture();
+    await f.p.initEncoder(48000, 1, 32, { inbandFec: true, packetLossPercent: 5, dtx: true });
+    assert.equal(JSON.stringify(f.p.encoder.config.opus), JSON.stringify({ useinbandfec: true, usedtx: true, packetlossperc: 5 }));
+    assert.equal(f.p.encoder.config.bitrate, 32000, '32 kbps voice leaves a mobile link room for video');
+    f.p.reconfigureBitrate(48000, 1, 24);
+    assert.equal(f.p.encoder.config.bitrate, 24000);
+    assert.equal(f.p.encoder.config.opus.useinbandfec, true, 'a rate change must not silently drop FEC');
+    await f.p.dispose();
+});
+
+test('a browser that rejects the Opus tuning still gets a working plain encoder', async () => {
+    const f = fixture();
+    f.sandbox.AudioEncoder.isConfigSupported = async config => ({ supported: !config.opus });
+    await f.p.initEncoder(48000, 1, 32, { inbandFec: true, packetLossPercent: 5, dtx: true });
+    assert.equal(f.p.encoder.config.opus, undefined);
+    assert.equal(f.p.encoder.config.bitrate, 32000);
+    await f.p.dispose();
+});
+
+// ── Phase 1: capture time on the wire, adaptive playout ──
+
+test('the capture time rides along with every encoded packet', async () => {
+    const f = fixture(); await initialized(f);
+    const sent = [];
+    await f.p.startCapture({ invokeMethodAsync: async (method, bytes, at) => { sent.push([method, at]); } });
+    f.p.encoder.callbacks.output({ byteLength: 1, timestamp: 40_000, copyTo(a) { a[0] = 1; } });
+    await new Promise(r => setImmediate(r));
+    assert.deepEqual(sent, [['OnAudioEncoded', 40_000]]);
+    await f.p.dispose();
+});
+
+test('playout re-buffers to its target after running dry, instead of playing each packet on arrival', () => {
+    const f = fixture();
+    const jitter = new f.sandbox.Jitter();
+    const first = jitter.plan(10, 0);
+    assert.equal(first.at, 10 + jitter.target);
+    assert.equal(first.drop, false);
+    assert.equal(jitter.plan(10, 10.2).rate, 1.05, 'more than the target buffered: play a little fast to catch up');
+    assert.equal(jitter.plan(10, 10 + jitter.target + 0.35).drop, true, 'past the latency cap a burst is dropped');
+    assert.equal(jitter.plan(10, 10.01).rate, 0.97, 'running low: stretch slightly rather than stall');
+});
+
+test('the playout target follows measured jitter: clumped arrivals on a long RTT path stop running dry', () => {
+    const f = fixture();
+    const jitter = new f.sandbox.Jitter();
+    // 20 ms packets that arrive in clumps of ten every 200 ms, as behind a stalled TCP stream.
+    let underruns = 0, next = 0;
+    for (let packet = 0; packet < 1_000; packet++) {
+        const media = packet * 0.02;
+        const arrival = Math.ceil((media + 0.001) / 0.2) * 0.2 + 1;
+        jitter.observe(arrival, media);
+        const plan = jitter.plan(arrival, next);
+        if (plan.drop) continue;
+        if (next > 0 && plan.at > next + 0.001) underruns++;
+        next = plan.at + 0.02 / plan.rate;
+        if (packet === 500) underruns = 0;
+    }
+    assert.ok(jitter.target >= 0.18 && jitter.target <= 0.5, `target ${jitter.target}`);
+    assert.ok(underruns <= 2, `after adapting, ${underruns} underruns`);
+});
+
+test('playout target stays small on a steady path', () => {
+    const f = fixture();
+    const jitter = new f.sandbox.Jitter();
+    for (let packet = 0; packet < 500; packet++) jitter.observe(1 + packet * 0.02 + (packet % 3) * 0.002, packet * 0.02);
+    assert.ok(jitter.target <= 0.05, `target ${jitter.target}`);
 });

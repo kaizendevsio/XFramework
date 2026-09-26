@@ -13,7 +13,7 @@ using Yap.Contracts;
 
 namespace Yap.Client.Tests;
 
-public sealed class VoiceStateTests
+public sealed partial class VoiceStateTests
 {
     [Test]
     public async Task SlowEncryptionInitialization_DoesNotConsumeTheSocketTicketLifetime()

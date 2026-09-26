@@ -1,9 +1,11 @@
+using System.Net;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Bolt.Protocol;
 using Bolt.Protocol.Transport;
 using Bolt.Server;
 using Communications.Integration.Clients;
+using Microsoft.AspNetCore.Connections.Features;
 using Communications.Integration.Drivers;
 using XFramework.Integration.Security;
 using Yap.Contracts;
@@ -20,6 +22,19 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
     private readonly IServiceScopeFactory scopes;
     private readonly ILogger pushLogger;
     private readonly Timer cleanup;
+    private readonly Timer holds;
+    private readonly int relaySocketUnsentBytes;
+    /// <summary>SO_SNDBUF cap on call sockets (see <see cref="BoltSocketTuning.TryLimitSendBuffer"/>); 0 keeps kernel autotuning.</summary>
+    internal int RelaySocketSendBufferBytes { get; }
+
+    /// <summary>How long a participant whose connection dropped keeps their seat while they resume.</summary>
+    internal TimeSpan ReconnectGrace { get; }
+    /// <summary>Extra time a resumed connection gets to finish rejoining (and rekey, if the roster changed meanwhile).</summary>
+    internal static readonly TimeSpan ResumeWindow = TimeSpan.FromSeconds(30);
+    /// <summary>Longest call. A backstop against abandoned rooms, not an authorization bound: that is the 5 s re-check.</summary>
+    internal TimeSpan MaxCallDuration { get; }
+    /// <summary>Server-side dead-peer detection on call sockets (WebSocket ping/pong); zero disables it.</summary>
+    private readonly TimeSpan keepAliveTimeout;
 
     /// <summary>How long a ringing invite stays valid; push TTLs are matched to it.</summary>
     internal static readonly TimeSpan InviteLifetime = TimeSpan.FromSeconds(60);
@@ -41,6 +56,13 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
         // Video is on wherever encrypted groups are, and can still be switched off per environment.
         videoEnabled = enableGroupLifecycle && configuration.GetValue("Yap:Calls:Video", true);
         Enabled = configuration.GetValue<bool>("Yap:Calls:Enabled");
+        relaySocketUnsentBytes = Math.Clamp(configuration.GetValue("Yap:Calls:RelaySocketUnsentBytes", 32 * 1024), 0, 4 * 1024 * 1024);
+        // Off by default: behind an ingress proxy (Funnel) the relay's socket is not the phone's bottleneck leg, and
+        // a fixed cap is a throughput ceiling on long paths. Set it where the relay faces phones directly.
+        RelaySocketSendBufferBytes = Math.Clamp(configuration.GetValue("Yap:Calls:RelaySocketSendBufferBytes", 0), 0, 16 * 1024 * 1024);
+        ReconnectGrace = TimeSpan.FromSeconds(Math.Clamp(configuration.GetValue("Yap:Calls:ReconnectGraceSeconds", 45), 10, 300));
+        MaxCallDuration = TimeSpan.FromHours(Math.Clamp(configuration.GetValue("Yap:Calls:MaxCallHours", 12.0), 1, 48));
+        keepAliveTimeout = TimeSpan.FromSeconds(Math.Clamp(configuration.GetValue("Yap:Calls:KeepAliveTimeoutSeconds", 20), 0, 120));
         var requiredMode = enableGroupLifecycle ? "EndToEndEncrypted" : "TrustedServerTls";
         if (Enabled && configuration["Yap:Calls:SecurityMode"] != requiredMode)
             throw new InvalidOperationException($"Yap calls require the explicit {requiredMode} security mode.");
@@ -52,11 +74,20 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
             GroupCallAuthorizer = enableGroupLifecycle ? this : null,
             MaxCallParticipants = enableGroupLifecycle ? 8 : 2, MaxMediaStreamsPerPrincipal = 2,
             MaxFrameBytes = 64 * 1024, SendQueueCapacity = 64, SendQueueByteCapacity = 1024 * 1024,
+            // Control frames still may not wait long for a queue slot; media never waits at all
+            // (per-receiver lanes drop video first). A receiver is retired only when its socket makes
+            // no progress for the whole stall window, so a slow or briefly dead mobile link survives.
             SendEnqueueTimeoutMs = enableGroupLifecycle ? 250 : 0,
-            MaxConnectionsPerPrincipal = 2, MaxConnectionLifetimeSeconds = 3600
+            TransportSendStallTimeoutMs = Math.Clamp(configuration.GetValue("Yap:Calls:RelayStallTimeoutSeconds", 15), 1, 120) * 1000,
+            // How long a seat survives while its periodic re-check cannot be answered (backend outage).
+            GroupAuthorizationGraceSeconds = Math.Clamp(configuration.GetValue("Yap:Calls:AuthorizationGraceSeconds", 120), 0, 600),
+            // A connection lives as long as the call may; the relay re-authorizes every participant every 5 s.
+            MaxConnectionsPerPrincipal = 2, MaxConnectionLifetimeSeconds = (int)MaxCallDuration.TotalSeconds
         });
-        Server.GroupParticipantRemoved += GroupParticipantRemoved;
+        Server.GroupParticipantDeparted += GroupParticipantDeparted;
         cleanup = new Timer(_ => Prune(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+        // Seat holds expire on the second, not on the 5 s cleanup tick.
+        holds = new Timer(_ => ExpireHolds(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
     }
 
     public static string ClientId(Guid call, Guid user) => $"yap-media-{call:N}-{user:N}";
@@ -100,7 +131,7 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
             active = GetInvite(tenant, credential, callId);
             if (active.Connected.Contains(credential)) throw new YapApiException(409, "This call is already connected on this account.");
             foreach (var old in tickets.Where(x => x.Value.CallId == callId && x.Value.User == credential).Select(x => x.Key).ToArray()) tickets.Remove(old);
-            tickets[ticket] = new Ticket(callId, tenant, credential, user.FindFirstValue(YapAuth.SessionClaim)!, DateTimeOffset.UtcNow.AddSeconds(30));
+            tickets[TicketKey(ticket)] = new Ticket(callId, tenant, credential, user.FindFirstValue(YapAuth.SessionClaim)!, DateTimeOffset.UtcNow.AddSeconds(30));
         }
         return new(callId, $"/api/chat/calls/socket?ticket={ticket}", ClientId(callId, credential), ClientId(callId, recipient));
     }
@@ -162,7 +193,7 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
         if (!HasSameOrigin(context.Request)) throw new YapApiException(403, "Open this call from Yap.");
         if (!context.WebSockets.IsWebSocketRequest) throw new YapApiException(400, "A call connection is required.");
         var (tenant, credential) = Identity(context.User);
-        var token = context.Request.Query["ticket"].ToString();
+        var token = TicketKey(context.Request.Query["ticket"].ToString());
         bool groupTicket;
         lock (gate) groupTicket = tickets.TryGetValue(token, out var candidate) && candidate.Group;
         if (groupTicket) { await AcceptGroupSocketAsync(context, token); return; }
@@ -186,8 +217,9 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
             identity.AddClaim(new("yap_call_id", ticket.CallId.ToString()));
             var principal = new ClaimsPrincipal(identity);
             using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted, active.Lifetime.Token);
-            lifetime.CancelAfter(TimeSpan.FromHours(1));
-            using var socket = await context.WebSockets.AcceptWebSocketAsync();
+            lifetime.CancelAfter(MaxCallDuration);
+            LimitUnsentBytes(context);
+            using var socket = await context.WebSockets.AcceptWebSocketAsync(SocketOptions());
             await using var transport = new ReadyTransport(new WebSocketBoltConnection(socket), () =>
             { lock (gate) active.Registered.Add(credential); });
             await Server.HandleConnectionAsync(transport, principal, lifetime.Token, isSecureTransport: context.Request.IsHttps);
@@ -233,6 +265,16 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
 
     private async Task<HashSet<Guid>> CurrentMembersAsync(ClaimsPrincipal user, Guid thread, CancellationToken ct)
     {
+        var (_, members) = await ReadMembersAsync(user, thread, ct);
+        return members ?? throw new YapApiException(403, "Calls are available only to current conversation members.");
+    }
+
+    /// <summary>
+    /// The thread's current members as seen by <paramref name="user"/>, or null when the service did
+    /// not return them; the status then says whether that was a refusal or an unavailable service.
+    /// </summary>
+    private async Task<(HttpStatusCode Status, HashSet<Guid>? Members)> ReadMembersAsync(ClaimsPrincipal user, Guid thread, CancellationToken ct)
+    {
         await using var scope = scopes.CreateAsyncScope();
         var services = scope.ServiceProvider;
         var client = new CommunicationsChatClient(services.GetRequiredService<ICommunicationsServiceWrapper>(),
@@ -240,10 +282,42 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
             services.GetRequiredService<IActorAccessTokenScope>());
         var session = await client.ForCurrentActorAsync(ct: ct);
         var response = await session.GetThreadAsync(thread, ct);
-        if (!response.IsSuccess || response.Response is null || !response.Response.Members.Any(x => x.CredentialId == session.CredentialId))
-            throw new YapApiException(403, "Calls are available only to current conversation members.");
-        return response.Response.Members.Select(x => x.CredentialId).ToHashSet();
+        if (!response.IsSuccess || response.Response is null) return (response.HttpStatusCode, null);
+        // A thread returned to someone who is not among its members is a refusal, whatever the status says.
+        if (!response.Response.Members.Any(x => x.CredentialId == session.CredentialId)) return (HttpStatusCode.Forbidden, null);
+        return (response.HttpStatusCode, response.Response.Members.Select(x => x.CredentialId).ToHashSet());
     }
+
+    private async Task<BoltGroupAuthorizationDecision> CheckMembershipAsync(ClaimsPrincipal user, Guid thread, Guid member, CancellationToken ct)
+    {
+        var (status, members) = await ReadMembersAsync(user, thread, ct);
+        if (members is null)
+            return IsDefinitiveRefusal(status) ? BoltGroupAuthorizationDecision.Denied : BoltGroupAuthorizationDecision.Unavailable;
+        return members.Contains(member) ? BoltGroupAuthorizationDecision.Allowed : BoltGroupAuthorizationDecision.Denied;
+    }
+
+    /// <summary>
+    /// Keeps the kernel from hiding seconds of media behind a slow phone: the backlog stays in the
+    /// relay's per-receiver queues, where audio is served first and stale video is dropped.
+    /// </summary>
+    private void LimitUnsentBytes(HttpContext context)
+    {
+        var socket = context.Features.Get<IConnectionSocketFeature>()?.Socket;
+        if (relaySocketUnsentBytes > 0) BoltSocketTuning.TryLimitUnsentBytes(socket, relaySocketUnsentBytes);
+        if (RelaySocketSendBufferBytes > 0) BoltSocketTuning.TryLimitSendBuffer(socket, RelaySocketSendBufferBytes);
+    }
+
+    /// <summary>
+    /// The server pings every call socket and aborts one whose pong does not come back in time. A
+    /// phone that changed networks leaves a TCP connection that would otherwise look alive for
+    /// minutes; this is what lets the other participants see "Reconnecting" promptly.
+    /// </summary>
+    private WebSocketAcceptContext SocketOptions() => keepAliveTimeout > TimeSpan.Zero
+        ? new WebSocketAcceptContext { KeepAliveInterval = TimeSpan.FromSeconds(5), KeepAliveTimeout = keepAliveTimeout }
+        : new WebSocketAcceptContext();
+
+    /// <summary>Tickets are kept only as a hash: the server can check one, never hand one back out.</summary>
+    private static string TicketKey(string ticket) => Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(ticket)));
 
     public static bool HasSameOrigin(HttpRequest request) => Uri.TryCreate(request.Headers.Origin.ToString(), UriKind.Absolute, out var origin) &&
         origin.Scheme == Uri.UriSchemeHttps && string.Equals(origin.Authority, request.Host.Value, StringComparison.OrdinalIgnoreCase) &&
@@ -287,7 +361,8 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
     public void Dispose()
     {
         cleanup.Dispose();
-        Server.GroupParticipantRemoved -= GroupParticipantRemoved;
+        holds.Dispose();
+        Server.GroupParticipantDeparted -= GroupParticipantDeparted;
         lock (gate)
         {
             foreach (var item in invites.Values) item.Lifetime.Cancel();
@@ -295,7 +370,13 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
         }
         Server.Dispose();
     }
-    private sealed record Ticket(Guid CallId, Guid Tenant, Guid User, string Session, DateTimeOffset ExpiresAt, bool Group = false);
+    /// <summary>
+    /// A single-use socket admission. A join ticket admits the first connection; a resume ticket admits
+    /// the connection that replaces generation <c>Generation</c> of the same participant's seat on the
+    /// same device, and nothing else.
+    /// </summary>
+    private sealed record Ticket(Guid CallId, Guid Tenant, Guid User, string Session, DateTimeOffset ExpiresAt, bool Group = false,
+        bool Resume = false, Guid DeviceId = default, int Generation = 0);
     private sealed class ActiveInvite(Guid tenant, YapCallInvite invite)
     {
         public Guid Tenant { get; } = tenant;
@@ -336,7 +417,8 @@ public static class YapCallEndpoints
         var api = app.MapGroup("/api/chat/calls").RequireAuthorization().AddEndpointFilter<YapApiFilter>();
         api.MapGet("/config", (YapCallGateway gateway) => new { enabled = gateway.Enabled,
             securityMode = gateway.EncryptedGroupsEnabled ? "EndToEndEncrypted" : "TrustedServerTls", groupCalls = gateway.EncryptedGroupsEnabled,
-            video = gateway.VideoEnabled, maxVideoSenders = YapCallGateway.MaxVideoSenders });
+            video = gateway.VideoEnabled, maxVideoSenders = YapCallGateway.MaxVideoSenders,
+            reconnectGraceSeconds = (int)gateway.ReconnectGrace.TotalSeconds });
         api.MapPost("/", (StartYapCall request, HttpContext context, YapCallGateway gateway, CancellationToken ct) => gateway.StartAsync(context.User, request, ct));
         api.MapPost("/{id:guid}/connect", (Guid id, HttpContext context, YapCallGateway gateway, CancellationToken ct) => gateway.ConnectAsync(context.User, id, ct));
         api.MapPost("/{id:guid}/ready", (Guid id, HttpContext context, YapCallGateway gateway) => { gateway.Ready(context.User, id); return Results.NoContent(); });
@@ -354,6 +436,12 @@ public static class YapCallEndpoints
             return gateway.AcceptGroupAsync(context.User, id, ct, request.DeviceId);
         });
         api.MapPost("/groups/{id:guid}/connect", (Guid id, HttpContext context, YapCallGateway gateway, CancellationToken ct) => gateway.ConnectGroupAsync(context.User, id, ct));
+        // A fresh single-use ticket for the seat this session and device already hold; see ResumeGroupAsync.
+        api.MapPost("/groups/{id:guid}/resume", (Guid id, YapGroupResume request, HttpContext context, YapCallGateway gateway, CancellationToken ct) =>
+        {
+            if (request.DeviceId == Guid.Empty) throw new YapApiException(400, "An approved device is required.");
+            return gateway.ResumeGroupAsync(context.User, id, request.DeviceId, ct);
+        });
         api.MapPost("/groups/{id:guid}/ready", async (Guid id, YapGroupReady request, HttpContext context, YapCallGateway gateway, CancellationToken ct) => { await gateway.ReadyGroupAsync(context.User, id, ct, request.Revision); return Results.NoContent(); });
         api.MapPost("/groups/{id:guid}/leave", async (Guid id, HttpContext context, YapCallGateway gateway, CancellationToken ct) => { await gateway.LeaveGroupAsync(context.User, id, ct); return Results.NoContent(); });
         api.MapPost("/groups/{id:guid}/control", async (Guid id, YapGroupControl request, HttpContext context, YapCallGateway gateway, CancellationToken ct) => { await gateway.RelayGroupControlAsync(context.User, id, request, ct); return Results.NoContent(); });

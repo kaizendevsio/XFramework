@@ -1,9 +1,9 @@
 @implements IAsyncDisposable
 @inject VoiceState Voice
 @inject IJSRuntime JS
-@if(Voice.IsCalling)
+@if(Voice.IsCalling || Voice.Ended is not null)
 {
-    @if(Voice.Minimized)
+    @if(Voice.Minimized && Voice.IsCalling)
     {
         <button class="active-call" data-update-busy="true" aria-label="Return to call with @Voice.Name, @Elapsed" @onclick="Expand">
             <span class="live" aria-hidden="true"></span><Icon Name="@(Voice.AnyVideo ? "video" : "phone")" Size="17" /><span class="who">@Voice.Name</span><span class="t">@Elapsed</span>
@@ -16,23 +16,51 @@
        the call would keep running behind the chat. Only the contents may switch.
        call-screen.js writes data-chrome, data-corner and data-swapped onto this element; Blazor never
        renders those attributes, so a re-render cannot undo a gesture. *@
-    <dialog class="voice-dialog" @ref="dialog" data-update-busy="true" aria-label="@(Video ? "Video call" : "Voice call")">
+    <dialog class="voice-dialog" @ref="dialog" data-update-busy="true" aria-label="@(EndedScreen ? "Call ended" : Video ? "Video call" : "Voice call")">
     <p class="call-sr" role="status">@Announcement</p>
-    @if (Video)
+    @if (EndedScreen && Voice.Ended is { } ended)
+    {
+        @* The call ended on its own. Same dialog, same place: say why, and offer the obvious next step. *@
+        <div class="call-screen voicescreen is-ended">
+            <div class="call-backdrop" aria-hidden="true">
+                @if (!string.IsNullOrWhiteSpace(ended.AvatarUrl) && backdropFailed != ended.AvatarUrl)
+                { <img src="@ended.AvatarUrl" alt="" draggable="false" @onerror="() => backdropFailed = ended.AvatarUrl" /> }
+            </div>
+            <header class="call-top">
+                <span class="call-spacer" aria-hidden="true"></span>
+                <span class="call-chip enc"><Icon Name="lock" Size="12" />End-to-end encrypted</span>
+                <span class="call-spacer" aria-hidden="true"></span>
+            </header>
+            <div class="call-center">
+                <div class="call-halo"><Avatar Initials="@ChatMessage.InitialsFor(ended.Name)" ImageUrl="@ended.AvatarUrl" Size="a92" /></div>
+                <h1 class="call-name">@ended.Name</h1>
+                <p class="call-status call-ended-reason" role="alert">@ended.Title — @ended.Detail</p>
+            </div>
+            <div class="call-tray" role="toolbar" aria-label="Call ended">
+                <button class="call-btn" aria-label="Close" @onclick="Voice.DismissEnded"><span class="k">@Glyph("close", 24)</span><span class="lbl">Close</span></button>
+                <button class="call-btn accept" aria-label="Call back" disabled="@ended.Redialing" @onclick="Voice.CallBackAsync"><span class="k"><Icon Name="@(ended.Video ? "video" : "phone")" Size="24" /></span><span class="lbl">Call back</span></button>
+            </div>
+        </div>
+    }
+    else if (Video)
     {
         <div class="call-screen vidscreen @(SelfStage ? "self-stage" : "") @(TileCount > 1 ? "is-group" : "is-single")">
             <div class="vidgrid @GridClass" aria-label="Call video">
                 @foreach (var tile in Voice.RemoteVideo)
                 {
-                    <div class="vidtile" @key="tile.StreamId">
-                        <canvas @ref="canvases[tile.StreamId]" role="img" aria-label="@Voice.ParticipantName(tile.CredentialId)"></canvas>
+                    var away = Frozen(tile);
+                    @* A frozen tile keeps its canvas, and so its last picture, dimmed under "Reconnecting". *@
+                    <div class="@(away ? "vidtile frozen" : "vidtile")" @key="tile.StreamId">
+                        <canvas @ref="canvases[tile.StreamId]" role="img" aria-label="@(away ? $"{Voice.ParticipantName(tile.CredentialId)}, reconnecting" : Voice.ParticipantName(tile.CredentialId))"></canvas>
+                        @if (away)
+                        { <span class="tile-away" aria-hidden="true"><span class="link-dot"></span>@(TileCount == 1 ? $"{Voice.ParticipantName(tile.CredentialId)} · Reconnecting…" : "Reconnecting…")</span> }
                         @if (TileCount > 1)
                         { <span class="tile-name">@if (IsMuted(tile.CredentialId)) { @Glyph("mic-off", 13) }@Voice.ParticipantName(tile.CredentialId)</span> }
                     </div>
                 }
                 @foreach (var person in CameraOffPeople)
                 {
-                    <div class="vidtile camera-off" @key="person.CredentialId">
+                    <div class="@(person.Reconnecting ? "vidtile camera-off away" : "vidtile camera-off")" @key="person.CredentialId">
                         <div class="tile-person">
                             <Avatar Initials="@ChatMessage.InitialsFor(Voice.ParticipantName(person.CredentialId))" ImageUrl="@Voice.ParticipantAvatar(person.CredentialId)" Size="a92" />
                             @if (TileCount == 1)
@@ -81,7 +109,7 @@
             }
             <div class="call-tray" role="toolbar" aria-label="Call controls" data-chrome-part>
                 <button class="call-btn @(outputOpen ? "on" : "")" aria-label="Audio and video options" aria-expanded="@outputOpen.ToString().ToLowerInvariant()" @onclick="ToggleOutputAsync"><span class="k"><Icon Name="volume" Size="23" /></span></button>
-                <button class="call-btn @(Voice.CameraOn ? "" : "on")" aria-label="@(Voice.CameraOn ? "Turn camera off" : "Turn camera on")" disabled="@(Voice.CameraBusy || Voice.ConnectedAt is null)" @onclick="Voice.ToggleCameraAsync"><span class="k">@(Voice.CameraOn ? Glyph("video", 23) : Glyph("video-off", 23))</span></button>
+                <button class="call-btn @(Voice.CameraOn ? "" : "on")" aria-label="@(Voice.CameraOn ? "Turn camera off" : "Turn camera on")" disabled="@(Voice.CameraBusy || Voice.ConnectedAt is null || (Voice.Reconnecting && !Voice.CameraOn))" @onclick="Voice.ToggleCameraAsync"><span class="k">@(Voice.CameraOn ? Glyph("video", 23) : Glyph("video-off", 23))</span></button>
                 @if (Voice.CameraOn)
                 { <button class="call-btn" aria-label="Flip camera" disabled="@Voice.CameraBusy" @onclick="Voice.SwitchCameraAsync"><span class="k"><Icon Name="flip" Size="23" /></span></button> }
                 <button class="call-btn @(Voice.Muted ? "on" : "")" aria-label="Mute" aria-pressed="@Voice.Muted.ToString().ToLowerInvariant()" disabled="@(Voice.ConnectedAt is null)" @onclick="Voice.ToggleMuteAsync"><span class="k">@(Voice.Muted ? Glyph("mic-off", 23) : Glyph("mic", 23))</span></button>
@@ -110,10 +138,10 @@
                     <div class="call-participants" aria-label="Call participants">
                         @foreach (var participant in Voice.Participants)
                         {
-                            <div class="call-participant">
+                            <div class="@(participant.Reconnecting ? "call-participant away" : "call-participant")">
                                 <Avatar Initials="@ChatMessage.InitialsFor(Voice.ParticipantName(participant.CredentialId))" ImageUrl="@Voice.ParticipantAvatar(participant.CredentialId)" />
                                 <span>@if (participant.Muted) { @Glyph("mic-off", 12) }@Voice.ParticipantName(participant.CredentialId)</span>
-                                <small>@(!participant.Accepted ? "Invited" : !participant.Ready ? "Connecting" : participant.Video ? "On camera" : participant.Muted ? "Muted" : "In call")</small>
+                                <small>@(participant.Reconnecting ? "Reconnecting…" : !participant.Accepted ? "Invited" : !participant.Ready ? "Connecting" : participant.Video ? "On camera" : participant.Muted ? "Muted" : "In call")</small>
                             </div>
                         }
                     </div>
@@ -136,7 +164,7 @@
                 <div class="call-tray" role="toolbar" aria-label="Call controls">
                     <button class="call-btn @(outputOpen ? "on" : "")" aria-label="Audio" aria-expanded="@outputOpen.ToString().ToLowerInvariant()" @onclick="ToggleOutputAsync"><span class="k"><Icon Name="volume" Size="24" /></span><span class="lbl">Audio</span></button>
                     @if (Voice.VideoAvailable)
-                    { <button class="call-btn" aria-label="Turn camera on" disabled="@(Voice.CameraBusy || Voice.ConnectedAt is null)" @onclick="Voice.ToggleCameraAsync"><span class="k"><Icon Name="video" Size="24" /></span><span class="lbl">Camera</span></button> }
+                    { <button class="call-btn" aria-label="Turn camera on" disabled="@(Voice.CameraBusy || Voice.ConnectedAt is null || Voice.Reconnecting)" @onclick="Voice.ToggleCameraAsync"><span class="k"><Icon Name="video" Size="24" /></span><span class="lbl">Camera</span></button> }
                     <button class="call-btn @(Voice.Muted ? "on" : "")" aria-label="Mute" aria-pressed="@Voice.Muted.ToString().ToLowerInvariant()" disabled="@(Voice.ConnectedAt is null)" @onclick="Voice.ToggleMuteAsync"><span class="k">@(Voice.Muted ? Glyph("mic-off", 24) : Glyph("mic", 24))</span><span class="lbl">Mute</span></button>
                     <button class="call-btn end" aria-label="End" @onclick="() => Voice.EndAsync()"><span class="k"><Icon Name="phone" Class="rot135" Size="26" /></span><span class="lbl">End</span></button>
                 </div>
@@ -202,12 +230,29 @@
     private bool Waiting => !Voice.Incoming && Voice.ConnectedAt is null;
     private bool IsMuted(Guid credential) => Voice.Participants.Any(x => x.CredentialId == credential && x.Muted);
     private static string PersonState(Yap.Contracts.YapGroupParticipant person)
-        => !person.Accepted ? "Ringing…" : !person.Ready ? "Connecting…" : "Camera off";
+        => person.Reconnecting ? "Reconnecting…" : !person.Accepted ? "Ringing…" : !person.Ready ? "Connecting…" : "Camera off";
+    // The ended screen owns the dialog once the call itself is gone; a new call takes it back in place.
+    private bool EndedScreen => !Voice.IsCalling && Voice.Ended is not null;
+    private bool Surface => EndedScreen || (Voice.IsCalling && !Voice.Minimized);
+    private bool Frozen(VideoTile tile) => tile.Frozen || Voice.IsAway(tile.CredentialId);
+    /// <summary>The other person in a one-to-one call, while the server holds their seat for them.</summary>
+    private string? AwayPeer => Voice.Participants.Where(x => !Voice.IsSelf(x.CredentialId)).ToArray() is [{ Reconnecting: true } peer]
+        ? Voice.ParticipantName(peer.CredentialId) : null;
     private string QualityLabel => Voice.VideoQuality is { } tier && Voice.CameraOn
         ? $"{tier.Height}p · {(Voice.MeasuredVideoFps is { } fps ? $"{fps:0} fps" : "measuring fps")} · {Voice.VideoCodecName}" : "";
-    private string StatusText => Voice.Incoming ? (Voice.IncomingHasVideo ? "Incoming video call" : "Incoming voice call") : Elapsed.Replace("...", "…");
+    private string StatusText => Voice.Incoming ? (Voice.IncomingHasVideo ? "Incoming video call" : "Incoming voice call")
+        : !Voice.Reconnecting && AwayPeer is { } peer ? $"{peer} is reconnecting…" : Elapsed.Replace("...", "…");
     // Announced on change only: the ticking timer would otherwise be read out every second.
-    private string Announcement => Voice.Incoming ? StatusText : Voice.Status.Replace("...", "…");
+    private string Announcement => Voice.Incoming ? StatusText
+        : EndedScreen ? $"{Voice.Ended!.Title}, {Voice.Ended.Detail}."
+        : Voice.Reconnecting ? "Reconnecting…"
+        : Voice.PoorConnection ? "Poor connection"
+        : AwayPeer is { } peer ? $"{peer} is reconnecting…"
+        : Voice.Status.Replace("...", "…");
+    /// <summary>How long this device has been reconnecting, or - in the last seconds of the grace - how long it has left.</summary>
+    private string ReconnectClock => Voice.ReconnectDeadline is { } deadline && deadline - DateTimeOffset.UtcNow is var left && left < TimeSpan.FromSeconds(15)
+        ? $"Call ends in {Math.Max(0, (int)Math.Ceiling(left.TotalSeconds))} s"
+        : Voice.ReconnectingSince is { } since ? Clock(DateTimeOffset.UtcNow - since) : "";
     private async Task CheckPlaybackAsync()
     {
         try { playbackSuspended = await Voice.GetPlaybackStateAsync() is "suspended" or "interrupted"; }
@@ -223,10 +268,10 @@
     private string Elapsed => Voice.Status == "Connected" && Voice.ConnectedAt is { } time ? Clock(DateTimeOffset.UtcNow - time) : Voice.Status;
     private static string Clock(TimeSpan span) => span.TotalHours >= 1 ? span.ToString(@"h\:mm\:ss") : span.ToString(@"mm\:ss");
     protected override void OnInitialized(){ Voice.Changed += Changed; _ = Tick(); }
-    private void Changed() => _ = InvokeAsync(() => { if (!Voice.IsCalling) { outputOpen = false; outputs = null; outputError = null; playbackSuspended = false; debugVideo = false; videoDiagnostics = null; backdropFailed = null; Release(); } StateHasChanged(); });
+    private void Changed() => _ = InvokeAsync(() => { if (!Voice.IsCalling) { outputOpen = false; outputs = null; outputError = null; playbackSuspended = false; debugVideo = false; videoDiagnostics = null; if (!Surface) { backdropFailed = null; Release(); } } StateHasChanged(); });
     private void Release(){ canvases.Clear(); attached.Clear(); previewAttached = null; opened = null; }
     // Ringing counts: the output picker is usable before the call connects, so it must refresh then too.
-    private async Task Tick(){ try { while(!lifetime.IsCancellationRequested){await Task.Delay(1000,lifetime.Token);if(Voice.IsCalling)await InvokeAsync(async () => { if (outputOpen && !outputBusy) await RefreshOutputsAsync(); await CheckPlaybackAsync(); await RefreshDiagnosticsAsync(); StateHasChanged(); });} }catch(OperationCanceledException){} }
+    private async Task Tick(){ try { while(!lifetime.IsCancellationRequested){await Task.Delay(1000,lifetime.Token);if(Voice.IsCalling || Voice.Ended is not null)await InvokeAsync(async () => { if (outputOpen && !outputBusy) await RefreshOutputsAsync(); await CheckPlaybackAsync(); await RefreshDiagnosticsAsync(); StateHasChanged(); });} }catch(OperationCanceledException){} }
     private async Task ToggleOutputAsync() { outputOpen = !outputOpen; if (outputOpen) { outputError = null; await RefreshOutputsAsync(); await RefreshCamerasAsync(); } }
     private async Task RefreshOutputsAsync()
     {
@@ -241,6 +286,11 @@
         finally { outputBusy = false; }
     }
     private RenderFragment Notices => @<div class="call-notices">
+        @* Not live regions: call-sr announces these once, and the clock inside must not be read every second. *@
+        @if (Voice.Reconnecting)
+        { <p class="call-notice link-notice reconnecting"><span class="link-dot" aria-hidden="true"></span>Reconnecting…<span class="t" aria-hidden="true">@ReconnectClock</span></p> }
+        else if (Voice.PoorConnection)
+        { <p class="call-notice link-notice poor">@Glyph("signal", 15)Poor connection</p> }
         @if (Voice.Incoming && Voice.RingSilent)
         { <button class="call-notice action" data-call-hold @onclick="Voice.RetryRingAsync">Turn on ring sound</button> }
         @if (Voice.VideoNotice is { } notice && !Voice.Incoming)
@@ -283,6 +333,8 @@
         ["video"] = "M4 5h11v14H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2ZM15 9l7-4v14l-7-4",
         ["video-off"] = "M9 5h6v6m0 4v4H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2M15 9l7-4v14l-4-2.3M3 3l18 18",
         ["minimize"] = "M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7",
+        ["close"] = "M6 6l12 12M18 6 6 18",
+        ["signal"] = "M4 20v-3M9 20v-7M14 20V9M19 20V4",
     };
     private static RenderFragment Glyph(string name, int size) => @<svg class="ic" width="@size" height="@size" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="@Glyphs[name]" /></svg>;
 
@@ -290,13 +342,15 @@
     {
         // Open the surface whenever the node we last opened is not the one on screen: the first
         // render of a call, and again after anything hands Blazor a different dialog element.
-        if(Voice.IsCalling && !Voice.Minimized && opened != dialog.Id){opened=dialog.Id;await JS.InvokeVoidAsync("yap.openCall",dialog);await MountGesturesAsync();}
+        if(Surface && opened != dialog.Id){opened=dialog.Id;await JS.InvokeVoidAsync("yap.openCall",dialog);await MountGesturesAsync();}
         // Minimizing removes the dialog and everything captured inside it, so drop the bindings too.
-        if(!Voice.IsCalling || Voice.Minimized){if (previewAttached is not null) await Voice.DetachLocalPreviewAsync(); Release(); return;}
+        if(!Surface){if (previewAttached is not null) await Voice.DetachLocalPreviewAsync(); Release(); return;}
+        if(EndedScreen){previewAttached = null; canvases.Clear(); attached.Clear(); return;}
         // Canvases and the preview element exist only after their first render; bind each once per node.
         if (Voice.CameraOn && Video) { if (previewAttached != preview.Id) { previewAttached = preview.Id; await Voice.AttachLocalPreviewAsync(preview); } }
         else previewAttached = null;
-        foreach (var tile in Voice.RemoteVideo)
+        // A frozen tile has no stream behind it any more: its canvas keeps the last picture, untouched.
+        foreach (var tile in Voice.RemoteVideo.Where(x => !x.Frozen))
             if (canvases.TryGetValue(tile.StreamId, out var canvas) && attached.GetValueOrDefault(tile.StreamId) != canvas.Id)
             { attached[tile.StreamId] = canvas.Id; await Voice.AttachRemoteVideoAsync(tile.StreamId, canvas); }
         foreach (var id in canvases.Keys.Where(id => Voice.RemoteVideo.All(tile => tile.StreamId != id)).ToArray())
