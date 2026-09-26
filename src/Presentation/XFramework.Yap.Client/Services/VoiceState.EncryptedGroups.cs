@@ -85,8 +85,12 @@ public sealed partial class VoiceState
         var origin = navigation.ToAbsoluteUri("/");
         if (origin.Scheme != "https" || endpoint.Scheme != "https" || endpoint.Authority != origin.Authority)
             throw new InvalidOperationException("Voice calls require a secure connection to Yap.");
+        // The socket URL carries a single-use, 30-second ticket: an automatic reconnect could only
+        // replay the spent ticket (a 403 every few seconds for the better part of an hour).
         var client = attempt.Client = new BoltClient(new UriBuilder(endpoint) { Scheme = "wss" }.Uri,
-            connection.ClientId, "Yap encrypted voice", new BoltClientOptions { MinConnections = 1, MaxConnections = 1, MaxFrameBytes = 65536 }, logs.CreateLogger("Yap.Voice"));
+            connection.ClientId, "Yap encrypted voice",
+            new BoltClientOptions { MinConnections = 1, MaxConnections = 1, MaxFrameBytes = 65536, AutoReconnect = false },
+            logs.CreateLogger("Yap.Voice"));
         attempt.Disconnected = () => { if (Current(attempt)) _ = EndAfterCallbackAsync(attempt); };
         client.Disconnected += attempt.Disconnected;
         await media.InitializeAsync(client);

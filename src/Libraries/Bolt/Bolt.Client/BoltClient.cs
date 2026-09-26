@@ -46,6 +46,8 @@ public sealed class BoltClient : IAsyncDisposable
     private volatile bool _isRegistered;
     private volatile bool _disposed;
     private int _disposeStarted;
+    // Cancels connect/reconnect work still running when the client is disposed.
+    private readonly CancellationTokenSource _lifetimeCts = new();
     private long _totalSendFailures;
     private long _totalSendTimeouts;
     private long _totalReceiveLoopFaults;
@@ -222,6 +224,7 @@ public sealed class BoltClient : IAsyncDisposable
 
     public async Task ConnectAsync(CancellationToken ct = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         // Auto-register the internal large RPC stream handler
         RegisterLargeRpcStreamHandler();
 
@@ -229,8 +232,18 @@ public sealed class BoltClient : IAsyncDisposable
         for (int i = 0; i < minConns; i++)
         {
             var conn = await CreateConnectionAsync(ct);
+            bool added;
             lock (_connectionsLock)
-                _connections.Add(conn);
+            {
+                // A client disposed while this attempt was in flight must not be revived by it.
+                added = !_disposed;
+                if (added) _connections.Add(conn);
+            }
+            if (!added)
+            {
+                await DiscardConnectionAsync(conn);
+                throw new ObjectDisposedException(nameof(BoltClient));
+            }
         }
         _isRegistered = true;
         _logger.LogInformation("Bolt client connected: {ClientId} ({ClientName}), {Count} connection(s)",
@@ -776,8 +789,11 @@ public sealed class BoltClient : IAsyncDisposable
         var baseDelay = TimeSpan.FromMilliseconds(500);
         var maxDelay = TimeSpan.FromSeconds(30);
         var random = new Random();
+        // Disposal ends the retry loop: a disposed client has nothing left to reconnect.
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _lifetimeCts.Token);
+        ct = linked.Token;
 
-        for (int attempt = 0; attempt < maxRetries && !ct.IsCancellationRequested; attempt++)
+        for (int attempt = 0; attempt < maxRetries && !ct.IsCancellationRequested && !_disposed; attempt++)
         {
             try { await ConnectAsync(ct); return; }
             catch (Exception ex) when (!ct.IsCancellationRequested)
@@ -790,7 +806,17 @@ public sealed class BoltClient : IAsyncDisposable
                 foreach (var c in connections) { c.CompleteSendChannel(); c.ReceiveCts?.Cancel(); try { await c.Transport.DisposeAsync(); } catch { } }
             }
         }
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ct.ThrowIfCancellationRequested();
         throw new InvalidOperationException($"Failed to connect after {maxRetries} attempts");
+    }
+
+    private static async Task DiscardConnectionAsync(BoltConnection conn)
+    {
+        conn.CompleteSendChannel();
+        conn.ReceiveCts?.Cancel();
+        try { await conn.Transport.DisposeAsync(); } catch { }
+        conn.ReceiveCts?.Dispose();
     }
 
     // ── RPC ──────────────────────────────────────────────────
@@ -2070,11 +2096,15 @@ public sealed class BoltClient : IAsyncDisposable
 
     private async Task ReconnectAsync()
     {
+        // Single-use credentials (a call ticket) can never succeed twice; such clients opt out and
+        // let their owner decide. A disposed client never reconnects.
+        if (!_config.AutoReconnect || _disposed)
+            return;
         _logger.LogInformation("Attempting reconnection...");
         try
         {
             RaiseLifecycleEvent(Reconnecting);
-            await ConnectWithRetryAsync(CancellationToken.None);
+            await ConnectWithRetryAsync(_lifetimeCts.Token);
             Interlocked.Increment(ref _totalSuccessfulReconnects);
             RaiseLifecycleEvent(Reconnected);
 
@@ -2106,6 +2136,7 @@ public sealed class BoltClient : IAsyncDisposable
                 }
             }
         }
+        catch (Exception) when (_disposed) { /* Disposed mid-reconnect: nothing to report. */ }
         catch (Exception ex) { _logger.LogError(ex, "Reconnection failed"); }
     }
 
@@ -2127,6 +2158,7 @@ public sealed class BoltClient : IAsyncDisposable
             return;
 
         _disposed = true;
+        try { _lifetimeCts.Cancel(); } catch (ObjectDisposedException) { }
         foreach (var (requestId, _) in _pendingCalls)
         {
             if (_pendingCalls.TryRemove(requestId, out var call))
