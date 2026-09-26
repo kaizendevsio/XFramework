@@ -735,6 +735,9 @@ public sealed partial class BoltServer : IDisposable
             case FrameType.CallSignal:
                 await HandleCallSignalAsync(connection, buffer, length, ct);
                 break;
+            case FrameType.MediaCongestion:
+                // Only the relay originates congestion reports; a participant cannot forge one for another.
+                break;
 
             default:
                 _logger.LogWarning("Unknown frame type {FrameType} from {ClientId}", frameType, connection.ClientId);
@@ -2092,18 +2095,29 @@ public sealed partial class BoltServer : IDisposable
         var isMediaFrame = (FrameType)buffer[0] == FrameType.MediaFrame;
         var sequence = 0u;
         var keyStart = false;
+        uint? picture = null;
+        var layer = 0;
+        var lane = route.MediaType == MediaType.Audio ? BoltMediaLane.Audio : BoltMediaLane.Video;
+        var now = Environment.TickCount64;
         if (isMediaFrame && BoltCodec.TryReadMediaFrame(frame, out var header))
         {
             sequence = header.SequenceNumber;
             keyStart = header.IsKeyframe;
+            if (lane == BoltMediaLane.Video)
+            {
+                // Every fragment of a picture carries the picture's timestamp and temporal layer in the clear.
+                picture = header.Timestamp;
+                layer = header.TemporalLayer;
+            }
+            route.Congestion.ObserveArrival(header.Timestamp, lane == BoltMediaLane.Video, now);
         }
         else
         {
             isMediaFrame = false;
         }
 
-        var lane = route.MediaType == MediaType.Audio ? BoltMediaLane.Audio : BoltMediaLane.Video;
         var needsKeyframe = false;
+        BoltHubConnection[] recipients;
 
         // Simulcast-aware routing: if this stream has a layer ID, only forward to
         // recipients whose preferred layer matches (or who have no preference = forward all)
@@ -2113,7 +2127,8 @@ public sealed partial class BoltServer : IDisposable
         // once a member is removed, not one more frame is queued for it.
         lock (owningCall.Participants)
         {
-            foreach (var recipient in route.GetRecipientSnapshot())
+            recipients = route.GetRecipientSnapshot();
+            foreach (var recipient in recipients)
             {
                 if (recipient.StreamId == sender.StreamId || !recipient.IsAlive || !IsCallParticipant(owningCall, recipient))
                     continue;
@@ -2129,12 +2144,29 @@ public sealed partial class BoltServer : IDisposable
                     continue;
 
                 // Drops are counted by the receiver's queue (bolt.server.media.relay_drops).
-                needsKeyframe |= recipient.TryEnqueueMedia(frame, lane, streamId, sequence, keyStart, pictureAware: isMediaFrame).RequestKeyframe;
+                needsKeyframe |= recipient.TryEnqueueMedia(frame, lane, streamId, sequence, keyStart, pictureAware: isMediaFrame, picture, layer).RequestKeyframe;
             }
         }
 
         if (needsKeyframe && lane == BoltMediaLane.Video)
             RequestKeyframeFromSender(route, streamId);
+        if (isMediaFrame)
+            ReportCongestion(route, streamId, lane == BoltMediaLane.Video, recipients, now);
+    }
+
+    /// <summary>
+    /// Periodically tell the stream's sender what its receivers' queues look like (REMB-style), so it can
+    /// follow the weakest one instead of waiting for the relay to drop. Takes the sender's feedback lane:
+    /// bounded, lossy, never awaited.
+    /// </summary>
+    private static void ReportCongestion(MediaStreamRoute route, Guid streamId, bool video, BoltHubConnection[] recipients, long now)
+    {
+        if (route.Sender.MediaQueue is null || !route.Sender.IsAlive || !route.Congestion.IsDue(video, now))
+            return;
+        var live = recipients.Where(recipient => recipient.StreamId != route.Sender.StreamId && recipient.IsAlive).ToArray();
+        if (route.Congestion.TryBuild(streamId, video, live, now) is { } report &&
+            route.Sender.TryEnqueueMedia(report, BoltMediaLane.Feedback, streamId).Queued)
+            BoltServerMetrics.RecordMediaCongestionReport();
     }
 
     /// <summary>
@@ -5436,11 +5468,13 @@ public sealed class BoltHubConnection
         Guid streamId,
         uint sequence = 0,
         bool keyStart = false,
-        bool pictureAware = true)
+        bool pictureAware = true,
+        uint? picture = null,
+        int layer = 0)
     {
         if (_media is null || IsClosing || SendFailure is not null)
             return BoltMediaEnqueueResult.Dropped;
-        var result = _media.TryEnqueue(frame, lane, streamId, sequence, keyStart, pictureAware);
+        var result = _media.TryEnqueue(frame, lane, streamId, sequence, keyStart, pictureAware, picture, layer);
         if (result.Queued)
             SignalMediaWork();
         return result;
@@ -5815,6 +5849,9 @@ internal sealed class MediaStreamRoute
 
     /// <summary>Last relay-originated keyframe request to <see cref="Sender"/>; coalesces requests across receivers.</summary>
     public long LastKeyframeRequestTick = long.MinValue / 2;
+
+    /// <summary>Uplink delay tracking and the periodic congestion report to <see cref="Sender"/>.</summary>
+    public MediaCongestionReporter Congestion { get; } = new();
 
     public bool ContainsRecipient(BoltHubConnection connection)
     {

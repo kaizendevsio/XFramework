@@ -37,6 +37,8 @@ internal static class BoltServerMetrics
         Meter.CreateCounter<long>("bolt.server.media.relay_drops");
     private static readonly Counter<long> MediaRelayKeyframeRequests =
         Meter.CreateCounter<long>("bolt.server.media.relay_keyframe_requests");
+    private static readonly Counter<long> MediaCongestionReports =
+        Meter.CreateCounter<long>("bolt.server.media.congestion_reports");
     private static readonly Histogram<double> RpcDuration =
         Meter.CreateHistogram<double>("bolt.server.rpc.duration", "ms");
     private static readonly Histogram<long> ReplayDeferredBytes =
@@ -67,6 +69,8 @@ internal static class BoltServerMetrics
         MediaRelayDrops.Add(1, new KeyValuePair<string, object?>("lane", lane));
 
     public static void RecordMediaRelayKeyframeRequest() => MediaRelayKeyframeRequests.Add(1);
+
+    public static void RecordMediaCongestionReport() => MediaCongestionReports.Add(1);
 
     public static void RecordTransportSendFailure(string reason) =>
         TransportSendFailures.Add(1, new KeyValuePair<string, object?>("reason", reason));

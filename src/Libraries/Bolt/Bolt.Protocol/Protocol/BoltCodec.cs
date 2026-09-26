@@ -38,6 +38,13 @@ public static class BoltCodec
     public const int MediaConfigHeaderSize = 1 + 16 + 16 + 1 + 1 + 4 + 4 + 4 + 1 + 4; // 52 bytes
     public const int MediaFeedbackSize = 1 + 16 + 4 + 4 + 4 + 2 + 1;    // 32 bytes
     public const int MediaKeyRequestSize = 1 + 16;                        // 17 bytes
+    /// <summary>
+    /// MediaFeedback followed by the receiver's delay report: [2:queueDelayMs] [4:receivedKbps] [1:flags] [1:reserved].
+    /// Older senders read only the first <see cref="MediaFeedbackSize"/> bytes, so the extension is compatible.
+    /// </summary>
+    public const int MediaFeedbackExtendedSize = MediaFeedbackSize + 2 + 4 + 1 + 1; // 40 bytes
+    public const int MediaCongestionSize = 1 + 16 + 1 + 1 + 1 + 2 + 2 + 4 + 2 + 1 + 1; // 32 bytes
+    public const byte MediaCongestionVersion = 1;
     public const int CallSignalHeaderSize = 1 + 16 + 1 + 4;              // 22 bytes
     public const int FecFrameHeaderSize = 1 + 16 + 4 + 1 + 4;            // 26 bytes
     public const int NackRequestHeaderSize = 1 + 16 + 2;                  // 19 bytes (+ nackCount * 4)
@@ -490,6 +497,49 @@ public static class BoltCodec
         span[31] = (byte)qualityHint;
         writer.Advance(MediaFeedbackSize);
         return MediaFeedbackSize;
+    }
+
+    /// <summary>
+    /// MediaFeedback with the receiver's end-to-end delay report appended. <paramref name="queueDelayMs"/> is how far
+    /// the stream's one-way delay currently sits above its recent minimum (the queue on the whole path, including
+    /// buffers neither end can see); <paramref name="receivedKbps"/> is what this receiver actually got recently.
+    /// </summary>
+    public static int WriteMediaFeedback(IBufferWriter<byte> writer, Guid streamId, uint highestSeqReceived, uint cumulativeLost,
+        uint jitterX100, ushort rttMs, QualityHint qualityHint, ushort queueDelayMs, uint receivedKbps)
+    {
+        var span = writer.GetSpan(MediaFeedbackExtendedSize);
+        span[0] = (byte)FrameType.MediaFeedback;
+        WriteGuid(span.Slice(1), streamId);
+        BinaryPrimitives.WriteUInt32LittleEndian(span.Slice(17), highestSeqReceived);
+        BinaryPrimitives.WriteUInt32LittleEndian(span.Slice(21), cumulativeLost);
+        BinaryPrimitives.WriteUInt32LittleEndian(span.Slice(25), jitterX100);
+        BinaryPrimitives.WriteUInt16LittleEndian(span.Slice(29), rttMs);
+        span[31] = (byte)qualityHint;
+        BinaryPrimitives.WriteUInt16LittleEndian(span.Slice(32), queueDelayMs);
+        BinaryPrimitives.WriteUInt32LittleEndian(span.Slice(34), receivedKbps);
+        span[38] = MediaFeedbackData.DelayReportFlag;
+        span[39] = 0;
+        writer.Advance(MediaFeedbackExtendedSize);
+        return MediaFeedbackExtendedSize;
+    }
+
+    /// <summary>Relay-to-sender congestion report. Only a relay writes these; see <see cref="MediaCongestionData"/>.</summary>
+    public static int WriteMediaCongestion(IBufferWriter<byte> writer, in MediaCongestionData report)
+    {
+        var span = writer.GetSpan(MediaCongestionSize);
+        span[0] = (byte)FrameType.MediaCongestion;
+        WriteGuid(span.Slice(1), report.StreamId);
+        span[17] = MediaCongestionVersion;
+        span[18] = (byte)report.Flags;
+        span[19] = report.Receivers;
+        BinaryPrimitives.WriteUInt16LittleEndian(span.Slice(20), report.QueueDelayMs);
+        BinaryPrimitives.WriteUInt16LittleEndian(span.Slice(22), report.UplinkDelayMs);
+        BinaryPrimitives.WriteUInt32LittleEndian(span.Slice(24), report.AllowedKbps);
+        BinaryPrimitives.WriteUInt16LittleEndian(span.Slice(28), report.DroppedPictures);
+        span[30] = report.LayerLimit;
+        span[31] = 0;
+        writer.Advance(MediaCongestionSize);
+        return MediaCongestionSize;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -986,6 +1036,31 @@ public static class BoltCodec
             RttMs = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(29)),
             QualityHint = (QualityHint)buffer[31],
         };
+        if (buffer.Length >= MediaFeedbackExtendedSize && (buffer[38] & MediaFeedbackData.DelayReportFlag) != 0)
+        {
+            feedback.HasDelayReport = true;
+            feedback.QueueDelayMs = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(32));
+            feedback.ReceivedKbps = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(34));
+        }
+        return true;
+    }
+
+    public static bool TryReadMediaCongestion(ReadOnlySpan<byte> buffer, out MediaCongestionData report)
+    {
+        report = default;
+        if (buffer.Length < MediaCongestionSize || buffer[0] != (byte)FrameType.MediaCongestion ||
+            buffer[17] != MediaCongestionVersion) return false;
+        report = new MediaCongestionData
+        {
+            StreamId = ReadGuid(buffer.Slice(1)),
+            Flags = (MediaCongestionFlags)buffer[18],
+            Receivers = buffer[19],
+            QueueDelayMs = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(20)),
+            UplinkDelayMs = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(22)),
+            AllowedKbps = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(24)),
+            DroppedPictures = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(28)),
+            LayerLimit = buffer[30],
+        };
         return true;
     }
 
@@ -1455,6 +1530,8 @@ public struct MediaFrameHeader
     public bool IsKeyframe => (Flags & 0x01) != 0;
     public bool IsFecProtected => (Flags & 0x08) != 0;
     public bool IsEncrypted => (Flags & 0x10) != 0;
+    /// <summary>Temporal layer of a video fragment (0 = base, or a sender without layers). Advisory only; see <see cref="MediaFrameFlags"/>.</summary>
+    public int TemporalLayer => MediaFrameFlags.TemporalLayer(Flags);
     public bool IsDropEligible => (Flags & 0x40) != 0;
     public bool IsCompressed => (Flags & 0x80) != 0;
 
@@ -1489,12 +1566,81 @@ public struct MediaConfigData
 /// <summary>Decoded media feedback (fixed size, no payload).</summary>
 public struct MediaFeedbackData
 {
+    internal const byte DelayReportFlag = 0x01;
+
     public Guid StreamId;
     public uint HighestSeqReceived;
     public uint CumulativeLost;
     public uint JitterX100;
     public ushort RttMs;
     public QualityHint QualityHint;
+    /// <summary>True when the receiver appended its delay report (<see cref="BoltCodec.MediaFeedbackExtendedSize"/>).</summary>
+    public bool HasDelayReport;
+    /// <summary>One-way delay above its recent minimum, as the receiver measured it.</summary>
+    public ushort QueueDelayMs;
+    /// <summary>What the receiver actually received of this stream recently.</summary>
+    public uint ReceivedKbps;
+}
+
+/// <summary>
+/// Clear MediaFrame flag bits. They travel outside the SFrame ciphertext and are not covered by its AAD, so a
+/// relay can read (and could rewrite) them. They may only steer what a relay forwards, never how a receiver
+/// decrypts or decodes: receivers take the keyframe flag and the temporal layer from the authenticated
+/// fragment header inside the ciphertext.
+/// </summary>
+public static class MediaFrameFlags
+{
+    public const byte Keyframe = 0x01;
+    /// <summary>Bits 1-2 of a video fragment: its picture's temporal layer (0 base, 1-3 enhancement).</summary>
+    public const byte TemporalLayerMask = 0x06;
+    public const int TemporalLayerShift = 1;
+    public const byte Encrypted = 0x10;
+    public const byte DropEligible = 0x40;
+
+    public static int TemporalLayer(byte flags) => (flags & TemporalLayerMask) >> TemporalLayerShift;
+
+    public static byte WithTemporalLayer(byte flags, int layer) =>
+        (byte)((flags & ~TemporalLayerMask) | ((Math.Clamp(layer, 0, 3) << TemporalLayerShift) & TemporalLayerMask));
+}
+
+[Flags]
+public enum MediaCongestionFlags : byte
+{
+    None = 0,
+    /// <summary>A receiver's queue is backlogged, so <see cref="MediaCongestionData.AllowedKbps"/> is a measured capacity.</summary>
+    Limited = 0x01,
+    /// <summary>The relay dropped pictures of this stream since the previous report.</summary>
+    Dropping = 0x02,
+    /// <summary>The relay dropped audio towards a receiver since the previous report.</summary>
+    AudioDropping = 0x04,
+    /// <summary>
+    /// A receiver lost this stream's base layer (not just enhancement pictures) and now waits for a keyframe:
+    /// the queue overflowed, which is congestion, not a transient stall.
+    /// </summary>
+    BaseLayerLost = 0x08,
+}
+
+/// <summary>
+/// What the relay sees of one sender stream across its receivers, aggregated to the worst one. The relay only
+/// sees clear headers and queue timings, so this carries no media content; a forged report could only change
+/// the sender's bitrate, never what anyone decrypts.
+/// </summary>
+public struct MediaCongestionData
+{
+    public Guid StreamId;
+    public MediaCongestionFlags Flags;
+    /// <summary>Receivers of this stream the report covers.</summary>
+    public byte Receivers;
+    /// <summary>Age of the oldest media queued towards the worst receiver.</summary>
+    public ushort QueueDelayMs;
+    /// <summary>How far this stream's sender-to-relay delay sits above its recent minimum.</summary>
+    public ushort UplinkDelayMs;
+    /// <summary>This stream's share of what the worst backlogged receiver drained; 0 when no receiver is limited.</summary>
+    public uint AllowedKbps;
+    /// <summary>Pictures of this stream the relay dropped since the previous report, over all receivers.</summary>
+    public ushort DroppedPictures;
+    /// <summary>Highest temporal layer the worst receiver currently gets (3 = all).</summary>
+    public byte LayerLimit;
 }
 
 /// <summary>Decoded call signal header. Zero-copy payload.</summary>

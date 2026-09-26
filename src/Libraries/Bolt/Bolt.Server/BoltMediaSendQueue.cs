@@ -10,8 +10,12 @@ namespace Bolt.Server;
 /// </summary>
 public sealed class BoltMediaSendQueueOptions
 {
-    /// <summary>Queued audio older than this is dropped, oldest first. Late speech is worse than a gap. Default: 500 ms.</summary>
-    public int AudioMaxQueueDelayMs { get; set; } = 500;
+    /// <summary>
+    /// Queued audio older than this is dropped, oldest first. Default: 1000 ms. On a 500-1000 ms RTT path one TCP
+    /// retransmission stalls the link for about a round trip, and speech that waited through it is still worth
+    /// playing; the receiver's playout buffer, not the relay, decides what is too late.
+    /// </summary>
+    public int AudioMaxQueueDelayMs { get; set; } = 1000;
 
     /// <summary>Byte budget for queued audio per receiver. Default: 64 KiB (several seconds of 32 kbps Opus).</summary>
     public int AudioMaxQueuedBytes { get; set; } = 64 * 1024;
@@ -34,9 +38,38 @@ public sealed class BoltMediaSendQueueOptions
     /// keyframe every second for everyone. Default: 1000 ms.
     /// </summary>
     public int KeyframeRequestIntervalMs { get; set; } = 1000;
+
+    /// <summary>
+    /// Fraction of the video budget (queued bytes or age, whichever is fuller) at which a receiver stops getting a
+    /// stream's top temporal layer. Twice this sheds every enhancement layer; half of it restores them at the next
+    /// base-layer picture. Only senders that mark temporal layers are affected. Default: 0.2 (300 ms of 1500 ms).
+    /// </summary>
+    public double VideoLayerShedFraction { get; set; } = 0.2;
 }
 
 internal enum BoltMediaLane : byte { Feedback, Audio, Video }
+
+/// <summary>
+/// One receiver's view of one stream, for the relay's congestion reports. Counters are cumulative; the reporter
+/// takes differences between its own reports.
+/// </summary>
+/// <param name="QueueDelayMs">Age of the oldest audio or video queued towards this receiver.</param>
+/// <param name="DeliveryKbps">Rate this receiver drained at while backlogged; 0 when it has not been backlogged recently.</param>
+/// <param name="TotalOfferedBytes">Every audio and video byte ever offered to this receiver.</param>
+/// <param name="StreamOfferedBytes">Bytes of this stream ever offered to this receiver.</param>
+/// <param name="StreamDroppedPictures">Pictures of this stream dropped for this receiver.</param>
+/// <param name="StreamBaseLosses">Times this receiver lost the stream's base layer and had to wait for a keyframe.</param>
+/// <param name="DroppedAudioFrames">Audio frames dropped for this receiver, all streams.</param>
+/// <param name="LayerLimit">Highest temporal layer of this stream the receiver currently gets.</param>
+internal readonly record struct BoltMediaQueueSnapshot(
+    int QueueDelayMs,
+    int DeliveryKbps,
+    long TotalOfferedBytes,
+    long StreamOfferedBytes,
+    long StreamDroppedPictures,
+    long StreamBaseLosses,
+    long DroppedAudioFrames,
+    int LayerLimit);
 
 /// <summary>Outcome of offering one media frame to a receiver.</summary>
 internal readonly record struct BoltMediaEnqueueResult(bool Queued, bool RequestKeyframe)
@@ -52,23 +85,35 @@ internal readonly record struct BoltMediaEnqueueResult(bool Queued, bool Request
 /// here ever blocks the caller, so a sender's receive loop and every other receiver keep going
 /// while one receiver's link stalls.
 ///
-/// Video is dropped as whole pictures and then until the next keyframe: without temporal layers
-/// every delta references the picture before it, so a decoder fed a picture after a gap only
-/// shows corruption. A receiver that starts or resumes mid-stream therefore waits for a keyframe,
-/// and the result tells the relay to ask the sender for one.
+/// Video is dropped as whole pictures. Without temporal layers every delta references the picture
+/// before it, so after a dropped picture the stream is dropped until the next keyframe: a decoder fed
+/// a picture after a gap only shows corruption. A receiver that starts or resumes mid-stream therefore
+/// waits for a keyframe, and the result tells the relay to ask the sender for one.
 ///
-/// Only clear header fields are used - sequence number, timestamp and the keyframe flag the sender
-/// puts on a keyframe's first fragment - so SFrame ciphertext, its AAD and its replay checks are
-/// untouched: frames are forwarded byte for byte or not at all.
+/// A sender that encodes temporal layers (L1T2/L1T3) marks each fragment with its picture's layer. A
+/// receiver whose queue fills first loses the top layer, then every enhancement layer, and only after
+/// that the base layer. Dropping a layer-L picture withholds every picture of layer L or above until the
+/// next base-layer picture, and layers only come back at a base-layer picture: a layer-L picture refers
+/// only to pictures of lower layers since the last base picture (or, for the base layer, to earlier base
+/// pictures), so everything forwarded stays decodable without a keyframe.
+///
+/// Only clear header fields are used - sequence number, timestamp, the keyframe flag the sender puts on
+/// a keyframe's first fragment and the temporal layer bits - so SFrame ciphertext, its AAD and its replay
+/// checks are untouched: frames are forwarded byte for byte or not at all. A forged layer can only make
+/// the relay drop more or less, which it could do anyway.
 /// </summary>
 internal sealed class BoltMediaSendQueue
 {
-    internal readonly struct Item(byte[] buffer, int length, long enqueuedAt, Guid streamId)
+    internal readonly struct Item(byte[] buffer, int length, long enqueuedAt, Guid streamId, byte layer = 0, uint picture = 0)
     {
         public byte[] Buffer { get; } = buffer;
         public int Length { get; } = length;
         public long EnqueuedAt { get; } = enqueuedAt;
         public Guid StreamId { get; } = streamId;
+        /// <summary>Temporal layer of the picture this video fragment belongs to.</summary>
+        public byte Layer { get; } = layer;
+        /// <summary>Picture key (the clear media timestamp) of a video fragment.</summary>
+        public uint Picture { get; } = picture;
         public ReadOnlyMemory<byte> Memory => Buffer.AsMemory(0, Length);
     }
 
@@ -80,9 +125,25 @@ internal sealed class BoltMediaSendQueue
         public long NextKeyframeRequestAt;
         public int KeyframeBackoffMs;
         public long LastCongestionAt = long.MinValue / 2;
+
+        // The picture whose fragments are arriving, and what was decided for it.
+        public bool InPicture;
+        public uint Picture;
+        public int PictureLayer;
+        public bool PictureDropped;
+        /// <summary>Highest temporal layer forwarded until the next base-layer picture.</summary>
+        public int LayerLimit = MaxLayer;
+
+        public long OfferedBytes;
+        public long DroppedPictures;
+        public long BaseLosses;
     }
 
     private const int MaxTrackedStreams = 64;
+    private const int MaxLayer = 3;
+    /// <summary>Delivery measured while backlogged is only a capacity for this long afterwards.</summary>
+    private const int DeliveryFreshMs = 2_000;
+    private const int DeliveryWindowMs = 200;
 
     private readonly BoltMediaSendQueueOptions _options;
     private readonly Func<long> _clock;
@@ -95,7 +156,17 @@ internal sealed class BoltMediaSendQueue
     private long _videoBytes;
     private bool _closed;
 
-    private long _droppedAudio, _droppedVideo, _droppedFeedback, _staleFrames, _videoPurges, _keyframeRequests;
+    private long _droppedAudio, _droppedVideo, _droppedFeedback, _staleFrames, _videoPurges, _keyframeRequests, _layerDrops;
+    private long _offeredBytes;
+
+    // Delivery measurement: the time from one dequeue to the next, while more was waiting, is the time the
+    // link took to take the earlier item.
+    private bool _backlogged;
+    private long _lastDequeueAt;
+    private int _lastDequeuedBytes;
+    private long _busyMs, _busyBytes;
+    private double _deliveryKbps;
+    private long _lastBusyAt = long.MinValue / 2;
 
     public BoltMediaSendQueue(BoltMediaSendQueueOptions options, Func<long>? clock = null)
     {
@@ -109,6 +180,8 @@ internal sealed class BoltMediaSendQueue
     public long StaleFrames => Interlocked.Read(ref _staleFrames);
     public long VideoPurges => Interlocked.Read(ref _videoPurges);
     public long KeyframeRequests => Interlocked.Read(ref _keyframeRequests);
+    /// <summary>Enhancement-layer pictures dropped so the base layer could keep flowing.</summary>
+    public long LayerDrops => Interlocked.Read(ref _layerDrops);
 
     public long QueuedBytes { get { lock (_sync) return _audioBytes + _videoBytes + _feedback.Sum(static x => (long)x.Length); } }
     public long QueuedVideoBytes { get { lock (_sync) return _videoBytes; } }
@@ -117,7 +190,9 @@ internal sealed class BoltMediaSendQueue
     /// <summary>
     /// Offer one frame. <paramref name="keyStart"/> is the clear keyframe flag, which the sender sets on
     /// the first fragment of a keyframe. <paramref name="pictureAware"/> is false for frames without
-    /// picture structure (FEC), which are dropped whenever video would be.
+    /// picture structure (FEC), which are dropped whenever video would be. <paramref name="picture"/> is
+    /// the clear media timestamp every fragment of one picture shares; without it each frame is its own
+    /// picture. <paramref name="layer"/> is the clear temporal layer.
     /// </summary>
     public BoltMediaEnqueueResult TryEnqueue(
         ReadOnlySpan<byte> frame,
@@ -125,7 +200,9 @@ internal sealed class BoltMediaSendQueue
         Guid streamId,
         uint sequence,
         bool keyStart,
-        bool pictureAware = true)
+        bool pictureAware = true,
+        uint? picture = null,
+        int layer = 0)
     {
         lock (_sync)
         {
@@ -172,11 +249,13 @@ internal sealed class BoltMediaSendQueue
 
                     _audio.Enqueue(Copy(frame, now, streamId));
                     _audioBytes += frame.Length;
+                    _offeredBytes += frame.Length;
+                    state.OfferedBytes += frame.Length;
                     return BoltMediaEnqueueResult.Accepted;
                 }
 
                 default:
-                    return EnqueueVideo(frame, streamId, sequence, keyStart, pictureAware, now);
+                    return EnqueueVideo(frame, streamId, sequence, keyStart, pictureAware, now, picture, Math.Clamp(layer, 0, MaxLayer));
             }
         }
     }
@@ -187,7 +266,9 @@ internal sealed class BoltMediaSendQueue
         uint sequence,
         bool keyStart,
         bool pictureAware,
-        long now)
+        long now,
+        uint? picture,
+        int layer)
     {
         // A receiver that joins or resumes mid-stream has no reference picture yet.
         var state = State(streamId, awaitKeyframe: true);
@@ -205,6 +286,8 @@ internal sealed class BoltMediaSendQueue
         }
 
         Remember(state, sequence);
+        _offeredBytes += frame.Length;
+        state.OfferedBytes += frame.Length;
         if (!pictureAware)
         {
             if (state.AwaitingKeyframe || IsVideoCongested(now, frame.Length))
@@ -213,34 +296,156 @@ internal sealed class BoltMediaSendQueue
                 return BoltMediaEnqueueResult.Dropped;
             }
 
-            Append(frame, now, streamId);
+            Append(frame, now, streamId, 0, 0);
             return BoltMediaEnqueueResult.Accepted;
         }
 
-        if (state.AwaitingKeyframe && !keyStart)
+        // Every fragment of a picture shares its decision: half a picture is never forwarded on purpose.
+        var starts = keyStart || picture is null || !state.InPicture || picture.Value != state.Picture;
+        if (starts)
+        {
+            state.InPicture = true;
+            state.Picture = picture ?? 0;
+            state.PictureLayer = layer;
+            state.PictureDropped = false;
+            if (state.AwaitingKeyframe && !keyStart)
+            {
+                DropPicture(state);
+                return new(false, ShouldRequestKeyframe(state, now));
+            }
+
+            if (keyStart)
+                state.LayerLimit = MaxLayer;
+            else
+                AdjustLayerLimit(state, layer, now);
+            if (layer > state.LayerLimit)
+            {
+                DropPicture(state);
+                _layerDrops++;
+                return BoltMediaEnqueueResult.Dropped;
+            }
+        }
+        else if (state.PictureDropped)
         {
             DroppedVideo();
-            return new(false, ShouldRequestKeyframe(state, now));
+            return state.AwaitingKeyframe ? new(false, ShouldRequestKeyframe(state, now)) : BoltMediaEnqueueResult.Dropped;
         }
 
         if (IsVideoCongested(now, frame.Length))
         {
-            // Older pictures of this stream are now useless: the next one sent must be a keyframe.
-            PurgeVideo(streamId);
-            if (!keyStart || IsVideoCongested(now, frame.Length))
+            // Enhancement pictures go first: no base picture refers to them.
+            if (PurgeEnhancement(state, streamId) > 0 || state.PictureLayer > 0)
+                state.LayerLimit = 0;
+            if (state.PictureLayer > 0)
             {
-                state.AwaitingKeyframe = true;
-                NoteCongestion(state, now);
+                state.PictureDropped = true;
+                state.DroppedPictures++;
+                _layerDrops++;
                 DroppedVideo();
-                return new(false, ShouldRequestKeyframe(state, now));
+                return BoltMediaEnqueueResult.Dropped;
             }
-            // A fresh keyframe that fits once stale pictures are gone skips the receiver ahead.
+
+            if (IsVideoCongested(now, frame.Length))
+            {
+                // Older pictures of this stream are now useless: the next one sent must be a keyframe.
+                PurgeVideo(streamId);
+                if (!keyStart || IsVideoCongested(now, frame.Length))
+                {
+                    state.AwaitingKeyframe = true;
+                    state.BaseLosses++;
+                    NoteCongestion(state, now);
+                    DropPicture(state);
+                    return new(false, ShouldRequestKeyframe(state, now));
+                }
+                // A fresh keyframe that fits once stale pictures are gone skips the receiver ahead.
+            }
         }
 
         if (keyStart)
             state.AwaitingKeyframe = false;
-        Append(frame, now, streamId);
+        Append(frame, now, streamId, (byte)layer, state.Picture);
         return BoltMediaEnqueueResult.Accepted;
+    }
+
+    /// <summary>The rest of the arriving picture is discarded along with this fragment.</summary>
+    private void DropPicture(StreamState state)
+    {
+        state.PictureDropped = true;
+        state.DroppedPictures++;
+        DroppedVideo();
+    }
+
+    /// <summary>
+    /// Shed enhancement layers as this receiver's video queue fills, and restore them only at a base-layer
+    /// picture, which refers to nothing a shed layer could have carried.
+    /// </summary>
+    private void AdjustLayerLimit(StreamState state, int layer, long now)
+    {
+        var shed = Math.Max(0.01, _options.VideoLayerShedFraction);
+        var pressure = VideoPressure(now);
+        if (pressure >= shed * 2)
+            state.LayerLimit = Math.Min(state.LayerLimit, 0);
+        else if (pressure >= shed)
+            state.LayerLimit = Math.Min(state.LayerLimit, 1);
+        else if (layer == 0 && pressure < shed / 2)
+            state.LayerLimit = MaxLayer;
+    }
+
+    private double VideoPressure(long now)
+    {
+        var bytes = (double)_videoBytes / Math.Max(1, _options.VideoMaxQueuedBytes);
+        var age = _video.First is { } oldest ? (double)(now - oldest.Value.EnqueuedAt) / Math.Max(1, _options.VideoMaxQueueDelayMs) : 0;
+        return Math.Max(bytes, age);
+    }
+
+    /// <summary>Drop this stream's queued enhancement-layer fragments. Returns how many pictures went.</summary>
+    private int PurgeEnhancement(StreamState state, Guid streamId)
+    {
+        var pictures = 0;
+        uint? last = null;
+        var node = _video.First;
+        while (node is not null)
+        {
+            var next = node.Next;
+            if (node.Value.StreamId == streamId && node.Value.Layer > 0)
+            {
+                if (last != node.Value.Picture) { pictures++; last = node.Value.Picture; }
+                _videoBytes -= node.Value.Length;
+                Release(node.Value);
+                _video.Remove(node);
+                DroppedVideo();
+            }
+            node = next;
+        }
+        state.DroppedPictures += pictures;
+        _layerDrops += pictures;
+        return pictures;
+    }
+
+    /// <summary>
+    /// What this receiver's queue says about one stream right now. The delivery rate is only reported while
+    /// it means something: measured recently, while media was actually waiting for the link.
+    /// </summary>
+    public BoltMediaQueueSnapshot Snapshot(Guid streamId)
+    {
+        lock (_sync)
+        {
+            var now = _clock();
+            var delay = 0L;
+            if (_audio.Count > 0) delay = now - _audio.Peek().EnqueuedAt;
+            if (_video.First is { } oldest) delay = Math.Max(delay, now - oldest.Value.EnqueuedAt);
+            _streams.TryGetValue(streamId, out var state);
+            var delivery = now - _lastBusyAt <= DeliveryFreshMs ? (int)Math.Round(_deliveryKbps) : 0;
+            return new BoltMediaQueueSnapshot(
+                (int)Math.Clamp(delay, 0, int.MaxValue),
+                delivery,
+                _offeredBytes,
+                state?.OfferedBytes ?? 0,
+                state?.DroppedPictures ?? 0,
+                state?.BaseLosses ?? 0,
+                _droppedAudio,
+                state?.LayerLimit ?? MaxLayer);
+        }
     }
 
     /// <summary>Next frame to send: feedback, then audio, then video. Audio that aged out while the link stalled is dropped here too.</summary>
@@ -248,15 +453,15 @@ internal sealed class BoltMediaSendQueue
     {
         lock (_sync)
         {
-            if (_feedback.TryDequeue(out item))
-                return true;
-
             var now = _clock();
+            if (_feedback.TryDequeue(out item))
+                return Dequeued(item, now);
+
             while (_audio.TryDequeue(out item))
             {
                 _audioBytes -= item.Length;
                 if (now - item.EnqueuedAt <= _options.AudioMaxQueueDelayMs)
-                    return true;
+                    return Dequeued(item, now);
                 Release(item);
                 DroppedAudio();
             }
@@ -266,12 +471,33 @@ internal sealed class BoltMediaSendQueue
                 item = first.Value;
                 _video.RemoveFirst();
                 _videoBytes -= item.Length;
-                return true;
+                return Dequeued(item, now);
             }
 
+            _backlogged = false;
             item = default;
             return false;
         }
+    }
+
+    private bool Dequeued(Item item, long now)
+    {
+        if (_backlogged)
+        {
+            _busyMs += Math.Max(0, now - _lastDequeueAt);
+            _busyBytes += _lastDequeuedBytes;
+            if (_busyMs >= DeliveryWindowMs)
+            {
+                var kbps = _busyBytes * 8.0 / _busyMs;
+                _deliveryKbps = now - _lastBusyAt > DeliveryFreshMs ? kbps : _deliveryKbps * 0.6 + kbps * 0.4;
+                _lastBusyAt = now;
+                _busyMs = _busyBytes = 0;
+            }
+        }
+        _lastDequeueAt = now;
+        _lastDequeuedBytes = item.Length;
+        _backlogged = _feedback.Count + _audio.Count + _video.Count > 0;
+        return true;
     }
 
     public bool IsEmpty
@@ -395,16 +621,16 @@ internal sealed class BoltMediaSendQueue
         }
     }
 
-    private void Append(ReadOnlySpan<byte> frame, long now, Guid streamId)
+    private void Append(ReadOnlySpan<byte> frame, long now, Guid streamId, byte layer, uint picture)
     {
-        _video.AddLast(Copy(frame, now, streamId));
+        _video.AddLast(Copy(frame, now, streamId, layer, picture));
         _videoBytes += frame.Length;
     }
 
-    private static Item Copy(ReadOnlySpan<byte> frame, long now, Guid streamId)
+    private static Item Copy(ReadOnlySpan<byte> frame, long now, Guid streamId, byte layer = 0, uint picture = 0)
     {
         var buffer = ArrayPool<byte>.Shared.Rent(Math.Max(1, frame.Length));
         frame.CopyTo(buffer);
-        return new Item(buffer, frame.Length, now, streamId);
+        return new Item(buffer, frame.Length, now, streamId, layer, picture);
     }
 }

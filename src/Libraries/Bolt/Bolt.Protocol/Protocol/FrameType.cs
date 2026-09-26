@@ -52,6 +52,12 @@ public enum FrameType : byte
     FecFrame = 0x25,
     /// <summary>NACK retransmission request: [1:type] [16:streamId] [2:nackCount] [nackCount * 4:missingSeqs]</summary>
     NackRequest = 0x26,
+    /// <summary>
+    /// Relay-to-sender congestion report, originated only by the relay:
+    /// [1:type] [16:streamId] [1:version] [1:flags] [1:receivers] [2:queueDelayMs] [2:uplinkDelayMs]
+    /// [4:allowedKbps] [2:droppedPictures] [1:layerLimit] [1:reserved]. See <see cref="MediaCongestionData"/>.
+    /// </summary>
+    MediaCongestion = 0x27,
 }
 
 /// <summary>Media type identifier.</summary>

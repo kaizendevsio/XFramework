@@ -266,6 +266,60 @@ public sealed class BoltGroupCallLifecycleTests
         Assert.That(() => f.Peers["b"].Media(video), Has.Count.EqualTo(5).After(3000, 10));
     }
 
+    // ── Phase 1: congestion reports and temporal layers ──
+
+    [Test]
+    public async Task Sender_GetsTheRelaysCongestionReports_AndNoParticipantCanForgeOne()
+    {
+        await using var f = await Fixture.CreateAsync();
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var video = await f.VideoConfig("a");
+        await f.SendVideo("a", video, keyframe: true);
+        Assert.That(() => f.Peers["a"].Congestion(video), Is.Not.Empty.After(3000, 10), "the first picture brings a report");
+        Assert.That(f.Peers["a"].Congestion(video)[0].Receivers, Is.EqualTo(2));
+        Assert.That(f.Peers["b"].Congestion(video), Is.Empty, "reports go to the sender only");
+
+        // b claims to be the relay and reports an absurd queue on a's stream. On a media-only relay a frame type
+        // a participant may not send closes its connection, like any other.
+        f.Peers["b"].Send(Frame(w => BoltCodec.WriteMediaCongestion(w,
+            new MediaCongestionData { StreamId = video, QueueDelayMs = 9_999, AllowedKbps = 1 })));
+        await f.Tasks["b"].WaitAsync(TimeSpan.FromSeconds(3));
+        await Task.Delay(300);
+        await f.SendVideo("a", video, keyframe: false);
+        Assert.That(() => f.Peers["a"].Congestion(video), Has.Count.GreaterThanOrEqualTo(2).After(3000, 10));
+        Assert.That(f.Peers["a"].Congestion(video).Any(x => x.QueueDelayMs == 9_999), Is.False,
+            "only the relay originates congestion reports");
+    }
+
+    [Test]
+    public async Task CongestedReceiver_LosesEnhancementPictures_KeepsTheBaseLayer_AndNeedsNoKeyframe()
+    {
+        await using var f = await Fixture.CreateAsync();
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var video = await f.VideoConfig("a");
+        await f.SendLayered("a", video, 0, keyframe: true); // 1
+        Assert.That(() => f.Peers["c"].Media(video), Has.Count.EqualTo(1).After(3000, 10));
+
+        f.Peers["c"].Block();
+        await f.SendLayered("a", video, 2); // 2: taken by the blocked write
+        Assert.That(() => f.Peers["b"].Media(video), Has.Count.EqualTo(2).After(3000, 10));
+        await Task.Delay(50);
+        await f.SendLayered("a", video, 1); // 3: queued
+        await Task.Delay(700);              // c's oldest queued picture is now past both shedding thresholds
+        await f.SendLayered("a", video, 2); // 4: shed
+        await f.SendLayered("a", video, 0); // 5: the base layer always goes
+        await f.SendLayered("a", video, 1); // 6: shed
+        f.Peers["c"].Release();
+        Assert.That(() => f.Peers["c"].Media(video).Select(x => x.Sequence), Is.EqualTo(new uint[] { 1, 2, 3, 5 }).After(3000, 10));
+        await f.SendLayered("a", video, 0); // 7: the queue drained; layers come back at a base picture
+        await f.SendLayered("a", video, 2); // 8
+        Assert.That(() => f.Peers["c"].Media(video).Select(x => x.Sequence), Is.EqualTo(new uint[] { 1, 2, 3, 5, 7, 8 }).After(3000, 10));
+        Assert.That(f.Peers["a"].KeyRequests(video), Is.Zero, "no picture the receiver kept refers to one it lost");
+        Assert.That(() => f.Peers["b"].Media(video), Has.Count.EqualTo(8).After(3000, 10), "a healthy receiver loses nothing");
+    }
+
     // ── Re-authorization ──
 
     [Test]
@@ -388,6 +442,13 @@ public sealed class BoltGroupCallLifecycleTests
             await Peers[id].ProcessAsync(Frame(w => BoltCodec.WriteMediaConfig(w, stream, Call, MediaType.Video, CodecId.H264, 426, 240, 180, 0, [])));
             return stream;
         }
+        /// <summary>One single-fragment picture of a temporal layer, marked in the clear flags as the browser sender does.</summary>
+        public Task SendLayered(string id, Guid stream, int layer, bool keyframe = false, int bytes = 1000)
+        {
+            var sequence = sequences[stream] = sequences.GetValueOrDefault(stream) + 1;
+            var flags = MediaFrameFlags.WithTemporalLayer(keyframe ? MediaFrameFlags.Keyframe : (byte)0, layer);
+            return Peers[id].ProcessAsync(Frame(w => BoltCodec.WriteMediaFrame(w, stream, sequence, 3000 * sequence, flags, new byte[bytes])));
+        }
         /// <summary>One single-fragment picture; a keyframe carries the clear keyframe flag like a real first fragment.</summary>
         public Task SendVideo(string id, Guid stream, bool keyframe, int bytes = 1000)
         {
@@ -416,6 +477,8 @@ public sealed class BoltGroupCallLifecycleTests
         public BoltTransport TransportType => BoltTransport.WebSocket;
         public int Count(FrameType type) => Sent.Count(x => x[0] == (byte)type);
         public int Signals(SignalType type) => Sent.Count(x => BoltCodec.TryReadCallSignal(x, out var header) && header.SignalType == type);
+        /// <summary>Deliver a frame without waiting for it to be processed (it may close the connection).</summary>
+        public void Send(byte[] frame) => inbound.Writer.TryWrite((frame, null));
         public async Task ProcessAsync(byte[] frame)
         {
             var barrier = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -429,7 +492,11 @@ public sealed class BoltGroupCallLifecycleTests
         public List<(uint Sequence, bool Keyframe)> Media(Guid stream) => Sent
             .Where(x => x[0] == (byte)FrameType.MediaFrame && BoltCodec.TryReadMediaFrame(x, out var h) && h.StreamId == stream)
             .Select(x => { BoltCodec.TryReadMediaFrame(x, out var h); return (h.SequenceNumber, h.IsKeyframe); }).ToList();
-        public int KeyRequests(Guid stream) => Sent.Count(x => BoltCodec.TryReadMediaKeyRequest(x, out var id) && id == stream);
+        public int KeyRequests(Guid stream) => Sent.Count(x =>
+            x[0] == (byte)FrameType.MediaKeyRequest && BoltCodec.TryReadMediaKeyRequest(x, out var id) && id == stream);
+        public List<MediaCongestionData> Congestion(Guid stream) => Sent
+            .Select(x => BoltCodec.TryReadMediaCongestion(x, out var report) ? report : (MediaCongestionData?)null)
+            .Where(x => x is { } report && report.StreamId == stream).Select(x => x!.Value).ToList();
         public async ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
         {
             if (blocked is { } gate) await gate.Task.WaitAsync(ct);
