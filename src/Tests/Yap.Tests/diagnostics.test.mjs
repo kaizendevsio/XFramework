@@ -3,14 +3,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 const root = new URL('../../Presentation/XFramework.Yap.Client/wwwroot/', import.meta.url);
-function fixture(storage = new Map()) {
-    const handlers = new Map(), window = { yap: {}, fetch: async () => ({ status: 403 }) };
-    const document = { querySelectorAll: () => [], addEventListener() {} };
-    vm.runInNewContext(readFileSync(new URL('diagnostics.js', root), 'utf8'), { window, document, URL, performance, Date,
+function fixture(storage = new Map(), yap = {}) {
+    const handlers = new Map(), window = { yap, fetch: async () => ({ status: 403 }) };
+    const document = { querySelectorAll: () => [], getElementsByTagName: () => ({ length: 42 }), visibilityState: 'visible', addEventListener: (name, handler) => handlers.set('document.' + name, handler) };
+    vm.runInNewContext(readFileSync(new URL('diagnostics.js', root), 'utf8'), { window, document, URL, performance, Date, JSON, Math,
+        setInterval: () => 1, clearInterval() {},
         location: { href: 'https://yap.test/chat/secret-person-id?token=private-token', origin: 'https://yap.test' },
         navigator: { onLine: true, userAgent: 'Test browser', clipboard: { writeText: async () => { throw Error('Denied'); } } },
-        innerWidth: 390, innerHeight: 844, addEventListener: (name, handler) => handlers.set(name, handler),
-        localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) } });
+        innerWidth: 390, innerHeight: 844, addEventListener: (name, handler) => { const prior = handlers.get(name); handlers.set(name, prior ? e => { prior(e); handler(e); } : handler); },
+        localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) } });
     return { api: window.yap.diagnostics, window, storage, handlers };
 }
 test('logging is opt-in, survives reload, and never captures private request data', async () => {
@@ -55,4 +56,28 @@ test('native previews are bounded and release their bitmap and canvas', async ()
         document: { createElement: () => canvas } });
     await window.yap.imagePreviews.jpeg(new Blob(['photo']), false);
     assert.deepEqual(encoded, [1024, 2048]); assert.equal(closed, true); assert.equal(canvas.width, 1); assert.equal(canvas.height, 1);
+});
+test('session health survives an abrupt end and reports only counts and sizes', () => {
+    const storage = new Map();
+    const motion = { transitions: { navigations: () => 37, started: () => 0, enabled: () => false } };
+    const first = fixture(storage, { motion });
+    first.api.health.navigated();
+    assert.equal(storage.has('yap-session-health-v1'), false, 'Nothing is written until logging is enabled.');
+    first.api.setEnabled(true);
+    const written = JSON.parse(storage.get('yap-session-health-v1'));
+    assert.equal(written.clean, false); assert.equal(written.navigations, 37); assert.equal(written.domNodes, 42);
+    // No pagehide: the process was killed, as iOS does to a WebContent process over its memory limit.
+    const next = fixture(storage, { motion });
+    assert.equal(next.api.health.previous().abrupt, true);
+    assert.equal(next.api.health.previous().visible, true);
+    const report = JSON.parse(next.api.report());
+    const abrupt = report.entries.find(e => e.event === 'session.abrupt');
+    assert.equal(abrupt.count, 37); assert.equal(abrupt.kind, 'foreground');
+    assert.equal(report.previousSession.navigations, 37);
+    for (const secret of ['secret-person-id', 'private-token']) assert.equal(JSON.stringify(report).includes(secret), false);
+    // A normal close marks the record clean, so the next start does not cry wolf.
+    next.handlers.get('pagehide')({ persisted: false });
+    assert.equal(fixture(storage, { motion }).api.health.previous().abrupt, false);
+    next.api.clear();
+    assert.equal(storage.has('yap-session-previous-v1'), false);
 });

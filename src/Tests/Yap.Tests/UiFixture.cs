@@ -231,6 +231,17 @@ internal static partial class UiFixture
                     TotalCount = rows.Length, PageIndex = page, PageSize = size
                 });
             });
+        // A call history page, so the Calls tab renders cards and exercises its online refresh
+        // instead of falling back to "offline" on a missing upstream.
+        var callHistory = Enumerable.Range(0, 12).Select(i => new SearchMessageItemResponse
+        {
+            MessageId = Guid.NewGuid(), ThreadId = fixture.Thread, ThreadName = conversations[0].Name, IsDirect = true,
+            SenderCredentialId = i % 2 == 0 ? fixture.Credential : friend, OtherCredentialId = i % 2 == 0 ? friend : fixture.Credential,
+            Text = i % 3 == 0 ? "Video call · 4:12" : "Voice call · 1:05", CreatedAt = DateTime.UtcNow.AddHours(-i * 5)
+        }).ToList();
+        fixture.Session.Setup(s => s.GetCallHistoryAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int page, CancellationToken _) => ChatFixture.Ok(new SearchMessagesResponse
+                { Items = callHistory.Skip(page * 30).Take(30).ToList(), TotalCount = callHistory.Count, PageIndex = page, PageSize = 30 }));
         fixture.Session.Setup(s => s.PublishTypingAsync(It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         Func<CommunicationsTypingState, Task>? onTyping = null;
         Guid typingThread = fixture.Thread;

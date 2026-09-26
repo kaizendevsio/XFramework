@@ -2,3 +2,6 @@
 .diagnostics .row { gap: 8px; }
 .diagnostics textarea { width: 100%; min-height: 180px; font: 16px monospace; user-select: text; -webkit-user-select: text; }
 .diagnostics a { text-decoration: underline; }
+.diagnostics .memory-readout { display: grid; gap: 3px; margin: 12px 0; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--surface) 55%, transparent); color: var(--dim); font-size: 12.5px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.diagnostics .memory-readout strong { color: var(--text); font-size: 13px; }
+.diagnostics .set-row { gap: 10px; flex-wrap: wrap; padding-inline: 0; }

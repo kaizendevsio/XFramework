@@ -29,6 +29,7 @@ public sealed partial class ChatState
             var files = await store.EncryptionResetFilesAsync(Scope);
             await js.InvokeVoidAsync("yap.device.clearAccountFiles", Scope, files);
             callHistoryVersion++;
+            ForgetSavedPage(); callsPage = null;
             await store.ClearEncryptionHistoryAsync(Scope);
             Selected = null; Conversations = []; PendingCount = 0;
             await Encryption.AcknowledgeResetAsync(User);
