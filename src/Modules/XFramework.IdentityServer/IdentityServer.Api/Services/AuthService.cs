@@ -1,4 +1,4 @@
-using System.IdentityModel.Tokens.Jwt;
+﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
 using System.Security.Claims;
 using System.Text.Json;
@@ -636,9 +636,7 @@ public sealed partial class AuthService : IAuthService, IPasswordResetProcessor
             if (request.GenerateToken)
             {
                 var sessionTypeId = await GetSessionTypeId(tenant.Id, request.AuthorizationType, ct);
-                var sessionExpiresAt = request.RememberMe
-                    ? now.AddDays(RememberMeSessionExpirationDays)
-                    : now.AddHours(DefaultSessionExpirationHours);
+                var sessionExpiresAt = NewSessionExpiry(request, _trustedInvocationContextAccessor.Current, now);
 
                 CreateSession(
                     tenant.Id,
@@ -697,6 +695,18 @@ public sealed partial class AuthService : IAuthService, IPasswordResetProcessor
     }
 
     #endregion
+
+    /// <summary>
+    /// The absolute expiry a new user session gets, or null for none. A persistent device
+    /// session has none: it still ends on sign-out, revocation or credential change, and when
+    /// its refresh token (which slides on every rotation) goes unused for its whole lifetime.
+    /// Only a trusted service may hold one, because such a backend keeps the tokens server-side;
+    /// an anonymous caller would take a never-capped refresh token wherever it came from.
+    /// </summary>
+    public static DateTime? NewSessionExpiry(AuthenticateIdentityRequest request, TrustedInvocationContext? invocation, DateTime now) =>
+        request.PersistentSession && invocation?.Service is not null ? null
+        : request.RememberMe ? now.AddDays(RememberMeSessionExpirationDays)
+        : now.AddHours(DefaultSessionExpirationHours);
 
     private static AuthenticatedIdentityResponse? ToAuthenticatedIdentityResponse(
         IdentityInformation? identity) => identity is null
@@ -2289,7 +2299,7 @@ public sealed partial class AuthService : IAuthService, IPasswordResetProcessor
         Guid credentialId,
         Guid sessionTypeId,
         JwtToken token,
-        DateTime? expiresAt = null)
+        DateTime? expiresAt)
     {
         var session = new Session
         {
@@ -2300,7 +2310,8 @@ public sealed partial class AuthService : IAuthService, IPasswordResetProcessor
             RefreshTokenHash = ComputeTokenHash(token.RefreshToken),
             RefreshTokenExpiresAt = token.RefreshTokenExpiresAt,
             Status = CurrentSessionState.Active,
-            ExpiresAt = expiresAt ?? DateTime.UtcNow.AddHours(DefaultSessionExpirationHours),
+            // Null is no absolute expiry; refresh and access-token validation both honour that.
+            ExpiresAt = expiresAt,
             IsEnabled = true,
             ConcurrencyStamp = Guid.NewGuid()
         };

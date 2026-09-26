@@ -197,22 +197,45 @@ public sealed class YapSessionsTests
     }
 
     [Test]
-    public async Task TouchAsync_ContinuousUse_StillEndsAtTheAbsoluteCap()
+    public async Task TouchAsync_ContinuousUse_NeverEndsTheSignIn()
     {
+        // A messenger on your own phone stays signed in for as long as you keep using it.
+        // A fixed cap from sign-in signed daily users out on a timer however recently they chatted.
         var clock = new Clock(DateTimeOffset.UtcNow);
-        var start = clock.GetUtcNow();
         using var provider = new ServiceCollection().BuildServiceProvider();
         var (sessions, _) = Build(provider, clock);
         var user = await sessions.CreateAsync(Session());
 
-        for (var day = 1; day <= 27; day++)
+        for (var day = 1; day <= 400; day++)
         {
             clock.Advance(TimeSpan.FromDays(1));
-            Assert.That(await sessions.TouchAsync(user), Is.Not.Null, $"Day {day} is inside the absolute cap");
+            Assert.That(await sessions.TouchAsync(user), Is.EqualTo(clock.GetUtcNow().Add(YapSessions.IdleWindow)),
+                $"Day {day} of daily use must roll the sign-in a full idle window forward");
         }
-        Assert.That(await sessions.TouchAsync(user), Is.EqualTo(start.AddDays(28)), "Rolling must clamp to the cap");
-        clock.Advance(TimeSpan.FromDays(1) + TimeSpan.FromMinutes(1));
-        Assert.That(await sessions.TouchAsync(user), Is.Null, "A continuously used sign-in must still end at the cap");
+        Assert.That(await sessions.ContainsAsync(user), Is.True);
+    }
+
+    [Test]
+    public async Task GetActorAsync_ActorWorkAfterTheOldCap_StillRefreshesAndKeepsTheSignIn()
+    {
+        // The chat socket uses the actor path, not the cookie, so it has to keep rolling too.
+        var clock = new Clock(DateTimeOffset.UtcNow);
+        var response = Session(); response.ExpiresIn = 1800;
+        var identity = new Mock<IIdentityServerServiceWrapper>();
+        var rotation = 0;
+        identity.Setup(i => i.RefreshToken(It.IsAny<RefreshTokenRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => ChatFixture.Ok(new RefreshTokenResponse
+            { SessionId = response.SessionId!.Value, AccessToken = $"access-{++rotation}", RefreshToken = $"refresh-{rotation}", ExpiresIn = 1800 }));
+        using var provider = new ServiceCollection().AddSingleton(identity.Object).BuildServiceProvider();
+        var (sessions, _) = Build(provider, clock);
+        var user = await sessions.CreateAsync(response);
+
+        for (var day = 1; day <= 60; day++)
+        {
+            clock.Advance(TimeSpan.FromDays(1));
+            Assert.That((await sessions.GetActorAsync(user, default)).AccessToken, Is.EqualTo($"access-{day}"), $"Day {day}");
+        }
+        Assert.That(await sessions.ContainsAsync(user), Is.True);
     }
 
     [Test]
@@ -256,19 +279,16 @@ public sealed class YapSessionsTests
         var key = $"yap:session:{user.FindFirstValue(YapAuth.SessionClaim)}";
 
         Assert.That(cache.Ttl(key), Is.EqualTo(TimeSpan.FromDays(7)), "A fresh sign-in expires on the idle window");
-        foreach (var day in (int[])[6, 12, 18])
+        foreach (var day in (int[])[6, 12, 18, 24, 30, 36])
         {
             clock.Advance(TimeSpan.FromDays(6));
             var rolled = await sessions.TouchAsync(user);
-            Assert.That(cache.Ttl(key), Is.EqualTo(rolled - clock.GetUtcNow()), $"Day {day} TTL must track the rolled deadline");
+            Assert.Multiple(() =>
+            {
+                Assert.That(cache.Ttl(key), Is.EqualTo(rolled - clock.GetUtcNow()), $"Day {day} TTL must track the rolled deadline");
+                Assert.That(cache.Ttl(key), Is.EqualTo(TimeSpan.FromDays(7)), $"Day {day} use buys a full idle window");
+            });
         }
-        clock.Advance(TimeSpan.FromDays(6));
-        var capped = await sessions.TouchAsync(user);
-        Assert.Multiple(() =>
-        {
-            Assert.That(cache.Ttl(key), Is.EqualTo(capped - clock.GetUtcNow()));
-            Assert.That(cache.Ttl(key), Is.EqualTo(TimeSpan.FromDays(4)), "Near the cap the TTL follows the cap, not the idle window");
-        });
     }
 
     /// <summary>Records the TTL each write asked for, which no in-memory cache exposes.</summary>

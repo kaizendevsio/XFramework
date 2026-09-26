@@ -22,6 +22,10 @@ public static class YapOpaqueAuth
             if (!Guid.TryParse(configuration["Yap:TenantId"], out var tenant) || !Guid.TryParse(configuration["Yap:RoleId"], out var role))
                 return Results.StatusCode(503);
             request.RoleId = role;
+            // A device that installed Yap stays signed in like any messenger. Without this the
+            // upstream session carries a 24-hour cap that no refresh extends, and the first
+            // refresh after it signs the device out however recently it was used.
+            request.PersistentSession = true;
             request.Metadata = new RequestMetadata { RequestedTenantId = tenant, RequestId = Guid.NewGuid(), OperationName = "Yap OPAQUE authentication" };
             CommunicationsChatActor? actor = null;
             if (request.Stage is "status" or "enroll-start" or "change-start" or "enroll-verify" or "enroll-finish"
@@ -40,7 +44,7 @@ public static class YapOpaqueAuth
                 if (authenticated.Credential?.TenantId != tenant) return Results.StatusCode(403);
                 var principal = await sessions.CreateAsync(authenticated, ct);
                 await context.SignInAsync(YapAuth.Scheme, principal,
-                    new AuthenticationProperties { IsPersistent = true, ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8) });
+                    new AuthenticationProperties { IsPersistent = true, ExpiresUtc = DateTimeOffset.UtcNow.Add(YapSessions.IdleWindow) });
                 response.Authentication = null;
             }
             return Results.Ok(response);

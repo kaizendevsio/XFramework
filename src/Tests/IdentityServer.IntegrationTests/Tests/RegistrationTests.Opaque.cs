@@ -51,8 +51,13 @@ public sealed partial class RegistrationTests
         (await db.Set<IdentityCredential>().AsNoTracking().SingleAsync(x => x.Id == credentialId)).PasswordByte.Should().BeNull();
         (await db.Set<OpaqueCredential>().SingleAsync(x => x.CredentialId == credentialId)).WrappedRecovery.Should().Be(WrappedFixture());
         (await db.Set<EncryptionAccount>().SingleAsync(x => x.CredentialId == credentialId)).RecoveryArchive.Should().Be(archive);
-        var authenticated = await OpaqueLogin(wrapper, browser, request, password);
+        // Yap signs its devices in as persistent sessions. Before this was honoured every OPAQUE
+        // sign-in got the 24-hour default cap that no refresh extends, and the device was signed
+        // out on its first refresh after that however recently it had been used.
+        var authenticated = await OpaqueLogin(wrapper, browser, request with { PersistentSession = true }, password);
         authenticated.Authentication!.Credential!.Id.Should().Be(credentialId);
+        (await db.Set<Session>().IgnoreQueryFilters().AsNoTracking().SingleAsync(x => x.Id == authenticated.Authentication.SessionId))
+            .ExpiresAt.Should().BeNull("a persistent device session has no absolute expiry");
         authenticated.WrappedRecovery.Should().Be(WrappedFixture());
         (await wrapper.AuthenticateIdentity(new() { UserName = username, Password = password, RoleId = request.RoleId,
             AuthorizationType = AuthorizationType.Username, Metadata = request.Metadata })).IsSuccess.Should().BeFalse();
