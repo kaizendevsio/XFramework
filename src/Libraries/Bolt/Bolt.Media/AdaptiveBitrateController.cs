@@ -28,6 +28,12 @@ public sealed class AdaptiveBitrateController : IAsyncDisposable
     private long _lastArrivalTicks;
     private uint? _lastMediaTimestamp;
     private double _jitterSmoothed; // Smoothed jitter in ticks (EWA)
+    // End-to-end delay report: queuing above the path's floor, and what actually arrived.
+    private readonly MediaQueuingDelayEstimator _delay = new();
+    private long _receivedBytes;
+    private long _windowStartedAt;
+    private double _receivedKbps;
+    private bool _haveTimestamps;
 
     // ── Feedback loop ──
     private CancellationTokenSource? _loopCts;
@@ -57,9 +63,16 @@ public sealed class AdaptiveBitrateController : IAsyncDisposable
     /// Record a received frame's sequence number (receiver side).
     /// Tracks loss and inter-arrival jitter for feedback reports.
     /// </summary>
-    public void RecordFrameReceived(uint seq, uint? timestamp = null)
+    public void RecordFrameReceived(uint seq, uint? timestamp = null, int bytes = 0)
     {
         var now = Environment.TickCount64;
+        Interlocked.Add(ref _receivedBytes, bytes);
+        if (timestamp is { } mediaTime)
+        {
+            // Video timestamps are a 90 kHz capture clock, audio a 48 kHz one; same-picture fragments are ignored.
+            lock (_delay) _delay.Observe(mediaTime, _isAudio ? 48 : 90, now);
+            _haveTimestamps = true;
+        }
 
         if (seq > _highestSeqReceived)
         {
@@ -159,9 +172,15 @@ public sealed class AdaptiveBitrateController : IAsyncDisposable
             {
                 var jitterX100 = (uint)(_jitterSmoothed * 100);
                 var hint = DetermineQualityHint();
+                var report = DelayReport(Environment.TickCount64);
 
                 var writer = RentedBufferWriter.GetThreadLocal();
-                BoltCodec.WriteMediaFeedback(writer, _streamId, _highestSeqReceived, _cumulativeLost, jitterX100, 0, hint);
+                // A stream that went quiet (a camera off, a suspended picture) has no current delay: no report.
+                if (_haveTimestamps && report is var (delayMs, receivedKbps))
+                    BoltCodec.WriteMediaFeedback(writer, _streamId, _highestSeqReceived, _cumulativeLost, jitterX100, 0, hint,
+                        delayMs, receivedKbps);
+                else
+                    BoltCodec.WriteMediaFeedback(writer, _streamId, _highestSeqReceived, _cumulativeLost, jitterX100, 0, hint);
                 await _connection.SendAsync(writer.WrittenMemory, ct);
             }
             catch (OperationCanceledException)
@@ -173,6 +192,26 @@ public sealed class AdaptiveBitrateController : IAsyncDisposable
                 // Connection may be closing; swallow and let loop exit naturally
             }
         }
+    }
+
+    /// <summary>
+    /// The end-to-end delay report the sender's rate control reads: queuing above the floor this receiver has seen,
+    /// and what it received over about the last second.
+    /// </summary>
+    internal (ushort DelayMs, uint ReceivedKbps)? DelayReport(long now)
+    {
+        var bytes = Interlocked.Exchange(ref _receivedBytes, 0);
+        var elapsed = _windowStartedAt == 0 ? 0 : now - _windowStartedAt;
+        _windowStartedAt = now;
+        if (bytes == 0) return null;
+        if (elapsed > 0)
+        {
+            var kbps = bytes * 8.0 / elapsed;
+            _receivedKbps = _receivedKbps <= 0 ? kbps : _receivedKbps * 0.7 + kbps * 0.3;
+        }
+        int delay;
+        lock (_delay) delay = _delay.DelayMs;
+        return ((ushort)Math.Clamp(delay, 0, ushort.MaxValue), (uint)Math.Max(0, Math.Round(_receivedKbps)));
     }
 
     private QualityHint DetermineQualityHint()

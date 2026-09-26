@@ -37,6 +37,14 @@ public sealed class BoltMediaClient : IAsyncDisposable
     public event Func<Guid, Task>? OnCallEnded;
     public event Action<Guid>? OnKeyframeRequested;
     public event Action<BoltMediaStream>? OnMediaStreamConfigured;
+    /// <summary>The relay's congestion report for one of this client's own streams.</summary>
+    public event Action<MediaCongestionData>? OnCongestionReport;
+    /// <summary>A receiver's feedback for one of this client's own streams (includes its delay report when present).</summary>
+    public event Action<MediaFeedbackData>? OnReceiverFeedback;
+
+    private readonly ConcurrentDictionary<Guid, long> _keyframeRequestedAt = new();
+    /// <summary>Fewest milliseconds between two keyframe requests this receiver sends for one stream.</summary>
+    public const int KeyframeRequestGapMs = 1_000;
 
     /// <summary>Explicit externally authenticated payload mode; configure before connecting.
     /// The factory must return a fail-closed provider before the stream is published to frame handlers.</summary>
@@ -62,6 +70,7 @@ public sealed class BoltMediaClient : IAsyncDisposable
         RegisterBorrowedFrameHandler(FrameType.FecFrame, HandleFecFrame);
         RegisterBorrowedFrameHandler(FrameType.NackRequest, HandleNackRequest);
         RegisterBorrowedFrameHandler(FrameType.CallSignal, HandleCallSignal);
+        RegisterBorrowedFrameHandler(FrameType.MediaCongestion, HandleMediaCongestion);
     }
 
     private void RegisterBorrowedFrameHandler(
@@ -179,10 +188,19 @@ public sealed class BoltMediaClient : IAsyncDisposable
     public BoltMediaStream? GetMediaStream(Guid streamId)
         => _mediaStreams.TryGetValue(streamId, out var stream) ? stream : null;
 
-    /// <summary>Ask a remote sender for a keyframe. The relay routes it back to that stream's owner.</summary>
-    public async ValueTask RequestRemoteKeyframeAsync(Guid streamId, CancellationToken ct = default)
+    /// <summary>
+    /// Ask a remote sender for a keyframe (PLI). The relay routes it back to that stream's owner. Requests are
+    /// rate-limited per stream to one per <see cref="KeyframeRequestGapMs"/>: every keyframe is a burst for every
+    /// receiver, and a congested decoder asking once per lost picture would feed the congestion that lost it.
+    /// <paramref name="force"/> is for a decoder that has nothing to show at all (a newly attached tile).
+    /// </summary>
+    public async ValueTask RequestRemoteKeyframeAsync(Guid streamId, CancellationToken ct = default, bool force = false)
     {
         if (!_mediaStreams.ContainsKey(streamId)) return;
+        var now = Environment.TickCount64;
+        var last = _keyframeRequestedAt.GetValueOrDefault(streamId, long.MinValue / 2);
+        if (!force && now - last < KeyframeRequestGapMs) return;
+        _keyframeRequestedAt[streamId] = now;
         var writer = RentedBufferWriter.GetThreadLocal();
         BoltCodec.WriteMediaKeyRequest(writer, streamId);
         try { await _client.GetPrimaryConnection().SendAsync(writer.WrittenMemory, ct); }
@@ -241,7 +259,7 @@ public sealed class BoltMediaClient : IAsyncDisposable
             stream.QueueReceivedFrame(header.SequenceNumber, header.Timestamp, payload, header.Flags);
 
             if (_bitrateControllers.TryGetValue(header.StreamId, out var controller))
-                controller.RecordFrameReceived(header.SequenceNumber, header.Timestamp);
+                controller.RecordFrameReceived(header.SequenceNumber, header.Timestamp, length);
         }
     }
 
@@ -271,6 +289,7 @@ public sealed class BoltMediaClient : IAsyncDisposable
         if (!_mediaStreams.TryAdd(config.StreamId, stream)) return;
 
         if (AuthenticatedStreamEncryptionFactory is null) stream.EnableFec(isAudio ? 4 : 8);
+        // No-op over a WebSocket: TCP already retransmits, and a gap there is a deliberate drop.
         stream.EnableNack(isAudio ? 128 : 256);
         stream.EnableDelayBasedControl(config.BitrateKbps);
 
@@ -299,6 +318,14 @@ public sealed class BoltMediaClient : IAsyncDisposable
         if (!BoltCodec.TryReadMediaFeedback(buffer.AsSpan(0, length), out var feedback)) return;
         if (_bitrateControllers.TryGetValue(feedback.StreamId, out var controller))
             controller.ProcessFeedback(feedback);
+        if (_mediaStreams.ContainsKey(feedback.StreamId)) OnReceiverFeedback?.Invoke(feedback);
+    }
+
+    private void HandleMediaCongestion(BoltConnection conn, byte[] buffer, int length)
+    {
+        // Only the relay originates these, and only about streams this client sends.
+        if (!BoltCodec.TryReadMediaCongestion(buffer.AsSpan(0, length), out var report)) return;
+        if (_mediaStreams.ContainsKey(report.StreamId)) OnCongestionReport?.Invoke(report);
     }
 
     private void HandleMediaKeyRequest(BoltConnection conn, byte[] buffer, int length)
@@ -436,6 +463,7 @@ public sealed class BoltMediaClient : IAsyncDisposable
         _client.UnregisterFrameHandler(FrameType.FecFrame, HandleFecFrame);
         _client.UnregisterFrameHandler(FrameType.NackRequest, HandleNackRequest);
         _client.UnregisterFrameHandler(FrameType.CallSignal, HandleCallSignal);
+        _client.UnregisterFrameHandler(FrameType.MediaCongestion, HandleMediaCongestion);
 
         foreach (var (streamId, stream) in _mediaStreams)
         {

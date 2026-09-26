@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Threading.Channels;
 using Bolt.Client;
+using Bolt.Media.Congestion;
 using Bolt.Protocol;
 using Bolt.Protocol.Buffers;
 
@@ -35,9 +36,7 @@ public sealed class BoltMediaStream : IAsyncDisposable
     private readonly Channel<MediaFrameData> _inbound;
     // At most two maximum-sized video pictures; decrypt one packet per stream at a time.
     // A websocket read can contain >32 fragments. Async fan-out exhausted the shared SFrame gate.
-    private readonly Channel<(uint Sequence, uint Timestamp, byte[] Data, byte Flags)> _received =
-        Channel.CreateBounded<(uint, uint, byte[], byte)>(new BoundedChannelOptions(192)
-        { SingleReader = true, FullMode = BoundedChannelFullMode.DropOldest });
+    private readonly Channel<(uint Sequence, uint Timestamp, byte[] Data, byte Flags)> _received;
     private readonly Task _receivePump;
     private uint _nextSequence;
     private uint _timestampCounter;
@@ -75,6 +74,12 @@ public sealed class BoltMediaStream : IAsyncDisposable
 
     // P2P direct connection
     private DirectConnectionManager? _directManager;
+
+    // Sender-side priority queue shared by the call's streams (audio first, whole video pictures).
+    private MediaSendPacer? _pacer;
+
+    // Frames this receiver dropped itself (bounded queues under a decrypt/playback backlog).
+    private long _localDrops;
 
     /// <summary>Unique identifier for this media stream.</summary>
     public Guid StreamId { get; }
@@ -126,9 +131,23 @@ public sealed class BoltMediaStream : IAsyncDisposable
         _inbound = Channel.CreateBounded<MediaFrameData>(new BoundedChannelOptions(isAudio ? 100 : 192)
         {
             FullMode = BoundedChannelFullMode.DropOldest
-        });
+        }, _ => Interlocked.Increment(ref _localDrops));
+        _received = Channel.CreateBounded<(uint, uint, byte[], byte)>(new BoundedChannelOptions(192)
+        { SingleReader = true, FullMode = BoundedChannelFullMode.DropOldest }, _ => Interlocked.Increment(ref _localDrops));
         _receivePump = ReceiveAsync();
     }
+
+    /// <summary>
+    /// Frames this receiver discarded on its own because its bounded queues were full. A gap caused here is not
+    /// one the relay's layer policy made safe, so a video consumer must treat it as a break in the stream.
+    /// </summary>
+    public long LocalDrops => Interlocked.Read(ref _localDrops);
+
+    /// <summary>True when the stream's connection is a reliable byte stream (TCP): retransmission is the transport's job.</summary>
+    public bool IsReliableTransport => MediaTransportPolicy.IsReliable(_connection.TransportType);
+
+    /// <summary>Send through the call's pacer instead of straight to the connection.</summary>
+    public void SetPacer(MediaSendPacer? pacer) => _pacer = pacer;
 
     // ── Feature enablement ───────────────────────────────────────
 
@@ -181,10 +200,14 @@ public sealed class BoltMediaStream : IAsyncDisposable
     /// <summary>Set QUIC datagram transport for unreliable sends.</summary>
     public void SetDatagramTransport(Func<ReadOnlyMemory<byte>, ValueTask> datagramSend) => _datagramSend = datagramSend;
 
-    /// <summary>Enable NACK retransmission (sender buffer + receiver gap detection).</summary>
+    /// <summary>
+    /// Enable NACK retransmission (sender buffer + receiver gap detection). Ignored on a reliable (TCP) transport:
+    /// nothing is lost there, gaps are frames a relay dropped on purpose, and retransmitting them only adds load
+    /// at the moment the link is already congested.
+    /// </summary>
     public void EnableNack(int retransmitBufferSize = 256)
     {
-        if (_nackTracker != null) return;
+        if (_nackTracker != null || IsReliableTransport) return;
         _retransmitBuffer = new RetransmitBuffer(retransmitBufferSize);
         _nackTracker = new NackTracker(_connection, StreamId);
         _nackTracker.Start();
@@ -359,6 +382,12 @@ public sealed class BoltMediaStream : IAsyncDisposable
             useDatagramTransport = true;
         }
 
+        if (_pacer is { } pacer && !useDatagramTransport && _fecEncoder is null)
+        {
+            pacer.EnqueueAudio(Frame(seq, ts, flags, payload.Span));
+            return;
+        }
+
         using var writer = new RentedBufferWriter(payload.Length + BoltCodec.MediaFrameHeaderSize);
         BoltCodec.WriteMediaFrame(writer, StreamId, seq, ts, flags, payload.Span);
 
@@ -392,6 +421,57 @@ public sealed class BoltMediaStream : IAsyncDisposable
                 await conn.SendAsync(fecWriter.WrittenMemory, ct);
             }
         }
+    }
+
+    private byte[] Frame(uint seq, uint ts, byte flags, ReadOnlySpan<byte> payload)
+    {
+        var frame = new byte[BoltCodec.MediaFrameHeaderSize + payload.Length];
+        BoltCodec.WriteMediaFrame(new FixedBufferWriter(frame), StreamId, seq, ts, flags, payload);
+        return frame;
+    }
+
+    /// <summary>
+    /// Send one encoded video picture, already cut into fragments: every fragment is encrypted and framed, then the
+    /// whole picture is handed to the pacer as one unit, so it goes out completely or not at all. The clear header
+    /// of each fragment carries the picture's temporal layer (for the relay), and the first fragment of a keyframe
+    /// carries the keyframe flag. Returns false when the picture was dropped.
+    /// </summary>
+    public async ValueTask<bool> SendPictureAsync(IReadOnlyList<byte[]> fragments, bool isKeyframe, uint timestamp, int temporalLayer = 0,
+        CancellationToken ct = default)
+    {
+        if (_closed || fragments.Count == 0) return false;
+        if (_pacer is { } gate && !gate.WouldAccept(isKeyframe, temporalLayer)) return false;
+        var frames = new List<byte[]>(fragments.Count);
+        for (var index = 0; index < fragments.Count; index++)
+        {
+            var seq = _nextSequence++;
+            var flags = MediaFrameFlags.WithTemporalLayer(index == 0 && isKeyframe ? MediaFrameFlags.Keyframe : (byte)0, temporalLayer);
+            ReadOnlyMemory<byte> payload = fragments[index];
+            if (_encryptionRequired)
+            {
+                if (_encryption?.IsReady != true)
+                    throw new InvalidOperationException("Media encryption is required but no ready authenticated key is configured.");
+                flags |= MediaFrameFlags.Encrypted;
+                payload = await _encryption.EncryptAsync(fragments[index], seq, timestamp, StreamId);
+            }
+            _retransmitBuffer?.Store(seq, timestamp, flags, payload);
+            frames.Add(Frame(seq, timestamp, flags, payload.Span));
+        }
+
+        if (_pacer is { } pacer)
+            return pacer.EnqueueVideo(new PacedPicture(frames, isKeyframe, temporalLayer));
+        var conn = _directManager?.IsDirectActive == true ? _directManager.ActiveConnection : _connection;
+        foreach (var frame in frames) await conn.SendAsync(frame, ct);
+        return true;
+    }
+
+    /// <summary>IBufferWriter over an array sized exactly for the frame.</summary>
+    private sealed class FixedBufferWriter(byte[] target) : System.Buffers.IBufferWriter<byte>
+    {
+        private int _written;
+        public void Advance(int count) => _written += count;
+        public Memory<byte> GetMemory(int sizeHint = 0) => target.AsMemory(_written);
+        public Span<byte> GetSpan(int sizeHint = 0) => target.AsSpan(_written);
     }
 
     // ── NACK handling ────────────────────────────────────────────

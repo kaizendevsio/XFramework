@@ -2480,6 +2480,7 @@ public sealed class BoltConnection
     private readonly TimeSpan _sendEnqueueTimeout;
     private readonly bool _enableBatching;
     private int _pendingSends;
+    private long _pendingBytes;
     private int _activeSends;
     private long _activeSendStartedAt;
     private int _isClosing;
@@ -2514,6 +2515,11 @@ public sealed class BoltConnection
     internal bool IsAvailable => Volatile.Read(ref _isClosing) == 0 && Transport.IsConnected;
     internal Exception? SendFailure => Volatile.Read(ref _sendFailure);
     public int PendingSends => _pendingSends;
+    /// <summary>
+    /// Bytes queued on this connection or still being written by the transport. Media pacing reads it to keep
+    /// the queue below it (where nothing can be prioritized or dropped) short.
+    /// </summary>
+    public long PendingBytes => Interlocked.Read(ref _pendingBytes);
     public int ActiveSends => _activeSends;
     public long ActiveSendElapsedMs
     {
@@ -2878,6 +2884,7 @@ public sealed class BoltConnection
         }
 
         Interlocked.Increment(ref _pendingSends);
+        Interlocked.Add(ref _pendingBytes, len);
         var pending = new PendingSend(buf, len, transportCompletion);
 
         // All sends go through Channel (serialized single-writer)
@@ -2956,6 +2963,7 @@ public sealed class BoltConnection
     {
         ArrayPool<byte>.Shared.Return(pending.Buffer);
         Interlocked.Decrement(ref _pendingSends);
+        Interlocked.Add(ref _pendingBytes, -pending.Length);
     }
 
     private async Task ReleaseWhenTransportCompletesAsync(Task transportSend, PendingSend pending)
