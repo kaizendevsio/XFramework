@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.70";
+    public const string Version = "1.3.71";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "27 September 2026", [
+            "Calls keep going on slow or changing networks: audio is protected first, video adapts to the connection, and a dropped connection shows Reconnecting and resumes on its own for up to 45 seconds.",
+            "Calls can now last up to 12 hours."]),
+        ("1.3.70", "27 September 2026", [
             "Avatars show a green dot when someone is active and an orange dot when they have been away for a little while.",
             "While someone is attaching a photo, video, file or voice message, you see it in the conversation header. This follows the conversation's typing indicator setting."]),
         ("1.3.69", "27 September 2026", [
