@@ -31,9 +31,9 @@ public sealed class ChatDirectory(IServiceProvider services, ICommunicationsChat
         var people = new List<ChatPerson>();
         foreach (var ids in credentialIds.Distinct().Chunk(50))
         {
-            var members = await data.Query<IdentityCredential>().NoCache()
+            var members = await Refusable(data.Query<IdentityCredential>().NoCache()
                 .Where(p => p.TenantId == actor.TenantId && ids.Contains(p.Id) && p.IsEnabled && !p.IsDeleted)
-                .Take(50).ToListAsync(ct);
+                .Take(50).ToListAsync(ct));
             people.AddRange(members.Select(p => new ChatPerson(p.Id,
                 string.IsNullOrWhiteSpace(p.UserAlias) ? p.UserName ?? "Workspace member" : p.UserAlias,
                 p.UserName ?? "", AvatarUrl(p, actor), p.AvatarStorageFileId)));
@@ -51,14 +51,24 @@ public sealed class ChatDirectory(IServiceProvider services, ICommunicationsChat
         {
             RequestedTenantId = actor.TenantId, RequestId = Guid.NewGuid(), OperationName = "Yap people search"
         });
-        var people = await data.Query<IdentityCredential>()
+        var people = await Refusable(data.Query<IdentityCredential>()
             .Where(p => p.TenantId == actor.TenantId && p.Id != actor.CredentialId && p.IsEnabled && !p.IsDeleted)
             .Where(p => (p.UserName != null && p.UserName.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
                         (p.UserAlias != null && p.UserAlias.Contains(search, StringComparison.OrdinalIgnoreCase)))
-            .OrderBy(p => p.UserName).Take(20).ToListAsync(ct);
+            .OrderBy(p => p.UserName).Take(20).ToListAsync(ct));
         return people.Select(p => new ChatPerson(p.Id,
             string.IsNullOrWhiteSpace(p.UserAlias) ? p.UserName ?? "Workspace member" : p.UserAlias,
             p.UserName ?? "", AvatarUrl(p, actor), p.AvatarStorageFileId)).ToArray();
+    }
+
+    // The remote query driver reports a refused actor token only as an InvalidOperationException
+    // naming the status. Surface it as the 401 it is, so a dead sign-in is settled like any
+    // other refusal instead of reading as the chat service being unreachable.
+    internal static async Task<T> Refusable<T>(Task<T> query)
+    {
+        try { return await query; }
+        catch (InvalidOperationException ex) when (ex.Message.StartsWith("DataContext query request failed with status 401", StringComparison.Ordinal))
+        { throw new YapApiException(401, "The directory refused this sign-in."); }
     }
 
     private static string? AvatarUrl(IdentityCredential person, CommunicationsChatActor actor) =>

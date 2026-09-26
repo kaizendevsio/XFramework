@@ -33,6 +33,9 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
     // only moves once it has drifted this far, which costs one write per active hour.
     private static readonly TimeSpan RollSlack = TimeSpan.FromHours(1);
 
+    // How long after a rotation a downstream refusal is not answered with another one.
+    private static readonly TimeSpan ForcedRefreshSpacing = TimeSpan.FromMinutes(1);
+
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     // Refreshing rotates the refresh token, so two concurrent requests for one session
@@ -98,41 +101,74 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
             var rolled = Roll(entry);
             if (entry.ExpiresAt <= clock.GetUtcNow().AddSeconds(60))
             {
-                using var scope = scopes.CreateScope();
-                // Once rotation starts it must finish and persist even if the browser crashes
-                // and aborts its request. Otherwise the next request reuses the spent token.
-                using var refreshTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-                var identity = scope.ServiceProvider.GetRequiredService<IIdentityServerServiceWrapper>();
-                var response = await identity.RefreshToken(new RefreshTokenRequest
-                {
-                    AccessToken = entry.AccessToken, RefreshToken = entry.RefreshToken, SessionId = entry.SessionId,
-                    Metadata = new RequestMetadata { RequestedTenantId = entry.TenantId, RequestId = Guid.NewGuid() }
-                }, refreshTimeout.Token);
-                if (!response.IsSuccess)
-                {
-                    if (response.HttpStatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
-                    {
-                        await cache.RemoveAsync(CacheKey(key), CancellationToken.None);
-                        throw new UnauthorizedAccessException("Your session ended. Please sign in again.");
-                    }
-                    // A timeout, rate limit or upstream outage must not destroy the refresh session.
-                    throw new HttpRequestException("Session refresh is temporarily unavailable.");
-                }
-                if (response.Response is not { } tokens ||
-                    tokens.SessionId != entry.SessionId || string.IsNullOrWhiteSpace(tokens.AccessToken) ||
-                    string.IsNullOrWhiteSpace(tokens.RefreshToken) || tokens.ExpiresIn <= 0)
-                {
-                    throw new HttpRequestException("Session refresh returned an incomplete response.");
-                }
-                entry.AccessToken = tokens.AccessToken;
-                entry.RefreshToken = tokens.RefreshToken;
-                entry.ExpiresAt = clock.GetUtcNow().AddSeconds(tokens.ExpiresIn);
-                await WriteAsync(key, entry, CancellationToken.None);
+                if (!await RefreshAsync(key, entry)) throw new UnauthorizedAccessException("Your session ended. Please sign in again.");
             }
             else if (rolled) await WriteAsync(key, entry, ct);
             return new CommunicationsChatActor(entry.TenantId, entry.CredentialId, key, entry.AccessToken);
         }
         finally { gate.Release(); }
+    }
+
+    /// <summary>A downstream service refused this sign-in's access token. Only IdentityServer's
+    /// answer to a refresh may end a sign-in, so the refusal is put to it straight away rather
+    /// than waiting for the access token to lapse on its own: an upstream session that expired
+    /// or was revoked otherwise keeps failing every call until then. Returns true once the
+    /// sign-in has ended and its entry is gone; false while it still holds (the refresh
+    /// rotated its tokens, or they were rotated a moment ago). A refresh that could not be
+    /// reached throws <see cref="HttpRequestException"/> and leaves the sign-in as it was.</summary>
+    public async Task<bool> ConfirmRejectionAsync(ClaimsPrincipal? user, CancellationToken ct)
+    {
+        if (user?.Identity?.IsAuthenticated != true || user.FindFirstValue(YapAuth.SessionClaim) is not { } key) return true;
+        var gate = gates.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(ct);
+        try
+        {
+            if (await ReadAsync(key, ct) is not { } entry) return true;
+            // A refusal right after a rotation is a request that raced it with the old token,
+            // or proof the new token is refused too. Rotating again fixes neither, and this
+            // bounds a misbehaving upstream to one forced rotation per session per interval.
+            if (clock.GetUtcNow() - entry.RefreshedAt < ForcedRefreshSpacing) return false;
+            return !await RefreshAsync(key, entry);
+        }
+        finally { gate.Release(); }
+    }
+
+    // Called under the session's gate. Returns false when IdentityServer refused the refresh,
+    // which is the one answer that ends the sign-in; its entry is removed before returning.
+    private async Task<bool> RefreshAsync(string key, Entry entry)
+    {
+        using var scope = scopes.CreateScope();
+        // Once rotation starts it must finish and persist even if the browser crashes
+        // and aborts its request. Otherwise the next request reuses the spent token.
+        using var refreshTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var identity = scope.ServiceProvider.GetRequiredService<IIdentityServerServiceWrapper>();
+        var response = await identity.RefreshToken(new RefreshTokenRequest
+        {
+            AccessToken = entry.AccessToken, RefreshToken = entry.RefreshToken, SessionId = entry.SessionId,
+            Metadata = new RequestMetadata { RequestedTenantId = entry.TenantId, RequestId = Guid.NewGuid() }
+        }, refreshTimeout.Token);
+        if (!response.IsSuccess)
+        {
+            if (response.HttpStatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+            {
+                await cache.RemoveAsync(CacheKey(key), CancellationToken.None);
+                return false;
+            }
+            // A timeout, rate limit or upstream outage must not destroy the refresh session.
+            throw new HttpRequestException("Session refresh is temporarily unavailable.");
+        }
+        if (response.Response is not { } tokens ||
+            tokens.SessionId != entry.SessionId || string.IsNullOrWhiteSpace(tokens.AccessToken) ||
+            string.IsNullOrWhiteSpace(tokens.RefreshToken) || tokens.ExpiresIn <= 0)
+        {
+            throw new HttpRequestException("Session refresh returned an incomplete response.");
+        }
+        entry.AccessToken = tokens.AccessToken;
+        entry.RefreshToken = tokens.RefreshToken;
+        entry.ExpiresAt = clock.GetUtcNow().AddSeconds(tokens.ExpiresIn);
+        entry.RefreshedAt = clock.GetUtcNow();
+        await WriteAsync(key, entry, CancellationToken.None);
+        return true;
     }
 
     public async Task RevokeAsync(ClaimsPrincipal user, CancellationToken ct)
@@ -207,6 +243,8 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
         public string RefreshToken { get; set; } = "";
         /// <summary>When the access token needs refreshing.</summary>
         public DateTimeOffset ExpiresAt { get; set; }
+        /// <summary>When the tokens were last rotated.</summary>
+        public DateTimeOffset RefreshedAt { get; set; }
         /// <summary>The rolling idle deadline: each use pushes it out again.</summary>
         public DateTimeOffset ActiveUntil { get; set; }
         /// <summary>Read only from entries written before sign-ins rolled, which carry no

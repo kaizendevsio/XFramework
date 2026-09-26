@@ -35,6 +35,7 @@ public sealed partial class ChatState
                 }
                 finally { sync.Release(); }
             }
+            catch (ChatApiException ex) when (ex.SessionEnded) { EndedSession(ex); Notify(); }
             catch (Exception ex) when (IsConnectionFailure(ex)) { SetOffline(); Notify(); }
         }
         var cached = await store.SettingAsync(key);

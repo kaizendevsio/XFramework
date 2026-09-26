@@ -44,7 +44,7 @@ public sealed class ChatApi(HttpClient http)
             if (account != Account) throw new OperationCanceledException("The signed-in account changed.");
             if (response is not null)
             {
-                if (response.Status is < 200 or >= 300) throw new ChatApiException(response.Status);
+                if (response.Status is < 200 or >= 300) throw new ChatApiException(response.Status) { SessionEnded = response.SessionEnded };
                 return response.Body is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) } data
                     ? data.Deserialize<T>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) : default;
             }
@@ -65,7 +65,11 @@ public sealed class ChatApi(HttpClient http)
         request.Headers.TryAddWithoutValidation("X-Yap-Account", Account);
         request.Headers.TryAddWithoutValidation("RequestVerificationToken", Token);
         using var response = await http.SendAsync(request, ct);
-        if (!response.IsSuccessStatusCode) throw new ChatApiException((int)response.StatusCode);
+        if (!response.IsSuccessStatusCode) throw new ChatApiException((int)response.StatusCode)
+        {
+            SessionEnded = response.StatusCode == System.Net.HttpStatusCode.Unauthorized &&
+                response.Headers.TryGetValues(SessionSignal.Header, out var signal) && signal.Contains(SessionSignal.Ended)
+        };
         return response.StatusCode == System.Net.HttpStatusCode.NoContent ? default : await response.Content.ReadFromJsonAsync<T>(ct);
     }
     private sealed record AuthRedirect(string Redirect);
@@ -82,4 +86,10 @@ public sealed class ChatApiException(int status) : Exception(status switch
     429 => "Too many requests. Your messages will retry shortly.",
     >= 500 => "Chat is temporarily unavailable. Your messages remain on this device.",
     _ => "The request could not be completed. Check the message and try again."
-}) { public int Status { get; } = status; }
+})
+{
+    public int Status { get; } = status;
+    /// <summary>The server confirmed the sign-in itself ended, which only a refused refresh
+    /// does. Without this a 401 proves nothing about the sign-in.</summary>
+    public bool SessionEnded { get; init; }
+}

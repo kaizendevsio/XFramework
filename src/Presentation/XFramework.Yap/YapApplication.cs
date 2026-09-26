@@ -50,7 +50,10 @@ public static class YapApplication
             options.SlidingExpiration = false;
             options.Events.OnRedirectToLogin = context =>
             {
+                // No live sign-in reached a protected endpoint: the cookie is missing, or its
+                // session entry was ended (idle, signed out, or a refused refresh).
                 context.Response.StatusCode = 401;
+                context.Response.Headers[SessionSignal.Header] = SessionSignal.Ended;
                 return Task.CompletedTask;
             };
             options.Events.OnRedirectToAccessDenied = context =>

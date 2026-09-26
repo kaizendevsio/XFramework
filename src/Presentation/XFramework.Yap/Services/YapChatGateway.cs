@@ -241,13 +241,14 @@ public sealed class YapChatGateway : IDisposable
     private async Task<(HttpStatusCode, ReadOnlyMemory<byte>)> CommandAsync(BoltRequestContext context,
         ReadOnlyMemory<byte> payload, Guid requestId, CancellationToken ct)
     {
+        Connection? connection = null;
         try
         {
-            if (context.ClientId is null || !connections.TryGetValue(context.ClientId, out var connection) ||
+            if (context.ClientId is null || !connections.TryGetValue(context.ClientId, out connection) ||
                 context.User is null || Binding(context.User) != Binding(connection.User) ||
-                !connection.Registered.Task.IsCompletedSuccessfully || connection.Registered.Task.Result != context.ConnectionId ||
-                !await sessions.ContainsAsync(connection.User, ct))
-                throw new YapApiException(401, "Sign in again.");
+                !connection.Registered.Task.IsCompletedSuccessfully || connection.Registered.Task.Result != context.ConnectionId)
+                return Response(401, new { title = "Sign in again." });
+            if (!await sessions.ContainsAsync(connection.User, ct)) return SessionEnded();
             var request = ParseRequest(payload);
             if (request.Operation == "ack")
             {
@@ -290,16 +291,36 @@ public sealed class YapChatGateway : IDisposable
             }
             return Response(204);
         }
+        catch (YapApiException error) when (error.Status == 401) { return await RejectedAsync(connection, ct); }
         catch (YapApiException error) { return Response(error.Status, new { title = error.Message }); }
-        catch (UnauthorizedAccessException) { return Response(401, new { title = "Sign in again." }); }
+        catch (UnauthorizedAccessException) { return await RejectedAsync(connection, ct); }
         catch (Exception error) when (!ct.IsCancellationRequested)
         {
             // Backend transport failures must keep the durable outbox retryable. Never
             // classify an execution exception as malformed input or log its payload.
             logger.LogInformation("Chat command temporarily unavailable. FailureType={FailureType}", error.GetType().Name);
-            return Response(503, new { title = "Messages will retry when the connection is restored." });
+            return Retryable();
         }
     }
+
+    // The socket form of YapApiFilter.RejectedAsync: a downstream 401 is settled by one
+    // refresh, and only a refused one tells the browser its sign-in ended.
+    private async Task<(HttpStatusCode, ReadOnlyMemory<byte>)> RejectedAsync(Connection? connection, CancellationToken ct)
+    {
+        try
+        {
+            if (await sessions.ConfirmRejectionAsync(connection?.User, ct)) return SessionEnded();
+        }
+        // Unconfirmed is not ended: the refresh could not be reached, so the sign-in stays.
+        catch (Exception error) when (!ct.IsCancellationRequested)
+        { logger.LogInformation("Chat could not confirm a refused sign-in. FailureType={FailureType}", error.GetType().Name); }
+        return Retryable();
+    }
+
+    private static (HttpStatusCode, ReadOnlyMemory<byte>) SessionEnded() =>
+        Response(401, new { title = "Your session ended. Sign in again." }, sessionEnded: true);
+    private static (HttpStatusCode, ReadOnlyMemory<byte>) Retryable() =>
+        Response(503, new { title = "Messages will retry when the connection is restored." });
 
     private async Task WatchAsync(Connection connection, ICommunicationsChatSession session, Guid? thread, CancellationToken ct)
     {
@@ -369,8 +390,9 @@ public sealed class YapChatGateway : IDisposable
         var remaining = DateTimeOffset.FromUnixTimeSeconds(expiry) - now - TimeSpan.FromSeconds(15);
         return remaining <= TimeSpan.Zero ? TimeSpan.Zero : remaining < maximum ? remaining : maximum;
     }
-    private static (HttpStatusCode, ReadOnlyMemory<byte>) Response(int status, object? body = null) =>
-        (HttpStatusCode.OK, JsonSerializer.SerializeToUtf8Bytes(new ChatSocketResponse(status, body is null ? null : JsonSerializer.SerializeToElement(body, Json)), Json));
+    private static (HttpStatusCode, ReadOnlyMemory<byte>) Response(int status, object? body = null, bool sessionEnded = false) =>
+        (HttpStatusCode.OK, JsonSerializer.SerializeToUtf8Bytes(new ChatSocketResponse(status,
+            body is null ? null : JsonSerializer.SerializeToElement(body, Json), sessionEnded), Json));
     private static string Binding(ClaimsPrincipal user) => string.Join(':', user.FindFirstValue(YapAuth.TenantClaim),
         user.FindFirstValue(ClaimTypes.NameIdentifier), user.FindFirstValue(YapAuth.SessionClaim));
     public void Dispose()

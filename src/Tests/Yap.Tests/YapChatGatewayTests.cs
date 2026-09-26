@@ -262,6 +262,36 @@ public sealed class YapChatGatewayTests
         await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "test complete", default);
     }
 
+    [Test]
+    public async Task Send_DownstreamRefusalWithRefreshRefused_TellsTheBrowserTheSignInEnded()
+    {
+        var identity = new Mock<IdentityServer.Integration.Drivers.IIdentityServerServiceWrapper>();
+        identity.Setup(i => i.RefreshToken(It.IsAny<IdentityServer.Domain.Shared.Contracts.Requests.RefreshTokenRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new XFramework.Domain.Shared.BusinessObjects.QueryResponse<IdentityServer.Domain.Shared.Contracts.Responses.RefreshTokenResponse>
+            { HttpStatusCode = HttpStatusCode.Unauthorized });
+        await using var fixture = await Fixture.CreateAsync(services => services.AddSingleton(identity.Object));
+        fixture.Wrapper.Setup(x => x.CreateThreadMessageAsync(It.IsAny<CreateThreadMessageRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new XFramework.Domain.Shared.BusinessObjects.QueryResponse<CreateThreadMessageResponse> { HttpStatusCode = HttpStatusCode.Unauthorized });
+        using var cookies = await fixture.LoginAsync(fixture.Alice);
+        var ticket = await fixture.Gateway.CreateTicketAsync(fixture.Alice, default);
+        using var socket = fixture.Socket(cookies);
+        await socket.ConnectAsync(fixture.Url(ticket), default);
+        await RegisterAsync(socket, ticket.ClientId);
+
+        var response = await InvokeAsync(socket, ticket.ClientId, "send", new SendMessage(Guid.NewGuid(), Guid.NewGuid(), "test"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Status, Is.EqualTo(401));
+            Assert.That(response.SessionEnded, Is.True);
+        });
+        Assert.That(await fixture.Sessions.ContainsAsync(fixture.Alice), Is.False, "A refused refresh removes the sign-in.");
+        var again = await InvokeAsync(socket, ticket.ClientId, "send", new SendMessage(Guid.NewGuid(), Guid.NewGuid(), "test"));
+        Assert.That(again.SessionEnded, Is.True);
+        identity.Verify(i => i.RefreshToken(It.IsAny<IdentityServer.Domain.Shared.Contracts.Requests.RefreshTokenRequest>(), It.IsAny<CancellationToken>()), Times.Once);
+        await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "test complete", default);
+    }
+
     [TestCase("send", "[]")]
     [TestCase("send", "{\"id\":42}")]
     [TestCase("ack", "{}")]
@@ -385,11 +415,12 @@ public sealed class YapChatGatewayTests
         public ClaimsPrincipal Alice { get; private set; } = null!;
         public ClaimsPrincipal Bob { get; private set; } = null!;
         public YapChatGateway Gateway => app.Services.GetRequiredService<YapChatGateway>();
+        public YapSessions Sessions => app.Services.GetRequiredService<YapSessions>();
         public Mock<ICommunicationsServiceWrapper> Wrapper { get; private set; } = null!;
         public Channel<Func<CommunicationsRealtimeEvent, Task>> Subscriptions { get; } = Channel.CreateUnbounded<Func<CommunicationsRealtimeEvent, Task>>();
         public Channel<bool> CompletedUpgrades { get; } = Channel.CreateUnbounded<bool>();
         private Uri origin = null!;
-        public static async Task<Fixture> CreateAsync()
+        public static async Task<Fixture> CreateAsync(Action<IServiceCollection>? configure = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
             builder.WebHost.UseUrls("http://127.0.0.1:0");
@@ -406,6 +437,7 @@ public sealed class YapChatGatewayTests
             builder.Services.AddSingleton<YapSessions>();
             builder.Services.AddSingleton<YapCallGateway>();
             builder.Services.AddSingleton<YapChatGateway>();
+            configure?.Invoke(builder.Services);
             var app = builder.Build();
             var fixture = new Fixture(app) { Wrapper = wrapper };
             wrapper.Setup(x => x.SubscribeLiveUserCommunicationsEventsAsync(It.IsAny<Guid>(), It.IsAny<Guid>(),

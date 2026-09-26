@@ -5,6 +5,15 @@ namespace Yap.Contracts;
 // Browser-facing models contain chat data only, never service credentials or actor tokens.
 public sealed record UserSession(Guid CredentialId, Guid TenantId, string Name, string? AvatarUrl = null);
 public sealed record SessionResponse(UserSession? User, string AntiforgeryToken, bool EncryptionRequired = false);
+
+/// <summary>Marks a 401 that means the sign-in itself ended: IdentityServer refused to refresh
+/// it, or it is gone from the session store. Any other failure, a 401 without this included,
+/// never proves that, so the browser treats only this as "sign in again".</summary>
+public static class SessionSignal
+{
+    public const string Header = "X-Yap-Session";
+    public const string Ended = "ended";
+}
 public sealed record Person(Guid Id, string Name, string UserName, string? AvatarUrl = null, Guid MemberId = default, string Role = "Member", string? Nickname = null, DateTime? ActiveUntil = null, DateTime? LastActiveAt = null);
 public sealed record ReactionType(Guid Id, string Name, string Emoji);
 // EditWindowMinutes is the tenant rule the server enforces; 0 disables editing entirely and
