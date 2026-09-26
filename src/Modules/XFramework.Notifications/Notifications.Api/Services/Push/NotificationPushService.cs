@@ -217,6 +217,13 @@ public sealed class NotificationPushService(
             await db.Set<NotificationPushSubscription>()
                 .Where(x => gone.Contains(x.Id))
                 .ExecuteDeleteAsync(ct);
+            // Information, not Debug: from here on this device receives nothing until the app
+            // registers it again, and this line is the only server-side trace of why.
+            logger.LogInformation(
+                "Removed {Count} push subscription(s) for credential {CredentialId} that the push service reported gone: {SubscriptionIds}",
+                gone.Count,
+                credentialId,
+                gone);
         }
 
         if (delivered.Count > 0)

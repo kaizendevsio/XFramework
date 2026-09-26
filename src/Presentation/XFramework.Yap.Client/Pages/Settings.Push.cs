@@ -72,7 +72,10 @@ public partial class Settings
             var scope = OfflineStore.Scope(State.User);
             pushConfig = knownConfig is { } known && known.Scope == scope ? known.Config : await Api.GetAsync<PushConfig>("api/chat/push/config");
             knownConfig = pushConfig.Enabled ? (scope, pushConfig) : null;
-            pushSubscribed = pushConfig.Enabled && await JS.InvokeAsync<string?>("yap.push.endpoint") is not null;
+            // "On" means the server can reach this device, not merely that the browser still holds a
+            // subscription: the server deletes one the push service reports gone. ensure re-registers
+            // it when permission is already granted, so the toggle and delivery agree.
+            pushSubscribed = pushConfig.Enabled && await JS.InvokeAsync<bool>("yap.push.ensure", scope, Api.Token);
         }
         catch (ChatApiException)
         {
@@ -106,7 +109,7 @@ public partial class Settings
     {
         // No await before this call: the browser only honours a permission prompt while the click
         // that triggered it is still the active user gesture.
-        var subscription = await JS.InvokeAsync<PushSubscriptionResult>("yap.push.enable", pushConfig!.PublicKey);
+        var subscription = await JS.InvokeAsync<PushSubscriptionResult>("yap.push.enable", pushConfig!.PublicKey, PushScope);
         if (subscription.Error is { } error)
         {
             pushNotice = error switch
@@ -128,13 +131,16 @@ public partial class Settings
             subscription.Label
         });
         pushSubscribed = true;
-        await JS.InvokeVoidAsync("yap.push.refreshPresence");
+        await JS.InvokeVoidAsync("yap.push.registered", PushScope, subscription.Endpoint);
         pushNotice = "Notifications are on for this device.";
     }
 
+    // Per account: turning push off here must stop the startup repair for this person only.
+    private string PushScope => State.User is null ? "" : OfflineStore.Scope(State.User);
+
     private async Task DisablePushAsync()
     {
-        var endpoint = await JS.InvokeAsync<string?>("yap.push.disable");
+        var endpoint = await JS.InvokeAsync<string?>("yap.push.disable", PushScope);
         // Always tell the server, even when the browser had already dropped its side, so the row
         // does not linger and keep receiving pushes nothing will render.
         if (endpoint is not null)

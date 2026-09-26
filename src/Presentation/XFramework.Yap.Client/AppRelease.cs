@@ -2,10 +2,12 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.68";
+    public const string Version = "1.3.69";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
-        (Version, "26 September 2026", [
+        (Version, "27 September 2026", [
+            "Notifications recover on their own: if a phone's push registration is dropped, Yap registers it again the next time you open the app."]),
+        ("1.3.68", "26 September 2026", [
             "Pressing and holding in the message menu and other pop-ups no longer selects text or opens the Android search sheet."]),
         ("1.3.67", "26 September 2026", [
             "When your session really has ended, Yap now asks you to sign in instead of saying it can't reach the server, and stops retrying in the background."]),
