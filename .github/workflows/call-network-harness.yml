@@ -4,6 +4,7 @@ name: Call network harness
 # (Yap's options) across a tc-netem shaped Linux TCP link, for the base branch and for this branch.
 # The branch runs the browser client's real send path (pacer, rate control, picture ladder) over a
 # synthetic encoder; the base runs a constant sender (its relay predates the congestion reports).
+# RESUME=1 runs add the gateway's resume contract and a receiver that resumes like the phone.
 # See src/Tests/Bolt.CallResilience.Harness/README.md. Runs when the relay changes, or on demand.
 on:
   workflow_dispatch:
@@ -64,6 +65,13 @@ jobs:
           - { name: after-4g-outage-2s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 2, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240" }
           - { name: after-4g-outage-10s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 10, expect: any, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240" }
           - { name: after-4g-auth-blip, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 AUTH_FAIL_AT_S=60 AUTH_FAIL_FOR_S=8" }
+          # the relay capping its sockets' send buffer (Yap:Calls:RelaySocketSendBufferBytes), which bounds TCP's bytes in
+          # flight: the step-down backlog it is for, and the links whose throughput it could cost
+          - { name: after-step-4m-512k-4m-sndbuf64k, target: head, relaynet: "delay 50ms 10ms rate 4mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: survive, steps: "60=delay 50ms 10ms rate 512kbit|120=delay 50ms 10ms rate 4mbit", settings: "ADAPTIVE=1 START_HEIGHT=240 SNDBUF_BYTES=65536" }
+          - { name: after-step-4m-512k-4m-sndbuf32k, target: head, relaynet: "delay 50ms 10ms rate 4mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: survive, steps: "60=delay 50ms 10ms rate 512kbit|120=delay 50ms 10ms rate 4mbit", settings: "ADAPTIVE=1 START_HEIGHT=240 SNDBUF_BYTES=32768" }
+          - { name: after-8mbit-40ms-sndbuf32k, target: head, relaynet: "delay 20ms 5ms rate 8mbit", recvnet: "delay 20ms 5ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 SNDBUF_BYTES=32768" }
+          - { name: after-4g-2mbit-sndbuf32k, target: head, relaynet: "delay 50ms 10ms rate 2mbit loss 0.5%", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 SNDBUF_BYTES=32768" }
+          - { name: after-512k-1000ms-from720p-sndbuf32k, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=720 SNDBUF_BYTES=32768" }
           # resume: the receiver's seat is held for 45 s and it comes back with a fresh ticket (phase 2), with the
           # adaptive sender on the other side, so the whole integrated call runs
           - { name: resume-4g-outage-10s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 10, expect: resume, steps: "", settings: "RESUME=1 GRACE_S=45 ADAPTIVE=1 START_HEIGHT=240" }

@@ -105,6 +105,8 @@ internal sealed class ResumeHost(BoltServer server, Guid call, Stopwatch clock, 
                 if (previous is not null) await previous.WaitAsync(TimeSpan.FromSeconds(10)).ContinueWith(_ => { });
             }
             using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted, connection.Token);
+            // A resumed socket gets the same tuning as the first one, as Yap's connect endpoint gives it.
+            Relay.TuneSocket(context);
             using var socket = await context.WebSockets.AcceptWebSocketAsync(new WebSocketAcceptContext
             { KeepAliveInterval = TimeSpan.FromSeconds(5), KeepAliveTimeout = TimeSpan.FromSeconds(20) });
             var principal = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", id), new Claim("bolt_media_client_id", id)], "harness"));

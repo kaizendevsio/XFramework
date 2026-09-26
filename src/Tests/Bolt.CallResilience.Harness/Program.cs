@@ -144,6 +144,7 @@ internal static class Relay
 
         string? outcome = null;
         var unsentLimited = false;
+        var sendBufferLimited = false;
         // RESUME=1: the receiver's seat is held across reconnects (ResumeHost); losing its socket is
         // expected, and only the seat running out (or the sender going) ends the call.
         var host = Env.Int("RESUME", 0) == 1 ? new ResumeHost(server, call, clock, Env.Int("GRACE_S", 45)) : null;
@@ -158,7 +159,9 @@ internal static class Relay
         {
             var id = context.Request.Query["id"].ToString();
             // Yap limits the kernel's unsent backlog on call sockets; relays without the helper skip it.
-            unsentLimited |= LimitUnsentBytes(context, Env.Int("UNSENT_BYTES", 32 * 1024));
+            var tuned = TuneSocket(context);
+            unsentLimited |= tuned.Unsent;
+            sendBufferLimited |= tuned.SendBuffer;
             using var socket = await context.WebSockets.AcceptWebSocketAsync();
             var principal = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", id), new Claim("bolt_media_client_id", id)], "harness"));
             await server.HandleConnectionAsync(new WebSocketBoltConnection(socket), principal, context.RequestAborted, isSecureTransport: true);
@@ -202,7 +205,7 @@ internal static class Relay
             Env.Log("SUMMARY " + JsonSerializer.Serialize(new { side = "relay", outcome = "join failed" }));
             return 1;
         }
-        Env.Log($"RELAY joined t={T()} unsentLimited={unsentLimited}");
+        Env.Log($"RELAY joined t={T()} unsentLimited={unsentLimited} sendBufferLimited={sendBufferLimited} sndbuf={Env.Int("SNDBUF_BYTES", 0)}");
         clock.Restart();
 #if HARNESS_ADAPTIVE
         if (adaptiveSender is not null) adaptiveSender.Start(call, adaptiveProfile);
@@ -246,6 +249,7 @@ internal static class Relay
         {
             side = "relay",
             outcome = outcome ?? host?.Outcome ?? "survived",
+            sendBufferBytes = sendBufferLimited ? Env.Int("SNDBUF_BYTES", 0) : 0,
             resume = host?.Summary(),
             seconds,
             adaptive,
@@ -279,11 +283,18 @@ internal static class Relay
         return false;
     }
 
-    private static bool LimitUnsentBytes(HttpContext context, int bytes)
+    /// <summary>
+    /// Yap's call-socket tuning (YapCallGateway): the kernel's unsent backlog (UNSENT_BYTES, default Yap's 32 KiB) and,
+    /// when SNDBUF_BYTES is set, the send buffer that bounds TCP's bytes in flight. Relays without a helper skip it.
+    /// </summary>
+    public static (bool Unsent, bool SendBuffer) TuneSocket(HttpContext context)
     {
         var tuning = typeof(BoltServer).Assembly.GetType("Bolt.Server.BoltSocketTuning");
         var socket = context.Features.Get<Microsoft.AspNetCore.Connections.Features.IConnectionSocketFeature>()?.Socket;
-        return tuning?.GetMethod("TryLimitUnsentBytes")?.Invoke(null, [socket, bytes]) is true;
+        var unsent = tuning?.GetMethod("TryLimitUnsentBytes")?.Invoke(null, [socket, Env.Int("UNSENT_BYTES", 32 * 1024)]) is true;
+        var sendBuffer = Env.Int("SNDBUF_BYTES", 0) > 0 &&
+                         tuning?.GetMethod("TryLimitSendBuffer")?.Invoke(null, [socket, Env.Int("SNDBUF_BYTES", 0)]) is true;
+        return (unsent, sendBuffer);
     }
 
     private static bool TrySet(object target, string property, object value)

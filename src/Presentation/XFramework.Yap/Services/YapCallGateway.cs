@@ -24,6 +24,8 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
     private readonly Timer cleanup;
     private readonly Timer holds;
     private readonly int relaySocketUnsentBytes;
+    /// <summary>SO_SNDBUF cap on call sockets (see <see cref="BoltSocketTuning.TryLimitSendBuffer"/>); 0 keeps kernel autotuning.</summary>
+    internal int RelaySocketSendBufferBytes { get; }
 
     /// <summary>How long a participant whose connection dropped keeps their seat while they resume.</summary>
     internal TimeSpan ReconnectGrace { get; }
@@ -55,6 +57,9 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
         videoEnabled = enableGroupLifecycle && configuration.GetValue("Yap:Calls:Video", true);
         Enabled = configuration.GetValue<bool>("Yap:Calls:Enabled");
         relaySocketUnsentBytes = Math.Clamp(configuration.GetValue("Yap:Calls:RelaySocketUnsentBytes", 32 * 1024), 0, 4 * 1024 * 1024);
+        // Off by default: behind an ingress proxy (Funnel) the relay's socket is not the phone's bottleneck leg, and
+        // a fixed cap is a throughput ceiling on long paths. Set it where the relay faces phones directly.
+        RelaySocketSendBufferBytes = Math.Clamp(configuration.GetValue("Yap:Calls:RelaySocketSendBufferBytes", 0), 0, 16 * 1024 * 1024);
         ReconnectGrace = TimeSpan.FromSeconds(Math.Clamp(configuration.GetValue("Yap:Calls:ReconnectGraceSeconds", 45), 10, 300));
         MaxCallDuration = TimeSpan.FromHours(Math.Clamp(configuration.GetValue("Yap:Calls:MaxCallHours", 12.0), 1, 48));
         keepAliveTimeout = TimeSpan.FromSeconds(Math.Clamp(configuration.GetValue("Yap:Calls:KeepAliveTimeoutSeconds", 20), 0, 120));
@@ -297,8 +302,9 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
     /// </summary>
     private void LimitUnsentBytes(HttpContext context)
     {
-        if (relaySocketUnsentBytes > 0)
-            BoltSocketTuning.TryLimitUnsentBytes(context.Features.Get<IConnectionSocketFeature>()?.Socket, relaySocketUnsentBytes);
+        var socket = context.Features.Get<IConnectionSocketFeature>()?.Socket;
+        if (relaySocketUnsentBytes > 0) BoltSocketTuning.TryLimitUnsentBytes(socket, relaySocketUnsentBytes);
+        if (RelaySocketSendBufferBytes > 0) BoltSocketTuning.TryLimitSendBuffer(socket, RelaySocketSendBufferBytes);
     }
 
     /// <summary>

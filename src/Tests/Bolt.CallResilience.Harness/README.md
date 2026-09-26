@@ -25,10 +25,17 @@ Linux TCP.
 
 ## Run it in CI
 
-`.github/workflows/call-network-harness.yml` runs every profile for the base branch (with a
-constant sender) and for the PR branch (with the adaptive sender where the profile says so), in
-parallel, and writes tables to the job summary. It runs on pull requests that touch the relay, or on
-demand from the Actions tab ("Call network harness", optional call length).
+`.github/workflows/call-network-harness.yml` runs every profile in parallel and writes tables to the
+job summary:
+
+- **before**: the base branch's relay with the client defaults it shipped with (a constant sender);
+- **p0 / stress**: this relay with phase 0's constant 240p sender, and under a constant overload offer;
+- **after**: the adaptive sender (phase 1), including the send-buffer cap variants;
+- **resume**: resumable calls (phase 2) with the adaptive sender on the other side, plus the same
+  resumes with phase 2's constant sender for a like-for-like comparison, and one run without resume.
+
+It runs on pull requests that touch the relay, the Bolt client or media libraries, or the harness,
+or on demand from the Actions tab ("Call network harness", optional call length).
 
 ## Run it locally
 
@@ -79,6 +86,8 @@ Options that relay does not have are skipped. The adaptive sender needs this che
 | `AUDIO_KBPS` | 32 | Adaptive: Opus rate before the rate loop moves it |
 | `SVC` | 1 | Adaptive: 0 encodes without temporal layers |
 | `OVERSHOOT_PCT` | 100 | Adaptive: encoder output as a percentage of its target |
+| `UNSENT_BYTES` | 32768 | `TCP_NOTSENT_LOWAT` on the relay's call sockets (`Yap:Calls:RelaySocketUnsentBytes`) |
+| `SNDBUF_BYTES` | 0 | `SO_SNDBUF` cap on the relay's call sockets, bounding TCP's bytes in flight (`Yap:Calls:RelaySocketSendBufferBytes`, off by default) |
 | `DEADLINE_MS` | 250 | `SendEnqueueTimeoutMs` (Yap's value) |
 | `STALL_MS` | 15000 | `TransportSendStallTimeoutMs`, the progress watchdog (newer relays only) |
 | `AUTH_DELAY_MS` | 30 | Latency of every participant authorization check |

@@ -314,6 +314,8 @@ public sealed partial class YapCallGatewayTests
         {
             Assert.That(f.Gateway.ReconnectGrace, Is.EqualTo(TimeSpan.FromSeconds(45)));
             Assert.That(f.Gateway.MaxCallDuration, Is.EqualTo(TimeSpan.FromHours(12)), "the old one-hour cap is gone");
+            Assert.That(f.Gateway.RelaySocketSendBufferBytes, Is.Zero,
+                "the in-flight cap is opt-in: behind the ingress proxy the relay's socket is not the phone's bottleneck");
             Assert.That(f.Gateway.Server, Is.Not.Null);
         });
         var room = await f.Gateway.StartGroupAsync(f.Alice, f.Thread, [f.BobId], deviceId: f.AliceDevice);

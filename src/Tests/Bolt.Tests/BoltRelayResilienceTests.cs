@@ -220,6 +220,23 @@ public sealed class BoltRelayResilienceTests
         Assert.That(BoltSocketTuning.TryLimitUnsentBytes(null, 1024), Is.False);
     }
 
+    [Test]
+    public void SocketTuning_CapsTheSendBuffer_WhichBoundsWhatTcpKeepsInFlight()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        client.Connect(listener.LocalEndpoint);
+        Assert.That(BoltSocketTuning.TryLimitSendBuffer(client, 48 * 1024), Is.True);
+        // Linux reports twice the request (its bookkeeping share); other systems report it as set.
+        Assert.That(client.SendBufferSize, Is.InRange(48 * 1024, 2 * 48 * 1024));
+        Assert.Multiple(() =>
+        {
+            Assert.That(BoltSocketTuning.TryLimitSendBuffer(null, 1024), Is.False);
+            Assert.That(BoltSocketTuning.TryLimitSendBuffer(client, 0), Is.False, "0 leaves autotuning on");
+        });
+    }
+
     // ── BoltClient reconnect discipline ──
 
     [Test]

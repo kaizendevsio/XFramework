@@ -8,6 +8,7 @@
 // Outage timestamps written by run-profile.sh (/tmp/outage-start, /tmp/outage-end, host clock) let
 // the summary say how long after the network came back audio and a decodable picture did.
 using System.Buffers.Binary;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
@@ -148,6 +149,11 @@ internal static class ResumingReceiver
             using var stop = CancellationTokenSource.CreateLinkedTokenSource(ct);
             string? lost = null;
             var frozen = false;
+#if HARNESS_ADAPTIVE
+            // The browser receiver's delay report, every 250 ms per stream, back to the (adaptive) sender. Its state
+            // belongs to the connection: a resumed one starts its delay floor and rate afresh, as the browser's does.
+            var feedback = new ConcurrentDictionary<Guid, ReceiverFeedback>();
+#endif
             var watch = Task.Run(async () =>
             {
                 long lastHeartbeat = 0;
@@ -161,6 +167,16 @@ internal static class ResumingReceiver
                         Env.Log($"IPCHANGE t={clock.Elapsed.TotalSeconds:F2} blackholing {LocalEndPoint}");
                         network.Blackhole(LocalEndPoint);
                     }
+#if HARNESS_ADAPTIVE
+                    foreach (var stream in feedback.Values)
+                    {
+                        byte[]? report;
+                        lock (stream) report = stream.Build(now);
+                        if (report is null) continue;
+                        try { await SendAsync(report, stop.Token); }
+                        catch (Exception) when (!stop.IsCancellationRequested) { /* The receive side will notice. */ }
+                    }
+#endif
                     if (now - lastHeartbeat >= link.Options.HeartbeatIntervalMs)
                     {
                         lastHeartbeat = now;
@@ -202,6 +218,15 @@ internal static class ResumingReceiver
                         if (frame[0] == (byte)FrameType.CallSignal && BoltCodec.TryReadCallSignal(frame, out var signal) &&
                             (byte)signal.SignalType == 0x0E && signal.PayloadLength == 8)
                         { link.Echo(BinaryPrimitives.ReadInt64LittleEndian(frame.AsSpan(signal.PayloadOffset, 8)), now); continue; }
+#if HARNESS_ADAPTIVE
+                        if (frame[0] == (byte)FrameType.MediaFrame && BoltCodec.TryReadMediaFrame(frame, out var media) &&
+                            media.GetPayload(frame) is { Length: >= Payload.HeaderSize } body)
+                        {
+                            var isAudio = body[8] == Payload.Audio;
+                            var tracker = feedback.GetOrAdd(media.StreamId, id => new ReceiverFeedback(id, isAudio));
+                            lock (tracker) tracker.Observe(media.SequenceNumber, media.Timestamp, frame.Length, now);
+                        }
+#endif
                         metrics.Add(frame);
                     }
                 }
@@ -228,7 +253,11 @@ internal static class ResumingReceiver
         private readonly List<long> audioDelays = [];
         private readonly List<(long Arrival, long Sent)> audioArrivals = [], decodableArrivals = [];
         private readonly Dictionary<uint, int> pending = [];
-        private uint? firstAudio, lastAudio, lastDecodable;
+        private uint? firstAudio, lastAudio;
+        // Pictures a decoder showed, so a later one can be checked against the picture it refers to (with temporal
+        // layers that is the last lower-layer picture, not the one right before it).
+        private readonly HashSet<uint> decodable = [];
+        private readonly Queue<uint> decodableOrder = new();
         private long? lastAudioArrival;
         public long AudioReceived, LongestAudioGapMs, PicturesDecodable, Keyframes;
 
@@ -257,8 +286,14 @@ internal static class ResumingReceiver
             foreach (var stale in pending.Keys.Where(x => x < picture).ToArray()) pending.Remove(stale);
             var isKey = payload[9] == 1;
             if (isKey) Keyframes++;
-            if (isKey || lastDecodable == picture - 1)
-            { lastDecodable = picture; PicturesDecodable++; decodableArrivals.Add((now, BinaryPrimitives.ReadInt64LittleEndian(payload))); }
+            var reference = BinaryPrimitives.ReadUInt32LittleEndian(payload[19..]);
+            if (isKey || decodable.Contains(reference))
+            {
+                PicturesDecodable++;
+                decodableArrivals.Add((now, BinaryPrimitives.ReadInt64LittleEndian(payload)));
+                decodable.Add(picture); decodableOrder.Enqueue(picture);
+                if (decodableOrder.Count > 4096) decodable.Remove(decodableOrder.Dequeue());
+            }
         }
 
         public double AudioDelivered => firstAudio is { } first && lastAudio is { } last && last >= first
