@@ -40,8 +40,15 @@ public sealed class MediaServiceOptions
     /// receiver, a decoder reset or a relay that dropped pictures asks for one.
     /// </summary>
     public int KeyframeIntervalSeconds { get; set; } = 10;
-    /// <summary>How often the send ladder looks at measured conditions.</summary>
-    public int AdaptationIntervalMs { get; set; } = 1_000;
+    /// <summary>How often the send rate loop reads its signals and moves the encoders.</summary>
+    public int AdaptationIntervalMs { get; set; } = 250;
+    /// <summary>
+    /// Encode temporal layers (L1T2/L1T3) where the browser's encoder accepts them, so the relay can shed
+    /// enhancement pictures for one slow receiver instead of every picture until a keyframe.
+    /// </summary>
+    public bool TemporalLayers { get; set; } = true;
+    /// <summary>Let the rate loop move Opus between its low, normal and high rates. Off keeps <see cref="AudioBitrateKbps"/>.</summary>
+    public bool AdaptiveAudioBitrate { get; set; } = true;
 
     /// <summary>Legacy option retained for source compatibility. SecurityMode is authoritative;
     /// setting this to false cannot opt into transport-only security.</summary>

@@ -141,13 +141,25 @@ public class BoltMediaBrowserTests
     {
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var pipeline = new BoltAudioPipeline(Substitute.For<IJSRuntime>(), NullLogger<BoltAudioPipeline>.Instance);
-        pipeline.OnEncoded += _ => completion.Task;
+        uint? timestamp = null;
+        pipeline.OnEncoded += (_, at) => { timestamp = at; return completion.Task; };
 
-        var pending = pipeline.OnAudioEncoded([1, 2, 3]);
+        var pending = pipeline.OnAudioEncoded([1, 2, 3], 40_000);
 
         pending.IsCompleted.Should().BeFalse();
+        timestamp.Should().Be(1920u, "40 ms of capture time on the 48 kHz media clock");
         completion.SetResult();
         await pending;
+    }
+
+    [Test]
+    public void AudioPipeline_MediaClock_FollowsCaptureTime_AndWraps()
+    {
+        BoltAudioPipeline.MediaClock(0).Should().Be(0u);
+        BoltAudioPipeline.MediaClock(20_000).Should().Be(960u);
+        BoltAudioPipeline.MediaClock(-5).Should().Be(0u);
+        // 2^32 ticks at 48 kHz is about 24.8 hours; the clock wraps like any RTP timestamp.
+        BoltAudioPipeline.MediaClock((double)(1L << 32) * 1000 / 48 + 20_000).Should().Be(960u);
     }
 
     [Test]

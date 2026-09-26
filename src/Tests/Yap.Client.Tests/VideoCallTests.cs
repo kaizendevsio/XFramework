@@ -47,6 +47,49 @@ public sealed class VideoCallTests
         });
     }
 
+    // ── Temporal layers ──
+
+    [Test]
+    public void ALayeredStream_ToleratesTheGapsItsDropPolicyMakes()
+    {
+        // L1T3 (0,2,1,2): the relay shed pictures 2 and 4 (top layer) for this receiver.
+        var assembler = new VideoFrameAssembler();
+        var got = new List<VideoFramePayload>();
+        foreach (var (frame, layer, key) in new[] { (1u, 0, true), (3u, 1, false), (5u, 0, false), (6u, 2, false) })
+            got.Add(assembler.Add(VideoFrameFragments.Split(new byte[10], frame, frame * 1000, key, layer)[0])!.Value);
+        Assert.Multiple(() =>
+        {
+            Assert.That(assembler.Layered, Is.True);
+            Assert.That(got.Select(x => x.Discontinuity), Is.All.False, "a policy gap is not a break: no decoder reset, no keyframe");
+            Assert.That(got.Select(x => x.Layer), Is.EqualTo(new[] { 0, 1, 0, 2 }), "the layer comes from the authenticated header");
+        });
+    }
+
+    [Test]
+    public void ALayeredStream_StillBreaksOnFragmentsThisDeviceDroppedItself()
+    {
+        var assembler = new VideoFrameAssembler();
+        assembler.Add(VideoFrameFragments.Split(new byte[10], 1, 0, true)[0]);
+        assembler.Add(VideoFrameFragments.Split(new byte[10], 2, 1, false, 2)[0]);
+        assembler.MarkLocalLoss();
+        var afterLoss = assembler.Add(VideoFrameFragments.Split(new byte[10], 4, 3, false, 0)[0]);
+        var next = assembler.Add(VideoFrameFragments.Split(new byte[10], 6, 5, false, 0)[0]);
+        Assert.That(afterLoss!.Value.Discontinuity, Is.True, "no drop policy covered what this receiver lost");
+        Assert.That(next!.Value.Discontinuity, Is.False, "one break, then a policy gap again");
+    }
+
+    [Test]
+    public void TheLayerBitsAreInvisibleToAReceiverThatPredatesThem()
+    {
+        var fragment = VideoFrameFragments.Split(new byte[10], 9, 0, false, 3)[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(fragment[0] & 0xF0, Is.EqualTo(0x10), "the version nibble an older receiver checks is unchanged");
+            Assert.That(fragment[0] & 0x03, Is.EqualTo(0x02), "keyframe and last-fragment bits are where they were");
+            Assert.That(VideoFrameFragments.Split(new byte[10], 9, 0, true, 3)[0][0] & 0x0C, Is.Zero, "a keyframe is always the base layer");
+        });
+    }
+
     [Test]
     public void NegotiatedCodecKeepsItsSoftwareAndDeviceCeiling()
     {
@@ -138,99 +181,53 @@ public sealed class VideoCallTests
     }
 
     // ── Adaptation ──
+    // The controller itself (step responses, convergence, suspension) is covered in Bolt.Tests
+    // SendRateControlTests; these pin down the camera-facing contract Yap relies on.
 
-    private static VideoConditions Good(int kbps) => new(kbps, 30, 0, 0);
+    private static VideoTier? Place(VideoAdaptation adaptation, int budgetKbps, long nowMs, bool congested = false)
+        => adaptation.Rates.Place(budgetKbps, nowMs, congested) is { } setting ? VideoAdaptation.ToTier(setting) : null;
 
     [Test]
-    public void OneBadWindowIsIgnored_ButTwoInARowDropATier()
+    public void DefaultStartsAt240p15_AndClimbsNoHigherThanThePreference()
     {
-        var adaptation = new VideoAdaptation(3);
+        // A call starts inside a 512 kbps mobile budget; the preference is only a ceiling.
+        var adaptation = new VideoAdaptation(new MediaServiceOptions().VideoStartTier);
+        adaptation.SetCeiling(1080);
+        Assert.That(adaptation.Current, Is.EqualTo(new VideoTier(426, 240, 15, 180)));
+        for (long now = 0; now < 60_000; now += 250) Place(adaptation, 50_000, now);
+        Assert.That(adaptation.Current!.Value.Height, Is.EqualTo(1080));
+    }
+
+    [Test]
+    public void ABudgetFarBelowThePicture_DropsStraightToTheSizeThatFits()
+    {
+        var adaptation = new VideoAdaptation(VideoAdaptation.IndexForHeight(1080));
+        var tier = Place(adaptation, 330, 0, congested: true);
         Assert.Multiple(() =>
         {
-            Assert.That(adaptation.Observe(new(600, 30, 0, 0)), Is.Null, "a single dip is not a trend");
-            Assert.That(adaptation.Observe(new(600, 30, 0, 0))!.Value.Height, Is.EqualTo(540));
-        });
-    }
-
-    // A thermally throttled phone still reports plenty of bandwidth; the encode backlog is the
-    // only honest signal that this device cannot hold the tier it is on.
-    [Test]
-    public void AnEncodeBacklogDropsTheTierEvenWithBandwidthToSpare()
-    {
-        var adaptation = new VideoAdaptation(5);
-        adaptation.Observe(new(20_000, 30, 5, 0));
-        var tier = adaptation.Observe(new(20_000, 30, 5, 0));
-        Assert.That(tier!.Value.Height, Is.EqualTo(900));
-    }
-
-    [Test]
-    public void SlowCameraWithoutQueuePressure_DoesNotLowerResolution()
-    {
-        var adaptation = new VideoAdaptation(3);
-        adaptation.Observe(new(20_000, 12, 0, 0));
-        for (var i = 0; i < 60; i++) Assert.That(adaptation.Observe(new(20_000, 12, 0, 0)), Is.Null);
-        Assert.That(adaptation.Current!.Value.Height, Is.EqualTo(720));
-    }
-
-    [Test]
-    public void ClimbingBackUpTakesTwelveCleanWindowsAndOnlyOneRungAtATime()
-    {
-        var adaptation = new VideoAdaptation(2);
-        for (var i = 0; i < VideoAdaptation.UpAfter - 1; i++)
-            Assert.That(adaptation.Observe(Good(20_000)), Is.Null, $"window {i} must not be enough on its own");
-        var tier = adaptation.Observe(Good(20_000));
-        Assert.Multiple(() =>
-        {
-            Assert.That(tier!.Value.Height, Is.EqualTo(720));
-            Assert.That(adaptation.Observe(Good(20_000)), Is.Null, "the next rung needs its own twelve windows");
+            Assert.That(tier!.Value.Height, Is.EqualTo(360), "one decision, not one rung per two seconds");
+            Assert.That(tier.Value.BitrateKbps, Is.EqualTo(330), "the bitrate follows the budget inside the rung");
         });
     }
 
     [Test]
-    public void TheCeilingClampsTheLadderImmediatelyAndBlocksFurtherClimbing()
+    public void TheCeilingClampsThePictureImmediatelyAndBlocksFurtherClimbing()
     {
-        var adaptation = new VideoAdaptation(5);
+        var adaptation = new VideoAdaptation(VideoAdaptation.IndexForHeight(1080));
         Assert.That(adaptation.SetCeiling(540), Is.True);
         Assert.That(adaptation.Current!.Value.Height, Is.EqualTo(540));
-        for (var i = 0; i < VideoAdaptation.UpAfter * 2; i++) adaptation.Observe(Good(20_000));
+        for (long now = 0; now < 60_000; now += 250) Place(adaptation, 20_000, now);
         Assert.That(adaptation.Current!.Value.Height, Is.EqualTo(540), "a battery or participant cap is not negotiable");
     }
 
-    // Below this the picture is worthless and the voice needs the room, so video stands down and
-    // comes back only when the link can carry the smallest rung with headroom.
     [Test]
-    public void ALinkTooSmallForAnyPicture_SuspendsVideoAndResumesWhenItRecovers()
+    public void ASuspendedPicture_ReportsNoTier()
     {
-        var adaptation = new VideoAdaptation(3);
-        for (var i = 0; i < VideoAdaptation.SuspendAfter; i++) adaptation.Observe(new(60, 8, 0, 0));
-        Assert.That(adaptation.Suspended, Is.True);
-        Assert.That(adaptation.Current, Is.Null);
-        Assert.That(adaptation.Observe(new(200, 0, 0, 0)), Is.Null, "one good reading is not enough headroom");
-        var resumed = adaptation.Observe(new(600, 0, 0, 0));
-        Assert.Multiple(() =>
-        {
-            Assert.That(adaptation.Suspended, Is.False);
-            Assert.That(resumed!.Value.Height, Is.EqualTo(240), "it comes back at the bottom and climbs from there");
-        });
-    }
-
-    // Nothing is being sent while video is suspended, so the receiver stops reporting a bitrate.
-    // Without a blind retry the picture would never come back on a link that has recovered.
-    [Test]
-    public void ASuspendedPicture_IsRetriedEvenWhenNoFeedbackArrives()
-    {
-        var adaptation = new VideoAdaptation(2);
-        for (var i = 0; i < VideoAdaptation.SuspendAfter; i++) adaptation.Observe(new(50, 5, 0, 0));
-        Assert.That(adaptation.Suspended, Is.True);
-        VideoTier? resumed = null;
-        for (var i = 0; i < VideoAdaptation.ResumeProbeAfter && resumed is null; i++) resumed = adaptation.Observe(new(0, 0, 0, 0));
-        Assert.Multiple(() =>
-        {
-            Assert.That(resumed, Is.Not.Null, "a silent link still gets retried after the cool-down");
-            Assert.That(adaptation.Suspended, Is.False);
-        });
-        for (var i = 0; i < VideoAdaptation.SuspendAfter; i++) adaptation.Observe(new(50, 5, 0, 0));
-        Assert.That(adaptation.Suspended, Is.True, "a link that is still bad stands the picture down again");
+        var adaptation = new VideoAdaptation();
+        adaptation.Suspended = true;
+        Assert.That(adaptation.Current, Is.Null, "null is the UI's 'video paused, audio continues'");
+        adaptation.Suspended = false;
+        Assert.That(adaptation.Current!.Value.Height, Is.EqualTo(240));
     }
 
     [Test]
@@ -246,25 +243,28 @@ public sealed class VideoCallTests
     }
 
     [Test]
-    public void Requested4K60_DropsFrameRateBeforeResolutionUnderPressure()
+    public void A60FpsPreference_IsUsedOnlyWhenTheBudgetAffordsIt_AndGoesFirstUnderPressure()
     {
-        var adaptation = new VideoAdaptation(VideoAdaptation.IndexForHeight(2160), 60);
-        Assert.That(adaptation.Current, Is.EqualTo(new VideoTier(3840, 2160, 60, 21000)));
-        adaptation.Observe(new(30000, 25, 3, 0));
-        Assert.That(adaptation.Observe(new(30000, 25, 3, 0)), Is.EqualTo(new VideoTier(3840, 2160, 30, 14000)));
-        adaptation.Observe(new(30000, 25, 3, 0));
-        Assert.That(adaptation.Observe(new(30000, 25, 3, 0))!.Value.Height, Is.EqualTo(1440));
+        var adaptation = new VideoAdaptation(VideoAdaptation.IndexForHeight(720), 60);
+        adaptation.SetCeiling(720);
+        Assert.That(adaptation.Current!.Value.Framerate, Is.EqualTo(30), "60 fps is earned, not the start");
+        for (long now = 0; now < 6_000; now += 250) Place(adaptation, 3_000, now);
+        Assert.That(adaptation.Current!.Value.Framerate, Is.EqualTo(60));
+        Place(adaptation, 1_200, 6_250, congested: true);
+        Assert.That(adaptation.Current, Is.EqualTo(new VideoTier(1280, 720, 30, 1_200)), "frame rate before resolution");
+        for (long now = 7_000; now < 20_000; now += 250) Place(adaptation, 3_000, now);
+        Assert.That(adaptation.Current!.Value.Framerate, Is.EqualTo(60));
+        Assert.That(adaptation.LimitTo30Fps(), Is.True, "an encoder that refuses 60 fps caps the call at 30");
+        Assert.That(adaptation.Current!.Value.Framerate, Is.EqualTo(30));
     }
 
     [Test]
-    public void DefaultStartsAt240p15_AndClimbsNoHigherThanThePreference()
+    public void WithoutThePreference_60FpsIsNeverUsed()
     {
-        // A call starts inside a 512 kbps mobile budget; the preference is only a ceiling.
-        var adaptation = new VideoAdaptation(new MediaServiceOptions().VideoStartTier);
-        adaptation.SetCeiling(1080);
-        Assert.That(adaptation.Current, Is.EqualTo(new VideoTier(426, 240, 15, 180)));
-        for (var i = 0; i < 100; i++) adaptation.Observe(Good(50000));
-        Assert.That(adaptation.Current!.Value.Height, Is.EqualTo(1080));
+        var adaptation = new VideoAdaptation(VideoAdaptation.IndexForHeight(720));
+        adaptation.SetCeiling(720);
+        for (long now = 0; now < 30_000; now += 250) Place(adaptation, 10_000, now);
+        Assert.That(adaptation.Current!.Value.Framerate, Is.EqualTo(30));
     }
 
     // ── Fragmentation: every picture rides the same 4 KB authenticated envelope as an Opus packet ──
