@@ -1,4 +1,5 @@
 using Bolt.Client;
+using Bolt.Media;
 using Bolt.Media.Browser;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
@@ -68,6 +69,7 @@ public sealed partial class VoiceState : IAsyncDisposable
             {
                 Enabled = configuration.Enabled && configuration.GroupCalls && configuration.SecurityMode == "EndToEndEncrypted";
                 VideoAvailable = Enabled && configuration.Video;
+                reconnectGraceSeconds = Math.Clamp(configuration.ReconnectGraceSeconds, 10, 300);
                 Notify();
             }
         }
@@ -158,6 +160,8 @@ public sealed partial class VoiceState : IAsyncDisposable
         attempt.Ended = true;
         if (attempt.Invite is { } ended) RememberEnded(ended.Id);
         attempt.Lifetime.Cancel();
+        attempt.Link.Fail();
+        _ = StopWatchingNetworkAsync(attempt);
         if (ReferenceEquals(active, attempt))
         {
             active = null; Incoming = false; ConnectedAt = null; Minimized = false; Muted = false;
@@ -168,6 +172,7 @@ public sealed partial class VoiceState : IAsyncDisposable
             video.OnLocalVideoStopped -= attempt.VideoStopped;
             video.OnVideoTierChanged -= attempt.TierChanged;
             video.OnRemoteVideoChanged -= attempt.RemoteVideoChanged;
+            video.OnHeartbeatEcho -= attempt.HeartbeatEcho;
         }
         attempt.CameraOn = false;
         // Stop capture before network notification, including a pending microphone permission request.
@@ -216,8 +221,8 @@ public sealed partial class VoiceState : IAsyncDisposable
     }
     public void DismissError() { Error = null; Notify(); }
     public async ValueTask DisposeAsync()
-    { disposed = true; chat.CallReceived -= ReceiveAsync; chat.Changed -= AccountChanged; await EndAsync(); StopRing(); await ringWork; }
-    private sealed record Configuration(bool Enabled, bool GroupCalls = false, string SecurityMode = "", bool Video = false);
+    { disposed = true; chat.CallReceived -= ReceiveAsync; chat.Changed -= AccountChanged; await EndAsync(); StopRing(); await ringWork; networkReference?.Dispose(); }
+    private sealed record Configuration(bool Enabled, bool GroupCalls = false, string SecurityMode = "", bool Video = false, int ReconnectGraceSeconds = 45);
     private sealed class Attempt(string account)
     {
         public string Account { get; } = account;
@@ -236,6 +241,24 @@ public sealed partial class VoiceState : IAsyncDisposable
         public Dictionary<(Guid, string), YapGroupControlEvent> PendingControls { get; } = [];
         public bool Starting, Ended, Muting, Notified;
         public string Phase = "microphone";
+
+        // ── Resilience. The transport may come and go; the call, its keys and its devices stay. ──
+        public CallLinkMonitor Link = new();
+        public CallReconnector? Reconnector;
+        public Task Reconnect = Task.CompletedTask;
+        /// <summary>This attempt had a working transport once, so losing it is a reconnect rather than a failed setup.</summary>
+        public bool EverConnected;
+        /// <summary>The resumed transport died before the reconnect loop finished; go round again.</summary>
+        public bool LostDuringResume;
+        /// <summary>Mute was toggled while the server could not be told; tell it after the resume.</summary>
+        public bool MuteDirty;
+        /// <summary>A resume that had to rekey republishes the camera once the new epoch is active.</summary>
+        public bool ResumeVideo;
+        public DateTimeOffset? ReconnectingSince;
+        public Action<long> HeartbeatEcho = _ => { };
+        public IJSObjectReference? NetworkWatch;
+        /// <summary>Remote pictures whose stream went away while their sender may be coming back: kept on screen, frozen.</summary>
+        public Dictionary<Guid, (VideoTile Tile, long Since)> Frozen { get; } = [];
 
         // ── Video. Everything here stays inert until the user turns the camera on. ──
         public bool WantsVideo, CameraOn, CameraBusy;
