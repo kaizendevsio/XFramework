@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-const css = readFileSync(new URL('../../Presentation/XFramework.Yap.Client/wwwroot/mobile.css', import.meta.url), 'utf8');
+const css = readFileSync(new URL('../../Presentation/XFramework.Yap.Client/wwwroot/mobile.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
 
 test('long press never selects text, including in modal dialogs and popovers', () => {
     // Chromium's UA sheet gives modal dialogs user-select:text, so inheriting from body is not enough.
