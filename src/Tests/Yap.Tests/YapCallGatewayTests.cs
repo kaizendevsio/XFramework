@@ -27,7 +27,7 @@ using XFramework.Integration.Security;
 namespace Yap.Tests;
 
 [TestFixture]
-public sealed class YapCallGatewayTests
+public sealed partial class YapCallGatewayTests
 {
     [TestCase(false)]
     [TestCase(true)]
@@ -675,6 +675,9 @@ public sealed class YapCallGatewayTests
         var identity = new ClaimsIdentity(f.Bob.Identity as ClaimsIdentity);
         identity.AddClaim(new("bolt_media_client_id", YapCallGateway.ClientId(room.Id, f.BobId)));
         identity.AddClaim(new("yap_call_id", room.Id.ToString()));
+        // The seat generation the relay's connection was admitted as (the first connection is 1).
+        member.GetType().GetField("Generation")!.SetValue(member, 1);
+        identity.AddClaim(new("yap_connection", "1"));
         return (room.Id, new ClaimsPrincipal(identity));
     }
 

@@ -12,7 +12,7 @@ using NUnit.Framework;
 
 namespace Bolt.Tests;
 
-public sealed class BoltGroupCallLifecycleTests
+public sealed partial class BoltGroupCallLifecycleTests
 {
     [Test]
     public async Task CanceledFirstAdmission_ReleasesEmptyActiveRoom()

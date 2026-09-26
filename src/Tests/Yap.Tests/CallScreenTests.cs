@@ -23,7 +23,7 @@ namespace Yap.Tests;
 /// With YAP_UI_ARTIFACT_DIR set, each phase is also written out as a standalone page carrying the real
 /// stylesheets and the built scoped bundle, for screenshotting at phone size.
 /// </summary>
-public sealed class CallScreenTests
+public sealed partial class CallScreenTests
 {
     private static readonly Guid Self = Guid.NewGuid(), Alex = Guid.NewGuid(), Jamie = Guid.NewGuid(), Sam = Guid.NewGuid();
 
@@ -219,6 +219,8 @@ public sealed class CallScreenTests
 
         public void Set(string property, object? value) => typeof(VoiceState).GetProperty(property)!.SetValue(voice, value);
         public void Attempt(string field, object? value) => attempt.GetType().GetField(field)!.SetValue(attempt, value);
+        /// <summary>The call itself is over (only a screen about it may remain).</summary>
+        public void Detach() => typeof(VoiceState).GetField("active", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(voice, null);
 
         public async Task<string> RenderAsync(bool options)
         {

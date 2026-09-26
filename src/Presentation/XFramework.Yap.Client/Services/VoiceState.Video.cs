@@ -5,8 +5,12 @@ using Yap.Contracts;
 
 namespace Yap.Client.Services;
 
-/// <summary>One remote camera, already bound to the participant it belongs to.</summary>
-public sealed record VideoTile(Guid StreamId, Guid CredentialId);
+/// <summary>
+/// One remote camera, already bound to the participant it belongs to. A <c>Frozen</c> tile is the last
+/// picture of a stream that went away while its sender (or this device) reconnects: it stays on
+/// screen, dimmed, until the sender's new stream replaces it or they leave.
+/// </summary>
+public sealed record VideoTile(Guid StreamId, Guid CredentialId, bool Frozen = false);
 
 public sealed partial class VoiceState
 {
@@ -99,6 +103,8 @@ public sealed partial class VoiceState
         var attempt = active;
         if (attempt?.Group is null || attempt.Media is not { } media || !Current(attempt) || attempt.CameraBusy) return;
         if (!attempt.CameraOn && (ConnectedAt is null || attempt.Epoch?.Active != true)) return;
+        // Turning the camera on needs the server and a transport; turning it off never waits for either.
+        if (!attempt.CameraOn && attempt.Link.State == Bolt.Media.CallLinkState.Reconnecting) return;
         attempt.CameraBusy = true; VideoNotice = null; Notify();
         try
         {
@@ -262,12 +268,43 @@ public sealed partial class VoiceState
     private void ApplyRemoteVideo(Attempt attempt)
     {
         if (attempt.Media is not { } media || !Current(attempt)) return;
-        var tiles = media.RemoteVideo
-            .Select(x => new VideoTile(x.StreamId, CredentialOf(x.SenderId)))
-            .Where(x => x.CredentialId != Guid.Empty).ToArray();
-        attempt.Tiles = tiles;
-        _ = media.SetVideoParticipantsAsync(tiles.Length + (attempt.CameraOn ? 1 : 0));
+        var live = LiveTiles(media);
+        var now = LinkNow();
+        // A picture whose stream just went away is kept, frozen, in case its sender is only reconnecting.
+        foreach (var gone in attempt.Tiles.Where(x => !x.Frozen && live.All(tile => tile.StreamId != x.StreamId)))
+            attempt.Frozen[gone.CredentialId] = (gone with { Frozen = true }, now);
+        foreach (var tile in live) attempt.Frozen.Remove(tile.CredentialId);
+        attempt.Tiles = [.. live, .. KeptFrozen(attempt, now)];
+        _ = media.SetVideoParticipantsAsync(live.Length + (attempt.CameraOn ? 1 : 0));
         Notify();
+    }
+
+    private static VideoTile[] LiveTiles(BoltMediaService media) => media.RemoteVideo
+        .Select(x => new VideoTile(x.StreamId, CredentialOf(x.SenderId)))
+        .Where(x => x.CredentialId != Guid.Empty).ToArray();
+
+    /// <summary>How long a vanished picture waits for the roster to say its sender is reconnecting.</summary>
+    private const long FrozenGraceMs = 5_000;
+
+    private IEnumerable<VideoTile> KeptFrozen(Attempt attempt, long now)
+    {
+        var selfAway = attempt.Link.State == Bolt.Media.CallLinkState.Reconnecting;
+        foreach (var (credential, (tile, since)) in attempt.Frozen.ToArray())
+        {
+            var person = attempt.Group?.Participants.FirstOrDefault(x => x.CredentialId == credential);
+            if (person is { Left: false } && (selfAway || person.Reconnecting || now - since < FrozenGraceMs)) yield return tile;
+            else attempt.Frozen.Remove(credential);
+        }
+    }
+
+    /// <summary>Re-decide which frozen pictures stay: after a roster change, and once a second.</summary>
+    private void RefreshFrozenTiles(Attempt attempt)
+    {
+        if (attempt.Media is not { } media || (attempt.Frozen.Count == 0 && attempt.Tiles.All(x => !x.Frozen))) return;
+        var before = attempt.Tiles;
+        var live = LiveTiles(media);
+        attempt.Tiles = [.. live, .. KeptFrozen(attempt, LinkNow())];
+        if (!before.SequenceEqual(attempt.Tiles)) Notify();
     }
 
     /// <summary>Media sender IDs are "yap-media-{call}-{credential}"; the tail names the participant.</summary>

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Bolt.Client;
+using Bolt.Media;
 using Bolt.Media.Browser;
 using Microsoft.Extensions.Logging;
 using Yap.Contracts;
@@ -23,6 +24,8 @@ public sealed partial class VoiceState
         var recipients = people.Where(x => x.Id != chat.User.CredentialId).Select(x => x.Id).Distinct().ToArray();
         if (recipients.Length is < 1 or > 7) { Error = "Voice calls support up to eight people."; Notify(); return Task.CompletedTask; }
         var attempt = active = new Attempt(chat.Scope) { Starting = true, WantsVideo = video && VideoAvailable };
+        // A new call replaces a "Call ended" screen in place, in the same dialog.
+        Ended = null;
         Name = name; AvatarUrl = people.Count == 1 ? people[0].AvatarUrl : null;
         Status = "Preparing microphone..."; Incoming = false; Minimized = false; Error = null;
         VideoQuality = null; VideoNotice = null; Notify();
@@ -91,8 +94,11 @@ public sealed partial class VoiceState
             connection.ClientId, "Yap encrypted voice",
             new BoltClientOptions { MinConnections = 1, MaxConnections = 1, MaxFrameBytes = 65536, AutoReconnect = false },
             logs.CreateLogger("Yap.Voice"));
-        attempt.Disconnected = () => { if (Current(attempt)) _ = EndAfterCallbackAsync(attempt); };
+        attempt.Disconnected = () => TransportLost(attempt, client);
         client.Disconnected += attempt.Disconnected;
+        attempt.Link = new CallLinkMonitor(LinkOptions());
+        attempt.HeartbeatEcho = stamp => attempt.Link.Echo(stamp, LinkNow());
+        media.OnHeartbeatEcho += attempt.HeartbeatEcho;
         await media.InitializeAsync(client);
         CheckCurrent(attempt);
         attempt.Phase = "call-transport";
@@ -112,6 +118,10 @@ public sealed partial class VoiceState
         attempt.RemoteVideoChanged = () => _ = InvokeRemoteVideoAsync(attempt);
         media.OnRemoteVideoChanged += attempt.RemoteVideoChanged;
         attempt.TransportReady = true;
+        attempt.EverConnected = true;
+        attempt.Link.Connected(LinkNow());
+        _ = LivenessAsync(attempt);
+        _ = WatchNetworkAsync(attempt);
         // Acceptance may race the caller's first connection; fetch the current roster before deriving an epoch.
         await ApplyGroupRosterAsync(attempt, await api.GetAsync<YapGroupCall>($"api/chat/calls/groups/{group.Id}", attempt.Lifetime.Token));
     }
@@ -130,12 +140,18 @@ public sealed partial class VoiceState
             if (item.Type == "group-ended" || self.Left)
             {
                 RememberEnded(group.Id);
-                if (attempt?.Group?.Id == group.Id) await EndAttemptAsync(attempt, false);
+                if (attempt?.Group?.Id == group.Id)
+                {
+                    // Nobody hung up: somebody's connection did not come back in time. Say so.
+                    if (item.Reason == "connection-lost" && attempt.EverConnected) ShowConnectionLost(attempt);
+                    await EndAttemptAsync(attempt, false);
+                }
                 return;
             }
             if (attempt is null && item.Type == "group-incoming" && !self.Left && !self.Accepted &&
                 !endedInvites.Contains(group.Id) && group.ExpiresAt > DateTimeOffset.UtcNow)
             {
+                Ended = null;
                 active = new Attempt(chat.Scope) { Invite = InviteFor(group), Group = group };
                 Name = group.CallerName; AvatarUrl = null; Incoming = true; Minimized = false;
                 Status = "Incoming encrypted voice call"; Error = null; Notify();
@@ -160,7 +176,9 @@ public sealed partial class VoiceState
         if (!Current(attempt) || attempt.Group is { } prior && group.Revision < prior.Revision) return;
         var self = group.Participants.SingleOrDefault(x => x.CredentialId == chat.User!.CredentialId);
         if (self is null || self.Left) { await EndAttemptAsync(attempt, false); return; }
-        attempt.Group = group; Notify();
+        attempt.Group = group;
+        RefreshFrozenTiles(attempt);
+        Notify();
         if (!self.Accepted || !attempt.TransportReady) return;
         if (self.DeviceId != ApprovedDevice()) throw new InvalidOperationException("This call belongs to another device.");
         if (attempt.Epoch?.Revision == group.Revision) return;
@@ -288,9 +306,17 @@ public sealed partial class VoiceState
                 if (!await RunEpochMediaAsync(attempt, epoch, () => media.StartHostedAudioAsync(attempt.Group.Id))) return;
                 attempt.HostedAudioStarted = true;
             }
+            // Resumed into a new epoch: the camera that stayed open is published again under its keys.
+            if (attempt.ResumeVideo && attempt.CameraOn)
+            {
+                attempt.ResumeVideo = false;
+                if (!await RunEpochMediaAsync(attempt, epoch, () => media.ResumeVideoStreamAsync(attempt.Group.Id))) return;
+            }
             if (!Muted && !await RunEpochMediaAsync(attempt, epoch, media.StartAudioAsync)) return;
             if (!CurrentEpoch(attempt, epoch)) return;
-            ConnectedAt ??= DateTimeOffset.UtcNow; Status = "Connected"; Notify();
+            ConnectedAt ??= DateTimeOffset.UtcNow;
+            if (attempt.Link.State != CallLinkState.Reconnecting) Status = "Connected";
+            Notify();
             NegotiateVideo(attempt, epoch);
             // A call started with the camera button opens it once, here, after the keys are live.
             // Detached on purpose: a camera permission prompt must not stall the call-event loop.
@@ -300,12 +326,24 @@ public sealed partial class VoiceState
         finally { epoch.Completion.Release(); }
     }
 
+    /// <summary>
+    /// Give an epoch "30 s or 10 × RTT" to be acknowledged by everyone. While this device, or a peer
+    /// the epoch is waiting for, is reconnecting, the wait is extended: the seat hold bounds it, and
+    /// its end changes the roster and so the epoch anyway.
+    /// </summary>
     private async Task ExpireEpochAsync(Attempt attempt, GroupEpoch epoch)
     {
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(30), attempt.Lifetime.Token);
-            if (CurrentEpoch(attempt, epoch) && !epoch.Active) await FailAsync(attempt, new TimeoutException("Call key confirmation timed out."));
+            while (true)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(attempt.Link.EpochConfirmationTimeoutMs), attempt.Lifetime.Token);
+                if (!CurrentEpoch(attempt, epoch) || epoch.Active) return;
+                if (attempt.Link.State == CallLinkState.Reconnecting ||
+                    attempt.Group?.Participants.Any(x => x.Reconnecting && epoch.Peers.Contains(x.CredentialId)) == true) continue;
+                await FailAsync(attempt, new TimeoutException("Call key confirmation timed out."));
+                return;
+            }
         }
         catch (OperationCanceledException) { }
     }
@@ -320,7 +358,11 @@ public sealed partial class VoiceState
             if (Muted && attempt.Epoch?.Active == true) await media.StartAudioAsync(); else await media.SetAudioMutedAsync(true);
             if (!Current(attempt)) { await media.StopAudioAsync(); return; }
             Muted = !Muted; Notify();
-            await api.PostAsync($"api/chat/calls/groups/{attempt.Group.Id}/mute", new YapGroupMute(Muted), attempt.Lifetime.Token);
+            // The microphone obeys at once. The roster flag follows when the server can be reached:
+            // muting in a tunnel must not end the call.
+            if (attempt.Link.State == CallLinkState.Reconnecting) { attempt.MuteDirty = true; return; }
+            try { await api.PostAsync($"api/chat/calls/groups/{attempt.Group.Id}/mute", new YapGroupMute(Muted), attempt.Lifetime.Token); }
+            catch (Exception error) when (error is not ChatApiException && Current(attempt)) { attempt.MuteDirty = true; }
         }
         catch (Exception error) { await FailAsync(attempt, error); }
         finally { attempt.Muting = false; }

@@ -88,6 +88,35 @@ Options that relay does not have are skipped. The adaptive sender needs this che
 `NETEM_STEPS` (in the environment of `run-profile.sh`, not the container) changes the downlink
 during the call: `"AT=NETEM|AT=NETEM"`, with AT in seconds after both participants joined.
 
+## Resumable calls (RESUME=1)
+
+With `RESUME=1` the relay container also plays the Yap gateway's resume contract (`ResumeHost.cs`):
+single-use tickets bound to the seat generation they replace, a seat held for `GRACE_S` (45) after
+its socket ends, a resume that supersedes a socket the server still thinks is alive, WebSocket
+keep-alive pings with a 20 s timeout, and the call ending only when a hold runs out. The relay is
+still the real `BoltServer`; the gateway's own implementation of these rules is tested in Yap.Tests.
+
+The receiver (`ResumingReceiver.cs`) then behaves like the phone: a heartbeat every 2 s, the app's
+own `CallLinkMonitor` to decide the link is dead (RTT-scaled), and the app's own `CallReconnector`
+to pace the resume attempts (both files are compiled in from `Bolt.Media`). Each attempt is a new TCP
+connection: a ticket, a socket, registration, then `/ready` to rejoin the relay's room. In adaptive
+builds it also sends the browser receiver's delay reports on each connection (fresh per connection,
+as the browser's are), so `ADAPTIVE=1 RESUME=1` runs the whole integrated call: the adaptive sender
+sees the receiver go silent, and the receiver's return.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `RESUME` | 0 | 1 holds the receiver's seat and lets it resume |
+| `GRACE_S` | 45 | Seat hold, and the receiver's give-up time |
+| `IPCHANGE_AT_S` | off | At this second the receiver's connection is blackholed both ways (iptables) and it continues from a second address |
+| `RX_STALL_AT_S`, `RX_STALL_FOR_S` | off | The receiver stops reading for a while (a frozen tab), so the relay's stall watchdog retires it |
+
+The receiver's summary lists each resume (`timeToResumeMs` from noticing the loss to being back),
+`audioBackAfterMs` / `videoBackAfterMs` (from the network returning, or the app unfreezing, to the
+first live audio packet / decodable picture, one delivered within 2 s of being sent), and whether it gave up. The relay's summary says whether
+the other side's call survived and how long the seat was held. `summarize.py` prints a second table
+for these runs. Expectations in `run-profile.sh`: `resume`, `resume-retired` and `end-clean`.
+
 ## Reading the result
 
 `SUMMARY` lines are JSON. The relay's `outcome` is `survived` unless a participant was retired,
@@ -102,9 +131,10 @@ the final picture, when the video bitrate settled, how often the picture size ch
 after the first 30 s), how long video was suspended, and the picture timeline. `RATE` lines log the
 controller once a second.
 
-What it does not model: cellular link-layer retransmission, an IP address change (a certain TCP
-death that needs call resumption), the extra buffering of the production ingress path, a real
-encoder's rate control, and a congested sender uplink (the sender is on loopback, so the relay's
-reports and the receiver's delay reports drive the adaptation; the pacer's uplink gate is covered
-by unit tests). netem's default queue (1000 packets) is deep: a link that shrinks while it is full,
+What it does not model: cellular link-layer retransmission, the extra buffering of the production
+ingress path, a real encoder's rate control, a congested sender uplink (the sender is on loopback, so
+the relay's reports and the receiver's delay reports drive the adaptation; the pacer's uplink gate is
+covered by unit tests), a resume by the *sender* (its restart estimate is covered by unit tests), and
+browser network hints (`online`, network change) that let the app retry a resume the moment a
+network appears. netem's default queue (1000 packets) is deep: a link that shrinks while it is full,
 as in the step-down profile, holds seconds of data no sender can take back.

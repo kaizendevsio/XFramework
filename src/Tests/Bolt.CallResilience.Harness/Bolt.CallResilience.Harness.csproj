@@ -26,4 +26,12 @@
         <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Media\Bolt.Media.csproj" Condition="'$(HarnessAdaptive)' == 'true'" />
     </ItemGroup>
 
+    <ItemGroup Condition="'$(HarnessAdaptive)' != 'true'">
+        <!-- The app's own link monitor and resume pacing (BCL-only files), so the simulated phone
+             reconnects exactly as the real one does. Always this checkout's copy, whatever relay; an
+             adaptive build already has them from the Bolt.Media reference. -->
+        <Compile Include="..\..\Libraries\Bolt\Bolt.Media\CallLinkMonitor.cs" Link="Shared\CallLinkMonitor.cs" />
+        <Compile Include="..\..\Libraries\Bolt\Bolt.Media\CallReconnector.cs" Link="Shared\CallReconnector.cs" />
+    </ItemGroup>
+
 </Project>

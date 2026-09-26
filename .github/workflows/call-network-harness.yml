@@ -36,16 +36,23 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # before: the base relay (phase 0) with a constant sender. Phase 0 clients start at 240p15 and never move fast
-          # enough to matter, so "240p" is phase 0 as shipped and "720p"/"1080p" is the same overload offer phase 1 starts from.
-          - { name: before-512k-1000ms-240p, target: base, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: any, steps: "", settings: "VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
-          - { name: before-512k-1000ms-720p, target: base, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: any, steps: "", settings: "VIDEO_KBPS=1500 FPS=30 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
-          - { name: before-512k-500ms-240p, target: base, relaynet: "delay 250ms 10ms rate 512kbit loss 1%", recvnet: "delay 250ms 10ms", at: -1, for: 0, expect: any, steps: "", settings: "VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
-          - { name: before-512k-500ms-1080p, target: base, relaynet: "delay 250ms 10ms rate 512kbit loss 1%", recvnet: "delay 250ms 10ms", at: -1, for: 0, expect: any, steps: "", settings: "VIDEO_KBPS=3800 FPS=30 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
-          - { name: before-4g-2mbit, target: base, relaynet: "delay 50ms 10ms rate 2mbit loss 0.5%", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: any, steps: "", settings: "VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
-          - { name: before-step-4m-512k-4m, target: base, relaynet: "delay 50ms 10ms rate 4mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: any, steps: "60=delay 50ms 10ms rate 512kbit|120=delay 50ms 10ms rate 4mbit", settings: "VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          # before: the base relay (develop) with the client defaults it shipped with (1080p30, Opus 128k, keyframe every 2 s)
+          - { name: before-512k-1000ms-1pct, target: base, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: any, steps: "", settings: "VIDEO_KBPS=3800 FPS=30 AUDIO_PAYLOAD=347 KF_MS=2000 KF_ON_DEMAND=0" }
+          - { name: before-512k-500ms-1pct, target: base, relaynet: "delay 250ms 10ms rate 512kbit loss 1%", recvnet: "delay 250ms 10ms", at: -1, for: 0, expect: any, steps: "", settings: "VIDEO_KBPS=3800 FPS=30 AUDIO_PAYLOAD=347 KF_MS=2000 KF_ON_DEMAND=0" }
+          - { name: before-4g-2mbit, target: base, relaynet: "delay 50ms 10ms rate 2mbit loss 0.5%", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: any, steps: "", settings: "VIDEO_KBPS=3800 FPS=30 AUDIO_PAYLOAD=347 KF_MS=2000 KF_ON_DEMAND=0" }
+          - { name: before-4g-outage-2s, target: base, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 2, expect: any, steps: "", settings: "VIDEO_KBPS=3800 FPS=30 AUDIO_PAYLOAD=347 KF_MS=2000 KF_ON_DEMAND=0" }
+          - { name: before-4g-outage-10s, target: base, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 10, expect: any, steps: "", settings: "VIDEO_KBPS=3800 FPS=30 AUDIO_PAYLOAD=347 KF_MS=2000 KF_ON_DEMAND=0" }
+          - { name: before-4g-auth-blip, target: base, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: any, steps: "", settings: "VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=347 KF_MS=2000 KF_ON_DEMAND=0 AUTH_FAIL_AT_S=60 AUTH_FAIL_FOR_S=8" }
+          # phase 0 client (a constant 240p15 / Opus 32k sender, keyframes on demand) on this relay, and the same relay
+          # under a constant overload offer, which only the relay's drops protect (the phase 0 stress rows)
+          - { name: p0-512k-1000ms-240p, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: survive, steps: "", settings: "VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          - { name: p0-512k-500ms-240p, target: head, relaynet: "delay 250ms 10ms rate 512kbit loss 1%", recvnet: "delay 250ms 10ms", at: -1, for: 0, expect: survive, steps: "", settings: "VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          - { name: p0-step-4m-512k-4m, target: head, relaynet: "delay 50ms 10ms rate 4mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: survive, steps: "60=delay 50ms 10ms rate 512kbit|120=delay 50ms 10ms rate 4mbit", settings: "VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          - { name: stress-512k-1000ms-720p, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: survive, steps: "", settings: "VIDEO_KBPS=1500 FPS=30 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          - { name: stress-4g-1080p, target: head, relaynet: "delay 50ms 10ms rate 2mbit loss 0.5%", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: survive, steps: "", settings: "VIDEO_KBPS=3800 FPS=30 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          - { name: stress-4g-outage-2s-720p, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 2, expect: survive, steps: "", settings: "VIDEO_KBPS=1500 FPS=30 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
           # after: this branch with the adaptive sender (the browser client's real pacer, rate controller and ladder),
-          # starting from an overload offer where the profile says so
+          # starting from an overload offer where the profile says so (phase 1)
           - { name: after-512k-1000ms-from720p, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=720" }
           - { name: after-512k-1000ms-from1080p, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=1080" }
           - { name: after-512k-500ms-from720p, target: head, relaynet: "delay 250ms 10ms rate 512kbit loss 1%", recvnet: "delay 250ms 10ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=720" }
@@ -57,6 +64,22 @@ jobs:
           - { name: after-4g-outage-2s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 2, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240" }
           - { name: after-4g-outage-10s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 10, expect: any, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240" }
           - { name: after-4g-auth-blip, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 AUTH_FAIL_AT_S=60 AUTH_FAIL_FOR_S=8" }
+          # resume: the receiver's seat is held for 45 s and it comes back with a fresh ticket (phase 2), with the
+          # adaptive sender on the other side, so the whole integrated call runs
+          - { name: resume-4g-outage-10s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 10, expect: resume, steps: "", settings: "RESUME=1 GRACE_S=45 ADAPTIVE=1 START_HEIGHT=240" }
+          - { name: resume-4g-outage-30s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 30, expect: resume, steps: "", settings: "RESUME=1 GRACE_S=45 ADAPTIVE=1 START_HEIGHT=240" }
+          - { name: resume-4g-outage-75s-beyond-grace, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 75, expect: end-clean, steps: "", settings: "RESUME=1 GRACE_S=45 ADAPTIVE=1 START_HEIGHT=240" }
+          - { name: resume-512k-1000ms-1pct-outage-10s, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: 60, for: 10, expect: resume, steps: "", settings: "RESUME=1 GRACE_S=45 ADAPTIVE=1 START_HEIGHT=240" }
+          - { name: resume-4g-ip-change, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: resume, steps: "", settings: "RESUME=1 GRACE_S=45 ADAPTIVE=1 START_HEIGHT=240 IPCHANGE_AT_S=60" }
+          - { name: resume-4g-relay-retired, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: resume-retired, steps: "", settings: "RESUME=1 GRACE_S=45 ADAPTIVE=1 START_HEIGHT=240 RX_STALL_AT_S=60 RX_STALL_FOR_S=30" }
+          # the same resumes with phase 2's constant 240p15 sender, for a like-for-like comparison with #564
+          - { name: resume-const-4g-outage-10s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 10, expect: resume, steps: "", settings: "RESUME=1 GRACE_S=45 VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          - { name: resume-const-4g-outage-30s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 30, expect: resume, steps: "", settings: "RESUME=1 GRACE_S=45 VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          - { name: resume-const-512k-1000ms-1pct-outage-10s, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: 60, for: 10, expect: resume, steps: "", settings: "RESUME=1 GRACE_S=45 VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1" }
+          - { name: resume-const-4g-ip-change, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: resume, steps: "", settings: "RESUME=1 GRACE_S=45 VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1 IPCHANGE_AT_S=60" }
+          - { name: resume-const-4g-relay-retired, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: resume-retired, steps: "", settings: "RESUME=1 GRACE_S=45 VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1 RX_STALL_AT_S=60 RX_STALL_FOR_S=30" }
+          # without resume (phase 0 behaviour), for contrast: any real disconnect ends the call
+          - { name: noresume-4g-outage-30s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 30, expect: any, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240" }
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

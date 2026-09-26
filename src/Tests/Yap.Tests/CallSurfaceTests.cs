@@ -24,7 +24,7 @@ namespace Yap.Tests;
 /// These render the real component through a real renderer, because a state-flag test cannot tell a
 /// surface that is open from one that was opened once.
 /// </summary>
-public sealed class CallSurfaceTests
+public sealed partial class CallSurfaceTests
 {
     // Camera on, camera off, camera on: every one of these flips VoiceCall between its two screens.
     [Test]
@@ -258,7 +258,10 @@ public sealed class CallSurfaceTests
             type.GetField("Tiles")!.SetValue(attempt, (IReadOnlyList<VideoTile>)tiles);
         });
 
-        private Task ChangeAsync(Action change) => renderer.Dispatcher.InvokeAsync(() =>
+        public VoiceState Voice => voice;
+        public object CurrentAttempt => attempt;
+
+        public Task ChangeAsync(Action change) => renderer.Dispatcher.InvokeAsync(() =>
         {
             change();
             typeof(VoiceState).GetMethod("Notify", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(voice, null);

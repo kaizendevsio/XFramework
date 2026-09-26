@@ -49,3 +49,25 @@ public interface IBoltGroupCallAuthorizer
             ? BoltGroupAuthorizationDecision.Allowed
             : BoltGroupAuthorizationDecision.Denied;
 }
+
+/// <summary>Why a participant stopped being part of a host-managed group call.</summary>
+public enum BoltGroupDepartureReason
+{
+    /// <summary>The host removed it, or the participant sent its own End signal.</summary>
+    Left,
+    /// <summary>
+    /// Its transport ended or failed: a closed socket, a stalled receiver retired by the watchdog, or a
+    /// failed control send. The person may still be on the call; a host that holds seats can let the
+    /// same participant resume on a new connection.
+    /// </summary>
+    Disconnected,
+    /// <summary>A periodic re-check refused it, or could not be answered for longer than the grace period.</summary>
+    Unauthorized
+}
+
+/// <summary>
+/// One participant's departure from the relay's room, with the reason it happened. <c>Participant</c> is
+/// the principal of the connection that departed, so a host can tell a superseded connection of a
+/// resumed participant from the participant itself.
+/// </summary>
+public sealed record BoltGroupDeparture(Guid CallId, string ClientId, BoltGroupDepartureReason Reason, ClaimsPrincipal? Participant = null);

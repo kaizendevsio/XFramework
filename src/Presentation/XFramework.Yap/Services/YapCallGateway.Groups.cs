@@ -29,7 +29,7 @@ public sealed partial class YapCallGateway
         var members = await CurrentMembersAsync(user, thread, ct);
         if (recipients.Any(x => !members.Contains(x))) throw new YapApiException(403, "Only current conversation members can join.");
         await VerifyCallDeviceAsync(user, deviceId, ct);
-        var room = new GroupRoom(Guid.NewGuid(), tenant, thread, caller, user.Identity?.Name ?? "Someone") { VideoRequested = videoRequested && VideoEnabled };
+        var room = new GroupRoom(Guid.NewGuid(), tenant, thread, caller, user.Identity?.Name ?? "Someone", MaxCallDuration) { VideoRequested = videoRequested && VideoEnabled };
         room.Members.Add(caller, new GroupMember { Session = user.FindFirstValue(YapAuth.SessionClaim), Accepted = true, DeviceId = deviceId });
         foreach (var id in recipients) room.Members.Add(id, new GroupMember());
         YapGroupCall snapshot;
@@ -88,8 +88,10 @@ public sealed partial class YapCallGateway
             var member = room.Members[credential];
             RequireAccepted(member, user);
             if (member.Connected) throw new YapApiException(409, "This call is already connected.");
+            // A seat that has had a connection comes back through the resume ticket, which is bound to it.
+            if (member.Generation > 0) throw new YapApiException(409, "Resume this call instead.");
             RemoveGroupTickets(callId, credential);
-            tickets[ticket] = new(callId, tenant, credential, member.Session!, DateTimeOffset.UtcNow.AddSeconds(30), Group: true);
+            tickets[TicketKey(ticket)] = new(callId, tenant, credential, member.Session!, DateTimeOffset.UtcNow.AddSeconds(30), Group: true);
         }
         // A host-managed group has no single recipient. The group client obtains its accepted roster separately.
         return new(callId, $"/api/chat/calls/socket?ticket={ticket}", ClientId(callId, credential), "");
@@ -99,6 +101,7 @@ public sealed partial class YapCallGateway
     {
         var (tenant, credential) = Identity(user);
         GroupRoom room;
+        bool resuming;
         lock (gate)
         {
             room = GetGroup(tenant, credential, callId);
@@ -106,9 +109,14 @@ public sealed partial class YapCallGateway
             var member = room.Members[credential];
             RequireAccepted(member, user);
             if (!member.Registered || !member.Connected) throw new YapApiException(409, "Connect before joining this call.");
+            resuming = member.AwaySince is not null;
         }
         if (!await Server.JoinGroupCallAsync(callId, ClientId(callId, credential), ct))
         {
+            // Admission stays fail-closed: no media without a positive answer. A resuming participant
+            // keeps the seat it is already holding, though, until the hold runs out: an answer that could
+            // not be given right now must not be what ends the call.
+            if (resuming) throw new YapApiException(503, "The call could not be rejoined yet. Try again.");
             await RemoveGroupMemberAsync(room, credential, ct);
             throw new YapApiException(403, "This call is no longer available.");
         }
@@ -116,7 +124,11 @@ public sealed partial class YapCallGateway
         {
             room = GetGroup(tenant, credential, callId);
             if (revision is { } expected && room.Revision != expected) throw new YapApiException(409, "The call membership changed.");
-            room.Members[credential].Ready = true;
+            var member = room.Members[credential];
+            member.Ready = true;
+            // Back in the relay's room: the seat is no longer held, it is occupied (unless the new
+            // socket already dropped again, in which case its hold stands).
+            if (member.Connected) { member.AwaySince = null; member.HoldUntil = null; }
             if (room.Members.Values.Count(x => x.Ready && !x.Left) >= 2)
             { room.Started = true; room.ConnectedAt ??= DateTimeOffset.UtcNow; }
             PublishGroupLocked(room, "group-roster");
@@ -180,19 +192,38 @@ public sealed partial class YapCallGateway
         room.Members.TryGetValue(credential, out var member) && !member.Left && member.Accepted && member.Registered &&
         member.Connected && member.Session == participant.FindFirstValue(YapAuth.SessionClaim) &&
         clientId == ClientId(callId, credential) && participant.FindFirstValue("bolt_media_client_id") == clientId &&
-        participant.FindFirstValue("yap_call_id") == callId.ToString();
+        participant.FindFirstValue("yap_call_id") == callId.ToString() && IsCurrentConnection(participant, member);
+
+    /// <summary>
+    /// Each socket's principal names the seat generation it was admitted as. After a resume the old
+    /// socket is no longer seated, whatever its client ID says, so the relay removes it and the host
+    /// knows that removal is not the participant leaving.
+    /// </summary>
+    private const string ConnectionClaim = "yap_connection";
+    private static bool IsCurrentConnection(ClaimsPrincipal participant, GroupMember member) =>
+        participant.FindFirstValue(ConnectionClaim) == member.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     private bool IsStillSeated(GroupRoom room, Guid callId, ClaimsPrincipal participant, Guid credential) =>
         groups.TryGetValue(callId, out var current) && ReferenceEquals(room, current) && room.Expires > DateTimeOffset.UtcNow &&
         room.Members.TryGetValue(credential, out var member) && !member.Left && member.Connected && member.Registered && member.Accepted &&
-        member.Session == participant.FindFirstValue(YapAuth.SessionClaim);
+        member.Session == participant.FindFirstValue(YapAuth.SessionClaim) && IsCurrentConnection(participant, member);
 
+    /// <summary>
+    /// Upgrade one call socket. <paramref name="token"/> is the ticket's hash. A join ticket admits the
+    /// seat's first connection; a resume ticket admits its replacement, superseding a previous socket
+    /// that the server still believes is alive (an IP change leaves exactly that behind).
+    /// </summary>
     private async Task AcceptGroupSocketAsync(HttpContext context, string token)
     {
         RequireGroupLifecycle();
         var (tenant, credential) = Identity(context.User);
         GroupRoom room;
         GroupMember member;
+        int generation;
+        CancellationTokenSource connection;
+        TaskCompletionSource closed;
+        CancellationTokenSource? superseded = null;
+        Task? previous = null;
         lock (gate)
         {
             if (!tickets.TryGetValue(token, out var ticket) || !ticket.Group || ticket.ExpiresAt <= DateTimeOffset.UtcNow ||
@@ -201,37 +232,148 @@ public sealed partial class YapCallGateway
             room = GetGroup(tenant, credential, ticket.CallId);
             member = room.Members[credential];
             RequireAccepted(member, context.User);
+            // Consumed before anything can fail or wait: a ticket is never good for a second upgrade.
             tickets.Remove(token);
-            if (member.Connected) throw new YapApiException(409, "This call is already connected.");
+            if (ticket.Resume)
+            {
+                // Bound to the seat as it was when the ticket was issued, on this device. A newer resume
+                // (or the join of a different seat) makes it worthless.
+                if (ticket.Generation != member.Generation || ticket.DeviceId != member.DeviceId)
+                    throw new YapApiException(403, "This call connection has expired.");
+                if (member.Connected)
+                {
+                    superseded = member.Connection;
+                    previous = member.Closed?.Task;
+                }
+                if (member.AwaySince is null) { member.AwaySince = DateTimeOffset.UtcNow; PublishGroupLocked(room, "group-roster"); }
+                ExtendHoldForResumeLocked(member);
+            }
+            else if (member.Connected || member.Generation > 0) throw new YapApiException(409, "This call is already connected.");
+            generation = ++member.Generation;
             member.Connected = true;
+            member.Registered = false;
+            connection = member.Connection = CancellationTokenSource.CreateLinkedTokenSource(member.Lifetime.Token);
+            closed = member.Closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         }
         try
         {
+            // The relay registers one connection per participant: let the old one finish leaving first.
+            try { superseded?.Cancel(); } catch (ObjectDisposedException) { /* It ended on its own meanwhile. */ }
+            if (previous is not null)
+            {
+                try { await previous.WaitAsync(TimeSpan.FromSeconds(10), context.RequestAborted); }
+                catch (TimeoutException) { /* The new socket's registration will say whether it is gone. */ }
+            }
             await VerifyMembershipAsync(context.User, room.Thread, credential, context.RequestAborted);
-            lock (gate) { GetGroup(tenant, credential, room.Id); RequireAccepted(member, context.User); }
+            lock (gate)
+            {
+                GetGroup(tenant, credential, room.Id); RequireAccepted(member, context.User);
+                if (member.Generation != generation) throw new YapApiException(409, "This call is already connected.");
+            }
             var identity = new ClaimsIdentity(context.User.Identity as ClaimsIdentity);
             identity.AddClaim(new("bolt_media_client_id", ClientId(room.Id, credential)));
             identity.AddClaim(new("yap_call_id", room.Id.ToString()));
-            using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted, member.Lifetime.Token);
-            lifetime.CancelAfter(TimeSpan.FromHours(1));
+            identity.AddClaim(new(ConnectionClaim, generation.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted, connection.Token);
+            var remaining = room.Expires - DateTimeOffset.UtcNow;
+            lifetime.CancelAfter(remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero);
             LimitUnsentBytes(context);
-            using var socket = await context.WebSockets.AcceptWebSocketAsync();
-            await using var transport = new ReadyTransport(new WebSocketBoltConnection(socket), () => { lock (gate) member.Registered = !member.Left; });
+            using var socket = await context.WebSockets.AcceptWebSocketAsync(SocketOptions());
+            await using var transport = new ReadyTransport(new WebSocketBoltConnection(socket), () =>
+            {
+                lock (gate)
+                {
+                    if (member.Left || member.Generation != generation) return;
+                    member.Registered = member.EverRegistered = true;
+                }
+            });
             await Server.HandleConnectionAsync(transport, new ClaimsPrincipal(identity), lifetime.Token, isSecureTransport: true);
         }
-        finally { await RemoveGroupMemberAsync(room, credential, CancellationToken.None); }
+        finally
+        {
+            closed.TrySetResult();
+            lock (gate) if (ReferenceEquals(member.Connection, connection)) member.Connection = null;
+            connection.Dispose();
+            await ConnectionEndedAsync(room, credential, generation);
+        }
     }
 
-    private async Task RemoveGroupMemberAsync(GroupRoom room, Guid credential, CancellationToken ct)
+    /// <summary>
+    /// A call socket ended. A participant who had a working connection keeps the seat for
+    /// <see cref="ReconnectGrace"/> and is shown as reconnecting; the call goes on for everyone else
+    /// and the key epoch is untouched. A connection that never got going, a superseded one, and a
+    /// participant who already left change nothing here.
+    /// </summary>
+    private async Task ConnectionEndedAsync(GroupRoom room, Guid credential, int generation)
+    {
+        lock (gate)
+        {
+            if (!room.Members.TryGetValue(credential, out var member) || member.Left) return;
+            // Superseded by a resume: the newer connection owns the seat now.
+            if (member.Generation != generation) return;
+            member.Connected = false;
+            member.Registered = false;
+            if (member.EverRegistered && groups.TryGetValue(room.Id, out var current) && ReferenceEquals(current, room))
+            {
+                var now = DateTimeOffset.UtcNow;
+                member.AwaySince ??= now;
+                // A seat that keeps dropping before it rejoins is not held forever: the grace counts from
+                // the first drop, plus at most one resume window.
+                var until = now + ReconnectGrace;
+                var cap = member.AwaySince.Value + ReconnectGrace + ResumeWindow;
+                member.HoldUntil = until < cap ? until : cap;
+                PublishGroupLocked(room, "group-roster");
+                return;
+            }
+        }
+        await RemoveGroupMemberAsync(room, credential, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// A resumed connection gets a bounded window to rejoin (and rekey) once its socket is up: at least
+    /// <see cref="ResumeWindow"/> from now, never beyond one grace period plus one window after the drop.
+    /// </summary>
+    private void ExtendHoldForResumeLocked(GroupMember member)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var wanted = now + ResumeWindow;
+        if (member.HoldUntil is { } held && held > wanted) wanted = held;
+        var cap = (member.AwaySince ?? now) + ReconnectGrace + ResumeWindow;
+        member.HoldUntil = wanted < cap ? wanted : cap;
+    }
+
+    /// <summary>End seats whose hold ran out: the participant did not come back in time.</summary>
+    internal void ExpireHolds()
+    {
+        (GroupRoom Room, Guid Credential)[] expired;
+        var now = DateTimeOffset.UtcNow;
+        lock (gate)
+            expired = groups.Values.SelectMany(room => room.Members
+                    .Where(x => !x.Value.Left && x.Value.HoldUntil is { } until && until <= now)
+                    .Select(x => (room, x.Key)))
+                .ToArray();
+        foreach (var (room, credential) in expired)
+            _ = RemoveGroupMemberAsync(room, credential, CancellationToken.None, "connection-lost",
+                member => member.HoldUntil is { } until && until <= DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>
+    /// Leave, hang up, a refusal, or a seat hold that ran out. <paramref name="reason"/> is published with
+    /// the <c>group-ended</c> it may cause; <paramref name="onlyIf"/> is re-checked under the lock so a
+    /// participant who resumed at the last moment is not removed by a decision made just before.
+    /// </summary>
+    private async Task RemoveGroupMemberAsync(GroupRoom room, Guid credential, CancellationToken ct, string? reason = null,
+        Func<GroupMember, bool>? onlyIf = null)
     {
         GroupMember[] cancel;
         lock (gate)
         {
-            if (!room.Members.TryGetValue(credential, out var member) || member.Left) return;
+            if (!room.Members.TryGetValue(credential, out var member) || member.Left || onlyIf?.Invoke(member) == false) return;
             member.Left = true; member.Ready = false; member.Registered = false; member.Connected = false; member.Video = false;
+            member.AwaySince = null; member.HoldUntil = null;
             if (member.Accepted) AdvanceGroupRoster(room);
-            Publish(room.Tenant, credential, GroupEvent(room, credential, "group-roster"));
-            PublishGroupLocked(room, "group-roster");
+            Publish(room.Tenant, credential, GroupEvent(room, credential, "group-roster", reason: reason));
+            PublishGroupLocked(room, "group-roster", reason);
             RemoveGroupTickets(room.Id, credential);
             cancel = [member];
             if (!CanContinueGroup(room))
@@ -239,35 +381,63 @@ public sealed partial class YapCallGateway
                 RemoveGroupLocked(room);
                 cancel = room.Members.Values.ToArray();
                 foreach (var id in room.Members.Keys) { room.Members[id].Left = true; RemoveGroupTickets(room.Id, id); }
-                PublishGroupLocked(room, "group-ended");
+                PublishGroupLocked(room, "group-ended", reason);
             }
         }
         foreach (var member in cancel) member.Lifetime.Cancel();
         await Server.LeaveGroupCallAsync(room.Id, ClientId(room.Id, credential), ct);
     }
 
-    private void GroupParticipantRemoved(Guid call, string clientId)
+    /// <summary>
+    /// The relay dropped a participant. A lost transport is the socket's business (it holds the seat);
+    /// a refusal or an explicit End ends the seat here and now.
+    /// </summary>
+    private void GroupParticipantDeparted(BoltGroupDeparture departure)
     {
+        if (departure.Reason == BoltGroupDepartureReason.Disconnected)
+        {
+            // Usually the socket is already gone and its own ending holds the seat. If the relay gave up
+            // on a connection that is still open (a control send it could not deliver), close it too:
+            // a socket outside the relay's room would carry heartbeats and nothing else, forever. Its
+            // ending then holds the seat and the phone resumes.
+            CancellationTokenSource? stale = null;
+            lock (gate)
+            {
+                if (groups.TryGetValue(departure.CallId, out var room) &&
+                    room.Members.Keys.FirstOrDefault(x => ClientId(departure.CallId, x) == departure.ClientId) is var credential &&
+                    credential != Guid.Empty && room.Members[credential] is { Left: false, Connected: true } member &&
+                    (departure.Participant is not { } principal || IsCurrentConnection(principal, member)))
+                    stale = member.Connection;
+            }
+            // Off the relay's thread: it may be inside its own cleanup of this very connection.
+            if (stale is not null)
+                _ = Task.Run(() => { try { stale.Cancel(); } catch (ObjectDisposedException) { /* It ended meanwhile. */ } });
+            return;
+        }
         GroupMember[] cancel;
         lock (gate)
         {
-            if (!groups.TryGetValue(call, out var room)) return;
-            var credential = room.Members.Keys.FirstOrDefault(x => ClientId(call, x) == clientId);
+            if (!groups.TryGetValue(departure.CallId, out var room)) return;
+            var credential = room.Members.Keys.FirstOrDefault(x => ClientId(departure.CallId, x) == departure.ClientId);
             if (credential == Guid.Empty) return;
             var removed = room.Members[credential];
             if (removed.Left) return;
+            // A connection this seat has since replaced: removing it was the point, not a refusal of the person.
+            if (departure.Participant is { } principal && !IsCurrentConnection(principal, removed)) return;
+            var reason = departure.Reason == BoltGroupDepartureReason.Unauthorized ? "removed" : null;
             removed.Left = true; removed.Ready = false; removed.Registered = false; removed.Connected = false; removed.Video = false;
+            removed.AwaySince = null; removed.HoldUntil = null;
             AdvanceGroupRoster(room);
-            Publish(room.Tenant, credential, GroupEvent(room, credential, "group-roster"));
-            PublishGroupLocked(room, "group-roster");
-            RemoveGroupTickets(call, credential);
+            Publish(room.Tenant, credential, GroupEvent(room, credential, "group-roster", reason: reason));
+            PublishGroupLocked(room, "group-roster", reason);
+            RemoveGroupTickets(departure.CallId, credential);
             cancel = [removed];
             if (!CanContinueGroup(room))
             {
                 RemoveGroupLocked(room);
                 cancel = room.Members.Values.ToArray();
-                foreach (var id in room.Members.Keys) { room.Members[id].Left = true; RemoveGroupTickets(call, id); }
-                PublishGroupLocked(room, "group-ended");
+                foreach (var id in room.Members.Keys) { room.Members[id].Left = true; RemoveGroupTickets(departure.CallId, id); }
+                PublishGroupLocked(room, "group-ended", reason);
             }
         }
         foreach (var member in cancel) member.Lifetime.Cancel();
@@ -321,8 +491,9 @@ public sealed partial class YapCallGateway
     private void RemoveGroupTickets(Guid call, Guid credential)
     { foreach (var key in tickets.Where(x => x.Value.CallId == call && x.Value.User == credential).Select(x => x.Key).ToArray()) tickets.Remove(key); }
     private static YapGroupCall Snapshot(GroupRoom room) => new(room.Id, room.Thread, room.Caller, room.CallerName, room.Revision, room.InviteExpires,
-        room.Members.Select(x => new YapGroupParticipant(x.Key, x.Value.DeviceId, x.Value.Accepted, x.Value.Ready, x.Value.Left, x.Value.Muted, x.Value.Video)).ToArray(), room.VideoRequested);
-    private sealed class GroupRoom(Guid id, Guid tenant, Guid thread, Guid caller, string callerName)
+        room.Members.Select(x => new YapGroupParticipant(x.Key, x.Value.DeviceId, x.Value.Accepted, x.Value.Ready, x.Value.Left, x.Value.Muted, x.Value.Video,
+            Reconnecting: !x.Value.Left && x.Value.AwaySince is not null)).ToArray(), room.VideoRequested);
+    private sealed class GroupRoom(Guid id, Guid tenant, Guid thread, Guid caller, string callerName, TimeSpan lifetime)
     {
         public Guid Id { get; } = id;
         public Guid Tenant { get; } = tenant;
@@ -331,7 +502,7 @@ public sealed partial class YapCallGateway
         public string CallerName { get; } = callerName;
         public long Revision = 1;
         public DateTimeOffset InviteExpires { get; } = DateTimeOffset.UtcNow.Add(InviteLifetime);
-        public DateTimeOffset Expires { get; } = DateTimeOffset.UtcNow.AddHours(1);
+        public DateTimeOffset Expires { get; } = DateTimeOffset.UtcNow.Add(lifetime);
         public Dictionary<Guid, GroupMember> Members { get; } = [];
         public Dictionary<(Guid Sender, Guid Recipient, string Kind), YapGroupControlEvent> Controls { get; } = [];
         public bool VideoRequested;
@@ -347,6 +518,18 @@ public sealed partial class YapCallGateway
         public DateTimeOffset ControlWindow;
         public int ControlCount;
         public bool Accepted, Connected, Registered, Ready, Left;
+        /// <summary>The seat has had a registered connection at least once, so losing it is a reconnect, not a failed join.</summary>
+        public bool EverRegistered;
+        /// <summary>Incremented per accepted socket. A resume ticket names the generation it replaces.</summary>
+        public int Generation;
+        /// <summary>Set while the participant is away (connection lost, or resumed but not yet back in the relay).</summary>
+        public DateTimeOffset? AwaySince;
+        /// <summary>When a held seat is given up. Null while a connection holds it.</summary>
+        public DateTimeOffset? HoldUntil;
+        /// <summary>The current socket's own lifetime, so a resume can supersede exactly that socket.</summary>
+        public CancellationTokenSource? Connection;
+        public TaskCompletionSource? Closed;
+        /// <summary>Cancelled when the participant leaves the call; every socket's lifetime is linked to it.</summary>
         public CancellationTokenSource Lifetime { get; } = new();
     }
 }
