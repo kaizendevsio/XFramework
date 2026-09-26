@@ -252,7 +252,7 @@ public sealed class VideoCallTests
         Assert.That(adaptation.Current!.Value.Framerate, Is.EqualTo(60));
         Place(adaptation, 1_200, 6_250, congested: true);
         Assert.That(adaptation.Current, Is.EqualTo(new VideoTier(1280, 720, 30, 1_200)), "frame rate before resolution");
-        for (long now = 7_000; now < 20_000; now += 250) Place(adaptation, 3_000, now);
+        for (long now = 7_000; now < 40_000; now += 250) Place(adaptation, 3_000, now);
         Assert.That(adaptation.Current!.Value.Framerate, Is.EqualTo(60));
         Assert.That(adaptation.LimitTo30Fps(), Is.True, "an encoder that refuses 60 fps caps the call at 30");
         Assert.That(adaptation.Current!.Value.Framerate, Is.EqualTo(30));

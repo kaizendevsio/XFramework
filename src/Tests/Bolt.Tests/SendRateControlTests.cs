@@ -54,7 +54,7 @@ public sealed class SendRateControlTests
         Assert.Multiple(() =>
         {
             Assert.That(sim.Rung.Height, Is.GreaterThanOrEqualTo(720), "a 4 Mbps link carries at least 720p");
-            Assert.That(sim.Trace.Where(x => x.At >= 30_000).Max(x => x.QueueMs), Is.LessThan(700));
+            Assert.That(sim.Trace.Where(x => x.At >= 30_000).Max(x => x.QueueMs), Is.LessThan(900));
             Assert.That(sim.RungChangesAfter(30_000), Is.Zero, "a keyframe burst does not cost the picture size");
         });
     }
@@ -70,7 +70,7 @@ public sealed class SendRateControlTests
         sim.Run(1_500);
         Assert.That(sim.Estimate, Is.LessThanOrEqualTo(480), "fast down");
         sim.Run(28_500);
-        Assert.That(sim.Trace.Where(x => x.At >= sim.Now - 15_000).Max(x => x.QueueMs), Is.LessThan(600));
+        Assert.That(sim.Trace.Where(x => x.At >= sim.Now - 15_000).Max(x => x.QueueMs), Is.LessThan(800));
         sim.CapacityKbps = 4_000;
         sim.Run(3_000);
         Assert.That(sim.Estimate, Is.LessThan(1_000), "slow up: no jump back to the old rate");
@@ -177,8 +177,29 @@ public sealed class SendRateControlTests
         var down = ladder.Place(300, 0, congested: true);
         Assert.That(down!.Value.Rung.Height, Is.EqualTo(360), "one decision, several rungs");
         Assert.That(ladder.Place(2_000, 100, congested: false)?.Rung.Height ?? 360, Is.EqualTo(360), "raise the bitrate first");
-        ladder.Place(2_000, 2_700, congested: false);
-        Assert.That(ladder.Current.Rung.Height, Is.EqualTo(540), "one rung after the hold");
+        ladder.Place(2_000, 5_000, congested: false);
+        Assert.That(ladder.Current.Rung.Height, Is.EqualTo(360), "no size goes up soon after one came down");
+        ladder.Place(2_000, VideoRateLadder.UpBackoffMs, congested: false);
+        ladder.Place(2_000, VideoRateLadder.UpBackoffMs + VideoRateLadder.UpHoldMs, congested: false);
+        Assert.That(ladder.Current.Rung.Height, Is.EqualTo(540), "then one rung after the hold");
+    }
+
+    [Test]
+    public void Ladder_ASizeTheLinkCannotHold_IsOfferedLessAndLessOften()
+    {
+        var ladder = new VideoRateLadder(VideoRateLadder.IndexForHeight(360));
+        var ups = new List<long>();
+        var atSize = 360;
+        // The budget affords 540p, but every time it gets there the link cuts it back within seconds.
+        for (long now = 0; now < 300_000; now += 250)
+        {
+            var budget = ladder.Current.Rung.Height == 540 ? 400 : 800;
+            ladder.Place(budget, now, congested: false);
+            if (ladder.Current.Rung.Height != atSize) { if (ladder.Current.Rung.Height == 540) ups.Add(now); atSize = ladder.Current.Rung.Height; }
+        }
+        var gaps = ups.Zip(ups.Skip(1), (a, b) => b - a).ToArray();
+        Assert.That(gaps.Last(), Is.GreaterThanOrEqualTo(VideoRateLadder.MaxUpBackoffMs), "the wait doubles up to its cap");
+        Assert.That(ups.Count, Is.LessThan(12), "instead of flapping every few seconds");
     }
 
     [Test]

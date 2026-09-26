@@ -125,8 +125,12 @@ public sealed class SendRateController
     private const int DrainWindowMs = 4_000;
     /// <summary>Reports in a row a high, rising delay must persist before it counts on its own: a stall drains, overload grows.</summary>
     private const int RisingSamples = 3;
-    /// <summary>The delay floor is the smallest delay over this window: a queue that never drained below target in it is standing.</summary>
-    private const int FloorWindowMs = 1_000;
+    /// <summary>
+    /// The delay floor is the smallest delay over this window: a queue that never drained below target in it is
+    /// standing. Two seconds outlasts the stall a lost segment causes on a 500 ms round trip (the queue drains in a
+    /// burst as soon as the retransmission lands); growing queues are caught sooner by the slope tests.
+    /// </summary>
+    private const int FloorWindowMs = 2_000;
     /// <summary>
     /// A queue growing faster than this (ms per second) is overload on its own: a stall grows the delay at most one
     /// second per second (nothing is delivered), so faster growth means more than twice the link is being offered.
@@ -274,17 +278,19 @@ public sealed class SendRateController
 
     /// <summary>
     /// The link's capacity as measured on a backlogged path, or 0. Downstream, the relay's drain rate and what the
-    /// receiver actually got describe the same link. The receiver's view is the end-to-end truth and wins: the
-    /// relay only sees how fast its socket takes data, which a deep buffer further on (a proxy, a radio, a big TCP
-    /// window) makes look far faster than the link, and a relay that just purged its queue under-reads. The
-    /// sender's own uplink is a different link: the smaller of the two ends is the path.
+    /// receiver actually got describe the same link, and each can be wrong: the relay only sees how fast its socket
+    /// takes data, which a deep buffer further on (a proxy, a radio, a big TCP window) makes look far faster than
+    /// the link, and a receiver's first reports average over a window that was not yet busy. When they roughly
+    /// agree the larger wins; when the relay claims far more, the receiver's end-to-end view wins. The sender's own
+    /// uplink is a different link: the smaller of the two ends is the path.
     /// </summary>
     private double Capacity(in SendPathSample sample, RelaySignal? relay, ReceiverSignal? receiver, int delay)
     {
         var downstream = 0.0;
         if (relay is { CapacityKbps: > 0 } rs) downstream = rs.CapacityKbps;
         // What a receiver got while its queue grew is what the path carries.
-        if (receiver is { ReceivedKbps: > 0 } rq && delay >= _options.TargetDelayMs) downstream = rq.ReceivedKbps;
+        if (receiver is { ReceivedKbps: > 0 } rq && delay >= _options.TargetDelayMs)
+            downstream = downstream > 0 && downstream <= rq.ReceivedKbps * 2 ? Math.Max(downstream, rq.ReceivedKbps) : rq.ReceivedKbps;
         if (sample.LocalCapacityKbps > 0)
             return downstream > 0 ? Math.Min(downstream, sample.LocalCapacityKbps) : sample.LocalCapacityKbps;
         return downstream;
@@ -312,7 +318,12 @@ public sealed class SendRateController
         _lastCongestionKbps = measured ? capacity : basis;
         _congestedOnce = true;
         var next = basis * factor;
-        if (!severe) next = Math.Max(next, _estimate * 0.75);
+        if (!severe)
+        {
+            // A first sign is not proof: it never costs more than a quarter, and never the picture itself.
+            next = Math.Max(next, _estimate * 0.75);
+            next = Math.Max(next, Math.Min(_estimate, AudioWireKbps(sample) + _options.SuspendVideoKbps + 20));
+        }
         _estimate = Math.Max(_options.MinTotalKbps, Math.Min(_estimate, next));
         _lastDecreaseAt = now;
         _delayAtDecrease = delay;
@@ -413,21 +424,22 @@ public sealed class SendRateController
     private double Gradient(long now, int delay)
     {
         _history.Enqueue((now, delay));
-        while (_history.Count > 0 && now - _history.Peek().At > 1_000) _history.Dequeue();
+        while (_history.Count > 0 && now - _history.Peek().At > FloorWindowMs) _history.Dequeue();
         _lastGradient = GradientOfHistory(now);
         return _lastGradient;
     }
 
     private double GradientOfHistory(long now)
     {
-        if (_history.Count < 3) return 0;
-        double n = _history.Count, sx = 0, sy = 0, sxx = 0, sxy = 0;
+        double n = 0, sx = 0, sy = 0, sxx = 0, sxy = 0;
         foreach (var (at, value) in _history)
         {
+            if (now - at > 1_000) continue;
+            n++;
             var x = (at - now) / 1000.0;
             sx += x; sy += value; sxx += x * x; sxy += x * value;
         }
         var denominator = n * sxx - sx * sx;
-        return denominator <= 1e-9 ? 0 : (n * sxy - sx * sy) / denominator;
+        return n < 3 || denominator <= 1e-9 ? 0 : (n * sxy - sx * sy) / denominator;
     }
 }

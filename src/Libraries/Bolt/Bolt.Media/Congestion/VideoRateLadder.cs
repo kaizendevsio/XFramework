@@ -44,6 +44,14 @@ public sealed class VideoRateLadder
     ];
 
     public const int UpHoldMs = 2_500;
+    /// <summary>
+    /// After a size came down, no size goes up for this long; a size that comes down again soon after going up
+    /// doubles it (to <see cref="MaxUpBackoffMs"/>). A link that cannot hold a size stops being offered it.
+    /// </summary>
+    public const int UpBackoffMs = 8_000;
+    public const int MaxUpBackoffMs = 64_000;
+    /// <summary>A size that lasted less than this before coming down counts as a failed step up.</summary>
+    public const int FailedUpWindowMs = 30_000;
     /// <summary>A bitrate change smaller than this fraction is not worth reconfiguring the encoder for.</summary>
     public const double BitrateStep = 0.1;
 
@@ -53,6 +61,9 @@ public sealed class VideoRateLadder
     private bool _allow60;
     private bool _at60;
     private long? _upSince;
+    private long _upBlockedUntil = long.MinValue / 2;
+    private long _lastUpAt = long.MinValue / 2;
+    private int _upBackoffMs = UpBackoffMs;
     private int _bitrate;
 
     /// <param name="startIndex">Rung to start on.</param>
@@ -123,7 +134,7 @@ public sealed class VideoRateLadder
             }
             _upSince = null;
         }
-        else if (!congested)
+        else if (!congested && nowMs >= _upBlockedUntil)
         {
             // Up one step at a time, and only on a budget that has held.
             var next = NextUp(index, sixty, ceiling);
@@ -134,6 +145,7 @@ public sealed class VideoRateLadder
                 {
                     (index, sixty) = up;
                     _upSince = null;
+                    _lastUpAt = nowMs;
                 }
             }
             else _upSince = null;
@@ -143,6 +155,11 @@ public sealed class VideoRateLadder
         var rung = Rung(index, sixty);
         var bitrate = Math.Clamp(budgetKbps, rung.MinKbps, rung.MaxKbps);
         var changedRung = index != _index || sixty != _at60;
+        if (changedRung && (index < _index || (index == _index && !sixty)))
+        {
+            _upBackoffMs = nowMs - _lastUpAt <= FailedUpWindowMs ? Math.Min(_upBackoffMs * 2, MaxUpBackoffMs) : UpBackoffMs;
+            _upBlockedUntil = nowMs + _upBackoffMs;
+        }
         // Cuts apply promptly (the queue is draining on them); raises wait for a worthwhile step.
         var changedRate = bitrate > _bitrate
             ? bitrate - _bitrate >= Math.Max(16, _bitrate * BitrateStep)
