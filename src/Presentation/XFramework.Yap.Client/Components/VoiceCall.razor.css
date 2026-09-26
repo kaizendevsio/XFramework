@@ -1,13 +1,262 @@
-.call-participants {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
-    gap: 18px 12px;
-    width: min(100%, 440px);
-    max-height: 30dvh;
-    overflow-y: auto;
-    margin: 0 auto 24px;
+/* Call screen, FaceTime-style: one full-screen surface, content edge to edge, and every control on
+   borderless floating glass. mobile.css keeps only the dialog shell (opaque --page background, top
+   layer sizing), because it loads after this bundle and would win any tie here.
+
+   Legacy rules for .vidtop/.pip/.vidgrid still live in app.css; every property they set that
+   matters is restated below rather than trusted. */
+
+.voice-dialog {
+    --call-end: #e5484d;
+    --call-accept: #2f9e4f;
+    --call-top: max(10px, env(safe-area-inset-top, 0px));
+    --call-bottom: max(18px, calc(env(safe-area-inset-bottom, 0px) + 8px));
+    --call-gutter: 12px;
+    /* What floats above the control tray (notices, the options panel, a bottom-corner self-view)
+       has to clear it. Each screen sets its own tray height. */
+    --tray-clear: 96px;
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
+.call-screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    isolation: isolate;
+    animation: call-screen-in .32s var(--ease-out, ease) both;
+}
+@keyframes call-screen-in { from { opacity: 0; } }
+
+/* Visually hidden live region: announces status changes without the per-second timer. */
+.call-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+/* ---------- Glass pieces ---------- */
+
+.call-round {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    color: inherit;
+    background: var(--call-glass);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    backdrop-filter: blur(20px) saturate(1.6);
+}
+.call-spacer { flex: none; width: 44px; }
+
+.call-chip {
+    min-width: 0;
+    margin-inline: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: 6px 16px 7px;
+    border-radius: 20px;
+    background: var(--call-glass);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    backdrop-filter: blur(20px) saturate(1.6);
+    text-align: center;
+}
+.call-chip .n {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -.02em;
+}
+.call-chip .s {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    opacity: .78;
+    font-variant-numeric: tabular-nums;
+}
+.call-chip.enc {
+    flex-direction: row;
+    gap: 6px;
+    padding: 0 14px;
+    min-height: 32px;
+    font-size: 12.5px;
+    font-weight: 650;
+    /* Text-derived rather than --dim: it has to stay legible over a caller's photo, not just --page. */
+    color: color-mix(in srgb, var(--text) 74%, transparent);
+}
+
+.call-tray {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: var(--call-bottom);
+    z-index: 5;
+    width: fit-content;
+    max-width: calc(100% - 2 * var(--call-gutter));
+    margin-inline: auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 40px;
+    background: var(--call-tray);
+    -webkit-backdrop-filter: blur(30px) saturate(1.7);
+    backdrop-filter: blur(30px) saturate(1.7);
+    box-shadow: 0 16px 44px -18px rgba(0, 0, 0, .5);
+    transition: opacity .26s ease, translate .34s var(--ease-out, ease), visibility 0s;
+}
+
+.call-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    min-width: 56px;
+    color: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: -.005em;
+}
+.call-btn .k {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    color: inherit;
+    background: var(--call-key);
+    transition: background-color .2s ease, color .2s ease, scale .18s var(--ease-out, ease);
+}
+.call-btn:active .k { scale: .92; }
+.call-btn.on .k { background: var(--call-key-on); color: var(--call-key-on-ink); }
+.call-btn.end .k { background: var(--call-end); color: #fff; }
+.call-btn.accept .k { background: var(--call-accept); color: #fff; }
+.call-btn:disabled { opacity: .42; }
+.call-btn .lbl { max-width: 84px; line-height: 1.2; text-align: center; }
+
+/* ---------- Voice, ringing and incoming ---------- */
+
+.voicescreen {
+    --call-glow: 42%;
+    --call-glass: color-mix(in srgb, var(--surface) 46%, transparent);
+    --call-tray: color-mix(in srgb, var(--surface) 38%, transparent);
+    --call-key: color-mix(in srgb, var(--text) 10%, transparent);
+    --call-key-on: var(--text);
+    --call-key-on-ink: var(--page);
+    --tray-clear: 118px;
+    color: var(--text);
+    background: var(--page);
+}
+:root[data-theme=dark] .voicescreen { --call-glow: 20%; --call-glass: color-mix(in srgb, var(--text) 10%, transparent); --call-key: color-mix(in srgb, var(--text) 13%, transparent); }
+.voicescreen.is-incoming { --tray-clear: 136px; }
+
+.call-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    background:
+        radial-gradient(95% 55% at 50% 24%, color-mix(in srgb, var(--accent) var(--call-glow), var(--page)) 0%, transparent 72%),
+        radial-gradient(80% 45% at 100% 105%, color-mix(in srgb, var(--accent) calc(var(--call-glow) / 2), var(--page)) 0%, transparent 70%),
+        var(--page);
+}
+/* The caller's own photo, blurred into a wash of its colours, as FaceTime does. */
+.call-backdrop img {
+    position: absolute;
+    inset: -20%;
+    width: 140%;
+    height: 140%;
+    object-fit: cover;
+    filter: blur(64px) saturate(1.5);
+    opacity: .85;
+}
+.call-backdrop:has(img)::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, color-mix(in srgb, var(--page) 42%, transparent), color-mix(in srgb, var(--page) 70%, transparent));
+}
+
+.call-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: var(--call-top) var(--call-gutter) 0;
+}
+
+.call-center {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: clamp(24px, 10dvh, 112px) 24px calc(var(--tray-clear) + var(--call-bottom));
+    text-align: center;
+    overflow-y: auto;
+}
+.call-halo { position: relative; display: grid; place-items: center; }
+.call-halo ::deep .avatar {
+    width: 136px;
+    height: 136px;
+    font-size: 46px;
+    /* brand.css rings every call avatar with a 1px outline; the call screen is borderless. */
+    outline: 0;
+    box-shadow: 0 22px 60px -22px rgba(0, 0, 0, .45);
+}
+/* Ringing, connecting: one slow breath behind the avatar - enough to read as "in progress". */
+.is-waiting .call-halo::before {
+    content: "";
+    position: absolute;
+    inset: -18px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--accent) 45%, transparent);
+    filter: blur(14px);
+    animation: call-breathe 2.4s ease-in-out infinite;
+}
+@keyframes call-breathe { 0%, 100% { scale: .9; opacity: 0; } 50% { scale: 1.08; opacity: .55; } }
+
+.call-name {
+    margin: 22px 0 6px;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -.035em;
+    line-height: 1.12;
+    color: inherit;
+}
+.call-status {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 500;
+    color: color-mix(in srgb, var(--text) 72%, transparent);
+    font-variant-numeric: tabular-nums;
+}
+
+.call-participants {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+    gap: 18px 12px;
+    width: min(100%, 440px);
+    margin: 32px auto 0;
+}
 .call-participant {
     display: flex;
     flex-direction: column;
@@ -15,71 +264,421 @@
     gap: 6px;
     min-width: 0;
     font-size: 13px;
+    font-weight: 600;
 }
-
+.call-participant ::deep .avatar { width: 56px; height: 56px; font-size: 19px; }
 .call-participant > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+.call-participant small { color: var(--dim); font-weight: 500; }
 
-.call-participant small { opacity: .65; }
-.callrow2 { gap: clamp(16px, 6vw, 40px); }
+.voicescreen .call-tray { gap: 14px; padding: 12px 16px 10px; border-radius: 34px; }
 
-.call-audio-output {
-    width: min(100%, 380px);
-    margin: 0 auto 20px;
-    padding: 16px;
-    border-radius: 18px;
-    background: var(--surface2);
-    text-align: left;
+/* Incoming: two big, labelled answers - and a third when the call offers video. */
+.call-answer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--call-bottom) + 12px);
+    z-index: 5;
+    display: flex;
+    justify-content: space-evenly;
+    padding: 0 16px;
 }
-.call-audio-output label { display: grid; gap: 8px; }
-.call-audio-output select { width: 100%; min-height: 44px; }
-.call-audio-output p { margin: 8px 0 0; font-size: 13px; line-height: 1.5; }
+.call-btn.big { min-width: 88px; gap: 10px; font-size: 13.5px; }
+.call-btn.big .k { width: 74px; height: 74px; }
+.call-btn.big.accept .k { box-shadow: 0 12px 30px -12px var(--call-accept); }
 
-/* Video: the stage fills the dialog and the controls float over it. */
-.vidscreen { display: flex; flex-direction: column; position: relative; height: 100%; padding: 0; overflow: hidden; }
-/* The base .vidgrid in app.css is a 2x2 from the prototype, which is a whole wasted row for one
-   caller and an empty bottom half for two. Each of these must therefore clear *both* axes, not just
-   the one it changes: leaving grid-template-rows at "1fr 1fr" is what parked two callers in the top
-   half of the stage under a black band. */
+/* ---------- Video ---------- */
+
+.vidscreen {
+    --call-glass: rgba(34, 34, 38, .42);
+    --call-tray: rgba(34, 34, 38, .46);
+    --call-key: rgba(255, 255, 255, .17);
+    --call-key-on: #fff;
+    --call-key-on-ink: #131315;
+    --tray-clear: 88px;
+    --pip-top: calc(var(--call-top) + 60px);
+    --pip-bottom: calc(var(--call-bottom) + var(--tray-clear) + 4px);
+    --pip-side: var(--call-gutter);
+    padding: 0;
+    color: #fff;
+    background: #000;
+}
+.voice-dialog[data-chrome=hidden] .vidscreen {
+    --pip-top: calc(var(--call-top) + 6px);
+    --pip-bottom: var(--call-bottom);
+}
+
+.vidtop {
+    position: absolute;
+    top: var(--call-top);
+    left: var(--call-gutter);
+    right: var(--call-gutter);
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0;
+    background: none;
+    color: #fff;
+    transition: opacity .26s ease, translate .34s var(--ease-out, ease), visibility 0s;
+}
+.vidtop .call-chip { max-width: calc(100% - 2 * 54px); text-shadow: 0 1px 8px rgba(0, 0, 0, .25); }
+
+.vidscreen .call-tray { gap: 12px; padding: 10px 12px; }
+.vidscreen .call-btn { min-width: 52px; }
+.vidscreen .call-btn .k { width: 52px; height: 52px; }
+
+/* Tap to hide: the controls lift away, the self-view settles into the space they leave. */
+.voice-dialog[data-chrome=hidden] .vidtop,
+.voice-dialog[data-chrome=hidden] .vidscreen .call-tray {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .24s ease, translate .3s ease, visibility 0s linear .3s;
+}
+.voice-dialog[data-chrome=hidden] .vidtop { translate: 0 -14px; }
+.voice-dialog[data-chrome=hidden] .vidscreen .call-tray { translate: 0 22px; }
+
+/* The stage runs under everything, including the notch and the home indicator. */
+.vidgrid {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    display: grid;
+    gap: 6px;
+    padding: 0;
+    background: #000;
+}
 .vidgrid.one { grid-template-columns: 1fr; grid-template-rows: 1fr; }
-/* Stacked, not side by side: at 375px wide two columns are two slivers. */
+/* Stacked, not side by side: at 375px wide two columns are two slivers. Each layout clears both
+   axes; leaving grid-template-rows at "1fr 1fr" once parked two callers under a black band. */
 .vidgrid.two { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
 .vidgrid.many { grid-template-columns: 1fr 1fr; grid-template-rows: none; grid-auto-rows: 1fr; }
 /* An odd tile last in a two-column grid would sit beside a hole; let it take the whole row. */
 .vidgrid.many > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+/* A group is tiles on a dark floor, clear of the header and the tray while they are showing. */
+.vidgrid.two,
+.vidgrid.many {
+    padding: calc(var(--call-top) + 56px) 8px calc(var(--call-bottom) + var(--tray-clear) - 6px);
+    background: #0c0c0e;
+    transition: padding .32s var(--ease-out, ease);
+}
+.voice-dialog[data-chrome=hidden] .vidgrid.two,
+.voice-dialog[data-chrome=hidden] .vidgrid.many { padding: calc(var(--call-top) + 4px) 8px var(--call-bottom); }
+
+.vidtile {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    background: #111113;
+}
+.vidgrid.two > .vidtile,
+.vidgrid.many > .vidtile { border-radius: 22px; }
 .vidtile canvas {
     /* A canvas defaults to 300x150 and ignores its element box otherwise, so the size is explicit. */
     display: block;
     width: 100%;
     height: 100%;
-    /* Contain, not cover: a call must not silently crop someone out of their own frame. The tile is
-       the whole stage now, so a landscape sender letterboxes symmetrically instead of leaving the
-       black rectangle in one quarter of a 2x2 that the bands were being read as. */
+    min-width: 0;
+    min-height: 0;
+    /* Contain until call-screen.js has seen the picture: nobody is cropped by default. It switches
+       to cover only when the picture and the tile share an orientation - a portrait phone on a
+       portrait phone loses a sliver of edge, as in FaceTime. A landscape sender stays whole, and a
+       double tap flips either way. */
     object-fit: contain;
     background: #000;
 }
-.vidtile { min-width: 0; min-height: 0; }
-.vidtile canvas { min-width: 0; min-height: 0; }
-.pip video { width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: contain; background: #000; }
+.vidtile[data-fit=cover] canvas { object-fit: cover; }
+
+.tile-name {
+    position: absolute;
+    left: 8px;
+    bottom: 8px;
+    max-width: calc(100% - 16px);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border-radius: 14px;
+    background: rgba(24, 24, 28, .42);
+    -webkit-backdrop-filter: blur(16px) saturate(1.5);
+    backdrop-filter: blur(16px) saturate(1.5);
+    font-size: 12.5px;
+    font-weight: 650;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.tile-name small { font-weight: 500; opacity: .72; }
+.tile-name small::before { content: "·"; margin-inline: 3px 4px; }
+
+/* Camera off: the person, never a black rectangle. */
+.vidtile.camera-off {
+    background:
+        radial-gradient(70% 50% at 50% 42%, color-mix(in srgb, var(--accent) 16%, #1d1d20) 0%, transparent 100%),
+        #121214;
+}
+.tile-person {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 16px;
+    text-align: center;
+}
+/* Video is dark in both themes, so avatars on it are too - a light-theme avatar is a white disc. */
+.vidscreen ::deep .avatar { outline: 0; }
+.vidscreen ::deep .avatar:not(:has(img)) { background: color-mix(in srgb, var(--accent) 24%, #202023); color: color-mix(in srgb, var(--accent) 80%, white); }
+.tile-person ::deep .avatar { width: 84px; height: 84px; font-size: 28px; }
+.is-single .tile-person ::deep .avatar { width: 128px; height: 128px; font-size: 42px; margin-bottom: 14px; }
+.tile-title { font-size: 26px; font-weight: 700; letter-spacing: -.03em; }
+.tile-sub { font-size: 15px; font-weight: 500; opacity: .7; }
+
+/* Self-view: small, rounded, shadowed, no frame. Drag it anywhere; it settles in the nearest corner. */
+.pip {
+    position: absolute;
+    z-index: 3;
+    top: var(--pip-top);
+    right: var(--pip-side);
+    bottom: auto;
+    left: auto;
+    width: 104px;
+    height: 156px;
+    display: block;
+    border: 0;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #1c1c1f;
+    box-shadow: 0 14px 34px -10px rgba(0, 0, 0, .6);
+    touch-action: none;
+    cursor: grab;
+    transition: translate .42s cubic-bezier(.2, .9, .3, 1.04), top .32s var(--ease-out, ease), bottom .32s var(--ease-out, ease),
+        width .32s var(--ease-out, ease), height .32s var(--ease-out, ease), border-radius .32s ease;
+}
+.pip[data-orient=landscape] { width: 156px; height: 104px; }
+@media (min-width: 720px) {
+    .pip { width: 150px; height: 224px; border-radius: 18px; }
+    .pip[data-orient=landscape] { width: 240px; height: 150px; }
+}
+.is-group .pip { width: 88px; height: 132px; }
+.is-group .pip[data-orient=landscape] { width: 132px; height: 88px; }
+.pip[data-dragging] { transition: none; cursor: grabbing; }
+.pip video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    /* A framing aid, not the picture that is sent: fill the corner. The full frame is what the far
+       side receives, and it is what you see when you tap to swap. */
+    object-fit: cover;
+    background: #000;
+}
+.pip[data-fit=contain] video { object-fit: contain; }
 /* Only the front camera. A mirrored back camera reverses any text it is pointed at, and the stream
    the far side receives is not mirrored on either. */
 .pip.mirror video { transform: scaleX(-1); }
-.vidnotice {
-    position: relative;
-    z-index: 6;
-    margin: 0 16px 8px;
-    padding: 9px 13px;
-    border-radius: 14px;
-    background: rgba(8, 10, 20, .58);
-    color: #fff;
-    font-size: 12.5px;
-    line-height: 1.45;
-    text-align: center;
+
+.voice-dialog[data-corner^=b] .pip { top: auto; bottom: var(--pip-bottom); }
+.voice-dialog[data-corner$=l] .pip { right: auto; left: var(--pip-side); }
+
+/* Swapped: you fill the stage and the person you are talking to takes the corner. */
+.voice-dialog[data-swapped] .vidscreen:not(.self-stage) .pip {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    border-radius: 0;
+    box-shadow: none;
+    cursor: default;
 }
-.vidscreen .call-audio-output { color: var(--text); margin-bottom: 12px; }
-.video-call-settings { position: relative; z-index: 6; flex: 0 1 auto; min-height: 0; max-height: 50dvh; overflow-y: auto; overscroll-behavior: contain; padding: 0 12px; }
-.vidscreen .btn { position: relative; z-index: 6; margin: 0 16px 12px; }
+.voice-dialog[data-swapped] .vidgrid.one { z-index: 3; background: transparent; pointer-events: none; }
+.voice-dialog[data-swapped] .vidgrid.one > .vidtile:has(canvas) {
+    position: absolute;
+    top: var(--pip-top);
+    right: var(--pip-side);
+    width: 104px;
+    height: 156px;
+    border-radius: 16px;
+    box-shadow: 0 14px 34px -10px rgba(0, 0, 0, .6);
+    pointer-events: auto;
+    touch-action: none;
+    cursor: grab;
+    transition: translate .42s cubic-bezier(.2, .9, .3, 1.04), top .32s var(--ease-out, ease), bottom .32s var(--ease-out, ease);
+}
+.voice-dialog[data-swapped][data-corner^=b] .vidgrid.one > .vidtile:has(canvas) { top: auto; bottom: var(--pip-bottom); }
+.voice-dialog[data-swapped][data-corner$=l] .vidgrid.one > .vidtile:has(canvas) { right: auto; left: var(--pip-side); }
+.voice-dialog[data-swapped] .vidgrid.one > .vidtile canvas { object-fit: cover; }
+.voice-dialog[data-swapped] .vidgrid.one > .vidtile[data-dragging] { transition: none; cursor: grabbing; }
+
+/* Ringing with your camera on: you are the stage, under the name of the person you are calling. */
+.self-stage .pip {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    border-radius: 0;
+    box-shadow: none;
+    cursor: default;
+}
+.self-stage .pip::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, .5), transparent 40%, transparent 70%, rgba(0, 0, 0, .4));
+}
+.stage-caption {
+    position: absolute;
+    top: calc(var(--call-top) + 64px);
+    left: 24px;
+    right: 24px;
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    text-shadow: 0 1px 14px rgba(0, 0, 0, .35);
+}
+.stage-caption ::deep .avatar { width: 64px; height: 64px; font-size: 22px; }
+.stage-caption .call-name { margin: 14px 0 4px; font-size: 28px; }
+.stage-caption .call-status { color: rgba(255, 255, 255, .8); }
+
+/* ---------- Notices and the options panel ---------- */
+
+.call-notices {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: calc(var(--call-bottom) + var(--tray-clear));
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    pointer-events: none;
+    transition: bottom .32s var(--ease-out, ease);
+}
+.voice-dialog[data-chrome=hidden] .vidscreen .call-notices { bottom: var(--call-bottom); }
+.call-notice {
+    max-width: 420px;
+    margin: 0;
+    padding: 10px 16px;
+    border-radius: 18px;
+    background: var(--call-glass);
+    -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    backdrop-filter: blur(24px) saturate(1.6);
+    color: inherit;
+    font-size: 13.5px;
+    font-weight: 550;
+    line-height: 1.4;
+    text-align: center;
+    pointer-events: auto;
+}
+.call-notice.action { min-height: 44px; padding-inline: 20px; font-weight: 700; }
+.vidscreen .call-notice.action { background: #fff; color: #131315; }
+.voicescreen .call-notice.action { background: var(--text); color: var(--page); }
+
+.call-panel {
+    position: absolute;
+    left: var(--call-gutter);
+    right: var(--call-gutter);
+    bottom: calc(var(--call-bottom) + var(--tray-clear));
+    z-index: 6;
+    max-width: 440px;
+    max-height: min(58dvh, 540px);
+    margin-inline: auto;
+    padding: 6px 18px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: 28px;
+    color: var(--text);
+    background: color-mix(in srgb, var(--surface) 82%, transparent);
+    -webkit-backdrop-filter: blur(32px) saturate(1.6);
+    backdrop-filter: blur(32px) saturate(1.6);
+    box-shadow: 0 24px 60px -22px rgba(0, 0, 0, .55);
+    text-align: left;
+    -webkit-user-select: text;
+    user-select: text;
+    animation: call-panel-in .26s var(--ease-out, ease) both;
+}
+@keyframes call-panel-in { from { opacity: 0; translate: 0 12px; scale: .98; } }
+.call-audio-output { margin: 0; padding: 12px 0; background: none; border-radius: 0; }
+.call-audio-output:empty { display: none; }
+.call-audio-output + .call-audio-output { padding-top: 4px; }
+.call-audio-output label { display: grid; gap: 8px; font-size: 14px; font-weight: 650; }
+.call-audio-output select {
+    width: 100%;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 14px;
+    color: var(--text);
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    font: inherit;
+    font-weight: 500;
+}
+.call-audio-output p { margin: 8px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--dim); }
+.call-panel ::deep .video-quality-settings { padding: 0; gap: 10px; }
+.call-panel ::deep .video-quality-settings label { font-size: 14px; font-weight: 650; }
+.call-panel ::deep .video-quality-settings select { min-height: 40px; border: 0; border-radius: 12px; padding: 0 10px; background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); }
+.call-panel ::deep .video-quality-settings p { font-size: 12.5px; color: var(--dim); opacity: 1; }
+.call-quality { font-variant-numeric: tabular-nums; }
+.call-panel .setting-toggle { display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 4px 0; border-bottom: 0; font-size: 14px; font-weight: 650; }
+
+.vidscreen ::deep .video-debug { top: calc(var(--call-top) + 60px); border: 0; border-radius: 16px; background: rgba(12, 14, 20, .86); }
+
+/* ---------- Minimized ---------- */
+
+.active-call {
+    position: fixed;
+    top: calc(8px + env(safe-area-inset-top, 0px));
+    left: 50%;
+    z-index: 200;
+    translate: -50% 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: calc(100vw - 32px);
+    min-height: 44px;
+    padding: 0 18px 0 14px;
+    border-radius: 22px;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: 14px;
+    font-weight: 650;
+    box-shadow: 0 12px 30px -12px color-mix(in srgb, var(--accent) 80%, transparent), 0 4px 14px -6px rgba(0, 0, 0, .3);
+    animation: call-pill-in .3s var(--ease-out, ease) both;
+}
+.active-call .who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.active-call .t { opacity: .7; font-variant-numeric: tabular-nums; }
+.active-call .live { flex: none; width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: call-live 1.8s ease-in-out infinite; }
+@keyframes call-live { 50% { opacity: .3; } }
+@keyframes call-pill-in { from { opacity: 0; translate: -50% -10px; } }
+
+@media (prefers-reduced-motion: reduce) {
+    .call-screen, .call-panel, .active-call, .active-call .live, .is-waiting .call-halo::before { animation: none; }
+    .pip, .vidtop, .call-tray, .call-notices, .vidgrid.two, .vidgrid.many, .call-btn .k,
+    .voice-dialog[data-swapped] .vidgrid.one > .vidtile:has(canvas) { transition: none; }
+}
+@media (prefers-reduced-transparency: reduce) {
+    .vidscreen { --call-glass: #2a2a2e; --call-tray: #2a2a2e; }
+    .voicescreen { --call-glass: var(--surface); --call-tray: var(--surface); }
+    .call-panel { background: var(--surface); }
+}

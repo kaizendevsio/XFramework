@@ -4,106 +4,144 @@
 @if(Voice.IsCalling)
 {
     @if(Voice.Minimized)
-    { <button class="active-call" data-update-busy="true" @onclick="Expand"><Icon Name="@(Voice.AnyVideo ? "video" : "phone")" Size="18" />@Voice.Name · @Elapsed</button> }
+    {
+        <button class="active-call" data-update-busy="true" aria-label="Return to call with @Voice.Name, @Elapsed" @onclick="Expand">
+            <span class="live" aria-hidden="true"></span><Icon Name="@(Voice.AnyVideo ? "video" : "phone")" Size="17" /><span class="who">@Voice.Name</span><span class="t">@Elapsed</span>
+        </button>
+    }
     else
     {
     @* One dialog for the whole call. showModal() puts *this node* in the top layer, so a second
        <dialog> in a sibling branch would be a fresh, closed element the moment a camera came on -
-       the call would keep running behind the chat. Only the contents may switch. *@
+       the call would keep running behind the chat. Only the contents may switch.
+       call-screen.js writes data-chrome, data-corner and data-swapped onto this element; Blazor never
+       renders those attributes, so a re-render cannot undo a gesture. *@
     <dialog class="voice-dialog" @ref="dialog" data-update-busy="true" aria-label="@(Video ? "Video call" : "Voice call")">
+    <p class="call-sr" role="status">@Announcement</p>
     @if (Video)
     {
-        <div class="callscreen"><div class="callinner vidscreen">
-            <div class="vidtop">
-                <button class="iconbtn" aria-label="Back to chat" @onclick="Minimize"><Icon Name="back" /></button>
-                <div class="mid"><div class="n">@Voice.Name</div><div class="s">@Elapsed@QualityLabel</div></div>
-                <span class="callenc"><Icon Name="lock" Size="14" /></span>
-            </div>
+        <div class="call-screen vidscreen @(SelfStage ? "self-stage" : "") @(TileCount > 1 ? "is-group" : "is-single")">
             <div class="vidgrid @GridClass" aria-label="Call video">
                 @foreach (var tile in Voice.RemoteVideo)
                 {
-                    <div class="vidtile t1" @key="tile.StreamId">
-                        <canvas @ref="canvases[tile.StreamId]"></canvas>
-                        <span class="nmtag">@Voice.ParticipantName(tile.CredentialId)</span>
+                    <div class="vidtile" @key="tile.StreamId">
+                        <canvas @ref="canvases[tile.StreamId]" role="img" aria-label="@Voice.ParticipantName(tile.CredentialId)"></canvas>
+                        @if (TileCount > 1)
+                        { <span class="tile-name">@if (IsMuted(tile.CredentialId)) { @Glyph("mic-off", 13) }@Voice.ParticipantName(tile.CredentialId)</span> }
                     </div>
                 }
-                @if (Voice.RemoteVideo.Count == 0)
+                @foreach (var person in CameraOffPeople)
                 {
-                    <div class="vidtile t2"><div class="video-center"><Avatar Initials="@ChatMessage.InitialsFor(Voice.Name)" ImageUrl="@Voice.AvatarUrl" Size="a92" /></div><span class="nmtag">@Voice.Name</span></div>
+                    <div class="vidtile camera-off" @key="person.CredentialId">
+                        <div class="tile-person">
+                            <Avatar Initials="@ChatMessage.InitialsFor(Voice.ParticipantName(person.CredentialId))" ImageUrl="@Voice.ParticipantAvatar(person.CredentialId)" Size="a92" />
+                            @if (TileCount == 1)
+                            { <span class="tile-title">@Voice.ParticipantName(person.CredentialId)</span><span class="tile-sub">@PersonState(person)</span> }
+                        </div>
+                        @if (TileCount > 1)
+                        { <span class="tile-name">@if (person.Muted) { @Glyph("mic-off", 13) }@Voice.ParticipantName(person.CredentialId)<small>@PersonState(person)</small></span> }
+                    </div>
+                }
+                @if (TileCount == 0)
+                {
+                    @* No remote camera and no roster yet: the person you called, never a black rectangle. *@
+                    <div class="vidtile camera-off">
+                        <div class="tile-person">
+                            <Avatar Initials="@ChatMessage.InitialsFor(Voice.Name)" ImageUrl="@Voice.AvatarUrl" Size="a92" />
+                            <span class="tile-title">@Voice.Name</span><span class="tile-sub">@(Voice.ConnectedAt is null ? StatusText : "Camera off")</span>
+                        </div>
+                    </div>
                 }
             </div>
             @if (Voice.CameraOn)
-            { <div class="pip @(Voice.CameraFacing == "user" ? "mirror" : "")"><video @ref="preview" autoplay muted playsinline></video><span class="lbl">You</span></div> }
-            @if (Voice.VideoNotice is { } notice)
-            { <p class="vidnotice" role="status">@notice</p> }
-            @if (debugVideo && !outputOpen)
-            { <VideoDiagnosticsPanel Snapshot="videoDiagnostics" RequestedHeight="Voice.PreferredVideoHeight" RequestedFps="Voice.PreferredVideoFramerate" OnClose="ToggleDiagnosticsAsync" /> }
-            <div class="vidbar liquid-glass">
-                <GlassLayer />
-                <button class="vbtn @(Voice.Muted ? "on" : "")" disabled="@(Voice.ConnectedAt is null)" aria-pressed="@Voice.Muted" @onclick="Voice.ToggleMuteAsync"><span class="k"><Icon Name="mic" Size="22" /></span>@(Voice.Muted ? "Unmute" : "Mute")</button>
-                <button class="vbtn @(Voice.CameraOn ? "on" : "")" disabled="@(Voice.CameraBusy || Voice.ConnectedAt is null)" aria-pressed="@Voice.CameraOn" @onclick="Voice.ToggleCameraAsync"><span class="k"><Icon Name="video" Size="22" /></span>@(Voice.CameraOn ? "Camera" : "Camera on")</button>
-                <button class="vbtn" disabled="@(!Voice.CameraOn || Voice.CameraBusy)" @onclick="Voice.SwitchCameraAsync"><span class="k"><Icon Name="flip" Size="22" /></span>Flip</button>
-                <button class="vbtn @(outputOpen ? "on" : "")" aria-expanded="@outputOpen.ToString().ToLowerInvariant()" @onclick="ToggleOutputAsync"><span class="k"><Icon Name="volume" Size="22" /></span>Settings</button>
-                <button class="vbtn end" @onclick="() => Voice.EndAsync()"><span class="k"><Icon Name="phone" Class="rot135" Size="22" /></span>End</button>
-            </div>
-            @if (outputOpen)
+            { <div class="pip @(Voice.CameraFacing == "user" ? "mirror" : "")" role="img" aria-label="Your camera"><video @ref="preview" autoplay muted playsinline></video></div> }
+            @if (SelfStage)
             {
-                <div class="video-call-settings">
-                    @AudioOutputPicker @CameraPicker
-                    <div class="call-audio-output"><VideoQualitySettings /></div>
-                    <div class="call-audio-output"><label class="setting-toggle"><span>Show video diagnostics</span><input type="checkbox" role="switch" checked="@debugVideo" @onchange="ToggleDiagnosticsAsync" /><span class="switch-track" aria-hidden="true"></span></label></div>
+                <div class="stage-caption">
+                    <Avatar Initials="@ChatMessage.InitialsFor(Voice.Name)" ImageUrl="@Voice.AvatarUrl" />
+                    <h1 class="call-name">@Voice.Name</h1><p class="call-status">@StatusText</p>
                 </div>
             }
-            @if (playbackSuspended && Voice.ConnectedAt is not null)
-            { <button class="btn" @onclick="ResumeAudioAsync">Tap to resume call audio</button> }
-        </div></div>
+            <header class="vidtop" data-chrome-part>
+                <button class="call-round" aria-label="Back to chat" @onclick="Minimize">@Glyph("minimize", 20)</button>
+                @if (!SelfStage)
+                { <div class="call-chip"><span class="n">@Voice.Name</span><span class="s"><Icon Name="lock" Size="11" />@StatusText</span></div> }
+                <span class="call-spacer" aria-hidden="true"></span>
+            </header>
+            @if (debugVideo && !outputOpen)
+            { <VideoDiagnosticsPanel Snapshot="videoDiagnostics" RequestedHeight="Voice.PreferredVideoHeight" RequestedFps="Voice.PreferredVideoFramerate" OnClose="ToggleDiagnosticsAsync" /> }
+            @Notices
+            @if (outputOpen)
+            {
+                <section class="call-panel video-call-settings" aria-label="Audio and video options" data-call-hold>
+                    @AudioOutputPicker @CameraPicker
+                    <div class="call-audio-output"><VideoQualitySettings />@if (QualityLabel is { Length: > 0 } quality) { <p class="call-quality">Sending @quality</p> }</div>
+                    <div class="call-audio-output"><label class="setting-toggle"><span>Show video diagnostics</span><input type="checkbox" role="switch" checked="@debugVideo" @onchange="ToggleDiagnosticsAsync" /><span class="switch-track" aria-hidden="true"></span></label></div>
+                </section>
+            }
+            <div class="call-tray" role="toolbar" aria-label="Call controls" data-chrome-part>
+                <button class="call-btn @(outputOpen ? "on" : "")" aria-label="Audio and video options" aria-expanded="@outputOpen.ToString().ToLowerInvariant()" @onclick="ToggleOutputAsync"><span class="k"><Icon Name="volume" Size="23" /></span></button>
+                <button class="call-btn @(Voice.CameraOn ? "" : "on")" aria-label="@(Voice.CameraOn ? "Turn camera off" : "Turn camera on")" disabled="@(Voice.CameraBusy || Voice.ConnectedAt is null)" @onclick="Voice.ToggleCameraAsync"><span class="k">@(Voice.CameraOn ? Glyph("video", 23) : Glyph("video-off", 23))</span></button>
+                @if (Voice.CameraOn)
+                { <button class="call-btn" aria-label="Flip camera" disabled="@Voice.CameraBusy" @onclick="Voice.SwitchCameraAsync"><span class="k"><Icon Name="flip" Size="23" /></span></button> }
+                <button class="call-btn @(Voice.Muted ? "on" : "")" aria-label="Mute" aria-pressed="@Voice.Muted.ToString().ToLowerInvariant()" disabled="@(Voice.ConnectedAt is null)" @onclick="Voice.ToggleMuteAsync"><span class="k">@(Voice.Muted ? Glyph("mic-off", 23) : Glyph("mic", 23))</span></button>
+                <button class="call-btn end" aria-label="End call" @onclick="() => Voice.EndAsync()"><span class="k"><Icon Name="phone" Class="rot135" Size="25" /></span></button>
+            </div>
+        </div>
     }
     else
     {
-        <div class="callscreen"><div class="callbg"></div><div class="callinner">
-            <div class="call-top"><button class="iconbtn" aria-label="Back to chat" @onclick="Minimize"><Icon Name="back" /></button><span class="callenc"><Icon Name="lock" Size="14" />Encrypted @(Voice.IncomingHasVideo ? "video" : "voice") call</span></div>
-            <div class="call-center"><Avatar Initials="@ChatMessage.InitialsFor(Voice.Name)" ImageUrl="@Voice.AvatarUrl" Size="a92" /><h1 class="callname">@Voice.Name</h1><p class="callstate" role="status">@Elapsed</p></div>
-            @if (Voice.Participants.Count > 2)
-            {
-                <div class="call-participants" aria-label="Call participants">
-                    @foreach (var participant in Voice.Participants)
-                    {
-                        <div class="call-participant">
-                            <Avatar Initials="@ChatMessage.InitialsFor(Voice.ParticipantName(participant.CredentialId))" ImageUrl="@Voice.ParticipantAvatar(participant.CredentialId)" />
-                            <span>@Voice.ParticipantName(participant.CredentialId)</span>
-                            <small>@(!participant.Accepted ? "Invited" : !participant.Ready ? "Connecting" : participant.Video ? "On camera" : participant.Muted ? "Muted" : "In call")</small>
-                        </div>
-                    }
-                </div>
-            }
-            @if (outputOpen && !Voice.Incoming) { @AudioOutputPicker }
-            @if (Voice.VideoNotice is { } notice && !Voice.Incoming)
-            { <p class="vidnotice" role="status">@notice</p> }
-            @if (Voice.Incoming && Voice.RingSilent)
-            { <button class="btn" @onclick="Voice.RetryRingAsync">Turn on ring sound</button> }
+        <div class="call-screen voicescreen @(Voice.Incoming ? "is-incoming" : "") @(Waiting ? "is-waiting" : "")">
+            <div class="call-backdrop" aria-hidden="true">
+                @if (!string.IsNullOrWhiteSpace(Voice.AvatarUrl) && backdropFailed != Voice.AvatarUrl)
+                { <img src="@Voice.AvatarUrl" alt="" draggable="false" @onerror="() => backdropFailed = Voice.AvatarUrl" /> }
+            </div>
+            <header class="call-top">
+                <button class="call-round" aria-label="Back to chat" @onclick="Minimize">@Glyph("minimize", 20)</button>
+                <span class="call-chip enc"><Icon Name="lock" Size="12" />End-to-end encrypted</span>
+                <span class="call-spacer" aria-hidden="true"></span>
+            </header>
+            <div class="call-center">
+                <div class="call-halo"><Avatar Initials="@ChatMessage.InitialsFor(Voice.Name)" ImageUrl="@Voice.AvatarUrl" Size="a92" /></div>
+                <h1 class="call-name">@Voice.Name</h1>
+                <p class="call-status">@StatusText</p>
+                @if (Voice.Participants.Count > 2)
+                {
+                    <div class="call-participants" aria-label="Call participants">
+                        @foreach (var participant in Voice.Participants)
+                        {
+                            <div class="call-participant">
+                                <Avatar Initials="@ChatMessage.InitialsFor(Voice.ParticipantName(participant.CredentialId))" ImageUrl="@Voice.ParticipantAvatar(participant.CredentialId)" />
+                                <span>@if (participant.Muted) { @Glyph("mic-off", 12) }@Voice.ParticipantName(participant.CredentialId)</span>
+                                <small>@(!participant.Accepted ? "Invited" : !participant.Ready ? "Connecting" : participant.Video ? "On camera" : participant.Muted ? "Muted" : "In call")</small>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+            @Notices
+            @if (outputOpen && !Voice.Incoming)
+            { <section class="call-panel" aria-label="Audio output" data-call-hold>@AudioOutputPicker</section> }
             @if(Voice.Incoming)
             {
-                <div class="callrow2">
-                    <button class="cbtn end" @onclick="() => Voice.EndAsync()"><span class="k"><Icon Name="phone" Class="rot135" Size="26" /></span>Decline</button>
+                <div class="call-answer">
+                    <button class="call-btn big end" aria-label="Decline" @onclick="() => Voice.EndAsync()"><span class="k"><Icon Name="phone" Class="rot135" Size="30" /></span><span class="lbl">Decline</span></button>
                     @if (Voice.VideoAvailable && Voice.IncomingHasVideo)
-                    { <button class="cbtn accept" @onclick="() => Voice.AcceptAsync(false)"><span class="k"><Icon Name="phone" Size="26" /></span>Audio only</button> }
-                    <button class="cbtn accept" @onclick="() => Voice.AcceptAsync()"><span class="k"><Icon Name="@(Voice.IncomingHasVideo ? "video" : "phone")" Size="26" /></span>@(Voice.IncomingHasVideo ? "Accept video" : "Accept")</button>
+                    { <button class="call-btn big" aria-label="Audio only" @onclick="() => Voice.AcceptAsync(false)"><span class="k"><Icon Name="phone" Size="28" /></span><span class="lbl">Audio only</span></button> }
+                    <button class="call-btn big accept" aria-label="@(Voice.IncomingHasVideo ? "Accept video" : "Accept")" @onclick="() => Voice.AcceptAsync()"><span class="k"><Icon Name="@(Voice.IncomingHasVideo ? "video" : "phone")" Size="30" /></span><span class="lbl">@(Voice.IncomingHasVideo ? "Accept video" : "Accept")</span></button>
                 </div>
             }
             else
             {
-                <div class="callrow2">
-                    <button class="cbtn @(Voice.Muted ? "on" : "")" disabled="@(Voice.ConnectedAt is null)" aria-pressed="@Voice.Muted" @onclick="Voice.ToggleMuteAsync"><span class="k"><Icon Name="mic" Size="24" /></span>@(Voice.Muted ? "Unmute" : "Mute")</button>
+                <div class="call-tray" role="toolbar" aria-label="Call controls">
+                    <button class="call-btn @(outputOpen ? "on" : "")" aria-label="Audio" aria-expanded="@outputOpen.ToString().ToLowerInvariant()" @onclick="ToggleOutputAsync"><span class="k"><Icon Name="volume" Size="24" /></span><span class="lbl">Audio</span></button>
                     @if (Voice.VideoAvailable)
-                    { <button class="cbtn" disabled="@(Voice.CameraBusy || Voice.ConnectedAt is null)" aria-pressed="false" @onclick="Voice.ToggleCameraAsync"><span class="k"><Icon Name="video" Size="24" /></span>Camera</button> }
-                    <button class="cbtn @(outputOpen ? "on" : "")" aria-expanded="@outputOpen.ToString().ToLowerInvariant()" @onclick="ToggleOutputAsync"><span class="k"><Icon Name="volume" Size="24" /></span>Audio</button>
-                    <button class="cbtn end" @onclick="() => Voice.EndAsync()"><span class="k"><Icon Name="phone" Class="rot135" Size="26" /></span>End</button>
+                    { <button class="call-btn" aria-label="Turn camera on" disabled="@(Voice.CameraBusy || Voice.ConnectedAt is null)" @onclick="Voice.ToggleCameraAsync"><span class="k"><Icon Name="video" Size="24" /></span><span class="lbl">Camera</span></button> }
+                    <button class="call-btn @(Voice.Muted ? "on" : "")" aria-label="Mute" aria-pressed="@Voice.Muted.ToString().ToLowerInvariant()" disabled="@(Voice.ConnectedAt is null)" @onclick="Voice.ToggleMuteAsync"><span class="k">@(Voice.Muted ? Glyph("mic-off", 24) : Glyph("mic", 24))</span><span class="lbl">Mute</span></button>
+                    <button class="call-btn end" aria-label="End" @onclick="() => Voice.EndAsync()"><span class="k"><Icon Name="phone" Class="rot135" Size="26" /></span><span class="lbl">End</span></button>
                 </div>
             }
-            @if (playbackSuspended && Voice.ConnectedAt is not null)
-            { <button class="btn" @onclick="ResumeAudioAsync">Tap to resume call audio</button> }
-            <p class="call-footer">End-to-end encrypted</p>
-        </div></div>
+        </div>
     }
     </dialog>
     }
@@ -120,6 +158,8 @@
     private readonly Dictionary<Guid, string> attached = [];
     private string? previewAttached;
     private string? opened;
+    private IJSObjectReference? gestures;
+    private string? backdropFailed;
     private readonly CancellationTokenSource lifetime = new();
     private bool outputOpen, outputBusy;
     private bool playbackSuspended;
@@ -149,10 +189,25 @@
     // The video screen replaces the avatar screen only once there is a picture to show; a
     // camera-off participant in a video call still sees the call they answered.
     private bool Video => Voice.AnyVideo && !Voice.Incoming;
+    // People on the call with no picture to show get an avatar tile rather than a hole in the grid.
+    private IReadOnlyList<Yap.Contracts.YapGroupParticipant> CameraOffPeople => Voice.Participants
+        .Where(x => !Voice.IsSelf(x.CredentialId) && Voice.RemoteVideo.All(tile => tile.CredentialId != x.CredentialId))
+        .DistinctBy(x => x.CredentialId).ToArray();
+    private int TileCount => Voice.RemoteVideo.Count + CameraOffPeople.Count;
     // Count 0 still renders one tile - the caller's avatar - so it shares the single-tile layout.
-    private string GridClass => Voice.RemoteVideo.Count switch { <= 1 => "one", 2 => "two", _ => "many" };
+    private string GridClass => TileCount switch { <= 1 => "one", 2 => "two", _ => "many" };
+    // Before a one-to-one video call connects there is nobody to look at, so your own camera fills
+    // the screen under the caller's name, as it does while a FaceTime call rings.
+    private bool SelfStage => Voice.CameraOn && Voice.RemoteVideo.Count == 0 && Voice.ConnectedAt is null && Voice.Participants.Count <= 2;
+    private bool Waiting => !Voice.Incoming && Voice.ConnectedAt is null;
+    private bool IsMuted(Guid credential) => Voice.Participants.Any(x => x.CredentialId == credential && x.Muted);
+    private static string PersonState(Yap.Contracts.YapGroupParticipant person)
+        => !person.Accepted ? "Ringing…" : !person.Ready ? "Connecting…" : "Camera off";
     private string QualityLabel => Voice.VideoQuality is { } tier && Voice.CameraOn
-        ? $" · {tier.Height}p {(Voice.MeasuredVideoFps is { } fps ? $"{fps:0} fps" : "Measuring?")} {Voice.VideoCodecName}" : "";
+        ? $"{tier.Height}p · {(Voice.MeasuredVideoFps is { } fps ? $"{fps:0} fps" : "measuring fps")} · {Voice.VideoCodecName}" : "";
+    private string StatusText => Voice.Incoming ? (Voice.IncomingHasVideo ? "Incoming video call" : "Incoming voice call") : Elapsed.Replace("...", "…");
+    // Announced on change only: the ticking timer would otherwise be read out every second.
+    private string Announcement => Voice.Incoming ? StatusText : Voice.Status.Replace("...", "…");
     private async Task CheckPlaybackAsync()
     {
         try { playbackSuspended = await Voice.GetPlaybackStateAsync() is "suspended" or "interrupted"; }
@@ -165,9 +220,10 @@
     }
     private Bolt.Media.Browser.AudioOutputs? outputs;
     private string? outputError;
-    private string Elapsed => Voice.Status == "Connected" && Voice.ConnectedAt is { } time ? (DateTimeOffset.UtcNow - time).ToString(@"mm\:ss") : Voice.Status;
+    private string Elapsed => Voice.Status == "Connected" && Voice.ConnectedAt is { } time ? Clock(DateTimeOffset.UtcNow - time) : Voice.Status;
+    private static string Clock(TimeSpan span) => span.TotalHours >= 1 ? span.ToString(@"h\:mm\:ss") : span.ToString(@"mm\:ss");
     protected override void OnInitialized(){ Voice.Changed += Changed; _ = Tick(); }
-    private void Changed() => _ = InvokeAsync(() => { if (!Voice.IsCalling) { outputOpen = false; outputs = null; outputError = null; playbackSuspended = false; debugVideo = false; videoDiagnostics = null; Release(); } StateHasChanged(); });
+    private void Changed() => _ = InvokeAsync(() => { if (!Voice.IsCalling) { outputOpen = false; outputs = null; outputError = null; playbackSuspended = false; debugVideo = false; videoDiagnostics = null; backdropFailed = null; Release(); } StateHasChanged(); });
     private void Release(){ canvases.Clear(); attached.Clear(); previewAttached = null; opened = null; }
     // Ringing counts: the output picker is usable before the call connects, so it must refresh then too.
     private async Task Tick(){ try { while(!lifetime.IsCancellationRequested){await Task.Delay(1000,lifetime.Token);if(Voice.IsCalling)await InvokeAsync(async () => { if (outputOpen && !outputBusy) await RefreshOutputsAsync(); await CheckPlaybackAsync(); await RefreshDiagnosticsAsync(); StateHasChanged(); });} }catch(OperationCanceledException){} }
@@ -184,6 +240,14 @@
         catch { outputError = "Could not switch audio. Check that the device is connected and try again."; await RefreshOutputsAsync(); }
         finally { outputBusy = false; }
     }
+    private RenderFragment Notices => @<div class="call-notices">
+        @if (Voice.Incoming && Voice.RingSilent)
+        { <button class="call-notice action" data-call-hold @onclick="Voice.RetryRingAsync">Turn on ring sound</button> }
+        @if (Voice.VideoNotice is { } notice && !Voice.Incoming)
+        { <p class="call-notice vidnotice" role="status">@notice</p> }
+        @if (playbackSuspended && Voice.ConnectedAt is not null)
+        { <button class="call-notice action" data-call-hold @onclick="ResumeAudioAsync">Tap to resume call audio</button> }
+    </div>;
     private RenderFragment CameraPicker => @<div class="call-audio-output">
         @if (Voice.CameraOn && cameras.Count > 1)
         {
@@ -209,11 +273,24 @@
         else { <p>Choose your audio output in your phone or computer’s audio controls. Speaker, earpiece and Bluetooth options depend on your device; this browser cannot switch them directly.</p> }
         @if (outputError is not null) { <p role="status">@outputError</p> }
     </div>;
+
+    // Call-only glyphs. Same 24px grid and stroke as Icon, kept here so the shared icon set does not
+    // grow symbols nothing else draws.
+    private static readonly Dictionary<string, string> Glyphs = new()
+    {
+        ["mic"] = "M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0V5ZM5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8",
+        ["mic-off"] = "M15 10V5a3 3 0 0 0-5.7-1.3M9 9v3a3 3 0 0 0 5 2.2M5 10v2a7 7 0 0 0 11.8 5.1M19 10v2c0 .9-.2 1.8-.5 2.6M12 19v3m-4 0h8M3 3l18 18",
+        ["video"] = "M4 5h11v14H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2ZM15 9l7-4v14l-7-4",
+        ["video-off"] = "M9 5h6v6m0 4v4H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2M15 9l7-4v14l-4-2.3M3 3l18 18",
+        ["minimize"] = "M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7",
+    };
+    private static RenderFragment Glyph(string name, int size) => @<svg class="ic" width="@size" height="@size" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="@Glyphs[name]" /></svg>;
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         // Open the surface whenever the node we last opened is not the one on screen: the first
         // render of a call, and again after anything hands Blazor a different dialog element.
-        if(Voice.IsCalling && !Voice.Minimized && opened != dialog.Id){opened=dialog.Id;await JS.InvokeVoidAsync("yap.openCall",dialog);}
+        if(Voice.IsCalling && !Voice.Minimized && opened != dialog.Id){opened=dialog.Id;await JS.InvokeVoidAsync("yap.openCall",dialog);await MountGesturesAsync();}
         // Minimizing removes the dialog and everything captured inside it, so drop the bindings too.
         if(!Voice.IsCalling || Voice.Minimized){if (previewAttached is not null) await Voice.DetachLocalPreviewAsync(); Release(); return;}
         // Canvases and the preview element exist only after their first render; bind each once per node.
@@ -225,11 +302,23 @@
         foreach (var id in canvases.Keys.Where(id => Voice.RemoteVideo.All(tile => tile.StreamId != id)).ToArray())
         { canvases.Remove(id); attached.Remove(id); }
     }
+    // Gestures are a nicety on top of working buttons: a module that fails to load leaves every
+    // control usable, so it must never take the call screen down with it.
+    private async Task MountGesturesAsync()
+    {
+        try
+        {
+            gestures ??= await JS.InvokeAsync<IJSObjectReference>("import", "./call-screen.js");
+            await gestures.InvokeVoidAsync("mount", dialog);
+        }
+        catch (JSException) { }
+    }
     private void Minimize(){Voice.Minimized=true;}
     private void Expand(){Voice.Minimized=false;}
     public async ValueTask DisposeAsync()
     {
         Voice.Changed -= Changed; lifetime.Cancel(); lifetime.Dispose();
         if (debugVideo) { try { await Voice.GetVideoDiagnosticsAsync(false); } catch { } }
+        if (gestures is not null) { try { await gestures.DisposeAsync(); } catch (JSDisconnectedException) { } }
     }
 }
