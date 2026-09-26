@@ -233,7 +233,8 @@ public sealed class SendRateController
                       got.ReceivedKbps < _sentAverage * StarvedFraction;
         var overload = delay >= _options.HighDelayMs && (gradient >= OverloadGradientMsPerSecond || jump || starved);
         var overuse = baseLost || standing || shedding || overload || _risingStreak >= RisingSamples;
-        var calm = !overuse && informed && floor < _options.TargetDelayMs / 2 && delay < _options.HighDelayMs;
+        // Probing needs the path quiet now as well: a spike (a stall, a keyframe) holds the estimate for that tick.
+        var calm = !overuse && informed && floor < _options.TargetDelayMs / 2 && delay < _options.TargetDelayMs;
         // After a decrease the queue keeps growing for a feedback delay and then drains: drops and a high delay in
         // that time are the old rate, not new congestion, and cutting again is how controllers undershoot. With a
         // capacity measurement the test is exact (the estimate already fits the link); without one, the delay must
