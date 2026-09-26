@@ -106,6 +106,26 @@ public sealed class CallSurfaceTests
         });
     }
 
+    // call-screen.js keeps its gesture state on the dialog, so it belongs to the node exactly as the
+    // modal state does: once per dialog, untouched by the voice/video switch, and again for the new
+    // node that comes back after minimizing.
+    [Test]
+    public async Task TheGesturesAreMountedOnTheDialogThatIsOpen()
+    {
+        await using var call = new SurfaceFixture();
+        await call.RenderAsync();
+        foreach (var video in new[] { true, false, true, false }) await call.SetVideoAsync(video);
+        Assert.That(call.Mounted, Is.EqualTo(call.Opened), "one mount, on the one dialog, however often the screen switches");
+
+        await call.SetMinimizedAsync(true);
+        await call.SetMinimizedAsync(false);
+        Assert.Multiple(() =>
+        {
+            Assert.That(call.Mounted, Has.Count.EqualTo(2), "the dialog that came back is a new node");
+            Assert.That(call.Mounted, Is.EqualTo(call.Opened));
+        });
+    }
+
     // The stage is one grid whose base rule was a 2x2 lifted from the prototype. The component has to
     // say how many callers there are, or every layout is that 2x2: one caller in a quarter of it, two
     // callers across the top with a black band underneath.
@@ -285,6 +305,9 @@ public sealed class CallSurfaceTests
 
         /// <summary>The element ids yap.openCall was asked to show, in order.</summary>
         public IReadOnlyList<string> Opened => js.Calls.Where(x => x.Name == "yap.openCall").Select(x => Reference(x.Args)).ToArray();
+
+        /// <summary>The element ids call-screen.js was mounted on, in order.</summary>
+        public IReadOnlyList<string> Mounted => js.Calls.Where(x => x.Name == "mount").Select(x => Reference(x.Args)).ToArray();
 
         /// <summary>The element the media pipeline was last pointed at by <paramref name="call"/>.</summary>
         public string? Attached(string call) => js.Calls.Where(x => x.Name == call).Select(x => Reference(x.Args)).LastOrDefault();
