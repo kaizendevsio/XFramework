@@ -197,6 +197,14 @@ class WorkflowTests(unittest.TestCase):
         for name in ["Build images", "Push images", "Pull candidate images"]:
             self.assertIn('if [ "$DEPLOY_SCOPE" = yap ]; then services=(yap); fi', self.steps[name]["run"])
 
+    def test_withdrawn_minio_image_is_reused_but_still_resolved(self):
+        run = self.steps["Pull candidate images"]["run"]
+        self.assertIn('if [ "$service" != minio ]; then pull_services+=("$service"); fi', run)
+        self.assertIn('pull "${pull_services[@]}"', run)
+        self.assertNotIn('pull "$@"', run)
+        resolve = run.split('"docker", "image", "inspect"', 1)[1]
+        self.assertIn("check=True", resolve)
+
     def test_full_expiry_and_observation_both_gate_success(self):
         run = self.steps["Run authenticated Bolt smoke and concurrent core observation"]["run"]
         self.assertIn("expiry_enabled=true", run)

@@ -732,10 +732,19 @@ jobs:
           ssh "$DEPLOY_HOST" \
             "COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' XFRAMEWORK_ENV_FILE='$REMOTE_CANDIDATE_ENV' REMOTE_CANDIDATE_COMPOSE='$REMOTE_CANDIDATE_COMPOSE' REMOTE_IMAGE_OVERRIDE='$REMOTE_IMAGE_OVERRIDE' bash -s -- $service_args" <<'REMOTE_SCRIPT'
           set -euo pipefail
-          /usr/bin/timeout --foreground --kill-after=30s 900s \
-            docker compose --project-name "$COMPOSE_PROJECT_NAME" \
-              --env-file "$XFRAMEWORK_ENV_FILE" \
-              -f "$REMOTE_CANDIDATE_COMPOSE" -f "$REMOTE_IMAGE_OVERRIDE" pull "$@"
+          # MinIO withdrew its public images (quay.io and Docker Hub answer 401 since
+          # 2026-09-26), so its pinned release is reused from the host. The resolve step
+          # below still inspects every service's image and fails if one is missing.
+          pull_services=()
+          for service in "$@"; do
+            if [ "$service" != minio ]; then pull_services+=("$service"); fi
+          done
+          if [ "${#pull_services[@]}" -gt 0 ]; then
+            /usr/bin/timeout --foreground --kill-after=30s 900s \
+              docker compose --project-name "$COMPOSE_PROJECT_NAME" \
+                --env-file "$XFRAMEWORK_ENV_FILE" \
+                -f "$REMOTE_CANDIDATE_COMPOSE" -f "$REMOTE_IMAGE_OVERRIDE" pull "${pull_services[@]}"
+          fi
           umask 077
           python3 - "$REMOTE_IMAGE_OVERRIDE" "$XFRAMEWORK_ENV_FILE" "$REMOTE_CANDIDATE_COMPOSE" "$@" <<'PY'
           import json
