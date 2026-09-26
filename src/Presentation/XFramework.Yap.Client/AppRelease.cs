@@ -2,10 +2,16 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.63";
+    public const string Version = "1.3.64";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
-        (Version, "22 September 2026", [
+        (Version, "26 September 2026", [
+            "Fixed: Yap no longer signs you out after a day. You stay signed in unless you sign out or skip Yap for 90 days (you may be asked to sign in once more after this update).",
+            "Fixed: switching tabs quickly on iPhone no longer slows Yap down until it restarts.",
+            "Voice and video calls have a new full-screen design with a floating control bar. In video calls, drag your self-view to any corner, tap it to swap, and tap the video to show or hide controls.",
+            "The Calls tab groups calls by person in compact rows, and calls in a conversation now show as a single line you can tap to call back.",
+            "Glass bars no longer have outlines, the tab bar blurs what scrolls under it, and it slides away smoothly when you open a conversation."]),
+        ("1.3.63", "22 September 2026", [
             "Video decoding prefers hardware, with a software recovery path up to 1440p.",
             "A new Calls tab and call cards make it easy to return voice and video calls.",
             "Navigation stays in place between pages, favorites have larger avatars, and the inbox opens before background loading finishes.",
