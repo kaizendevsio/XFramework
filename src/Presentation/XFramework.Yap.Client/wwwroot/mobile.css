@@ -238,6 +238,6 @@ input,textarea,[contenteditable]:not([contenteditable=false]){-webkit-user-selec
 .favorite-grid .inbox-menu-trigger{top:0;right:0}
 .inbox-skeleton{display:grid;gap:16px;padding:16px 0}.inbox-skeleton span{display:block;height:60px;border-radius:18px;background:var(--surface2)}
 
-/* The inbox header is flat: page colour, no glass tint or blur. */
-.scroll-header .appbar.inbox-header{background:var(--page)!important}
+/* The inbox header is flat: the app background (--surface), no glass tint or blur. */
+.scroll-header .appbar.inbox-header{background:var(--surface)!important}
 .inbox-header>.glass-optics{display:none}
