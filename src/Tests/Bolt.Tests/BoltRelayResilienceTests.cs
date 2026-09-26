@@ -1,10 +1,7 @@
 using System.Buffers;
-using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
-using System.Security.Claims;
-using System.Threading.Channels;
 using Bolt.Client;
 using Bolt.Protocol;
 using Bolt.Protocol.Transport;
@@ -17,7 +14,7 @@ namespace Bolt.Tests;
 /// <summary>
 /// Phase 0 of call network resilience: a slow or briefly dead mobile link must degrade the call,
 /// never end it. Covers the relay's per-receiver media queue, the transport progress watchdog,
-/// graceful credential expiry, and the client's reconnect discipline.
+/// and the client's reconnect discipline.
 /// </summary>
 [CancelAfter(20_000)]
 public sealed class BoltRelayResilienceTests
@@ -223,25 +220,6 @@ public sealed class BoltRelayResilienceTests
         Assert.That(BoltSocketTuning.TryLimitUnsentBytes(null, 1024), Is.False);
     }
 
-    // ── Credential expiry ──
-
-    [Test]
-    public async Task CredentialExpiry_ClosesWithAHandshake_InsteadOfAbortingTheSocket()
-    {
-        using var server = new BoltServer(NullLogger<BoltServer>.Instance, new BoltServerOptions { TransportCloseTimeoutMs = 2_000 });
-        var transport = new ClosableConnection();
-        var principal = new ClaimsPrincipal(new ClaimsIdentity(
-            [new Claim("sub", "expiring"), new Claim("exp", DateTimeOffset.UtcNow.AddSeconds(1).ToUnixTimeSeconds().ToString())], "test"));
-        var run = server.HandleConnectionAsync(transport, principal, CancellationToken.None);
-        transport.Inbound.Writer.TryWrite(Write(w => BoltCodec.WriteRegister(w, "expiring", "expiring")));
-        await run.WaitAsync(TimeSpan.FromSeconds(8));
-        Assert.Multiple(() =>
-        {
-            Assert.That(transport.CloseRequested, Is.True);
-            Assert.That(transport.ReceiveCanceled, Is.False, "cancelling a pending WebSocket receive aborts it without a close frame");
-        });
-    }
-
     // ── BoltClient reconnect discipline ──
 
     [Test]
@@ -329,55 +307,5 @@ public sealed class BoltRelayResilienceTests
         public ValueTask SendDatagramAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) => ValueTask.CompletedTask;
         public ValueTask CloseAsync(CancellationToken ct = default) => ValueTask.CompletedTask;
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-    }
-
-    /// <summary>Records whether the server closed it with a handshake or cancelled its pending receive.</summary>
-    private sealed class ClosableConnection : IBoltConnection
-    {
-        public Channel<byte[]> Inbound { get; } = Channel.CreateUnbounded<byte[]>();
-        public ConcurrentQueue<byte[]> Sent { get; } = new();
-        public bool CloseRequested, ReceiveCanceled;
-        public bool SupportsDatagrams => false;
-        public bool IsConnected { get; private set; } = true;
-        public BoltTransport TransportType => BoltTransport.WebSocket;
-
-        public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
-        {
-            Sent.Enqueue(data.ToArray());
-            return ValueTask.CompletedTask;
-        }
-
-        public async ValueTask<(int BytesRead, bool EndOfMessage)> ReceiveAsync(Memory<byte> buffer, CancellationToken ct = default)
-        {
-            try
-            {
-                if (!await Inbound.Reader.WaitToReadAsync(ct) || !Inbound.Reader.TryRead(out var frame)) return (0, true);
-                frame.CopyTo(buffer);
-                return (frame.Length, true);
-            }
-            catch (OperationCanceledException) when (!CloseRequested)
-            {
-                ReceiveCanceled = true;
-                throw;
-            }
-        }
-
-        public ValueTask SendDatagramAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) => ValueTask.CompletedTask;
-
-        public ValueTask CloseAsync(CancellationToken ct = default)
-        {
-            // A peer that answers the close frame: the pending receive completes with a close.
-            CloseRequested = true;
-            IsConnected = false;
-            Inbound.Writer.TryComplete();
-            return ValueTask.CompletedTask;
-        }
-
-        public ValueTask DisposeAsync()
-        {
-            IsConnected = false;
-            Inbound.Writer.TryComplete();
-            return ValueTask.CompletedTask;
-        }
     }
 }

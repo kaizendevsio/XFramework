@@ -397,19 +397,8 @@ public sealed partial class BoltServer : IDisposable
             await CloseTransportAsync(transport);
             return;
         }
-        using var connectionCts = CancellationTokenSource.CreateLinkedTokenSource(ct, _shutdownCts.Token);
+        using var connectionCts = CreateConnectionCancellation(user, ct);
         var connectionCt = connectionCts.Token;
-        // Credential expiry and the lifetime cap close the transport with a close handshake, so the
-        // peer sees an orderly end (and reconnects with a fresh credential) instead of an aborted
-        // socket. From that instant no further inbound frame from the expired principal is processed.
-        var expiry = new ConnectionExpiry(transport, connectionCts, _transportCloseTimeout);
-        var lifetime = GetConnectionLifetime(user);
-        if (lifetime == TimeSpan.Zero)
-            connectionCts.Cancel();
-        using var expiryTimer = lifetime > TimeSpan.Zero
-            ? new Timer(static state => ((ConnectionExpiry)state!).Expire(), expiry,
-                lifetime < MaxTimerDueTime ? lifetime : MaxTimerDueTime, Timeout.InfiniteTimeSpan)
-            : null;
         var connection = new BoltHubConnection(
             transport,
             _sendQueueCapacity,
@@ -514,15 +503,14 @@ public sealed partial class BoltServer : IDisposable
                     largeBuffer = null;
                     try
                     {
-                        if (!expiry.Expired)
-                            await ProcessFrameAsync(connection, assembledFrame, totalLength, connectionCt);
+                        await ProcessFrameAsync(connection, assembledFrame, totalLength, connectionCt);
                     }
                     finally
                     {
                         _receiveBufferPool.Return(assembledFrame);
                     }
                 }
-                else if (!expiry.Expired)
+                else
                 {
                     await ProcessFrameAsync(connection, frameBytes, totalLength, connectionCt);
                 }
@@ -583,11 +571,9 @@ public sealed partial class BoltServer : IDisposable
         catch { }
     }
 
-    private static readonly TimeSpan MaxTimerDueTime = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
-
-    /// <summary>Time until the credential's exp or the lifetime cap; infinite when neither applies.</summary>
-    private TimeSpan GetConnectionLifetime(ClaimsPrincipal? user)
+    private CancellationTokenSource CreateConnectionCancellation(ClaimsPrincipal? user, CancellationToken ct)
     {
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(ct, _shutdownCts.Token);
         var lifetime = _maxConnectionLifetime;
 
         var expirationValue = user?.FindFirstValue("exp");
@@ -608,35 +594,10 @@ public sealed partial class BoltServer : IDisposable
             }
         }
 
-        return lifetime;
-    }
+        if (lifetime != Timeout.InfiniteTimeSpan)
+            cts.CancelAfter(lifetime);
 
-    private sealed class ConnectionExpiry(IBoltConnection transport, CancellationTokenSource connectionCts, TimeSpan closeTimeout)
-    {
-        private int _expired;
-
-        public bool Expired => Volatile.Read(ref _expired) != 0;
-
-        public void Expire()
-        {
-            if (Interlocked.Exchange(ref _expired, 1) == 0)
-                _ = CloseAsync();
-        }
-
-        private async Task CloseAsync()
-        {
-            try
-            {
-                using var closeCts = new CancellationTokenSource(closeTimeout);
-                await transport.CloseAsync(closeCts.Token);
-            }
-            catch { /* The cancellation below still ends the connection. */ }
-            finally
-            {
-                try { connectionCts.Cancel(); }
-                catch (ObjectDisposedException) { }
-            }
-        }
+        return cts;
     }
 
     private async Task ProcessFrameAsync(BoltHubConnection connection, byte[] buffer, int length, CancellationToken ct)
