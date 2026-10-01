@@ -86,7 +86,9 @@ services:
       start_period: 10s
 
   minio-init:
-    image: quay.io/minio/mc:RELEASE.2025-04-16T18-13-26Z
+    # MinIO withdrew its public images (quay.io and Docker Hub answer 401); this is the community rebuild of
+    # the same client from source. Only bucket bootstrap uses it, so any recent mc that speaks S3 is fine.
+    image: pgsty/mc:RELEASE.2026-09-16T00-00-00Z@sha256:cfc83108c3abb371f8fb84d99c1fdc88f8c237e022409b0081fb7c0a3be634dd
     restart: "no"
     depends_on:
       minio:
