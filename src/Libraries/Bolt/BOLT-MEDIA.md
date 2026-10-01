@@ -70,6 +70,8 @@ The intended SFU path forwards encoded payloads without codec decoding. The curr
 | FecFrame | 0x25 | 26 bytes + payload | XOR parity for error correction |
 | NackRequest | 0x26 | 19 bytes + 4 per sequence | Retransmission request (never sent over a WebSocket) |
 | MediaCongestion | 0x27 | 32 bytes (fixed) | Relay-to-sender congestion report; only a relay originates it |
+| MediaTransport | 0x28 | 7 bytes + JSON | Datagram path signalling between one participant and the relay (WebSocket only) |
+| MediaBundle | 0x29 | 2 bytes + frames | Up to four whole MediaFrames in one datagram (audio redundancy; datagram path only) |
 
 ### MediaFrame Header (30 bytes)
 
@@ -90,6 +92,34 @@ A call on TCP never loses media, so congestion shows as delay and as the relay's
 - **Relay.** Each receiver's queue sheds a stream's top temporal layer when it is 20% full, every enhancement layer at 40%, and the base layer (then everything until a keyframe) only when it overflows. A shed layer comes back only at a base-layer picture, so every forwarded picture's references were forwarded too. Every 250 ms (500 ms for audio) the relay tells each sender, per stream, about the worst receiver: its queue delay, the sender-to-relay queuing delay, the stream's share of what that receiver drained while backlogged, drops, base-layer losses and the layer limit (`MediaCongestion`).
 - **Receiver.** Every 250 ms it adds its end-to-end queuing delay (one-way delay above its recent minimum, against the sender's capture clock) and what it received to its `MediaFeedback`.
 - **Sender.** `MediaSendPacer` holds audio and video above the transport, sends audio first, keeps the connection's queue and the browser's WebSocket buffer short, and drops whole pictures (enhancement layers first). `SendRateController` turns the three views into one estimate (fast down, slow probing up, hysteresis), and `VideoRateLadder` into a picture size, frame rate and bitrate.
+
+### The datagram path (WebRTC data channel through TURN)
+
+A participant of an authenticated call may move its media off the WebSocket onto a WebRTC data channel to
+the relay; the WebSocket keeps signalling, configuration and heartbeats, and takes media back whenever the
+channel is not open. Only the pipe changes: the same Bolt frames, SFrame-encrypted end to end, one per
+message, with DTLS as an extra hop layer.
+
+- **Negotiation** rides the authenticated socket as `MediaTransport` frames: the participant asks; the relay
+  mints short-lived ICE servers for it (`IBoltIceServerSource`, e.g. Cloudflare TURN) and announces a session;
+  the participant offers, the relay answers with a relay-only peer; candidates trickle both ways.
+- **The channel** is pre-negotiated (id 0), unordered, never retransmitted, binary, and carries at most 1150
+  bytes per message. The relay's endpoint is the `bolt-rtc` sidecar (Pion), driven by `Bolt.Rtc`.
+- **Relay to participant.** The receiver's media lanes drain into the channel instead of the socket, never
+  blocking: while the channel holds more than its SCTP window plus 16 KiB, media waits in the lanes (where audio
+  still overtakes video and stale video is dropped). Frames too large for one message take the socket.
+- **Participant to relay.** Only media and media feedback are accepted from a channel, routed exactly like the
+  connection's own frames. Audio is de-duplicated per stream.
+- **Congestion.** SCTP's loss-based window runs underneath with a 128 KiB floor on the relay's side; the
+  relay's lanes and reports and the sender's delay-based controller set the rate, and the sender's pacer
+  counts the channel's buffered amount as transport backlog, so loss is never reacted to twice.
+- **Loss.** Each side reports the audio loss it sees once a second; above 1.5% the other side sends each
+  audio frame with its predecessor (`MediaBundle`) while its own queue is short, until loss stays below 0.5%
+  for 10 s.
+- **Video fragments** are cut to fit one message on this path (4 KB on the socket); receivers take either.
+- **Lifecycle.** A channel that does not open in 15 s or fails falls back to the socket, then retries with
+  backoff; a network change restarts ICE in place; credentials are renewed with a fresh session before they
+  expire, and a resumed socket negotiates its own.
 
 ### CallSignal Types
 
