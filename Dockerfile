@@ -5,6 +5,15 @@ COPY src/Libraries/XFramework.Opaque.Native/Cargo.toml src/Libraries/XFramework.
 COPY src/Libraries/XFramework.Opaque.Native/src/ src/
 RUN cargo build --release --locked
 
+# The call relay's WebRTC data-channel sidecar (Pion, see src/Libraries/Bolt/Bolt.Rtc/sidecar). Only Yap
+# ships it; no Go toolchain enters runtime images.
+FROM golang:1.25.14-bookworm@sha256:c268a04d59aea0b180ed9946a658cfab9e7b3391dc90eed6e4969ccff98c851f AS bolt-rtc
+WORKDIR /bolt-rtc
+COPY src/Libraries/Bolt/Bolt.Rtc/sidecar/go.mod src/Libraries/Bolt/Bolt.Rtc/sidecar/go.sum ./
+RUN go mod download && go mod verify
+COPY src/Libraries/Bolt/Bolt.Rtc/sidecar/*.go ./
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/bolt-rtc .
+
 # linux/amd64 manifests are pinned so deployment provenance includes immutable
 # compiler and runtime roots. Update both digests together during SDK upgrades.
 FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:493fca072aac81307027cbb7b7c9a82b6e87d222af315504d05dc6530e69b519 AS restore-inputs
@@ -43,6 +52,11 @@ RUN dotnet publish "${PROJECT_PATH}" \
     -c Release \
     -o /app/publish \
     --no-restore -p:SkipOpaqueNativeBuild=true -p:OpaqueNativePath=/opt/opaque/libxframework_opaque.so
+
+# Yap's call relay runs the WebRTC sidecar next to itself; without it calls stay on WebSockets.
+COPY --from=bolt-rtc /out/bolt-rtc /opt/bolt-rtc/bolt-rtc
+RUN case "${PROJECT_PATH}" in *XFramework.Yap.csproj) \
+    install -m 0755 /opt/bolt-rtc/bolt-rtc /app/publish/bolt-rtc ;; esac
 
 # A server-only health check cannot detect a missing Blazor browser runtime.
 RUN case "${PROJECT_PATH}" in *XFramework.Portal.csproj) \

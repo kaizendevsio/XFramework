@@ -33,6 +33,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Server\Bolt.Server.csproj" />
+        <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Rtc\Bolt.Rtc.csproj" />
         <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Client\Bolt.Client.csproj" />
         <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Media\Bolt.Media.csproj" />
         <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Media.Browser\Bolt.Media.Browser.csproj" />

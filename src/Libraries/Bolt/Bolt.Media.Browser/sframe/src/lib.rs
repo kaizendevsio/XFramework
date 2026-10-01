@@ -10,6 +10,11 @@ use zeroize::{Zeroize, Zeroizing};
 
 const MAX_AUDIO_BYTES: usize = 4096;
 const MAX_AAD_BYTES: usize = 1024;
+/// How far behind the newest counter a frame may arrive and still be accepted (once). One sender's audio
+/// and video share a counter, a keyframe on a datagram path is up to 256 fragments, and the pacers on both
+/// ends let audio overtake queued video, so a picture's last fragments can arrive several hundred counters
+/// after newer audio. Duplicates are still rejected anywhere in the window; older frames are rejected.
+const REPLAY_WINDOW: usize = 1024;
 
 fn check_input(payload: &[u8], aad: &[u8], encrypted: bool) -> Result<(), String> {
     if payload.is_empty() || payload.len() > MAX_AUDIO_BYTES + if encrypted { MAX_AAD_BYTES + 35 } else { 0 }
@@ -88,7 +93,7 @@ impl SFrameReceiver {
         Ok(Self {
             key: DecryptionKey::derive_from(CipherSuite::AesGcm256Sha512, kid, base_key)
                 .map_err(|e| e.to_string())?,
-            replay: ReplayAttackProtection::new(kid, Tolerance::new(128)),
+            replay: ReplayAttackProtection::new(kid, Tolerance::new(REPLAY_WINDOW)),
         })
     }
     fn decrypt_frame(&mut self, payload: &[u8], aad: &[u8]) -> Result<Vec<u8>, String> {
@@ -178,10 +183,24 @@ mod tests {
     fn reordering_is_bounded() {
         let mut tx = SFrameSender::create(1, &[7;32]).unwrap();
         let mut rx = SFrameReceiver::create(1, &[7;32]).unwrap();
-        let frames: Vec<_> = (0..130).map(|_| tx.encrypt_frame(b"opus", AAD).unwrap()).collect();
-        assert!(rx.decrypt_frame(&frames[129], AAD).is_ok());
-        assert!(rx.decrypt_frame(&frames[128], AAD).is_ok());
+        let frames: Vec<_> = (0..REPLAY_WINDOW + 2).map(|_| tx.encrypt_frame(b"opus", AAD).unwrap()).collect();
+        assert!(rx.decrypt_frame(&frames[REPLAY_WINDOW + 1], AAD).is_ok());
+        assert!(rx.decrypt_frame(&frames[REPLAY_WINDOW], AAD).is_ok());
         assert!(rx.decrypt_frame(&frames[0], AAD).is_err());
+    }
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+    #[cfg_attr(not(target_arch = "wasm32"), test)]
+    fn a_keyframe_overtaken_by_audio_still_decrypts_and_duplicates_do_not() {
+        // A 256-fragment keyframe is encrypted, then 40 audio frames overtake its tail on the wire.
+        let mut tx = SFrameSender::create(1, &[7;32]).unwrap();
+        let mut rx = SFrameReceiver::create(1, &[7;32]).unwrap();
+        let keyframe: Vec<_> = (0..256).map(|_| tx.encrypt_frame(b"fragment", AAD).unwrap()).collect();
+        let audio: Vec<_> = (0..40).map(|_| tx.encrypt_frame(b"opus", AAD).unwrap()).collect();
+        assert!(rx.decrypt_frame(&keyframe[0], AAD).is_ok());
+        for frame in &audio { assert!(rx.decrypt_frame(frame, AAD).is_ok()); }
+        for frame in keyframe.iter().skip(1).rev() { assert!(rx.decrypt_frame(frame, AAD).is_ok()); }
+        assert!(rx.decrypt_frame(&keyframe[100], AAD).is_err(), "a duplicate inside the window is still a replay");
+        assert!(rx.decrypt_frame(&audio[39], AAD).is_err());
     }
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
     #[cfg_attr(not(target_arch = "wasm32"), test)]

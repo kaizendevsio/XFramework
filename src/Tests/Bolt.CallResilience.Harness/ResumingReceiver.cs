@@ -21,6 +21,10 @@ using Bolt.Protocol;
 internal static class ResumingReceiver
 {
     private const string Id = "receiver";
+#if HARNESS_ADAPTIVE
+    /// <summary>Each connection's data channel, for the summary.</summary>
+    private static readonly List<HarnessDatagram?> Datagrams = [];
+#endif
 
     public static async Task<int> RunAsync()
     {
@@ -97,7 +101,12 @@ internal static class ResumingReceiver
             audioDelayMs = metrics.AudioDelay(),
             longestAudioGapMs = metrics.LongestAudioGapMs,
             picturesDecodable = metrics.PicturesDecodable,
-            keyframes = metrics.Keyframes
+            keyframes = metrics.Keyframes,
+#if HARNESS_ADAPTIVE
+            transport = Datagrams.LastOrDefault()?.Summary(),
+            keyframeRequests = metrics.KeyframeRequests,
+            datagramOpens = Datagrams.Sum(x => x?.Opens ?? 0),
+#endif
         }));
         return 0;
     }
@@ -154,6 +163,35 @@ internal static class ResumingReceiver
             // belongs to the connection: a resumed one starts its delay floor and rate afresh, as the browser's does.
             var feedback = new ConcurrentDictionary<Guid, ReceiverFeedback>();
 #endif
+            // Media reaches the phone on the socket and (UDP=1) on this connection's data channel; one lock keeps
+            // the metrics consistent between the two.
+            var sync = new object();
+            void Process(byte[] frame)
+            {
+                var now = Environment.TickCount64;
+                lock (sync)
+                {
+                    link.Inbound(now);
+#if HARNESS_ADAPTIVE
+                    if (frame[0] == (byte)FrameType.MediaFrame && BoltCodec.TryReadMediaFrame(frame, out var media) &&
+                        media.GetPayload(frame) is { Length: >= Payload.HeaderSize } body)
+                    {
+                        var isAudio = body[8] == Payload.Audio;
+                        var tracker = feedback.GetOrAdd(media.StreamId, id => new ReceiverFeedback(id, isAudio));
+                        lock (tracker) tracker.Observe(media.SequenceNumber, media.Timestamp, frame.Length, now);
+                    }
+#endif
+                    metrics.Add(frame);
+                }
+            }
+#if HARNESS_ADAPTIVE
+            // A new connection negotiates its own data channel, as the browser's does after a resume.
+            await using var datagram = HarnessDatagram.Enabled ? new HarnessDatagram(frame => SendAsync(frame, stop.Token), Process, clock) : null;
+            datagram?.Start();
+            if (datagram is not null)
+                metrics.KeyframeNeeded = stream => _ = SendAsync(Frames.Write(w => BoltCodec.WriteMediaKeyRequest(w, stream)), stop.Token);
+            Datagrams.Add(datagram);
+#endif
             var watch = Task.Run(async () =>
             {
                 long lastHeartbeat = 0;
@@ -166,6 +204,10 @@ internal static class ResumingReceiver
                     {
                         Env.Log($"IPCHANGE t={clock.Elapsed.TotalSeconds:F2} blackholing {LocalEndPoint}");
                         network.Blackhole(LocalEndPoint);
+#if HARNESS_ADAPTIVE
+                        // The old network takes the data channel's flows with it.
+                        if (datagram is not null) HarnessDatagram.BlackholeUdp();
+#endif
                     }
 #if HARNESS_ADAPTIVE
                     foreach (var stream in feedback.Values)
@@ -212,22 +254,17 @@ internal static class ResumingReceiver
                     var message = await Frames.ReceiveAsync(socket, buffer, ct);
                     if (message is null) return null;
                     var now = Environment.TickCount64;
-                    link.Inbound(now);
+                    lock (sync) link.Inbound(now);
                     foreach (var frame in Frames.Unbatch(message))
                     {
                         if (frame[0] == (byte)FrameType.CallSignal && BoltCodec.TryReadCallSignal(frame, out var signal) &&
                             (byte)signal.SignalType == 0x0E && signal.PayloadLength == 8)
-                        { link.Echo(BinaryPrimitives.ReadInt64LittleEndian(frame.AsSpan(signal.PayloadOffset, 8)), now); continue; }
+                        { lock (sync) link.Echo(BinaryPrimitives.ReadInt64LittleEndian(frame.AsSpan(signal.PayloadOffset, 8)), now); continue; }
 #if HARNESS_ADAPTIVE
-                        if (frame[0] == (byte)FrameType.MediaFrame && BoltCodec.TryReadMediaFrame(frame, out var media) &&
-                            media.GetPayload(frame) is { Length: >= Payload.HeaderSize } body)
-                        {
-                            var isAudio = body[8] == Payload.Audio;
-                            var tracker = feedback.GetOrAdd(media.StreamId, id => new ReceiverFeedback(id, isAudio));
-                            lock (tracker) tracker.Observe(media.SequenceNumber, media.Timestamp, frame.Length, now);
-                        }
+                        if (frame[0] == (byte)FrameType.MediaTransport) { if (datagram is not null) await datagram.HandleAsync(frame); continue; }
+                        if (datagram is not null) { datagram.Accept(frame, datagram: false); continue; }
 #endif
-                        metrics.Add(frame);
+                        Process(frame);
                     }
                 }
             }
@@ -259,7 +296,10 @@ internal static class ResumingReceiver
         private readonly HashSet<uint> decodable = [];
         private readonly Queue<uint> decodableOrder = new();
         private long? lastAudioArrival;
-        public long AudioReceived, LongestAudioGapMs, PicturesDecodable, Keyframes;
+        private long lastKeyframeRequest = long.MinValue / 2;
+        public long AudioReceived, LongestAudioGapMs, PicturesDecodable, Keyframes, KeyframeRequests;
+        /// <summary>UDP=1: a picture could not be shown; ask its sender for a keyframe, as the browser's decoder does (once a second).</summary>
+        public Action<Guid>? KeyframeNeeded;
 
         public void Add(byte[] frame)
         {
@@ -293,6 +333,12 @@ internal static class ResumingReceiver
                 decodableArrivals.Add((now, BinaryPrimitives.ReadInt64LittleEndian(payload)));
                 decodable.Add(picture); decodableOrder.Enqueue(picture);
                 if (decodableOrder.Count > 4096) decodable.Remove(decodableOrder.Dequeue());
+            }
+            else if (KeyframeNeeded is { } request && now - lastKeyframeRequest >= 1000)
+            {
+                lastKeyframeRequest = now;
+                KeyframeRequests++;
+                request(header.StreamId);
             }
         }
 

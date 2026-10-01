@@ -18,6 +18,34 @@ public sealed partial class BoltMediaService
     /// <summary>Whether a transport is attached (false between <see cref="SuspendTransportAsync"/> and <see cref="AttachTransport"/>).</summary>
     public bool HasTransport => _mediaClient is not null;
 
+    private MediaTransportClient? _transport;
+
+    /// <summary>The media path changed: a data channel opened or closed, or its route changed.</summary>
+    public event Action<MediaPathStatus>? OnMediaPathChanged;
+
+    /// <summary>Where media goes now: the data channel (and its route) or the WebSocket, and why.</summary>
+    public MediaPathStatus MediaPath => _transport?.Status ?? new MediaPathStatus(MediaPathKind.WebSocket, "WebSocket",
+        Reason: _datagramSupported ? "starting" : _options.DatagramTransport ? "unsupported" : "disabled");
+
+    /// <summary>
+    /// The device's network changed (online again, Wi-Fi to cellular). An open data channel restarts ICE in
+    /// place; with none, the next attempt starts at once. The call's own resume handles a lost WebSocket.
+    /// </summary>
+    public void NetworkChanged() => _transport?.NetworkChanged();
+
+    private MediaTransportClient? CreateDatagramTransport(BoltClient client, BoltMediaClient media)
+    {
+        if (!_datagramSupported || _rtc is not { } rtc) return null;
+        var transport = new MediaTransportClient(client, rtc.CreatePeerAsync, _logger)
+        {
+            ReceiveLossPermille = media.SampleAudioReceiveLoss,
+        };
+        transport.StatusChanged += status => OnMediaPathChanged?.Invoke(status);
+        // Requests a session once the socket is registered, and keeps the path healthy from then on.
+        transport.Start();
+        return transport;
+    }
+
     /// <summary>Send one liveness probe. False when there is no transport or it would not take the frame.</summary>
     public async Task<bool> SendHeartbeatAsync(Guid callId, long stamp)
     {
@@ -37,6 +65,8 @@ public sealed partial class BoltMediaService
         EnsureInitialized();
         var client = _mediaClient;
         _mediaClient = null;
+        var datagram = _transport;
+        _transport = null;
         _activeAudioStreamId = Guid.Empty;
         _activeVideoStreamId = Guid.Empty;
         lock (_configuredCalls) _configuredCalls.Clear();
@@ -56,6 +86,11 @@ public sealed partial class BoltMediaService
         try { await Task.WhenAll(loops.Select(loop => loop.Completion)).WaitAsync(TimeSpan.FromSeconds(2)); }
         catch (TimeoutException) { /* A wedged decoder must not hold up the reconnect. */ }
 
+        if (datagram is not null)
+        {
+            try { await datagram.DisposeAsync(); }
+            catch (Exception ex) { _logger.LogDebug(ex, "Closing the lost datagram path failed"); }
+        }
         if (client is not null)
         {
             try { await client.DisposeAsync(); }

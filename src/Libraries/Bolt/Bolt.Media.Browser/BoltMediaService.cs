@@ -25,6 +25,8 @@ public sealed partial class BoltMediaService : IAsyncDisposable
     private readonly MediaServiceOptions _options;
     private readonly ILogger<BoltMediaService> _logger;
     private readonly BoltSFrameInterop? _sframe;
+    private readonly BoltRtcInterop? _rtc;
+    private bool _datagramSupported;
     private string? _sframeLocalSenderId;
 
     private BoltMediaClient? _mediaClient;
@@ -98,7 +100,8 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         BoltDeviceManager devices,
         MediaServiceOptions options,
         ILogger<BoltMediaService> logger,
-        BoltSFrameInterop? sframe = null)
+        BoltSFrameInterop? sframe = null,
+        BoltRtcInterop? rtc = null)
     {
         _crypto = crypto;
         _audio = audio;
@@ -107,6 +110,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         _options = options;
         _logger = logger;
         _sframe = sframe;
+        _rtc = rtc;
     }
 
     /// <summary>
@@ -127,6 +131,8 @@ public sealed partial class BoltMediaService : IAsyncDisposable
 
         // Initialize audio pipeline
         await _audio.InitializeAsync(_options.AudioSampleRate, _options.AudioChannels, _options.AudioBitrateKbps, OpusSettings);
+        _datagramSupported = _options.DatagramTransport && _options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame &&
+                             _rtc is not null && await _rtc.IsSupportedAsync();
 
         _mediaClient = CreateMediaClient(client);
 
@@ -175,6 +181,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         mediaClient.OnReceiverFeedback += feedback =>
             _signals.OnReceiverFeedback(feedback, feedback.StreamId == _activeVideoStreamId, Environment.TickCount64);
         mediaClient.OnHeartbeat += (_, stamp) => OnHeartbeatEcho?.Invoke(stamp);
+        _transport = CreateDatagramTransport(client, mediaClient);
         return mediaClient;
     }
 
@@ -355,12 +362,17 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         if (_pacer is not null || _mediaClient is not { } media) return;
         // The pacer is bound to this transport's client: a resumed call gets a new pacer on its new client.
         var client = media.Client;
+        // The pacer is bound to this transport's datagram path too: frames go to the data channel while it is
+        // open and fit one message, to the socket otherwise. Both backlogs count, so the pacer keeps both short.
+        var datagram = _transport;
         _signals.Clear();
         var pacer = _pacer = new MediaSendPacer(
-            (frame, ct) => client.GetPrimaryConnection().SendAsync(frame, ct),
+            (frame, audio, ct) => datagram?.TrySend(frame.Span, audio) == true
+                ? ValueTask.CompletedTask
+                : client.GetPrimaryConnection().SendAsync(frame, ct),
             () =>
             {
-                try { return client.GetPrimaryConnection().PendingBytes + _audio.TransportBufferedBytes(); }
+                try { return client.GetPrimaryConnection().PendingBytes + _audio.TransportBufferedBytes() + (datagram?.BufferedAmount ?? 0); }
                 catch (InvalidOperationException) { return 0; }
             });
         // The pacer dropped a base picture itself: every receiver is stalled until the next keyframe.
@@ -478,6 +490,13 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         await StopPipelinesAsync();
         _audio.OnEncoded -= OnAudioEncodedForStream;
         DetachVideoHandlers();
+        // The data channel (and its TURN allocation) goes with the call, not with the page.
+        if (_transport is { } datagram)
+        {
+            _transport = null;
+            try { await datagram.DisposeAsync(); }
+            catch (Exception ex) { _logger.LogDebug(ex, "Closing the datagram path failed"); }
+        }
         if (_mediaClient is not null) await _mediaClient.DisposeAsync();
         // These dependencies belong to the DI scope; it disposes each once after this service.
         _initialized = false;

@@ -44,11 +44,12 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
     public bool VideoEnabled => EncryptedGroupsEnabled && videoEnabled;
     public BoltServer Server { get; }
 
-    public YapCallGateway(IConfiguration configuration, IServiceScopeFactory scopes, ILogger<BoltServer> logger)
-        : this(configuration, scopes, logger, configuration.GetValue<bool>("Yap:Calls:EncryptedGroups")) { }
+    public YapCallGateway(IConfiguration configuration, IServiceScopeFactory scopes, ILogger<BoltServer> logger, YapCallTransport? transport = null)
+        : this(configuration, scopes, logger, configuration.GetValue<bool>("Yap:Calls:EncryptedGroups"), transport?.Options) { }
 
     // Kept explicit for disposable fixtures; production uses the default-false configuration gate.
-    internal YapCallGateway(IConfiguration configuration, IServiceScopeFactory scopes, ILogger<BoltServer> logger, bool enableGroupLifecycle)
+    internal YapCallGateway(IConfiguration configuration, IServiceScopeFactory scopes, ILogger<BoltServer> logger, bool enableGroupLifecycle,
+        BoltMediaTransportOptions? mediaTransport = null)
     {
         this.scopes = scopes;
         pushLogger = logger;
@@ -82,7 +83,10 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
             // How long a seat survives while its periodic re-check cannot be answered (backend outage).
             GroupAuthorizationGraceSeconds = Math.Clamp(configuration.GetValue("Yap:Calls:AuthorizationGraceSeconds", 120), 0, 600),
             // A connection lives as long as the call may; the relay re-authorizes every participant every 5 s.
-            MaxConnectionsPerPrincipal = 2, MaxConnectionLifetimeSeconds = (int)MaxCallDuration.TotalSeconds
+            MaxConnectionsPerPrincipal = 2, MaxConnectionLifetimeSeconds = (int)MaxCallDuration.TotalSeconds,
+            // UDP media (a WebRTC data channel through TURN) for encrypted group calls, when TURN is configured.
+            // Signalling rides the participant's authenticated socket; the socket stays the fallback.
+            MediaTransport = enableGroupLifecycle ? mediaTransport : null,
         });
         Server.GroupParticipantDeparted += GroupParticipantDeparted;
         cleanup = new Timer(_ => Prune(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
@@ -411,13 +415,21 @@ public sealed partial class YapCallGateway : IBoltCallAuthorizer, IBoltGroupCall
 
 public static class YapCallEndpoints
 {
-    public static IServiceCollection AddYapCalls(this IServiceCollection services) => services.AddSingleton<YapCallGateway>();
+    public static IServiceCollection AddYapCalls(this IServiceCollection services)
+    {
+        // Cloudflare's TURN API: one short request per participant session; never retried on the media path.
+        services.AddHttpClient(YapTurnCredentials.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(8));
+        services.AddSingleton<YapCallTransport>();
+        return services.AddSingleton<YapCallGateway>();
+    }
     public static void MapYapCalls(this WebApplication app)
     {
         var api = app.MapGroup("/api/chat/calls").RequireAuthorization().AddEndpointFilter<YapApiFilter>();
         api.MapGet("/config", (YapCallGateway gateway) => new { enabled = gateway.Enabled,
             securityMode = gateway.EncryptedGroupsEnabled ? "EndToEndEncrypted" : "TrustedServerTls", groupCalls = gateway.EncryptedGroupsEnabled,
             video = gateway.VideoEnabled, maxVideoSenders = YapCallGateway.MaxVideoSenders,
+            // Whether this relay offers UDP media paths; the client asks over its call socket either way.
+            datagram = gateway.Server.DatagramTransportEnabled,
             reconnectGraceSeconds = (int)gateway.ReconnectGrace.TotalSeconds });
         api.MapPost("/", (StartYapCall request, HttpContext context, YapCallGateway gateway, CancellationToken ct) => gateway.StartAsync(context.User, request, ct));
         api.MapPost("/{id:guid}/connect", (Guid id, HttpContext context, YapCallGateway gateway, CancellationToken ct) => gateway.ConnectAsync(context.User, id, ct));

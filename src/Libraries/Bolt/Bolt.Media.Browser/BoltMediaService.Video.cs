@@ -33,7 +33,12 @@ public sealed partial class BoltMediaService
     public async ValueTask<VideoDiagnostics?> GetVideoDiagnosticsAsync(bool enabled)
     {
         var snapshot = await _video.DiagnosticsAsync(enabled);
-        return snapshot is null ? null : snapshot with { SendQueue = _videoSend?.Reader.Count ?? 0 };
+        var path = MediaPath;
+        return snapshot is null ? null : snapshot with
+        {
+            SendQueue = _videoSend?.Reader.Count ?? 0,
+            Transport = path.Description, TransportReason = path.Reason, TransportRttMs = path.RttMs, AudioRedundancy = path.AudioRedundancy,
+        };
     }
 
     public bool IsCameraOn => _video.IsCapturing;
@@ -224,7 +229,7 @@ public sealed partial class BoltMediaService
         if (_activeVideoStreamId == Guid.Empty) return;
         if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame && _sframe?.IsReady != true) return;
         if (_pacer is { } pacer && !pacer.WouldAccept(isKeyframe, layer)) return;
-        if (data.Length == 0 || VideoFrameFragments.FragmentCount(data.Length) > VideoFrameFragments.MaxFragments) { VideoDropped(layer); return; }
+        if (data.Length == 0 || data.Length > VideoFrameFragments.MaxPictureBytes) { VideoDropped(layer); return; }
         var channel = _videoSend;
         if (channel is null) return;
         // A whole picture is queued or dropped as one: half a picture on the wire is wasted bandwidth.
@@ -245,8 +250,10 @@ public sealed partial class BoltMediaService
             {
                 var stream = _mediaClient?.GetMediaStream(_activeVideoStreamId);
                 if (stream is null) continue;
-                // Fragment only accepted pictures: dropped pictures allocate no fragment arrays.
-                var fragments = VideoFrameFragments.Split(picture.Data, picture.FrameId, picture.TimestampMicroseconds, picture.IsKeyframe, picture.Layer);
+                // Fragment only accepted pictures: dropped pictures allocate no fragment arrays. On a datagram path
+                // every fragment must fit one message after encryption; anything bigger rides the WebSocket.
+                var fragments = VideoFrameFragments.Split(picture.Data, picture.FrameId, picture.TimestampMicroseconds, picture.IsKeyframe,
+                    picture.Layer, VideoFragmentPayload(stream, picture.Data.Length));
                 try
                 {
                     var sent = await stream.SendPictureAsync(fragments, picture.IsKeyframe,
@@ -258,6 +265,25 @@ public sealed partial class BoltMediaService
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { _logger.LogWarning(ex, "Video send loop ended"); }
+    }
+
+    /// <summary>
+    /// Fragment payload for the current path. Over the WebSocket, the SFrame bound (4 KB). Over a data channel,
+    /// whatever leaves one message for the Bolt header and the SFrame ciphertext overhead this stream's
+    /// encryption actually adds, plus room for its context to grow; a picture that would need more fragments
+    /// than the header can count goes out at the WebSocket size (and so on the WebSocket). The SFrame
+    /// operation itself is unchanged: smaller plaintexts, same keys, same AAD, same replay checks.
+    /// </summary>
+    private int VideoFragmentPayload(BoltMediaStream stream, int pictureBytes)
+    {
+        var message = _transport?.MaxMessageBytes ?? 0;
+        if (message <= 0) return VideoFrameFragments.MaxPayload;
+        var overhead = BoltCodec.MediaFrameHeaderSize + (stream.EncryptionOverhead > 0 ? stream.EncryptionOverhead : VideoFrameFragments.DefaultEncryptionOverhead) +
+                       VideoFrameFragments.ContextSlack + VideoFrameFragments.HeaderSize;
+        var payload = message - overhead;
+        if (payload < VideoFrameFragments.MinPayload || VideoFrameFragments.FragmentCount(pictureBytes, payload) > VideoFrameFragments.MaxFragments)
+            return VideoFrameFragments.MaxPayload;
+        return payload;
     }
 
     // ── Receive path ──

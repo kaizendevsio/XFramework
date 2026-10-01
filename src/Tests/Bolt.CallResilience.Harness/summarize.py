@@ -18,6 +18,28 @@ def ms(value):
     return "-" if value is None else f"{value} ms"
 
 
+def datagram(receiver):
+    transport = receiver.get("transport") or {}
+    # The plain receiver nests the channel's summary beside its keyframe requests; the resuming one does not.
+    return transport.get("datagram", transport) if isinstance(transport, dict) else {}
+
+
+def path(receiver):
+    return datagram(receiver).get("path", "WebSocket")
+
+
+# Phase 3 pairs: a UDP run and its WebSocket twin with identical settings (or the closest earlier row).
+PAIRS = [
+    ("udp-512k-1000ms-1pct", "ws-512k-1000ms-1pct"),
+    ("udp-512k-1000ms-3pct", "ws-512k-1000ms-3pct"),
+    ("udp-512k-1000ms-from720p", "after-512k-1000ms-from720p"),
+    ("udp-512k-500ms-1pct", "ws-512k-500ms-1pct"),
+    ("udp-4g-2mbit", "after-4g-2mbit"),
+    ("udp-4g-outage-2s", "after-4g-outage-2s"),
+    ("udp-512k-1000ms-1pct-sframe278", "ws-512k-1000ms-1pct-sframe278"),
+]
+
+
 def main(directory):
     root = pathlib.Path(directory)
     names = sorted({p.name.split(".")[0] for p in root.rglob("*.relay.log")})
@@ -28,9 +50,9 @@ def main(directory):
         runs.append((name, relay, receiver))
 
     rows = [
-        "| run | outcome | audio one-way ms p50 / p90 / p99 / max | after 20 s: p50 / p99 / max | audio delivered | "
+        "| run | path | outcome | audio one-way ms p50 / p90 / p99 / max | after 20 s: p50 / p99 / max | audio delivered | "
         "longest audio gap | decodable pictures | video frozen s | keyframes | relay drops (audio / video) |",
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     rate_rows = [
         "| run | settled video kbps (median) | settled estimate kbps | final picture | converged at | "
@@ -43,7 +65,7 @@ def main(directory):
         counters = relay.get("counters", {})
         drops = f"{counters.get('media.relay_drops[audio]', 0)} / {counters.get('media.relay_drops[video]', 0)}"
         rows.append(
-            f"| {name} | {relay.get('outcome', 'no summary')} | "
+            f"| {name} | {path(receiver)} | {relay.get('outcome', 'no summary')} | "
             f"{delay.get('p50', '-')} / {delay.get('p90', '-')} / {delay.get('p99', '-')} / {delay.get('max', '-')} | "
             f"{settled.get('p50', '-')} / {settled.get('p99', '-')} / {settled.get('max', '-')} | "
             f"{receiver.get('audioDelivered', '-')}% | {receiver.get('longestAudioGapMs', '-')} ms | "
@@ -60,6 +82,48 @@ def main(directory):
                 f"{rate.get('suspendedSeconds', '-')} | {rate.get('rungTimeline', '')} |"
             )
     print("\n".join(rows))
+
+    # Phase 3: UDP against WebSocket, same link, same sender.
+    by_name = {name: (relay, receiver) for name, relay, receiver in runs}
+    compare = [
+        "",
+        "UDP (data channel through TURN) against the WebSocket, same link and sender. Audio delay is one way, "
+        "after the first 20 s; \"video\" is the settled picture and how long video was frozen or suspended.",
+        "",
+        "| link | path | audio p50 / p99 ms | audio delivered | longest gap | video | frozen / suspended s | recovered after |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for udp, ws in PAIRS:
+        for name in (udp, ws):
+            if name not in by_name:
+                continue
+            relay, receiver = by_name[name]
+            settled = receiver.get("audioDelayAfter20sMs", {})
+            rate = relay.get("rate") or {}
+            compare.append(
+                f"| {name} | {path(receiver)} | {settled.get('p50', '-')} / {settled.get('p99', '-')} | "
+                f"{receiver.get('audioDelivered', '-')}% | {receiver.get('longestAudioGapMs', '-')} ms | "
+                f"{rate.get('finalRung', '-')} ({rate.get('settledVideoKbpsMedian', '-')} kbps) | "
+                f"{receiver.get('frozenSeconds', '-')} / {rate.get('suspendedSeconds', '-')} | {ms(receiver.get('recoverAfterMs'))} |"
+            )
+    if len(compare) > 5:
+        print("\n".join(compare))
+
+    transports = [(name, relay, receiver) for name, relay, receiver in runs if datagram(receiver)]
+    if transports:
+        rows = ["", "Datagram path per UDP run:", "",
+                "| run | final path | opened at | opens / failures / ICE restarts | frames on the channel / on the socket | "
+                "relay: sent on channel / fell back / redundant audio | timeline |",
+                "|---|---|---|---|---|---|---|"]
+        for name, relay, receiver in transports:
+            t = datagram(receiver)
+            d = relay.get("datagram") or {}
+            rows.append(
+                f"| {name} | {t.get('path')} | {t.get('openedAtS', '-')} s | {t.get('opens')} / {t.get('failures')} / {t.get('iceRestarts')} | "
+                f"{t.get('datagramFrames')} / {t.get('socketMediaFrames')} | "
+                f"{d.get('sent', '-')} / {d.get('fellBackToSocket', '-')} / {d.get('redundantAudio', '-')} | {t.get('timeline', '')[:300]} |"
+            )
+        print("\n".join(rows))
     if len(rate_rows) > 2:
         print("\nAdaptive sender (runs with ADAPTIVE=1):\n")
         print("\n".join(rate_rows))

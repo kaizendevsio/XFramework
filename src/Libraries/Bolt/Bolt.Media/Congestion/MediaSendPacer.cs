@@ -65,7 +65,7 @@ public sealed class MediaSendPacer : IAsyncDisposable
 {
     private const int MaxLayer = 3;
 
-    private readonly Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> _send;
+    private readonly Func<ReadOnlyMemory<byte>, bool, CancellationToken, ValueTask> _send;
     private readonly Func<long> _backlog;
     private readonly Func<long> _clock;
     private readonly MediaSendPacerOptions _options;
@@ -96,6 +96,16 @@ public sealed class MediaSendPacer : IAsyncDisposable
 
     public MediaSendPacer(
         Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> send,
+        Func<long>? transportBacklogBytes = null,
+        MediaSendPacerOptions? options = null,
+        Func<long>? clock = null)
+        : this((frame, _, ct) => send(frame, ct), transportBacklogBytes, options, clock)
+    {
+    }
+
+    /// <param name="send">Hands one frame to the transport; the flag says it is audio (a datagram path may add redundancy to audio).</param>
+    public MediaSendPacer(
+        Func<ReadOnlyMemory<byte>, bool, CancellationToken, ValueTask> send,
         Func<long>? transportBacklogBytes = null,
         MediaSendPacerOptions? options = null,
         Func<long>? clock = null)
@@ -354,7 +364,7 @@ public sealed class MediaSendPacer : IAsyncDisposable
                     continue;
                 }
                 if (!TryTake(out var frame, out var audio)) continue;
-                try { await _send(frame, ct); }
+                try { await _send(frame, audio, ct); }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
                 catch { lock (_sync) { if (audio) _droppedAudio++; } continue; }
                 lock (_sync)

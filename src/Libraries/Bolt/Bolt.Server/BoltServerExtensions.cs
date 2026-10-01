@@ -41,6 +41,12 @@ public class BoltServerOptions
     /// </summary>
     public int TransportSendStallTimeoutMs { get; set; } = 0;
 
+    /// <summary>
+    /// Optional datagram media paths (WebRTC data channels through TURN) for participants of authenticated
+    /// calls. Null keeps every participant on its WebSocket. See <see cref="BoltMediaTransportOptions"/>.
+    /// </summary>
+    public BoltMediaTransportOptions? MediaTransport { get; set; }
+
     /// <summary>Per-receiver media lanes used when <see cref="MediaEnabled"/> is set.</summary>
     public BoltMediaSendQueueOptions MediaSendQueue { get; } = new();
 

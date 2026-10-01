@@ -11,6 +11,9 @@
 #                          "resume-retired" also needs the relay to have retired the receiver first;
 #                          "end-clean" needs the held seat to expire (after the grace) and the receiver to give up
 #   ENV=VALUE              harness settings passed to the relay (SECONDS, VIDEO_KBPS, FPS, AUDIO_PAYLOAD, KF_MS, ...)
+#                          UDP=1 adds a TURN server (coturn) to the run's network and lets the receiver move its
+#                          media onto a WebRTC data channel through it; UDP_BLOCK=1 also drops the receiver's UDP
+#                          to that server, as on a network that blocks UDP (the call must stay on its WebSocket).
 #
 # NETEM_STEPS (environment, optional) changes the downlink mid-call, e.g. a bandwidth step down and back up:
 #   NETEM_STEPS="60=delay 50ms 10ms rate 512kbit|120=delay 50ms 10ms rate 4mbit"
@@ -19,27 +22,46 @@ name=$1 image=$2 relaynet=$3 recvnet=$4 outage_at=$5 outage_for=$6 expect=$7
 shift 7
 envs=()
 seconds=180
+udp=0 udp_block=0
 for setting in "$@"; do
   envs+=(-e "$setting")
-  case $setting in SECONDS=*) seconds=${setting#SECONDS=} ;; esac
+  case $setting in
+    SECONDS=*) seconds=${setting#SECONDS=} ;;
+    UDP=1) udp=1 ;;
+    UDP_BLOCK=1) udp_block=1 ;;
+  esac
 done
 
-net="callnet-$name" relay="relay-$name" receiver="receiver-$name"
+net="callnet-$name" relay="relay-$name" receiver="receiver-$name" turn="turn-$name"
+turn_image=${TURN_IMAGE:-coturn/coturn:4.18.0-debian@sha256:bbefd3e1fdfdc0d58770fe01b581fd8b00d9f3a5580d00acb77cf719a6bc78e3}
 logs=${LOG_DIR:-logs}
 mkdir -p "$logs"
 cleanup() {
   docker logs "$relay" >"$logs/$name.relay.log" 2>&1 || true
   docker logs "$receiver" >"$logs/$name.receiver.log" 2>&1 || true
-  docker rm -f "$relay" "$receiver" >/dev/null 2>&1 || true
+  if [ "$udp" = 1 ]; then docker logs "$turn" >"$logs/$name.turn.log" 2>&1 || true; fi
+  docker rm -f "$relay" "$receiver" "$turn" >/dev/null 2>&1 || true
   docker network rm "$net" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
 docker network create "$net" >/dev/null
+receiver_prefix=""
+if [ "$udp" = 1 ]; then
+  # TURN for both sides, as Cloudflare is for Yap: the relay allocates over UDP (relay-only), the receiver may use any
+  # candidate to reach it. Credentials are TURN REST ones derived from a shared secret, short-lived like Cloudflare's.
+  docker run -d --name "$turn" --network "$net" --network-alias turn "$turn_image" \
+    -n --log-file=stdout --listening-port=3478 --use-auth-secret --static-auth-secret=harness-turn-secret \
+    --realm=harness --fingerprint --no-tls --min-port=49160 --max-port=49760 >/dev/null
+  envs+=(-e "TURN_URL=turn:turn:3478?transport=udp" -e "TURN_SECRET=harness-turn-secret")
+  if [ "$udp_block" = 1 ]; then
+    receiver_prefix='iptables -I OUTPUT -p udp -d "$(getent hosts turn | cut -d" " -f1)" -j DROP && '
+  fi
+fi
 docker run -d --name "$relay" --network "$net" --network-alias relay --cap-add NET_ADMIN "${envs[@]}" "$image" \
   sh -c "tc qdisc add dev eth0 root netem $relaynet && exec dotnet Bolt.CallResilience.Harness.dll relay" >/dev/null
 docker run -d --name "$receiver" --network "$net" --cap-add NET_ADMIN "${envs[@]}" -e "SECONDS=$seconds" "$image" \
-  sh -c "tc qdisc add dev eth0 root netem $recvnet && exec dotnet Bolt.CallResilience.Harness.dll receiver" >/dev/null
+  sh -c "tc qdisc add dev eth0 root netem $recvnet && ${receiver_prefix}exec dotnet Bolt.CallResilience.Harness.dll receiver" >/dev/null
 
 waitfor() { # container pattern timeout
   local deadline=$((SECONDS + $3))

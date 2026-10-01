@@ -104,8 +104,11 @@ internal readonly record struct BoltMediaEnqueueResult(bool Queued, bool Request
 /// </summary>
 internal sealed class BoltMediaSendQueue
 {
-    internal readonly struct Item(byte[] buffer, int length, long enqueuedAt, Guid streamId, byte layer = 0, uint picture = 0)
+    internal readonly struct Item(byte[] buffer, int length, long enqueuedAt, Guid streamId, byte layer = 0, uint picture = 0,
+        BoltMediaLane lane = BoltMediaLane.Video)
     {
+        /// <summary>The lane the frame waited in; a datagram path adds redundancy to audio only.</summary>
+        public BoltMediaLane Lane { get; } = lane;
         public byte[] Buffer { get; } = buffer;
         public int Length { get; } = length;
         public long EnqueuedAt { get; } = enqueuedAt;
@@ -217,19 +220,23 @@ internal sealed class BoltMediaSendQueue
                         Release(_feedback.Dequeue());
                         DroppedFeedback();
                     }
-                    _feedback.Enqueue(Copy(frame, now, streamId));
+                    _feedback.Enqueue(Copy(frame, now, streamId, lane: BoltMediaLane.Feedback));
                     return BoltMediaEnqueueResult.Accepted;
 
                 case BoltMediaLane.Audio:
                 {
                     var state = State(streamId, awaitKeyframe: false);
-                    if (Order(state, sequence) == SequenceOrder.Stale)
+                    var order = Order(state, sequence);
+                    // A datagram path may reorder a few packets (and redundancy repeats the previous one, which
+                    // the route has already deduplicated): a slightly late voice frame is still worth playing.
+                    var reordered = order == SequenceOrder.Stale && unchecked(state.LastSequence - sequence) is > 0 and <= AudioReorderWindow;
+                    if (order == SequenceOrder.Stale && !reordered)
                     {
                         _staleFrames++;
                         return BoltMediaEnqueueResult.Dropped;
                     }
 
-                    Remember(state, sequence);
+                    if (!reordered) Remember(state, sequence);
                     if (frame.Length > _options.AudioMaxQueuedBytes)
                     {
                         DroppedAudio();
@@ -247,7 +254,7 @@ internal sealed class BoltMediaSendQueue
                         DroppedAudio();
                     }
 
-                    _audio.Enqueue(Copy(frame, now, streamId));
+                    _audio.Enqueue(Copy(frame, now, streamId, lane: BoltMediaLane.Audio));
                     _audioBytes += frame.Length;
                     _offeredBytes += frame.Length;
                     state.OfferedBytes += frame.Length;
@@ -563,6 +570,9 @@ internal sealed class BoltMediaSendQueue
     /// <summary>Retransmission buffers hold a few hundred frames; anything further back is a restart.</summary>
     private const uint StaleWindow = 1024;
 
+    /// <summary>How far behind the newest an audio frame may arrive and still be forwarded (about 160 ms of voice).</summary>
+    internal const uint AudioReorderWindow = 8;
+
     // Sequence numbers are per stream. Over one TCP connection they only go backwards for a
     // retransmission (NACK), which for a relay-dropped frame is always too late to be useful.
     private static SequenceOrder Order(StreamState state, uint sequence)
@@ -627,10 +637,11 @@ internal sealed class BoltMediaSendQueue
         _videoBytes += frame.Length;
     }
 
-    private static Item Copy(ReadOnlySpan<byte> frame, long now, Guid streamId, byte layer = 0, uint picture = 0)
+    private static Item Copy(ReadOnlySpan<byte> frame, long now, Guid streamId, byte layer = 0, uint picture = 0,
+        BoltMediaLane lane = BoltMediaLane.Video)
     {
         var buffer = ArrayPool<byte>.Shared.Rent(Math.Max(1, frame.Length));
         frame.CopyTo(buffer);
-        return new Item(buffer, frame.Length, now, streamId, layer, picture);
+        return new Item(buffer, frame.Length, now, streamId, layer, picture, lane);
     }
 }

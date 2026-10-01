@@ -203,6 +203,25 @@ public sealed class BoltMediaClient : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Loss, in thousandths, of remote audio since the previous call: sequence numbers the relay forwarded that
+    /// never arrived. Reported to the relay over a datagram path, which then adds redundancy to this
+    /// participant's audio. Relay drops count too, but the relay only adds redundancy while its own queue for
+    /// this participant is nearly empty, so congestion never feeds more bytes into a congested link.
+    /// </summary>
+    public int SampleAudioReceiveLoss()
+    {
+        long expected = 0, received = 0;
+        foreach (var stream in _mediaStreams.Values)
+        {
+            if (!stream.IsAudio) continue;
+            var (e, r) = stream.ReceivedSequences.Sample();
+            expected += e;
+            received += r;
+        }
+        return LossMath.Permille(expected, received);
+    }
+
     public BoltMediaStream? GetMediaStream(Guid streamId)
         => _mediaStreams.TryGetValue(streamId, out var stream) ? stream : null;
 
@@ -289,6 +308,9 @@ public sealed class BoltMediaClient : IAsyncDisposable
         if (AuthenticatedStreamEncryptionFactory is not null && header.PayloadLength > 5155) return;
         if (_mediaStreams.TryGetValue(header.StreamId, out var stream))
         {
+            // The second copy of a frame (datagram redundancy, or a frame racing on both paths) is dropped
+            // here, before it costs a decrypt that its replay check would refuse anyway.
+            if (!stream.ReceivedSequences.TryMark(header.SequenceNumber)) return;
             var payload = header.GetPayload(buffer.AsSpan(0, length)).ToArray();
             stream.QueueReceivedFrame(header.SequenceNumber, header.Timestamp, payload, header.Flags);
 

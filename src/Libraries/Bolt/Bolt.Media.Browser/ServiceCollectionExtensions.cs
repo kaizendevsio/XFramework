@@ -15,6 +15,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<BoltAudioPipeline>();
         services.AddScoped<BoltVideoPipeline>();
         services.AddScoped<BoltDeviceManager>();
+        services.AddScoped<BoltRtcInterop>();
         services.AddScoped<BoltMediaService>();
 
         return services;

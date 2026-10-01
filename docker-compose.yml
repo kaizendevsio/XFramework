@@ -763,6 +763,10 @@ services:
       ServiceIdentity__DefaultScopes__8: tenant.target
       # Only used to ring a closed device for an incoming call; message push is fanned out by Communications.
       ServiceIdentity__DefaultScopes__9: notifications.send
+      # UDP call media through Cloudflare Realtime TURN (WebRTC data channels). Both empty keeps every call on its
+      # WebSocket. The API token stays in this container: participants only ever get short-lived TURN credentials.
+      Yap__Calls__Turn__CloudflareKeyId: ${YAP_CALLS_TURN_CLOUDFLARE_KEY_ID:-}
+      Yap__Calls__Turn__CloudflareApiToken: ${YAP_CALLS_TURN_CLOUDFLARE_API_TOKEN:-}
     ports:
       - "127.0.0.1:5188:8080"
     volumes:

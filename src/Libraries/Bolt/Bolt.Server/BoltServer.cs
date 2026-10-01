@@ -244,6 +244,8 @@ public sealed partial class BoltServer : IDisposable
             ? TimeSpan.FromSeconds(options.MaxConnectionLifetimeSeconds)
             : Timeout.InfiniteTimeSpan;
         _mediaEnabled = options.MediaEnabled;
+        _mediaTransport = options.MediaEnabled && options.AuthenticatedMediaOnly ? options.MediaTransport : null;
+        StartMediaTransportTimer();
         _callAuthorizer = options.CallAuthorizer;
         _groupCallAuthorizer = options.GroupCallAuthorizer;
         if (_groupCallAuthorizer is not null && (!options.AuthenticatedMediaOnly || !options.RequireSecureTransport))
@@ -738,6 +740,10 @@ public sealed partial class BoltServer : IDisposable
             case FrameType.MediaCongestion:
                 // Only the relay originates congestion reports; a participant cannot forge one for another.
                 break;
+            case FrameType.MediaTransport:
+                // Datagram path signalling for this connection only, handled off the receive loop.
+                EnqueueMediaTransport(connection, buffer, length);
+                break;
 
             default:
                 _logger.LogWarning("Unknown frame type {FrameType} from {ClientId}", frameType, connection.ClientId);
@@ -1066,7 +1072,8 @@ public sealed partial class BoltServer : IDisposable
             FrameType.MediaFeedback or
             FrameType.MediaKeyRequest or
             FrameType.NackRequest or
-            FrameType.CallSignal;
+            FrameType.CallSignal or
+            FrameType.MediaTransport;
 
     private async Task HandleResponseAsync(BoltHubConnection responder, byte[] buffer, int length, CancellationToken ct)
     {
@@ -2070,7 +2077,16 @@ public sealed partial class BoltServer : IDisposable
         if (!IsCallParticipant(owningCall, sender) || !_activeMediaStreams.TryGetValue(streamId, out var currentRoute) || !ReferenceEquals(route, currentRoute))
             return;
 
-        FanOutMediaFrame(route, owningCall, sender, streamId, buffer, length);
+        // A frame can reach the relay twice (audio redundancy on a datagram path, or the switch between the
+        // WebSocket and a data channel): the second copy is dropped here, before any receiver sees it.
+        if (route.MediaType == MediaType.Audio && (FrameType)buffer[0] == FrameType.MediaFrame &&
+            BoltCodec.TryReadMediaFrame(buffer.AsSpan(0, length), out var audioHeader) &&
+            !route.AudioSequences.TryMark(audioHeader.SequenceNumber))
+            return;
+
+        // One participant may deliver over its WebSocket and its data channel at once; fan-out per sender stays serial.
+        lock (sender.MediaIngressSync)
+            FanOutMediaFrame(route, owningCall, sender, streamId, buffer, length);
 
         // Tap: send a copy to media processors (non-blocking, drops if full)
         if (!_requireEncryptedMedia && _mediaProcessors.Count > 0)
@@ -2320,6 +2336,8 @@ public sealed partial class BoltServer : IDisposable
 
             AddMediaStream(callState, config.StreamId);
             if (callState.HostManagedGroup) route.Configuration = buffer.AsSpan(0, length).ToArray();
+            // A (re)published stream starts its sequence afresh.
+            route.AudioSequences.Reset();
             route.AddRecipients(GetParticipantSnapshot(callState));
             recipients = route.GetRecipientSnapshot();
         }
@@ -4228,6 +4246,7 @@ public sealed partial class BoltServer : IDisposable
 
     private async Task RemoveConnectionAsync(BoltHubConnection connection)
     {
+        await CloseMediaTransportAsync(connection);
         using var notificationCts = new CancellationTokenSource(_transportCloseTimeout);
         var peerNotifications = new List<Task>();
 
@@ -4749,6 +4768,9 @@ public sealed partial class BoltServer : IDisposable
             return;
 
         _shutdownCts.Cancel();
+        _mediaTransportTimer?.Dispose();
+        foreach (var transport in _mediaTransports.Values)
+            _ = CloseMediaTransportAsync(transport.Connection);
         _mediaTapCts.Cancel();
         _mediaTapChannel.Writer.TryComplete();
         _cleanupTimer.Dispose();
@@ -5126,6 +5148,12 @@ public sealed class BoltHubConnection
     private readonly TimeSpan _transportSendTimeout;
     private readonly BoltMediaSendQueue? _media;
     private int _mediaWakePending;
+    private readonly Action _wakeMedia;
+    private IRtcPeer? _datagram;
+    // The previous audio frame sent per stream, for redundancy. Touched by the send loop only.
+    private readonly Dictionary<Guid, byte[]> _lastAudio = new();
+    private int _audioRedundancy;
+    private long _datagramSent, _datagramFallbacks, _datagramRejected, _redundantAudio;
     private readonly long _sendQueueByteCapacity;
     private readonly object _pendingByteCapacitySync = new();
     private TaskCompletionSource? _pendingByteCapacityChanged;
@@ -5187,6 +5215,98 @@ public sealed class BoltHubConnection
     /// <summary>The relay's prioritized per-receiver media queue; null when the host does not route media.</summary>
     internal BoltMediaSendQueue? MediaQueue => _media;
 
+    /// <summary>Serializes media fan-out from this sender when its frames arrive on two paths at once.</summary>
+    internal object MediaIngressSync { get; } = new();
+
+    /// <summary>The participant's open data channel, when it has one: media lanes drain into it instead of the socket.</summary>
+    internal IRtcPeer? Datagram => Volatile.Read(ref _datagram);
+
+    /// <summary>Send this receiver's audio with the previous frame alongside (its datagram path reports loss).</summary>
+    internal bool AudioRedundancy
+    {
+        get => Volatile.Read(ref _audioRedundancy) != 0;
+        set => Volatile.Write(ref _audioRedundancy, value ? 1 : 0);
+    }
+
+    /// <summary>Media frames handed to the data channel.</summary>
+    public long DatagramFramesSent => Interlocked.Read(ref _datagramSent);
+    /// <summary>Media frames that went to the socket although a data channel was attached (too big, or refused).</summary>
+    public long DatagramFallbacks => Interlocked.Read(ref _datagramFallbacks);
+    /// <summary>Datagrams from the participant that were not media and were ignored.</summary>
+    public long DatagramRejected => Interlocked.Read(ref _datagramRejected);
+    /// <summary>Audio frames sent together with their predecessor.</summary>
+    public long RedundantAudioFrames => Interlocked.Read(ref _redundantAudio);
+
+    internal void RecordDatagramRejected() => Interlocked.Increment(ref _datagramRejected);
+
+    /// <summary>Make <paramref name="peer"/> this connection's media pipe, replacing any previous one.</summary>
+    internal void AttachDatagram(IRtcPeer peer)
+    {
+        var previous = Interlocked.Exchange(ref _datagram, peer);
+        if (ReferenceEquals(previous, peer)) return;
+        if (previous is not null) previous.BufferedAmountLow -= _wakeMedia;
+        peer.BufferedAmountLow += _wakeMedia;
+        SignalMediaWork();
+    }
+
+    /// <summary>Stop using <paramref name="peer"/>; queued media continues on the socket. False when it was not attached.</summary>
+    internal bool DetachDatagram(IRtcPeer peer)
+    {
+        if (!ReferenceEquals(Interlocked.CompareExchange(ref _datagram, null, peer), peer)) return false;
+        peer.BufferedAmountLow -= _wakeMedia;
+        AudioRedundancy = false;
+        SignalMediaWork();
+        return true;
+    }
+
+    /// <summary>
+    /// How much a data channel may hold before the relay stops feeding it: the SCTP window plus a short queue.
+    /// Anything more would wait in SCTP's first-in-first-out buffer, where audio cannot overtake video and
+    /// nothing can be dropped; it waits in this receiver's lanes instead.
+    /// </summary>
+    internal static long DatagramBacklogLimit(long congestionWindow) =>
+        congestionWindow > 0 ? Math.Clamp(congestionWindow + 16 * 1024, 32 * 1024, 512 * 1024) : 64 * 1024;
+
+    /// <summary>Redundancy is only added while this receiver's lanes are nearly empty: never to a congested link.</summary>
+    private const long RedundancyQueueLimitBytes = 8 * 1024;
+
+    private bool TrySendDatagram(IRtcPeer datagram, BoltMediaSendQueue.Item item)
+    {
+        var frame = item.Memory.Span;
+        if (frame.Length > datagram.MaxMessageBytes)
+            return false;
+        if (item.Lane != BoltMediaLane.Audio || frame[0] != (byte)FrameType.MediaFrame)
+        {
+            if (!datagram.TrySend(frame)) return false;
+            Interlocked.Increment(ref _datagramSent);
+            return true;
+        }
+
+        var sent = false;
+        if (AudioRedundancy && _lastAudio.TryGetValue(item.StreamId, out var previous) &&
+            _media!.QueuedBytes <= RedundancyQueueLimitBytes)
+        {
+            var size = MediaBundleCodec.Size(previous.Length, frame.Length);
+            if (size <= datagram.MaxMessageBytes)
+            {
+                var bundle = ArrayPool<byte>.Shared.Rent(size);
+                try
+                {
+                    MediaBundleCodec.Write(bundle, previous, frame);
+                    sent = datagram.TrySend(bundle.AsSpan(0, size));
+                    if (sent) Interlocked.Increment(ref _redundantAudio);
+                }
+                finally { ArrayPool<byte>.Shared.Return(bundle); }
+            }
+        }
+        if (!sent && !datagram.TrySend(frame))
+            return false;
+        if (_lastAudio.Count >= 32 && !_lastAudio.ContainsKey(item.StreamId)) _lastAudio.Clear();
+        _lastAudio[item.StreamId] = frame.ToArray();
+        Interlocked.Increment(ref _datagramSent);
+        return true;
+    }
+
     public BoltHubConnection(
         IBoltConnection transport,
         int sendQueueCapacity = 4096,
@@ -5219,6 +5339,7 @@ public sealed class BoltHubConnection
             ? TimeSpan.FromMilliseconds(transportSendTimeoutMs)
             : _sendEnqueueTimeout;
         _media = mediaSendQueue is null ? null : new BoltMediaSendQueue(mediaSendQueue);
+        _wakeMedia = SignalMediaWork;
         _sendChannel = Channel.CreateBounded<PendingSend>(
             new BoundedChannelOptions(Math.Max(1, sendQueueCapacity))
             {
@@ -5410,8 +5531,26 @@ public sealed class BoltHubConnection
             {
                 if (_media is null)
                     return;
-                while (!_sendChannel.Reader.TryPeek(out _) && _media.TryDequeue(out var item))
+                while (!_sendChannel.Reader.TryPeek(out _))
                 {
+                    // A participant with an open data channel gets its media there, never blocking this loop:
+                    // when the channel is full the media waits in the lanes, and its next drain wakes this up.
+                    var datagram = Volatile.Read(ref _datagram);
+                    if (datagram is not { State: RtcChannelState.Open })
+                        datagram = null;
+                    if (datagram is not null && datagram.BufferedAmount >= DatagramBacklogLimit(datagram.CongestionWindow))
+                        return;
+                    if (!_media.TryDequeue(out var item))
+                        break;
+                    if (datagram is not null)
+                    {
+                        if (TrySendDatagram(datagram, item))
+                        {
+                            BoltMediaSendQueue.Release(item);
+                            continue;
+                        }
+                        Interlocked.Increment(ref _datagramFallbacks);
+                    }
                     Task? mediaSend = null;
                     try
                     {
@@ -5860,6 +5999,9 @@ internal sealed class MediaStreamRoute
 
     /// <summary>Uplink delay tracking and the periodic congestion report to <see cref="Sender"/>.</summary>
     public MediaCongestionReporter Congestion { get; } = new();
+
+    /// <summary>Audio sequence numbers seen from <see cref="Sender"/>: drops duplicates and measures uplink loss.</summary>
+    public SequenceWindow AudioSequences { get; } = new();
 
     public bool ContainsRecipient(BoltHubConnection connection)
     {

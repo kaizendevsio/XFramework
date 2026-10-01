@@ -244,6 +244,20 @@ jobs:
           docker logs storage-ci-minio
           exit 1
 
+      - name: Set up Go for the WebRTC sidecar tests
+        if: steps.scope.outputs.scope != 'yap'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: src/Libraries/Bolt/Bolt.Rtc/sidecar/go.mod
+          cache-dependency-path: src/Libraries/Bolt/Bolt.Rtc/sidecar/go.sum
+
+      - name: Test the WebRTC sidecar
+        if: steps.scope.outputs.scope != 'yap'
+        working-directory: src/Libraries/Bolt/Bolt.Rtc/sidecar
+        run: |
+          go vet ./...
+          go test -count=1 ./...
+
       - name: Test complete Bolt suite
         if: steps.scope.outputs.scope != 'yap'
         env:

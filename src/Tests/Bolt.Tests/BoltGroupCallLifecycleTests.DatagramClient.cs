@@ -1,0 +1,240 @@
+using System.Reflection;
+using System.Threading.Channels;
+using Bolt.Client;
+using Bolt.Media;
+using Bolt.Protocol;
+using Bolt.Protocol.Transport;
+using Microsoft.Extensions.Logging.Abstractions;
+using NUnit.Framework;
+
+namespace Bolt.Tests;
+
+/// <summary>
+/// Phase 3, the participant's side: <see cref="MediaTransportClient"/> against the real relay over an in-memory
+/// socket, with fake WebRTC peers. Covers selection, fallback, upgrade, ICE restart, renewal and redundancy.
+/// </summary>
+public sealed partial class BoltGroupCallLifecycleTests
+{
+    private static readonly MediaTransportClientOptions FastClient = new()
+    {
+        OpenTimeout = TimeSpan.FromMilliseconds(600), FirstRetryDelay = TimeSpan.FromMilliseconds(300),
+        MaxRetryDelay = TimeSpan.FromSeconds(1), ReportInterval = TimeSpan.FromMilliseconds(200),
+    };
+
+    private sealed class Participant : IAsyncDisposable
+    {
+        public required BoltClient Client { get; init; }
+        public required MediaTransportClient Transport { get; init; }
+        public required BridgeTransport Bridge { get; init; }
+        public async ValueTask DisposeAsync()
+        {
+            await Transport.DisposeAsync();
+            Bridge.Close();
+            await Client.DisposeAsync();
+        }
+    }
+
+    /// <summary>A participant's client whose socket is the fixture's in-memory connection for <paramref name="id"/>.</summary>
+    private static Participant Connect(Fixture f, string id, FakeRtcNetwork network, MediaTransportClientOptions? options = null)
+    {
+        var client = new BoltClient(new Uri("wss://localhost/bolt"), id, id, new BoltClientOptions(), NullLogger<BoltClient>.Instance);
+        var bridge = new BridgeTransport(f.Peers[id]);
+        var connection = new BoltConnection(bridge);
+        connection.StartSendLoop(CancellationToken.None);
+        var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        ((List<BoltConnection>)typeof(BoltClient).GetField("_connections", flags)!.GetValue(client)!).Add(connection);
+        typeof(BoltClient).GetField("_isRegistered", flags)!.SetValue(client, true);
+        connection.ReceiveLoop = (Task)typeof(BoltClient).GetMethod("ReceiveLoopAsync", flags)!.Invoke(client, [connection, CancellationToken.None])!;
+        var factory = network.Factory(RtcPeerRole.Offer);
+        var transport = new MediaTransportClient(client, (peerOptions, ct) => factory.CreateAsync(RtcPeerRole.Offer, peerOptions, ct), NullLogger.Instance, options ?? FastClient);
+        return new Participant { Client = client, Transport = transport, Bridge = bridge };
+    }
+
+    /// <summary>The participant's end of the fixture's in-memory socket.</summary>
+    private sealed class BridgeTransport : IBoltConnection
+    {
+        private readonly Channel<byte[]> _inbound = Channel.CreateUnbounded<byte[]>();
+        private readonly Peer _relaySide;
+        private bool _closed;
+
+        public BridgeTransport(Peer relaySide)
+        {
+            _relaySide = relaySide;
+            _relaySide.Forward = frame => _inbound.Writer.TryWrite(frame);
+        }
+
+        public bool SupportsDatagrams => false;
+        public bool IsConnected => !_closed;
+        public BoltTransport TransportType => BoltTransport.WebSocket;
+        public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) { _relaySide.Send(data.ToArray()); return ValueTask.CompletedTask; }
+        public async ValueTask<(int BytesRead, bool EndOfMessage)> ReceiveAsync(Memory<byte> buffer, CancellationToken ct = default)
+        {
+            try
+            {
+                var frame = await _inbound.Reader.ReadAsync(ct);
+                frame.CopyTo(buffer);
+                return (frame.Length, true);
+            }
+            catch (ChannelClosedException) { return (0, true); }
+        }
+        public ValueTask SendDatagramAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) => throw new NotSupportedException();
+        public void Close() { _closed = true; _inbound.Writer.TryComplete(); }
+        public ValueTask CloseAsync(CancellationToken ct = default) { Close(); return ValueTask.CompletedTask; }
+        public ValueTask DisposeAsync() { Close(); return ValueTask.CompletedTask; }
+    }
+
+    [Test]
+    public async Task Client_MovesMediaToTheDatagramPath_AndBackToTheSocketWhenItFails_ThenUpgradesAgain()
+    {
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var stream = await f.Config("a");
+        await using var a = Connect(f, "a", network);
+        var changes = new List<MediaPathStatus>();
+        a.Transport.StatusChanged += status => { lock (changes) changes.Add(status); };
+        var audio = Frame(w => BoltCodec.WriteMediaFrame(w, stream, 1, 960, MediaFrameFlags.Encrypted, [1, 2, 3]));
+        Assert.That(a.Transport.TrySend(audio), Is.False, "before the channel opens, the caller sends on the socket");
+
+        a.Transport.Start();
+        await WaitUntil(() => a.Transport.IsDatagramActive);
+        Assert.Multiple(() =>
+        {
+            Assert.That(a.Transport.Status.Kind, Is.EqualTo(MediaPathKind.Datagram));
+            Assert.That(a.Transport.Status.Description, Is.EqualTo("UDP/relay"));
+            Assert.That(a.Transport.MaxMessageBytes, Is.EqualTo(RtcDefaults.MaxMessageBytes));
+            Assert.That(a.Transport.TrySend(audio), Is.True);
+        });
+        await WaitUntil(() => f.Peers["b"].Media(stream).Count == 1);
+
+        // The relay's side of the channel fails (say the TURN allocation dies): media returns to the socket at once.
+        network.Created.Single(x => x.Role == RtcPeerRole.Answer).Fail();
+        await WaitUntil(() => !a.Transport.IsDatagramActive);
+        Assert.That(a.Transport.Status.Reason, Does.StartWith("relay-").Or.EqualTo("closed"));
+        Assert.That(a.Transport.TrySend(audio), Is.False);
+
+        // And after the backoff the client tries again and is back on UDP.
+        await WaitUntil(() => a.Transport.IsDatagramActive, 5000);
+        Assert.That(network.Created.Count(x => x.Role == RtcPeerRole.Answer), Is.EqualTo(2));
+        lock (changes) Assert.That(changes.Select(x => x.Kind), Does.Contain(MediaPathKind.WebSocket).And.Contain(MediaPathKind.Datagram));
+    }
+
+    [Test]
+    public async Task Client_WhenUdpIsBlocked_GivesUpOnTheChannelAndStaysOnTheSocket()
+    {
+        var network = new FakeRtcNetwork { Reachable = false };
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        await using var a = Connect(f, "a", network);
+        a.Transport.Start();
+        await WaitUntil(() => a.Transport.Status.Reason == "timeout", 4000);
+        Assert.Multiple(() =>
+        {
+            Assert.That(a.Transport.IsDatagramActive, Is.False);
+            Assert.That(a.Transport.Status.Kind, Is.Not.EqualTo(MediaPathKind.Datagram));
+            Assert.That(f.Tasks["a"].IsCompleted, Is.False, "the call's socket is untouched");
+        });
+        // The relay is told, and closes its half.
+        await WaitUntil(() => network.Created.Where(x => x.Role == RtcPeerRole.Answer).All(x => x.Disposed) &&
+                              network.Created.Any(x => x.Role == RtcPeerRole.Answer));
+    }
+
+    [Test]
+    public async Task Client_ARelayWithoutTurn_IsAskedOnce()
+    {
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync();
+        await using var a = Connect(f, "a", network);
+        a.Transport.Start();
+        await WaitUntil(() => a.Transport.Status.Reason == "disabled");
+        await Task.Delay(1000);
+        Assert.Multiple(() =>
+        {
+            Assert.That(f.Peers["a"].Sent.Count(x => MediaTransportCodec.TryRead(x, out var k, out _) && k == MediaTransportKind.Config), Is.EqualTo(1));
+            Assert.That(network.Created, Is.Empty, "no peer is ever created");
+        });
+    }
+
+    [Test]
+    public async Task Client_NetworkChange_RestartsIceOnTheOpenChannel()
+    {
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        await using var a = Connect(f, "a", network);
+        a.Transport.Start();
+        await WaitUntil(() => a.Transport.IsDatagramActive);
+        a.Transport.NetworkChanged();
+        var participant = network.Created.Single(x => x.Role == RtcPeerRole.Offer);
+        await WaitUntil(() => participant.IceRestarts == 1);
+        await AwaitTransport<MediaTransportDescription>(f.Peers["a"], MediaTransportKind.Answer, x => x.IceRestart);
+        Assert.That(a.Transport.IsDatagramActive, Is.True, "the channel stays up through the restart");
+    }
+
+    [Test]
+    public async Task Client_RenewedCredentials_OpenABesideTheCurrentChannel_ThenReplaceIt()
+    {
+        var network = new FakeRtcNetwork();
+        var ice = new FakeIceSource { Lifetime = TimeSpan.FromMinutes(2) };
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, ice));
+        await using var a = Connect(f, "a", network);
+        a.Transport.Start();
+        await WaitUntil(() => a.Transport.IsDatagramActive);
+        var first = a.Transport.ActivePeer;
+        await WaitUntil(() => a.Transport.ActivePeer is { } peer && !ReferenceEquals(peer, first), 5000);
+        await WaitUntil(() => ((FakeRtcPeer)first!).Disposed);
+        Assert.That(network.Created.Where(x => x.Role == RtcPeerRole.Answer).Count(x => !x.Disposed), Is.EqualTo(1),
+            "the relay keeps exactly the renewed peer");
+    }
+
+    [Test]
+    public async Task Client_RelayReportedLoss_AddsRedundancyToItsAudio()
+    {
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var stream = await f.Config("a");
+        await using var a = Connect(f, "a", network);
+        a.Transport.Start();
+        await WaitUntil(() => a.Transport.IsDatagramActive);
+        byte[] Audio(uint sequence) => Frame(w => BoltCodec.WriteMediaFrame(w, stream, sequence, 960 * sequence, MediaFrameFlags.Encrypted, [1, 2, 3]));
+        // Every third datagram is lost on the way up; the relay measures that and tells the participant.
+        network.DropEvery = 3;
+        for (uint sequence = 1; sequence <= 30; sequence++) a.Transport.TrySend(Audio(sequence), audio: true);
+        await WaitUntil(() => a.Transport.AudioRedundancy, 4000);
+        network.DropEvery = 0;
+        var participant = (FakeRtcPeer)a.Transport.ActivePeer!;
+        a.Transport.TrySend(Audio(31), audio: true);
+        a.Transport.TrySend(Audio(32), audio: true);
+        Assert.That(participant.Sent.Last()[0], Is.EqualTo((byte)FrameType.MediaBundle), "the previous frame rides along");
+        await WaitUntil(() => f.Peers["b"].Media(stream).Any(x => x.Sequence == 32));
+        Assert.That(f.Peers["b"].Media(stream).GroupBy(x => x.Sequence).All(x => x.Count() == 1), Is.True, "every frame reaches b once");
+        Assert.That(a.Transport.Status.AudioRedundancy, Is.True);
+    }
+
+    [Test]
+    public async Task Client_DatagramMessages_ReachTheMediaHandlers_ButOnlyMediaDoes()
+    {
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync();
+        await using var a = Connect(f, "a", network);
+        var seen = new List<FrameType>();
+        a.Client.RegisterFrameHandler(FrameType.MediaFrame, (_, buffer, _) => seen.Add((FrameType)buffer[0]));
+        a.Client.RegisterFrameHandler(FrameType.CallSignal, (_, buffer, _) => seen.Add((FrameType)buffer[0]));
+        a.Client.RegisterFrameHandler(FrameType.MediaConfig, (_, buffer, _) => seen.Add((FrameType)buffer[0]));
+        var media = Frame(w => BoltCodec.WriteMediaFrame(w, Guid.NewGuid(), 1, 960, 0, [1]));
+        var bundle = new byte[MediaBundleCodec.Size(media.Length, media.Length)];
+        MediaBundleCodec.Write(bundle, media, media);
+        Assert.Multiple(() =>
+        {
+            Assert.That(a.Client.DispatchDatagram(media), Is.EqualTo(1));
+            Assert.That(a.Client.DispatchDatagram(bundle), Is.EqualTo(2));
+            Assert.That(a.Client.DispatchDatagram(Frame(w => BoltCodec.WriteCallSignal(w, Guid.NewGuid(), SignalType.End, []))), Is.Zero,
+                "a signal can only come from the authenticated socket");
+            Assert.That(a.Client.DispatchDatagram(Frame(w => BoltCodec.WriteMediaConfig(w, Guid.NewGuid(), Guid.NewGuid(), MediaType.Audio, CodecId.Opus, 48000, 1, 32, 0x10, []))), Is.Zero,
+                "nor can a stream configuration");
+            Assert.That(a.Client.DispatchDatagram(bundle.AsSpan(0, bundle.Length - 1)), Is.Zero, "a truncated bundle is dropped whole");
+            Assert.That(seen, Is.EqualTo(new[] { FrameType.MediaFrame, FrameType.MediaFrame, FrameType.MediaFrame }));
+        });
+    }
+}

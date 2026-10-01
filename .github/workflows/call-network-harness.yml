@@ -5,6 +5,8 @@ name: Call network harness
 # The branch runs the browser client's real send path (pacer, rate control, picture ladder) over a
 # synthetic encoder; the base runs a constant sender (its relay predates the congestion reports).
 # RESUME=1 runs add the gateway's resume contract and a receiver that resumes like the phone.
+# UDP=1 runs (phase 3) add a TURN server and move the receiver's media onto a WebRTC data channel through it; the
+# ws-* rows are their WebSocket twins with identical settings.
 # See src/Tests/Bolt.CallResilience.Harness/README.md. Runs when the relay changes, or on demand.
 on:
   workflow_dispatch:
@@ -19,6 +21,7 @@ on:
       - src/Libraries/Bolt/Bolt.Client/**
       - src/Libraries/Bolt/Bolt.Media/**
       - src/Tests/Bolt.CallResilience.Harness/**
+      - src/Libraries/Bolt/Bolt.Rtc/**
       - .github/workflows/call-network-harness.yml
 
 permissions:
@@ -88,6 +91,24 @@ jobs:
           - { name: resume-const-4g-relay-retired, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: resume-retired, steps: "", settings: "RESUME=1 GRACE_S=45 VIDEO_KBPS=180 FPS=15 AUDIO_PAYLOAD=104 KF_MS=10000 KF_ON_DEMAND=1 RX_STALL_AT_S=60 RX_STALL_FOR_S=30" }
           # without resume (phase 0 behaviour), for contrast: any real disconnect ends the call
           - { name: noresume-4g-outage-30s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 30, expect: any, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240" }
+          # phase 3: the receiver's media on a WebRTC data channel through TURN (coturn), each beside its WebSocket twin;
+          # the sframe278 pair uses the real SFrame adapter's per-frame overhead (278 bytes) instead of the 26 used so far
+          - { name: udp-512k-1000ms-1pct, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1" }
+          - { name: ws-512k-1000ms-1pct, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240" }
+          - { name: udp-512k-1000ms-3pct, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 3%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1" }
+          - { name: ws-512k-1000ms-3pct, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 3%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: any, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240" }
+          - { name: udp-512k-1000ms-from720p, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=720 UDP=1" }
+          - { name: udp-512k-500ms-1pct, target: head, relaynet: "delay 250ms 10ms rate 512kbit loss 1%", recvnet: "delay 250ms 10ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1" }
+          - { name: ws-512k-500ms-1pct, target: head, relaynet: "delay 250ms 10ms rate 512kbit loss 1%", recvnet: "delay 250ms 10ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240" }
+          - { name: udp-4g-2mbit, target: head, relaynet: "delay 50ms 10ms rate 2mbit loss 0.5%", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1" }
+          - { name: udp-4g-outage-2s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 2, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1" }
+          - { name: udp-resume-4g-outage-10s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 10, expect: resume, steps: "", settings: "RESUME=1 GRACE_S=45 ADAPTIVE=1 START_HEIGHT=240 UDP=1" }
+          - { name: udp-resume-4g-outage-30s, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: 60, for: 30, expect: resume, steps: "", settings: "RESUME=1 GRACE_S=45 ADAPTIVE=1 START_HEIGHT=240 UDP=1" }
+          - { name: udp-resume-4g-ip-change, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: resume, steps: "", settings: "RESUME=1 GRACE_S=45 ADAPTIVE=1 START_HEIGHT=240 UDP=1 IPCHANGE_AT_S=60" }
+          - { name: udp-4g-ice-restart, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1 IPCHANGE_UDP_AT_S=60" }
+          - { name: udp-blocked-4g, target: head, relaynet: "delay 50ms 10ms rate 2mbit loss 0.5%", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1 UDP_BLOCK=1" }
+          - { name: udp-512k-1000ms-1pct-sframe278, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1 SFRAME_OVERHEAD=278" }
+          - { name: ws-512k-1000ms-1pct-sframe278, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: any, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 SFRAME_OVERHEAD=278" }
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -99,6 +120,13 @@ jobs:
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: 10.x
+
+      - name: Set up Go
+        if: matrix.target == 'head'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: src/Libraries/Bolt/Bolt.Rtc/sidecar/go.mod
+          cache-dependency-path: src/Libraries/Bolt/Bolt.Rtc/sidecar/go.sum
 
       - name: Enable netem
         shell: bash
@@ -128,6 +156,10 @@ jobs:
           fi
           dotnet publish src/Tests/Bolt.CallResilience.Harness/Bolt.CallResilience.Harness.csproj \
             --configuration Release --output "$RUNNER_TEMP/harness" "-p:BoltServerProject=$project" "-p:HarnessAdaptive=$adaptive"
+          if [ "$TARGET" = head ]; then
+            # The WebRTC sidecar for UDP=1 runs; the relay and the receiver both use it.
+            (cd src/Libraries/Bolt/Bolt.Rtc/sidecar && CGO_ENABLED=0 go build -trimpath -o "$RUNNER_TEMP/harness/bolt-rtc" .)
+          fi
           docker build --tag bolt-call-harness --file src/Tests/Bolt.CallResilience.Harness/Dockerfile "$RUNNER_TEMP/harness"
 
       - name: Run call

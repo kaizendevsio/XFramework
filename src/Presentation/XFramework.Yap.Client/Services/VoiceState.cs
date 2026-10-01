@@ -173,6 +173,7 @@ public sealed partial class VoiceState : IAsyncDisposable
             video.OnVideoTierChanged -= attempt.TierChanged;
             video.OnRemoteVideoChanged -= attempt.RemoteVideoChanged;
             video.OnHeartbeatEcho -= attempt.HeartbeatEcho;
+            video.OnMediaPathChanged -= attempt.PathChanged;
         }
         attempt.CameraOn = false;
         // Stop capture before network notification, including a pending microphone permission request.
@@ -278,5 +279,6 @@ public sealed partial class VoiceState : IAsyncDisposable
         public Action<string> VideoStopped = _ => { };
         public Action<VideoTier?> TierChanged = _ => { };
         public Action RemoteVideoChanged = () => { };
+        public Action<MediaPathStatus> PathChanged = _ => { };
     }
 }
