@@ -58,6 +58,18 @@ public enum FrameType : byte
     /// [4:allowedKbps] [2:droppedPictures] [1:layerLimit] [1:reserved]. See <see cref="MediaCongestionData"/>.
     /// </summary>
     MediaCongestion = 0x27,
+    /// <summary>
+    /// Media transport signalling between one participant and the relay (WebRTC data channel setup,
+    /// path state and loss reports): [1:type] [1:version] [1:kind] [4:payloadLen] [payload: UTF-8 JSON].
+    /// Travels only on the authenticated connection it is about. See <see cref="MediaTransportCodec"/>.
+    /// </summary>
+    MediaTransport = 0x28,
+    /// <summary>
+    /// Datagram-only redundancy bundle: [1:type] [1:count] then count x ([2:frameLen] [MediaFrame]).
+    /// Carries an audio frame together with the previous one on a lossy datagram path; never sent on a
+    /// stream transport. See <see cref="MediaBundleCodec"/>.
+    /// </summary>
+    MediaBundle = 0x29,
 }
 
 /// <summary>Media type identifier.</summary>
