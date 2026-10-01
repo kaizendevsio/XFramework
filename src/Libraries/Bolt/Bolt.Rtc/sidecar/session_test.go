@@ -233,16 +233,31 @@ func TestRelayOnlyPeersGatherNoHostCandidates(t *testing.T) {
 	host := startHost(t)
 	host.hello("offer", func(h *hello) { h.RelayOnly = true })
 	host.sendJSON(msgCreateOffer, offerRequest{})
-	offer := waitFor(t, host, msgSDP, nil)
+	// With no TURN server configured nothing can be gathered at all: the end of candidates comes at once,
+	// possibly before the offer itself reaches the host.
+	var offer []byte
+	ended := false
+	deadline := time.After(10 * time.Second)
+	for offer == nil || !ended {
+		select {
+		case f := <-host.frames:
+			switch f.kind {
+			case msgSDP:
+				offer = f.payload
+			case msgCandidate:
+				var candidate candidateMessage
+				_ = json.Unmarshal(f.payload, &candidate)
+				if candidate.Candidate != "" {
+					t.Fatalf("unexpected candidate %q", candidate.Candidate)
+				}
+				ended = true
+			}
+		case <-deadline:
+			t.Fatalf("offer=%v ended=%v", offer != nil, ended)
+		}
+	}
 	if strings.Contains(string(offer), "typ host") {
 		t.Fatal("a relay-only peer must not offer host candidates")
-	}
-	// With no TURN server configured nothing can be gathered at all: the end of candidates comes at once.
-	end := waitFor(t, host, msgCandidate, nil)
-	var candidate candidateMessage
-	_ = json.Unmarshal(end, &candidate)
-	if candidate.Candidate != "" {
-		t.Fatalf("unexpected candidate %q", candidate.Candidate)
 	}
 	host.session.mu.Lock()
 	policy := host.session.pc.GetConfiguration().ICETransportPolicy
