@@ -143,6 +143,23 @@ public sealed class BoltMediaStream : IAsyncDisposable
     /// </summary>
     public long LocalDrops => Interlocked.Read(ref _localDrops);
 
+    private int _encryptionOverhead;
+
+    /// <summary>
+    /// The most bytes encryption has added to one of this stream's frames (SFrame header, tag and its
+    /// authenticated context), 0 before the first. A sender sizes fragments for a datagram path with it.
+    /// </summary>
+    public int EncryptionOverhead => Volatile.Read(ref _encryptionOverhead);
+
+    private void RecordEncryptionOverhead(int plaintext, int ciphertext)
+    {
+        var overhead = ciphertext - plaintext;
+        if (overhead > Volatile.Read(ref _encryptionOverhead)) Volatile.Write(ref _encryptionOverhead, overhead);
+    }
+
+    /// <summary>Sequence numbers that arrived for this (remote) stream: drops second copies and measures loss.</summary>
+    public SequenceWindow ReceivedSequences { get; } = new();
+
     /// <summary>True when the stream's connection is a reliable byte stream (TCP): retransmission is the transport's job.</summary>
     public bool IsReliableTransport => MediaTransportPolicy.IsReliable(_connection.TransportType);
 
@@ -359,6 +376,7 @@ public sealed class BoltMediaStream : IAsyncDisposable
 
             flags |= 0x10; // encrypted flag
             payload = await _encryption.EncryptAsync(encodedData.ToArray(), seq, ts, StreamId);
+            RecordEncryptionOverhead(encodedData.Length, payload.Length);
         }
         else
         {
@@ -453,6 +471,7 @@ public sealed class BoltMediaStream : IAsyncDisposable
                     throw new InvalidOperationException("Media encryption is required but no ready authenticated key is configured.");
                 flags |= MediaFrameFlags.Encrypted;
                 payload = await _encryption.EncryptAsync(fragments[index], seq, timestamp, StreamId);
+                RecordEncryptionOverhead(fragments[index].Length, payload.Length);
             }
             _retransmitBuffer?.Store(seq, timestamp, flags, payload);
             frames.Add(Frame(seq, timestamp, flags, payload.Span));

@@ -118,6 +118,49 @@ public sealed class BoltClient : IAsyncDisposable
         _frameHandlers.TryRemove(
             new KeyValuePair<byte, Action<BoltConnection, byte[], int>>((byte)frameType, handler));
 
+    /// <summary>
+    /// Deliver one message that arrived on a datagram path bound to this client's connection (a WebRTC data
+    /// channel negotiated over it). Only media-plane frames the relay may send that way are dispatched, to the
+    /// same handlers as if they had arrived on the socket; a <see cref="FrameType.MediaBundle"/> is unpacked.
+    /// Anything else is ignored. Returns how many frames were dispatched.
+    /// </summary>
+    public int DispatchDatagram(ReadOnlySpan<byte> message)
+    {
+        if (message.IsEmpty || _disposed || !DatagramFramePolicy.AcceptFromRelay((FrameType)message[0]))
+            return 0;
+        BoltConnection connection;
+        try { connection = GetConnection(); }
+        catch (InvalidOperationException) { return 0; }
+        if ((FrameType)message[0] != FrameType.MediaBundle)
+            return DispatchDatagramFrame(connection, message) ? 1 : 0;
+        Span<Range> frames = stackalloc Range[MediaBundleCodec.MaxFrames];
+        if (!MediaBundleCodec.TryRead(message, frames, out var count))
+            return 0;
+        var dispatched = 0;
+        for (var index = 0; index < count; index++)
+            if (DispatchDatagramFrame(connection, message[frames[index]])) dispatched++;
+        return dispatched;
+    }
+
+    private bool DispatchDatagramFrame(BoltConnection connection, ReadOnlySpan<byte> frame)
+    {
+        if (frame.Length > _maxFrameBytes || !_frameHandlers.TryGetValue(frame[0], out var handler))
+            return false;
+        var buffer = ArrayPool<byte>.Shared.Rent(frame.Length);
+        try
+        {
+            frame.CopyTo(buffer);
+            handler(connection, buffer, frame.Length);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Bolt datagram frame handler failed for frame type {FrameType}", (FrameType)frame[0]);
+            return false;
+        }
+        finally { ArrayPool<byte>.Shared.Return(buffer); }
+    }
+
     /// <summary>Get the current primary connection for sending frames.</summary>
     public BoltConnection GetPrimaryConnection() => GetConnection();
 

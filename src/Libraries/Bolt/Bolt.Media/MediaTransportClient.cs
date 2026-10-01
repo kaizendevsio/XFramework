@@ -1,0 +1,514 @@
+using System.Buffers;
+using Bolt.Client;
+using Bolt.Protocol;
+using Bolt.Protocol.Transport;
+using Microsoft.Extensions.Logging;
+
+namespace Bolt.Media;
+
+/// <summary>Where a call's media is going right now.</summary>
+public enum MediaPathKind { WebSocket, Negotiating, Datagram }
+
+/// <summary>A participant's view of its media path, for diagnostics.</summary>
+/// <param name="Kind">The pipe media uses now.</param>
+/// <param name="Description">"UDP/relay", "TLS/relay", "WebSocket" and the like.</param>
+/// <param name="RttMs">The data channel's measured round trip, when known.</param>
+/// <param name="Reason">Why media is on the WebSocket, when it is.</param>
+/// <param name="AudioRedundancy">Audio leaves with the previous frame alongside (the relay reported loss).</param>
+public sealed record MediaPathStatus(MediaPathKind Kind, string Description, double? RttMs = null, string? Reason = null, bool AudioRedundancy = false);
+
+public sealed class MediaTransportClientOptions
+{
+    /// <summary>Give up on a session whose channel has not opened by then (ICE through TURN takes 1-3 s normally).</summary>
+    public TimeSpan OpenTimeout { get; init; } = TimeSpan.FromSeconds(15);
+    /// <summary>Backoff after a failed attempt: first, then doubling up to <see cref="MaxRetryDelay"/>.</summary>
+    public TimeSpan FirstRetryDelay { get; init; } = TimeSpan.FromSeconds(5);
+    public TimeSpan MaxRetryDelay { get; init; } = TimeSpan.FromSeconds(60);
+    /// <summary>Use a path whose local leg rides TCP/TLS to the TURN server (a network that blocks UDP).</summary>
+    public bool AllowStreamBasedPath { get; init; } = true;
+    public TimeSpan ReportInterval { get; init; } = TimeSpan.FromSeconds(1);
+    public int RedundancyOnLossPermille { get; init; } = 15;
+    public int RedundancyOffLossPermille { get; init; } = 5;
+    public TimeSpan RedundancyHold { get; init; } = TimeSpan.FromSeconds(10);
+    /// <summary>Redundancy is added only while the channel's own buffer is this short.</summary>
+    public long RedundancyBacklogBytes { get; init; } = 8 * 1024;
+}
+
+/// <summary>
+/// The participant's side of the datagram media path (Phase 3). After the call socket is up it asks the relay
+/// for a session, offers a WebRTC peer with the short-lived ICE servers the relay minted for it, and trickles
+/// candidates, all over the same authenticated socket. Once the data channel opens, <see cref="TrySend"/>
+/// takes media frames; until then, and whenever the channel fails, it refuses them and the caller sends on the
+/// socket, so a failure only ever costs the datagram path, never the call. It retries with backoff, restarts
+/// ICE when the network changes, and moves to a fresh session when the relay renews credentials.
+///
+/// Frames are already SFrame-encrypted when they get here; the channel's DTLS is an extra hop layer only.
+/// </summary>
+public sealed class MediaTransportClient : IAsyncDisposable
+{
+    private readonly BoltClient _client;
+    private readonly Func<RtcPeerOptions, CancellationToken, ValueTask<IRtcPeer>> _createPeer;
+    private readonly MediaTransportClientOptions _options;
+    private readonly ILogger _logger;
+    private readonly Func<long> _clock;
+    private readonly object _sync = new();
+    private readonly CancellationTokenSource _lifetime = new();
+    private readonly Action<BoltConnection, byte[], int> _handler;
+    // Signalling is applied strictly in arrival order: a candidate must never overtake the answer it follows.
+    private readonly System.Threading.Channels.Channel<(MediaTransportKind Kind, byte[] Payload)> _inbox =
+        System.Threading.Channels.Channel.CreateBounded<(MediaTransportKind, byte[])>(
+            new System.Threading.Channels.BoundedChannelOptions(128) { SingleReader = true, FullMode = System.Threading.Channels.BoundedChannelFullMode.DropWrite });
+    private readonly Task _inboxLoop;
+
+    private Session? _active;
+    private Session? _pending;
+    private bool _requested;
+    private bool _disabled;
+    private int _failures;
+    private long _retryAt;
+    private string? _reason = "starting";
+    private int _redundancy;
+    private long _lossQuietSince;
+    private Task _loop = Task.CompletedTask;
+    private bool _disposed;
+
+    private sealed class Session(string id, MediaTransportConfig config, long createdAt)
+    {
+        public string Id { get; } = id;
+        public MediaTransportConfig Config { get; } = config;
+        public long CreatedAt { get; } = createdAt;
+        public IRtcPeer? Peer;
+        public bool Opened;
+        public bool Closed;
+    }
+
+    public MediaTransportClient(BoltClient client, Func<RtcPeerOptions, CancellationToken, ValueTask<IRtcPeer>> createPeer,
+        ILogger logger, MediaTransportClientOptions? options = null, Func<long>? clock = null)
+    {
+        _client = client;
+        _createPeer = createPeer;
+        _logger = logger;
+        _options = options ?? new MediaTransportClientOptions();
+        _clock = clock ?? (static () => Environment.TickCount64);
+        _handler = HandleFrame;
+        _client.RegisterFrameHandler(FrameType.MediaTransport, _handler);
+        _inboxLoop = Task.Run(ProcessInboxAsync);
+    }
+
+    /// <summary>Raised when the path changes (opened, failed, switched, or its route changed).</summary>
+    public event Action<MediaPathStatus>? StatusChanged;
+
+    /// <summary>
+    /// Supplies the loss (thousandths) of audio that reached this participant since the last call; the relay
+    /// uses it to decide whether to send this participant's audio with redundancy.
+    /// </summary>
+    public Func<int>? ReceiveLossPermille { get; set; }
+
+    /// <summary>The open data channel, when there is one.</summary>
+    public IRtcPeer? ActivePeer { get { lock (_sync) return _active is { Opened: true, Closed: false, Peer: { State: RtcChannelState.Open } peer } ? peer : null; } }
+
+    public bool IsDatagramActive => ActivePeer is not null;
+
+    /// <summary>Largest message the active channel takes; 0 when media goes over the socket.</summary>
+    public int MaxMessageBytes => ActivePeer?.MaxMessageBytes ?? 0;
+
+    /// <summary>Bytes the channel has accepted and not yet sent; part of the sender's transport backlog.</summary>
+    public long BufferedAmount => ActivePeer?.BufferedAmount ?? 0;
+
+    /// <summary>Audio leaves with the previous frame alongside: the relay reports loss on this participant's audio.</summary>
+    public bool AudioRedundancy => Volatile.Read(ref _redundancy) != 0;
+
+    public MediaPathStatus Status
+    {
+        get
+        {
+            lock (_sync)
+            {
+                if (_active is { Opened: true, Closed: false, Peer: { State: RtcChannelState.Open } peer })
+                    return new(MediaPathKind.Datagram, peer.Path?.Describe() ?? "UDP", peer.Path?.RttMs, AudioRedundancy: AudioRedundancy);
+                if (_pending is not null || (_active is not null && !_active.Opened))
+                    return new(MediaPathKind.Negotiating, "WebSocket", Reason: "negotiating");
+                return new(MediaPathKind.WebSocket, "WebSocket", Reason: _reason);
+            }
+        }
+    }
+
+    /// <summary>Ask the relay for a session (once the socket is registered) and keep the path healthy from then on.</summary>
+    public void Start()
+    {
+        lock (_sync)
+        {
+            if (_disposed || !_loop.IsCompleted) return;
+            _retryAt = _clock();
+            _loop = Task.Run(() => RunAsync(_lifetime.Token));
+        }
+    }
+
+    /// <summary>
+    /// The device's network changed (online again, a different interface). An open channel restarts ICE in
+    /// place; with none, the next attempt starts now instead of waiting out its backoff.
+    /// </summary>
+    public void NetworkChanged()
+    {
+        Session? active;
+        lock (_sync)
+        {
+            if (_disposed || _disabled) return;
+            active = _active is { Opened: true, Closed: false } ? _active : null;
+            if (active is null) { _failures = 0; _retryAt = _clock(); return; }
+        }
+        _ = RestartIceAsync(active);
+    }
+
+    /// <summary>
+    /// Hand one Bolt frame to the data channel. False when there is none, the frame is too large for one
+    /// message, or the channel would not take it: the caller sends that frame on the socket.
+    /// Audio with <paramref name="audio"/> set may leave with the previous audio frame of its stream.
+    /// </summary>
+    public bool TrySend(ReadOnlySpan<byte> frame, bool audio = false)
+    {
+        var peer = ActivePeer;
+        if (peer is null || frame.IsEmpty || frame.Length > peer.MaxMessageBytes)
+            return false;
+        if (audio && frame[0] == (byte)FrameType.MediaFrame && BoltCodec.TryReadMediaFrameHeader(frame, out var streamId))
+            return SendAudio(peer, streamId, frame);
+        return peer.TrySend(frame);
+    }
+
+    // The previous audio frame per stream, for redundancy.
+    private readonly Dictionary<Guid, byte[]> _lastAudio = new();
+
+    private bool SendAudio(IRtcPeer peer, Guid streamId, ReadOnlySpan<byte> frame)
+    {
+        byte[]? previous;
+        lock (_lastAudio) previous = _lastAudio.GetValueOrDefault(streamId);
+        var sent = false;
+        if (AudioRedundancy && previous is not null && peer.BufferedAmount <= _options.RedundancyBacklogBytes)
+        {
+            var size = MediaBundleCodec.Size(previous.Length, frame.Length);
+            if (size <= peer.MaxMessageBytes)
+            {
+                var bundle = ArrayPool<byte>.Shared.Rent(size);
+                try
+                {
+                    MediaBundleCodec.Write(bundle, previous, frame);
+                    sent = peer.TrySend(bundle.AsSpan(0, size));
+                }
+                finally { ArrayPool<byte>.Shared.Return(bundle); }
+            }
+        }
+        if (!sent && !peer.TrySend(frame))
+            return false;
+        lock (_lastAudio)
+        {
+            if (_lastAudio.Count >= 8 && !_lastAudio.ContainsKey(streamId)) _lastAudio.Clear();
+            _lastAudio[streamId] = frame.ToArray();
+        }
+        return true;
+    }
+
+    private async Task RunAsync(CancellationToken ct)
+    {
+        var nextReport = _clock();
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                await Task.Delay(250, ct);
+                var now = _clock();
+                Session? expired = null;
+                bool request = false;
+                lock (_sync)
+                {
+                    if (_disabled) return;
+                    var negotiating = _pending ?? (_active is { Opened: false } ? _active : null);
+                    if (negotiating is not null && now - negotiating.CreatedAt > (long)_options.OpenTimeout.TotalMilliseconds)
+                        expired = negotiating;
+                    else if (negotiating is null && !_requested && _active is null && now >= _retryAt && _client.IsConnected)
+                    {
+                        _requested = true;
+                        request = true;
+                    }
+                }
+                if (expired is not null)
+                {
+                    _logger.LogInformation("The datagram media path did not open in time; media stays on the WebSocket");
+                    await FailAsync(expired, "timeout", notifyRelay: true);
+                }
+                if (request)
+                    await SendAsync(MediaTransportKind.Request, new MediaTransportRequest(1, RtcDefaults.MaxMessageBytes));
+                if (now >= nextReport)
+                {
+                    nextReport = now + (long)_options.ReportInterval.TotalMilliseconds;
+                    if (IsDatagramActive && ReceiveLossPermille is { } loss && _active is { } active)
+                        await SendAsync(MediaTransportKind.Report, new MediaTransportReport(active.Id, Math.Clamp(loss(), 0, 1000)));
+                }
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { _logger.LogWarning(ex, "The datagram media path loop ended"); }
+    }
+
+    private void HandleFrame(BoltConnection connection, byte[] buffer, int length)
+    {
+        if (!MediaTransportCodec.TryRead(buffer.AsSpan(0, length), out var kind, out var payload))
+            return;
+        _inbox.Writer.TryWrite((kind, payload.ToArray()));
+    }
+
+    private async Task ProcessInboxAsync()
+    {
+        try
+        {
+            await foreach (var (kind, payload) in _inbox.Reader.ReadAllAsync(_lifetime.Token))
+                await HandleAsync(kind, payload);
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task HandleAsync(MediaTransportKind kind, byte[] payload)
+    {
+        try
+        {
+            switch (kind)
+            {
+                case MediaTransportKind.Config when MediaTransportCodec.Decode<MediaTransportConfig>(payload) is { } config:
+                    await OnConfigAsync(config);
+                    break;
+                case MediaTransportKind.Answer when MediaTransportCodec.Decode<MediaTransportDescription>(payload) is { } answer:
+                    if (FindSession(answer.Session)?.Peer is { } peer) await peer.SetAnswerAsync(answer.Sdp, _lifetime.Token);
+                    break;
+                case MediaTransportKind.Candidate when MediaTransportCodec.Decode<MediaTransportCandidate>(payload) is { } candidate:
+                    if (FindSession(candidate.Session)?.Peer is { } target)
+                        await target.AddCandidateAsync(new RtcCandidate(candidate.Candidate, candidate.SdpMid, candidate.SdpMLineIndex), _lifetime.Token);
+                    break;
+                case MediaTransportKind.State when MediaTransportCodec.Decode<MediaTransportStateMessage>(payload) is { } state:
+                    if (state.State is "failed" or "closed" && FindSession(state.Session) is { } lost)
+                        await FailAsync(lost, "relay-" + state.State, notifyRelay: false);
+                    break;
+                case MediaTransportKind.Close when MediaTransportCodec.Decode<MediaTransportClose>(payload) is { } close:
+                    if (FindSession(close.Session) is { } closed)
+                        await FailAsync(closed, close.Reason == "superseded" ? null : "relay-closed", notifyRelay: false);
+                    break;
+                case MediaTransportKind.Report when MediaTransportCodec.Decode<MediaTransportReport>(payload) is { } report:
+                    ApplyRelayLoss(Math.Clamp(report.ReceiveLossPermille, 0, 1000));
+                    break;
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Datagram path signalling failed");
+            Session? broken;
+            lock (_sync) broken = _pending ?? (_active is { Opened: false } ? _active : null);
+            if (broken is not null) await FailAsync(broken, "negotiation", notifyRelay: true);
+        }
+    }
+
+    private async Task OnConfigAsync(MediaTransportConfig config)
+    {
+        if (config.Unavailable is { } reason || string.IsNullOrEmpty(config.Session) || config.IceServers.Length == 0)
+        {
+            lock (_sync)
+            {
+                _requested = false;
+                _reason = config.Unavailable ?? "unavailable";
+                if (config.Unavailable == "disabled") _disabled = true;
+                else ScheduleRetryLocked(config.Unavailable == "rate-limited" ? TimeSpan.FromSeconds(10) : null);
+            }
+            Raise();
+            return;
+        }
+
+        var session = new Session(config.Session, config, _clock());
+        Session? replaced;
+        lock (_sync)
+        {
+            if (_disposed) return;
+            _requested = false;
+            // A config while a channel is open is the relay renewing credentials: negotiate beside it, then switch.
+            if (_active is { Opened: true, Closed: false }) { replaced = _pending; _pending = session; }
+            else { replaced = _active; _active = session; }
+        }
+        if (replaced is not null) await CloseSessionAsync(replaced, notifyRelay: false);
+        Raise();
+        var maxMessage = Math.Clamp(config.MaxMessageBytes, 256, RtcDefaults.MaxMessageBytes);
+        var peer = await _createPeer(new RtcPeerOptions(config.IceServers, config.IceTransportPolicy == "relay", maxMessage), _lifetime.Token);
+        lock (_sync)
+        {
+            if (session.Closed || _disposed) { _ = peer.DisposeAsync(); return; }
+            session.Peer = peer;
+        }
+        peer.LocalCandidate += candidate => _ = SendAsync(MediaTransportKind.Candidate,
+            new MediaTransportCandidate(session.Id, candidate.Candidate, candidate.SdpMid, candidate.SdpMLineIndex));
+        peer.StateChanged += state => _ = OnPeerStateAsync(session, state);
+        peer.PathChanged += _ => Raise();
+        peer.Message += data => _client.DispatchDatagram(data.Span);
+        var offer = await peer.CreateOfferAsync(iceRestart: false, _lifetime.Token);
+        await SendAsync(MediaTransportKind.Offer, new MediaTransportDescription(session.Id, offer));
+    }
+
+    private async Task OnPeerStateAsync(Session session, RtcChannelState state)
+    {
+        if (state == RtcChannelState.Open)
+        {
+            Session? superseded = null;
+            lock (_sync)
+            {
+                if (session.Closed) return;
+                if (!_options.AllowStreamBasedPath && session.Peer?.Path is { IsStreamBased: true })
+                {
+                    _reason = "stream-based-path";
+                }
+                else
+                {
+                    session.Opened = true;
+                    if (ReferenceEquals(_pending, session))
+                    {
+                        superseded = _active;
+                        _active = session;
+                        _pending = null;
+                    }
+                    _failures = 0;
+                    _reason = null;
+                }
+            }
+            if (!session.Opened)
+            {
+                await FailAsync(session, "stream-based-path", notifyRelay: true);
+                return;
+            }
+            _logger.LogInformation("Call media moved to the datagram path ({Path})", session.Peer?.Path?.Describe() ?? "UDP");
+            if (superseded is not null) await CloseSessionAsync(superseded, notifyRelay: false);
+            Raise();
+            return;
+        }
+        if (state is RtcChannelState.Failed or RtcChannelState.Closed)
+            await FailAsync(session, state == RtcChannelState.Failed ? "ice-failed" : "closed", notifyRelay: true);
+    }
+
+    private async Task RestartIceAsync(Session session)
+    {
+        try
+        {
+            if (session.Peer is not { } peer) return;
+            var offer = await peer.CreateOfferAsync(iceRestart: true, _lifetime.Token);
+            await SendAsync(MediaTransportKind.Offer, new MediaTransportDescription(session.Id, offer, IceRestart: true));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogDebug(ex, "ICE restart failed");
+            await FailAsync(session, "ice-restart", notifyRelay: true);
+        }
+    }
+
+    /// <summary>Drop a session: media falls back to the socket at once, and a new attempt is scheduled.</summary>
+    private async Task FailAsync(Session session, string? reason, bool notifyRelay)
+    {
+        lock (_sync)
+        {
+            if (session.Closed) return;
+            // A renewal that fails while the current channel is open costs nothing: that channel carries on.
+            var current = ReferenceEquals(_active, session) || _active is not { Opened: true, Closed: false };
+            if (reason is not null && current)
+            {
+                _reason = reason;
+                _failures++;
+                ScheduleRetryLocked(null);
+            }
+        }
+        if (reason is not null && session.Opened)
+            _logger.LogInformation("The datagram media path closed ({Reason}); media continues on the WebSocket", reason);
+        await CloseSessionAsync(session, notifyRelay);
+        Raise();
+    }
+
+    private async Task CloseSessionAsync(Session session, bool notifyRelay)
+    {
+        IRtcPeer? peer;
+        lock (_sync)
+        {
+            if (session.Closed) return;
+            session.Closed = true;
+            if (ReferenceEquals(_active, session)) { _active = _pending; _pending = null; }
+            if (ReferenceEquals(_pending, session)) _pending = null;
+            peer = session.Peer;
+            if (_active is null) { Volatile.Write(ref _redundancy, 0); lock (_lastAudio) _lastAudio.Clear(); }
+        }
+        if (notifyRelay) await SendAsync(MediaTransportKind.Close, new MediaTransportClose(session.Id, "client"));
+        if (peer is not null)
+        {
+            try { await peer.DisposeAsync(); }
+            catch (Exception ex) { _logger.LogDebug(ex, "Closing the data channel failed"); }
+        }
+    }
+
+    private void ScheduleRetryLocked(TimeSpan? delay)
+    {
+        _requested = false;
+        var backoff = delay ?? TimeSpan.FromMilliseconds(Math.Min(_options.MaxRetryDelay.TotalMilliseconds,
+            _options.FirstRetryDelay.TotalMilliseconds * Math.Pow(2, Math.Max(0, _failures - 1))));
+        _retryAt = _clock() + (long)backoff.TotalMilliseconds;
+    }
+
+    private void ApplyRelayLoss(int lossPermille)
+    {
+        var now = _clock();
+        if (lossPermille >= _options.RedundancyOnLossPermille)
+        {
+            _lossQuietSince = 0;
+            if (Interlocked.Exchange(ref _redundancy, 1) == 0) Raise();
+            return;
+        }
+        if (!AudioRedundancy) return;
+        if (lossPermille >= _options.RedundancyOffLossPermille) { _lossQuietSince = 0; return; }
+        if (_lossQuietSince == 0) _lossQuietSince = now;
+        else if (now - _lossQuietSince >= (long)_options.RedundancyHold.TotalMilliseconds)
+        {
+            Volatile.Write(ref _redundancy, 0);
+            _lossQuietSince = 0;
+            Raise();
+        }
+    }
+
+    private Session? FindSession(string id)
+    {
+        lock (_sync)
+            return _active?.Id == id ? _active : _pending?.Id == id ? _pending : null;
+    }
+
+    private async Task SendAsync<T>(MediaTransportKind kind, T message)
+    {
+        try { await _client.GetPrimaryConnection().SendAsync(MediaTransportCodec.Encode(kind, message), _lifetime.Token); }
+        catch (Exception ex) when (ex is InvalidOperationException or OperationCanceledException or IOException or ObjectDisposedException)
+        {
+            // The socket is going away; the call's own reconnect takes it from here.
+        }
+    }
+
+    private void Raise()
+    {
+        try { StatusChanged?.Invoke(Status); }
+        catch (Exception ex) { _logger.LogDebug(ex, "A media path listener failed"); }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Session? active, pending;
+        lock (_sync)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            active = _active;
+            pending = _pending;
+        }
+        _client.UnregisterFrameHandler(FrameType.MediaTransport, _handler);
+        _inbox.Writer.TryComplete();
+        try { await _lifetime.CancelAsync(); } catch (ObjectDisposedException) { }
+        try { await Task.WhenAll(_loop, _inboxLoop).WaitAsync(TimeSpan.FromSeconds(2)); } catch { /* Shutdown. */ }
+        if (active is not null) await CloseSessionAsync(active, notifyRelay: false);
+        if (pending is not null) await CloseSessionAsync(pending, notifyRelay: false);
+        lock (_sync) _active = _pending = null;
+        _lifetime.Dispose();
+    }
+}
