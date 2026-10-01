@@ -61,7 +61,7 @@ jobs:
             --use-auth-secret --static-auth-secret=ci-turn-secret --realm=bolt.test --fingerprint \
             --no-tls --no-cli --allow-loopback-peers --min-port=49160 --max-port=49400
           for attempt in $(seq 1 30); do
-            if docker logs coturn 2>&1 | grep -q "Total General servers"; then exit 0; fi
+            if ss -lnu | grep -q '127.0.0.1:3478 '; then exit 0; fi
             sleep 1
           done
           docker logs coturn
