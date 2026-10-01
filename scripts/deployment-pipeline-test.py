@@ -28,6 +28,17 @@ contexts = load("prepare-dotnet-build-context")
 baseline = load("deployed-yap-baseline")
 
 
+
+def dockerfile_copy_sources():
+    """Context paths copied by Dockerfile COPY lines (not COPY --from), optional (*-suffixed) ones excluded."""
+    sources = []
+    for line in (ROOT / "Dockerfile").read_text(encoding="utf-8").splitlines():
+        parts = line.split()
+        if not parts or parts[0] != "COPY" or any(part.startswith("--from") for part in parts):
+            continue
+        sources += [part for part in parts[1:-1] if not part.startswith("--") and not part.endswith("*")]
+    return sources
+
 class ScopeTests(unittest.TestCase):
     def test_only_yap_source_and_tests_qualify(self):
         self.assertEqual("yap", scope.classify([
@@ -136,6 +147,10 @@ class ContextTests(unittest.TestCase):
                 self.assertTrue((context / "Dockerfile").is_file(), service)
                 self.assertTrue((context / "src/Libraries/XFramework.Opaque.Native/Cargo.lock").is_file(), service)
                 self.assertTrue((context / "src/Libraries/XFramework.Opaque.Native/src/lib.rs").is_file(), service)
+                # Every file the Dockerfile copies from the context must be in the trimmed context.
+                for source in dockerfile_copy_sources():
+                    matches = list(context.glob(source.rstrip("/"))) or [context / source.rstrip("/")]
+                    self.assertTrue(all(match.exists() for match in matches) and matches[0].exists(), f"{service}: {source}")
 
     def test_yap_includes_transitive_service_and_generator_dependencies(self):
         directories = contexts.project_directories(ROOT, "src/Presentation/XFramework.Yap/XFramework.Yap.csproj")
