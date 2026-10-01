@@ -210,7 +210,8 @@ public sealed class BrowserDataChannelTests
         await page.GotoAsync(_origin + "/");
         await page.WaitForFunctionAsync("() => window.ready === true");
         var id = Guid.NewGuid().ToString("N");
-        var result = await page.EvaluateAsync<CallResult>("options => window.runCall(options)", new
+        // As JSON: Playwright's own conversion cannot build positional records.
+        var json = await page.EvaluateAsync<string>("options => window.runCall(options).then(result => JSON.stringify(result))", new
         {
             id,
             iceServers = browserServers.Select(x => new { urls = x.Urls, username = x.Username, credential = x.Credential }),
@@ -218,6 +219,7 @@ public sealed class BrowserDataChannelTests
             count,
             timeoutMs,
         });
+        var result = JsonSerializer.Deserialize<CallResult>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
         await Task.Delay(500);
         return (result, _serverResults.GetValueOrDefault(id));
     }
