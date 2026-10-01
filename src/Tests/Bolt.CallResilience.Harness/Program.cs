@@ -583,6 +583,18 @@ internal static class Receiver
         // network-change event; the socket is left alone. Recovery is timed from the change.
         var iceRestartAt = Env.Int("IPCHANGE_UDP_AT_S", -1);
         long? iceRestartedAt = null;
+        // A datagram path loses fragments; like the browser, a decoder that cannot show a picture asks its sender for a
+        // keyframe (at most once a second per stream). Over a WebSocket nothing is lost, so the twins never need to.
+        long lastKeyframeRequest = long.MinValue / 2;
+        long keyframeRequests = 0;
+        async Task RequestKeyframeAsync(Guid stream)
+        {
+            var request = Frames.Write(w => BoltCodec.WriteMediaKeyRequest(w, stream));
+            await sendLock.WaitAsync();
+            try { await socket.SendAsync(request, WebSocketMessageType.Binary, true, CancellationToken.None); }
+            catch { /* The call is ending. */ }
+            finally { sendLock.Release(); }
+        }
 #endif
         var reader = Task.Run(async () =>
         {
@@ -666,6 +678,14 @@ internal static class Receiver
                         decodable.Add(picture); decodableOrder.Enqueue(picture);
                         if (decodableOrder.Count > 4096) decodable.Remove(decodableOrder.Dequeue());
                     }
+#if HARNESS_ADAPTIVE
+                    else if (datagram is not null && clock.ElapsedMilliseconds - lastKeyframeRequest >= 1000)
+                    {
+                        lastKeyframeRequest = clock.ElapsedMilliseconds;
+                        keyframeRequests++;
+                        _ = RequestKeyframeAsync(header.StreamId);
+                    }
+#endif
                 }
 
                 var second = clock.ElapsedMilliseconds / 1000;
@@ -689,7 +709,7 @@ internal static class Receiver
 #if HARNESS_ADAPTIVE
         feedbackStop.Cancel();
         await feedbackLoop;
-        var transport = datagram?.Summary();
+        var transport = datagram is null ? null : new { datagram = datagram.Summary(), keyframeRequests };
 #else
         object? transport = null;
 #endif

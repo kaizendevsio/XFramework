@@ -104,6 +104,7 @@ internal static class ResumingReceiver
             keyframes = metrics.Keyframes,
 #if HARNESS_ADAPTIVE
             transport = Datagrams.LastOrDefault()?.Summary(),
+            keyframeRequests = metrics.KeyframeRequests,
             datagramOpens = Datagrams.Sum(x => x?.Opens ?? 0),
 #endif
         }));
@@ -187,6 +188,8 @@ internal static class ResumingReceiver
             // A new connection negotiates its own data channel, as the browser's does after a resume.
             await using var datagram = HarnessDatagram.Enabled ? new HarnessDatagram(frame => SendAsync(frame, stop.Token), Process, clock) : null;
             datagram?.Start();
+            if (datagram is not null)
+                metrics.KeyframeNeeded = stream => _ = SendAsync(Frames.Write(w => BoltCodec.WriteMediaKeyRequest(w, stream)), stop.Token);
             Datagrams.Add(datagram);
 #endif
             var watch = Task.Run(async () =>
@@ -293,7 +296,10 @@ internal static class ResumingReceiver
         private readonly HashSet<uint> decodable = [];
         private readonly Queue<uint> decodableOrder = new();
         private long? lastAudioArrival;
-        public long AudioReceived, LongestAudioGapMs, PicturesDecodable, Keyframes;
+        private long lastKeyframeRequest = long.MinValue / 2;
+        public long AudioReceived, LongestAudioGapMs, PicturesDecodable, Keyframes, KeyframeRequests;
+        /// <summary>UDP=1: a picture could not be shown; ask its sender for a keyframe, as the browser's decoder does (once a second).</summary>
+        public Action<Guid>? KeyframeNeeded;
 
         public void Add(byte[] frame)
         {
@@ -327,6 +333,12 @@ internal static class ResumingReceiver
                 decodableArrivals.Add((now, BinaryPrimitives.ReadInt64LittleEndian(payload)));
                 decodable.Add(picture); decodableOrder.Enqueue(picture);
                 if (decodableOrder.Count > 4096) decodable.Remove(decodableOrder.Dequeue());
+            }
+            else if (KeyframeNeeded is { } request && now - lastKeyframeRequest >= 1000)
+            {
+                lastKeyframeRequest = now;
+                KeyframeRequests++;
+                request(header.StreamId);
             }
         }
 

@@ -18,9 +18,14 @@ def ms(value):
     return "-" if value is None else f"{value} ms"
 
 
-def path(receiver):
+def datagram(receiver):
     transport = receiver.get("transport") or {}
-    return transport.get("path", "WebSocket")
+    # The plain receiver nests the channel's summary beside its keyframe requests; the resuming one does not.
+    return transport.get("datagram", transport) if isinstance(transport, dict) else {}
+
+
+def path(receiver):
+    return datagram(receiver).get("path", "WebSocket")
 
 
 # Phase 3 pairs: a UDP run and its WebSocket twin with identical settings (or the closest earlier row).
@@ -104,14 +109,14 @@ def main(directory):
     if len(compare) > 5:
         print("\n".join(compare))
 
-    transports = [(name, relay, receiver) for name, relay, receiver in runs if receiver.get("transport")]
+    transports = [(name, relay, receiver) for name, relay, receiver in runs if datagram(receiver)]
     if transports:
         rows = ["", "Datagram path per UDP run:", "",
                 "| run | final path | opened at | opens / failures / ICE restarts | frames on the channel / on the socket | "
                 "relay: sent on channel / fell back / redundant audio | timeline |",
                 "|---|---|---|---|---|---|---|"]
         for name, relay, receiver in transports:
-            t = receiver["transport"]
+            t = datagram(receiver)
             d = relay.get("datagram") or {}
             rows.append(
                 f"| {name} | {t.get('path')} | {t.get('openedAtS', '-')} s | {t.get('opens')} / {t.get('failures')} / {t.get('iceRestarts')} | "

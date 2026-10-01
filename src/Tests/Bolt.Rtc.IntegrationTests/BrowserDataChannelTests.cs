@@ -134,11 +134,16 @@ public sealed class BrowserDataChannelTests
         window.runCall = async ({ id, iceServers, policy, count, timeoutMs }) => {
           const ws = new WebSocket(`ws://${location.host}/signal?id=${id}`);
           await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
-          const result = { states: [], path: null, echoed: 0, opened: false, supported: typeof RTCPeerConnection === 'function', bad: 0 };
+          const result = { states: [], path: null, echoed: 0, opened: false, supported: typeof RTCPeerConnection === 'function', bad: 0, candidates: [] };
           let opened; const open = new Promise(resolve => opened = resolve);
           const seen = new Set();
           const dotnet = { invokeMethodAsync: async (method, ...args) => {
-            if (method === 'OnCandidate') ws.send(JSON.stringify({ type: 'candidate', candidate: args[0], sdpMid: args[1], sdpMLineIndex: args[2] }));
+            if (method === 'OnCandidate') {
+              ws.send(JSON.stringify({ type: 'candidate', candidate: args[0], sdpMid: args[1], sdpMLineIndex: args[2] }));
+              // Only each candidate's transport and type, for a failure message.
+              const parts = (args[0] || '').split(' ');
+              if (parts.length > 7) result.candidates.push(parts[2] + '/' + parts[7]);
+            }
             else if (method === 'OnState') { result.states.push(args[0]); if (args[0] === 'open') opened(); }
             else if (method === 'OnPath') result.path = { local: args[0], localProtocol: args[1], relayProtocol: args[2], remote: args[3], rttMs: args[4] };
             else if (method === 'OnMessage') {
@@ -174,13 +179,17 @@ public sealed class BrowserDataChannelTests
           // Keys as the .NET record names them.
           const path = result.path && { Local: result.path.local, LocalProtocol: result.path.localProtocol,
             RelayProtocol: result.path.relayProtocol, Remote: result.path.remote, RttMs: result.path.rttMs };
-          return { States: result.states, Path: path, Echoed: result.echoed, Opened: result.opened, Supported: result.supported, Bad: result.bad };
+          return { States: result.states, Path: path, Echoed: result.echoed, Opened: result.opened, Supported: result.supported, Bad: result.bad,
+            Candidates: result.candidates };
         };
         window.ready = true;
         </script>
         """;
 
-    private sealed record CallResult(string[] States, BrowserPath? Path, int Echoed, bool Opened, bool Supported, int Bad);
+    private sealed record CallResult(string[] States, BrowserPath? Path, int Echoed, bool Opened, bool Supported, int Bad, string[]? Candidates = null)
+    {
+        public override string ToString() => $"states [{string.Join(",", States)}], candidates [{string.Join(",", Candidates ?? [])}]";
+    }
     private sealed record BrowserPath(string Local, string LocalProtocol, string? RelayProtocol, string Remote, double RttMs);
 
     private async Task<(CallResult Browser, ServerResult? Relay)> CallAsync(string engine, RtcIceServer[] browserServers, int count = 200, int timeoutMs = 15000)
@@ -195,7 +204,7 @@ public sealed class BrowserDataChannelTests
                     Headless = true,
                     ExecutablePath = Env("CHROME_PATH"),
                     // Loopback TURN relays only: no host candidates are offered and none are needed.
-                    Args = ["--disable-features=WebRtcHideLocalIpsWithMdns"],
+                    Args = ["--disable-features=WebRtcHideLocalIpsWithMdns", "--allow-loopback-in-peer-connection"],
                 });
         }
         catch (PlaywrightException error)
@@ -233,7 +242,7 @@ public sealed class BrowserDataChannelTests
         if (!browser.Supported) Assert.Ignore($"{engine} has no RTCPeerConnection here.");
         Assert.Multiple(() =>
         {
-            Assert.That(browser.Opened, Is.True, string.Join(",", browser.States));
+            Assert.That(browser.Opened, Is.True, browser.ToString());
             Assert.That(browser.Echoed, Is.EqualTo(200), "every 1150-byte message makes the round trip on a clean path");
             Assert.That(browser.Bad, Is.Zero, "no message is cut, merged or duplicated");
             Assert.That(browser.Path?.Local, Is.EqualTo("relay"));
@@ -250,7 +259,7 @@ public sealed class BrowserDataChannelTests
         var (browser, relay) = await CallAsync("chromium", [Turn($"turn:{_turnHost}:3478?transport=tcp", "browser")]);
         Assert.Multiple(() =>
         {
-            Assert.That(browser.Opened, Is.True, string.Join(",", browser.States));
+            Assert.That(browser.Opened, Is.True, browser.ToString());
             Assert.That(browser.Echoed, Is.EqualTo(200));
             Assert.That(browser.Path?.RelayProtocol, Is.EqualTo("tcp"), "the browser's leg rides TCP to TURN");
             Assert.That(relay?.Path, Is.EqualTo("UDP/relay"));

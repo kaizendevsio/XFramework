@@ -52,7 +52,7 @@ if [ "$udp" = 1 ]; then
   # candidate to reach it. Credentials are TURN REST ones derived from a shared secret, short-lived like Cloudflare's.
   docker run -d --name "$turn" --network "$net" --network-alias turn "$turn_image" \
     -n --log-file=stdout --listening-port=3478 --use-auth-secret --static-auth-secret=harness-turn-secret \
-    --realm=harness --fingerprint --no-tls --no-cli --min-port=49160 --max-port=49760 >/dev/null
+    --realm=harness --fingerprint --no-tls --min-port=49160 --max-port=49760 >/dev/null
   envs+=(-e "TURN_URL=turn:turn:3478?transport=udp" -e "TURN_SECRET=harness-turn-secret")
   if [ "$udp_block" = 1 ]; then
     receiver_prefix='iptables -I OUTPUT -p udp -d "$(getent hosts turn | cut -d" " -f1)" -j DROP && '
