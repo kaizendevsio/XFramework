@@ -99,6 +99,8 @@ public sealed partial class VoiceState
         attempt.Link = new CallLinkMonitor(LinkOptions());
         attempt.HeartbeatEcho = stamp => attempt.Link.Echo(stamp, LinkNow());
         media.OnHeartbeatEcho += attempt.HeartbeatEcho;
+        attempt.PathChanged = status => { if (Current(attempt)) _ = RecordPathAsync(status); };
+        media.OnMediaPathChanged += attempt.PathChanged;
         await media.InitializeAsync(client);
         CheckCurrent(attempt);
         attempt.Phase = "call-transport";

@@ -332,6 +332,8 @@ public sealed partial class VoiceState
     {
         if (active is not { EverConnected: true } attempt || !Current(attempt)) return Task.CompletedTask;
         if (attempt.Link.State == CallLinkState.Reconnecting) { attempt.Reconnector?.Nudge(); return Task.CompletedTask; }
+        // A new network: an open UDP media path restarts ICE in place (or, with none, tries again now).
+        if (kind is "online" or "network") attempt.Media?.NetworkChanged();
         var now = LinkNow();
         // Back from the background, the last frame is old for a reason that says nothing about the socket.
         if (kind == "visible") attempt.Link.Inbound(now);
@@ -359,6 +361,20 @@ public sealed partial class VoiceState
         attempt.NetworkWatch = null;
         try { await watch.InvokeVoidAsync("dispose"); await watch.DisposeAsync(); }
         catch (Exception) { /* The page is going away. */ }
+    }
+
+    /// <summary>The media path in the diagnostic log: "udp.relay", "tls.relay" or "websocket", with why and the RTT.</summary>
+    private async Task RecordPathAsync(MediaPathStatus status)
+    {
+        try
+        {
+            var kind = status.Kind == MediaPathKind.Datagram ? status.Description.Replace('/', '.').ToLowerInvariant() : "websocket";
+            await js.InvokeVoidAsync("yap.diagnostics.record", "call.transport", new
+            {
+                kind, reason = status.Reason ?? (status.AudioRedundancy ? "redundant-audio" : "ok"), ms = (int)Math.Round(status.RttMs ?? 0)
+            });
+        }
+        catch { /* Diagnostics never hold up a call. */ }
     }
 
     private async Task RecordLinkAsync(string kind, Attempt attempt, int attempts = 0)

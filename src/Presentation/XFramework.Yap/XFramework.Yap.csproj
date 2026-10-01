@@ -10,6 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../Libraries/Bolt/Bolt.Server/Bolt.Server.csproj" />
+    <ProjectReference Include="../../Libraries/Bolt/Bolt.Rtc/Bolt.Rtc.csproj" />
     <ProjectReference Include="../XFramework.Yap.Contracts/XFramework.Yap.Contracts.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />

@@ -4,6 +4,11 @@
     @if (Snapshot is { } info)
     {
         <div class="debug-stream">
+            <strong>Transport: @(string.IsNullOrEmpty(info.Transport) ? "—" : info.Transport)</strong>
+            @if (info.TransportReason is { Length: > 0 } reason) { <div>On the WebSocket: @reason</div> }
+            @if (info.TransportRttMs is { } rtt) { <div>Round trip: @Number(rtt) ms@(info.AudioRedundancy ? " · audio sent twice" : "")</div> }
+        </div>
+        <div class="debug-stream">
             <strong>Outgoing · @(info.Capturing ? "camera on" : "camera off")</strong>
             <div>Requested: @(RequestedHeight)p / @RequestedFps fps</div>
             @if (info.Capturing)
