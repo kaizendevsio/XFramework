@@ -37,6 +37,8 @@ internal sealed class HarnessDatagram : IAsyncDisposable
     public bool IsOpen => _peer is { State: RtcChannelState.Open };
     public string Path => _peer is { State: RtcChannelState.Open } peer ? peer.Path?.Describe() ?? "UDP" : "WebSocket";
     public double? OpenedAtS { get; private set; }
+    /// <summary>The path media last took on the channel (the summary is written after the call ended and closed it).</summary>
+    public string? LastOpenPath { get; private set; }
     public long DatagramFrames, SocketFrames, Duplicates, IceRestarts, Failures, Opens;
     public readonly List<string> Timeline = [];
 
@@ -104,7 +106,11 @@ internal sealed class HarnessDatagram : IAsyncDisposable
                     peer.LocalCandidate += candidate => _ = _sendOnSocket(MediaTransportCodec.Encode(MediaTransportKind.Candidate,
                         new MediaTransportCandidate(config.Session, candidate.Candidate, candidate.SdpMid, candidate.SdpMLineIndex)));
                     peer.StateChanged += state => _ = OnStateAsync(peer, state);
-                    peer.PathChanged += path => Note($"path {path.Describe()} rtt={path.RttMs:F0}ms");
+                    peer.PathChanged += path =>
+                    {
+                        LastOpenPath = path.Describe();
+                        Note($"path {path.Describe()} rtt={path.RttMs:F0}ms");
+                    };
                     peer.Message += data => OnMessage(data.Span);
                     var offer = await peer.CreateOfferAsync(false, _stop.Token);
                     await _sendOnSocket(MediaTransportCodec.Encode(MediaTransportKind.Offer, new MediaTransportDescription(config.Session, offer)));
@@ -137,7 +143,8 @@ internal sealed class HarnessDatagram : IAsyncDisposable
             Opens++;
             OpenedAtS ??= Math.Round(_clock.Elapsed.TotalSeconds, 2);
             _failures = 0;
-            Note($"open via {peer.Path?.Describe() ?? "UDP"}");
+            LastOpenPath = peer.Path?.Describe() ?? "UDP";
+            Note($"open via {LastOpenPath}");
             return;
         }
         if (state is RtcChannelState.Failed or RtcChannelState.Closed) await FailAsync(peer, state.ToString().ToLowerInvariant());
@@ -197,7 +204,8 @@ internal sealed class HarnessDatagram : IAsyncDisposable
 
     public object Summary() => new
     {
-        path = Path,
+        path = LastOpenPath ?? "WebSocket",
+        openAtEnd = IsOpen,
         openedAtS = OpenedAtS,
         opens = Opens,
         failures = Failures,

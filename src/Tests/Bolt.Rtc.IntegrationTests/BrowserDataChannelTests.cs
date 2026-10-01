@@ -80,7 +80,8 @@ public sealed class BrowserDataChannelTests
     }
 
     private sealed record ServerResult(string? Path, long Cwnd, int Received);
-    private readonly ConcurrentDictionary<string, ServerResult> _serverResults = new();
+    private sealed class RelaySide(IRtcPeer peer) { public IRtcPeer Peer { get; } = peer; public int Received; }
+    private readonly ConcurrentDictionary<string, RelaySide> _relays = new();
 
     /// <summary>The relay's end: one answering peer per page, relay-only, echoing every message back.</summary>
     private async Task SignalAsync(HttpContext context)
@@ -99,11 +100,9 @@ public sealed class BrowserDataChannelTests
         var peer = await _sidecar!.CreateAsync(RtcPeerRole.Answer, new RtcPeerOptions(
             [Turn($"turn:{_turnHost}:3478?transport=udp", "relay")], RelayOnly: true, RtcDefaults.MaxMessageBytes, 128 * 1024), CancellationToken.None);
         _relayPeers.Enqueue(peer);
-        var received = 0;
+        var relay = _relays[id] = new RelaySide(peer);
         peer.LocalCandidate += candidate => _ = Send(new { type = "candidate", candidate = candidate.Candidate, sdpMid = candidate.SdpMid, sdpMLineIndex = candidate.SdpMLineIndex });
-        peer.Message += data => { Interlocked.Increment(ref received); peer.TrySend(data.Span); };
-        peer.StateChanged += state => _serverResults[id] = new(peer.Path?.Describe(), peer.CongestionWindow, received);
-        peer.PathChanged += path => _serverResults[id] = new(path.Describe(), peer.CongestionWindow, received);
+        peer.Message += data => { Interlocked.Increment(ref relay.Received); peer.TrySend(data.Span); };
         var buffer = new byte[64 * 1024];
         while (socket.State == WebSocketState.Open)
         {
@@ -123,7 +122,6 @@ public sealed class BrowserDataChannelTests
                         root.TryGetProperty("sdpMLineIndex", out var index) && index.ValueKind == JsonValueKind.Number ? index.GetInt32() : null), CancellationToken.None);
                     break;
                 case "done":
-                    _serverResults[id] = new(peer.Path?.Describe(), peer.CongestionWindow, received);
                     break;
             }
         }
@@ -220,8 +218,11 @@ public sealed class BrowserDataChannelTests
             timeoutMs,
         });
         var result = JsonSerializer.Deserialize<CallResult>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
-        await Task.Delay(500);
-        return (result, _serverResults.GetValueOrDefault(id));
+        if (!_relays.TryGetValue(id, out var relay)) return (result, null);
+        // The relay's view of the same call: its path and SCTP window arrive with its periodic reports.
+        for (var wait = 0; result.Opened && wait < 50 && (relay.Peer.Path is null || relay.Peer.CongestionWindow == 0); wait++)
+            await Task.Delay(100);
+        return (result, new ServerResult(relay.Peer.Path?.Describe(), relay.Peer.CongestionWindow, Volatile.Read(ref relay.Received)));
     }
 
     [TestCase("chromium")]

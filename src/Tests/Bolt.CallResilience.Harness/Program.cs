@@ -257,7 +257,11 @@ internal static class Relay
         {
             await Task.Delay(1000);
             Env.Log($"RELAY t={T():F0} sentAudio={AudioSent()} sentVideo={VideoSent()} keyframes={Keyframes()} " +
-                    $"keyRequests={KeyRequests()} {string.Join(' ', counters.OrderBy(x => x.Key).Select(x => $"{x.Key}={x.Value}"))}");
+                    $"keyRequests={KeyRequests()} {string.Join(' ', counters.OrderBy(x => x.Key).Select(x => $"{x.Key}={x.Value}"))}"
+#if HARNESS_ADAPTIVE
+                    + ReceiverPipe(server)
+#endif
+                    );
         }
 
         object? rate = null;
@@ -295,6 +299,31 @@ internal static class Relay
     }
 
 #if HARNESS_ADAPTIVE
+    private static long _lastDatagramSent;
+
+    /// <summary>
+    /// Once a second, where the receiver's media waits: in the relay's lanes (audio / video bytes queued), or in the
+    /// data channel (its buffered amount, which includes SCTP's unacknowledged bytes, against its window).
+    /// </summary>
+    private static string ReceiverPipe(BoltServer server)
+    {
+        var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        if (typeof(BoltServer).GetField("_connectionsByStreamId", flags)?.GetValue(server) is not System.Collections.IDictionary connections) return "";
+        foreach (System.Collections.DictionaryEntry entry in connections)
+        {
+            if (entry.Value is not BoltHubConnection { ClientId: "receiver" } receiver) continue;
+            var queue = typeof(BoltHubConnection).GetProperty("MediaQueue", flags)?.GetValue(receiver);
+            var audio = queue?.GetType().GetProperty("QueuedAudioBytes")?.GetValue(queue);
+            var video = queue?.GetType().GetProperty("QueuedVideoBytes")?.GetValue(queue);
+            var peer = typeof(BoltHubConnection).GetField("_datagram", flags)?.GetValue(receiver) as IRtcPeer;
+            var sent = receiver.DatagramFramesSent;
+            var delta = sent - _lastDatagramSent;
+            _lastDatagramSent = sent;
+            return $" lanes={audio}/{video} dgram={(peer is null ? "-" : $"{peer.State}:buf{peer.BufferedAmount}/cwnd{peer.CongestionWindow}/drop{peer.Dropped}")} sent+{delta} redundant={receiver.RedundantAudioFrames}";
+        }
+        return "";
+    }
+
     /// <summary>What the relay sent the receiver over its data channel, and what still took the socket.</summary>
     private static object? DatagramStats(BoltServer server)
     {
