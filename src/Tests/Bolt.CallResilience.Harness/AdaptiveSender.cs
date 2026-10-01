@@ -13,7 +13,7 @@ internal sealed record AdaptiveProfile(int StartHeight, int AudioKbps, int Keyfr
 
 internal sealed class AdaptiveSender(Stopwatch clock) : IAsyncDisposable
 {
-    private const int FragmentPayload = 4084 + 12 + 26; // fragment + fragment header + SFrame overhead
+    private static readonly int FragmentPayload = Env.FragmentPayload; // fragment + fragment header + SFrame overhead
     private readonly ClientWebSocket _socket = new();
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private readonly CancellationTokenSource _stop = new();
@@ -116,7 +116,7 @@ internal sealed class AdaptiveSender(Stopwatch clock) : IAsyncDisposable
             while (await timer.WaitForNextTickAsync(_stop.Token))
             {
                 // Opus bytes for 20 ms at the current rate, plus the SFrame header and tag.
-                var payload = Payload.Create(_audioKbps * 20 / 8 + 26, Payload.Audio);
+                var payload = Payload.Create(_audioKbps * 20 / 8 + Env.SFrameOverhead, Payload.Audio);
                 var sequence = ++_audioSequence;
                 var timestamp = (uint)(clock.ElapsedMilliseconds * 48); // capture clock, 48 kHz
                 _pacer!.EnqueueAudio(Frames.Write(w => BoltCodec.WriteMediaFrame(w, _audio, sequence, timestamp, MediaFrameFlags.Encrypted, payload)));

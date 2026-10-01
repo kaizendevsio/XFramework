@@ -24,6 +24,8 @@
     <ItemGroup>
         <ProjectReference Include="$(BoltServerProject)" />
         <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Media\Bolt.Media.csproj" Condition="'$(HarnessAdaptive)' == 'true'" />
+        <!-- UDP=1 runs: the relay's and the receiver's WebRTC endpoint (the bolt-rtc sidecar). -->
+        <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Rtc\Bolt.Rtc.csproj" Condition="'$(HarnessAdaptive)' == 'true'" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(HarnessAdaptive)' != 'true'">

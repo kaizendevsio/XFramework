@@ -44,6 +44,18 @@ internal static class Env
         Environment.GetEnvironmentVariable(name) is { Length: > 0 } value ? value : fallback;
     public static long NowMs() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     public static void Log(string line) => Console.WriteLine(line);
+
+    /// <summary>
+    /// Bytes standing in for SFrame's header, tag and authenticated context. 26 is what #563-#566 measured with;
+    /// the real adapter adds about 278 bytes per frame (its context travels inside the ciphertext).
+    /// </summary>
+    public static int SFrameOverhead => Int("SFRAME_OVERHEAD", 26);
+
+    /// <summary>
+    /// A video fragment's MediaFrame payload: 4 KB of picture plus the fragment header and SFrame over a WebSocket;
+    /// with UDP=1 whatever fills one 1150-byte data-channel message (the browser sizes them the same way).
+    /// </summary>
+    public static int FragmentPayload => Int("UDP", 0) == 1 ? 1150 - BoltCodec.MediaFrameHeaderSize : 4084 + 12 + SFrameOverhead;
 }
 
 /// <summary>
@@ -130,6 +142,13 @@ internal static class Relay
             MaxConnectionsPerPrincipal = 2, MaxConnectionLifetimeSeconds = 3600
         };
         var stallApplied = TrySet(options, "TransportSendStallTimeoutMs", Env.Int("STALL_MS", 15_000));
+#if HARNESS_ADAPTIVE
+        // UDP=1: the relay offers the datagram path through TURN (coturn in the run's network), as Yap does with TURN set.
+        await using var rtc = HarnessDatagram.Enabled && HarnessIce.Configured
+            ? new Bolt.Rtc.RtcSidecar(new Bolt.Rtc.RtcSidecarOptions { ExecutablePath = "/app/bolt-rtc" }) : null;
+        if (rtc is not null)
+            options.MediaTransport = new BoltMediaTransportOptions { Peers = rtc, IceServers = new HarnessIce() };
+#endif
         TrySet(options, "GroupAuthorizationGraceSeconds", Env.Int("AUTH_GRACE_S", 120));
 
         var counters = new ConcurrentDictionary<string, long>();
@@ -258,6 +277,9 @@ internal static class Relay
             keyframesSent = Keyframes(),
             keyframeRequestsReceived = KeyRequests(),
             rate,
+#if HARNESS_ADAPTIVE
+            datagram = DatagramStats(server),
+#endif
             counters
         }));
 #if HARNESS_ADAPTIVE
@@ -271,6 +293,19 @@ internal static class Relay
         await app.StopAsync(TimeSpan.FromSeconds(2));
         return 0;
     }
+
+#if HARNESS_ADAPTIVE
+    /// <summary>What the relay sent the receiver over its data channel, and what still took the socket.</summary>
+    private static object? DatagramStats(BoltServer server)
+    {
+        var field = typeof(BoltServer).GetField("_connectionsByStreamId", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        if (field?.GetValue(server) is not System.Collections.IDictionary connections) return null;
+        foreach (System.Collections.DictionaryEntry entry in connections)
+            if (entry.Value is BoltHubConnection { ClientId: "receiver" } receiver)
+                return new { sent = receiver.DatagramFramesSent, fellBackToSocket = receiver.DatagramFallbacks, redundantAudio = receiver.RedundantAudioFrames };
+        return null;
+    }
+#endif
 
     private static async Task<bool> JoinAsync(BoltServer server, Guid call, string id, TimeSpan patience)
     {
@@ -330,7 +365,7 @@ internal sealed record SenderProfile(int AudioPayload, int VideoKbps, int Fps, i
 /// <summary>A participant on an unshaped link publishing one audio and one video stream.</summary>
 internal sealed class Sender(Stopwatch clock) : IAsyncDisposable
 {
-    private const int FragmentPayload = 4084 + 12 + 26; // fragment + fragment header + SFrame overhead
+    private static readonly int FragmentPayload = Env.FragmentPayload; // fragment + fragment header + SFrame overhead
     private readonly ClientWebSocket _socket = new();
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private readonly CancellationTokenSource _stop = new();
@@ -499,16 +534,60 @@ internal static class Receiver
         });
 #endif
         var end = "socket closed";
-        var buffer = new byte[128 * 1024];
         var lastTick = 0L;
         // Stop on our own if the relay's close never arrives (it can be lost with a dead link).
         using var patience = new CancellationTokenSource(TimeSpan.FromSeconds(Env.Int("SECONDS", 180) + 150));
+        // Frames from the socket and (UDP=1) from the data channel, in arrival order.
+        var inbox = System.Threading.Channels.Channel.CreateUnbounded<byte[]>();
+        long? recoveredAt = null;
+#if HARNESS_ADAPTIVE
+        await using var datagram = HarnessDatagram.Enabled
+            ? new HarnessDatagram(async frame =>
+                {
+                    await sendLock.WaitAsync();
+                    try { await socket.SendAsync(frame, WebSocketMessageType.Binary, true, CancellationToken.None); }
+                    finally { sendLock.Release(); }
+                }, frame => inbox.Writer.TryWrite(frame), clock)
+            : null;
+        datagram?.Start();
+        // IPCHANGE_UDP_AT_S: the data channel's UDP flows die (a new network) and the phone restarts ICE on its
+        // network-change event; the socket is left alone. Recovery is timed from the change.
+        var iceRestartAt = Env.Int("IPCHANGE_UDP_AT_S", -1);
+        long? iceRestartedAt = null;
+#endif
+        var reader = Task.Run(async () =>
+        {
+            var socketBuffer = new byte[128 * 1024];
+            try
+            {
+                while (await Frames.ReceiveAsync(socket, socketBuffer, patience.Token) is { } message)
+                    foreach (var frame in Frames.Unbatch(message))
+                    {
+#if HARNESS_ADAPTIVE
+                        if (frame[0] == (byte)FrameType.MediaTransport) { if (datagram is not null) await datagram.HandleAsync(frame); continue; }
+                        if (datagram is not null) { datagram.Accept(frame, datagram: false); continue; }
+#endif
+                        inbox.Writer.TryWrite(frame);
+                    }
+                inbox.Writer.TryComplete();
+            }
+            catch (Exception error) { inbox.Writer.TryComplete(error); }
+        });
         try
         {
-            while (await Frames.ReceiveAsync(socket, buffer, patience.Token) is { } message)
+            while (await inbox.Reader.WaitToReadAsync(patience.Token))
             {
                 var now = Env.NowMs();
-                foreach (var frame in Frames.Unbatch(message))
+#if HARNESS_ADAPTIVE
+                if (datagram is not null && iceRestartAt >= 0 && iceRestartedAt is null && clock.Elapsed.TotalSeconds >= iceRestartAt)
+                {
+                    iceRestartedAt = now;
+                    File.WriteAllText("/tmp/outage-end", now.ToString());
+                    HarnessDatagram.BlackholeUdp();
+                    await datagram.NetworkChangedAsync();
+                }
+#endif
+                while (inbox.Reader.TryRead(out var frame))
                 {
                     if (frame[0] == (byte)FrameType.MediaConfig && BoltCodec.TryReadMediaConfig(frame, out var config))
                     { kinds[config.StreamId] = config.MediaType; continue; }
@@ -525,6 +604,9 @@ internal static class Receiver
                     window.Bytes += frame.Length;
                     if (payload[8] == Payload.Audio)
                     {
+                        // Recovery after an outage or a network change: the first live (under 2 s old) audio after it.
+                        if (recoveredAt is null && delay <= 2000 && ReadUnix("/tmp/outage-end") is { } outageEnd && now >= outageEnd)
+                            recoveredAt = now - outageEnd;
                         audioDelays.Add(delay); window.Audio.Add(delay); audioReceived++;
                         if (firstMediaAt is { } started && clock.ElapsedMilliseconds - started >= 20_000) settledAudioDelays.Add(delay);
                         firstAudioSequence ??= header.SequenceNumber;
@@ -574,9 +656,13 @@ internal static class Receiver
             }
         }
         catch (Exception error) { end = $"{error.GetType().Name}: {error.Message}"; }
+        try { await reader; } catch { /* Ended with the socket. */ }
 #if HARNESS_ADAPTIVE
         feedbackStop.Cancel();
         await feedbackLoop;
+        var transport = datagram?.Summary();
+#else
+        object? transport = null;
 #endif
 
         var span = firstAudioSequence is { } first && lastAudioSequence is { } last ? last - first + 1 : 0;
@@ -596,10 +682,15 @@ internal static class Receiver
             picturesDecodable,
             decodableByLayer = layerPictures,
             keyframes,
-            frozenSeconds
+            frozenSeconds,
+            recoverAfterMs = recoveredAt,
+            transport
         }));
         return 0;
     }
+
+    private static long? ReadUnix(string path) =>
+        File.Exists(path) && long.TryParse(File.ReadAllText(path).Trim(), out var value) ? value : null;
 
     private static long Percentile(List<long> values, double q)
     {

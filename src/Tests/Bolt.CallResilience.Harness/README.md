@@ -126,6 +126,29 @@ first live audio packet / decodable picture, one delivered within 2 s of being s
 the other side's call survived and how long the seat was held. `summarize.py` prints a second table
 for these runs. Expectations in `run-profile.sh`: `resume`, `resume-retired` and `end-clean`.
 
+## UDP media (UDP=1)
+
+With `UDP=1` the run gets a TURN server (coturn, `turn` in the run's network) and the relay offers the
+phase 3 datagram path exactly as Yap does when TURN is configured: the relay's own WebRTC peer (the
+`bolt-rtc` sidecar, relay candidates only) and per-session TURN REST credentials. The receiver asks for a
+session over its call socket and offers a peer of its own (the same sidecar, in the offering role, since
+there is no browser here), then receives media on the data channel while its socket carries everything else.
+The sender stays on loopback over its WebSocket but cuts pictures into 1150-byte messages, as a phone on UDP
+does. The relay's egress netem shapes the relay-to-TURN leg and the receiver's shapes its own leg, the same
+two directions as the WebSocket runs. A receiver whose channel fails or never opens stays on its socket.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `UDP` | 0 | 1 adds TURN and the datagram path (needs the head build: `bolt-rtc` next to the harness) |
+| `UDP_BLOCK` | 0 | 1 drops the receiver's UDP to the TURN server: the call must stay on its WebSocket |
+| `IPCHANGE_UDP_AT_S` | off | The data channel's UDP flows are blackholed (a new network) and the receiver restarts ICE; the socket is untouched |
+| `SFRAME_OVERHEAD` | 26 | Bytes per frame standing in for SFrame; the real adapter adds about 278 (its context travels inside the ciphertext) |
+
+`run-profile.sh` starts coturn and passes `TURN_URL` / `TURN_SECRET`. The summaries gain a `transport`
+object (receiver: final path, when it opened, ICE restarts, frames on each path, a timeline) and a
+`datagram` object (relay: frames sent on the channel, frames that fell back to the socket, redundant audio).
+`summarize.py` prints a UDP-against-WebSocket table for the `udp-*` / `ws-*` pairs.
+
 ## Reading the result
 
 `SUMMARY` lines are JSON. The relay's `outcome` is `survived` unless a participant was retired,
