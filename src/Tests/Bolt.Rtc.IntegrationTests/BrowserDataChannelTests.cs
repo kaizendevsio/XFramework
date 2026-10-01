@@ -260,7 +260,9 @@ public sealed class BrowserDataChannelTests
         Assert.Multiple(() =>
         {
             Assert.That(browser.Opened, Is.True, browser.ToString());
-            Assert.That(browser.Echoed, Is.EqualTo(200));
+            // The channel never retransmits, and coturn re-sends the TCP leg's burst as UDP to the relay, where a
+            // few datagrams can drop on a busy runner. The test proves the path, not a lossless one.
+            Assert.That(browser.Echoed, Is.InRange(190, 200));
             Assert.That(browser.Path?.RelayProtocol, Is.EqualTo("tcp"), "the browser's leg rides TCP to TURN");
             Assert.That(relay?.Path, Is.EqualTo("UDP/relay"));
         });
