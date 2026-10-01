@@ -56,9 +56,10 @@ public static class RtcDefaults
 }
 
 /// <summary>
-/// A WebRTC peer connection with one pre-negotiated data channel (id 0, unordered, never retransmitted,
-/// binary). Media rides it as whole Bolt frames, one per message, already SFrame-encrypted end to end; DTLS
-/// adds hop encryption only.
+/// A WebRTC peer connection with one data channel ("bolt-media", unordered, never retransmitted, binary),
+/// opened in band by the offering side and accepted, with exactly those settings, by the answering side.
+/// Media rides it as whole Bolt frames, one per message, already SFrame-encrypted end to end; DTLS adds hop
+/// encryption only.
 ///
 /// Congestion: SCTP's own loss-based window still runs underneath. A sender reads it through
 /// <see cref="BufferedAmount"/> (what the channel has not yet sent or had acknowledged) and keeps that

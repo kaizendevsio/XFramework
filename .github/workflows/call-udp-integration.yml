@@ -2,7 +2,7 @@ name: Call UDP integration
 
 # Real browsers (Chromium and WebKit, through the production bolt-rtc.js) against the relay's WebRTC endpoint
 # (the bolt-rtc sidecar driven by Bolt.Rtc), both forced through a real TURN server (coturn). Covers the
-# data channel's shape (pre-negotiated, unordered, never retransmitted, binary), full-size messages both
+# data channel's shape (opened in band, unordered, never retransmitted, binary), full-size messages both
 # ways, TURN over UDP and over TCP, and an unreachable TURN server (where the call stays on its WebSocket).
 on:
   workflow_dispatch:
@@ -48,6 +48,8 @@ jobs:
           set -euo pipefail
           go vet ./...
           go test -race -count=1 ./...
+          # The property everything rests on, on a virtual 500 ms / 3% loss link: what arrives, arrives one way later.
+          BOLT_RTC_LATENCY=1 go test -count=1 -run TestUnreliableChannelNeverWaitsARoundTrip -v ./... | grep -E 'messages=|^(ok|FAIL|---)'
           CGO_ENABLED=0 go build -trimpath -o "$RUNNER_TEMP/bolt-rtc" .
 
       - name: Start coturn

@@ -1,11 +1,14 @@
-// Datagram media path for Bolt calls: one RTCPeerConnection with one pre-negotiated data channel
-// (id 0, unordered, never retransmitted, binary) to the relay, through TURN. The .NET side decides
-// what goes on it; this module only drives the browser's WebRTC objects and reports back.
+// Datagram media path for Bolt calls: one RTCPeerConnection with one data channel (unordered, never
+// retransmitted, binary) to the relay, through TURN. The .NET side decides what goes on it; this module
+// only drives the browser's WebRTC objects and reports back.
+//
+// The channel is opened in band (DCEP) rather than pre-negotiated: the relay's WebRTC stack applies a
+// channel's ordering and retransmission settings only to channels opened that way.
 //
 // Frames arrive here already SFrame-encrypted end to end. DTLS on the channel is a hop layer only.
 // Nothing here logs SDP, candidates or ICE credentials.
 
-const channelOptions = { negotiated: true, id: 0, ordered: false, maxRetransmits: 0 };
+const channelOptions = { ordered: false, maxRetransmits: 0 };
 const pathPollMs = 2000;
 
 export function isSupported() {

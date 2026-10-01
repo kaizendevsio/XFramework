@@ -103,8 +103,10 @@ message, with DTLS as an extra hop layer.
 - **Negotiation** rides the authenticated socket as `MediaTransport` frames: the participant asks; the relay
   mints short-lived ICE servers for it (`IBoltIceServerSource`, e.g. Cloudflare TURN) and announces a session;
   the participant offers, the relay answers with a relay-only peer; candidates trickle both ways.
-- **The channel** is pre-negotiated (id 0), unordered, never retransmitted, binary, and carries at most 1150
-  bytes per message. The relay's endpoint is the `bolt-rtc` sidecar (Pion), driven by `Bolt.Rtc`.
+- **The channel** is opened in band by the participant (DCEP), unordered, never retransmitted, binary, and
+  carries at most 1150 bytes per message; the relay accepts only a channel with exactly those settings. (Pion
+  keeps a pre-negotiated channel ordered and reliable on its sending side, so in-band opening is required.)
+  The relay's endpoint is the `bolt-rtc` sidecar (Pion), driven by `Bolt.Rtc`.
 - **Relay to participant.** The receiver's media lanes drain into the channel instead of the socket, never
   blocking: while the channel holds more than its SCTP window plus 16 KiB, media waits in the lanes (where audio
   still overtakes video and stale video is dropped). Frames too large for one message take the socket.

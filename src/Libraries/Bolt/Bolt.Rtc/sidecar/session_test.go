@@ -150,8 +150,8 @@ func TestPeersOpenAnUnorderedUnreliableChannelAndCarryMessagesBothWays(t *testin
 		if dc.MaxRetransmits() == nil || *dc.MaxRetransmits() != 0 {
 			t.Fatal("media channel must never retransmit")
 		}
-		if !dc.Negotiated() || dc.ID() == nil || *dc.ID() != mediaChannelID {
-			t.Fatal("media channel must be pre-negotiated")
+		if dc.Negotiated() || dc.Label() != mediaChannelLabel {
+			t.Fatal("the media channel is opened in band, so pion applies its settings on both sides")
 		}
 	}
 
@@ -279,5 +279,68 @@ func TestFramesAreBounded(t *testing.T) {
 	f, err := readFrame(bytes.NewReader(encoded), make([]byte, 4))
 	if err != nil || f.kind != msgData || !bytes.Equal(f.payload, []byte{1, 2, 3}) {
 		t.Fatal("frames must round-trip")
+	}
+}
+
+// A participant that opens a reliable (or ordered, or differently named) channel gets no media path: the relay
+// only ever sends on a channel that cannot hold media back for a retransmission.
+func TestTheRelayRefusesAChannelThatWouldRetransmit(t *testing.T) {
+	answerer := startHost(t)
+	answerer.hello("answer", nil)
+	settings := webrtc.SettingEngine{}
+	settings.SetIncludeLoopbackCandidate(true)
+	settings.SetIPFilter(func(ip net.IP) bool { return ip.IsLoopback() })
+	settings.SetNetworkTypes([]webrtc.NetworkType{webrtc.NetworkTypeUDP4})
+	pc, err := webrtc.NewAPI(webrtc.WithSettingEngine(settings)).NewPeerConnection(webrtc.Configuration{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = pc.Close() }()
+	reliable, err := pc.CreateDataChannel(mediaChannelLabel, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closed := make(chan struct{})
+	reliable.OnClose(func() { close(closed) })
+	pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
+		if candidate == nil {
+			return
+		}
+		init := candidate.ToJSON()
+		answerer.sendJSON(msgCandidate, candidateMessage{Candidate: init.Candidate, SDPMid: init.SDPMid, SDPMLineIndex: init.SDPMLineIndex})
+	})
+	offer, _ := pc.CreateOffer(nil)
+	_ = pc.SetLocalDescription(offer)
+	answerer.sendJSON(msgSDP, sdpMessage{Type: "offer", SDP: offer.SDP})
+	deadline := time.After(20 * time.Second)
+	for {
+		select {
+		case f := <-answerer.frames:
+			switch f.kind {
+			case msgSDP:
+				var answer sdpMessage
+				_ = json.Unmarshal(f.payload, &answer)
+				_ = pc.SetRemoteDescription(webrtc.SessionDescription{Type: webrtc.SDPTypeAnswer, SDP: answer.SDP})
+			case msgCandidate:
+				var candidate candidateMessage
+				_ = json.Unmarshal(f.payload, &candidate)
+				if candidate.Candidate != "" {
+					_ = pc.AddICECandidate(webrtc.ICECandidateInit{Candidate: candidate.Candidate, SDPMid: candidate.SDPMid, SDPMLineIndex: candidate.SDPMLineIndex})
+				}
+			case msgState:
+				if channelOpen(f.payload) {
+					t.Fatal("a reliable channel must never become the media path")
+				}
+			}
+		case <-closed:
+			answerer.session.mu.Lock()
+			defer answerer.session.mu.Unlock()
+			if answerer.session.dc != nil {
+				t.Fatal("the refused channel must not be attached")
+			}
+			return
+		case <-deadline:
+			t.Fatal("the relay should close a channel it does not accept")
+		}
 	}
 }

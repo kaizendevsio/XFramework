@@ -20,9 +20,10 @@ const (
 	defaultMaxMessage = 1200
 	// A host that respects the buffered reports never comes near this; it only bounds memory.
 	hardBufferedCap = 4 * 1024 * 1024
-	// The media channel is negotiated out of band (both sides create it with this ID), so no DCEP
-	// round trip is needed before media can flow.
-	mediaChannelID    = 0
+	// The media channel is opened in band by the offering side (DCEP). Pion applies a channel's ordering and
+	// retransmission settings only to channels opened that way: a pre-negotiated channel silently stays
+	// ordered and reliable on pion's sending side (pion/datachannel Client never commits them), which turned
+	// every loss into a round trip of head-of-line blocking.
 	mediaChannelLabel = "bolt-media"
 	controlQueue      = 256
 	dataQueue         = 2048
@@ -172,20 +173,32 @@ func (s *session) start(h hello) error {
 	if err != nil {
 		return fmt.Errorf("peer connection: %w", err)
 	}
-	negotiated := true
-	ordered := false
-	var id uint16 = mediaChannelID
-	var retransmits uint16 = 0
-	dc, err := pc.CreateDataChannel(mediaChannelLabel, &webrtc.DataChannelInit{
-		Negotiated: &negotiated, ID: &id, Ordered: &ordered, MaxRetransmits: &retransmits,
-	})
-	if err != nil {
-		_ = pc.Close()
-		return fmt.Errorf("data channel: %w", err)
-	}
 	s.mu.Lock()
-	s.pc, s.dc = pc, dc
+	s.pc = pc
 	s.mu.Unlock()
+	if h.Role == "offer" {
+		ordered := false
+		var retransmits uint16 = 0
+		dc, err := pc.CreateDataChannel(mediaChannelLabel, &webrtc.DataChannelInit{Ordered: &ordered, MaxRetransmits: &retransmits})
+		if err != nil {
+			_ = pc.Close()
+			return fmt.Errorf("data channel: %w", err)
+		}
+		s.attachChannel(dc)
+	} else {
+		// The answering side takes exactly one channel: the media channel, unordered and never retransmitted.
+		pc.OnDataChannel(func(dc *webrtc.DataChannel) {
+			s.mu.Lock()
+			taken := s.dc != nil
+			s.mu.Unlock()
+			if taken || !isMediaChannel(dc) {
+				s.logger.Printf("session %d: refused data channel", s.id)
+				_ = dc.Close()
+				return
+			}
+			s.attachChannel(dc)
+		})
+	}
 
 	pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
 		message := candidateMessage{}
@@ -197,12 +210,30 @@ func (s *session) start(h hello) error {
 	})
 	pc.OnICEConnectionStateChange(func(webrtc.ICEConnectionState) { s.sendState() })
 	pc.OnConnectionStateChange(func(webrtc.PeerConnectionState) { s.sendState() })
+	return nil
+}
+
+// isMediaChannel accepts only what the relay can rely on: the media label, unordered, no retransmission.
+func isMediaChannel(dc *webrtc.DataChannel) bool {
+	return dc.Label() == mediaChannelLabel && !dc.Ordered() && dc.MaxRetransmits() != nil && *dc.MaxRetransmits() == 0 &&
+		dc.MaxPacketLifeTime() == nil
+}
+
+func (s *session) attachChannel(dc *webrtc.DataChannel) {
+	s.mu.Lock()
+	s.dc = dc
+	s.mu.Unlock()
 	dc.SetBufferedAmountLowThreshold(16 * 1024)
 	dc.OnBufferedAmountLow(func() { s.reportBuffered() })
-	dc.OnOpen(func() {
+	opened := func() {
+		// The path and the window are known at once, not half a second later.
+		s.sample()
 		s.sendState()
+		s.reportBuffered()
 		go s.reportLoop()
-	})
+	}
+	var once sync.Once
+	dc.OnOpen(func() { once.Do(opened) })
 	dc.OnClose(func() { s.sendState() })
 	dc.OnMessage(func(message webrtc.DataChannelMessage) {
 		if message.IsString || len(message.Data) == 0 || len(message.Data) > s.maxMessage {
@@ -214,7 +245,10 @@ func (s *session) start(h hello) error {
 			s.dropped.Add(1)
 		}
 	})
-	return nil
+	// An accepted channel may already be open by the time it is handed over.
+	if dc.ReadyState() == webrtc.DataChannelStateOpen {
+		once.Do(opened)
+	}
 }
 
 // handle applies one message from the host. False ends the session.
@@ -367,7 +401,7 @@ func (s *session) reportLoop() {
 			s.mu.Lock()
 			dc := s.dc
 			s.mu.Unlock()
-			if dc.ReadyState() != webrtc.DataChannelStateOpen {
+			if dc == nil || dc.ReadyState() != webrtc.DataChannelStateOpen {
 				return
 			}
 			buffered := dc.BufferedAmount()
@@ -406,27 +440,20 @@ func (s *session) sample() {
 	pc := s.pc
 	s.mu.Unlock()
 	report := pc.GetStats()
-	var path *pathInfo
+	var candidates []webrtc.ICECandidateStats
+	var pairs []webrtc.ICECandidatePairStats
 	for _, value := range report {
 		switch stat := value.(type) {
 		case webrtc.SCTPTransportStats:
 			s.cwnd.Store(stat.CongestionWindow)
 			s.srttMs.Store(uint32(stat.SmoothedRoundTripTime * 1000))
+		case webrtc.ICECandidateStats:
+			candidates = append(candidates, stat)
 		case webrtc.ICECandidatePairStats:
-			if !stat.Nominated || stat.State != webrtc.StatsICECandidatePairStateSucceeded {
-				continue
-			}
-			local, lok := report[stat.LocalCandidateID].(webrtc.ICECandidateStats)
-			remote, rok := report[stat.RemoteCandidateID].(webrtc.ICECandidateStats)
-			if !lok || !rok {
-				continue
-			}
-			path = &pathInfo{
-				Local: local.CandidateType.String(), LocalProtocol: local.Protocol, RelayProtocol: local.RelayProtocol,
-				Remote: remote.CandidateType.String(), RttMs: stat.CurrentRoundTripTime * 1000,
-			}
+			pairs = append(pairs, stat)
 		}
 	}
+	path := selectedPath(pc, candidates, pairs)
 	if path == nil {
 		return
 	}
@@ -440,6 +467,36 @@ func (s *session) sample() {
 	if changed {
 		s.sendState()
 	}
+}
+
+// selectedPath names the pair ICE selected: the local and remote candidate types, the local protocol and,
+// for a local relay candidate, the protocol to the TURN server. The controlled side (the relay answers)
+// does not always mark a pair nominated in its stats, so the transport's own selection decides.
+func selectedPath(pc *webrtc.PeerConnection, candidates []webrtc.ICECandidateStats, pairs []webrtc.ICECandidatePairStats) *pathInfo {
+	transport := pc.SCTP().Transport().ICETransport()
+	selected, err := transport.GetSelectedCandidatePair()
+	if err != nil || selected == nil || selected.Local == nil || selected.Remote == nil {
+		return nil
+	}
+	path := &pathInfo{
+		Local: selected.Local.Typ.String(), LocalProtocol: selected.Local.Protocol.String(), Remote: selected.Remote.Typ.String(),
+	}
+	if stats, ok := transport.GetSelectedCandidatePairStats(); ok {
+		path.RttMs = stats.CurrentRoundTripTime * 1000
+	}
+	for _, candidate := range candidates {
+		if candidate.Type == webrtc.StatsTypeLocalCandidate && candidate.IP == selected.Local.Address && int(candidate.Port) == int(selected.Local.Port) {
+			path.RelayProtocol = candidate.RelayProtocol
+		}
+	}
+	if path.RttMs == 0 {
+		for _, pair := range pairs {
+			if pair.State == webrtc.StatsICECandidatePairStateSucceeded && pair.CurrentRoundTripTime > 0 {
+				path.RttMs = pair.CurrentRoundTripTime * 1000
+			}
+		}
+	}
+	return path
 }
 
 func abs(value float64) float64 {
@@ -456,7 +513,11 @@ func (s *session) sendState() {
 	if pc == nil {
 		return
 	}
-	state := stateMessage{ICE: pc.ICEConnectionState().String(), Peer: pc.ConnectionState().String(), Channel: dc.ReadyState().String(), Path: path}
+	channel := "connecting"
+	if dc != nil {
+		channel = dc.ReadyState().String()
+	}
+	state := stateMessage{ICE: pc.ICEConnectionState().String(), Peer: pc.ConnectionState().String(), Channel: channel, Path: path}
 	s.sendJSON(msgState, state)
 }
 

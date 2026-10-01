@@ -43,11 +43,12 @@ function open(peer) {
     return pc;
 }
 
-test('the media channel is pre-negotiated, unordered, never retransmitted and binary', () => {
+test('the media channel is opened in band, unordered, never retransmitted and binary', () => {
     const target = dotnet();
     const peer = createPeer(target, { iceServers: [], iceTransportPolicy: 'all', maxMessageBytes: 1150 });
     const pc = FakePeerConnection.last;
-    assert.deepEqual(pc.channel.init, { negotiated: true, id: 0, ordered: false, maxRetransmits: 0 });
+    assert.deepEqual(pc.channel.init, { ordered: false, maxRetransmits: 0 });
+    assert.equal(pc.channel.label, 'bolt-media');
     assert.equal(pc.channel.binaryType, 'arraybuffer', 'Safari would otherwise hand over Blobs');
     assert.equal(pc.config.iceTransportPolicy, 'all');
     assert.equal(pc.config.bundlePolicy, 'max-bundle');
