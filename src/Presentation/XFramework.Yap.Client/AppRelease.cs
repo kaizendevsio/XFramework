@@ -2,10 +2,12 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.71";
+    public const string Version = "1.3.72";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
-        (Version, "27 September 2026", [
+        (Version, "1 October 2026", [
+            "Calls can now use a faster UDP connection through Cloudflare, so audio and video hold up better on high-latency or lossy mobile networks. If UDP is unavailable, calls fall back automatically."]),
+        ("1.3.71", "27 September 2026", [
             "Calls keep going on slow or changing networks: audio is protected first, video adapts to the connection, and a dropped connection shows Reconnecting and resumes on its own for up to 45 seconds.",
             "Calls can now last up to 12 hours."]),
         ("1.3.70", "27 September 2026", [
