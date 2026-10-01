@@ -173,7 +173,10 @@ public sealed class BrowserDataChannelTests
           ws.send(JSON.stringify({ type: 'done' }));
           await new Promise(resolve => setTimeout(resolve, 300));
           peer.close(); ws.close();
-          return result;
+          // Keys as the .NET record names them.
+          const path = result.path && { Local: result.path.local, LocalProtocol: result.path.localProtocol,
+            RelayProtocol: result.path.relayProtocol, Remote: result.path.remote, RttMs: result.path.rttMs };
+          return { States: result.states, Path: path, Echoed: result.echoed, Opened: result.opened, Supported: result.supported, Bad: result.bad };
         };
         window.ready = true;
         </script>

@@ -490,6 +490,13 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         await StopPipelinesAsync();
         _audio.OnEncoded -= OnAudioEncodedForStream;
         DetachVideoHandlers();
+        // The data channel (and its TURN allocation) goes with the call, not with the page.
+        if (_transport is { } datagram)
+        {
+            _transport = null;
+            try { await datagram.DisposeAsync(); }
+            catch (Exception ex) { _logger.LogDebug(ex, "Closing the datagram path failed"); }
+        }
         if (_mediaClient is not null) await _mediaClient.DisposeAsync();
         // These dependencies belong to the DI scope; it disposes each once after this service.
         _initialized = false;
