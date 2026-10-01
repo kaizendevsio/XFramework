@@ -500,8 +500,12 @@ public sealed partial class BoltGroupCallLifecycleTests
         public async ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
         {
             if (blocked is { } gate) await gate.Task.WaitAsync(ct);
-            Sent.Enqueue(data.ToArray());
+            var copy = data.ToArray();
+            Sent.Enqueue(copy);
+            Forward?.Invoke(copy);
         }
+        /// <summary>Also hand every frame the relay sends to a participant's client (an in-memory socket).</summary>
+        public Action<byte[]>? Forward { get; set; }
         public async ValueTask<(int BytesRead, bool EndOfMessage)> ReceiveAsync(Memory<byte> buffer, CancellationToken ct = default)
         {
             while (await inbound.Reader.WaitToReadAsync(ct))
