@@ -1,0 +1,88 @@
+name: Call UDP integration
+
+# Real browsers (Chromium and WebKit, through the production bolt-rtc.js) against the relay's WebRTC endpoint
+# (the bolt-rtc sidecar driven by Bolt.Rtc), both forced through a real TURN server (coturn). Covers the
+# data channel's shape (pre-negotiated, unordered, never retransmitted, binary), full-size messages both
+# ways, TURN over UDP and over TCP, and an unreachable TURN server (where the call stays on its WebSocket).
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - src/Libraries/Bolt/**
+      - src/Tests/Bolt.Rtc.IntegrationTests/**
+      - .github/workflows/call-udp-integration.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: call-udp-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browsers:
+    name: Browsers through TURN
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 10.x
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: src/Libraries/Bolt/Bolt.Rtc/sidecar/go.mod
+          cache-dependency-path: src/Libraries/Bolt/Bolt.Rtc/sidecar/go.sum
+
+      - name: Test and build the sidecar
+        shell: bash
+        working-directory: src/Libraries/Bolt/Bolt.Rtc/sidecar
+        run: |
+          set -euo pipefail
+          go vet ./...
+          go test -race -count=1 ./...
+          CGO_ENABLED=0 go build -trimpath -o "$RUNNER_TEMP/bolt-rtc" .
+
+      - name: Start coturn
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Loopback only. TURN REST credentials (use-auth-secret), as the relay derives them; no TLS here.
+          docker run --detach --name coturn --network host \
+            coturn/coturn:4.18.0-debian@sha256:bbefd3e1fdfdc0d58770fe01b581fd8b00d9f3a5580d00acb77cf719a6bc78e3 \
+            -n --log-file=stdout --listening-ip=127.0.0.1 --relay-ip=127.0.0.1 --listening-port=3478 \
+            --use-auth-secret --static-auth-secret=ci-turn-secret --realm=bolt.test --fingerprint \
+            --no-tls --no-dtls --no-cli --allow-loopback-peers --min-port=49160 --max-port=49400
+          for attempt in $(seq 1 30); do
+            if docker logs coturn 2>&1 | grep -q "Total General servers"; then exit 0; fi
+            sleep 1
+          done
+          docker logs coturn
+          exit 1
+
+      - name: Build tests and install browsers
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet build src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj --configuration Release
+          pwsh src/Tests/Bolt.Rtc.IntegrationTests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium webkit
+
+      - name: Browsers through TURN
+        env:
+          BOLT_RTC_SIDECAR: ${{ runner.temp }}/bolt-rtc
+          BOLT_RTC_TURN_HOST: 127.0.0.1
+          BOLT_RTC_TURN_SECRET: ci-turn-secret
+        run: |
+          dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj \
+            --configuration Release --no-build --logger "console;verbosity=normal"
+
+      - name: TURN server log
+        if: failure()
+        run: docker logs coturn 2>&1 | tail -200
