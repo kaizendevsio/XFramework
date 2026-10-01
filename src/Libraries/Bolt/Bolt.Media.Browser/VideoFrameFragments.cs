@@ -148,14 +148,14 @@ public sealed class VideoFrameAssembler
             if (pending.Count >= MaxPending) DropOldest();
             pending[frameId] = slot = new Pending { Parts = new byte[total][], Total = total, Order = ++sequence };
         }
-        else if (slot.Total != total) { pending.Remove(frameId); Incomplete++; return null; }
+        else if (slot.Total != total) { pending.Remove(frameId); Lost(); return null; }
 
         if (slot.Parts[index] is not null) return null;
         var size = index != total - 1 ? payload.Length : 0;
-        if (size != 0 && slot.FragmentSize != 0 && size != slot.FragmentSize) { pending.Remove(frameId); Incomplete++; return null; }
+        if (size != 0 && slot.FragmentSize != 0 && size != slot.FragmentSize) { pending.Remove(frameId); Lost(); return null; }
         if (size != 0) slot.FragmentSize = size;
-        if (slot.FragmentSize != 0 && index == total - 1 && payload.Length > slot.FragmentSize) { pending.Remove(frameId); Incomplete++; return null; }
-        if (slot.Bytes + payload.Length > VideoFrameFragments.MaxPictureBytes) { pending.Remove(frameId); Incomplete++; return null; }
+        if (slot.FragmentSize != 0 && index == total - 1 && payload.Length > slot.FragmentSize) { pending.Remove(frameId); Lost(); return null; }
+        if (slot.Bytes + payload.Length > VideoFrameFragments.MaxPictureBytes) { pending.Remove(frameId); Lost(); return null; }
         slot.Parts[index] = payload.ToArray();
         slot.Received++; slot.Bytes += payload.Length;
         slot.Timestamp = timestamp;
@@ -164,20 +164,26 @@ public sealed class VideoFrameAssembler
         if (slot.Layer > 0) Layered = true;
         if (slot.Received != slot.Total) return null;
         // A one-fragment picture has no size to check; otherwise the last part must not exceed the others.
-        if (slot.Total > 1 && slot.Parts[^1]!.Length > slot.FragmentSize) { pending.Remove(frameId); Incomplete++; return null; }
+        if (slot.Total > 1 && slot.Parts[^1]!.Length > slot.FragmentSize) { pending.Remove(frameId); Lost(); return null; }
 
         var data = new byte[slot.Bytes];
         var offset = 0;
         foreach (var part in slot.Parts) { part!.CopyTo(data, offset); offset += part.Length; }
         pending.Remove(frameId);
+        // Fragments of older pictures still in flight are now useless; their picture can never be shown in order.
+        // Part of a picture arrived and the rest never did: that is loss on this path (a relay drops whole pictures),
+        // and this very picture may refer to it, unless it is a keyframe.
+        foreach (var stale in pending.Where(x => unchecked(x.Key - frameId) > 0x8000_0000u).Select(x => x.Key).ToArray())
+        {
+            pending.Remove(stale);
+            Incomplete++;
+            if (!slot.Keyframe) localLoss = true;
+        }
         var gap = hasCompleted && unchecked(frameId - lastCompleted) != 1;
         // With temporal layers a gap is a policy drop, and what arrived is decodable (see the class remarks).
         var discontinuity = gap && (!Layered || localLoss);
         if (slot.Keyframe || discontinuity) localLoss = false;
         lastCompleted = frameId; hasCompleted = true;
-        // Fragments of older pictures still in flight are now useless; their picture can never be shown in order.
-        foreach (var stale in pending.Where(x => unchecked(x.Key - frameId) > 0x8000_0000u).Select(x => x.Key).ToArray())
-        { pending.Remove(stale); Incomplete++; }
         return new(data, slot.Timestamp, slot.Keyframe, discontinuity, frameId, slot.Keyframe ? 0 : slot.Layer);
     }
 
@@ -187,6 +193,13 @@ public sealed class VideoFrameAssembler
     {
         var oldest = pending.OrderBy(x => x.Value.Order).First().Key;
         pending.Remove(oldest);
+        Lost();
+    }
+
+    /// <summary>A partly received picture was given up: whatever referred to it cannot decode, so the next gap is a break.</summary>
+    private void Lost()
+    {
         Incomplete++;
+        localLoss = true;
     }
 }

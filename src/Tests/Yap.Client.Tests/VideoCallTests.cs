@@ -378,6 +378,34 @@ public sealed class VideoCallTests
     }
 
     [Test]
+    public void APartlyReceivedPicture_IsLossOnThePath_SoTheNextGapBreaksEvenALayeredStream()
+    {
+        // A relay drops whole pictures, so a layered stream's gaps are normally safe. Half a picture is not a relay
+        // decision: it was lost on the way (a datagram path), and whatever referred to it cannot decode.
+        var assembler = new VideoFrameAssembler();
+        assembler.Add(VideoFrameFragments.Split(new byte[10], 1, 0, true)[0]);
+        assembler.Add(VideoFrameFragments.Split(new byte[10], 2, 1, false, 2)[0]);
+        var partial = VideoFrameFragments.Split(new byte[600], 3, 2, false, 0, payload: 300);
+        assembler.Add(partial[0]);
+        var next = assembler.Add(VideoFrameFragments.Split(new byte[10], 4, 3, false, 1)[0]);
+        var afterGap = assembler.Add(VideoFrameFragments.Split(new byte[10], 6, 5, false, 0)[0]);
+        Assert.Multiple(() =>
+        {
+            Assert.That(assembler.Layered, Is.True);
+            Assert.That(next!.Value.Discontinuity, Is.True, "picture 3 never completed and picture 4 skipped it");
+            Assert.That(afterGap!.Value.Discontinuity, Is.False, "the break was reported once; a later policy gap is safe again");
+        });
+
+        var keyed = new VideoFrameAssembler();
+        keyed.Add(VideoFrameFragments.Split(new byte[10], 1, 0, true)[0]);
+        keyed.Add(VideoFrameFragments.Split(new byte[10], 2, 1, false, 2)[0]);
+        keyed.Add(VideoFrameFragments.Split(new byte[600], 3, 2, false, 0, payload: 300)[0]);
+        Assert.That(keyed.Add(VideoFrameFragments.Split(new byte[10], 5, 4, true)[0])!.Value.Discontinuity, Is.False,
+            "a keyframe makes the lost picture irrelevant");
+        Assert.That(keyed.Add(VideoFrameFragments.Split(new byte[10], 7, 6, false, 0)[0])!.Value.Discontinuity, Is.False);
+    }
+
+    [Test]
     public void TheHeaderCountsUpTo256Fragments_AndThePictureBoundStillHolds()
     {
         var picture = RandomNumberGenerator.GetBytes(VideoFrameFragments.MinPayload * VideoFrameFragments.MaxFragments);
