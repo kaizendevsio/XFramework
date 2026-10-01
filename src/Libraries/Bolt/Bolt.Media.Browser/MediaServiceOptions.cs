@@ -50,6 +50,12 @@ public sealed class MediaServiceOptions
     /// <summary>Let the rate loop move Opus between its low, normal and high rates. Off keeps <see cref="AudioBitrateKbps"/>.</summary>
     public bool AdaptiveAudioBitrate { get; set; } = true;
 
+    /// <summary>
+    /// Move call media onto a WebRTC data channel (UDP through TURN) when the relay offers one, keeping the
+    /// WebSocket for signalling and as the fallback. Off keeps every call on the WebSocket.
+    /// </summary>
+    public bool DatagramTransport { get; set; } = true;
+
     /// <summary>Legacy option retained for source compatibility. SecurityMode is authoritative;
     /// setting this to false cannot opt into transport-only security.</summary>
     public bool EnableEncryption { get; set; } = true;

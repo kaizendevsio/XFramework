@@ -22,6 +22,10 @@ public readonly record struct VideoFramePayload(byte[] Data, uint TimestampMicro
 ///
 /// Header byte 0 is the version (high nibble), the keyframe (0x01) and last-fragment (0x02) bits and
 /// the temporal layer (bits 2-3). Receivers that predate layers ignore bits 2-3.
+///
+/// The fragment size depends on the sender's path: 4 KB on a WebSocket, about 800 bytes on a data
+/// channel, where each fragment must fit one unretransmitted datagram. Within one picture every
+/// fragment but the last has the same size, and a receiver checks exactly that.
 /// </summary>
 public static class VideoFrameFragments
 {
@@ -29,29 +33,41 @@ public static class VideoFrameFragments
     public const int MaxPlaintext = 4096;
     public const int HeaderSize = 12;
     public const int MaxPayload = MaxPlaintext - HeaderSize;
-    /// <summary>96 fragments is ~392 KB: far above any sane 1080p keyframe, far below a memory problem.</summary>
-    public const int MaxFragments = 96;
+    /// <summary>The header counts at most 256 fragments (byte 1 is the count minus one).</summary>
+    public const int MaxFragments = 256;
+    /// <summary>~392 KB per picture: far above any sane 1080p keyframe, far below a memory problem.</summary>
+    public const int MaxPictureBytes = 96 * MaxPayload;
+    /// <summary>Smallest fragment payload a sender uses, so no picture is cut into hundreds of tiny pieces.</summary>
+    public const int MinPayload = 256;
+    /// <summary>What SFrame adds to a fragment before the first one tells (header, tag and the bound context).</summary>
+    public const int DefaultEncryptionOverhead = 320;
+    /// <summary>Room for the authenticated context to grow (its sequence and timestamp digits).</summary>
+    public const int ContextSlack = 24;
     private const byte Version = 0x10;
     private const byte KeyframeFlag = 0x01, LastFlag = 0x02;
     internal const byte LayerMask = 0x0C;
     internal const int LayerShift = 2;
 
-    public static int FragmentCount(int encodedLength) => Math.Max(1, (encodedLength + MaxPayload - 1) / MaxPayload);
+    public static int FragmentCount(int encodedLength) => FragmentCount(encodedLength, MaxPayload);
+
+    public static int FragmentCount(int encodedLength, int payload) => Math.Max(1, (encodedLength + payload - 1) / payload);
 
     /// <summary>
     /// Cut one encoded picture into wire fragments. Returns an empty list when the picture is
     /// larger than the reassembly bound: dropping it is correct, a partial picture is not.
     /// </summary>
-    public static List<byte[]> Split(ReadOnlySpan<byte> encoded, uint frameId, uint timestampMicroseconds, bool isKeyframe, int layer = 0)
+    public static List<byte[]> Split(ReadOnlySpan<byte> encoded, uint frameId, uint timestampMicroseconds, bool isKeyframe, int layer = 0,
+        int payload = MaxPayload)
     {
+        payload = Math.Clamp(payload, MinPayload, MaxPayload);
         var layerBits = (byte)((isKeyframe ? 0 : Math.Clamp(layer, 0, 3)) << LayerShift);
-        var count = FragmentCount(encoded.Length);
-        if (encoded.Length == 0 || count > MaxFragments) return [];
+        var count = FragmentCount(encoded.Length, payload);
+        if (encoded.Length == 0 || count > MaxFragments || encoded.Length > MaxPictureBytes) return [];
         var fragments = new List<byte[]>(count);
         for (var index = 0; index < count; index++)
         {
-            var offset = index * MaxPayload;
-            var size = Math.Min(MaxPayload, encoded.Length - offset);
+            var offset = index * payload;
+            var size = Math.Min(payload, encoded.Length - offset);
             var fragment = new byte[HeaderSize + size];
             fragment[0] = (byte)(Version | (isKeyframe ? KeyframeFlag : 0) | (index == count - 1 ? LastFlag : 0) | layerBits);
             fragment[1] = (byte)(count - 1);
@@ -85,6 +101,8 @@ public sealed class VideoFrameAssembler
     {
         public byte[]?[] Parts = [];
         public int Received, Total, Bytes;
+        /// <summary>Payload size of this picture's non-final fragments, once one has arrived.</summary>
+        public int FragmentSize;
         public uint Timestamp;
         public bool Keyframe;
         public int Layer;
@@ -118,8 +136,10 @@ public sealed class VideoFrameAssembler
         var timestamp = BinaryPrimitives.ReadUInt32LittleEndian(fragment[8..]);
         var payload = fragment[VideoFrameFragments.HeaderSize..];
         if (total > VideoFrameFragments.MaxFragments || index >= total) return null;
-        // Only the final fragment may be short; anything else is a truncated or forged split.
-        if (index != total - 1 && payload.Length != VideoFrameFragments.MaxPayload) return null;
+        // Fragments of one picture share one size, set by the sender's path; only the final one may be short.
+        // Anything else is a truncated or forged split. The whole picture stays within the reassembly bound.
+        if (index != total - 1 && payload.Length < VideoFrameFragments.MinPayload) return null;
+        if ((long)(total - 1) * VideoFrameFragments.MinPayload > VideoFrameFragments.MaxPictureBytes) return null;
         // A picture already handed to the decoder must not be rebuilt from replayed fragments.
         if (hasCompleted && unchecked(frameId - lastCompleted) is 0 or > 0x8000_0000u) return null;
 
@@ -131,6 +151,11 @@ public sealed class VideoFrameAssembler
         else if (slot.Total != total) { pending.Remove(frameId); Incomplete++; return null; }
 
         if (slot.Parts[index] is not null) return null;
+        var size = index != total - 1 ? payload.Length : 0;
+        if (size != 0 && slot.FragmentSize != 0 && size != slot.FragmentSize) { pending.Remove(frameId); Incomplete++; return null; }
+        if (size != 0) slot.FragmentSize = size;
+        if (slot.FragmentSize != 0 && index == total - 1 && payload.Length > slot.FragmentSize) { pending.Remove(frameId); Incomplete++; return null; }
+        if (slot.Bytes + payload.Length > VideoFrameFragments.MaxPictureBytes) { pending.Remove(frameId); Incomplete++; return null; }
         slot.Parts[index] = payload.ToArray();
         slot.Received++; slot.Bytes += payload.Length;
         slot.Timestamp = timestamp;
@@ -138,6 +163,8 @@ public sealed class VideoFrameAssembler
         slot.Layer = (fragment[0] & VideoFrameFragments.LayerMask) >> VideoFrameFragments.LayerShift;
         if (slot.Layer > 0) Layered = true;
         if (slot.Received != slot.Total) return null;
+        // A one-fragment picture has no size to check; otherwise the last part must not exceed the others.
+        if (slot.Total > 1 && slot.Parts[^1]!.Length > slot.FragmentSize) { pending.Remove(frameId); Incomplete++; return null; }
 
         var data = new byte[slot.Bytes];
         var offset = 0;

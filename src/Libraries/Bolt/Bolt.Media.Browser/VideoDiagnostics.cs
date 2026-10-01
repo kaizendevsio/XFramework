@@ -20,6 +20,13 @@ public sealed record VideoDiagnostics
     public int SendQueue { get; init; }
     public double? EncoderDelayMs { get; init; }
     public int Dropped { get; init; }
+    /// <summary>The media path: "UDP/relay", "TLS/relay", "WebSocket" and so on.</summary>
+    public string Transport { get; init; } = "";
+    /// <summary>Why media is on the WebSocket, when it is (no TURN offered, ICE failed, negotiating).</summary>
+    public string? TransportReason { get; init; }
+    public double? TransportRttMs { get; init; }
+    /// <summary>Audio leaves with its previous frame alongside (the datagram path reports loss).</summary>
+    public bool AudioRedundancy { get; init; }
     public RemoteVideoDiagnostics[] Remotes { get; init; } = [];
 }
 

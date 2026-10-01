@@ -326,6 +326,77 @@ public sealed class VideoCallTests
         });
     }
 
+    // ── Phase 3: datagram-sized fragments. Same SFrame operation per fragment, only smaller plaintexts. ──
+
+    [Test]
+    public void DatagramSizedFragments_RebuildTheSamePicture_InAnyOrder()
+    {
+        var picture = RandomNumberGenerator.GetBytes(60_000);
+        var fragments = VideoFrameFragments.Split(picture, 3, 777, isKeyframe: true, payload: 800);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fragments, Has.Count.EqualTo(VideoFrameFragments.FragmentCount(picture.Length, 800)));
+            Assert.That(fragments.Take(fragments.Count - 1).All(x => x.Length == VideoFrameFragments.HeaderSize + 800), Is.True);
+        });
+        var assembler = new VideoFrameAssembler();
+        VideoFramePayload? built = null;
+        foreach (var fragment in fragments.OrderBy(_ => RandomNumberGenerator.GetInt32(1000))) built ??= assembler.Add(fragment);
+        Assert.That(built!.Value.Data, Is.EqualTo(picture));
+        Assert.That(built.Value.IsKeyframe, Is.True);
+    }
+
+    [Test]
+    public void ReceiversAcceptEitherPathsFragments_FromConsecutivePictures()
+    {
+        var assembler = new VideoFrameAssembler();
+        var socket = VideoFrameFragments.Split(RandomNumberGenerator.GetBytes(9_000), 1, 0, true);
+        var datagram = VideoFrameFragments.Split(RandomNumberGenerator.GetBytes(9_000), 2, 1, false, payload: 820);
+        VideoFramePayload? first = null, second = null;
+        foreach (var fragment in socket) first ??= assembler.Add(fragment);
+        foreach (var fragment in datagram) second ??= assembler.Add(fragment);
+        Assert.Multiple(() =>
+        {
+            Assert.That(first, Is.Not.Null, "a 4 KB split from a sender on the WebSocket");
+            Assert.That(second, Is.Not.Null, "an 820-byte split from a sender on a data channel");
+            Assert.That(second!.Value.Discontinuity, Is.False);
+        });
+    }
+
+    [Test]
+    public void APictureMixingFragmentSizes_IsRefused()
+    {
+        var large = VideoFrameFragments.Split(RandomNumberGenerator.GetBytes(5_000), 5, 0, true, payload: 1000);
+        var small = VideoFrameFragments.Split(RandomNumberGenerator.GetBytes(5_000), 5, 0, true, payload: 800);
+        var assembler = new VideoFrameAssembler();
+        assembler.Add(large[0]);
+        Assert.Multiple(() =>
+        {
+            Assert.That(assembler.Add(small[1]), Is.Null, "a middle fragment of another size is a forged or truncated split");
+            Assert.That(assembler.Incomplete, Is.EqualTo(1));
+            Assert.That(new VideoFrameAssembler().Add(small[0][..(VideoFrameFragments.HeaderSize + 100)]), Is.Null, "tiny middle fragments are refused");
+        });
+    }
+
+    [Test]
+    public void TheHeaderCountsUpTo256Fragments_AndThePictureBoundStillHolds()
+    {
+        var picture = RandomNumberGenerator.GetBytes(VideoFrameFragments.MinPayload * VideoFrameFragments.MaxFragments);
+        var fragments = VideoFrameFragments.Split(picture, 9, 0, true, payload: VideoFrameFragments.MinPayload);
+        Assert.That(fragments, Has.Count.EqualTo(256));
+        var assembler = new VideoFrameAssembler();
+        VideoFramePayload? built = null;
+        foreach (var fragment in fragments) built ??= assembler.Add(fragment);
+        Assert.Multiple(() =>
+        {
+            Assert.That(built!.Value.Data, Is.EqualTo(picture));
+            Assert.That(VideoFrameFragments.Split(new byte[VideoFrameFragments.MinPayload * 256 + 1], 1, 0, true, payload: VideoFrameFragments.MinPayload), Is.Empty,
+                "257 fragments cannot be counted");
+            Assert.That(VideoFrameFragments.Split(new byte[VideoFrameFragments.MaxPictureBytes + 1], 1, 0, true), Is.Empty);
+            Assert.That(VideoFrameFragments.Split(new byte[10], 1, 0, true, payload: 10)[0].Length, Is.EqualTo(VideoFrameFragments.HeaderSize + 10),
+                "a payload below the minimum is raised to it, a short picture stays one fragment");
+        });
+    }
+
     [Test]
     public void AbandonedPictures_AreBoundedAndCounted()
     {
