@@ -214,6 +214,36 @@ public sealed partial class BoltGroupCallLifecycleTests
     }
 
     [Test]
+    public async Task Client_AChannelThatFlaps_IsLeftOnce_NotEveryBlip()
+    {
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        await using var a = Connect(f, "a", network);
+        a.Transport.Start();
+        await WaitUntil(() => a.Transport.IsDatagramActive);
+        var participant = network.Created.Single(x => x.Role == RtcPeerRole.Offer);
+        var switches = 0;
+        var last = true;
+        var started = Environment.TickCount64;
+        var tick = 0;
+        while (Environment.TickCount64 - started < 4_000)
+        {
+            if (tick % 20 == 0) participant.Stall();
+            if (tick % 20 == 6) participant.Recover();
+            var now = a.Transport.IsDatagramActive;
+            if (now != last) { switches++; last = now; }
+            tick++;
+            await Task.Delay(20);
+        }
+        var reports = f.Peers["a"].Received.Count(x => MediaTransportCodec.TryRead(x, out var kind, out _) && kind == MediaTransportKind.State);
+        Assert.Multiple(() =>
+        {
+            Assert.That(switches, Is.LessThanOrEqualTo(2), "the path is left at the first blip and held off, not used again at every recovery");
+            Assert.That(reports, Is.LessThanOrEqualTo(2), "and the relay is not told stalled/open at every blip");
+        });
+    }
+
+    [Test]
     public async Task Client_AStalledChannel_SendsOnTheSocket_AndTellsTheRelay_UntilItRecovers()
     {
         var network = new FakeRtcNetwork();

@@ -92,6 +92,30 @@ public sealed class SendRateControlTests
     }
 
     [Test]
+    public void APathSwitch_NeverLowersTheEstimate_NorRestartsThePicture()
+    {
+        // A media path switch (data channel to WebSocket or back) is not an outage of the link. Restarting from half the
+        // stable rate on every switch, with a flapping path every few seconds, ground video down to "not enough
+        // bandwidth" on a good 5G link (production, 12:49-12:54 UTC).
+        var sim = new LinkSimulation(capacityKbps: 4_000, oneWayMs: 35, startTier: 360);
+        sim.Run(40_000);
+        var before = sim.Estimate;
+        var restarts = sim.Controller.Restarts;
+        Assert.That(before, Is.GreaterThan(1_500));
+        for (var i = 0; i < 5; i++)
+        {
+            sim.Controller.RestartAfterPathChange(sim.Now);
+            sim.Run(3_000);
+        }
+        Assert.Multiple(() =>
+        {
+            Assert.That(sim.Estimate, Is.GreaterThanOrEqualTo(before * 9 / 10), "five switches cost the estimate nothing");
+            Assert.That(sim.Controller.Restarts, Is.EqualTo(restarts), "and never restart the picture (a keyframe each)");
+            Assert.That(sim.Suspended, Is.False);
+        });
+    }
+
+    [Test]
     public void ALinkThatStaysBad_BacksOffResumeAttempts()
     {
         var controller = new SendRateController(400);
@@ -283,6 +307,7 @@ public sealed class SendRateControlTests
         public int CapacityKbps { get; set; }
         public long Now { get; private set; }
         public int Estimate => _controller.EstimateKbps;
+        public SendRateController Controller => _controller;
         public bool Suspended => _controller.VideoSuspended;
         public VideoRung Rung => _ladder.Current.Rung;
         public List<(long At, int Estimate, int QueueMs, bool Suspended, VideoSetting Rung)> Trace { get; } = [];
