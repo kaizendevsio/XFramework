@@ -85,6 +85,18 @@ jobs:
           dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj \
             --configuration Release --no-build --logger "console;verbosity=normal"
 
+      - name: Browser uplink at video rates under delay and loss
+        env:
+          BOLT_RTC_SIDECAR: ${{ runner.temp }}/bolt-rtc
+          BOLT_RTC_TURN_HOST: 127.0.0.1
+          BOLT_RTC_TURN_SECRET: ci-turn-secret
+        run: |
+          set -euo pipefail
+          # Everything here crosses loopback (browser, coturn, sidecar): 5 ms each way per hop and 0.5% loss per packet.
+          sudo tc qdisc add dev lo root netem delay 5ms 1ms loss 0.5%
+          trap 'sudo tc qdisc del dev lo root || true' EXIT
+          dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj             --configuration Release --no-build --filter "FullyQualifiedName~AtVideoRates" --logger "console;verbosity=normal"
+
       - name: TURN server log
         if: failure()
         run: docker logs coturn 2>&1 | tail -200

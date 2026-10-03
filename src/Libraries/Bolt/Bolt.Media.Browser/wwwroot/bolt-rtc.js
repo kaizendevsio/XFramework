@@ -65,7 +65,7 @@ export class BoltRtcPeer {
         channel.binaryType = 'arraybuffer';
         channel.bufferedAmountLowThreshold = 16 * 1024;
         channel.onopen = () => this.#setState('open');
-        channel.onclose = () => this.#setState(this.#state === 'open' ? 'closed' : 'failed');
+        channel.onclose = () => this.#setState(this.#state === 'open' || this.#state === 'stalled' ? 'closed' : 'failed');
         channel.onerror = () => { /* onclose follows */ };
         channel.onbufferedamountlow = () => this.#notify('OnBufferedLow');
         channel.onmessage = event => {
@@ -81,8 +81,14 @@ export class BoltRtcPeer {
             if (state === 'failed') this.#setState('failed');
             else if (state === 'closed') this.#setState('closed');
         };
+        // The channel stays "open" while ICE hears nothing (Chrome declares ICE failed only ~30 s later) and while
+        // it checks again after a restart. Media sent then is lost, so the channel is "stalled" and takes nothing:
+        // the call's media goes on the WebSocket until ICE is connected again.
         this.#pc.oniceconnectionstatechange = () => {
-            if (this.#pc.iceConnectionState === 'failed') this.#setState('failed');
+            const ice = this.#pc.iceConnectionState;
+            if (ice === 'failed') this.#setState('failed');
+            else if (this.#state === 'open' && (ice === 'disconnected' || ice === 'checking')) this.#setState('stalled');
+            else if (this.#state === 'stalled' && (ice === 'connected' || ice === 'completed')) this.#setState('open');
         };
     }
 
@@ -106,7 +112,7 @@ export class BoltRtcPeer {
     // Synchronous on purpose: called from the sender's pacer for every frame. Never throws.
     send(bytes) {
         const channel = this.#channel;
-        if (this.#closed || channel.readyState !== 'open' || !bytes || bytes.length === 0 || bytes.length > this.#maxMessage) {
+        if (this.#closed || this.#state !== 'open' || channel.readyState !== 'open' || !bytes || bytes.length === 0 || bytes.length > this.#maxMessage) {
             this.#dropped++;
             return false;
         }
@@ -130,11 +136,10 @@ export class BoltRtcPeer {
     #setState(state) {
         if (this.#state === state || this.#state === 'closed' || this.#state === 'failed') return;
         this.#state = state;
+        clearInterval(this.#pathTimer);
         if (state === 'open') {
             this.#pollPath();
             this.#pathTimer = setInterval(() => this.#pollPath(), pathPollMs);
-        } else {
-            clearInterval(this.#pathTimer);
         }
         this.#notify('OnState', state);
     }

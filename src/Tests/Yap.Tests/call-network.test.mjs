@@ -39,7 +39,7 @@ test('online, a network change and the page coming back are each reported', () =
 });
 
 test('a new estimate of the same network is not a network change', () => {
-    // Chromium fires "change" whenever its RTT or bandwidth estimate moves, every few seconds on a busy phone.
+    // Chromium also fires "change" when only its RTT or bandwidth estimate moves.
     // Each "network" hint restarts ICE on the call's UDP path, so only a different connection type may count.
     const { scope, calls } = fixture();
     const connection = scope.navigator.connection;

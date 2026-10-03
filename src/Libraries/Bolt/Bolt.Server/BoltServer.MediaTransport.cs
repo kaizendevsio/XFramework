@@ -25,7 +25,11 @@ public sealed partial class BoltServer
 
     /// <summary>Most signalling messages waiting for one connection's worker; more are dropped.</summary>
     private const int MaxQueuedTransportMessages = 64;
+    /// <summary>Remote candidates one gathering may add (every ICE restart is a new gathering).</summary>
     private const int MaxCandidatesPerSession = 64;
+
+    /// <summary>Where the datagram path's own story is logged (see <see cref="BoltMediaTransportOptions.Logger"/>).</summary>
+    private ILogger TransportLog => _mediaTransport?.Logger ?? _logger;
 
     internal sealed class ConnectionMediaTransport(BoltHubConnection connection)
     {
@@ -49,7 +53,10 @@ public sealed partial class BoltServer
         public BoltIceGrant Grant { get; } = grant;
         public IRtcPeer? Peer { get; set; }
         public int Candidates;
+        public int Restarts;
         public bool Renewing;
+        /// <summary>The channel opened once (later "open" states are recoveries from a stall).</summary>
+        public bool Opened;
     }
 
     /// <summary>Whether this relay offers datagram paths at all (a host with TURN credentials and the sidecar).</summary>
@@ -133,18 +140,48 @@ public sealed partial class BoltServer
                 var session = FindSession(transport, offer.Session);
                 if (session is null || _mediaTransport is not { } options)
                     return;
-                if (session.Peer is null)
+                if (offer.IceRestart)
                 {
-                    var peer = await options.Peers.CreateAsync(RtcPeerRole.Answer,
-                        new RtcPeerOptions(session.Grant.Server, options.RelayOnly, options.MaxMessageBytes, options.MinCwndBytes, AllowLoopback), ct);
-                    if (!AttachSessionPeer(transport, session, peer))
+                    // Every restart re-allocates TURN on both ends: a phone may ask often, not without end.
+                    if (++session.Restarts > options.MaxIceRestartsPerSession)
                     {
-                        await peer.DisposeAsync();
+                        TransportLog.LogInformation("Datagram path for {ClientId} closed after {Restarts} ICE restarts; media continues on the WebSocket",
+                            connection.ClientId, session.Restarts - 1);
+                        await CloseSessionAsync(transport, session, notify: true, reason: "restart-limit");
                         return;
                     }
+                    // A restart is a new gathering: its candidates are counted afresh (pion dropped the old ones).
+                    Interlocked.Exchange(ref session.Candidates, 0);
                 }
-                var answer = await session.Peer!.AnswerAsync(offer.Sdp, ct);
-                await SendTransportAsync(connection, MediaTransportKind.Answer, new MediaTransportDescription(session.Id, answer, offer.IceRestart));
+                try
+                {
+                    if (session.Peer is null)
+                    {
+                        var peer = await options.Peers.CreateAsync(RtcPeerRole.Answer,
+                            new RtcPeerOptions(session.Grant.Server, options.RelayOnly, options.MaxMessageBytes, options.MinCwndBytes, AllowLoopback), ct);
+                        if (!AttachSessionPeer(transport, session, peer))
+                        {
+                            await peer.DisposeAsync();
+                            return;
+                        }
+                    }
+                    var answer = await session.Peer!.AnswerAsync(offer.Sdp, ct);
+                    await SendTransportAsync(connection, MediaTransportKind.Answer, new MediaTransportDescription(session.Id, answer, offer.IceRestart));
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+                {
+                    // The sidecar is restarting or gone, or refused the offer. Say so now: the phone carries on over its
+                    // socket and retries on its backoff, instead of negotiating until its open timeout.
+                    TransportLog.LogInformation("Datagram negotiation for {ClientId} failed ({Error}); media stays on the WebSocket",
+                        connection.ClientId, ex.GetType().Name);
+                    bool removed;
+                    lock (transport.Sync) removed = transport.Sessions.Remove(session.Id);
+                    if (removed)
+                    {
+                        await CloseSessionAsync(transport, session, notify: false);
+                        await SendTransportAsync(connection, MediaTransportKind.State, new MediaTransportStateMessage(session.Id, "failed"));
+                    }
+                }
                 break;
             }
             case MediaTransportKind.Candidate:
@@ -157,6 +194,22 @@ public sealed partial class BoltServer
                 await peer.AddCandidateAsync(new RtcCandidate(candidate.Candidate, candidate.SdpMid, candidate.SdpMLineIndex), ct);
                 break;
             }
+            case MediaTransportKind.State:
+            {
+                // The participant's own view of the active channel: "stalled" when it hears nothing on it (ICE quiet, or
+                // nothing it sends drains), "open" when it is back. The relay may still hear the phone, so only the phone
+                // knows the downlink is dead; media for it takes the socket meanwhile.
+                if (MediaTransportCodec.Decode<MediaTransportStateMessage>(payload) is not { } state || state.Session != transport.ActiveSession)
+                    return;
+                var suspended = state.State == "stalled";
+                if (state.State is not ("stalled" or "open") || connection.DatagramSuspended == suspended)
+                    return;
+                connection.DatagramSuspended = suspended;
+                TransportLog.LogInformation(suspended
+                    ? "Participant {ClientId} reports its datagram path stalled; its media continues on the WebSocket"
+                    : "Participant {ClientId} reports its datagram path back; its media returns to it", connection.ClientId);
+                break;
+            }
             case MediaTransportKind.Report:
             {
                 if (MediaTransportCodec.Decode<MediaTransportReport>(payload) is { } report && report.Session == transport.ActiveSession)
@@ -166,7 +219,11 @@ public sealed partial class BoltServer
             case MediaTransportKind.Close:
             {
                 if (MediaTransportCodec.Decode<MediaTransportClose>(payload) is { } close && FindSession(transport, close.Session) is { } session)
+                {
+                    TransportLog.LogInformation("Participant {ClientId} closed its datagram path ({Reason}); its media continues on the WebSocket",
+                        connection.ClientId, SafeReason(close.Reason));
                     await CloseSessionAsync(transport, session, notify: false);
+                }
                 break;
             }
         }
@@ -183,14 +240,27 @@ public sealed partial class BoltServer
         }
         if (now - transport.LastRequestTick < options.RequestSpacingSeconds * 1000L || transport.Requests >= options.MaxRequestsPerConnection)
         {
+            TransportLog.LogInformation("Datagram path for {ClientId} not offered (rate-limited); media stays on the WebSocket", connection.ClientId);
             await SendTransportAsync(connection, MediaTransportKind.Config, Unavailable("rate-limited"));
             return;
         }
         transport.LastRequestTick = now;
         transport.Requests++;
-        if (await StartSessionAsync(transport, ct) is null)
+        if (await StartSessionAsync(transport, ct) is { } session)
+            TransportLog.LogInformation("Datagram path offered to {ClientId} (session {Session}, request {Request})", connection.ClientId, ShortId(session.Id), transport.Requests);
+        else
+        {
+            TransportLog.LogInformation("Datagram path for {ClientId} unavailable (no ICE servers could be issued); media stays on the WebSocket", connection.ClientId);
             await SendTransportAsync(connection, MediaTransportKind.Config, Unavailable("unavailable"));
+        }
     }
+
+    /// <summary>A session id is a random handle; its first few characters are enough to follow it through a log.</summary>
+    private static string ShortId(string id) => id.Length > 8 ? id[..8] : id;
+
+    /// <summary>A participant-supplied reason, as far as it is safe to log: short, lower-case words and dashes.</summary>
+    internal static string SafeReason(string? reason) =>
+        reason is { Length: > 0 and <= 32 } && reason.All(c => c is >= 'a' and <= 'z' or '-') ? reason : "other";
 
     /// <summary>Mint credentials and announce a new session (also used to renew one). Null when there are none.</summary>
     private async Task<TransportSession?> StartSessionAsync(ConnectionMediaTransport transport, CancellationToken ct)
@@ -208,7 +278,7 @@ public sealed partial class BoltServer
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             // The provider's message may name the endpoint; never the token, which it never sees here.
-            _logger.LogWarning("ICE credentials could not be issued ({Error}); media stays on the WebSocket", ex.GetType().Name);
+            TransportLog.LogWarning("ICE credentials could not be issued ({Error}); media stays on the WebSocket", ex.GetType().Name);
             return null;
         }
         if (grant is null || grant.Client.Count == 0 || grant.Server.Count == 0)
@@ -248,6 +318,9 @@ public sealed partial class BoltServer
         peer.LocalCandidate += candidate => _ = SendTransportAsync(connection, MediaTransportKind.Candidate,
             new MediaTransportCandidate(session.Id, candidate.Candidate, candidate.SdpMid, candidate.SdpMLineIndex));
         peer.StateChanged += state => _ = OnSessionStateAsync(transport, session, state);
+        connection.DatagramDrainChanged = stalled => TransportLog.LogInformation(stalled
+            ? "Datagram path for {ClientId} stopped draining; media continues on the WebSocket until it does"
+            : "Datagram path for {ClientId} drains again; media is back on it", connection.ClientId);
         peer.PathChanged += path =>
         {
             if (peer.State == RtcChannelState.Open)
@@ -260,8 +333,30 @@ public sealed partial class BoltServer
     private async Task OnSessionStateAsync(ConnectionMediaTransport transport, TransportSession session, RtcChannelState state)
     {
         var connection = transport.Connection;
+        if (state == RtcChannelState.Stalled)
+        {
+            // ICE went quiet or is checking again (a restart): the channel stays, media takes the socket meanwhile.
+            if (ReferenceEquals(connection.Datagram, session.Peer))
+            {
+                TransportLog.LogInformation("Datagram path for {ClientId} stalled (ICE not connected); media continues on the WebSocket until it recovers",
+                    connection.ClientId);
+                connection.WakeMedia();
+            }
+            return;
+        }
+        if (state == RtcChannelState.Open && session.Opened && session.Peer is { } recovered)
+        {
+            // Back from a stall: the same channel carries media again.
+            if (ReferenceEquals(connection.Datagram, recovered))
+            {
+                TransportLog.LogInformation("Datagram path for {ClientId} recovered via {Path}", connection.ClientId, recovered.Path?.Describe() ?? "unknown");
+                connection.WakeMedia();
+            }
+            return;
+        }
         if (state == RtcChannelState.Open && session.Peer is { } peer)
         {
+            session.Opened = true;
             TransportSession[] superseded;
             lock (transport.Sync)
             {
@@ -271,7 +366,8 @@ public sealed partial class BoltServer
                 foreach (var old in superseded) transport.Sessions.Remove(old.Id);
             }
             connection.AttachDatagram(peer);
-            _logger.LogInformation("Datagram media path open for {ClientId} via {Path}", connection.ClientId, peer.Path?.Describe() ?? "unknown");
+            TransportLog.LogInformation("Datagram media path open for {ClientId} via {Path} (session {Session})", connection.ClientId,
+                peer.Path?.Describe() ?? "unknown", ShortId(session.Id));
             await SendTransportAsync(connection, MediaTransportKind.State, new MediaTransportStateMessage(session.Id, "open", peer.Path));
             foreach (var old in superseded) await CloseSessionAsync(transport, old, notify: true);
             return;
@@ -281,13 +377,15 @@ public sealed partial class BoltServer
             bool removed;
             lock (transport.Sync) removed = transport.Sessions.Remove(session.Id);
             if (!removed) return;
+            TransportLog.LogInformation("Datagram path for {ClientId} {State} (session {Session}); media continues on the WebSocket",
+                connection.ClientId, state == RtcChannelState.Failed ? "failed" : "closed", ShortId(session.Id));
             await CloseSessionAsync(transport, session, notify: false);
             await SendTransportAsync(connection, MediaTransportKind.State,
                 new MediaTransportStateMessage(session.Id, state == RtcChannelState.Failed ? "failed" : "closed"));
         }
     }
 
-    private async Task CloseSessionAsync(ConnectionMediaTransport transport, TransportSession session, bool notify)
+    private async Task CloseSessionAsync(ConnectionMediaTransport transport, TransportSession session, bool notify, string reason = "superseded")
     {
         lock (transport.Sync)
         {
@@ -297,11 +395,11 @@ public sealed partial class BoltServer
         if (session.Peer is { } peer)
         {
             if (transport.Connection.DetachDatagram(peer))
-                _logger.LogInformation("Datagram media path closed for {ClientId}; media continues on the WebSocket", transport.Connection.ClientId);
+                TransportLog.LogInformation("Datagram media path closed for {ClientId}; media continues on the WebSocket", transport.Connection.ClientId);
             try { await peer.DisposeAsync(); } catch (Exception ex) { _logger.LogDebug(ex, "Closing a datagram peer failed"); }
         }
         if (notify)
-            await SendTransportAsync(transport.Connection, MediaTransportKind.Close, new MediaTransportClose(session.Id, "superseded"));
+            await SendTransportAsync(transport.Connection, MediaTransportKind.Close, new MediaTransportClose(session.Id, reason));
     }
 
     private async Task CloseMediaTransportAsync(BoltHubConnection connection)
@@ -323,6 +421,9 @@ public sealed partial class BoltServer
             connection.DetachDatagram(peer);
             try { await peer.DisposeAsync(); } catch { /* The connection is gone either way. */ }
         }
+        if (transport.Requests > 0)
+            TransportLog.LogInformation("Call connection {ClientId} ended: {Sent} media frames went on its datagram path, {Fallbacks} took the socket while one was attached",
+                connection.ClientId, connection.DatagramFramesSent, connection.DatagramFallbacks);
     }
 
     private async Task SendTransportAsync<T>(BoltHubConnection connection, MediaTransportKind kind, T message)
@@ -459,7 +560,11 @@ public sealed partial class BoltServer
             if (!active.Renewing && active.Grant.ExpiresAt - DateTimeOffset.UtcNow <= options.RenewBefore)
             {
                 active.Renewing = true;
-                try { await StartSessionAsync(transport, _shutdownCts.Token); }
+                try
+                {
+                    if (await StartSessionAsync(transport, _shutdownCts.Token) is { } renewed)
+                        TransportLog.LogInformation("Datagram path for {ClientId} renewing its credentials (session {Session})", transport.Connection.ClientId, ShortId(renewed.Id));
+                }
                 catch (Exception ex) when (ex is not OperationCanceledException) { _logger.LogDebug(ex, "Datagram session renewal failed"); }
             }
         }

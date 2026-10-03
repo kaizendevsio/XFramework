@@ -5221,6 +5221,18 @@ public sealed class BoltHubConnection
     /// <summary>The participant's open data channel, when it has one: media lanes drain into it instead of the socket.</summary>
     internal IRtcPeer? Datagram => Volatile.Read(ref _datagram);
 
+    private int _datagramSuspended;
+
+    /// <summary>
+    /// The participant reported its channel stalled (it hears nothing on it): media for it takes the socket until it
+    /// reports the channel open again. The channel stays attached.
+    /// </summary>
+    internal bool DatagramSuspended
+    {
+        get => Volatile.Read(ref _datagramSuspended) != 0;
+        set { Volatile.Write(ref _datagramSuspended, value ? 1 : 0); SignalMediaWork(); }
+    }
+
     /// <summary>Send this receiver's audio with the previous frame alongside (its datagram path reports loss).</summary>
     internal bool AudioRedundancy
     {
@@ -5243,7 +5255,10 @@ public sealed class BoltHubConnection
     internal void AttachDatagram(IRtcPeer peer)
     {
         var previous = Interlocked.Exchange(ref _datagram, peer);
-        if (ReferenceEquals(previous, peer)) return;
+        if (ReferenceEquals(previous, peer)) { SignalMediaWork(); return; }
+        // A new channel: nothing it holds is stuck yet, and the participant has not reported it stalled.
+        _datagramDrain = new DatagramDrainWatch();
+        Volatile.Write(ref _datagramSuspended, 0);
         if (previous is not null) previous.BufferedAmountLow -= _wakeMedia;
         peer.BufferedAmountLow += _wakeMedia;
         SignalMediaWork();
@@ -5270,6 +5285,29 @@ public sealed class BoltHubConnection
     /// <summary>Redundancy is only added while this receiver's lanes are nearly empty: never to a congested link.</summary>
     private const long RedundancyQueueLimitBytes = 8 * 1024;
 
+    private DatagramDrainWatch _datagramDrain = new();
+
+    /// <summary>Raised (on the send loop) when the attached channel stops draining (true) or drains again (false).</summary>
+    internal Action<bool>? DatagramDrainChanged { get; set; }
+
+    /// <summary>The attached channel has held bytes without draining any for a while: it is not carrying media.</summary>
+    internal bool DatagramDrainStalled => _datagramDrain.Stalled;
+
+    /// <summary>
+    /// Whether the channel may carry this receiver's media now: open (ICE connected), not reported stalled by the
+    /// participant, and still draining what it was given. Otherwise media takes the socket; the channel stays attached.
+    /// </summary>
+    private bool DatagramUsable(IRtcPeer datagram)
+    {
+        if (datagram.State != RtcChannelState.Open || Volatile.Read(ref _datagramSuspended) != 0) return false;
+        var drain = _datagramDrain;
+        if (drain.Observe(datagram.BufferedAmount, Environment.TickCount64))
+        {
+            try { DatagramDrainChanged?.Invoke(drain.Stalled); } catch { /* Logging only. */ }
+        }
+        return !drain.Stalled;
+    }
+
     private bool TrySendDatagram(IRtcPeer datagram, BoltMediaSendQueue.Item item)
     {
         var frame = item.Memory.Span;
@@ -5278,6 +5316,7 @@ public sealed class BoltHubConnection
         if (item.Lane != BoltMediaLane.Audio || frame[0] != (byte)FrameType.MediaFrame)
         {
             if (!datagram.TrySend(frame)) return false;
+            _datagramDrain.Sent(frame.Length);
             Interlocked.Increment(ref _datagramSent);
             return true;
         }
@@ -5294,13 +5333,16 @@ public sealed class BoltHubConnection
                 {
                     MediaBundleCodec.Write(bundle, previous, frame);
                     sent = datagram.TrySend(bundle.AsSpan(0, size));
-                    if (sent) Interlocked.Increment(ref _redundantAudio);
+                    if (sent) { Interlocked.Increment(ref _redundantAudio); _datagramDrain.Sent(size); }
                 }
                 finally { ArrayPool<byte>.Shared.Return(bundle); }
             }
         }
-        if (!sent && !datagram.TrySend(frame))
-            return false;
+        if (!sent)
+        {
+            if (!datagram.TrySend(frame)) return false;
+            _datagramDrain.Sent(frame.Length);
+        }
         if (_lastAudio.Count >= 32 && !_lastAudio.ContainsKey(item.StreamId)) _lastAudio.Clear();
         _lastAudio[item.StreamId] = frame.ToArray();
         Interlocked.Increment(ref _datagramSent);
@@ -5536,7 +5578,7 @@ public sealed class BoltHubConnection
                     // A participant with an open data channel gets its media there, never blocking this loop:
                     // when the channel is full the media waits in the lanes, and its next drain wakes this up.
                     var datagram = Volatile.Read(ref _datagram);
-                    if (datagram is not { State: RtcChannelState.Open })
+                    if (datagram is not null && !DatagramUsable(datagram))
                         datagram = null;
                     if (datagram is not null && datagram.BufferedAmount >= DatagramBacklogLimit(datagram.CongestionWindow))
                         return;
@@ -5626,6 +5668,9 @@ public sealed class BoltHubConnection
             SignalMediaWork();
         return result;
     }
+
+    /// <summary>Let the send loop look at the media lanes again (the datagram path changed state).</summary>
+    internal void WakeMedia() => SignalMediaWork();
 
     private void SignalMediaWork()
     {

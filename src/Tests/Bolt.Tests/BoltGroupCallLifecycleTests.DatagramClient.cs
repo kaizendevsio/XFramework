@@ -214,6 +214,40 @@ public sealed partial class BoltGroupCallLifecycleTests
     }
 
     [Test]
+    public async Task Client_AStalledChannel_SendsOnTheSocket_AndTellsTheRelay_UntilItRecovers()
+    {
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var stream = await f.Config("a");
+        await using var a = Connect(f, "a", network);
+        a.Transport.Start();
+        await WaitUntil(() => a.Transport.IsDatagramActive);
+        var audio = Frame(w => BoltCodec.WriteMediaFrame(w, stream, 1, 960, MediaFrameFlags.Encrypted, [1, 2, 3]));
+        var participant = network.Created.Single(x => x.Role == RtcPeerRole.Offer);
+        var relay = network.Created.Single(x => x.Role == RtcPeerRole.Answer);
+
+        participant.Stall();
+        await WaitUntil(() => !a.Transport.IsDatagramActive);
+        Assert.Multiple(() =>
+        {
+            Assert.That(a.Transport.TrySend(audio), Is.False, "the caller sends on the socket");
+            Assert.That(a.Transport.Status.Reason, Is.EqualTo("stalled"));
+            Assert.That(participant.Disposed, Is.False, "the session is kept: ICE may come back by itself");
+        });
+        // The relay is told, so its media for this participant takes the socket too.
+        await WaitUntil(() => Connection(f, "a").DatagramSuspended);
+        await f.Send("b", await f.Config("b"));
+        Assert.That(MediaOn(relay), Is.Zero);
+
+        participant.Recover();
+        await WaitUntil(() => a.Transport.IsDatagramActive);
+        await WaitUntil(() => !Connection(f, "a").DatagramSuspended);
+        Assert.That(a.Transport.TrySend(audio), Is.True);
+    }
+
+    [Test]
     public async Task Client_TellsTheRelayWhyItGaveUpOnAChannel()
     {
         var network = new FakeRtcNetwork { Reachable = false };

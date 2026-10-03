@@ -139,6 +139,7 @@ public sealed class SendRateLoop
     private bool _suspended;
     private int _cpuStrained, _cpuCalm;
     private int _restarts;
+    private int _pathChanged;
 
     public SendRateLoop(MediaSendPacer pacer, SendRateController controller, VideoRateLadder ladder, SendPathSignals? signals = null)
     {
@@ -156,10 +157,22 @@ public sealed class SendRateLoop
     public SendPathSignals Signals => _signals;
     public bool VideoSuspended => _suspended;
 
+    /// <summary>
+    /// The media path died under the sender and media moved to another (see
+    /// <see cref="SendRateController.RestartAfterPathChange"/>). Applied on the next tick; safe from any thread.
+    /// </summary>
+    public void PathChanged() => Volatile.Write(ref _pathChanged, 1);
+
     /// <param name="nowMs">Monotonic time.</param>
     /// <param name="encodeBacklog">Frames queued in front of the video encoder (the CPU/thermal signal).</param>
     public SendRateTick Tick(long nowMs, int encodeBacklog = 0)
     {
+        if (Interlocked.Exchange(ref _pathChanged, 0) == 1)
+        {
+            // Reports from the dead path (or their silence) must not be read as the new path's queue.
+            _signals.Clear();
+            Controller.RestartAfterPathChange(nowMs);
+        }
         var pacer = Pacer.Sample();
         var sentVideo = Math.Max(0, pacer.SentKbps - pacer.AudioKbps);
         var (relay, receiver) = _signals.Take(nowMs, sentVideo, pacer.AudioKbps, Controller.Options.ReportFreshMs);

@@ -333,6 +333,14 @@ public sealed class SendRateController
         return Allocate(now, sample, signal, delay);
     }
 
+    /// <summary>
+    /// The pipe under the sender changed because the old one died (a data channel that failed or stopped draining,
+    /// with media moving to the WebSocket). What was measured on it - a backlog that never drained, reports that never
+    /// came back - says nothing about the link, so the path starts over from the stable rate, as after an outage.
+    /// </summary>
+    public void RestartAfterPathChange(long now) =>
+        RestartAfterOutage(now, _audioKbps + _options.AudioOverheadBytes * 8 * _options.AudioPacketsPerSecond / 1000);
+
     private void RestartAfterOutage(long now, int audioWireKbps)
     {
         _estimate = RestartKbps(StableKbps, _options, audioWireKbps);

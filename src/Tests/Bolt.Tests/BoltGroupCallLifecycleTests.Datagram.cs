@@ -437,6 +437,52 @@ public sealed partial class BoltGroupCallLifecycleTests
         Assert.That(f.Tasks["a"].IsCompleted, Is.False);
     }
 
+    [Test]
+    public async Task Datagram_AChannelThatStopsDraining_SendsThatReceiversMediaOnTheSocket()
+    {
+        // ICE is fine (the phone's checks still arrive), but nothing the relay hands the channel is acknowledged any
+        // more: a dead downlink. The buffer never drains, so after a short grace the receiver's media takes its socket.
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var (relay, _, _) = await OpenDatagramAsync(f, network, "a");
+        relay.Stuck = true;
+        var stream = await f.Config("b");
+        var started = Environment.TickCount64;
+        while (Environment.TickCount64 - started < 3_000 && f.Peers["a"].Count(FrameType.MediaFrame) == 0)
+        {
+            await f.Send("b", stream);
+            await Task.Delay(20);
+        }
+        Assert.Multiple(() =>
+        {
+            Assert.That(f.Peers["a"].Count(FrameType.MediaFrame), Is.GreaterThan(0), "media left the stalled channel for the socket");
+            Assert.That(f.Tasks["a"].IsCompleted, Is.False);
+        });
+    }
+
+    [Test]
+    public async Task Datagram_AParticipantReportingItsChannelStalled_GetsItsMediaOnTheSocket_UntilItIsBack()
+    {
+        // The phone hears nothing on its channel (its ICE went quiet) while the relay still hears the phone: only the
+        // phone knows the downlink is dead. It says so over its socket, and says so again when the channel is back.
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var (relay, _, session) = await OpenDatagramAsync(f, network, "a");
+        var stream = await f.Config("b");
+        await f.Peers["a"].ProcessAsync(MediaTransportCodec.Encode(MediaTransportKind.State, new MediaTransportStateMessage(session, "stalled")));
+        await f.Send("b", stream);
+        await WaitUntil(() => f.Peers["a"].Count(FrameType.MediaFrame) == 1);
+        Assert.That(MediaOn(relay), Is.Zero);
+        await f.Peers["a"].ProcessAsync(MediaTransportCodec.Encode(MediaTransportKind.State, new MediaTransportStateMessage(session, "open")));
+        await f.Send("b", stream);
+        await WaitUntil(() => MediaOn(relay) == 1);
+        Assert.That(f.Peers["a"].Count(FrameType.MediaFrame), Is.EqualTo(1));
+    }
+
     private static BoltHubConnection Connection(Fixture f, string id)
     {
         var connections = (System.Collections.Concurrent.ConcurrentDictionary<string, BoltHubConnection>)typeof(BoltServer)

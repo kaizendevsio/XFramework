@@ -182,6 +182,62 @@ public sealed class BrowserDataChannelTests
           return { States: result.states, Path: path, Echoed: result.echoed, Opened: result.opened, Supported: result.supported, Bad: result.bad,
             Candidates: result.candidates };
         };
+        // A sender at video rates, paced the way the call's pacer is (send while the buffer is under 48 KB): how much
+        // arrives, whether the buffer drains once sending stops, and whether it ever sat full without draining for
+        // two seconds (which the client and relay read as a stalled channel).
+        window.runRate = async ({ id, iceServers, kbps, seconds, timeoutMs }) => {
+          const ws = new WebSocket(`ws://${location.host}/signal?id=${id}`);
+          await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
+          let opened; const open = new Promise(resolve => opened = resolve);
+          let echoed = 0;
+          const dotnet = { invokeMethodAsync: async (method, ...args) => {
+            if (method === 'OnCandidate') ws.send(JSON.stringify({ type: 'candidate', candidate: args[0], sdpMid: args[1], sdpMLineIndex: args[2] }));
+            else if (method === 'OnState' && args[0] === 'open') opened();
+            else if (method === 'OnMessage') echoed++;
+          } };
+          const peer = createPeer(dotnet, { iceServers, iceTransportPolicy: 'relay', maxMessageBytes: 1150 });
+          ws.onmessage = async event => {
+            const message = JSON.parse(event.data);
+            if (message.type === 'answer') await peer.setAnswer(message.sdp);
+            else if (message.type === 'candidate') await peer.addCandidate(message.candidate, message.sdpMid, message.sdpMLineIndex);
+          };
+          ws.send(JSON.stringify({ type: 'offer', sdp: await peer.createOffer(false) }));
+          await Promise.race([open, new Promise(resolve => setTimeout(resolve, timeoutMs))]);
+          const result = { Opened: peer.state() === 'open', Sent: 0, Echoed: 0, MaxBuffered: 0, StuckMs: 0, DrainedAfterStop: false, Held: 0 };
+          if (result.Opened) {
+            const message = new Uint8Array(1150); message[0] = 0x21;
+            const perTick = kbps * 1000 / 8 * 0.005;
+            let credit = 0, lastBuffered = 0, added = 0, lastProgress = performance.now();
+            const started = performance.now();
+            let nextSample = started + 250;
+            while (performance.now() - started < seconds * 1000) {
+              await new Promise(resolve => setTimeout(resolve, 5));
+              credit = Math.min(credit + perTick, 64 * 1024);
+              while (credit >= message.length) {
+                if (peer.bufferedAmount() > 48 * 1024) { result.Held++; break; }
+                if (!peer.send(message)) break;
+                result.Sent++; added += message.length; credit -= message.length;
+              }
+              const now = performance.now();
+              if (now >= nextSample) {
+                nextSample = now + 250;
+                const buffered = peer.bufferedAmount();
+                result.MaxBuffered = Math.max(result.MaxBuffered, buffered);
+                if (buffered <= 0 || lastBuffered + added - buffered > 0) lastProgress = now;
+                result.StuckMs = Math.max(result.StuckMs, now - lastProgress);
+                lastBuffered = buffered; added = 0;
+              }
+            }
+            const drainDeadline = performance.now() + 3000;
+            while (peer.bufferedAmount() > 0 && performance.now() < drainDeadline) await new Promise(resolve => setTimeout(resolve, 20));
+            result.DrainedAfterStop = peer.bufferedAmount() === 0;
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            result.Echoed = echoed;
+          }
+          ws.send(JSON.stringify({ type: 'done' }));
+          peer.close(); ws.close();
+          return result;
+        };
         window.ready = true;
         </script>
         """;
@@ -250,6 +306,60 @@ public sealed class BrowserDataChannelTests
             Assert.That(relay?.Path, Is.EqualTo("UDP/relay"), "the relay's side allocates on TURN over UDP");
             Assert.That(relay?.Cwnd, Is.GreaterThanOrEqualTo(128 * 1024), "the SCTP window floor is in force");
             Assert.That(relay?.Received, Is.EqualTo(200));
+        });
+    }
+
+    private sealed record RateResult(bool Opened, int Sent, int Echoed, double MaxBuffered, double StuckMs, bool DrainedAfterStop, int Held);
+
+    /// <summary>
+    /// The phone's uplink at video rates, through TURN, paced as the call's pacer paces it. The pacer counts the
+    /// channel's buffered amount as its own backlog and the client treats a buffer that drains nothing for two seconds
+    /// as a stalled channel, so both must hold in a real browser: the buffer drains while sending, and empties after.
+    /// The workflow runs this once on a clean loopback and once under netem (delay and loss).
+    /// </summary>
+    [TestCase("chromium")]
+    [TestCase("webkit")]
+    public async Task AtVideoRates_TheBrowserUplinkDelivers_AndItsBufferKeepsDraining(string engine)
+    {
+        IBrowser browser;
+        try
+        {
+            browser = engine == "webkit"
+                ? await _playwright!.Webkit.LaunchAsync(new() { Headless = true })
+                : await _playwright!.Chromium.LaunchAsync(new()
+                {
+                    Headless = true, ExecutablePath = Env("CHROME_PATH"),
+                    Args = ["--disable-features=WebRtcHideLocalIpsWithMdns", "--allow-loopback-in-peer-connection"],
+                });
+        }
+        catch (PlaywrightException error)
+        {
+            Assert.Ignore($"{engine} is not installed here: {error.Message.Split('\n')[0]}");
+            throw;
+        }
+        await using var _ = browser;
+        var page = await browser.NewPageAsync();
+        await page.GotoAsync(_origin + "/");
+        await page.WaitForFunctionAsync("() => window.ready === true");
+        var id = Guid.NewGuid().ToString("N");
+        var json = await page.EvaluateAsync<string>("options => window.runRate(options).then(result => JSON.stringify(result))", new
+        {
+            id,
+            iceServers = new[] { Turn($"turn:{_turnHost}:3478?transport=udp", "browser") }.Select(x => new { urls = x.Urls, username = x.Username, credential = x.Credential }),
+            kbps = 2000,
+            seconds = 8,
+            timeoutMs = 15000,
+        });
+        var result = JsonSerializer.Deserialize<RateResult>(json)!;
+        if (!result.Opened) Assert.Ignore($"{engine}: the channel did not open here ({json}).");
+        var received = _relays.TryGetValue(id, out var relay) ? Volatile.Read(ref relay.Received) : 0;
+        TestContext.Out.WriteLine($"{engine}: {json} relayReceived={received}");
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Sent, Is.GreaterThan(1500), "the pacer kept sending at about 2 Mbit/s");
+            Assert.That(received, Is.GreaterThanOrEqualTo(result.Sent * 9 / 10), "what the browser sent reached the relay");
+            Assert.That(result.StuckMs, Is.LessThan(2000), "a working channel never sits full without draining for the stall window");
+            Assert.That(result.DrainedAfterStop, Is.True, "the buffered amount empties once sending stops");
         });
     }
 

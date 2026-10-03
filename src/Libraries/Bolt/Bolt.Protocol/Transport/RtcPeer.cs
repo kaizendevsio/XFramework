@@ -31,7 +31,19 @@ public sealed record RtcCandidate(string Candidate, string? SdpMid, int? SdpMLin
 
 public enum RtcPeerRole { Offer, Answer }
 
-public enum RtcChannelState { Connecting, Open, Closed, Failed }
+public enum RtcChannelState
+{
+    Connecting,
+    Open,
+    Closed,
+    Failed,
+    /// <summary>
+    /// The channel is open but the path under it carries nothing right now: ICE has stopped hearing from the
+    /// other side, or is checking again after a restart. Nothing is sent on it (media takes the WebSocket); it
+    /// goes back to <see cref="Open"/> when ICE is connected again, or ends <see cref="Failed"/> or <see cref="Closed"/>.
+    /// </summary>
+    Stalled,
+}
 
 /// <param name="IceServers">STUN/TURN servers for this peer.</param>
 /// <param name="RelayOnly">Gather and use relay candidates only (iceTransportPolicy "relay").</param>

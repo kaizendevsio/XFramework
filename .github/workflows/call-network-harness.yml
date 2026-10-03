@@ -107,6 +107,13 @@ jobs:
           - { name: udp-resume-4g-ip-change, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: resume, steps: "", settings: "RESUME=1 GRACE_S=45 ADAPTIVE=1 START_HEIGHT=240 UDP=1 IPCHANGE_AT_S=60" }
           - { name: udp-4g-ice-restart, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1 IPCHANGE_UDP_AT_S=60" }
           - { name: udp-blocked-4g, target: head, relaynet: "delay 50ms 10ms rate 2mbit loss 0.5%", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1 UDP_BLOCK=1" }
+          # A fast, clean path (good Wi-Fi): video must stay on and climb, over UDP as over the WebSocket.
+          - { name: udp-20mbit-20ms, target: head, relaynet: "delay 10ms 2ms rate 20mbit", recvnet: "delay 10ms 2ms", at: -1, for: 0, expect: video-climbs, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=360 UDP=1" }
+          - { name: udp-20mbit-20ms-1pct, target: head, relaynet: "delay 10ms 2ms rate 20mbit loss 1%", recvnet: "delay 10ms 2ms", at: -1, for: 0, expect: video-climbs, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=360 UDP=1" }
+          - { name: ws-20mbit-20ms, target: head, relaynet: "delay 10ms 2ms rate 20mbit", recvnet: "delay 10ms 2ms", at: -1, for: 0, expect: video-climbs, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=360" }
+          # The data channel dies silently at 60 s (no network-change event; the channel still says "open"):
+          # the relay must move the media back to the socket by itself within seconds.
+          - { name: udp-silent-stall-4g, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: audio-continues, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1 UDP_STALL_AT_S=60" }
           - { name: udp-512k-1000ms-1pct-sframe278, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1 SFRAME_OVERHEAD=278" }
           - { name: ws-512k-1000ms-1pct-sframe278, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: any, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 SFRAME_OVERHEAD=278" }
     steps:

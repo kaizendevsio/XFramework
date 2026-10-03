@@ -41,6 +41,9 @@ public sealed partial class BoltMediaService
             ReceiveLossPermille = media.SampleAudioReceiveLoss,
         };
         transport.StatusChanged += status => OnMediaPathChanged?.Invoke(status);
+        // A channel that failed or stopped draining under the sender: what the rate control measured on it was the
+        // dead channel, not the link. It starts over on the WebSocket instead of suspending video for a dead pipe.
+        transport.PathLost += () => _rateLoop?.PathChanged();
         // Requests a session once the socket is registered, and keeps the path healthy from then on.
         transport.Start();
         return transport;

@@ -131,9 +131,16 @@ internal sealed class FakeRtcPeer(FakeRtcNetwork network, RtcPeerRole role, RtcP
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// The path under the open channel carries nothing, yet ICE has not noticed: sends are accepted and pile up in the
+    /// buffer (no acknowledgment ever drains it), as when SCTP stops making progress.
+    /// </summary>
+    public bool Stuck { get; set; }
+
     public bool TrySend(ReadOnlySpan<byte> message)
     {
         if (State != RtcChannelState.Open || Refuse || message.Length > MaxMessageBytes) { Dropped++; return false; }
+        if (Stuck) { BufferedAmount += message.Length; Sent.Enqueue(message.ToArray()); return true; }
         var copy = message.ToArray();
         Sent.Enqueue(copy);
         var count = Interlocked.Increment(ref _sent);
@@ -155,6 +162,12 @@ internal sealed class FakeRtcPeer(FakeRtcNetwork network, RtcPeerRole role, RtcP
     }
 
     public void Fail() => SetState(RtcChannelState.Failed);
+
+    /// <summary>ICE went quiet (or is checking again) under the open channel.</summary>
+    public void Stall() => SetState(RtcChannelState.Stalled);
+
+    /// <summary>ICE is connected again.</summary>
+    public void Recover() => SetState(RtcChannelState.Open);
 
     public void Drain(long buffered)
     {

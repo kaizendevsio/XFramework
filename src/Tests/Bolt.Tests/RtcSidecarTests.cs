@@ -156,7 +156,13 @@ public sealed class RtcSidecarTests
         var offer = await offerer.CreateOfferAsync(iceRestart: true, CancellationToken.None);
         await offerer.SetAnswerAsync(await answerer.AnswerAsync(offer, CancellationToken.None), CancellationToken.None);
 
-        await WaitFor(() => states.Any(x => x.State != RtcChannelState.Open) && states.Last().State == RtcChannelState.Open);
+        var deadline = Environment.TickCount64 + 20_000;
+        while (!(states.Any(x => x.State != RtcChannelState.Open) && states.Last().State == RtcChannelState.Open))
+        {
+            if (Environment.TickCount64 > deadline)
+                Assert.Fail($"The restart did not stall and recover: [{string.Join(", ", states.Select(x => x.State))}], now {answerer.State}");
+            await Task.Delay(20);
+        }
         var stalled = states.First(x => x.State != RtcChannelState.Open);
         Assert.Multiple(() =>
         {

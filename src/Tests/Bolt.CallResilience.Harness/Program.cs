@@ -583,6 +583,10 @@ internal static class Receiver
         // network-change event; the socket is left alone. Recovery is timed from the change.
         var iceRestartAt = Env.Int("IPCHANGE_UDP_AT_S", -1);
         long? iceRestartedAt = null;
+        // UDP_STALL_AT_S: the data channel's UDP flows die and nothing tells the phone (no network-change event): the
+        // channel still says "open". The relay must notice and put the media back on the socket by itself.
+        var udpStallAt = Env.Int("UDP_STALL_AT_S", -1);
+        var udpStalled = false;
         // A datagram path loses fragments; like the browser, a decoder that cannot show a picture asks its sender for a
         // keyframe (at most once a second per stream). Over a WebSocket nothing is lost, so the twins never need to.
         long lastKeyframeRequest = long.MinValue / 2;
@@ -620,6 +624,12 @@ internal static class Receiver
             {
                 var now = Env.NowMs();
 #if HARNESS_ADAPTIVE
+                if (datagram is not null && udpStallAt >= 0 && !udpStalled && clock.Elapsed.TotalSeconds >= udpStallAt)
+                {
+                    udpStalled = true;
+                    File.WriteAllText("/tmp/outage-end", now.ToString());
+                    HarnessDatagram.BlackholeUdp();
+                }
                 if (datagram is not null && iceRestartAt >= 0 && iceRestartedAt is null && clock.Elapsed.TotalSeconds >= iceRestartAt)
                 {
                     iceRestartedAt = now;

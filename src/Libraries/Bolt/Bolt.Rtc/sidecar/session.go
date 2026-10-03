@@ -147,7 +147,9 @@ func (s *session) start(h hello) error {
 		settings.SetSCTPMinCwnd(minCwnd)
 	}
 	settings.EnableSCTPZeroChecksum(true)
-	settings.SetICETimeouts(5*time.Second, 15*time.Second, 2*time.Second)
+	// Disconnected after 3 s without a packet (a keepalive goes every second, so a working path is never that
+	// quiet): the host then stops sending media here and uses the WebSocket until ICE is connected again.
+	settings.SetICETimeouts(3*time.Second, 15*time.Second, 1*time.Second)
 	// mDNS host candidates are for browsers hiding LAN addresses; the relay never needs them, and the
 	// multicast listener would be one more socket open on the host.
 	settings.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)

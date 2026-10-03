@@ -61,4 +61,13 @@ public sealed class BoltMediaTransportOptions
     public int RedundancyOffLossPermille { get; init; } = 5;
 
     public int RedundancyHoldSeconds { get; init; } = 10;
+
+    /// <summary>ICE restarts one session may ask for; each re-allocates TURN on both ends. Then the session ends (the call goes on).</summary>
+    public int MaxIceRestartsPerSession { get; init; } = 16;
+
+    /// <summary>
+    /// Where the datagram path logs what happened to each participant (offered, open via which path, stalled, closed and
+    /// why). Defaults to the relay's own logger; a host can give it a category its console shows at Information.
+    /// </summary>
+    public Microsoft.Extensions.Logging.ILogger? Logger { get; init; }
 }

@@ -237,11 +237,20 @@ internal sealed class SidecarRtcPeer : IRtcPeer
         }
     }
 
-    private RtcChannelState Map(SidecarState state) =>
-        state.Channel == "open" && state.Peer is not ("failed" or "closed") ? RtcChannelState.Open
-        : state.Peer is "failed" || state.Ice is "failed" ? RtcChannelState.Failed
-        : state.Peer is "closed" || state.Channel is "closed" ? RtcChannelState.Closed
-        : State == RtcChannelState.Open ? RtcChannelState.Open : RtcChannelState.Connecting;
+    /// <summary>
+    /// The channel counts as open only while ICE is connected. Pion keeps reporting the channel "open" while ICE
+    /// is disconnected (nothing heard for seconds) and while it checks again after a restart (when it has dropped
+    /// its selected pair and TURN allocations); anything sent then is lost, so the peer is stalled instead and the
+    /// relay sends that participant's media on its WebSocket until ICE is back.
+    /// </summary>
+    private RtcChannelState Map(SidecarState state) => state switch
+    {
+        { Peer: "failed" } or { Ice: "failed" } => RtcChannelState.Failed,
+        { Peer: "closed" } or { Channel: "closed" } => RtcChannelState.Closed,
+        { Channel: "open", Ice: "connected" or "completed" } => RtcChannelState.Open,
+        { Channel: "open" } => RtcChannelState.Stalled,
+        _ => State is RtcChannelState.Open or RtcChannelState.Stalled ? RtcChannelState.Stalled : RtcChannelState.Connecting,
+    };
 
     private void SetState(RtcChannelState next)
     {
@@ -259,7 +268,7 @@ internal sealed class SidecarRtcPeer : IRtcPeer
     {
         if (ex is not null && !_closed.IsCancellationRequested)
             _logger.LogDebug(ex, "WebRTC sidecar peer connection ended");
-        SetState(State == RtcChannelState.Open ? RtcChannelState.Closed : RtcChannelState.Failed);
+        SetState(State is RtcChannelState.Open or RtcChannelState.Stalled ? RtcChannelState.Closed : RtcChannelState.Failed);
         Volatile.Read(ref _pendingDescription)?.TrySetException(new InvalidOperationException("The WebRTC peer closed."));
         try { _closed.Cancel(); } catch (ObjectDisposedException) { }
     }
