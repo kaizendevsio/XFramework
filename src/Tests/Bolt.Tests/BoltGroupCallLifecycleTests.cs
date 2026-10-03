@@ -119,6 +119,8 @@ public sealed partial class BoltGroupCallLifecycleTests
         else await f.Peers["c"].ProcessAsync(Frame(w => BoltCodec.WriteCallSignal(w, f.Call, SignalType.End, [])));
         await f.Send("a", aStream);
         if (!disconnect) await f.Send("c", cStream);
+        // Delivery is queued, as above: wait for b's second frame instead of racing the send loop (failed ~1 run in 12).
+        Assert.That(() => f.Peers["b"].Count(FrameType.MediaFrame), Is.EqualTo(2).After(3000, 10));
         Assert.Multiple(() =>
         {
             Assert.That(f.Peers["b"].Count(FrameType.MediaFrame), Is.EqualTo(2));
