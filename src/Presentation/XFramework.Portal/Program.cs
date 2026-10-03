@@ -1,5 +1,6 @@
 using BlazorBlueprint.Components;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using System.Security.Claims;
 using Attendance.Integration.Drivers;
 using Community.Integration.Drivers;
@@ -41,6 +42,13 @@ builder.Services.AddRazorComponents()
 builder.Services.AddCascadingAuthenticationState();
 
 builder.Services.AddHttpContextAccessor();
+var sessionCacheConnection = builder.Configuration["Portal:SessionCacheConnection"];
+if (string.IsNullOrWhiteSpace(sessionCacheConnection))
+    builder.Services.AddDistributedMemoryCache();
+else
+    builder.Services.AddStackExchangeRedisCache(options => options.Configuration = sessionCacheConnection);
+builder.Services.AddDataProtection();
+builder.Services.AddSingleton<PortalAuthenticationTicketStore>();
 builder.Services.AddAuthentication(PortalAuthDefaults.AuthenticationScheme)
     .AddCookie(PortalAuthDefaults.AuthenticationScheme, options =>
     {
@@ -56,6 +64,8 @@ builder.Services.AddAuthentication(PortalAuthDefaults.AuthenticationScheme)
         options.EventsType = typeof(PortalCookieAuthenticationEvents);
     });
 builder.Services.AddAuthorization();
+builder.Services.AddOptions<CookieAuthenticationOptions>(PortalAuthDefaults.AuthenticationScheme)
+    .Configure<PortalAuthenticationTicketStore>((options, tickets) => options.SessionStore = tickets);
 
 // BlueprintUI
 builder.Services.AddBlazorBlueprintComponents(configureTheme: options =>

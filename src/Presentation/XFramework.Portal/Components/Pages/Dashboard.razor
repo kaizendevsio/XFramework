@@ -1,5 +1,6 @@
 @page "/"
 @using XFramework.Domain.Shared.DataContext
+@using XFramework.Integration.DataContext
 @implements IDisposable
 
 <PageTitle>Dashboard - Portal</PageTitle>
@@ -69,7 +70,8 @@ else
 }
 
 @code {
-    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private IServiceProvider Services { get; set; } = default!;
+    [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
     [Inject] private ILogger<Dashboard> Logger { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
 
@@ -101,22 +103,34 @@ else
         _error = null;
         try
         {
-            var usersQuery = DataContext.Query<IdentityInformation>()
+            // Admin aggregates use the authenticated actor's tenant, not delegated tenant access.
+            // IgnoreQueryFilters still requires the server's cross-tenant scope and actor capability.
+            var dataContext = new RemoteDataContext(Services, new RequestMetadata
+            {
+                RequestId = Guid.NewGuid(),
+                OperationName = "Portal.Dashboard",
+                DeviceName = RequestMetadata.DeviceName,
+                UserAgent = RequestMetadata.UserAgent,
+                IpAddress = RequestMetadata.IpAddress
+            });
+
+            var usersQuery = dataContext.Query<IdentityInformation>()
                 .IgnoreQueryFilters()
                 .NoCache()
                 .Where(x => !x.IsDeleted);
 
-            var sessionsQuery = DataContext.Query<Session>()
+            var sessionsQuery = dataContext.Query<Session>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => !x.IsDeleted)
+                .Where(x => x.Status == CurrentSessionState.Active);
+
+            var walletsQuery = dataContext.Query<Wallet>()
                 .IgnoreQueryFilters()
                 .NoCache()
                 .Where(x => !x.IsDeleted);
 
-            var walletsQuery = DataContext.Query<Wallet>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => !x.IsDeleted);
-
-            var tenantsQuery = DataContext.Query<Tenant>()
+            var tenantsQuery = dataContext.Query<Tenant>()
                 .IgnoreQueryFilters()
                 .NoCache()
                 .Where(x => !x.IsDeleted);
@@ -130,8 +144,7 @@ else
             }
 
             _userCount = await usersQuery.CountAsync();
-            var sessions = await sessionsQuery.ToListAsync();
-            _sessionCount = sessions.LongCount(x => x.Status == CurrentSessionState.Active);
+            _sessionCount = await sessionsQuery.CountAsync();
             _walletCount = await walletsQuery.CountAsync();
             _tenantCount = await tenantsQuery.CountAsync();
         }

@@ -688,6 +688,7 @@ services:
     environment:
       <<: *common-env
       ASPNETCORE_ENVIRONMENT: ${PORTAL_ASPNETCORE_ENVIRONMENT:-dev}
+      Portal__SessionCacheConnection: ${PORTAL_SESSION_REDIS_CONNECTION:-redis:6379}
       ServiceIdentity__ClientSecret: ${PORTAL_SERVICE_IDENTITY_SECRET:?Set PORTAL_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__DefaultScopes__0: bolt.service
       ServiceIdentity__DefaultScopes__1: identity.admin
@@ -705,6 +706,8 @@ services:
     volumes:
       - portal-keydata:/root/.aspnet/DataProtection-Keys
     depends_on:
+      redis:
+        condition: service_healthy
       bolt-hub:
         condition: service_healthy
       identityserver:
