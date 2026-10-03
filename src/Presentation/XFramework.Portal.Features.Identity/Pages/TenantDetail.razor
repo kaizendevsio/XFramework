@@ -805,11 +805,8 @@ else
                         IsEnabled = resolved.Definition.DefaultEnabled && !resolved.IsBlocked
                     }).ToList()
                 });
-                if (!seedResult.IsSuccess)
-                {
-                    ToastService.Error("Module toggles could not be initialized.", "Initialization failed");
-                }
-                else
+                var initializationConflict = seedResult.HttpStatusCode == System.Net.HttpStatusCode.Conflict;
+                if (seedResult.IsSuccess || initializationConflict)
                 {
                     await RefreshTenantConcurrencyStamp();
                 }
@@ -824,6 +821,15 @@ else
                     .ToList();
 
                 resolvedDefinitions = await ModuleFeatureDefinitionResolver.ResolveAsync(_detailModuleFeatures);
+
+                // A competing initializer may have persisted different enabled values; keep its rows as-is.
+                var initializedByAnotherWriter = initializationConflict && missingDefinitions.All(missing =>
+                    _detailModuleFeatures.Any(feature => !feature.IsDeleted &&
+                        string.Equals(feature.Key, missing.Definition.Key, StringComparison.OrdinalIgnoreCase)));
+                if (!seedResult.IsSuccess && !initializedByAnotherWriter)
+                {
+                    ToastService.Error("Module toggles could not be initialized.", "Initialization failed");
+                }
             }
 
             _moduleFeatureRows = resolvedDefinitions

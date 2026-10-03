@@ -16,8 +16,7 @@ public sealed class PortalActorContext(
         try
         {
             var state = await authenticationStateProvider.GetAuthenticationStateAsync().WaitAsync(ct);
-            if (state.User.Identity?.IsAuthenticated == true)
-                return state.User;
+            return state.User.Identity?.IsAuthenticated == true ? state.User : null;
         }
         catch (InvalidOperationException)
         {
@@ -35,8 +34,9 @@ public sealed class PortalActorContext(
         try
         {
             var state = authenticationStateProvider.GetAuthenticationStateAsync();
-            if (state.IsCompletedSuccessfully && state.Result.User.Identity?.IsAuthenticated == true)
-                return state.Result.User;
+            return state.IsCompletedSuccessfully && state.Result.User.Identity?.IsAuthenticated == true
+                ? state.Result.User
+                : null;
         }
         catch (InvalidOperationException)
         {

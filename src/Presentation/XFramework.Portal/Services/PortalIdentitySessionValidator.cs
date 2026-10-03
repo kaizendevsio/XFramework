@@ -12,6 +12,7 @@ public sealed class PortalIdentitySessionValidator(
     IIdentityServerServiceWrapper identityServer,
     PortalActorAccessTokenScope actorAccessTokenScope,
     PortalActorTokenRefreshCoordinator refreshCoordinator,
+    PortalAuthenticationTicketStore ticketStore,
     TimeProvider timeProvider,
     ILogger<PortalIdentitySessionValidator> logger)
 {
@@ -35,21 +36,25 @@ public sealed class PortalIdentitySessionValidator(
 
         try
         {
+            var currentPrincipal = await ticketStore.ReadPrincipalAsync(principal);
+            if (currentPrincipal is null)
+                return PortalSessionValidationResult.Invalid;
+
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
             timeout.CancelAfter(ValidationTimeout);
-            var accessToken = principal.FindFirst(PortalAuthClaims.ActorAccessToken)!.Value;
+            var accessToken = currentPrincipal.FindFirst(PortalAuthClaims.ActorAccessToken)!.Value;
             var validation = await actorIdentityProvider.ValidateAsync(accessToken, timeout.Token);
             var hasExpectedBindings = HasExpectedBindings(validation, tenantId, credentialId, sessionId);
             if (hasExpectedBindings &&
                 validation.Identity!.ExpiresAtUtc > timeProvider.GetUtcNow().Add(RefreshWindow))
             {
-                return PortalSessionValidationResult.Valid;
+                return SynchronizeTokens(identity, currentPrincipal);
             }
 
             if (!hasExpectedBindings && validation.StatusCode != (int)HttpStatusCode.Unauthorized)
                 return PortalSessionValidationResult.Invalid;
 
-            var refreshToken = principal.FindFirst(PortalAuthClaims.RefreshToken)?.Value;
+            var refreshToken = currentPrincipal.FindFirst(PortalAuthClaims.RefreshToken)?.Value;
             if (string.IsNullOrWhiteSpace(refreshToken))
             {
                 logger.LogInformation(
@@ -61,7 +66,20 @@ public sealed class PortalIdentitySessionValidator(
             var refreshedTokens = await refreshCoordinator.RefreshAsync(
                 sessionId,
                 refreshToken,
-                refreshCt => RefreshTokenAsync(accessToken, refreshToken, sessionId, refreshCt),
+                async _ =>
+                {
+                    // Once IdentityServer rotates a credential, persist the replacement even
+                    // if the initiating tab disconnects. Waiting for the gate remains cancelable.
+                    using var rotationTimeout = new CancellationTokenSource(ValidationTimeout);
+                    var rotated = await RefreshTokenAsync(accessToken, refreshToken, sessionId, rotationTimeout.Token);
+                    if (rotated is null)
+                        return null;
+                    var checkedActor = await actorIdentityProvider.ValidateAsync(rotated.AccessToken, rotationTimeout.Token);
+                    if (!HasExpectedBindings(checkedActor, tenantId, credentialId, sessionId) ||
+                        !await ticketStore.UpdateTokensAsync(principal, refreshToken, rotated))
+                        return null;
+                    return rotated;
+                },
                 timeout.Token);
             if (refreshedTokens is null)
                 return PortalSessionValidationResult.Invalid;
@@ -75,6 +93,9 @@ public sealed class PortalIdentitySessionValidator(
                 return PortalSessionValidationResult.Invalid;
             }
 
+            if (!await ticketStore.UpdateTokensAsync(principal, refreshToken, refreshedTokens))
+                return PortalSessionValidationResult.Invalid;
+
             ReplaceClaim(identity, PortalAuthClaims.ActorAccessToken, refreshedTokens.AccessToken);
             ReplaceClaim(identity, PortalAuthClaims.RefreshToken, refreshedTokens.RefreshToken);
             logger.LogInformation("Refreshed the actor token for Portal session {SessionId}.", sessionId);
@@ -83,7 +104,7 @@ public sealed class PortalIdentitySessionValidator(
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             logger.LogDebug("Portal session validation was canceled.");
-            return PortalSessionValidationResult.Invalid;
+            throw;
         }
         catch (OperationCanceledException ex)
         {
@@ -175,6 +196,18 @@ public sealed class PortalIdentitySessionValidator(
             identity.RemoveClaim(existing);
 
         identity.AddClaim(new Claim(claimType, value));
+    }
+
+    private static PortalSessionValidationResult SynchronizeTokens(ClaimsIdentity identity, ClaimsPrincipal current)
+    {
+        var accessToken = current.FindFirst(PortalAuthClaims.ActorAccessToken)!.Value;
+        var refreshToken = current.FindFirst(PortalAuthClaims.RefreshToken)!.Value;
+        if (identity.FindFirst(PortalAuthClaims.ActorAccessToken)?.Value == accessToken &&
+            identity.FindFirst(PortalAuthClaims.RefreshToken)?.Value == refreshToken)
+            return PortalSessionValidationResult.Valid;
+        ReplaceClaim(identity, PortalAuthClaims.ActorAccessToken, accessToken);
+        ReplaceClaim(identity, PortalAuthClaims.RefreshToken, refreshToken);
+        return PortalSessionValidationResult.Refreshed;
     }
 
     private static bool TryReadGuidClaim(ClaimsPrincipal principal, string claimType, out Guid value) =>

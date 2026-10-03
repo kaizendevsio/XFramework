@@ -380,6 +380,62 @@ public sealed class PortalSessionRevocationContractTests
     }
 
     [Test]
+    public async Task AnonymousCircuit_DoesNotRestoreTheAuthenticatedHttpPrincipal()
+    {
+        var requestPrincipal = CreatePrincipal(
+            Guid.NewGuid().ToString(), Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
+        ((ClaimsIdentity)requestPrincipal.Identity!).AddClaim(
+            new Claim(PortalAuthClaims.ActorAccessToken, CreateActorToken(DateTime.UtcNow.AddMinutes(30))));
+        var actorContext = new PortalActorContext(
+            new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = requestPrincipal } },
+            new FixedAuthenticationStateProvider(new ClaimsPrincipal(new ClaimsIdentity())));
+
+        (await actorContext.GetAuthenticatedPrincipalAsync()).Should().BeNull();
+        (await actorContext.GetActorAccessTokenAsync()).Should().BeNull();
+        (await CreateTokenProvider(actorContext).GetTokenAsync()).Should().BeNull();
+        actorContext.CredentialId.Should().BeNull();
+        actorContext.SessionId.Should().BeNull();
+    }
+
+    [Test]
+    public async Task PendingCircuit_DoesNotExposeHttpBindingsWhileWaitingForAuthentication()
+    {
+        var pending = new TaskCompletionSource<AuthenticationState>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var requestPrincipal = CreatePrincipal(
+            Guid.NewGuid().ToString(), Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
+        var actorContext = new PortalActorContext(
+            new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = requestPrincipal } },
+            new PendingAuthenticationStateProvider(pending.Task));
+
+        actorContext.CredentialId.Should().BeNull();
+        actorContext.SessionId.Should().BeNull();
+        var principalTask = actorContext.GetAuthenticatedPrincipalAsync().AsTask();
+        principalTask.IsCompleted.Should().BeFalse();
+        pending.SetResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity())));
+        (await principalTask).Should().BeNull();
+    }
+
+    [Test]
+    public async Task HttpScope_WithoutCircuit_UsesTheAuthenticatedRequest()
+    {
+        var credentialId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        var principal = CreatePrincipal(
+            Guid.NewGuid().ToString(), credentialId.ToString(), sessionId.ToString(), Guid.NewGuid().ToString());
+        var token = CreateActorToken(DateTime.UtcNow.AddMinutes(30));
+        ((ClaimsIdentity)principal.Identity!).AddClaim(new Claim(PortalAuthClaims.ActorAccessToken, token));
+        var actorContext = new PortalActorContext(
+            new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = principal } },
+            new UninitializedAuthenticationStateProvider());
+
+        (await CreateTokenProvider(actorContext).GetTokenAsync()).Should().Be(token);
+        actorContext.CredentialId.Should().Be(credentialId);
+        actorContext.SessionId.Should().Be(sessionId);
+    }
+
+    [Test]
     public void PortalActorTokenProvider_IsCircuitScopedAndUsesAuthenticationState()
     {
         var portalRoot = GetPortalRoot();
@@ -480,6 +536,12 @@ public sealed class PortalSessionRevocationContractTests
     {
         public override Task<AuthenticationState> GetAuthenticationStateAsync() =>
             throw new InvalidOperationException("No circuit authentication state is available.");
+    }
+
+    private sealed class PendingAuthenticationStateProvider(Task<AuthenticationState> state)
+        : AuthenticationStateProvider
+    {
+        public override Task<AuthenticationState> GetAuthenticationStateAsync() => state;
     }
 
     private static DirectoryInfo FindRepositoryRoot()
