@@ -51,6 +51,8 @@ export function createPeer(dotnet, options) {
 export class BoltRtcPeer {
     #dotnet; #pc; #channel; #maxMessage; #state = 'connecting'; #pathTimer; #closed = false; #lastPath = '';
     #dropped = 0;
+    // Candidates that arrived while an offer waits for its answer: applied once the answer is, in order.
+    #early = null;
 
     constructor(dotnet, options) {
         this.#dotnet = dotnet;
@@ -93,6 +95,9 @@ export class BoltRtcPeer {
     }
 
     async createOffer(iceRestart) {
+        // From here until the answer is applied, the other side's candidates belong to an answer not yet here: a
+        // browser would reject them (no remote description) or, on an ICE restart, file them under the old one.
+        this.#early ??= [];
         const offer = await this.#pc.createOffer(iceRestart ? { iceRestart: true } : undefined);
         await this.#pc.setLocalDescription(offer);
         return this.#pc.localDescription.sdp;
@@ -100,12 +105,22 @@ export class BoltRtcPeer {
 
     async setAnswer(sdp) {
         await this.#pc.setRemoteDescription({ type: 'answer', sdp });
+        const early = this.#early ?? [];
+        this.#early = null;
+        for (const candidate of early) await this.#apply(candidate);
     }
 
     async addCandidate(candidate, sdpMid, sdpMLineIndex) {
         if (this.#closed) return;
         // An empty candidate is the end of the relay's candidates.
-        try { await this.#pc.addIceCandidate(candidate ? { candidate, sdpMid, sdpMLineIndex } : null); }
+        const init = candidate ? { candidate, sdpMid, sdpMLineIndex } : null;
+        if (this.#early) { this.#early.push(init); return; }
+        await this.#apply(init);
+    }
+
+    async #apply(init) {
+        if (this.#closed) return;
+        try { await this.#pc.addIceCandidate(init); }
         catch { /* A candidate the browser cannot use is not a failure of the path. */ }
     }
 
