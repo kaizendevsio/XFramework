@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.72";
+    public const string Version = "1.3.73";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
-        (Version, "1 October 2026", [
+        (Version, "3 October 2026", [
+            "Video calls no longer pause on fast connections: very sharp key pictures no longer trip the quality control.",
+            "If the faster UDP connection stops carrying a call, Yap moves it back to the regular connection within seconds instead of freezing."]),
+        ("1.3.72", "1 October 2026", [
             "Calls can now use a faster UDP connection through Cloudflare, so audio and video hold up better on high-latency or lossy mobile networks. If UDP is unavailable, calls fall back automatically."]),
         ("1.3.71", "27 September 2026", [
             "Calls keep going on slow or changing networks: audio is protected first, video adapts to the connection, and a dropped connection shows Reconnecting and resumes on its own for up to 45 seconds.",
