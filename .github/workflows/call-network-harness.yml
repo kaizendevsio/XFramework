@@ -117,8 +117,13 @@ jobs:
           - { name: udp-flap-4g, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: flap-bounded, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1 UDP_FLAP_EVERY_S=15 UDP_FLAP_FOR_S=4" }
           - { name: udp-flap-20mbit, target: head, relaynet: "delay 10ms 2ms rate 20mbit", recvnet: "delay 10ms 2ms", at: -1, for: 0, expect: flap-bounded, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=360 UDP=1 UDP_FLAP_EVERY_S=10 UDP_FLAP_FOR_S=1" }
           - { name: udp-silent-stall-4g, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: audio-continues, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1 UDP_STALL_AT_S=60" }
-          - { name: udp-512k-1000ms-1pct-sframe278, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1 SFRAME_OVERHEAD=278" }
-          - { name: ws-512k-1000ms-1pct-sframe278, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: any, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 SFRAME_OVERHEAD=278" }
+          # Bandwidth efficiency: the same relay and links with the previous client's choices (legacy SFrame at 278 bytes a
+          # frame, 20 ms audio packets, no NACK), against the rows above with compact SFrame (20), 60 ms audio on a scarce
+          # link and NACK.
+          - { name: udp-512k-1000ms-1pct-before, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1 SFRAME_OVERHEAD=278 NACK=0 AUDIO_MAX_FRAME_MS=20" }
+          - { name: udp-512k-1000ms-3pct-before, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 3%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1 SFRAME_OVERHEAD=278 NACK=0 AUDIO_MAX_FRAME_MS=20" }
+          - { name: udp-512k-500ms-1pct-before, target: head, relaynet: "delay 250ms 10ms rate 512kbit loss 1%", recvnet: "delay 250ms 10ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1 SFRAME_OVERHEAD=278 NACK=0 AUDIO_MAX_FRAME_MS=20" }
+          - { name: ws-512k-1000ms-1pct-before, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: any, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 SFRAME_OVERHEAD=278 AUDIO_MAX_FRAME_MS=20" }
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

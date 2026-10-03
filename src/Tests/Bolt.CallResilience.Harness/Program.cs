@@ -49,7 +49,8 @@ internal static class Env
     /// Bytes standing in for SFrame's header, tag and authenticated context. 26 is what #563-#566 measured with;
     /// the real adapter adds about 278 bytes per frame (its context travels inside the ciphertext).
     /// </summary>
-    public static int SFrameOverhead => Int("SFRAME_OVERHEAD", 26);
+    /// <summary>Bytes SFrame adds to a frame: about 20 with compact frames (header and tag), about 278 with the legacy ones.</summary>
+    public static int SFrameOverhead => Int("SFRAME_OVERHEAD", 20);
 
     /// <summary>
     /// A video fragment's MediaFrame payload: 4 KB of picture plus the fragment header and SFrame over a WebSocket;
@@ -530,7 +531,7 @@ internal static class Receiver
         var window = new Window();
         long? firstAudioSequence = null, lastAudioSequence = null, lastAudioArrival = null, firstMediaAt = null;
         long audioReceived = 0, longestAudioGap = 0, silentSeconds = 0, frozenSeconds = 0;
-        long picturesComplete = 0, picturesDecodable = 0, keyframes = 0;
+        long picturesComplete = 0, picturesDecodable = 0, keyframes = 0, mediaBytes = 0;
         var layerPictures = new long[4];
         var pending = new Dictionary<uint, int>();
         // Pictures a decoder showed, so a later picture can be checked against the one it refers to.
@@ -598,6 +599,38 @@ internal static class Receiver
         // keyframe (at most once a second per stream). Over a WebSocket nothing is lost, so the twins never need to.
         long lastKeyframeRequest = long.MinValue / 2;
         long keyframeRequests = 0;
+        // NACK=1 (the default on a datagram path): lost video fragments are asked of the relay, and pictures go through
+        // the browser receiver's own reassembly with recovery (VideoRecoveryBuffer), with the same timing and give-up rules.
+        var recovery = datagram is not null && Env.Int("NACK", 1) == 1 ? new Dictionary<Guid, Bolt.Media.Browser.VideoRecoveryBuffer>() : null;
+        var recovered = new List<Bolt.Media.Browser.VideoFramePayload>();
+        var nacks = new List<uint>();
+        long nackRequests = 0;
+        void SendNacks(Guid stream)
+        {
+            // At most 64 numbers a request, as the browser sends them.
+            for (var offset = 0; offset < nacks.Count; offset += 64)
+            {
+                var chunk = nacks.GetRange(offset, Math.Min(64, nacks.Count - offset)).ToArray();
+                if (datagram!.TrySend(Frames.Write(w => BoltCodec.WriteNackRequest(w, stream, chunk)))) nackRequests++;
+            }
+            nacks.Clear();
+        }
+        int RecoveryRtt() => datagram?.RttMs is { } rtt ? (int)Math.Round(rtt) : 300;
+        byte[] Fragment(Bolt.Protocol.MediaFrameHeader media, ReadOnlySpan<byte> body)
+        {
+            // The browser's fragment header around the harness payload: version, keyframe, last, layer; count, index, picture, time.
+            var isKey = body[9] == 1;
+            var index = BinaryPrimitives.ReadUInt16LittleEndian(body[14..]);
+            var count = BinaryPrimitives.ReadUInt16LittleEndian(body[16..]);
+            var fragment = new byte[12 + body.Length];
+            fragment[0] = (byte)(0x10 | (isKey ? 0x01 : 0) | (index == count - 1 ? 0x02 : 0) | (isKey ? 0 : (Math.Min(3, (int)body[18]) << 2)));
+            fragment[1] = (byte)(count - 1);
+            BinaryPrimitives.WriteUInt16LittleEndian(fragment.AsSpan(2), index);
+            BinaryPrimitives.WriteUInt32LittleEndian(fragment.AsSpan(4), BinaryPrimitives.ReadUInt32LittleEndian(body[10..]));
+            BinaryPrimitives.WriteUInt32LittleEndian(fragment.AsSpan(8), media.Timestamp);
+            body.CopyTo(fragment.AsSpan(12));
+            return fragment;
+        }
         async Task RequestKeyframeAsync(Guid stream)
         {
             var request = Frames.Write(w => BoltCodec.WriteMediaKeyRequest(w, stream));
@@ -656,10 +689,27 @@ internal static class Receiver
                     await datagram.NetworkChangedAsync();
                 }
 #endif
+#if HARNESS_ADAPTIVE
+                if (recovery is not null)
+                    foreach (var (stream, buffer) in recovery)
+                    {
+                        buffer.Configure(true, RecoveryRtt());
+                        buffer.Poll(Environment.TickCount64, recovered, nacks);
+                        SendNacks(stream);
+                    }
+#endif
                 while (inbox.Reader.TryRead(out var frame))
                 {
                     if (frame[0] == (byte)FrameType.MediaConfig && BoltCodec.TryReadMediaConfig(frame, out var config))
                     { kinds[config.StreamId] = config.MediaType; continue; }
+#if HARNESS_ADAPTIVE
+                    if (frame[0] == (byte)FrameType.NackDeclined && recovery is not null && BoltCodec.TryReadNackRequest(frame, out var declined))
+                    {
+                        if (recovery.TryGetValue(declined.StreamId, out var declinedBuffer))
+                            declinedBuffer.Decline(declined.GetMissingSequences(frame), recovered);
+                        continue;
+                    }
+#endif
                     if (frame[0] != (byte)FrameType.MediaFrame || !BoltCodec.TryReadMediaFrame(frame, out var header)) continue;
                     var payload = header.GetPayload(frame);
                     if (payload.Length < Payload.HeaderSize) continue;
@@ -671,6 +721,7 @@ internal static class Receiver
                     firstMediaAt ??= clock.ElapsedMilliseconds;
                     var delay = now - BinaryPrimitives.ReadInt64LittleEndian(payload);
                     window.Bytes += frame.Length;
+                    mediaBytes += frame.Length;
                     if (payload[8] == Payload.Audio)
                     {
                         // Recovery after an outage or a network change: the first live (under 2 s old) audio after it.
@@ -687,12 +738,34 @@ internal static class Receiver
                     }
 
                     videoDelays.Add(delay); window.Video.Add(delay);
+#if HARNESS_ADAPTIVE
+                    if (recovery is not null)
+                    {
+                        if (!recovery.TryGetValue(header.StreamId, out var buffer))
+                            recovery[header.StreamId] = buffer = new Bolt.Media.Browser.VideoRecoveryBuffer();
+                        buffer.Configure(true, RecoveryRtt());
+                        buffer.Push(header.SequenceNumber, Fragment(header, payload), Environment.TickCount64, recovered);
+                        continue;
+                    }
+#endif
                     var picture = BinaryPrimitives.ReadUInt32LittleEndian(payload[10..]);
                     var count = BinaryPrimitives.ReadUInt16LittleEndian(payload[16..]);
                     var got = pending[picture] = pending.GetValueOrDefault(picture) + 1;
                     if (got < count) continue;
                     pending.Remove(picture);
                     foreach (var stale in pending.Keys.Where(x => x < picture).ToArray()) pending.Remove(stale);
+                    Judge(payload, header.StreamId);
+                }
+#if HARNESS_ADAPTIVE
+                // Pictures the recovery released, in order, judged exactly like the plain path's.
+                foreach (var released in recovered)
+                    if (recovery!.Keys.FirstOrDefault() is var stream) Judge(released.Data, stream);
+                recovered.Clear();
+#endif
+
+                void Judge(ReadOnlySpan<byte> payload, Guid stream)
+                {
+                    var picture = BinaryPrimitives.ReadUInt32LittleEndian(payload[10..]);
                     picturesComplete++;
                     var isKey = payload[9] == 1;
                     if (isKey) keyframes++;
@@ -711,7 +784,7 @@ internal static class Receiver
                     {
                         lastKeyframeRequest = clock.ElapsedMilliseconds;
                         keyframeRequests++;
-                        _ = RequestKeyframeAsync(header.StreamId);
+                        _ = RequestKeyframeAsync(stream);
                     }
 #endif
                 }
@@ -737,7 +810,16 @@ internal static class Receiver
 #if HARNESS_ADAPTIVE
         feedbackStop.Cancel();
         await feedbackLoop;
-        var transport = datagram is null ? null : new { datagram = datagram.Summary(), keyframeRequests };
+        var nack = recovery is null ? null : new
+        {
+            requests = nackRequests,
+            asked = recovery.Values.Sum(x => x.Nacked),
+            recovered = recovery.Values.Sum(x => x.Recovered),
+            abandoned = recovery.Values.Sum(x => x.Abandoned),
+            declined = recovery.Values.Sum(x => x.Declined),
+            skipped = recovery.Values.Sum(x => x.Skipped),
+        };
+        var transport = datagram is null ? null : new { datagram = datagram.Summary(), keyframeRequests, nack };
 #else
         object? transport = null;
 #endif
@@ -757,6 +839,9 @@ internal static class Receiver
             videoDelayMsP50 = Percentile(videoDelays, .5),
             picturesComplete,
             picturesDecodable,
+            // Media frames (Bolt header, SFrame and payload) that reached this receiver, per second of call.
+            mediaKbps = firstMediaAt is { } mediaStart && clock.ElapsedMilliseconds > mediaStart
+                ? Math.Round(mediaBytes * 8.0 / (clock.ElapsedMilliseconds - mediaStart), 1) : 0,
             decodableByLayer = layerPictures,
             keyframes,
             frozenSeconds,

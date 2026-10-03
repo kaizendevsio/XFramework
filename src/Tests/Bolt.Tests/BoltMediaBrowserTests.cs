@@ -181,6 +181,29 @@ public class BoltMediaBrowserTests
     }
 
     [Test]
+    public void ManagedOpusCodec_PacksThreeCapturesInto60msPackets_ThatEveryNewReceiverPlays()
+    {
+        using var sender = new ManagedOpusCodec(32) { FrameMs = 60 };
+        using var receiver = new ManagedOpusDecoder();
+        var packets = new List<(byte[] Packet, double Capture)>();
+        for (var frame = 0; frame < 9; frame++)
+        {
+            var pcm = new byte[1920];
+            for (var i = 0; i < 960; i++)
+                BinaryPrimitives.WriteInt16LittleEndian(pcm.AsSpan(i * 2), (short)(Math.Sin(2 * Math.PI * 440 * (frame * 960 + i) / 48000) * 12000));
+            if (sender.TryEncode(pcm, frame * 20_000, out var packet, out var capture)) packets.Add((packet, capture));
+        }
+        packets.Select(x => x.Capture).Should().Equal([0, 60_000, 120_000], "one packet per three captures, stamped with the first");
+        var decoded = receiver.Decode(packets[1].Packet);
+        decoded.Length.Should().Be(2880 * 2, "a 60 ms packet decodes to 2880 samples");
+        decoded.Any(sample => sample != 0).Should().BeTrue();
+
+        sender.FrameMs = 20;
+        sender.TryEncode(new byte[1920], 200_000, out var single, out _).Should().BeTrue("20 ms packets again, one per capture");
+        receiver.Decode(single).Length.Should().Be(1920);
+    }
+
+    [Test]
     public void ManagedOpusCodec_RejectsUnboundedOrInvalidFrameSizes()
     {
         using var codec = new ManagedOpusCodec();

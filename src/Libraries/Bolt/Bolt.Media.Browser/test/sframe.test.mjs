@@ -90,3 +90,78 @@ test('key reuse, shared sender key, bounds and disposed session fail closed', ()
         assert.throws(() => alice.activateEpoch('1', binding));
     } finally { close(sessions); }
 });
+
+function setupCompact(call = 'call', revision = 1, names = ['alice', 'bob'], compact = names.map(() => true)) {
+    const members = names.map((name, i) => entry(name, revision * 10 + i, revision * 10 + i));
+    return members.map((local, i) => {
+        const session = new SFrameSession(call, local.senderId);
+        session.installEpoch({ epochId: String(revision), rosterBinding: binding, local,
+            remote: members.filter(member => member !== local), compact: compact[i] });
+        session.activateEpoch(String(revision), binding);
+        return session;
+    });
+}
+
+test('a compact epoch adds at most 20 bytes a frame; the legacy one hundreds', () => {
+    // Yap's real identifiers: a call UUID and yap-media-<call>-<credential> senders.
+    const call = '0f8fad5b-d9cb-469f-a165-70867728950e', sender = 'yap-media-' + 'a'.repeat(32) + '-' + 'b'.repeat(32);
+    const legacy = setup(call, 1, [sender, 'bob']);
+    const compact = setupCompact(call, 1, [sender, 'bob']);
+    try {
+        const opus = new Uint8Array(80).fill(7);
+        const stream = '16fd2706-8baf-433b-82eb-8c7fada847da';
+        const old = legacy[0].encrypt(opus, stream, 123456, 4294967295);
+        assert.ok(old.length - opus.length > 250, `legacy overhead ${old.length - opus.length}`);
+        for (let sequence = 0; sequence < 600; sequence++) {
+            const frame = compact[0].encrypt(opus, stream, sequence, sequence * 960);
+            assert.ok(frame.length - opus.length <= 20, `compact overhead ${frame.length - opus.length}`);
+            assert.deepEqual(compact[1].decrypt(sender, frame, stream, sequence, sequence * 960), opus);
+        }
+    } finally { close(legacy); close(compact); }
+});
+
+test('receivers take both formats, so a call can mix old and new senders', () => {
+    // Alice sends compact frames, Bob (an older sender) legacy ones; each decodes the other.
+    const [alice, bob] = setupCompact('call', 1, ['alice', 'bob'], [true, false]);
+    try {
+        const fromAlice = alice.encrypt(payload, 'a-stream', 1, 960);
+        const fromBob = bob.encrypt(payload, 'b-stream', 1, 960);
+        assert.ok(fromAlice.length <= payload.length + 20);
+        assert.ok(fromBob.length > payload.length + 60, "the legacy context rides inside the ciphertext");
+        assert.deepEqual(bob.decrypt('alice', fromAlice, 'a-stream', 1, 960), payload);
+        assert.deepEqual(alice.decrypt('bob', fromBob, 'b-stream', 1, 960), payload);
+        assert.throws(() => bob.decrypt('alice', fromAlice, 'a-stream', 1, 960), 'replay');
+    } finally { close([alice, bob]); }
+});
+
+test('a compact frame is bound to its call, epoch, roster, sender, stream, sequence and timestamp', () => {
+    const sessions = setupCompact('call', 1, ['alice', 'bob', 'carol']);
+    const other = setupCompact('call-b', 1, ['alice', 'bob']);
+    try {
+        const [alice, bob, carol] = sessions;
+        const packet = alice.encrypt(payload, 'stream', 5, 4800);
+        for (const route of [['other', 5, 4800], ['stream', 6, 4800], ['stream', 5, 4801]])
+            assert.throws(() => bob.decrypt('alice', packet, ...route));
+        assert.throws(() => bob.decrypt('carol', packet, 'stream', 5, 4800), 'another sender key');
+        assert.throws(() => other[1].decrypt('alice', packet, 'stream', 5, 4800), 'another call');
+        const tampered = packet.slice(); tampered[tampered.length - 1] ^= 1;
+        assert.throws(() => carol.decrypt('alice', tampered, 'stream', 5, 4800));
+        assert.deepEqual(bob.decrypt('alice', packet, 'stream', 5, 4800), payload);
+        assert.deepEqual(carol.decrypt('alice', packet, 'stream', 5, 4800), payload);
+        // A new epoch: the old epoch's compact frames no longer decrypt.
+        alice.pause(); bob.pause();
+        const a = entry('alice', 21, 21); const b = entry('bob', 22, 22);
+        alice.installEpoch({ epochId: '2', rosterBinding: binding, local: a, remote: [b], compact: true });
+        bob.installEpoch({ epochId: '2', rosterBinding: binding, local: b, remote: [a], compact: true });
+        alice.activateEpoch('2', binding); bob.activateEpoch('2', binding);
+        assert.throws(() => bob.decrypt('alice', packet, 'stream', 5, 4800));
+    } finally { close(sessions); close(other); }
+});
+
+test('sender key IDs below 8 are reserved for the compact format marker', () => {
+    const session = new SFrameSession('call', 'alice');
+    try {
+        assert.throws(() => session.installEpoch({ epochId: '1', rosterBinding: binding,
+            local: entry('alice', 1, 1), remote: [entry('bob', 22, 22)], compact: true }), /key ID/);
+    } finally { session.dispose(); }
+});

@@ -168,6 +168,21 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
         await _pipeline.InvokeVoidAsync("reconfigureBitrate", sampleRate, channels, newBitrateKbps);
     }
 
+    /// <summary>
+    /// Opus packet length in milliseconds (20, 40 or 60). Returns the length the encoder now uses: a browser whose
+    /// encoder does not support longer packets keeps 20 ms.
+    /// </summary>
+    public async ValueTask<int> SetFrameDurationAsync(int frameMs)
+    {
+        if (_pipeline is null) return 20;
+        if (_managedCodec is not null)
+        {
+            _managedCodec.FrameMs = frameMs;
+            return _managedCodec.FrameMs;
+        }
+        return await _pipeline.InvokeAsync<int>("setFrameDuration", frameMs) is var used and (40 or 60) ? used : 20;
+    }
+
     /// <summary>Called from JS when an encoded audio chunk is ready. <paramref name="captureMicroseconds"/> is its capture time.</summary>
     [JSInvokable]
     public async Task OnAudioEncoded(byte[] data, double captureMicroseconds)
@@ -179,9 +194,10 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
     }
 
     [JSInvokable]
-    public Task OnAudioPcm(byte[] pcm, double captureMicroseconds) => _managedCodec is null
-        ? Task.CompletedTask
-        : OnAudioEncoded(_managedCodec.Encode(pcm), captureMicroseconds);
+    public Task OnAudioPcm(byte[] pcm, double captureMicroseconds) =>
+        _managedCodec is { } codec && codec.TryEncode(pcm, captureMicroseconds, out var packet, out var capture)
+            ? OnAudioEncoded(packet, capture)
+            : Task.CompletedTask;
 
     /// <summary>
     /// Capture time on the 48 kHz media clock. Sent as the frame timestamp, it lets receivers and the relay measure

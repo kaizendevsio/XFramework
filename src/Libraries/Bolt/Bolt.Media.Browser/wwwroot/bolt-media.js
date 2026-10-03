@@ -293,6 +293,25 @@ class AudioPipeline {
         decoder.decode(new EncodedAudioChunk({ type: 'key', timestamp: Math.round(timestamp * 1000000 / 48000), data }));
     }
 
+    /// Opus packet length in milliseconds (20, 40 or 60): longer packets on a scarce link, where each one's framing
+    /// costs more than the voice it carries. Returns what the encoder now uses. An encoder that does not know
+    /// frameDuration (WebIDL drops unknown members, so "supported" alone proves nothing) keeps what it had.
+    async setFrameDuration(frameMs) {
+        const current = Math.round((this.encoderConfig?.opus?.frameDuration ?? 20000) / 1000);
+        if (this.managed) return [20, 40, 60].includes(frameMs) ? frameMs : 20;
+        const wanted = [20, 40, 60].includes(frameMs) ? frameMs : 20;
+        if (this.encoder?.state !== 'configured' || !this.encoderConfig || wanted === current) return current;
+        const candidate = { ...this.encoderConfig, opus: { ...(this.encoderConfig.opus ?? {}), frameDuration: wanted * 1000 } };
+        try {
+            const support = await AudioEncoder.isConfigSupported(candidate);
+            if (!support?.supported || support.config?.opus?.frameDuration !== wanted * 1000) return current;
+        } catch { return current; }
+        if (this.encoder?.state !== 'configured') return current;
+        this.encoderConfig = candidate;
+        this.encoder.configure(candidate);
+        return wanted;
+    }
+
     reconfigureBitrate(sampleRate, channels, bitrate) {
         // Keep the FEC/DTX tuning the encoder was accepted with; only the rate changes.
         if (this.encoder?.state === 'configured')
@@ -333,12 +352,14 @@ class AudioPipeline {
         return Object.fromEntries([...this.receivers.entries()].map(([id, r]) => [id, Math.round((r.jitter?.target ?? 0) * 1000)]));
     }
 
+    /// Decoded PCM from the managed codec: whole 20 ms frames, up to 120 ms (one Opus packet of several frames).
     playPcm(bytes, streamId = 'default', timestamp = undefined) {
-        if (bytes.length !== 1920) return;
+        if (bytes.length < 1920 || bytes.length > 11520 || bytes.length % 1920 !== 0) return;
+        const frames = bytes.length / 2;
         const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-        this._playAudioData({ numberOfFrames: 960, numberOfChannels: 1, sampleRate: 48000,
+        this._playAudioData({ numberOfFrames: frames, numberOfChannels: 1, sampleRate: 48000,
             timestamp: Number.isFinite(timestamp) ? Math.round(timestamp * 1e6 / 48000) : undefined,
-            copyTo: samples => { for (let i = 0; i < 960; i++) samples[i] = view.getInt16(i * 2, true) / 32768; },
+            copyTo: samples => { for (let i = 0; i < frames; i++) samples[i] = view.getInt16(i * 2, true) / 32768; },
             close() {} }, streamId);
     }
 
@@ -432,7 +453,7 @@ export function h264BitstreamCodec(data) {
 
 /// Opus with in-band FEC and DTX where the browser accepts them, plain Opus otherwise. The tuning
 /// is an optimisation: a browser that rejects the opus dictionary still gets a working encoder.
-async function opusEncoderConfig(sampleRate, channels, bitrateKbps, opus) {
+export async function opusEncoderConfig(sampleRate, channels, bitrateKbps, opus) {
     const base = { codec: 'opus', sampleRate, numberOfChannels: channels, bitrate: bitrateKbps * 1000 };
     const tuning = opus && (opus.inbandFec || opus.dtx) ? {
         useinbandfec: !!opus.inbandFec, usedtx: !!opus.dtx,
@@ -448,7 +469,7 @@ async function opusEncoderConfig(sampleRate, channels, bitrateKbps, opus) {
 /// Fastest a remote request can make this sender emit another keyframe.
 const KEYFRAME_REQUEST_GAP_MS = 1000;
 
-function encoderConfig(codec, width, height, bitrateKbps, framerate, hardware, scalabilityMode = 'L1T1') {
+export function encoderConfig(codec, width, height, bitrateKbps, framerate, hardware, scalabilityMode = 'L1T1') {
     const config = {
         codec: videoCodecString(codec, Math.min(width, height), framerate), width, height,
         bitrate: Math.max(64, bitrateKbps) * 1000, framerate,
@@ -472,7 +493,7 @@ export function temporalModeFor(framerate, supported) {
 
 /// Which temporal-layer modes this encoder accepts at this configuration. WebKit and some hardware encoders
 /// refuse them (or accept only some); a refusal is an answer, never an error.
-async function probeTemporalModes(config) {
+export async function probeTemporalModes(config) {
     const modes = new Set();
     for (const mode of ['L1T2', 'L1T3']) {
         try { if ((await VideoEncoder.isConfigSupported({ ...config, scalabilityMode: mode }))?.supported) modes.add(mode); }

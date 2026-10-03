@@ -53,6 +53,9 @@ public sealed partial class BoltMediaService : IAsyncDisposable
     /// <summary>The rate controller of a transport lost to an outage, until the resumed transport starts its own from it.</summary>
     private SendRateController? _resumeFrom;
 
+    /// <summary>Opus packet length the encoder uses now (see <see cref="AudioPacketization"/>).</summary>
+    private int _audioFrameMs = AudioPacketization.ShortFrameMs;
+
     /// <summary>The send estimate and its split, as the last rate-loop tick decided it.</summary>
     public SendRateDecision? SendRate { get; private set; }
 
@@ -175,6 +178,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
             if (OnCallEnded is not null) await OnCallEnded(callId);
         };
         mediaClient.OnKeyframeRequested += streamId => { _ = _video.RequestKeyframeAsync(); };
+        mediaClient.OnNackDeclined += (streamId, sequences) => { _ = DeclineVideoAsync(streamId, sequences); };
         mediaClient.OnMediaStreamConfigured += stream => { RegisterRemoteVideo(stream); StartPlaybackLoop(stream); };
         mediaClient.OnCongestionReport += report =>
             _signals.OnCongestionReport(report, report.StreamId == _activeVideoStreamId, Environment.TickCount64);
@@ -324,7 +328,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
                     if (stream.IsAudio)
                         await _audio.DecodeFrameAsync(stream.StreamId, frame.Data, frame.Timestamp);
                     else
-                        await PlayVideoFragmentAsync(stream, frame.Data);
+                        await PlayVideoFragmentAsync(stream, frame);
                 }
             }
             catch (OperationCanceledException) { }
@@ -403,6 +407,9 @@ public sealed partial class BoltMediaService : IAsyncDisposable
                     RestartFloorKbps = startTierKbps + AudioWireKbps,
                 });
         var loop = _rateLoop = new SendRateLoop(pacer, controller, ladder, _signals);
+        // Longer Opus packets only if every receiver plays them; the encoder may already use some from the last path.
+        loop.Audio.MaxFrameMs = CallMediaFormat.MaxAudioFrameMs(PeerMediaFormat);
+        loop.Audio.Applied(_audioFrameMs);
         var cts = _rateCts = new CancellationTokenSource();
         _rateTask = RateLoopAsync(loop, cts.Token);
     }
@@ -418,6 +425,11 @@ public sealed partial class BoltMediaService : IAsyncDisposable
                 SendRate = tick.Decision;
                 if (tick.AudioKbps is { } audio && _options.AdaptiveAudioBitrate)
                     await _audio.ReconfigureBitrateAsync(_options.AudioSampleRate, _options.AudioChannels, audio);
+                if (tick.AudioFrameMs is { } frameMs)
+                {
+                    _audioFrameMs = await _audio.SetFrameDurationAsync(frameMs);
+                    loop.Audio.Applied(_audioFrameMs);
+                }
                 await ApplyVideoAsync(tick);
             }
         }
@@ -469,6 +481,12 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         lock (_configuredCalls) _configuredCalls.Clear();
 
         if (_audio.IsCapturing) await _audio.StopCaptureAsync();
+        // The next call starts at 20 ms; its own link decides again.
+        if (_audioFrameMs != AudioPacketization.ShortFrameMs)
+        {
+            try { _audioFrameMs = await _audio.SetFrameDurationAsync(AudioPacketization.ShortFrameMs); }
+            catch (JSException) { _audioFrameMs = AudioPacketization.ShortFrameMs; }
+        }
         await _audio.StopPlaybackAsync();
         await StopVideoPipelineAsync();
         if (_sframe is not null)

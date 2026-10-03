@@ -191,8 +191,7 @@ public sealed partial class VoiceState
     {
         var old = attempt.Epoch;
         var localId = chat.User!.CredentialId;
-        var local = new SFrameSenderKey(MediaSender(group.Id, localId),
-            BitConverter.ToUInt64(RandomNumberGenerator.GetBytes(8)).ToString(CultureInfo.InvariantCulture), RandomNumberGenerator.GetBytes(32));
+        var local = new SFrameSenderKey(MediaSender(group.Id, localId), NewKeyId(), RandomNumberGenerator.GetBytes(32));
         var epoch = attempt.Epoch = new GroupEpoch(group.Revision, ChatEncryption.CallRosterBinding(group), local,
             group.Participants.Where(x => x.Accepted && !x.Left && x.CredentialId != localId).Select(x => x.CredentialId).ToArray());
         attempt.Phase = "call-keys";
@@ -208,13 +207,26 @@ public sealed partial class VoiceState
         foreach (var peer in epoch.Peers)
         {
             await SendEpochControlAsync(attempt, epoch, peer, "key",
-                new CallKey(local.Kid, Convert.ToBase64String(local.Key), VideoCodecLadder.Advertise(attempt.Ladder?.Decodable ?? []), attempt.DecodeCeiling));
+                new CallKey(local.Kid, Convert.ToBase64String(local.Key), VideoCodecLadder.Advertise(attempt.Ladder?.Decodable ?? []), attempt.DecodeCeiling,
+                    CallMediaFormat.Current));
             if (!CurrentEpoch(attempt, epoch)) return;
         }
         var pending = attempt.PendingControls.Values.Where(x => x.Revision == epoch.Revision).ToArray();
         attempt.PendingControls.Clear();
         foreach (var control in pending) await ReceiveEpochControlAsync(attempt, epoch, control);
     }
+
+    /// <summary>
+    /// A random 64-bit SFrame key ID. IDs below <see cref="MinKeyId"/> are reserved: a compact frame's header uses KID 1
+    /// as its format marker, so a sender whose real KID were that small could not be told apart.
+    /// </summary>
+    private static string NewKeyId()
+    {
+        ulong kid;
+        do kid = BitConverter.ToUInt64(RandomNumberGenerator.GetBytes(8)); while (kid < MinKeyId);
+        return kid.ToString(CultureInfo.InvariantCulture);
+    }
+    private const ulong MinKeyId = 8;
 
     private bool CurrentEpoch(Attempt attempt, GroupEpoch epoch) => Current(attempt) && ReferenceEquals(attempt.Epoch, epoch) && attempt.Group?.Revision == epoch.Revision;
     private static string MediaSender(Guid call, Guid credential) => $"yap-media-{call:N}-{credential:N}";
@@ -254,7 +266,8 @@ public sealed partial class VoiceState
         if (!CurrentEpoch(attempt, epoch)) return;
         var payload = body.Deserialize<CallKey>(new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
             ?? throw new InvalidOperationException("Invalid call key.");
-        if (!ulong.TryParse(payload.Kid, NumberStyles.None, CultureInfo.InvariantCulture, out _)) throw new InvalidOperationException("Invalid call key ID.");
+        if (!ulong.TryParse(payload.Kid, NumberStyles.None, CultureInfo.InvariantCulture, out var kid) || kid < MinKeyId)
+            throw new InvalidOperationException("Invalid call key ID.");
         if (control.Kind == "key")
         {
             var key = Convert.FromBase64String(payload.Key ?? "");
@@ -272,6 +285,9 @@ public sealed partial class VoiceState
             if (payload.Video is { Length: <= 32 } advertised)
                 epoch.PeerCodecs[control.SenderId] = VideoCodecLadder.ReadAdvertisement(advertised);
             epoch.PeerVideoHeights[control.SenderId] = Math.Clamp(payload.VideoHeight, 240, 2160);
+            // Like the decoder list, a peer's own claim about what it reads: overstating it only costs that peer audio
+            // or video it cannot parse, never anyone's keys. A missing value is an older client (legacy formats).
+            epoch.PeerMedia[control.SenderId] = payload.Media;
         }
         else if (control.Kind == "ack" && payload.Kid == epoch.Local.Kid && payload.Key is null) epoch.Acknowledged.Add(control.SenderId);
         else throw new InvalidOperationException("Invalid call acknowledgment.");
@@ -288,7 +304,8 @@ public sealed partial class VoiceState
             var media = attempt.Media!;
             if (!epoch.Installed)
             {
-                if (!await RunEpochMediaAsync(attempt, epoch, () => media.InstallSFrameEpochAsync(epoch.Id, epoch.Binding, epoch.Local, epoch.Remote.Values.ToArray()))) return;
+                var formats = CallMediaFormat.Common(epoch.Peers.Select(peer => epoch.PeerMedia.GetValueOrDefault(peer)));
+                if (!await RunEpochMediaAsync(attempt, epoch, () => media.InstallSFrameEpochAsync(epoch.Id, epoch.Binding, epoch.Local, epoch.Remote.Values.ToArray(), formats))) return;
                 epoch.Installed = true;
                 foreach (var peer in epoch.Peers) await SendEpochControlAsync(attempt, epoch, peer, "ack", new CallKey(epoch.Remote[peer].Kid, null));
             }
@@ -371,8 +388,9 @@ public sealed partial class VoiceState
     }
 
     /// <summary>Epoch control payload. <c>Video</c> lists the codecs the sender can decode, so the
-    /// choice of wire codec never leaves the end-to-end encrypted envelope.</summary>
-    private sealed record CallKey(string Kid, string? Key, string? Video = null, int VideoHeight = 1080);
+    /// choice of wire codec never leaves the end-to-end encrypted envelope. <c>Media</c> is the
+    /// <see cref="CallMediaFormat"/> the sender reads (0 from a client that predates it: legacy).</summary>
+    private sealed record CallKey(string Kid, string? Key, string? Video = null, int VideoHeight = 1080, int Media = 0);
 
     /// <summary>Resolve the concurrent capability probe into a ladder, once per call.</summary>
     private async Task LoadVideoLadderAsync(Attempt attempt)
@@ -415,6 +433,7 @@ public sealed partial class VoiceState
         public Dictionary<Guid, SFrameSenderKey> Remote { get; } = [];
         public Dictionary<Guid, VideoCodec[]> PeerCodecs { get; } = [];
         public Dictionary<Guid, int> PeerVideoHeights { get; } = [];
+        public Dictionary<Guid, int> PeerMedia { get; } = [];
         public HashSet<Guid> Acknowledged { get; } = [];
         public Dictionary<(Guid, string), long> Seen { get; } = [];
         public SemaphoreSlim Completion { get; } = new(1, 1);

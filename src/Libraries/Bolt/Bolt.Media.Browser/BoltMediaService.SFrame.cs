@@ -11,10 +11,25 @@ public sealed partial class BoltMediaService
         _sframeLocalSenderId = localSenderId;
     }
 
-    public Task InstallSFrameEpochAsync(string epochId, string rosterHash, SFrameSenderKey local, IReadOnlyList<SFrameSenderKey> remote)
+    /// <summary>The media format every remote member of the installed epoch reads (<see cref="CallMediaFormat"/>).</summary>
+    public int PeerMediaFormat { get; private set; } = CallMediaFormat.Legacy;
+
+    /// <param name="peerMediaFormat">
+    /// <see cref="CallMediaFormat.Common"/> of what the remote members announced in their authenticated envelopes. It
+    /// decides whether this device sends compact SFrame frames and how long its Opus packets may be.
+    /// </param>
+    public async Task InstallSFrameEpochAsync(string epochId, string rosterHash, SFrameSenderKey local, IReadOnlyList<SFrameSenderKey> remote,
+        int peerMediaFormat = CallMediaFormat.Legacy)
     {
         RequireSFrame();
-        return _sframe!.InstallEpochAsync(epochId, rosterHash, local, remote);
+        await _sframe!.InstallEpochAsync(epochId, rosterHash, local, remote, compact: peerMediaFormat >= CallMediaFormat.Compact);
+        PeerMediaFormat = peerMediaFormat;
+        // Fragments are sized by the overhead the format adds; the next picture measures the new one (from the
+        // conservative default until then, so a switch to the larger legacy format never overflows a datagram).
+        foreach (var id in new[] { _activeAudioStreamId, _activeVideoStreamId })
+            if (id != Guid.Empty) _mediaClient?.GetMediaStream(id)?.ResetEncryptionOverhead();
+        // A member that only plays 20 ms packets joined: the next tick shrinks them.
+        if (_rateLoop is { } loop) loop.Audio.MaxFrameMs = CallMediaFormat.MaxAudioFrameMs(peerMediaFormat);
     }
 
     public Task ActivateSFrameEpochAsync(string epochId, string rosterHash)

@@ -84,6 +84,7 @@ Options that relay does not have are skipped. The adaptive sender needs this che
 | `ADAPTIVE` | 0 | 1 runs the adaptive sender (the browser's send path) instead of the constant one |
 | `START_HEIGHT` | 240 | Adaptive: the picture to start from; 720 or 1080 is an overload offer on a mobile link |
 | `AUDIO_KBPS` | 32 | Adaptive: Opus rate before the rate loop moves it |
+| `AUDIO_MAX_FRAME_MS` | 60 | Adaptive: longest Opus packet the rate loop may choose on a scarce link (20: a call with a legacy receiver, the previous client) |
 | `SVC` | 1 | Adaptive: 0 encodes without temporal layers |
 | `OVERSHOOT_PCT` | 100 | Adaptive: encoder output as a percentage of its target |
 | `UNSENT_BYTES` | 32768 | `TCP_NOTSENT_LOWAT` on the relay's call sockets (`Yap:Calls:RelaySocketUnsentBytes`) |
@@ -142,7 +143,8 @@ two directions as the WebSocket runs. A receiver whose channel fails or never op
 | `UDP` | 0 | 1 adds TURN and the datagram path (needs the head build: `bolt-rtc` next to the harness) |
 | `UDP_BLOCK` | 0 | 1 drops the receiver's UDP to the TURN server: the call must stay on its WebSocket |
 | `IPCHANGE_UDP_AT_S` | off | The data channel's UDP flows are blackholed (a new network) and the receiver restarts ICE; the socket is untouched |
-| `SFRAME_OVERHEAD` | 26 | Bytes per frame standing in for SFrame; the real adapter adds about 278 (its context travels inside the ciphertext) |
+| `SFRAME_OVERHEAD` | 20 | Bytes per frame standing in for SFrame: compact frames add at most 20; the legacy format about 278 (its context traveled inside the ciphertext) |
+| `NACK` | 1 | With `UDP=1`: lost video fragments are asked of the relay, and pictures go through the browser's own `VideoRecoveryBuffer` (0: no retransmission, the previous client) |
 
 `run-profile.sh` starts coturn and passes `TURN_URL` / `TURN_SECRET`. The summaries gain a `transport`
 object (receiver: final path, when it opened, ICE restarts, frames on each path, a timeline) and a

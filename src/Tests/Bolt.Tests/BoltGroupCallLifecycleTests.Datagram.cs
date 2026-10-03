@@ -500,10 +500,13 @@ public sealed partial class BoltGroupCallLifecycleTests
         var (relay, _, session) = await OpenDatagramAsync(f, network, "a");
         var stream = await f.Config("b");
         await f.Peers["a"].ProcessAsync(MediaTransportCodec.Encode(MediaTransportKind.State, new MediaTransportStateMessage(session, "stalled")));
+        // Signalling is handled by the connection's own worker: wait for it, or the frame races the report.
+        await WaitUntil(() => Connection(f, "a").DatagramSuspended);
         await f.Send("b", stream);
         await WaitUntil(() => f.Peers["a"].Count(FrameType.MediaFrame) == 1);
         Assert.That(MediaOn(relay), Is.Zero);
         await f.Peers["a"].ProcessAsync(MediaTransportCodec.Encode(MediaTransportKind.State, new MediaTransportStateMessage(session, "open")));
+        await WaitUntil(() => !Connection(f, "a").DatagramSuspended);
         await f.Send("b", stream);
         await WaitUntil(() => MediaOn(relay) == 1);
         Assert.That(f.Peers["a"].Count(FrameType.MediaFrame), Is.EqualTo(1));
