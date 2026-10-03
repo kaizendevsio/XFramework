@@ -80,7 +80,13 @@ public sealed class BrowserDataChannelTests
     }
 
     private sealed record ServerResult(string? Path, long Cwnd, int Received);
-    private sealed class RelaySide(IRtcPeer peer) { public IRtcPeer Peer { get; } = peer; public int Received; }
+    private sealed class RelaySide(IRtcPeer peer)
+    {
+        public IRtcPeer Peer { get; } = peer;
+        public int Received;
+        /// <summary>What the relay's peer did and sent, in order, for failure messages.</summary>
+        public System.Collections.Concurrent.ConcurrentQueue<string> Log { get; } = new();
+    }
     private readonly ConcurrentDictionary<string, RelaySide> _relays = new();
 
     /// <summary>The relay's end: one answering peer per page, relay-only, echoing every message back.</summary>
@@ -101,7 +107,14 @@ public sealed class BrowserDataChannelTests
             [Turn($"turn:{_turnHost}:3478?transport=udp", "relay")], RelayOnly: true, RtcDefaults.MaxMessageBytes, 128 * 1024), CancellationToken.None);
         _relayPeers.Enqueue(peer);
         var relay = _relays[id] = new RelaySide(peer);
-        peer.LocalCandidate += candidate => _ = Send(new { type = "candidate", candidate = candidate.Candidate, sdpMid = candidate.SdpMid, sdpMLineIndex = candidate.SdpMLineIndex });
+        var started = Environment.TickCount64;
+        void Note(string what) => relay.Log.Enqueue($"{Environment.TickCount64 - started}ms {what}");
+        peer.StateChanged += state => Note("state=" + state);
+        peer.LocalCandidate += candidate =>
+        {
+            Note("send candidate " + (candidate.Candidate.Split(' ').ElementAtOrDefault(7) ?? "end"));
+            _ = Send(new { type = "candidate", candidate = candidate.Candidate, sdpMid = candidate.SdpMid, sdpMLineIndex = candidate.SdpMLineIndex });
+        };
         peer.Message += data => { Interlocked.Increment(ref relay.Received); peer.TrySend(data.Span); };
         var buffer = new byte[64 * 1024];
         while (socket.State == WebSocketState.Open)
@@ -113,10 +126,13 @@ public sealed class BrowserDataChannelTests
             switch (root.GetProperty("type").GetString())
             {
                 case "offer":
+                    Note("offer");
                     var answer = await peer.AnswerAsync(root.GetProperty("sdp").GetString()!, CancellationToken.None);
+                    Note("send answer");
                     await Send(new { type = "answer", sdp = answer });
                     break;
                 case "candidate":
+                    Note("candidate from browser");
                     await peer.AddCandidateAsync(new RtcCandidate(root.GetProperty("candidate").GetString() ?? "",
                         root.TryGetProperty("sdpMid", out var mid) && mid.ValueKind == JsonValueKind.String ? mid.GetString() : null,
                         root.TryGetProperty("sdpMLineIndex", out var index) && index.ValueKind == JsonValueKind.Number ? index.GetInt32() : null), CancellationToken.None);
@@ -130,7 +146,21 @@ public sealed class BrowserDataChannelTests
     private const string Page = """
         <!doctype html><meta charset="utf-8"><title>bolt-rtc</title>
         <script type="module">
-        import { createPeer } from './bolt-rtc.js';
+        // Diagnostics only: every ICE, connection and gathering state the browser goes through, for failure messages.
+        const NativePeerConnection = globalThis.RTCPeerConnection;
+        window.iceLog = [];
+        if (NativePeerConnection) globalThis.RTCPeerConnection = class extends NativePeerConnection {
+          constructor(config) {
+            super(config);
+            const t0 = performance.now();
+            const note = what => window.iceLog.push(`${Math.round(performance.now() - t0)}ms ${what}`);
+            this.addEventListener('iceconnectionstatechange', () => note('ice=' + this.iceConnectionState));
+            this.addEventListener('connectionstatechange', () => note('pc=' + this.connectionState));
+            this.addEventListener('icegatheringstatechange', () => note('gathering=' + this.iceGatheringState));
+            this.addEventListener('icecandidateerror', e => note(`candidate-error ${e.errorCode} ${e.url || ''}`));
+          }
+        };
+        const { createPeer } = await import('./bolt-rtc.js');
         window.runCall = async ({ id, iceServers, policy, count, timeoutMs }) => {
           const ws = new WebSocket(`ws://${location.host}/signal?id=${id}`);
           await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
@@ -155,6 +185,7 @@ public sealed class BrowserDataChannelTests
           const peer = createPeer(dotnet, { iceServers, iceTransportPolicy: policy, maxMessageBytes: 1150 });
           ws.onmessage = async event => {
             const message = JSON.parse(event.data);
+            window.iceLog.push('signal ' + message.type + (message.type === 'candidate' && message.candidate ? ' ' + (message.candidate.split(' ')[7] || '') : ''));
             if (message.type === 'answer') await peer.setAnswer(message.sdp);
             else if (message.type === 'candidate') await peer.addCandidate(message.candidate, message.sdpMid, message.sdpMLineIndex);
           };
@@ -180,7 +211,7 @@ public sealed class BrowserDataChannelTests
           const path = result.path && { Local: result.path.local, LocalProtocol: result.path.localProtocol,
             RelayProtocol: result.path.relayProtocol, Remote: result.path.remote, RttMs: result.path.rttMs };
           return { States: result.states, Path: path, Echoed: result.echoed, Opened: result.opened, Supported: result.supported, Bad: result.bad,
-            Candidates: result.candidates };
+            Candidates: result.candidates, Ice: window.iceLog.slice() };
         };
         // A sender at video rates, paced the way the call's pacer is (send while the buffer is under 48 KB): how much
         // arrives, whether the buffer drains once sending stops, and whether it ever sat full without draining for
@@ -245,9 +276,12 @@ public sealed class BrowserDataChannelTests
         </script>
         """;
 
-    private sealed record CallResult(string[] States, BrowserPath? Path, int Echoed, bool Opened, bool Supported, int Bad, string[]? Candidates = null)
+    private sealed record CallResult(string[] States, BrowserPath? Path, int Echoed, bool Opened, bool Supported, int Bad, string[]? Candidates = null,
+        string[]? Ice = null)
     {
-        public override string ToString() => $"states [{string.Join(",", States)}], candidates [{string.Join(",", Candidates ?? [])}]";
+        public string? Relay { get; set; }
+        public override string ToString() => $"states [{string.Join(",", States)}], candidates [{string.Join(",", Candidates ?? [])}], " +
+                                             $"browser [{string.Join("; ", Ice ?? [])}], relay [{Relay}]";
     }
     private sealed record BrowserPath(string Local, string LocalProtocol, string? RelayProtocol, string Remote, double RttMs);
 
@@ -287,6 +321,8 @@ public sealed class BrowserDataChannelTests
         });
         var result = JsonSerializer.Deserialize<CallResult>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
         if (!_relays.TryGetValue(id, out var relay)) return (result, null);
+        result.Relay = string.Join("; ", relay.Log);
+        TestContext.Out.WriteLine($"{engine}: {result}");
         // The relay's view of the same call: its path and SCTP window arrive with its periodic reports.
         for (var wait = 0; result.Opened && wait < 50 && (relay.Peer.Path is null || relay.Peer.CongestionWindow == 0); wait++)
             await Task.Delay(100);
