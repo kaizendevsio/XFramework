@@ -90,6 +90,8 @@ public sealed class MediaTransportClient : IAsyncDisposable
         public bool Closed;
         /// <summary>The ICE restart waiting for its answer, if one is in flight.</summary>
         public TaskCompletionSource? Restart;
+        /// <summary>This side's candidates wait for the offer they belong to.</summary>
+        public CandidateGate Candidates { get; } = new();
     }
 
     /// <summary>Longest an ICE restart may wait for the relay's answer before the channel is given up.</summary>
@@ -471,13 +473,27 @@ public sealed class MediaTransportClient : IAsyncDisposable
             if (session.Closed || _disposed) { _ = peer.DisposeAsync(); return; }
             session.Peer = peer;
         }
-        peer.LocalCandidate += candidate => _ = SendAsync(MediaTransportKind.Candidate,
-            new MediaTransportCandidate(session.Id, candidate.Candidate, candidate.SdpMid, candidate.SdpMLineIndex));
+        peer.LocalCandidate += candidate =>
+        {
+            if (!session.Candidates.TryHold(candidate)) _ = SendCandidateAsync(session, candidate);
+        };
         peer.StateChanged += state => _ = OnPeerStateAsync(session, state);
         peer.PathChanged += _ => Raise();
         peer.Message += data => _client.DispatchDatagram(data.Span);
+        session.Candidates.Hold();
         var offer = await peer.CreateOfferAsync(iceRestart: false, _lifetime.Token);
         await SendAsync(MediaTransportKind.Offer, new MediaTransportDescription(session.Id, offer));
+        await SendHeldCandidatesAsync(session);
+    }
+
+    private Task SendCandidateAsync(Session session, RtcCandidate candidate) => SendAsync(MediaTransportKind.Candidate,
+        new MediaTransportCandidate(session.Id, candidate.Candidate, candidate.SdpMid, candidate.SdpMLineIndex));
+
+    /// <summary>The offer is out: candidates gathered while it was made follow it, in order.</summary>
+    private async Task SendHeldCandidatesAsync(Session session)
+    {
+        foreach (var candidate in session.Candidates.Release())
+            await SendCandidateAsync(session, candidate);
     }
 
     private async Task OnPeerStateAsync(Session session, RtcChannelState state)
@@ -546,8 +562,10 @@ public sealed class MediaTransportClient : IAsyncDisposable
         {
             if (session.Peer is not { } peer || session.Closed) return false;
             session.Restart = answered;
+            session.Candidates.Hold();
             var offer = await peer.CreateOfferAsync(iceRestart: true, _lifetime.Token);
             await SendAsync(MediaTransportKind.Offer, new MediaTransportDescription(session.Id, offer, IceRestart: true));
+            await SendHeldCandidatesAsync(session);
             await answered.Task.WaitAsync(RestartAnswerTimeout, _lifetime.Token);
             return !session.Closed;
         }

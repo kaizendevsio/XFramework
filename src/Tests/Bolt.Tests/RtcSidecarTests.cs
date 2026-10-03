@@ -149,12 +149,29 @@ public sealed class RtcSidecarTests
         await using var sidecar = new RtcSidecar(new RtcSidecarOptions { ExecutablePath = RequireBinary() }, NullLogger<RtcSidecar>.Instance);
         await using var offerer = await sidecar.CreateAsync(RtcPeerRole.Offer, Loopback(), CancellationToken.None);
         await using var answerer = await sidecar.CreateAsync(RtcPeerRole.Answer, Loopback(), CancellationToken.None);
-        await ConnectAsync(offerer, answerer);
+        // Signalling as the client and relay do it: each side's candidates follow the description they belong to.
+        var offererGate = new CandidateGate();
+        var answererGate = new CandidateGate();
+        offerer.LocalCandidate += candidate => { if (!offererGate.TryHold(candidate)) _ = answerer.AddCandidateAsync(candidate, CancellationToken.None); };
+        answerer.LocalCandidate += candidate => { if (!answererGate.TryHold(candidate)) _ = offerer.AddCandidateAsync(candidate, CancellationToken.None); };
+        var open = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        answerer.StateChanged += state => { if (state == RtcChannelState.Open) open.TrySetResult(); };
+        async Task NegotiateAsync(bool restart)
+        {
+            offererGate.Hold();
+            answererGate.Hold();
+            var offer = await offerer.CreateOfferAsync(restart, CancellationToken.None);
+            var answer = await answerer.AnswerAsync(offer, CancellationToken.None);
+            foreach (var candidate in offererGate.Release()) await answerer.AddCandidateAsync(candidate, CancellationToken.None);
+            await offerer.SetAnswerAsync(answer, CancellationToken.None);
+            foreach (var candidate in answererGate.Release()) await offerer.AddCandidateAsync(candidate, CancellationToken.None);
+        }
+        await NegotiateAsync(restart: false);
+        await open.Task.WaitAsync(TimeSpan.FromSeconds(20));
 
         var states = new System.Collections.Concurrent.ConcurrentQueue<(RtcChannelState State, bool Took)>();
         answerer.StateChanged += state => states.Enqueue((state, answerer.TrySend([0x21])));
-        var offer = await offerer.CreateOfferAsync(iceRestart: true, CancellationToken.None);
-        await offerer.SetAnswerAsync(await answerer.AnswerAsync(offer, CancellationToken.None), CancellationToken.None);
+        await NegotiateAsync(restart: true);
 
         var deadline = Environment.TickCount64 + 20_000;
         while (!(states.Any(x => x.State != RtcChannelState.Open) && states.Last().State == RtcChannelState.Open))

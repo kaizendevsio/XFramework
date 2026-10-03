@@ -22,6 +22,8 @@ internal sealed class FakeRtcNetwork
     public bool FailCreate { get; set; }
     /// <summary>How long the answering side takes to answer an offer (a slow sidecar, or a long ICE restart).</summary>
     public TimeSpan AnswerDelay { get; set; }
+    /// <summary>The answering side has a candidate before its answer is back (it gathers as it applies the answer).</summary>
+    public bool CandidateBeforeAnswer { get; set; }
 
     public IRtcPeerFactory Factory(RtcPeerRole expected) => new PeerFactory(this, expected);
 
@@ -110,6 +112,7 @@ internal sealed class FakeRtcPeer(FakeRtcNetwork network, RtcPeerRole role, RtcP
         HasRemote = true;
         Partner = offerer;
         offerer.Partner = this;
+        if (network.CandidateBeforeAnswer) LocalCandidate?.Invoke(new RtcCandidate("candidate:3 1 udp 1 198.51.100.8 3478 typ relay", "0", 0));
         _ = Task.Run(() => { LocalCandidate?.Invoke(new RtcCandidate("candidate:2 1 udp 1 198.51.100.7 3478 typ relay", "0", 0)); LocalCandidate?.Invoke(new RtcCandidate("", null, null)); });
         network.TryConnect(this, offerer);
         return "answer:" + offerSdp;

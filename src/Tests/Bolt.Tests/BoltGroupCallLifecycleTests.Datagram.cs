@@ -438,6 +438,27 @@ public sealed partial class BoltGroupCallLifecycleTests
     }
 
     [Test]
+    public async Task Datagram_TheRelaysCandidates_FollowItsAnswer()
+    {
+        // Pion gathers as soon as it applies its answer. A candidate that reached the phone before that answer would be
+        // added to the previous ICE generation, and an ICE restart drops it with the rest: the restart cannot connect.
+        var network = new FakeRtcNetwork { CandidateBeforeAnswer = true };
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        var (_, participant, session) = await OpenDatagramAsync(f, network, "a");
+        var offer = await participant.CreateOfferAsync(true, CancellationToken.None);
+        await f.Peers["a"].ProcessAsync(MediaTransportCodec.Encode(MediaTransportKind.Offer, new MediaTransportDescription(session, offer, IceRestart: true)));
+        await AwaitTransport<MediaTransportDescription>(f.Peers["a"], MediaTransportKind.Answer, x => x.IceRestart);
+        await WaitUntil(() => TransportCount(f.Peers["a"], MediaTransportKind.Candidate) >= 2);
+        var order = f.Peers["a"].Sent.Select(x => MediaTransportCodec.TryRead(x, out var kind, out _) ? kind : (MediaTransportKind?)null)
+            .Where(x => x is MediaTransportKind.Answer or MediaTransportKind.Candidate).ToList();
+        Assert.That(order.IndexOf(MediaTransportKind.Answer), Is.LessThan(order.IndexOf(MediaTransportKind.Candidate)),
+            "every candidate follows the answer it belongs to");
+        var restartAnswer = order.LastIndexOf(MediaTransportKind.Answer);
+        Assert.That(order.Skip(restartAnswer).Count(x => x == MediaTransportKind.Candidate), Is.GreaterThanOrEqualTo(1),
+            "and the restart's candidate is sent after the restart's answer");
+    }
+
+    [Test]
     public async Task Datagram_AChannelThatStopsDraining_SendsThatReceiversMediaOnTheSocket()
     {
         // ICE is fine (the phone's checks still arrive), but nothing the relay hands the channel is acknowledged any

@@ -55,6 +55,8 @@ public sealed partial class BoltServer
         public int Candidates;
         public int Restarts;
         public bool Renewing;
+        /// <summary>The relay's candidates wait for the answer they belong to.</summary>
+        public CandidateGate LocalCandidates { get; } = new();
         /// <summary>The channel opened once (later "open" states are recoveries from a stall).</summary>
         public bool Opened;
     }
@@ -153,6 +155,7 @@ public sealed partial class BoltServer
                     // A restart is a new gathering: its candidates are counted afresh (pion dropped the old ones).
                     Interlocked.Exchange(ref session.Candidates, 0);
                 }
+                session.LocalCandidates.Hold();
                 try
                 {
                     if (session.Peer is null)
@@ -167,9 +170,12 @@ public sealed partial class BoltServer
                     }
                     var answer = await session.Peer!.AnswerAsync(offer.Sdp, ct);
                     await SendTransportAsync(connection, MediaTransportKind.Answer, new MediaTransportDescription(session.Id, answer, offer.IceRestart));
+                    foreach (var held in session.LocalCandidates.Release())
+                        await SendCandidateAsync(connection, session, held);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
                 {
+                    session.LocalCandidates.Release();
                     // The sidecar is restarting or gone, or refused the offer. Say so now: the phone carries on over its
                     // socket and retries on its backoff, instead of negotiating until its open timeout.
                     TransportLog.LogInformation("Datagram negotiation for {ClientId} failed ({Error}); media stays on the WebSocket",
@@ -302,6 +308,10 @@ public sealed partial class BoltServer
 
     private static MediaTransportConfig Unavailable(string reason) => new("", [], "all", 0, 0, reason);
 
+    private Task SendCandidateAsync(BoltHubConnection connection, TransportSession session, RtcCandidate candidate) =>
+        SendTransportAsync(connection, MediaTransportKind.Candidate,
+            new MediaTransportCandidate(session.Id, candidate.Candidate, candidate.SdpMid, candidate.SdpMLineIndex));
+
     private static TransportSession? FindSession(ConnectionMediaTransport transport, string id)
     {
         lock (transport.Sync) return transport.Sessions.GetValueOrDefault(id);
@@ -315,8 +325,12 @@ public sealed partial class BoltServer
             session.Peer = peer;
         }
         var connection = transport.Connection;
-        peer.LocalCandidate += candidate => _ = SendTransportAsync(connection, MediaTransportKind.Candidate,
-            new MediaTransportCandidate(session.Id, candidate.Candidate, candidate.SdpMid, candidate.SdpMLineIndex));
+        peer.LocalCandidate += candidate =>
+        {
+            // Pion gathers as soon as it applies its answer; a candidate must not reach the phone before that answer
+            // (on an ICE restart the phone would add it to the old generation and then drop it).
+            if (!session.LocalCandidates.TryHold(candidate)) _ = SendCandidateAsync(connection, session, candidate);
+        };
         peer.StateChanged += state => _ = OnSessionStateAsync(transport, session, state);
         connection.DatagramDrainChanged = stalled => TransportLog.LogInformation(stalled
             ? "Datagram path for {ClientId} stopped draining; media continues on the WebSocket until it does"
