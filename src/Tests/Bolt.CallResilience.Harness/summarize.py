@@ -144,8 +144,7 @@ def main(directory):
                 f"{transport.get('keyframeRequests', '-') if isinstance(transport, dict) else '-'} | {receiver.get('mediaKbps', '-')} |"
             )
     if len(efficiency) > 6:
-        print("
-".join(efficiency))
+        print("\n".join(efficiency))
 
     transports = [(name, relay, receiver) for name, relay, receiver in runs if datagram(receiver)]
     if transports:
