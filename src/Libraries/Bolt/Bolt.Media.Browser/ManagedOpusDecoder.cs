@@ -7,7 +7,8 @@ namespace Bolt.Media.Browser;
 /// <summary>One receiver's independent 48 kHz mono Opus history.</summary>
 public sealed class ManagedOpusDecoder : IDisposable
 {
-    private const int SamplesPerFrame = 960;
+    /// <summary>The longest Opus packet: 120 ms at 48 kHz. Senders use up to 60 ms.</summary>
+    private const int MaxSamples = 5760;
     private readonly IOpusDecoder _decoder;
 
     public ManagedOpusDecoder()
@@ -22,8 +23,8 @@ public sealed class ManagedOpusDecoder : IDisposable
     {
         if (packet.IsEmpty || packet.Length > 1275)
             throw new ArgumentException("Invalid Opus packet size.", nameof(packet));
-        Span<short> samples = stackalloc short[SamplesPerFrame];
-        var count = _decoder.Decode(packet, samples, SamplesPerFrame, false);
+        Span<short> samples = stackalloc short[MaxSamples];
+        var count = _decoder.Decode(packet, samples, MaxSamples, false);
         var pcm = new byte[count * sizeof(short)];
         for (var i = 0; i < count; i++)
             BinaryPrimitives.WriteInt16LittleEndian(pcm.AsSpan(i * 2), samples[i]);

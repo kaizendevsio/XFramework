@@ -111,6 +111,7 @@ public sealed class SendPathSignals
 /// <param name="Pacer">What the sender's own queues saw.</param>
 /// <param name="Relay">The relay signal the decision used, if any was fresh.</param>
 /// <param name="Receiver">The receiver signal the decision used, if any was fresh.</param>
+/// <param name="AudioFrameMs">New Opus packet length in milliseconds (see <see cref="AudioPacketization"/>), or null to keep it.</param>
 public readonly record struct SendRateTick(
     SendRateDecision Decision,
     VideoSetting? Video,
@@ -119,7 +120,8 @@ public readonly record struct SendRateTick(
     int? AudioKbps,
     MediaSendPacerSample Pacer,
     RelaySignal? Relay = null,
-    ReceiverSignal? Receiver = null);
+    ReceiverSignal? Receiver = null,
+    int? AudioFrameMs = null);
 
 /// <summary>
 /// Couples one sender's pacer, rate controller and picture ladder. The host calls <see cref="Tick"/> every
@@ -156,6 +158,8 @@ public sealed class SendRateLoop
     public VideoRateLadder Ladder { get; set; }
     public SendPathSignals Signals => _signals;
     public bool VideoSuspended => _suspended;
+    /// <summary>Opus packet length. The host sets <see cref="AudioPacketization.MaxFrameMs"/> from what every receiver plays.</summary>
+    public AudioPacketization Audio { get; } = new();
 
     /// <summary>
     /// The media path died under the sender and media moved to another (see
@@ -210,6 +214,7 @@ public sealed class SendRateLoop
 
         int? audio = decision.AudioKbps != _audioKbps ? decision.AudioKbps : null;
         _audioKbps = decision.AudioKbps;
-        return new SendRateTick(decision, video, suspend, resume, audio, pacer, relay, receiver);
+        var frameMs = Audio.Update(Controller.CongestionKbps, decision.VideoSuspended, nowMs);
+        return new SendRateTick(decision, video, suspend, resume, audio, pacer, relay, receiver, frameMs);
     }
 }

@@ -24,6 +24,8 @@ public sealed partial class BoltMediaService
         RequireSFrame();
         await _sframe!.InstallEpochAsync(epochId, rosterHash, local, remote, compact: peerMediaFormat >= CallMediaFormat.Compact);
         PeerMediaFormat = peerMediaFormat;
+        // A member that only plays 20 ms packets joined: the next tick shrinks them.
+        if (_rateLoop is { } loop) loop.Audio.MaxFrameMs = CallMediaFormat.MaxAudioFrameMs(peerMediaFormat);
     }
 
     public Task ActivateSFrameEpochAsync(string epochId, string rosterHash)

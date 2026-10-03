@@ -221,6 +221,11 @@ public sealed class SendRateController
 
     public SendRateOptions Options => _options;
     public int EstimateKbps => (int)Math.Round(_estimate);
+    /// <summary>
+    /// Where the link was last found congested (its measured capacity at the last decrease), 0 while no limit is known:
+    /// before the first congestion, after the estimate grew well past it, and after an outage restart.
+    /// </summary>
+    public int CongestionKbps => (int)Math.Round(_lastCongestionKbps);
     public bool VideoSuspended => _suspended;
     /// <summary>Current wait between a suspension and a resume attempt.</summary>
     public int ResumeHoldMs => _resumeHoldMs;

@@ -293,6 +293,25 @@ class AudioPipeline {
         decoder.decode(new EncodedAudioChunk({ type: 'key', timestamp: Math.round(timestamp * 1000000 / 48000), data }));
     }
 
+    /// Opus packet length in milliseconds (20, 40 or 60): longer packets on a scarce link, where each one's framing
+    /// costs more than the voice it carries. Returns what the encoder now uses. An encoder that does not know
+    /// frameDuration (WebIDL drops unknown members, so "supported" alone proves nothing) keeps what it had.
+    async setFrameDuration(frameMs) {
+        const current = Math.round((this.encoderConfig?.opus?.frameDuration ?? 20000) / 1000);
+        if (this.managed) return [20, 40, 60].includes(frameMs) ? frameMs : 20;
+        const wanted = [20, 40, 60].includes(frameMs) ? frameMs : 20;
+        if (this.encoder?.state !== 'configured' || !this.encoderConfig || wanted === current) return current;
+        const candidate = { ...this.encoderConfig, opus: { ...(this.encoderConfig.opus ?? {}), frameDuration: wanted * 1000 } };
+        try {
+            const support = await AudioEncoder.isConfigSupported(candidate);
+            if (!support?.supported || support.config?.opus?.frameDuration !== wanted * 1000) return current;
+        } catch { return current; }
+        if (this.encoder?.state !== 'configured') return current;
+        this.encoderConfig = candidate;
+        this.encoder.configure(candidate);
+        return wanted;
+    }
+
     reconfigureBitrate(sampleRate, channels, bitrate) {
         // Keep the FEC/DTX tuning the encoder was accepted with; only the rate changes.
         if (this.encoder?.state === 'configured')
@@ -333,12 +352,14 @@ class AudioPipeline {
         return Object.fromEntries([...this.receivers.entries()].map(([id, r]) => [id, Math.round((r.jitter?.target ?? 0) * 1000)]));
     }
 
+    /// Decoded PCM from the managed codec: whole 20 ms frames, up to 120 ms (one Opus packet of several frames).
     playPcm(bytes, streamId = 'default', timestamp = undefined) {
-        if (bytes.length !== 1920) return;
+        if (bytes.length < 1920 || bytes.length > 11520 || bytes.length % 1920 !== 0) return;
+        const frames = bytes.length / 2;
         const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-        this._playAudioData({ numberOfFrames: 960, numberOfChannels: 1, sampleRate: 48000,
+        this._playAudioData({ numberOfFrames: frames, numberOfChannels: 1, sampleRate: 48000,
             timestamp: Number.isFinite(timestamp) ? Math.round(timestamp * 1e6 / 48000) : undefined,
-            copyTo: samples => { for (let i = 0; i < 960; i++) samples[i] = view.getInt16(i * 2, true) / 32768; },
+            copyTo: samples => { for (let i = 0; i < frames; i++) samples[i] = view.getInt16(i * 2, true) / 32768; },
             close() {} }, streamId);
     }
 

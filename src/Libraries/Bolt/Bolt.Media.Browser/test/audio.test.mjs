@@ -409,3 +409,44 @@ test('playout target stays small on a steady path', () => {
     for (let packet = 0; packet < 500; packet++) jitter.observe(1 + packet * 0.02 + (packet % 3) * 0.002, packet * 0.02);
     assert.ok(jitter.target <= 0.05, `target ${jitter.target}`);
 });
+
+// ── Packetization: longer Opus packets on a scarce link ──
+
+test('a scarce link gets 60 ms Opus packets, keeping FEC and DTX, and can go back to 20 ms', async () => {
+    const f = fixture();
+    f.sandbox.AudioEncoder.isConfigSupported = async config => ({ supported: true, config });
+    await f.p.initEncoder(48000, 1, 32, { inbandFec: true, packetLossPercent: 5, dtx: true });
+    assert.equal(await f.p.setFrameDuration(60), 60);
+    assert.equal(f.p.encoder.config.opus.frameDuration, 60000);
+    assert.equal(f.p.encoder.config.opus.useinbandfec, true, 'longer packets keep their FEC');
+    assert.equal(f.p.encoder.config.opus.usedtx, true);
+    f.p.reconfigureBitrate(48000, 1, 24);
+    assert.equal(f.p.encoder.config.opus.frameDuration, 60000, 'a rate change keeps the packet length');
+    assert.equal(await f.p.setFrameDuration(20), 20);
+    assert.equal(f.p.encoder.config.opus.frameDuration, 20000);
+    await f.p.dispose();
+});
+
+test('an encoder that does not know frameDuration keeps 20 ms and says so', async () => {
+    const f = fixture();
+    // WebIDL drops unknown dictionary members: "supported", but the echoed config has no frameDuration.
+    f.sandbox.AudioEncoder.isConfigSupported = async config => {
+        const { frameDuration, ...opus } = config.opus ?? {};
+        return { supported: true, config: { ...config, opus } };
+    };
+    await f.p.initEncoder(48000, 1, 32, { inbandFec: true, packetLossPercent: 5, dtx: true });
+    assert.equal(await f.p.setFrameDuration(60), 20);
+    assert.equal(f.p.encoder.config.opus.frameDuration, undefined);
+    await f.p.dispose();
+});
+
+test('managed playback plays 40 and 60 ms packets, and still refuses odd sizes', async () => {
+    const f = fixture(); f.p.initManaged();
+    await f.p.startCapture({ invokeMethodAsync: async () => {} });
+    for (const samples of [960, 1920, 2880]) f.p.playPcm(new Uint8Array(samples * 2), 'peer', samples);
+    assert.equal(f.stats.played.length, 3);
+    f.p.playPcm(new Uint8Array(1000), 'peer');
+    f.p.playPcm(new Uint8Array(2880 * 2 + 1920 * 4), 'peer');
+    assert.equal(f.stats.played.length, 3);
+    await f.p.dispose();
+});
