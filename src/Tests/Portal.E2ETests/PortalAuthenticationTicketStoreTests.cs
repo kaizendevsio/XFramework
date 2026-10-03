@@ -6,7 +6,9 @@ using IdentityServer.Domain.Shared.Contracts.Requests;
 using IdentityServer.Domain.Shared.Contracts.Responses;
 using IdentityServer.Integration.Drivers;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
@@ -188,12 +190,62 @@ public sealed class PortalAuthenticationTicketStoreTests
         using var canceled = new CancellationTokenSource();
         fixture.BeforeRefresh = () => { canceled.Cancel(); return Task.CompletedTask; };
 
-        await fixture.Validator().ValidateAndRefreshAsync(ticket.Principal, canceled.Token);
+        var validation = () => fixture.Validator().ValidateAndRefreshAsync(ticket.Principal, canceled.Token);
+        await validation.Should().ThrowAsync<OperationCanceledException>();
 
         var stored = (await fixture.NewStore().RetrieveAsync(key))!;
         stored.Principal.FindFirstValue(PortalAuthClaims.RefreshToken).Should().Be("refresh-1");
         (await fixture.Validator().ValidateAndRefreshAsync(original)).IsValid.Should().BeTrue();
         fixture.RefreshCalls.Should().Be(1);
+    }
+
+    [Test]
+    public async Task CookieValidation_BrowserAbortsDuringRotation_DoesNotLogOutOtherTabs()
+    {
+        var fixture = new SessionFixture();
+        var ticket = fixture.CreateTicket();
+        var key = await fixture.Store.StoreAsync(ticket);
+        fixture.Clock.Advance(TimeSpan.FromMinutes(30));
+        using var canceled = new CancellationTokenSource();
+        fixture.BeforeRefresh = () => { canceled.Cancel(); return Task.CompletedTask; };
+        var http = new DefaultHttpContext { RequestAborted = canceled.Token };
+        var authentication = new Mock<IAuthenticationService>(MockBehavior.Strict);
+        using var services = new ServiceCollection().AddSingleton(authentication.Object).BuildServiceProvider();
+        http.RequestServices = services;
+        var context = new CookieValidatePrincipalContext(http,
+            new AuthenticationScheme(PortalAuthDefaults.AuthenticationScheme, null, typeof(CookieAuthenticationHandler)),
+            new CookieAuthenticationOptions { SessionStore = fixture.Store }, ticket);
+        var events = new PortalCookieAuthenticationEvents(
+            fixture.Validator(), NullLogger<PortalCookieAuthenticationEvents>.Instance);
+
+        var validation = () => events.ValidatePrincipal(context);
+        await validation.Should().ThrowAsync<OperationCanceledException>();
+
+        authentication.VerifyNoOtherCalls();
+        context.Principal!.Identity!.IsAuthenticated.Should().BeTrue();
+        var stored = (await fixture.NewStore().RetrieveAsync(key))!;
+        stored.Principal.FindFirstValue(PortalAuthClaims.RefreshToken).Should().Be("refresh-1");
+        (await fixture.Validator().ValidateAndRefreshAsync(stored.Principal)).IsValid.Should().BeTrue();
+    }
+
+    [Test]
+    public async Task TicketLookup_CiphertextCopiedFromAnotherSession_RejectsSubstitution()
+    {
+        var fixture = new SessionFixture();
+        var first = fixture.CreateTicket();
+        var second = fixture.CreateTicket();
+        var identity = (ClaimsIdentity)second.Principal.Identity!;
+        identity.RemoveClaim(identity.FindFirst(PortalAuthClaims.SessionId)!);
+        identity.AddClaim(new Claim(PortalAuthClaims.SessionId, Guid.NewGuid().ToString()));
+        var firstKey = await fixture.Store.StoreAsync(first);
+        var secondKey = await fixture.Store.StoreAsync(second);
+        var otherPayload = await fixture.Cache.GetAsync($"portal:authentication:session:{secondKey}");
+
+        await fixture.Cache.SetAsync($"portal:authentication:session:{firstKey}", otherPayload!);
+
+        (await fixture.Store.RetrieveAsync(firstKey)).Should().BeNull();
+        (await fixture.Store.ReadPrincipalAsync(first.Principal)).Should().BeNull();
+        (await fixture.Store.RetrieveAsync(secondKey)).Should().NotBeNull();
     }
 
     [TestCase(PortalAuthClaims.TenantId)]

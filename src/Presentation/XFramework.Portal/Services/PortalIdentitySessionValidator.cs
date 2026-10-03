@@ -104,7 +104,7 @@ public sealed class PortalIdentitySessionValidator(
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             logger.LogDebug("Portal session validation was canceled.");
-            return PortalSessionValidationResult.Invalid;
+            throw;
         }
         catch (OperationCanceledException ex)
         {

@@ -106,9 +106,12 @@ public sealed class PortalAuthenticationTicketStore(
         var payload = await cache.GetAsync(CacheKey(key));
         if (payload is null) return null;
         AuthenticationTicket? ticket;
-        try { ticket = TicketSerializer.Default.Deserialize(_protector.Unprotect(payload)); }
+        try { ticket = TicketSerializer.Default.Deserialize(_protector.CreateProtector(key).Unprotect(payload)); }
         catch (CryptographicException) { return null; }
-        if (ticket?.Properties.ExpiresUtc > clock.GetUtcNow()) return ticket;
+        if (ticket?.AuthenticationScheme == PortalAuthDefaults.AuthenticationScheme &&
+            PortalIdentitySessionValidator.TryReadSessionClaims(ticket.Principal, out _, out _, out var storedSession, out _) &&
+            storedSession == session && ticket.Properties.ExpiresUtc > clock.GetUtcNow())
+            return ticket;
         await cache.RemoveAsync(CacheKey(key));
         return null;
     }
@@ -117,7 +120,7 @@ public sealed class PortalAuthenticationTicketStore(
     {
         var remaining = ticket.Properties.ExpiresUtc!.Value - clock.GetUtcNow();
         if (remaining <= TimeSpan.Zero) return;
-        await cache.SetAsync(CacheKey(key), _protector.Protect(TicketSerializer.Default.Serialize(ticket)),
+        await cache.SetAsync(CacheKey(key), _protector.CreateProtector(key).Protect(TicketSerializer.Default.Serialize(ticket)),
             new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = remaining });
     }
 
