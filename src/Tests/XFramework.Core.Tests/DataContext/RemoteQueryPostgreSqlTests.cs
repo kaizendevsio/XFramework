@@ -106,6 +106,58 @@ public sealed class RemoteQueryPostgreSqlTests
             .Should().ContainSingle().Which.Id.Should().Be(first.Id);
     }
 
+    [Test]
+    public async Task Execute_SerializedEnumEquality_CountsOnlyActiveSessionsInTenant()
+    {
+        await using var db = new QueryDb(options);
+        var tenant = Guid.NewGuid();
+        var active = Row(tenant, "active", null, true);
+        active.Status = CurrentSessionState.Active;
+        var inactive = Row(tenant, "inactive", null, true);
+        var otherTenant = Row(Guid.NewGuid(), "other", null, true);
+        otherTenant.Status = CurrentSessionState.Active;
+        db.AddRange(active, inactive, otherTenant);
+        await db.SaveChangesAsync();
+
+        var descriptor = RoundTrip<SearchRow>(x => x.Status == CurrentSessionState.Active);
+        descriptor.Mode = QueryExecutionMode.Count;
+        var result = await QueryDescriptorExecutor.ExecuteAsync(db, typeof(SearchRow), descriptor, tenant);
+        result.Should().Be(1);
+    }
+
+    [Test]
+    public async Task Execute_SerializedNullableEnumEquality_PreservesNullAndTenantFiltering()
+    {
+        await using var db = new QueryDb(options);
+        var tenant = Guid.NewGuid();
+        var active = Row(tenant, "active", null, true);
+        active.NullableStatus = CurrentSessionState.Active;
+        db.AddRange(active, Row(tenant, "null", null, true));
+        await db.SaveChangesAsync();
+
+        (await Execute(db, tenant, x => x.NullableStatus == CurrentSessionState.Active))
+            .Should().ContainSingle().Which.Id.Should().Be(active.Id);
+        (await Execute(db, tenant, x => x.NullableStatus == null))
+            .Should().ContainSingle().Which.UserName.Should().Be("null");
+    }
+
+    [Test]
+    public async Task Execute_SerializedEnumMembership_PreservesTypedValues()
+    {
+        await using var db = new QueryDb(options);
+        var tenant = Guid.NewGuid();
+        var active = Row(tenant, "active", null, true);
+        active.Status = CurrentSessionState.Active;
+        var expired = Row(tenant, "expired", null, true);
+        expired.Status = CurrentSessionState.Expired;
+        db.AddRange(active, expired, Row(tenant, "inactive", null, true));
+        await db.SaveChangesAsync();
+        var statuses = new[] { CurrentSessionState.Active, CurrentSessionState.Expired };
+
+        (await Execute(db, tenant, x => Enumerable.Contains(statuses, x.Status)))
+            .Select(x => x.Id).Should().BeEquivalentTo(new[] { active.Id, expired.Id });
+    }
+
     private static QueryDescriptor RoundTrip<T>(Expression<Func<T, bool>> predicate) =>
         MemoryPackSerializer.Deserialize<QueryDescriptor>(MemoryPackSerializer.Serialize(new QueryDescriptor
         {
@@ -126,6 +178,8 @@ public sealed class RemoteQueryPostgreSqlTests
         public string? UserName { get; set; }
         public string? UserAlias { get; set; }
         public bool IsEnabled { get; set; }
+        public CurrentSessionState Status { get; set; }
+        public CurrentSessionState? NullableStatus { get; set; }
     }
 
     private sealed class QueryDb(DbContextOptions<QueryDb> dbOptions) : DbContext(dbOptions)
