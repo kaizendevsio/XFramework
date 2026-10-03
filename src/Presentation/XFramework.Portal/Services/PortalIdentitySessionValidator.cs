@@ -71,7 +71,7 @@ public sealed class PortalIdentitySessionValidator(
                     // Once IdentityServer rotates a credential, persist the replacement even
                     // if the initiating tab disconnects. Waiting for the gate remains cancelable.
                     using var rotationTimeout = new CancellationTokenSource(ValidationTimeout);
-                    var rotated = await RefreshTokenAsync(accessToken, refreshToken, sessionId, rotationTimeout.Token);
+                    var rotated = await RefreshTokenAsync(accessToken, refreshToken, sessionId, tenantId, rotationTimeout.Token);
                     if (rotated is null)
                         return null;
                     var checkedActor = await actorIdentityProvider.ValidateAsync(rotated.AccessToken, rotationTimeout.Token);
@@ -141,6 +141,7 @@ public sealed class PortalIdentitySessionValidator(
         string accessToken,
         string refreshToken,
         Guid sessionId,
+        Guid tenantId,
         CancellationToken ct)
     {
         using var suppressedActor = actorAccessTokenScope.Suppress();
@@ -153,6 +154,7 @@ public sealed class PortalIdentitySessionValidator(
                 Metadata = new RequestMetadata
                 {
                     RequestId = Guid.NewGuid(),
+                    RequestedTenantId = tenantId,
                     OperationName = "Refresh Portal actor token",
                     DeviceName = Environment.MachineName
                 }

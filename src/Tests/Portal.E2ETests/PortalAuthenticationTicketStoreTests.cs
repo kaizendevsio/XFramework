@@ -91,6 +91,22 @@ public sealed class PortalAuthenticationTicketStoreTests
     }
 
     [Test]
+    public async Task CircuitRefresh_TargetsAuthenticatedSessionTenant()
+    {
+        var fixture = new SessionFixture();
+        var ticket = fixture.CreateTicket();
+        await fixture.Store.StoreAsync(ticket);
+        fixture.Clock.Advance(TimeSpan.FromMinutes(30));
+
+        (await fixture.Validator().ValidateAndRefreshAsync(ticket.Principal)).IsValid.Should().BeTrue();
+
+        fixture.LastRefreshRequest.Should().NotBeNull();
+        fixture.LastRefreshRequest!.Metadata.RequestedTenantId.Should().Be(
+            Guid.Parse(ticket.Principal.FindFirstValue(PortalAuthClaims.TenantId)!));
+        fixture.RefreshCalls.Should().Be(1);
+    }
+
+    [Test]
     public async Task CircuitRefresh_IdleThenNewTabWithOriginalPrincipal_UsesPersistedTokens()
     {
         var fixture = new SessionFixture();
@@ -336,6 +352,7 @@ public sealed class PortalAuthenticationTicketStoreTests
         public int RefreshCalls { get; private set; }
         public int? RejectionStatus { get; set; }
         public Func<Task>? BeforeRefresh { get; set; }
+        public RefreshTokenRequest? LastRefreshRequest { get; private set; }
 
         public SessionFixture(IDistributedCache? cache = null, IDataProtectionProvider? protection = null)
         {
@@ -358,6 +375,9 @@ public sealed class PortalAuthenticationTicketStoreTests
             _identity.Setup(identity => identity.RefreshToken(It.IsAny<RefreshTokenRequest>(), It.IsAny<CancellationToken>()))
                 .Returns(async (RefreshTokenRequest request, CancellationToken ct) =>
                 {
+                    LastRefreshRequest = request;
+                    if (request.Metadata.RequestedTenantId != _tenant)
+                        return new QueryResponse<RefreshTokenResponse> { HttpStatusCode = HttpStatusCode.BadRequest };
                     if (BeforeRefresh is not null) await BeforeRefresh();
                     ct.ThrowIfCancellationRequested();
                     if (RejectionStatus is not null || request.RefreshToken != $"refresh-{RefreshCalls}")
