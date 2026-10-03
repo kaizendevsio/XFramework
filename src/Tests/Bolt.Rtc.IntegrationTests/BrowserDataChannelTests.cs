@@ -407,20 +407,23 @@ public sealed class BrowserDataChannelTests
         });
     }
 
+    /// <summary>
+    /// Why Yap gives the relay's peer TURN over UDP only. With a TCP leg on offer too, WebKit (the controlling side, an
+    /// iPhone in production) nominated the relay's TCP candidate even on this loopback, where UDP works perfectly, and
+    /// pion, the controlled side, keeps the pair nominated first: run 37125841243 here, and every "via TLS/relay" in
+    /// production at 12:45-12:54 UTC. With the relay on UDP only, its leg is UDP whatever the browser is offered.
+    /// </summary>
     [TestCase("chromium")]
     [TestCase("webkit")]
-    public async Task WithUdpAndTcpTurnOnBothSides_BothLegsUseUdp(string engine)
+    public async Task WithTheRelayOnUdpTurn_ItsLegIsUdp_EvenWhenTheBrowserAlsoHasTcpTurn(string engine)
     {
-        // Production 12:45-12:54 UTC: every relay leg opened over TLS to TURN and stalled on each keyframe. Where UDP
-        // works, both legs must be UDP, whatever else is on offer.
         var (browser, relay) = await CallAsync(engine,
-            [Turn($"turn:{_turnHost}:3478?transport=tcp", "browser"), Turn($"turn:{_turnHost}:3478?transport=udp", "browser")], relayTransports: "tcp,udp");
+            [Turn($"turn:{_turnHost}:3478?transport=tcp", "browser"), Turn($"turn:{_turnHost}:3478?transport=udp", "browser")], relayTransports: "udp");
         if (!browser.Supported) Assert.Ignore($"{engine} has no RTCPeerConnection here.");
         Assert.Multiple(() =>
         {
             Assert.That(browser.Opened, Is.True, browser.ToString());
             Assert.That(relay?.Path, Is.EqualTo("UDP/relay"), "the relay's leg to TURN is UDP; " + browser);
-            Assert.That(browser.Path?.RelayProtocol ?? "udp", Is.EqualTo("udp"), "and so is the browser's; " + browser);
         });
     }
 
