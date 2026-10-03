@@ -233,6 +233,111 @@ public sealed class YapCallTransportTests
         });
     }
 
+    [Test]
+    public async Task Cloudflare_Success_IsLoggedWithItsStatus_AndNothingSecret()
+    {
+        var logger = new CapturingLogger();
+        var handler = new Handler((_, n) => Json(CloudflareArray, n));
+        var credentials = new YapTurnCredentials(new YapTurnOptions { CloudflareKeyId = KeyId, CloudflareApiToken = Token }, new Factory(handler), logger);
+        Assert.That(await credentials.GrantAsync(Participant, CancellationToken.None), Is.Not.Null);
+        var lines = string.Join("\n", logger.Lines);
+        Assert.Multiple(() =>
+        {
+            Assert.That(logger.Lines, Has.Count.EqualTo(2), "one line per mint (the participant's and the relay's)");
+            Assert.That(lines, Does.Contain("201"));
+            Assert.That(lines, Does.Not.Contain(Token).And.Not.Contain("CRED-").And.Not.Contain("USER-").And.Not.Contain(KeyId));
+        });
+    }
+
+    [Test]
+    public async Task KillSwitch_TurnsUdpOff_WithoutRemovingTheTurnCredentials()
+    {
+        var sidecar = Path.GetTempFileName();
+        try
+        {
+            await using var off = Transport(new() { ["Yap:Calls:Turn:CloudflareKeyId"] = KeyId, ["Yap:Calls:Turn:CloudflareApiToken"] = Token,
+                ["Yap:Calls:Rtc:SidecarPath"] = sidecar, ["Yap:Calls:Udp:Enabled"] = "false" });
+            await using var on = Transport(new() { ["Yap:Calls:Turn:CloudflareKeyId"] = KeyId, ["Yap:Calls:Turn:CloudflareApiToken"] = Token,
+                ["Yap:Calls:Rtc:SidecarPath"] = sidecar });
+            Assert.Multiple(() =>
+            {
+                Assert.That(off.Options, Is.Null, "every call stays on its WebSocket");
+                Assert.That(off.Status, Does.StartWith("off").And.Contain("Yap:Calls:Udp:Enabled"));
+                Assert.That(on.Options, Is.Not.Null, "on unless switched off");
+            });
+        }
+        finally { File.Delete(sidecar); }
+    }
+
+    [Test]
+    public void Deployment_PassesTheUdpKillSwitchThrough_DefaultingOn()
+    {
+        var root = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "CLAUDE.md"))) root = root.Parent;
+        var compose = File.ReadAllText(Path.Combine(root!.FullName, "docker-compose.yml"));
+        Assert.That(compose, Does.Contain("Yap__Calls__Udp__Enabled: ${YAP_CALLS_UDP_ENABLED:-true}"));
+    }
+
+    private sealed class CapturingProvider : ILoggerProvider
+    {
+        public System.Collections.Concurrent.ConcurrentQueue<(string Category, LogLevel Level, string Text)> Lines { get; } = new();
+        public ILogger CreateLogger(string categoryName) => new Logger(this, categoryName);
+        public void Dispose() { }
+        private sealed class Logger(CapturingProvider owner, string category) : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+            public bool IsEnabled(LogLevel logLevel) => true;
+            public void Log<TState>(LogLevel level, EventId id, TState state, Exception? error, Func<TState, Exception?, string> format) =>
+                owner.Lines.Enqueue((category, level, format(state, error)));
+        }
+    }
+
+    private static Microsoft.AspNetCore.Builder.WebApplication BuildApp(CapturingProvider? capture = null, params string[] extra)
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Presentation/XFramework.Yap"));
+        return YapApplication.Build([
+            "--contentRoot", root, "--applicationName", "XFramework.Yap", "--environment", "Development", "--urls", "http://127.0.0.1:0",
+            "--ServiceIdentity:GenerationId", "fixture-g1", "--ServiceIdentity:ClientSecret", "fixture-only-secret-not-for-any-real-service", ..extra
+        ], builder =>
+        {
+            foreach (var service in builder.Services.Where(d => d.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService) &&
+                         d.ImplementationType?.Name.Contains("Bolt", StringComparison.Ordinal) == true).ToArray())
+                builder.Services.Remove(service);
+            if (capture is not null) builder.Logging.AddProvider(capture);
+        });
+    }
+
+    [Test]
+    public async Task CallTransportLogs_ReachTheContainerLog_AtInformation()
+    {
+        // The container log is the console: Warning and up, except what is named here. UDP status, each
+        // participant's path and why it fell back, TURN mints and the sidecar are what an operator needs in a call.
+        await using var app = BuildApp();
+        var logs = app.Services.GetRequiredService<ILoggerFactory>();
+        Assert.Multiple(() =>
+        {
+            foreach (var category in new[] { "Yap.Calls.Transport", "Yap.Calls.Turn", "Bolt.Server.MediaTransport", "Bolt.Rtc.RtcSidecar" })
+                Assert.That(logs.CreateLogger(category).IsEnabled(LogLevel.Information), Is.True, category);
+            Assert.That(logs.CreateLogger("Yap.Services.ChatDirectory").IsEnabled(LogLevel.Information), Is.False, "the rest stays quiet");
+        });
+    }
+
+    [Test]
+    public async Task UdpStatus_IsLoggedAtStartup_NotOnTheFirstCall()
+    {
+        var capture = new CapturingProvider();
+        await using var app = BuildApp(capture);
+        await app.StartAsync();
+        try
+        {
+            var line = capture.Lines.FirstOrDefault(x => x.Text.Contains("UDP call media is", StringComparison.Ordinal));
+            Assert.That(line.Text, Is.Not.Null, "the status is known before anyone calls");
+            Assert.That(line.Level, Is.EqualTo(LogLevel.Information));
+            Assert.That(line.Text, Does.Contain("off"));
+        }
+        finally { await app.StopAsync(); }
+    }
+
     private static YapCallTransport Transport(Dictionary<string, string?> values) =>
         new(new ConfigurationBuilder().AddInMemoryCollection(values).Build(),
             new Factory(new Handler((_, _) => new HttpResponseMessage(HttpStatusCode.InternalServerError))), NullLoggerFactory.Instance);

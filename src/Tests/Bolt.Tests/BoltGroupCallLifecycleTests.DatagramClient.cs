@@ -171,6 +171,63 @@ public sealed partial class BoltGroupCallLifecycleTests
     }
 
     [Test]
+    public async Task Client_NetworkChangesInQuickSuccession_RestartIceOneAtATime()
+    {
+        // Two offers before the first answer leave the browser applying an answer to an offer it has replaced:
+        // each end then expects the other's previous ICE credentials and the restart can only fail.
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        await using var a = Connect(f, "a", network);
+        a.Transport.Start();
+        await WaitUntil(() => a.Transport.IsDatagramActive);
+        var participant = network.Created.Single(x => x.Role == RtcPeerRole.Offer);
+        network.AnswerDelay = TimeSpan.FromMilliseconds(500);
+        for (var i = 0; i < 3; i++) a.Transport.NetworkChanged();
+        await Task.Delay(250);
+        Assert.That(participant.IceRestarts, Is.EqualTo(1), "one restart in flight at a time");
+        await WaitUntil(() => participant.IceRestarts == 2, 4000);
+        await Task.Delay(1200);
+        Assert.Multiple(() =>
+        {
+            Assert.That(participant.IceRestarts, Is.EqualTo(2), "the changes during the first restart are folded into one more");
+            Assert.That(a.Transport.IsDatagramActive, Is.True);
+        });
+    }
+
+    [Test]
+    public async Task Client_ARestartAnswerThatCannotBeApplied_MovesMediaToTheSocket_AndTriesAgain()
+    {
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        await using var a = Connect(f, "a", network);
+        a.Transport.Start();
+        await WaitUntil(() => a.Transport.IsDatagramActive);
+        var participant = network.Created.Single(x => x.Role == RtcPeerRole.Offer);
+        participant.FailRestartAnswer = true;
+        a.Transport.NetworkChanged();
+        // The browser refused the answer: its ICE credentials and the relay's no longer match, so nothing it sends
+        // on that channel will arrive. Media must not keep going there.
+        await WaitUntil(() => !a.Transport.IsDatagramActive);
+        Assert.That(a.Transport.Status.Reason, Is.EqualTo("negotiation"));
+        await WaitUntil(() => a.Transport.IsDatagramActive, 5000);
+        Assert.That(network.Created.Count(x => x.Role == RtcPeerRole.Offer), Is.EqualTo(2), "a fresh session replaced the broken one");
+    }
+
+    [Test]
+    public async Task Client_TellsTheRelayWhyItGaveUpOnAChannel()
+    {
+        var network = new FakeRtcNetwork { Reachable = false };
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        await using var a = Connect(f, "a", network);
+        a.Transport.Start();
+        await WaitUntil(() => a.Transport.Status.Reason == "timeout", 4000);
+        await WaitUntil(() => f.Peers["a"].Received.Any(x => MediaTransportCodec.TryRead(x, out var k, out _) && k == MediaTransportKind.Close));
+        var close = f.Peers["a"].Received.Select(x => MediaTransportCodec.TryRead(x, out var k, out var p) && k == MediaTransportKind.Close
+            ? MediaTransportCodec.Decode<MediaTransportClose>(p.ToArray()) : null).First(x => x is not null)!;
+        Assert.That(close.Reason, Is.EqualTo("timeout"), "the relay logs why a participant fell back to the WebSocket");
+    }
+
+    [Test]
     public async Task Client_RenewedCredentials_OpenABesideTheCurrentChannel_ThenReplaceIt()
     {
         var network = new FakeRtcNetwork();

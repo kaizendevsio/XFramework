@@ -137,6 +137,35 @@ public sealed class RtcSidecarTests
         });
     }
 
+    /// <summary>
+    /// What a participant does after a network change: an ICE restart on the open channel. Pion drops the
+    /// answering side's selected pair and its candidates (TURN allocations included) and checks again, while
+    /// the data channel keeps reporting "open". Until ICE is connected again nothing sent there can leave, so
+    /// the relay must see the peer as not usable (and send that participant's media on the WebSocket).
+    /// </summary>
+    [Test]
+    public async Task AnIceRestart_StallsTheAnsweringPeer_UntilIceIsConnectedAgain()
+    {
+        await using var sidecar = new RtcSidecar(new RtcSidecarOptions { ExecutablePath = RequireBinary() }, NullLogger<RtcSidecar>.Instance);
+        await using var offerer = await sidecar.CreateAsync(RtcPeerRole.Offer, Loopback(), CancellationToken.None);
+        await using var answerer = await sidecar.CreateAsync(RtcPeerRole.Answer, Loopback(), CancellationToken.None);
+        await ConnectAsync(offerer, answerer);
+
+        var states = new System.Collections.Concurrent.ConcurrentQueue<(RtcChannelState State, bool Took)>();
+        answerer.StateChanged += state => states.Enqueue((state, answerer.TrySend([0x21])));
+        var offer = await offerer.CreateOfferAsync(iceRestart: true, CancellationToken.None);
+        await offerer.SetAnswerAsync(await answerer.AnswerAsync(offer, CancellationToken.None), CancellationToken.None);
+
+        await WaitFor(() => states.Any(x => x.State != RtcChannelState.Open) && states.Last().State == RtcChannelState.Open);
+        var stalled = states.First(x => x.State != RtcChannelState.Open);
+        Assert.Multiple(() =>
+        {
+            Assert.That(stalled.State, Is.Not.EqualTo(RtcChannelState.Closed).And.Not.EqualTo(RtcChannelState.Failed), "a restart is not the end of the channel");
+            Assert.That(stalled.Took, Is.False, "while ICE checks again the channel takes nothing; the relay uses the socket");
+            Assert.That(answerer.TrySend([0x21]), Is.True, "and once ICE is back, it carries media again");
+        });
+    }
+
     [Test]
     public void AMissingExecutable_IsReportedAsUnavailable()
     {

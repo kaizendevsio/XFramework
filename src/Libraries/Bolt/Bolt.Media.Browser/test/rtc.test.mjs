@@ -154,3 +154,44 @@ test('an open channel reports its path', async () => {
     assert.deepEqual(target.calls.find(x => x[0] === 'OnPath'), ['OnPath', 'srflx', 'udp', null, 'relay', 100]);
     peer.close();
 });
+
+test('an open channel whose ICE goes quiet is reported stalled, takes nothing, and comes back when ICE does', async () => {
+    // A dead path under an open channel: Chrome keeps the channel "open" for up to 30 s after ICE stops
+    // hearing back. Media sent there is lost, so the .NET side must send it on the WebSocket meanwhile.
+    const target = dotnet();
+    const peer = createPeer(target, { maxMessageBytes: 1150 });
+    const pc = open(peer);
+    try {
+    pc.iceConnectionState = 'connected';
+    pc.oniceconnectionstatechange();
+    pc.iceConnectionState = 'disconnected';
+    pc.oniceconnectionstatechange();
+    assert.equal(peer.state(), 'stalled');
+    assert.equal(peer.send(new Uint8Array(10)), false, 'nothing goes to a stalled channel');
+    pc.iceConnectionState = 'checking';
+    pc.oniceconnectionstatechange();
+    pc.iceConnectionState = 'connected';
+    pc.oniceconnectionstatechange();
+    assert.equal(peer.state(), 'open');
+    assert.equal(peer.send(new Uint8Array(10)), true);
+    pc.iceConnectionState = 'disconnected';
+    pc.oniceconnectionstatechange();
+    pc.iceConnectionState = 'failed';
+    pc.oniceconnectionstatechange();
+    await flush();
+    assert.deepEqual(target.calls.filter(x => x[0] === 'OnState').map(x => x[1]), ['open', 'stalled', 'open', 'stalled', 'failed']);
+    } finally { peer.close(); }
+});
+
+test('a stalled channel that closes is reported closed, not failed', async () => {
+    const target = dotnet();
+    const peer = createPeer(target, {});
+    const pc = open(peer);
+    try {
+    pc.iceConnectionState = 'disconnected';
+    pc.oniceconnectionstatechange();
+    pc.channel.onclose();
+    await flush();
+    assert.deepEqual(target.calls.filter(x => x[0] === 'OnState').map(x => x[1]), ['open', 'stalled', 'closed']);
+    } finally { peer.close(); }
+});

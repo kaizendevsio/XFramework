@@ -478,7 +478,9 @@ public sealed partial class BoltGroupCallLifecycleTests
         public int Count(FrameType type) => Sent.Count(x => x[0] == (byte)type);
         public int Signals(SignalType type) => Sent.Count(x => BoltCodec.TryReadCallSignal(x, out var header) && header.SignalType == type);
         /// <summary>Deliver a frame without waiting for it to be processed (it may close the connection).</summary>
-        public void Send(byte[] frame) => inbound.Writer.TryWrite((frame, null));
+        public void Send(byte[] frame) { Received.Enqueue(frame); inbound.Writer.TryWrite((frame, null)); }
+        /// <summary>Frames a participant's client sent through <see cref="Send"/>.</summary>
+        public ConcurrentQueue<byte[]> Received { get; } = new();
         public async Task ProcessAsync(byte[] frame)
         {
             var barrier = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
