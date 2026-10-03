@@ -217,8 +217,10 @@ internal sealed class HarnessDatagram : IAsyncDisposable
     };
 
     /// <summary>Blackhole every UDP flow the sidecar has open (its TURN allocations): the old network is gone.</summary>
-    public static void BlackholeUdp()
+    /// <summary>Blackhole every UDP flow the sidecar has open; returns the rules, for <see cref="RestoreUdp"/>.</summary>
+    public static List<string> BlackholeUdp()
     {
+        var rules = new List<string>();
         try
         {
             using var list = Process.Start(new ProcessStartInfo("ss", "-uanpH") { RedirectStandardOutput = true })!;
@@ -229,12 +231,25 @@ internal sealed class HarnessDatagram : IAsyncDisposable
                 var local = line.Split(' ', StringSplitOptions.RemoveEmptyEntries).ElementAtOrDefault(3);
                 if (local is null || local.LastIndexOf(':') is var colon && colon < 0) continue;
                 var port = local[(colon + 1)..];
-                Process.Start("iptables", $"-I OUTPUT -p udp --sport {port} -j DROP")?.WaitForExit(5000);
-                Process.Start("iptables", $"-I INPUT -p udp --dport {port} -j DROP")?.WaitForExit(5000);
+                foreach (var rule in new[] { $"OUTPUT -p udp --sport {port} -j DROP", $"INPUT -p udp --dport {port} -j DROP" })
+                {
+                    Process.Start("iptables", "-I " + rule)?.WaitForExit(5000);
+                    rules.Add(rule);
+                }
                 Env.Log($"UDP blackholed local port {port}");
             }
         }
         catch (Exception error) { Env.Log($"UDP blackhole failed: {error.Message}"); }
+        return rules;
+    }
+
+    /// <summary>Lift what <see cref="BlackholeUdp"/> put in place: the same flows work again.</summary>
+    public static void RestoreUdp(List<string> rules)
+    {
+        foreach (var rule in rules)
+            try { Process.Start("iptables", "-D " + rule)?.WaitForExit(5000); }
+            catch (Exception error) { Env.Log($"UDP restore failed: {error.Message}"); }
+        if (rules.Count > 0) Env.Log("UDP restored");
     }
 
     public async ValueTask DisposeAsync()

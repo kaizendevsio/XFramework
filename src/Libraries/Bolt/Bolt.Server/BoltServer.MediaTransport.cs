@@ -154,6 +154,8 @@ public sealed partial class BoltServer
                     }
                     // A restart is a new gathering: its candidates are counted afresh (pion dropped the old ones).
                     Interlocked.Exchange(ref session.Candidates, 0);
+                    // And it follows a network change on the phone: the old network's flaps say nothing about the new one.
+                    connection.ResetDatagramPath();
                 }
                 session.LocalCandidates.Hold();
                 try
@@ -211,9 +213,10 @@ public sealed partial class BoltServer
                 if (state.State is not ("stalled" or "open") || connection.DatagramSuspended == suspended)
                     return;
                 connection.DatagramSuspended = suspended;
-                TransportLog.LogInformation(suspended
-                    ? "Participant {ClientId} reports its datagram path stalled; its media continues on the WebSocket"
-                    : "Participant {ClientId} reports its datagram path back; its media returns to it", connection.ClientId);
+                // The participant reports with its own hysteresis; whether media follows is this side's decision.
+                TransportLog.LogDebug(suspended
+                    ? "Participant {ClientId} reports its datagram path stalled"
+                    : "Participant {ClientId} reports its datagram path back", connection.ClientId);
                 break;
             }
             case MediaTransportKind.Report:
@@ -332,9 +335,19 @@ public sealed partial class BoltServer
             if (!session.LocalCandidates.TryHold(candidate)) _ = SendCandidateAsync(connection, session, candidate);
         };
         peer.StateChanged += state => _ = OnSessionStateAsync(transport, session, state);
-        connection.DatagramDrainChanged = stalled => TransportLog.LogInformation(stalled
-            ? "Datagram path for {ClientId} stopped draining; media continues on the WebSocket until it does"
-            : "Datagram path for {ClientId} drains again; media is back on it", connection.ClientId);
+        connection.PathHysteresisOptions = _mediaTransport!.PathHysteresis;
+        connection.DatagramDrainChanged = stalled => TransportLog.LogDebug(stalled
+            ? "Datagram path for {ClientId} stopped draining" : "Datagram path for {ClientId} drains again", connection.ClientId);
+        connection.DatagramPathChanged = (usable, path) =>
+        {
+            if (usable)
+                TransportLog.LogInformation("Datagram path for {ClientId} carries media again ({Switches} switches so far)", connection.ClientId, path.Switches);
+            else if (path.GivenUp)
+                TransportLog.LogInformation("Datagram path for {ClientId} flapped {Flaps} times; media stays on the WebSocket for this call", connection.ClientId, path.Flaps);
+            else
+                TransportLog.LogInformation("Datagram path for {ClientId} left ({Flaps} of {Max}); media on the WebSocket for at least {Hold} s",
+                    connection.ClientId, path.Flaps, path.Options.MaxFlaps, Math.Max(0, (path.HoldUntil - Environment.TickCount64 + 999) / 1000));
+        };
         peer.PathChanged += path =>
         {
             if (peer.State == RtcChannelState.Open)
@@ -352,7 +365,7 @@ public sealed partial class BoltServer
             // ICE went quiet or is checking again (a restart): the channel stays, media takes the socket meanwhile.
             if (ReferenceEquals(connection.Datagram, session.Peer))
             {
-                TransportLog.LogInformation("Datagram path for {ClientId} stalled (ICE not connected); media continues on the WebSocket until it recovers",
+                TransportLog.LogDebug("Datagram path for {ClientId} stalled (ICE not connected)",
                     connection.ClientId);
                 connection.WakeMedia();
             }
@@ -363,7 +376,7 @@ public sealed partial class BoltServer
             // Back from a stall: the same channel carries media again.
             if (ReferenceEquals(connection.Datagram, recovered))
             {
-                TransportLog.LogInformation("Datagram path for {ClientId} recovered via {Path}", connection.ClientId, recovered.Path?.Describe() ?? "unknown");
+                TransportLog.LogDebug("Datagram path for {ClientId} ICE connected again via {Path}", connection.ClientId, recovered.Path?.Describe() ?? "unknown");
                 connection.WakeMedia();
             }
             return;

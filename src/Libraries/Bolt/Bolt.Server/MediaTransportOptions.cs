@@ -62,6 +62,12 @@ public sealed class BoltMediaTransportOptions
 
     public int RedundancyHoldSeconds { get; init; } = 10;
 
+    /// <summary>
+    /// How a receiver's media moves between its data channel and its socket: off at once, back only after a hold that
+    /// doubles each time (from 10 s) and 5 s of sustained health, and not again after 3 flaps (until a network change).
+    /// </summary>
+    public Bolt.Protocol.Transport.DatagramHysteresisOptions PathHysteresis { get; init; } = new();
+
     /// <summary>ICE restarts one session may ask for; each re-allocates TURN on both ends. Then the session ends (the call goes on).</summary>
     public int MaxIceRestartsPerSession { get; init; } = 16;
 
