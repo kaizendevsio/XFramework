@@ -304,7 +304,13 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
 
         try
         {
-            return MemoryPackSerializer.Deserialize<TQueryResult>(resultBytes);
+            TQueryResult? result = default;
+            var consumed = MemoryPackSerializer.Deserialize<TQueryResult>(resultBytes, ref result);
+            // Scalar formatters accept a prefix of an error payload; a query result must consume it all.
+            if (consumed != resultBytes.Length)
+                throw new InvalidOperationException("Response contains trailing data.");
+
+            return result;
         }
         catch (Exception ex) when (ex is MemoryPackSerializationException or ArgumentException or OverflowException or InvalidOperationException)
         {
@@ -325,8 +331,10 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
 
         try
         {
-            var result = MemoryPackSerializer.Deserialize<DataContextResult>(resultBytes);
-            if (result is not { IsSuccess: false } || string.IsNullOrWhiteSpace(result.Message))
+            DataContextResult? result = null;
+            var consumed = MemoryPackSerializer.Deserialize<DataContextResult>(resultBytes, ref result);
+            if (consumed != resultBytes.Length ||
+                result is not { IsSuccess: false } || string.IsNullOrWhiteSpace(result.Message))
                 return false;
 
             failure = result;
