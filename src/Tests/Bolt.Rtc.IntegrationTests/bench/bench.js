@@ -552,10 +552,17 @@ async function runBolt(options, source) {
         error: error => console.error('bench video encoder', error)
     });
     encoder.configure(videoConfig);
+    // Below the target bitrate the picture keeps its size and loses frames, as native WebRTC does with
+    // maintain-resolution (an encoder cannot go arbitrarily low at a fixed size and rate; the product's ladder would
+    // shrink the picture instead).
+    let lastEncodedAt = -Infinity;
     const stopVideo = readTrack(source.video, frame => {
         try {
             if (encoder.encodeQueueSize > 2) return;
             const at = now();
+            const fps = Math.max(5, Math.min(options.fps, Math.round(options.fps * rate.videoKbps / options.videoKbps)));
+            if (at - lastEncodedAt < 1000 / fps - 3) return;
+            lastEncodedAt = at;
             const key = keyframeWanted || at - lastKeyframe > 10000;
             if (key) { keyframeWanted = false; lastKeyframe = at; if (measuring) counters.keyframes++; }
             encoder.encode(frame, { keyFrame: key });
@@ -607,7 +614,8 @@ async function runBolt(options, source) {
         const video = Math.max(60, Math.min(options.videoKbps, decision.videoKbps));
         if (Math.abs(video - rate.videoKbps) / rate.videoKbps > 0.05 && encoder.state === 'configured') {
             rate.videoKbps = video;
-            encoder.configure({ ...videoConfig, bitrate: video * 1000 });
+            const fps = Math.max(5, Math.min(options.fps, Math.round(options.fps * video / options.videoKbps)));
+            encoder.configure({ ...videoConfig, bitrate: video * 1000, framerate: fps, scalabilityMode: temporalModeFor(fps, modes) });
         }
         const frameMs = decision.frameMs ?? rate.frameMs;
         if ((frameMs !== rate.frameMs || decision.audioKbps !== rate.audioKbps) && audioEncoder.state === 'configured') {
