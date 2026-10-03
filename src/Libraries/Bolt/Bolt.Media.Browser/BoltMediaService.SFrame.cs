@@ -11,10 +11,19 @@ public sealed partial class BoltMediaService
         _sframeLocalSenderId = localSenderId;
     }
 
-    public Task InstallSFrameEpochAsync(string epochId, string rosterHash, SFrameSenderKey local, IReadOnlyList<SFrameSenderKey> remote)
+    /// <summary>The media format every remote member of the installed epoch reads (<see cref="CallMediaFormat"/>).</summary>
+    public int PeerMediaFormat { get; private set; } = CallMediaFormat.Legacy;
+
+    /// <param name="peerMediaFormat">
+    /// <see cref="CallMediaFormat.Common"/> of what the remote members announced in their authenticated envelopes. It
+    /// decides whether this device sends compact SFrame frames and how long its Opus packets may be.
+    /// </param>
+    public async Task InstallSFrameEpochAsync(string epochId, string rosterHash, SFrameSenderKey local, IReadOnlyList<SFrameSenderKey> remote,
+        int peerMediaFormat = CallMediaFormat.Legacy)
     {
         RequireSFrame();
-        return _sframe!.InstallEpochAsync(epochId, rosterHash, local, remote);
+        await _sframe!.InstallEpochAsync(epochId, rosterHash, local, remote, compact: peerMediaFormat >= CallMediaFormat.Compact);
+        PeerMediaFormat = peerMediaFormat;
     }
 
     public Task ActivateSFrameEpochAsync(string epochId, string rosterHash)
