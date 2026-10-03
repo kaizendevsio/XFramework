@@ -236,6 +236,16 @@ class WorkflowTests(unittest.TestCase):
         self.assertNotIn("up -d --no-build postgres", block)
         self.assertIn("exit 0", block)
 
+    def test_failed_candidate_logs_are_captured_before_the_rollback_recreates_containers(self):
+        names = list(self.steps)
+        capture = "Capture candidate service logs before rollback"
+        restore = next(name for name in names if name.startswith("Restore previous release"))
+        self.assertLess(names.index(capture), names.index(restore))
+        self.assertEqual(self.steps[restore]["if"], self.steps[capture]["if"])
+        run = self.steps[capture]["run"]
+        self.assertIn("< scripts/capture-candidate-logs.py", run)
+        self.assertIn("exit 0", run)
+
     def test_workflow_bash_and_python_heredocs_parse(self):
         bash = shutil.which("bash")
         git_bash = pathlib.Path("C:/Program Files/Git/bin/bash.exe")
