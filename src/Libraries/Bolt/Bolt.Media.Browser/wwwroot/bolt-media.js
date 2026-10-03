@@ -453,7 +453,7 @@ export function h264BitstreamCodec(data) {
 
 /// Opus with in-band FEC and DTX where the browser accepts them, plain Opus otherwise. The tuning
 /// is an optimisation: a browser that rejects the opus dictionary still gets a working encoder.
-async function opusEncoderConfig(sampleRate, channels, bitrateKbps, opus) {
+export async function opusEncoderConfig(sampleRate, channels, bitrateKbps, opus) {
     const base = { codec: 'opus', sampleRate, numberOfChannels: channels, bitrate: bitrateKbps * 1000 };
     const tuning = opus && (opus.inbandFec || opus.dtx) ? {
         useinbandfec: !!opus.inbandFec, usedtx: !!opus.dtx,
@@ -469,7 +469,7 @@ async function opusEncoderConfig(sampleRate, channels, bitrateKbps, opus) {
 /// Fastest a remote request can make this sender emit another keyframe.
 const KEYFRAME_REQUEST_GAP_MS = 1000;
 
-function encoderConfig(codec, width, height, bitrateKbps, framerate, hardware, scalabilityMode = 'L1T1') {
+export function encoderConfig(codec, width, height, bitrateKbps, framerate, hardware, scalabilityMode = 'L1T1') {
     const config = {
         codec: videoCodecString(codec, Math.min(width, height), framerate), width, height,
         bitrate: Math.max(64, bitrateKbps) * 1000, framerate,
@@ -493,7 +493,7 @@ export function temporalModeFor(framerate, supported) {
 
 /// Which temporal-layer modes this encoder accepts at this configuration. WebKit and some hardware encoders
 /// refuse them (or accept only some); a refusal is an answer, never an error.
-async function probeTemporalModes(config) {
+export async function probeTemporalModes(config) {
     const modes = new Set();
     for (const mode of ['L1T2', 'L1T3']) {
         try { if ((await VideoEncoder.isConfigSupported({ ...config, scalabilityMode: mode }))?.supported) modes.add(mode); }

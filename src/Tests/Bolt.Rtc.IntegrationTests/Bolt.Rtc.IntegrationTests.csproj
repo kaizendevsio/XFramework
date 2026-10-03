@@ -29,6 +29,12 @@
   <ItemGroup>
     <!-- The real browser module under test, served to the page as-is. -->
     <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\bolt-rtc.js" Link="bolt-rtc.js" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The media benchmark (MediaBenchmark.cs): its page, and the production modules it runs (encoder settings, SFrame). -->
+    <None Include="bench\bench.js" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\bolt-media.js" Link="bench\bolt-media.js" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\bolt-sframe.mjs" Link="bench\bolt-sframe.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\sframe\bolt_sframe.js" Link="bench\sframe\bolt_sframe.js" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\sframe\bolt_sframe_bg.wasm" Link="bench\sframe\bolt_sframe_bg.wasm" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
