@@ -555,14 +555,17 @@ async function runBolt(options, source) {
     // Below the target bitrate the picture keeps its size and loses frames, as native WebRTC does with
     // maintain-resolution (an encoder cannot go arbitrarily low at a fixed size and rate; the product's ladder would
     // shrink the picture instead).
-    let lastEncodedAt = -Infinity;
+    let nextDue = 0;
     const stopVideo = readTrack(source.video, frame => {
         try {
             if (encoder.encodeQueueSize > 2) return;
             const at = now();
             const fps = Math.max(5, Math.min(options.fps, Math.round(options.fps * rate.videoKbps / options.videoKbps)));
-            if (at - lastEncodedAt < 1000 / fps - 3) return;
-            lastEncodedAt = at;
+            if (fps < options.fps) {
+                // A deadline, not the last frame's time: camera jitter must not cost frames on top of the rate.
+                if (at < nextDue) return;
+                nextDue = Math.max(nextDue + 1000 / fps, at - 1000 / fps);
+            }
             const key = keyframeWanted || at - lastKeyframe > 10000;
             if (key) { keyframeWanted = false; lastKeyframe = at; if (measuring) counters.keyframes++; }
             encoder.encode(frame, { keyFrame: key });

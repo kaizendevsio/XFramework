@@ -20,9 +20,11 @@ public sealed class AudioPacketizationTests
         Assert.That(audio.Update(450, false, 1_500), Is.Null);
         Assert.That(audio.Update(450, false, 2_100), Is.EqualTo(60), "a second of it is");
         Assert.That(audio.FrameMs, Is.EqualTo(60));
-        Assert.That(audio.Update(0, false, 3_000), Is.Null, "the way back waits longer");
-        Assert.That(audio.Update(0, false, 7_000), Is.Null);
-        Assert.That(audio.Update(0, false, 8_100), Is.EqualTo(20));
+        // The controller probes above the congestion point and forgets it (0): the link has not grown for that.
+        Assert.That(audio.Update(0, false, 3_000), Is.Null, "a congestion point is remembered for 30 s");
+        Assert.That(audio.Update(0, false, 32_200), Is.Null, "then the way back waits 5 s more");
+        Assert.That(audio.Update(0, false, 36_000), Is.Null);
+        Assert.That(audio.Update(0, false, 37_300), Is.EqualTo(20));
     }
 
     [Test]
