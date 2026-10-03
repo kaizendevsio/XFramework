@@ -154,3 +154,72 @@ test('an open channel reports its path', async () => {
     assert.deepEqual(target.calls.find(x => x[0] === 'OnPath'), ['OnPath', 'srflx', 'udp', null, 'relay', 100]);
     peer.close();
 });
+
+test('an open channel whose ICE goes quiet is reported stalled, takes nothing, and comes back when ICE does', async () => {
+    // A dead path under an open channel: Chrome keeps the channel "open" for up to 30 s after ICE stops
+    // hearing back. Media sent there is lost, so the .NET side must send it on the WebSocket meanwhile.
+    const target = dotnet();
+    const peer = createPeer(target, { maxMessageBytes: 1150 });
+    const pc = open(peer);
+    try {
+    pc.iceConnectionState = 'connected';
+    pc.oniceconnectionstatechange();
+    pc.iceConnectionState = 'disconnected';
+    pc.oniceconnectionstatechange();
+    assert.equal(peer.state(), 'stalled');
+    assert.equal(peer.send(new Uint8Array(10)), false, 'nothing goes to a stalled channel');
+    pc.iceConnectionState = 'checking';
+    pc.oniceconnectionstatechange();
+    pc.iceConnectionState = 'connected';
+    pc.oniceconnectionstatechange();
+    assert.equal(peer.state(), 'open');
+    assert.equal(peer.send(new Uint8Array(10)), true);
+    pc.iceConnectionState = 'disconnected';
+    pc.oniceconnectionstatechange();
+    pc.iceConnectionState = 'failed';
+    pc.oniceconnectionstatechange();
+    await flush();
+    assert.deepEqual(target.calls.filter(x => x[0] === 'OnState').map(x => x[1]), ['open', 'stalled', 'open', 'stalled', 'failed']);
+    } finally { peer.close(); }
+});
+
+test('a stalled channel that closes is reported closed, not failed', async () => {
+    const target = dotnet();
+    const peer = createPeer(target, {});
+    const pc = open(peer);
+    try {
+    pc.iceConnectionState = 'disconnected';
+    pc.oniceconnectionstatechange();
+    pc.channel.onclose();
+    await flush();
+    assert.deepEqual(target.calls.filter(x => x[0] === 'OnState').map(x => x[1]), ['open', 'stalled', 'closed']);
+    } finally { peer.close(); }
+});
+
+test('candidates that arrive before their answer are applied after it, never dropped', async () => {
+    // The relay's TURN candidate can overtake its answer on the signalling socket (pion gathers as it applies the
+    // answer). A browser rejects addIceCandidate without a remote description, and that one relay candidate is all
+    // the relay has: dropped, ICE never connects (WebKit through TURN: states [], relay path null).
+    const peer = createPeer(dotnet(), {});
+    const pc = FakePeerConnection.last;
+    try {
+        pc.addIceCandidate = async function (candidate) {
+            if (!this.remote) throw new Error('InvalidStateError: no remote description');
+            this.candidates.push(candidate);
+        };
+        await peer.createOffer(false);
+        await peer.addCandidate('candidate:1 1 udp 1 198.51.100.7 3478 typ relay', '0', 0);
+        assert.deepEqual(pc.candidates, [], 'held until the answer');
+        await peer.setAnswer('v=0 answer');
+        assert.deepEqual(pc.candidates.map(x => x?.candidate), ['candidate:1 1 udp 1 198.51.100.7 3478 typ relay']);
+        // An ICE restart: the new generation's candidates wait for the new answer, not the old description.
+        await peer.createOffer(true);
+        await peer.addCandidate('candidate:2 1 udp 1 198.51.100.8 3478 typ relay', '0', 0);
+        assert.equal(pc.candidates.length, 1);
+        await peer.setAnswer('v=0 answer 2');
+        assert.deepEqual(pc.candidates.map(x => x?.candidate).slice(1), ['candidate:2 1 udp 1 198.51.100.8 3478 typ relay']);
+        // After the answer, candidates go straight in.
+        await peer.addCandidate('candidate:3 1 udp 1 198.51.100.9 3478 typ relay', '0', 0);
+        assert.equal(pc.candidates.length, 3);
+    } finally { peer.close(); }
+});

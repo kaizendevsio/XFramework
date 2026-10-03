@@ -373,6 +373,137 @@ public sealed partial class BoltGroupCallLifecycleTests
         });
     }
 
+    /// <summary>A phone's candidates for one gathering: hosts, server-reflexive and a relay per TURN URL and interface.</summary>
+    private static async Task TrickleAsync(Peer peer, string session, int count, int generation)
+    {
+        for (var i = 0; i < count; i++)
+            await peer.ProcessAsync(MediaTransportCodec.Encode(MediaTransportKind.Candidate,
+                new MediaTransportCandidate(session, $"candidate:{generation}{i} 1 udp 1 203.0.113.{i + 1} {9000 + generation} typ relay", "0", 0)));
+    }
+
+    [Test]
+    public async Task Datagram_EveryIceRestart_GetsItsOwnCandidates_NotWhatEarlierGatheringsLeftOfACap()
+    {
+        // With Cloudflare's five browser TURN URLs over Wi-Fi, IPv6 and a VPN interface, a phone gathers 20-30
+        // candidates each time. A per-session cap shared by every restart refuses the third gathering outright:
+        // pion has dropped the old candidates on restart, so it has nothing to check and the restart can only fail.
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        var (relay, participant, session) = await OpenDatagramAsync(f, network, "a");
+        await TrickleAsync(f.Peers["a"], session, 25, 0);
+        for (var restart = 1; restart <= 2; restart++)
+        {
+            var offer = await participant.CreateOfferAsync(true, CancellationToken.None);
+            await f.Peers["a"].ProcessAsync(MediaTransportCodec.Encode(MediaTransportKind.Offer, new MediaTransportDescription(session, offer, IceRestart: true)));
+            await AwaitTransport<MediaTransportDescription>(f.Peers["a"], MediaTransportKind.Answer, x => x.IceRestart, skip: restart - 1);
+            await TrickleAsync(f.Peers["a"], session, 25, restart);
+        }
+        await WaitUntil(() => relay.RemoteCandidates.Count == 75);
+    }
+
+    [Test]
+    public async Task Datagram_IceRestarts_AreBoundedPerSession_ThenTheSessionEnds_AndTheCallCarriesOn()
+    {
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        var (relay, participant, session) = await OpenDatagramAsync(f, network, "a");
+        for (var restart = 0; restart < 40 && !relay.Disposed; restart++)
+        {
+            var offer = await participant.CreateOfferAsync(true, CancellationToken.None);
+            await f.Peers["a"].ProcessAsync(MediaTransportCodec.Encode(MediaTransportKind.Offer, new MediaTransportDescription(session, offer, IceRestart: true)));
+        }
+        await WaitUntil(() => relay.Disposed);
+        Assert.Multiple(() =>
+        {
+            Assert.That(TransportCount(f.Peers["a"], MediaTransportKind.Answer), Is.LessThan(40), "each restart re-allocates TURN; a phone cannot ask without end");
+            Assert.That(Connection(f, "a").Datagram, Is.Null);
+            Assert.That(f.Tasks["a"].IsCompleted, Is.False, "the call's socket is untouched");
+        });
+        await AwaitTransport<MediaTransportClose>(f.Peers["a"], MediaTransportKind.Close, x => x.Session == session);
+    }
+
+    [Test]
+    public async Task Datagram_APeerTheRelayCannotCreate_IsReportedFailedAtOnce_SoThePhoneDoesNotWaitOutItsTimeout()
+    {
+        // The sidecar is restarting (or gone): the offer cannot be answered. Saying nothing leaves the phone negotiating
+        // for its whole open timeout; saying "failed" lets it carry on over the socket and retry on its backoff.
+        var network = new FakeRtcNetwork { FailCreate = true };
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        var peer = f.Peers["a"];
+        await peer.ProcessAsync(MediaTransportCodec.Encode(MediaTransportKind.Request, new MediaTransportRequest(1, RtcDefaults.MaxMessageBytes)));
+        var config = await AwaitTransport<MediaTransportConfig>(peer, MediaTransportKind.Config, x => x.Unavailable is null);
+        await peer.ProcessAsync(MediaTransportCodec.Encode(MediaTransportKind.Offer, new MediaTransportDescription(config.Session, "offer:x")));
+        await AwaitTransport<MediaTransportStateMessage>(peer, MediaTransportKind.State, x => x.Session == config.Session && x.State == "failed");
+        Assert.That(f.Tasks["a"].IsCompleted, Is.False);
+    }
+
+    [Test]
+    public async Task Datagram_TheRelaysCandidates_FollowItsAnswer()
+    {
+        // Pion gathers as soon as it applies its answer. A candidate that reached the phone before that answer would be
+        // added to the previous ICE generation, and an ICE restart drops it with the rest: the restart cannot connect.
+        var network = new FakeRtcNetwork { CandidateBeforeAnswer = true };
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        var (_, participant, session) = await OpenDatagramAsync(f, network, "a");
+        var offer = await participant.CreateOfferAsync(true, CancellationToken.None);
+        await f.Peers["a"].ProcessAsync(MediaTransportCodec.Encode(MediaTransportKind.Offer, new MediaTransportDescription(session, offer, IceRestart: true)));
+        await AwaitTransport<MediaTransportDescription>(f.Peers["a"], MediaTransportKind.Answer, x => x.IceRestart);
+        await WaitUntil(() => TransportCount(f.Peers["a"], MediaTransportKind.Candidate) >= 2);
+        var order = f.Peers["a"].Sent.Select(x => MediaTransportCodec.TryRead(x, out var kind, out _) ? kind : (MediaTransportKind?)null)
+            .Where(x => x is MediaTransportKind.Answer or MediaTransportKind.Candidate).ToList();
+        Assert.That(order.IndexOf(MediaTransportKind.Answer), Is.LessThan(order.IndexOf(MediaTransportKind.Candidate)),
+            "every candidate follows the answer it belongs to");
+        var restartAnswer = order.LastIndexOf(MediaTransportKind.Answer);
+        Assert.That(order.Skip(restartAnswer).Count(x => x == MediaTransportKind.Candidate), Is.GreaterThanOrEqualTo(1),
+            "and the restart's candidate is sent after the restart's answer");
+    }
+
+    [Test]
+    public async Task Datagram_AChannelThatStopsDraining_SendsThatReceiversMediaOnTheSocket()
+    {
+        // ICE is fine (the phone's checks still arrive), but nothing the relay hands the channel is acknowledged any
+        // more: a dead downlink. The buffer never drains, so after a short grace the receiver's media takes its socket.
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var (relay, _, _) = await OpenDatagramAsync(f, network, "a");
+        relay.Stuck = true;
+        var stream = await f.Config("b");
+        var started = Environment.TickCount64;
+        while (Environment.TickCount64 - started < 3_000 && f.Peers["a"].Count(FrameType.MediaFrame) == 0)
+        {
+            await f.Send("b", stream);
+            await Task.Delay(20);
+        }
+        Assert.Multiple(() =>
+        {
+            Assert.That(f.Peers["a"].Count(FrameType.MediaFrame), Is.GreaterThan(0), "media left the stalled channel for the socket");
+            Assert.That(f.Tasks["a"].IsCompleted, Is.False);
+        });
+    }
+
+    [Test]
+    public async Task Datagram_AParticipantReportingItsChannelStalled_GetsItsMediaOnTheSocket_UntilItIsBack()
+    {
+        // The phone hears nothing on its channel (its ICE went quiet) while the relay still hears the phone: only the
+        // phone knows the downlink is dead. It says so over its socket, and says so again when the channel is back.
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var (relay, _, session) = await OpenDatagramAsync(f, network, "a");
+        var stream = await f.Config("b");
+        await f.Peers["a"].ProcessAsync(MediaTransportCodec.Encode(MediaTransportKind.State, new MediaTransportStateMessage(session, "stalled")));
+        await f.Send("b", stream);
+        await WaitUntil(() => f.Peers["a"].Count(FrameType.MediaFrame) == 1);
+        Assert.That(MediaOn(relay), Is.Zero);
+        await f.Peers["a"].ProcessAsync(MediaTransportCodec.Encode(MediaTransportKind.State, new MediaTransportStateMessage(session, "open")));
+        await f.Send("b", stream);
+        await WaitUntil(() => MediaOn(relay) == 1);
+        Assert.That(f.Peers["a"].Count(FrameType.MediaFrame), Is.EqualTo(1));
+    }
+
     private static BoltHubConnection Connection(Fixture f, string id)
     {
         var connections = (System.Collections.Concurrent.ConcurrentDictionary<string, BoltHubConnection>)typeof(BoltServer)

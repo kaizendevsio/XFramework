@@ -9,7 +9,10 @@
 #   EXPECT                 "survive" fails the run unless the call lasted; "any" only records it;
 #                          "resume" (RESUME=1) needs the call to last and the receiver to have resumed;
 #                          "resume-retired" also needs the relay to have retired the receiver first;
-#                          "end-clean" needs the held seat to expire (after the grace) and the receiver to give up
+#                          "end-clean" needs the held seat to expire (after the grace) and the receiver to give up;
+#                          "video-climbs" (ADAPTIVE=1) needs the call to last with video never suspended and settling at
+#                          or above MIN_VIDEO_KBPS (default 1000); "audio-continues" needs the call to last with no
+#                          audio gap longer than MAX_AUDIO_GAP_MS (default 6000)
 #   ENV=VALUE              harness settings passed to the relay (SECONDS, VIDEO_KBPS, FPS, AUDIO_PAYLOAD, KF_MS, ...)
 #                          UDP=1 adds a TURN server (coturn) to the run's network and lets the receiver move its
 #                          media onto a WebRTC data channel through it; UDP_BLOCK=1 also drops the receiver's UDP
@@ -107,7 +110,7 @@ docker logs "$receiver" 2>&1 | grep "^SUMMARY" | sed "s/^/$name receiver: /" || 
 relay_summary=$(docker logs "$relay" 2>&1 | grep "^SUMMARY" || true)
 receiver_summary=$(docker logs "$receiver" 2>&1 | grep "^SUMMARY" || true)
 case $expect in
-  survive | resume | resume-retired)
+  survive | resume | resume-retired | video-climbs | audio-continues)
     if ! grep -q '"outcome":"survived"' <<<"$relay_summary"; then
       echo "$name: the call did not survive" >&2
       exit 1
@@ -125,6 +128,30 @@ relay_log=$(docker logs "$relay" 2>&1 || true)
 if [ "$expect" = resume-retired ] && ! grep -q "Retiring Bolt connection" <<<"$relay_log"; then
   echo "$name: the relay never retired the stalled receiver" >&2
   exit 1
+fi
+summary_field() { # json-line field.path
+  python3 -c 'import json,sys
+value = json.loads(sys.argv[1].split(" ", 1)[1])
+for key in sys.argv[2].split("."):
+    value = (value or {}).get(key) if isinstance(value, dict) else None
+print("" if value is None else value)' "$1" "$2"
+}
+if [ "$expect" = video-climbs ]; then
+  suspended=$(summary_field "$relay_summary" rate.suspendedSeconds)
+  settled=$(summary_field "$relay_summary" rate.settledVideoKbpsMedian)
+  echo "$name: video suspended ${suspended}s, settled at ${settled} kbps"
+  if [ "${suspended%.*}" != 0 ] || [ "${settled:-0}" -lt "${MIN_VIDEO_KBPS:-1000}" ]; then
+    echo "$name: video did not stay on and climb on a fast path" >&2
+    exit 1
+  fi
+fi
+if [ "$expect" = audio-continues ]; then
+  gap=$(summary_field "$receiver_summary" longestAudioGapMs)
+  echo "$name: longest audio gap ${gap} ms"
+  if [ "${gap:-999999}" -gt "${MAX_AUDIO_GAP_MS:-6000}" ]; then
+    echo "$name: audio stopped for ${gap} ms while the WebSocket was fine" >&2
+    exit 1
+  fi
 fi
 if [ "$expect" = end-clean ]; then
   if ! grep -q 'seat expired' <<<"$relay_summary" || ! grep -q '"gaveUp":true' <<<"$receiver_summary"; then

@@ -144,6 +144,8 @@ public sealed class BrowserRtcPeer : IRtcPeer
         var next = state switch
         {
             "open" => RtcChannelState.Open,
+            // The channel is open but ICE has gone quiet or is checking again: media takes the WebSocket meanwhile.
+            "stalled" => RtcChannelState.Stalled,
             "closed" => RtcChannelState.Closed,
             "failed" => RtcChannelState.Failed,
             _ => RtcChannelState.Connecting,

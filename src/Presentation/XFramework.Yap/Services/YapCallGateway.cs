@@ -420,6 +420,8 @@ public static class YapCallEndpoints
         // Cloudflare's TURN API: one short request per participant session; never retried on the media path.
         services.AddHttpClient(YapTurnCredentials.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(8));
         services.AddSingleton<YapCallTransport>();
+        // UDP status at startup, not on the first call.
+        services.AddHostedService<YapCallTransportStartup>();
         return services.AddSingleton<YapCallGateway>();
     }
     public static void MapYapCalls(this WebApplication app)

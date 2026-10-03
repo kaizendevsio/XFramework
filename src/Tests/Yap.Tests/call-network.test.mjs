@@ -21,7 +21,7 @@ function fixture({ connection = true } = {}) {
     const scope = new Target();
     scope.document = new Target();
     scope.document.hidden = false;
-    scope.navigator = connection ? { connection: new Target() } : {};
+    scope.navigator = connection ? { connection: Object.assign(new Target(), { type: 'wifi', effectiveType: '4g', rtt: 50, downlink: 10 }) } : {};
     const calls = [];
     const target = { invokeMethodAsync: (method, kind) => { calls.push(`${method}:${kind}`); return Promise.resolve(); } };
     return { scope, calls, handle: watch(target, scope) };
@@ -30,11 +30,37 @@ function fixture({ connection = true } = {}) {
 test('online, a network change and the page coming back are each reported', () => {
     const { scope, calls } = fixture();
     scope.fire('online');
+    scope.navigator.connection.type = 'cellular';
     scope.navigator.connection.fire('change');
     scope.document.fire('visibilitychange');
     scope.fire('pageshow', { persisted: true });
     assert.deepEqual(calls, ['OnCallNetworkChanged:online', 'OnCallNetworkChanged:network',
         'OnCallNetworkChanged:visible', 'OnCallNetworkChanged:visible']);
+});
+
+test('a new estimate of the same network is not a network change', () => {
+    // Chromium also fires "change" when only its RTT or bandwidth estimate moves.
+    // Each "network" hint restarts ICE on the call's UDP path, so only a different connection type may count.
+    const { scope, calls } = fixture();
+    const connection = scope.navigator.connection;
+    for (const [rtt, downlink, effectiveType] of [[100, 8.5, '4g'], [350, 1.2, '3g'], [50, 10, '4g']]) {
+        Object.assign(connection, { rtt, downlink, effectiveType });
+        connection.fire('change');
+    }
+    assert.deepEqual(calls, []);
+    connection.type = 'cellular';
+    connection.fire('change');
+    connection.fire('change');
+    connection.type = 'wifi';
+    connection.fire('change');
+    assert.deepEqual(calls, ['OnCallNetworkChanged:network', 'OnCallNetworkChanged:network']);
+});
+
+test('without a connection type, change events are not network changes', () => {
+    const { scope, calls } = fixture();
+    delete scope.navigator.connection.type;
+    scope.navigator.connection.fire('change');
+    assert.deepEqual(calls, []);
 });
 
 test('going to the background is not a hint; only coming back is', () => {

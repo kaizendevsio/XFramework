@@ -64,9 +64,12 @@ public sealed class YapTurnOptions
 /// The participant's copy and the relay's own copy are minted separately, so neither outlives its session.
 /// Nothing here logs a credential or the token: failures are reported by status code only.
 /// </summary>
-public sealed class YapTurnCredentials(YapTurnOptions options, IHttpClientFactory http, ILogger<YapTurnCredentials> logger, TimeProvider? time = null)
+public sealed class YapTurnCredentials(YapTurnOptions options, IHttpClientFactory http, ILogger logger, TimeProvider? time = null)
     : IBoltIceServerSource
 {
+    /// <summary>Log category for TURN credential mints (the container log shows it at Information).</summary>
+    public const string LogCategory = "Yap.Calls.Turn";
+
     public const string HttpClientName = "cloudflare-turn";
     internal static readonly Uri CloudflareBase = new("https://rtc.live.cloudflare.com/");
     private readonly TimeProvider _time = time ?? TimeProvider.System;
@@ -120,7 +123,14 @@ public sealed class YapTurnCredentials(YapTurnOptions options, IHttpClientFactor
                 return null;
             }
             var body = await response.Content.ReadFromJsonAsync(CloudflareJson.Default.JsonElement, ct);
-            return ParseIceServers(body);
+            if (ParseIceServers(body) is not { } servers)
+            {
+                logger.LogWarning("Cloudflare TURN answered HTTP {Status} without usable ICE servers; calls stay on WebSockets", (int)response.StatusCode);
+                return null;
+            }
+            // The status and how many URLs came back; never a URL's credential, the key or the token.
+            logger.LogInformation("Cloudflare TURN issued ICE servers (HTTP {Status}, {Urls} URLs)", (int)response.StatusCode, servers.Sum(x => x.Urls.Length));
+            return servers;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException && !ct.IsCancellationRequested)
         {
@@ -186,50 +196,84 @@ internal sealed record CloudflareRequest([property: JsonPropertyName("ttl")] int
 internal sealed partial class CloudflareJson : JsonSerializerContext;
 
 /// <summary>
-/// UDP call media for Yap: the WebRTC sidecar plus TURN credentials, or nothing. Built once per process; the
-/// gateway gives its options to the relay. When either half is missing it says why, once, and calls carry on
-/// over WebSockets.
+/// UDP call media for Yap: the WebRTC sidecar plus TURN credentials, or nothing. Built once per process, at startup
+/// (<see cref="YapCallTransportStartup"/>); the gateway gives its options to the relay. When UDP is off it says why,
+/// once, and calls carry on over WebSockets.
+///
+/// <c>Yap:Calls:Udp:Enabled</c> (default true) is the kill switch: false keeps every call on its WebSocket without
+/// removing the TURN credentials. The relay then answers every participant's request with "disabled".
 /// </summary>
 public sealed class YapCallTransport : IAsyncDisposable
 {
+    /// <summary>Log category for UDP status and each participant's path (the container log shows it at Information).</summary>
+    public const string LogCategory = "Yap.Calls.Transport";
     private readonly RtcSidecar? _sidecar;
 
     public YapCallTransport(IConfiguration configuration, IHttpClientFactory http, ILoggerFactory logs)
     {
-        var logger = logs.CreateLogger<YapCallTransport>();
-        var turn = YapTurnOptions.From(configuration);
-        if (!turn.IsConfigured)
+        var logger = logs.CreateLogger(LogCategory);
+        try
         {
-            Status = "off: no TURN configured";
-            logger.LogInformation("UDP call media is off: no TURN credentials are configured; calls use WebSockets");
-            return;
+            if (!configuration.GetValue("Yap:Calls:Udp:Enabled", true))
+            {
+                Status = "off: disabled by Yap:Calls:Udp:Enabled";
+                logger.LogInformation("UDP call media is {Status}; calls use WebSockets", Status);
+                return;
+            }
+            var turn = YapTurnOptions.From(configuration);
+            if (!turn.IsConfigured)
+            {
+                Status = "off: no TURN configured";
+                logger.LogInformation("UDP call media is off: no TURN credentials are configured; calls use WebSockets");
+                return;
+            }
+            var sidecar = new RtcSidecar(new RtcSidecarOptions { ExecutablePath = configuration["Yap:Calls:Rtc:SidecarPath"] }, logs.CreateLogger<RtcSidecar>());
+            if (!sidecar.IsAvailable)
+            {
+                Status = "off: WebRTC sidecar missing";
+                logger.LogWarning("UDP call media is off: the bolt-rtc sidecar is not installed; calls use WebSockets");
+                return;
+            }
+            _sidecar = sidecar;
+            Status = turn.UsesCloudflare ? "on: Cloudflare TURN" : turn.UsesSharedSecret ? "on: TURN (shared secret)" : "on: TURN (static)";
+            Options = new BoltMediaTransportOptions
+            {
+                Peers = sidecar,
+                IceServers = new YapTurnCredentials(turn, http, logs.CreateLogger(YapTurnCredentials.LogCategory)),
+                RelayOnly = turn.RelayOnly,
+                Logger = logger,
+            };
+            logger.LogInformation("UDP call media is {Status}", Status);
         }
-        var sidecar = new RtcSidecar(new RtcSidecarOptions { ExecutablePath = configuration["Yap:Calls:Rtc:SidecarPath"] }, logs.CreateLogger<RtcSidecar>());
-        if (!sidecar.IsAvailable)
+        catch (Exception ex)
         {
-            Status = "off: WebRTC sidecar missing";
-            logger.LogWarning("UDP call media is off: the bolt-rtc sidecar is not installed; calls use WebSockets");
-            return;
+            // Never a reason for calls not to work: they stay on their WebSockets.
+            Options = null;
+            Status = "off: failed to start (" + ex.GetType().Name + ")";
+            logger.LogWarning("UDP call media is {Status}; calls use WebSockets", Status);
         }
-        _sidecar = sidecar;
-        Status = turn.UsesCloudflare ? "on: Cloudflare TURN" : turn.UsesSharedSecret ? "on: TURN (shared secret)" : "on: TURN (static)";
-        Options = new BoltMediaTransportOptions
-        {
-            Peers = sidecar,
-            IceServers = new YapTurnCredentials(turn, http, logs.CreateLogger<YapTurnCredentials>()),
-            RelayOnly = turn.RelayOnly,
-        };
-        logger.LogInformation("UDP call media is {Status}", Status);
     }
 
     /// <summary>Null when calls stay on WebSockets.</summary>
     public BoltMediaTransportOptions? Options { get; }
 
     /// <summary>For logs and the call configuration endpoint: on or off, and why. Never a credential.</summary>
-    public string Status { get; }
+    public string Status { get; } = "off";
 
     public async ValueTask DisposeAsync()
     {
         if (_sidecar is not null) await _sidecar.DisposeAsync();
     }
+}
+
+/// <summary>Builds <see cref="YapCallTransport"/> when the app starts, so its status is in the log before anyone calls.</summary>
+public sealed class YapCallTransportStartup(IServiceProvider services) : IHostedService
+{
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        _ = services.GetRequiredService<YapCallTransport>();
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

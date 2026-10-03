@@ -31,6 +31,9 @@ public static class LoggingExtensions
         logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>(level => level >= LogLevel.Warning);
         logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("Microsoft.Hosting.Lifetime", LogLevel.Information);
         logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("Bolt.Client", LogLevel.Information);
+        // Call media over WebRTC: the sidecar (start, exit, its own session lines) and the relay's datagram paths.
+        logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("Bolt.Rtc", LogLevel.Information);
+        logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("Bolt.Server.MediaTransport", LogLevel.Information);
 
         // Seq: Debug+ for everything (if configured)
         var seqUrl = configuration["Seq:Url"];

@@ -8,6 +8,10 @@
  * Kinds: "online" (the browser regained a network), "network" (the connection type changed, where
  * the Network Information API exists), "visible" (the page came back from the background; iOS
  * suspends a backgrounded PWA's sockets and timers, so this is when a resume can begin).
+ *
+ * Chromium also fires the connection's "change" event when only its RTT or bandwidth estimate moves,
+ * which on a phone in a call can be often. Only a different connection type (Wi-Fi to cellular and
+ * back) is a network change: each "network" hint restarts ICE on the call's UDP path.
  */
 export function watch(target, scope = globalThis) {
     const doc = scope.document;
@@ -15,7 +19,13 @@ export function watch(target, scope = globalThis) {
     let disposed = false;
     const report = kind => { if (!disposed) Promise.resolve(target.invokeMethodAsync('OnCallNetworkChanged', kind)).catch(() => {}); };
     const online = () => report('online');
-    const network = () => report('network');
+    let type = connection?.type;
+    const network = () => {
+        const next = connection?.type;
+        if (next === undefined || next === type) return;
+        type = next;
+        report('network');
+    };
     const visible = () => { if (!doc?.hidden) report('visible'); };
     const shown = event => { if (event?.persisted) report('visible'); };
     scope.addEventListener?.('online', online);

@@ -137,6 +137,58 @@ public sealed class RtcSidecarTests
         });
     }
 
+    /// <summary>
+    /// What a participant does after a network change: an ICE restart on the open channel. Pion drops the
+    /// answering side's selected pair and its candidates (TURN allocations included) and checks again, while
+    /// the data channel keeps reporting "open". Until ICE is connected again nothing sent there can leave, so
+    /// the relay must see the peer as not usable (and send that participant's media on the WebSocket).
+    /// </summary>
+    [Test]
+    public async Task AnIceRestart_StallsTheAnsweringPeer_UntilIceIsConnectedAgain()
+    {
+        await using var sidecar = new RtcSidecar(new RtcSidecarOptions { ExecutablePath = RequireBinary() }, NullLogger<RtcSidecar>.Instance);
+        await using var offerer = await sidecar.CreateAsync(RtcPeerRole.Offer, Loopback(), CancellationToken.None);
+        await using var answerer = await sidecar.CreateAsync(RtcPeerRole.Answer, Loopback(), CancellationToken.None);
+        // Signalling as the client and relay do it: each side's candidates follow the description they belong to.
+        var offererGate = new CandidateGate();
+        var answererGate = new CandidateGate();
+        offerer.LocalCandidate += candidate => { if (!offererGate.TryHold(candidate)) _ = answerer.AddCandidateAsync(candidate, CancellationToken.None); };
+        answerer.LocalCandidate += candidate => { if (!answererGate.TryHold(candidate)) _ = offerer.AddCandidateAsync(candidate, CancellationToken.None); };
+        var open = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        answerer.StateChanged += state => { if (state == RtcChannelState.Open) open.TrySetResult(); };
+        async Task NegotiateAsync(bool restart)
+        {
+            offererGate.Hold();
+            answererGate.Hold();
+            var offer = await offerer.CreateOfferAsync(restart, CancellationToken.None);
+            var answer = await answerer.AnswerAsync(offer, CancellationToken.None);
+            foreach (var candidate in offererGate.Release()) await answerer.AddCandidateAsync(candidate, CancellationToken.None);
+            await offerer.SetAnswerAsync(answer, CancellationToken.None);
+            foreach (var candidate in answererGate.Release()) await offerer.AddCandidateAsync(candidate, CancellationToken.None);
+        }
+        await NegotiateAsync(restart: false);
+        await open.Task.WaitAsync(TimeSpan.FromSeconds(20));
+
+        var states = new System.Collections.Concurrent.ConcurrentQueue<(RtcChannelState State, bool Took)>();
+        answerer.StateChanged += state => states.Enqueue((state, answerer.TrySend([0x21])));
+        await NegotiateAsync(restart: true);
+
+        var deadline = Environment.TickCount64 + 20_000;
+        while (!(states.Any(x => x.State != RtcChannelState.Open) && states.Last().State == RtcChannelState.Open))
+        {
+            if (Environment.TickCount64 > deadline)
+                Assert.Fail($"The restart did not stall and recover: [{string.Join(", ", states.Select(x => x.State))}], now {answerer.State}");
+            await Task.Delay(20);
+        }
+        var stalled = states.First(x => x.State != RtcChannelState.Open);
+        Assert.Multiple(() =>
+        {
+            Assert.That(stalled.State, Is.Not.EqualTo(RtcChannelState.Closed).And.Not.EqualTo(RtcChannelState.Failed), "a restart is not the end of the channel");
+            Assert.That(stalled.Took, Is.False, "while ICE checks again the channel takes nothing; the relay uses the socket");
+            Assert.That(answerer.TrySend([0x21]), Is.True, "and once ICE is back, it carries media again");
+        });
+    }
+
     [Test]
     public void AMissingExecutable_IsReportedAsUnavailable()
     {

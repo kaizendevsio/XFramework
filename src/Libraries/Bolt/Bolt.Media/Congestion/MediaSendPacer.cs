@@ -194,7 +194,11 @@ public sealed class MediaSendPacer : IAsyncDisposable
             return false;
         }
 
-        if (Pressure(now, bytes) > 1)
+        // A picture alone in front of the transport is not a queue, whatever its size: a keyframe at the top of the
+        // ladder can be bigger than the whole budget (2160p at 14 Mbit/s is about 350 KB). Dropping it as a base-layer
+        // loss would tell the rate controller the queue overflowed, on a link that carries it in a fraction of a second.
+        var alone = _video.Count == 0 && (_current is null || _currentIndex >= _current.Frames.Count);
+        if (!alone && Pressure(now, bytes) > 1)
         {
             // Enhancement pictures go first: no base picture refers to them.
             if (DropQueuedEnhancement() > 0) _layerLimit = 0;
@@ -281,6 +285,24 @@ public sealed class MediaSendPacer : IAsyncDisposable
             _droppedPictures++;
             if (layer > 0) { _layerLimit = Math.Min(_layerLimit, layer - 1); return; }
             if (!_awaitingKeyframe) _baseLosses++;
+            _awaitingKeyframe = true;
+            request = RequestKeyframe(_clock());
+        }
+        if (request) KeyframeNeeded?.Invoke();
+    }
+
+    /// <summary>
+    /// The encoder made a picture too large for the transport to carry at all (over the reassembly bound). That is
+    /// the picture size, not the link: the stream needs a keyframe, but no base-layer loss is reported, so the rate
+    /// controller does not read it as an overflowing queue. The caller lowers the picture instead.
+    /// </summary>
+    public void NotePictureTooLarge(int layer)
+    {
+        bool request;
+        lock (_sync)
+        {
+            _droppedPictures++;
+            if (layer > 0) { _layerLimit = Math.Min(_layerLimit, layer - 1); return; }
             _awaitingKeyframe = true;
             request = RequestKeyframe(_clock());
         }

@@ -229,7 +229,15 @@ public sealed partial class BoltMediaService
         if (_activeVideoStreamId == Guid.Empty) return;
         if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame && _sframe?.IsReady != true) return;
         if (_pacer is { } pacer && !pacer.WouldAccept(isKeyframe, layer)) return;
-        if (data.Length == 0 || data.Length > VideoFrameFragments.MaxPictureBytes) { VideoDropped(layer); return; }
+        if (data.Length == 0) { VideoDropped(layer); return; }
+        if (data.Length > VideoFrameFragments.MaxPictureBytes)
+        {
+            // Too big to carry at all: the picture is too large, not the link too small. A keyframe is needed, but no
+            // congestion is reported (the rate controller would cut tenfold); the picture steps down a rung instead.
+            _pacer?.NotePictureTooLarge(layer);
+            if (_adaptation?.Rates.ReduceForCpu() == true && _adaptation.Current is { } smaller) _ = _video.ApplyTierAsync(smaller);
+            return;
+        }
         var channel = _videoSend;
         if (channel is null) return;
         // A whole picture is queued or dropped as one: half a picture on the wire is wasted bandwidth.
