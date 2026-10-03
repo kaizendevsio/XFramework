@@ -15,7 +15,9 @@ public enum MediaPathKind { WebSocket, Negotiating, Datagram }
 /// <param name="RttMs">The data channel's measured round trip, when known.</param>
 /// <param name="Reason">Why media is on the WebSocket, when it is.</param>
 /// <param name="AudioRedundancy">Audio leaves with the previous frame alongside (the relay reported loss).</param>
-public sealed record MediaPathStatus(MediaPathKind Kind, string Description, double? RttMs = null, string? Reason = null, bool AudioRedundancy = false);
+/// <param name="RelayLeg">The relay's own leg to its TURN server ("UDP/relay", "TLS/relay"), as the relay reported it.</param>
+public sealed record MediaPathStatus(MediaPathKind Kind, string Description, double? RttMs = null, string? Reason = null, bool AudioRedundancy = false,
+    string? RelayLeg = null);
 
 public sealed class MediaTransportClientOptions
 {
@@ -35,6 +37,8 @@ public sealed class MediaTransportClientOptions
     /// <see cref="DatagramDrainWatch"/>): media takes the WebSocket until it drains again.
     /// </summary>
     public int DrainStallMs { get; init; } = DatagramDrainWatch.DefaultTimeoutMs;
+    /// <summary>How media moves between the data channel and the socket (see <see cref="DatagramPathHysteresis"/>).</summary>
+    public DatagramHysteresisOptions PathHysteresis { get; init; } = new();
     /// <summary>Redundancy is added only while the channel's own buffer is this short.</summary>
     public long RedundancyBacklogBytes { get; init; } = 8 * 1024;
 }
@@ -77,6 +81,10 @@ public sealed class MediaTransportClient : IAsyncDisposable
     private Task _loop = Task.CompletedTask;
     private bool _disposed;
     private DatagramDrainWatch _drain = new();
+    private DatagramPathHysteresis _path = new();
+    /// <summary>The path flapped too often: no new session until the network changes.</summary>
+    private bool _parked;
+    private string? _relayLeg;
     /// <summary>The relay was told the active channel is stalled (and has not been told it is back).</summary>
     private bool _reportedStalled;
 
@@ -110,6 +118,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
         _logger = logger;
         _options = options ?? new MediaTransportClientOptions();
         _drain = new DatagramDrainWatch(_options.DrainStallMs);
+        _path = new DatagramPathHysteresis(_options.PathHysteresis);
         _clock = clock ?? (static () => Environment.TickCount64);
         _handler = HandleFrame;
         _client.RegisterFrameHandler(FrameType.MediaTransport, _handler);
@@ -133,7 +142,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
     public Func<int>? ReceiveLossPermille { get; set; }
 
     /// <summary>The open data channel, when there is one and it carries media (it has not stalled).</summary>
-    public IRtcPeer? ActivePeer { get { lock (_sync) return _drain.Stalled ? null : OpenPeerLocked(); } }
+    public IRtcPeer? ActivePeer { get { lock (_sync) return _drain.Stalled || !_path.Usable ? null : OpenPeerLocked(); } }
 
     private IRtcPeer? OpenPeerLocked() => _active is { Opened: true, Closed: false, Peer: { State: RtcChannelState.Open } peer } ? peer : null;
 
@@ -154,8 +163,8 @@ public sealed class MediaTransportClient : IAsyncDisposable
         {
             lock (_sync)
             {
-                if (!_drain.Stalled && OpenPeerLocked() is { } peer)
-                    return new(MediaPathKind.Datagram, peer.Path?.Describe() ?? "UDP", peer.Path?.RttMs, AudioRedundancy: AudioRedundancy);
+                if (!_drain.Stalled && _path.Usable && OpenPeerLocked() is { } peer)
+                    return new(MediaPathKind.Datagram, peer.Path?.Describe() ?? "UDP", peer.Path?.RttMs, AudioRedundancy: AudioRedundancy, RelayLeg: _relayLeg);
                 if (_pending is not null || (_active is not null && !_active.Opened))
                     return new(MediaPathKind.Negotiating, "WebSocket", Reason: "negotiating");
                 return new(MediaPathKind.WebSocket, "WebSocket", Reason: _reason);
@@ -184,6 +193,9 @@ public sealed class MediaTransportClient : IAsyncDisposable
         lock (_sync)
         {
             if (_disposed || _disabled) return;
+            // A new network: the old one's flaps say nothing about it.
+            _path.Reset();
+            _parked = false;
             active = _active is { Opened: true, Closed: false } ? _active : null;
             if (active is null) { _failures = 0; _retryAt = _clock(); return; }
             if (_restarting) { _restartAgain = true; return; }
@@ -281,7 +293,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
                     var negotiating = _pending ?? (_active is { Opened: false } ? _active : null);
                     if (negotiating is not null && now - negotiating.CreatedAt > (long)_options.OpenTimeout.TotalMilliseconds)
                         expired = negotiating;
-                    else if (negotiating is null && !_requested && _active is null && now >= _retryAt && _client.IsConnected)
+                    else if (negotiating is null && !_requested && !_parked && _active is null && now >= _retryAt && _client.IsConnected)
                     {
                         _requested = true;
                         request = true;
@@ -294,7 +306,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
                 }
                 if (request)
                     await SendAsync(MediaTransportKind.Request, new MediaTransportRequest(1, RtcDefaults.MaxMessageBytes));
-                await WatchDrainAsync(now);
+                await EvaluatePathAsync(now);
                 if (now >= nextReport)
                 {
                     nextReport = now + (long)_options.ReportInterval.TotalMilliseconds;
@@ -308,59 +320,70 @@ public sealed class MediaTransportClient : IAsyncDisposable
     }
 
     /// <summary>
-    /// An open channel must keep draining what it is given. When it holds bytes and drains none for
-    /// <see cref="MediaTransportClientOptions.DrainStallMs"/>, nothing sent there is arriving: media takes the socket
-    /// (and the relay is told, since a channel that never acknowledges is usually dead both ways) until it drains again.
+    /// Whether media goes on the channel. It must be open with ICE connected and keep draining what it is given (a
+    /// buffer that drains nothing for <see cref="MediaTransportClientOptions.DrainStallMs"/> means nothing arrives).
+    /// Media leaves a bad path at once, comes back only after a hold and sustained health, and after repeated flaps the
+    /// session is closed and none is asked for until the network changes (<see cref="DatagramPathHysteresis"/>).
     /// </summary>
-    private async Task WatchDrainAsync(long now)
+    private async Task EvaluatePathAsync(long now)
     {
         IRtcPeer? peer;
-        string? session;
+        Session? active;
         DatagramDrainWatch drain;
+        DatagramPathHysteresis path;
         lock (_sync)
         {
             peer = OpenPeerLocked();
-            session = _active?.Id;
+            active = _active;
             drain = _drain;
+            path = _path;
         }
-        if (peer is null || session is null) return;
-        if (!drain.Observe(peer.BufferedAmount, now))
+        if (peer is not null)
         {
+            drain.Observe(peer.BufferedAmount, now);
             // Stuck for good: give this session up so a fresh one (new TURN allocations, new path) is tried on the backoff.
-            if (drain.Stalled && drain.StuckForMs(now) >= _options.DrainStallMs * 5)
+            if (drain.Stalled && drain.StuckForMs(now) >= _options.DrainStallMs * 5 && active is not null)
             {
-                Session? stuck;
-                lock (_sync) stuck = _active?.Id == session ? _active : null;
-                if (stuck is not null) await FailAsync(stuck, "stalled", notifyRelay: true);
+                await FailAsync(active, "stalled", notifyRelay: true);
+                return;
             }
-            return;
         }
-        if (drain.Stalled)
+        var healthy = peer is not null && !drain.Stalled;
+        if (path.Observe(healthy, now))
         {
-            lock (_sync) _reason = "stalled";
-            _logger.LogInformation("The datagram media path stopped draining; media continues on the WebSocket until it does");
-            await ReportStalledAsync(session);
-            PathLostNow();
+            if (path.Usable)
+            {
+                lock (_sync) _reason = null;
+                _logger.LogInformation("Call media is back on the datagram path ({Switches} switches so far)", path.Switches);
+            }
+            else
+            {
+                lock (_sync) _reason = path.GivenUp ? "flapping" : "stalled";
+                _logger.LogInformation(path.GivenUp
+                    ? "The datagram media path flapped {Flaps} times; media stays on the WebSocket until the network changes"
+                    : "The datagram media path went bad (flap {Flaps}); media continues on the WebSocket for a while", path.Flaps);
+                PathLostNow();
+            }
+            Raise();
         }
-        else
+        if (active is { Opened: true, Closed: false }) await ReportStalledAsync(active.Id);
+        if (path.GivenUp && active is { Closed: false })
         {
-            lock (_sync) _reason = null;
-            _logger.LogInformation("The datagram media path drains again; media is back on it");
-            await ReportStalledAsync(session);
+            lock (_sync) _parked = true;
+            await FailAsync(active, "flapping", notifyRelay: true);
         }
-        Raise();
     }
 
     /// <summary>
-    /// Tell the relay whether this participant's channel carries anything, so its media for this participant follows:
-    /// a stalled channel is usually dead both ways, and only this side may know.
+    /// Tell the relay whether this participant's channel carries media, so its media for this participant follows: a
+    /// stalled channel is usually dead both ways, and only this side may know. Follows the hysteresis, not each blip.
     /// </summary>
     private async Task ReportStalledAsync(string session)
     {
         bool send, stalled;
         lock (_sync)
         {
-            stalled = _drain.Stalled || _active?.Peer?.State == RtcChannelState.Stalled;
+            stalled = !_path.Usable;
             send = stalled != _reportedStalled && _active?.Id == session;
             if (send) _reportedStalled = stalled;
         }
@@ -412,6 +435,12 @@ public sealed class MediaTransportClient : IAsyncDisposable
                     subject = FindSession(candidate.Session);
                     if (subject?.Peer is { } target)
                         await target.AddCandidateAsync(new RtcCandidate(candidate.Candidate, candidate.SdpMid, candidate.SdpMLineIndex), _lifetime.Token);
+                    break;
+                case MediaTransportKind.State when MediaTransportCodec.Decode<MediaTransportStateMessage>(payload) is { State: "open", Path: { } relayPath } open
+                                                   && FindSession(open.Session) is not null:
+                    // The relay's own leg, for diagnostics: "UDP/relay" is the point of the datagram path; TCP or TLS is not.
+                    lock (_sync) _relayLeg = relayPath.Describe();
+                    Raise();
                     break;
                 case MediaTransportKind.State when MediaTransportCodec.Decode<MediaTransportStateMessage>(payload) is { } state:
                     if (state.State is "failed" or "closed" && FindSession(state.Session) is { } lost)
@@ -531,23 +560,15 @@ public sealed class MediaTransportClient : IAsyncDisposable
             }
             _logger.LogInformation("Call media moved to the datagram path ({Path})", session.Peer?.Path?.Describe() ?? "UDP");
             if (superseded is not null) await CloseSessionAsync(superseded, notifyRelay: false);
-            await ReportStalledAsync(session.Id);
+            await EvaluatePathAsync(_clock());
             Raise();
             return;
         }
         if (state == RtcChannelState.Stalled)
         {
             // The path under an open channel went quiet (or is being rebuilt by an ICE restart). ActivePeer is null
-            // until it is back, so the pacer sends on the socket; the session is kept, since ICE may recover by itself.
-            lock (_sync)
-            {
-                if (session.Closed || !session.Opened || !ReferenceEquals(_active, session)) return;
-                _reason = "stalled";
-            }
-            _logger.LogInformation("The datagram media path stalled; media continues on the WebSocket until it recovers");
-            await ReportStalledAsync(session.Id);
-            PathLostNow();
-            Raise();
+            // until it is back and the hysteresis lets media return; the session is kept, ICE may recover by itself.
+            await EvaluatePathAsync(_clock());
             return;
         }
         if (state is RtcChannelState.Failed or RtcChannelState.Closed)

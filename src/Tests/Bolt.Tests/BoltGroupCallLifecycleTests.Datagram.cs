@@ -21,6 +21,7 @@ public sealed partial class BoltGroupCallLifecycleTests
         {
             Peers = network.Factory(RtcPeerRole.Answer), IceServers = ice, RequestSpacingSeconds = builder.Spacing,
             MaxRequestsPerConnection = builder.MaxRequests, RenewBefore = builder.RenewBefore,
+            PathHysteresis = builder.Hysteresis ?? new DatagramHysteresisOptions(),
         };
     }
 
@@ -29,6 +30,7 @@ public sealed partial class BoltGroupCallLifecycleTests
         public int Spacing = 0;
         public int MaxRequests = 30;
         public TimeSpan RenewBefore = TimeSpan.FromMinutes(5);
+        public DatagramHysteresisOptions? Hysteresis;
     }
 
     private static async Task<T> AwaitTransport<T>(Peer peer, MediaTransportKind kind, Func<T, bool>? match = null, int skip = 0) where T : class
@@ -78,6 +80,9 @@ public sealed partial class BoltGroupCallLifecycleTests
         var relay = network.Created.Single(x => x.Role == RtcPeerRole.Answer && ReferenceEquals(x.Partner, participant));
         return (relay, participant, config.Session);
     }
+
+    /// <summary>For tests of the mechanics of leaving and returning, not of the hysteresis (DatagramPathHysteresisTests).</summary>
+    internal static readonly DatagramHysteresisOptions QuickPath = new() { FirstHoldMs = 0, MaxHoldMs = 0, HealthyForMs = 0, MaxFlaps = 100 };
 
     private static int MediaOn(FakeRtcPeer peer, FrameType type = FrameType.MediaFrame) => peer.Sent.Count(x => x[0] == (byte)type);
 
@@ -489,7 +494,7 @@ public sealed partial class BoltGroupCallLifecycleTests
         // The phone hears nothing on its channel (its ICE went quiet) while the relay still hears the phone: only the
         // phone knows the downlink is dead. It says so over its socket, and says so again when the channel is back.
         var network = new FakeRtcNetwork();
-        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource(), x => x.Hysteresis = QuickPath));
         f.Policy.Accepted.UnionWith(f.Peers.Keys);
         foreach (var id in f.Peers.Keys) await f.Join(id);
         var (relay, _, session) = await OpenDatagramAsync(f, network, "a");

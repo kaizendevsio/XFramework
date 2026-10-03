@@ -6,7 +6,7 @@ namespace Bolt.Tests;
 public sealed class DatagramPathHysteresisTests
 {
     [Test]
-    public void APathThatFlapsEverySecond_IsLeftAtOnce_ReturnsOnlyAfterTheHoldAndSustainedHealth_ThenIsGivenUp()
+    public void APathThatBlipsEveryFewSeconds_IsLeftOnce_AndNotUsedAgainWhileItKeepsBlipping()
     {
         var path = new DatagramPathHysteresis();
         Assert.That(path.Observe(true, 0), Is.True, "the first open needs no proof");
@@ -15,9 +15,24 @@ public sealed class DatagramPathHysteresisTests
             path.Observe(t / 500 % 8 != 0, t);
         Assert.Multiple(() =>
         {
-            Assert.That(path.GivenUp, Is.True, "a path that keeps flapping is given up for the call");
+            Assert.That(path.Usable, Is.False, "never 5 s healthy in a row: media stays on the WebSocket");
+            Assert.That(path.Switches, Is.EqualTo(2), "onto the path once and off it once, not once per blip");
+        });
+    }
+
+    [Test]
+    public void APathThatComesBackAndFailsAgain_IsGivenUpAfterThreeFlaps()
+    {
+        var path = new DatagramPathHysteresis();
+        path.Observe(true, 0);
+        // Bad for a second every 80 s: long enough to come back each time, then it fails again.
+        for (var t = 500L; t <= 400_000; t += 500)
+            path.Observe(t % 80_000 != 0, t);
+        Assert.Multiple(() =>
+        {
+            Assert.That(path.GivenUp, Is.True);
             Assert.That(path.Usable, Is.False);
-            Assert.That(path.Switches, Is.LessThanOrEqualTo(2 * path.Options.MaxFlaps), "switches are bounded, not one per blip");
+            Assert.That(path.Switches, Is.EqualTo(2 * path.Options.MaxFlaps), "opened, then left three times and back twice");
         });
     }
 
@@ -47,6 +62,6 @@ public sealed class DatagramPathHysteresisTests
         path.Observe(false, 1);
         Assert.That(path.GivenUp, Is.True);
         path.Reset();
-        Assert.That(path.Observe(true, 2), Is.True);
+        Assert.That(path.Observe(true, 2), Is.True, "after a network change a healthy path is used at once");
     }
 }

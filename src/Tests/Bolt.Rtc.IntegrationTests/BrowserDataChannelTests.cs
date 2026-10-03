@@ -103,8 +103,11 @@ public sealed class BrowserDataChannelTests
             try { if (socket.State == WebSocketState.Open) await socket.SendAsync(bytes, WebSocketMessageType.Text, true, CancellationToken.None); }
             finally { sendGate.Release(); }
         }
+        // ?relay=udp,tcp gives the relay's peer TURN over TCP as well (as a host allowing TCP would); UDP must still win.
+        var relayUrls = (context.Request.Query["relay"].ToString() is { Length: > 0 } relayList ? relayList : "udp").Split(',')
+            .Select(transport => $"turn:{_turnHost}:3478?transport={transport}").ToArray();
         var peer = await _sidecar!.CreateAsync(RtcPeerRole.Answer, new RtcPeerOptions(
-            [Turn($"turn:{_turnHost}:3478?transport=udp", "relay")], RelayOnly: true, RtcDefaults.MaxMessageBytes, 128 * 1024), CancellationToken.None);
+            [.. relayUrls.Select(url => Turn(url, "relay"))], RelayOnly: true, RtcDefaults.MaxMessageBytes, 128 * 1024), CancellationToken.None);
         _relayPeers.Enqueue(peer);
         var relay = _relays[id] = new RelaySide(peer);
         var started = Environment.TickCount64;
@@ -161,8 +164,8 @@ public sealed class BrowserDataChannelTests
           }
         };
         const { createPeer } = await import('./bolt-rtc.js');
-        window.runCall = async ({ id, iceServers, policy, count, timeoutMs }) => {
-          const ws = new WebSocket(`ws://${location.host}/signal?id=${id}`);
+        window.runCall = async ({ id, iceServers, policy, count, timeoutMs, relay }) => {
+          const ws = new WebSocket(`ws://${location.host}/signal?id=${id}&relay=${relay || ''}`);
           await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
           const result = { states: [], path: null, echoed: 0, opened: false, supported: typeof RTCPeerConnection === 'function', bad: 0, candidates: [] };
           let opened; const open = new Promise(resolve => opened = resolve);
@@ -285,7 +288,8 @@ public sealed class BrowserDataChannelTests
     }
     private sealed record BrowserPath(string Local, string LocalProtocol, string? RelayProtocol, string Remote, double RttMs);
 
-    private async Task<(CallResult Browser, ServerResult? Relay)> CallAsync(string engine, RtcIceServer[] browserServers, int count = 200, int timeoutMs = 15000)
+    private async Task<(CallResult Browser, ServerResult? Relay)> CallAsync(string engine, RtcIceServer[] browserServers, int count = 200, int timeoutMs = 15000,
+        string relayTransports = "udp")
     {
         IBrowser browser;
         try
@@ -316,6 +320,7 @@ public sealed class BrowserDataChannelTests
             id,
             iceServers = browserServers.Select(x => new { urls = x.Urls, username = x.Username, credential = x.Credential }),
             policy = "relay",
+            relay = relayTransports,
             count,
             timeoutMs,
         });
@@ -399,6 +404,23 @@ public sealed class BrowserDataChannelTests
             Assert.That(received, Is.GreaterThanOrEqualTo(result.Sent * 9 / 10), "what the browser sent reached the relay");
             Assert.That(result.StuckMs, Is.LessThan(2000), "a working channel never sits full without draining for the stall window");
             Assert.That(result.DrainedAfterStop, Is.True, "the buffered amount empties once sending stops");
+        });
+    }
+
+    [TestCase("chromium")]
+    [TestCase("webkit")]
+    public async Task WithUdpAndTcpTurnOnBothSides_BothLegsUseUdp(string engine)
+    {
+        // Production 12:45-12:54 UTC: every relay leg opened over TLS to TURN and stalled on each keyframe. Where UDP
+        // works, both legs must be UDP, whatever else is on offer.
+        var (browser, relay) = await CallAsync(engine,
+            [Turn($"turn:{_turnHost}:3478?transport=tcp", "browser"), Turn($"turn:{_turnHost}:3478?transport=udp", "browser")], relayTransports: "tcp,udp");
+        if (!browser.Supported) Assert.Ignore($"{engine} has no RTCPeerConnection here.");
+        Assert.Multiple(() =>
+        {
+            Assert.That(browser.Opened, Is.True, browser.ToString());
+            Assert.That(relay?.Path, Is.EqualTo("UDP/relay"), "the relay's leg to TURN is UDP; " + browser);
+            Assert.That(browser.Path?.RelayProtocol ?? "udp", Is.EqualTo("udp"), "and so is the browser's; " + browser);
         });
     }
 

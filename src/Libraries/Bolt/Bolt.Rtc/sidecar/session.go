@@ -147,9 +147,10 @@ func (s *session) start(h hello) error {
 		settings.SetSCTPMinCwnd(minCwnd)
 	}
 	settings.EnableSCTPZeroChecksum(true)
-	// Disconnected after 3 s without a packet (a keepalive goes every second, so a working path is never that
-	// quiet): the host then stops sending media here and uses the WebSocket until ICE is connected again.
-	settings.SetICETimeouts(3*time.Second, 15*time.Second, 1*time.Second)
+	// Disconnected after 5 s without a packet (a keepalive goes every second): the host then stops sending media here
+	// and its hysteresis keeps media on the WebSocket for a while. Not shorter: a leg to TURN over TCP (only when the
+	// host allows it) queues keepalives behind a keyframe, and 3 s turned every keyframe into a path switch.
+	settings.SetICETimeouts(5*time.Second, 20*time.Second, 1*time.Second)
 	// mDNS host candidates are for browsers hiding LAN addresses; the relay never needs them, and the
 	// multicast listener would be one more socket open on the host.
 	settings.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
@@ -202,8 +203,20 @@ func (s *session) start(h hello) error {
 		})
 	}
 
+	gathered := map[string]int{}
+	var gatheredMu sync.Mutex
 	pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
 		message := candidateMessage{}
+		gatheredMu.Lock()
+		if candidate == nil {
+			// What this side can offer, for the host's log: no addresses, only kinds. A relay that only has a TLS or TCP
+			// leg to TURN (or none) is the first thing to know when a datagram path will not carry media well.
+			s.logger.Printf("session %d: gathered %v", s.id, gathered)
+			gathered = map[string]int{}
+		} else {
+			gathered[candidateKind(candidate)]++
+		}
+		gatheredMu.Unlock()
 		if candidate != nil {
 			init := candidate.ToJSON()
 			message = candidateMessage{Candidate: init.Candidate, SDPMid: init.SDPMid, SDPMLineIndex: init.SDPMLineIndex}
@@ -213,6 +226,24 @@ func (s *session) start(h hello) error {
 	pc.OnICEConnectionStateChange(func(webrtc.ICEConnectionState) { s.sendState() })
 	pc.OnConnectionStateChange(func(webrtc.PeerConnectionState) { s.sendState() })
 	return nil
+}
+
+// candidateKind names a candidate by type and, for a relay candidate, its leg to the TURN server. pion encodes that
+// leg in the local preference (UDP 3, DTLS 2, TCP 1, TLS 0), the middle bits of the priority.
+func candidateKind(candidate *webrtc.ICECandidate) string {
+	if candidate.Typ != webrtc.ICECandidateTypeRelay {
+		return candidate.Typ.String() + "/" + candidate.Protocol.String()
+	}
+	switch (candidate.Priority >> 8) & 0xFFFF {
+	case 3:
+		return "relay/udp"
+	case 2:
+		return "relay/dtls"
+	case 1:
+		return "relay/tcp"
+	default:
+		return "relay/tls"
+	}
 }
 
 // isMediaChannel accepts only what the relay can rely on: the media label, unordered, no retransmission.

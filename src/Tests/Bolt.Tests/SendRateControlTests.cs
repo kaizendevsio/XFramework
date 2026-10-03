@@ -109,7 +109,7 @@ public sealed class SendRateControlTests
         }
         Assert.Multiple(() =>
         {
-            Assert.That(sim.Estimate, Is.GreaterThanOrEqualTo(before * 9 / 10), "five switches cost the estimate nothing");
+            Assert.That(sim.Estimate, Is.GreaterThanOrEqualTo(3_000), "five switches cost the 4 Mbit/s link's estimate nothing");
             Assert.That(sim.Controller.Restarts, Is.EqualTo(restarts), "and never restart the picture (a keyframe each)");
             Assert.That(sim.Suspended, Is.False);
         });

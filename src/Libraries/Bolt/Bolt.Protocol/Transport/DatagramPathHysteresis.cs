@@ -73,12 +73,15 @@ public sealed class DatagramPathHysteresis(DatagramHysteresisOptions? options = 
         }
     }
 
-    /// <summary>A new network: the old path's history no longer says anything.</summary>
+    /// <summary>
+    /// A new network: the old path's flaps and holds no longer say anything. A path in use stays in use; one that was
+    /// held comes back as soon as it is healthy, like a first open.
+    /// </summary>
     public void Reset()
     {
         lock (_sync)
         {
-            _usable = _everUsable = false;
+            if (!_usable) _everUsable = false;
             Flaps = 0;
             _holdUntil = long.MinValue;
             _healthySince = null;

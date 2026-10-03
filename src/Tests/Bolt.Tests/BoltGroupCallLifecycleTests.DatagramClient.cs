@@ -21,6 +21,13 @@ public sealed partial class BoltGroupCallLifecycleTests
         MaxRetryDelay = TimeSpan.FromSeconds(1), ReportInterval = TimeSpan.FromMilliseconds(200),
     };
 
+    /// <summary><see cref="FastClient"/> that leaves and returns without hysteresis, for tests of those mechanics.</summary>
+    private static readonly MediaTransportClientOptions QuickClient = new()
+    {
+        OpenTimeout = TimeSpan.FromMilliseconds(600), FirstRetryDelay = TimeSpan.FromMilliseconds(300),
+        MaxRetryDelay = TimeSpan.FromSeconds(1), ReportInterval = TimeSpan.FromMilliseconds(200), PathHysteresis = QuickPath,
+    };
+
     private sealed class Participant : IAsyncDisposable
     {
         public required BoltClient Client { get; init; }
@@ -91,7 +98,7 @@ public sealed partial class BoltGroupCallLifecycleTests
         f.Policy.Accepted.UnionWith(f.Peers.Keys);
         foreach (var id in f.Peers.Keys) await f.Join(id);
         var stream = await f.Config("a");
-        await using var a = Connect(f, "a", network);
+        await using var a = Connect(f, "a", network, QuickClient);
         var changes = new List<MediaPathStatus>();
         a.Transport.StatusChanged += status => { lock (changes) changes.Add(status); };
         var audio = Frame(w => BoltCodec.WriteMediaFrame(w, stream, 1, 960, MediaFrameFlags.Encrypted, [1, 2, 3]));
@@ -198,8 +205,8 @@ public sealed partial class BoltGroupCallLifecycleTests
     public async Task Client_ARestartAnswerThatCannotBeApplied_MovesMediaToTheSocket_AndTriesAgain()
     {
         var network = new FakeRtcNetwork();
-        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
-        await using var a = Connect(f, "a", network);
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource(), x => x.Hysteresis = QuickPath));
+        await using var a = Connect(f, "a", network, QuickClient);
         a.Transport.Start();
         await WaitUntil(() => a.Transport.IsDatagramActive);
         var participant = network.Created.Single(x => x.Role == RtcPeerRole.Offer);
@@ -247,11 +254,11 @@ public sealed partial class BoltGroupCallLifecycleTests
     public async Task Client_AStalledChannel_SendsOnTheSocket_AndTellsTheRelay_UntilItRecovers()
     {
         var network = new FakeRtcNetwork();
-        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource(), x => x.Hysteresis = QuickPath));
         f.Policy.Accepted.UnionWith(f.Peers.Keys);
         foreach (var id in f.Peers.Keys) await f.Join(id);
         var stream = await f.Config("a");
-        await using var a = Connect(f, "a", network);
+        await using var a = Connect(f, "a", network, QuickClient);
         a.Transport.Start();
         await WaitUntil(() => a.Transport.IsDatagramActive);
         var audio = Frame(w => BoltCodec.WriteMediaFrame(w, stream, 1, 960, MediaFrameFlags.Encrypted, [1, 2, 3]));
