@@ -231,6 +231,45 @@ public sealed class BoltCallCongestionTests
     }
 
     [Test]
+    public void Pacer_ALoneKeyframeBiggerThanTheBudget_IsSent_NotCountedAsAnOverflow()
+    {
+        // On a fast path the ladder reaches a picture whose keyframe alone is bigger than the queue budget (2160p at
+        // 14 Mbit/s: about 350 KB against 256 KB). Nothing else is queued: that is one picture, not a queue. Dropping it
+        // as a base-layer loss told the rate controller the queue had overflowed: it cut tenfold and suspended video
+        // on a 20 Mbit/s link (call-network-harness, ws-20mbit-20ms and udp-20mbit-20ms).
+        var now = 0L;
+        var pacer = new MediaSendPacer((_, _) => ValueTask.CompletedTask,
+            options: new MediaSendPacerOptions { VideoMaxQueuedBytes = 1_000, VideoMaxDelayMs = 500 }, clock: () => now);
+        var keyframes = 0;
+        pacer.KeyframeNeeded += () => keyframes++;
+        Assert.That(pacer.EnqueueVideo(Picture(true, 0, 1, 4, 400)), Is.True, "1600 bytes against a 1000-byte budget, alone");
+        var sample = pacer.Sample();
+        Assert.Multiple(() =>
+        {
+            Assert.That(sample.BaseLosses, Is.Zero);
+            Assert.That(sample.DroppedPictures, Is.Zero);
+            Assert.That(keyframes, Is.Zero);
+            Assert.That(pacer.IsAwaitingKeyframe, Is.False);
+        });
+    }
+
+    [Test]
+    public void Pacer_APictureTooLargeToCarry_AsksForAKeyframe_ButIsNotCongestion()
+    {
+        var pacer = new MediaSendPacer((_, _) => ValueTask.CompletedTask);
+        var keyframes = 0;
+        pacer.KeyframeNeeded += () => keyframes++;
+        pacer.NotePictureTooLarge(0);
+        var sample = pacer.Sample();
+        Assert.Multiple(() =>
+        {
+            Assert.That(sample.BaseLosses, Is.Zero, "an encoder picture over the transport bound says nothing about the link");
+            Assert.That(pacer.IsAwaitingKeyframe, Is.True, "but the stream still needs a keyframe");
+            Assert.That(keyframes, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
     public void Pacer_OverBudget_ShedsEnhancementPicturesFirst_ThenWaitsForAKeyframe()
     {
         var now = 0L;

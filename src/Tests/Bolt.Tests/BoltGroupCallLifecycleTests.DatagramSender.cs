@@ -76,8 +76,11 @@ public sealed partial class BoltGroupCallLifecycleTests
         foreach (var line in log) TestContext.Out.WriteLine(line);
         Assert.Multiple(() =>
         {
-            Assert.That(result.SuspendedTicks, Is.Zero, "a fast clean path never suspends video");
-            Assert.That(result.FinalVideoKbps, Is.GreaterThan(800), "and the picture climbs");
+            var story = Environment.NewLine + string.Join(Environment.NewLine, log);
+            Assert.That(result.SuspendedTicks, Is.Zero, "a fast clean path never suspends video" + story);
+            // A keyframe burst can still cost one cut (the phone side here is pion without a window floor), so the test
+            // asks for the climb, not for where a 20 s run happens to end.
+            Assert.That(result.PeakVideoKbps, Is.GreaterThan(1200), "and the picture climbs" + story);
             Assert.That(sender.Transport.IsDatagramActive, Is.True);
         });
     }
@@ -112,7 +115,7 @@ public sealed partial class BoltGroupCallLifecycleTests
         });
     }
 
-    internal sealed record SenderResult(int SuspendedTicks, int FinalVideoKbps, int FinalEstimate);
+    internal sealed record SenderResult(int SuspendedTicks, int FinalVideoKbps, int FinalEstimate, int PeakVideoKbps);
 
     /// <summary>The browser's send path over a synthetic encoder; the receiver answers with the browser's delay reports.</summary>
     private static async Task<SenderResult> RunSenderAsync(BoltClient senderClient, MediaTransportClient datagram, BoltClient? receiverClient,
@@ -160,6 +163,7 @@ public sealed partial class BoltGroupCallLifecycleTests
         var stop = new CancellationTokenSource(duration);
         var suspended = false;
         var suspendedTicks = 0;
+        var peakVideo = 0;
         var audioSequence = 0u;
         var videoSequence = 0u;
         var random = new Random(7);
@@ -238,6 +242,7 @@ public sealed partial class BoltGroupCallLifecycleTests
             if (tick.ResumeVideo) suspended = false;
             if (suspended) suspendedTicks++;
             if (tick.Video is { } next) setting = next;
+            if (!suspended) peakVideo = Math.Max(peakVideo, setting.BitrateKbps);
             if (clock.ElapsedMilliseconds - lastLog >= 1000)
             {
                 lastLog = clock.ElapsedMilliseconds;
@@ -249,6 +254,6 @@ public sealed partial class BoltGroupCallLifecycleTests
         }
         await Task.WhenAll(audioLoop, videoLoop, feedbackLoop);
         await pacer.DisposeAsync();
-        return new SenderResult(suspendedTicks, suspended ? 0 : setting.BitrateKbps, tick.Decision.TotalKbps);
+        return new SenderResult(suspendedTicks, suspended ? 0 : setting.BitrateKbps, tick.Decision.TotalKbps, peakVideo);
     }
 }
