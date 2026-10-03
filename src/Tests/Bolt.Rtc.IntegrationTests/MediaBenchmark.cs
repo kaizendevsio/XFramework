@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Bolt.Protocol.Transport;
 using Microsoft.Playwright;
 using NUnit.Framework;
 
@@ -33,6 +34,7 @@ public sealed class MediaBenchmark
     {
         if (Env("BENCH_MODE") is not { } mode || Env("BOLT_RTC_TURN_SECRET") is not { } secret)
         {
+            // The Bolt runs also need BOLT_RTC_SIDECAR: their relay is the production WebRTC endpoint.
             Assert.Ignore("Set BENCH_MODE (native, bolt-before, bolt-after) and BOLT_RTC_TURN_SECRET (see call-media-benchmark.yml).");
             return;
         }
@@ -51,6 +53,62 @@ public sealed class MediaBenchmark
             var type = Path.GetExtension(file) switch { ".wasm" => "application/wasm", ".js" or ".mjs" => "text/javascript", _ => "application/octet-stream" };
             return Results.File(file, type);
         });
+        // The relay for the Bolt runs: the production WebRTC endpoint (the bolt-rtc sidecar through RtcSidecar), relay-only on
+        // its own TURN address (127.0.0.4), with the production SCTP window floor; it forwards between the two browsers.
+        await using var sidecar = Env("BOLT_RTC_SIDECAR") is { } sidecarPath ? new RtcSidecar(new RtcSidecarOptions { ExecutablePath = sidecarPath }) : null;
+        var relays = new System.Collections.Concurrent.ConcurrentDictionary<string, IRtcPeer>();
+        app.UseWebSockets();
+        app.Map("/relay", async context =>
+        {
+            if (!context.WebSockets.IsWebSocketRequest || sidecar is null) { context.Response.StatusCode = 400; return; }
+            var id = context.Request.Query["id"].ToString();
+            var partner = id.EndsWith("-sender", StringComparison.Ordinal) ? id[..^7] + "-receiver" : id[..^9] + "-sender";
+            using var socket = await context.WebSockets.AcceptWebSocketAsync();
+            var gate = new SemaphoreSlim(1, 1);
+            async Task Send(object message)
+            {
+                var bytes = JsonSerializer.SerializeToUtf8Bytes(message);
+                await gate.WaitAsync();
+                try { if (socket.State == System.Net.WebSockets.WebSocketState.Open) await socket.SendAsync(bytes, System.Net.WebSockets.WebSocketMessageType.Text, true, CancellationToken.None); }
+                finally { gate.Release(); }
+            }
+            var direct = Env("BENCH_DIRECT") == "1";
+            var peer = await sidecar.CreateAsync(RtcPeerRole.Answer, new RtcPeerOptions(
+                direct ? [] : [ToIceServer(Turn("127.0.0.4", secret, "relay"))], RelayOnly: !direct, RtcDefaults.MaxMessageBytes,
+                MinCwndBytes: 128 * 1024, AllowLoopback: direct), CancellationToken.None);
+            relays[id] = peer;
+            peer.LocalCandidate += candidate => _ = Send(new { type = "candidate", candidate = candidate.Candidate, sdpMid = candidate.SdpMid, sdpMLineIndex = candidate.SdpMLineIndex });
+            peer.Message += data => { if (relays.TryGetValue(partner, out var other)) other.TrySend(data.Span); };
+            var buffer = new byte[64 * 1024];
+            try
+            {
+                while (socket.State == System.Net.WebSockets.WebSocketState.Open)
+                {
+                    var received = await socket.ReceiveAsync(buffer, CancellationToken.None);
+                    if (received.MessageType == System.Net.WebSockets.WebSocketMessageType.Close) break;
+                    using var message = JsonDocument.Parse(buffer.AsMemory(0, received.Count));
+                    var root = message.RootElement;
+                    switch (root.GetProperty("type").GetString())
+                    {
+                        case "offer":
+                            await Send(new { type = "answer", sdp = await peer.AnswerAsync(root.GetProperty("sdp").GetString()!, CancellationToken.None) });
+                            break;
+                        case "candidate":
+                            await peer.AddCandidateAsync(new RtcCandidate(root.GetProperty("candidate").GetString() ?? "",
+                                root.TryGetProperty("sdpMid", out var mid) && mid.ValueKind == JsonValueKind.String ? mid.GetString() : null,
+                                root.TryGetProperty("sdpMLineIndex", out var index) && index.ValueKind == JsonValueKind.Number ? index.GetInt32() : null),
+                                CancellationToken.None);
+                            break;
+                    }
+                }
+            }
+            catch (System.Net.WebSockets.WebSocketException) { }
+            finally
+            {
+                relays.TryRemove(id, out _);
+                await peer.DisposeAsync();
+            }
+        });
         await app.StartAsync();
         var origin = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
 
@@ -64,7 +122,7 @@ public sealed class MediaBenchmark
         IBrowser browser;
         try { browser = await playwright.Chromium.LaunchAsync(new(launch) { Channel = Env("BENCH_CHANNEL") ?? "chrome" }); }
         catch (PlaywrightException) { browser = await playwright.Chromium.LaunchAsync(launch); }
-        await using var _ = browser;
+        await using var ownedBrowser = browser;
         var page = await browser.NewPageAsync();
         var console = new List<string>();
         page.Console += (_, message) => { lock (console) if (console.Count < 200) console.Add($"{message.Type}: {message.Text}"); };
@@ -145,7 +203,14 @@ public sealed class MediaBenchmark
         return counters;
     }
 
-    /// <summary>TURN REST credentials (coturn use-auth-secret), UDP only, for one of coturn's two listening addresses.</summary>
+    private static RtcIceServer ToIceServer(object turn)
+    {
+        var element = JsonSerializer.SerializeToElement(turn);
+        return new RtcIceServer([.. element.GetProperty("urls").EnumerateArray().Select(x => x.GetString()!)],
+            element.GetProperty("username").GetString(), element.GetProperty("credential").GetString());
+    }
+
+    /// <summary>TURN REST credentials (coturn use-auth-secret), UDP only, for one of coturn's listening addresses.</summary>
     private static object Turn(string host, string secret, string label)
     {
         var username = $"{DateTimeOffset.UtcNow.AddMinutes(30).ToUnixTimeSeconds()}:{label}";

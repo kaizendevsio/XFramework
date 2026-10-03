@@ -49,6 +49,17 @@ jobs:
         with:
           dotnet-version: 10.x
 
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: src/Libraries/Bolt/Bolt.Rtc/sidecar/go.mod
+          cache-dependency-path: src/Libraries/Bolt/Bolt.Rtc/sidecar/go.sum
+
+      - name: Build the relay's WebRTC sidecar
+        shell: bash
+        working-directory: src/Libraries/Bolt/Bolt.Rtc/sidecar
+        run: CGO_ENABLED=0 go build -trimpath -o "$RUNNER_TEMP/bolt-rtc" .
+
       - name: Enable netem
         shell: bash
         run: |
@@ -63,10 +74,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # One TURN address per peer, so each leg can be shaped and counted on its own. UDP only, as Yap configures it.
+          # One TURN address per side (sender .2, receiver .3, the Bolt relay .4), so each leg can be shaped and counted on
+          # its own. UDP only, as Yap configures it.
           docker run --detach --name coturn --network host \
             coturn/coturn:4.18.0-debian@sha256:bbefd3e1fdfdc0d58770fe01b581fd8b00d9f3a5580d00acb77cf719a6bc78e3 \
-            -n --log-file=stdout --listening-ip=127.0.0.2 --listening-ip=127.0.0.3 --relay-ip=127.0.0.1 --listening-port=3478 \
+            -n --log-file=stdout --listening-ip=127.0.0.2 --listening-ip=127.0.0.3 --listening-ip=127.0.0.4 --relay-ip=127.0.0.1 --listening-port=3478 \
             --use-auth-secret --static-auth-secret=ci-turn-secret --realm=bolt.test --fingerprint \
             --no-tls --no-tcp-relay --allow-loopback-peers --min-port=49160 --max-port=49400
           for attempt in $(seq 1 30); do
@@ -89,6 +101,7 @@ jobs:
         shell: bash
         env:
           BENCH_SECONDS: ${{ github.event.inputs.seconds || '60' }}
+          BOLT_RTC_SIDECAR: ${{ runner.temp }}/bolt-rtc
           SCENARIO: ${{ matrix.scenario }}
           DOWNLINK: ${{ matrix.downlink }}
           UPLINK: ${{ matrix.uplink }}

@@ -2,15 +2,22 @@
 // (a) native WebRTC media (RTCPeerConnection tracks, with an SFrame-sized encoded transform) and
 // (b) Bolt's datagram path: WebCodecs with the production encoder configuration, the production SFrame adapter (WASM),
 //     Bolt MediaFrame framing and video fragmentation, on an unordered, unretransmitted "bolt-media" data channel.
-// Both peers live in this page and reach each other only through TURN (relay-only, a different TURN address per side),
-// so the test host can shape the receiver's leg with netem and count bytes per leg with iptables.
+// Both browsers' peers live in this page and reach the far end only through TURN (relay-only, a different TURN address
+// per side), so the test host can shape the receiver's leg with netem and count bytes per leg with iptables.
 //
-// What (b) is and is not: the wire format, the encryption and the encoder settings are the product's own modules. The
-// receiver's loss recovery (NACK timing, picture hold, give-up rules) is a line-by-line port of VideoRecoveryBuffer.
-// There is no relay in the middle and no rate control: the product's .NET pipeline (pacer, SendRateController, the
-// relay's retransmission cache) is measured by the call network harness instead. Native WebRTC runs its own GCC.
+// Topology. Native WebRTC goes peer to peer through TURN. Bolt goes as in production: each browser's data channel
+// (the production bolt-rtc.js) runs to the relay's own WebRTC endpoint (the bolt-rtc sidecar, relay-only, with the
+// production SCTP window floor), which forwards between them; so the receiver's lossy leg is driven by the relay's
+// SCTP, as a phone's downlink is.
+//
+// What (b) is and is not: the wire format, the encryption, the channel and the encoder settings are the product's own
+// modules. The receiver's loss recovery (NACK timing, picture hold, give-up rules) is a line-by-line port of
+// VideoRecoveryBuffer. The relay here only forwards (NACKs go to the sender; the real relay answers most from its
+// cache, one hop), and nothing runs rate control: the product's .NET pipeline (pacer, SendRateController, lanes) is
+// measured by the call network harness instead. Native WebRTC runs its own GCC.
 import { initializeSFrame, SFrameSession } from './bolt-sframe.mjs';
 import { encoderConfig, opusEncoderConfig, probeTemporalModes, temporalModeFor } from './bolt-media.js';
+import { createPeer } from './bolt-rtc.js';
 
 const MESSAGE_BYTES = 1150;           // RtcDefaults.MaxMessageBytes
 const MEDIA_HEADER = 30;              // BoltCodec.MediaFrameHeaderSize
@@ -455,19 +462,35 @@ class RecoveryBuffer {
     }
 }
 
+/// One browser's production data channel (bolt-rtc.js) to the test host's relay, signalled over a WebSocket.
+async function relayChannel(id, turn) {
+    const socket = new WebSocket(`ws://${location.host}/relay?id=${id}`);
+    await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
+    let opened; const open = new Promise(resolve => opened = resolve);
+    const channel = { onmessage: null, rttMs: null, socket };
+    const dotnet = { invokeMethodAsync: async (method, ...args) => {
+        if (method === 'OnCandidate') socket.send(JSON.stringify({ type: 'candidate', candidate: args[0], sdpMid: args[1], sdpMLineIndex: args[2] }));
+        else if (method === 'OnState' && args[0] === 'open') opened();
+        else if (method === 'OnMessage') channel.onmessage?.(args[0]);
+        else if (method === 'OnPath' && args[4] > 0) channel.rttMs = args[4];
+    } };
+    const peer = channel.peer = createPeer(dotnet, { iceServers: turn ? [turn] : [], iceTransportPolicy: turn ? 'relay' : 'all', maxMessageBytes: MESSAGE_BYTES });
+    socket.onmessage = async event => {
+        const message = JSON.parse(event.data);
+        if (message.type === 'answer') await peer.setAnswer(message.sdp);
+        else if (message.type === 'candidate') await peer.addCandidate(message.candidate, message.sdpMid, message.sdpMLineIndex);
+    };
+    socket.send(JSON.stringify({ type: 'offer', sdp: await peer.createOffer(false) }));
+    await Promise.race([open, sleep(20000).then(() => { throw new Error(`The ${id} channel did not open`); })]);
+    return channel;
+}
+
 async function runBolt(options, source) {
     await initializeSFrame();
-    const config = turn => turn ? { iceServers: [turn], iceTransportPolicy: 'relay' } : {};
-    const pc1 = new RTCPeerConnection(config(options.turnSender));
-    const pc2 = new RTCPeerConnection(config(options.turnReceiver));
-    // The production channel: unordered and never retransmitted (bolt-rtc.js refuses anything else).
-    const sendChannel = pc1.createDataChannel('bolt-media', { ordered: false, maxRetransmits: 0 });
-    sendChannel.binaryType = 'arraybuffer';
-    const received = new Promise(resolve => { pc2.ondatachannel = event => resolve(event.channel); });
-    await connect(pc1, pc2);
-    const receiveChannel = await received;
-    receiveChannel.binaryType = 'arraybuffer';
-    while (sendChannel.readyState !== 'open') await sleep(20);
+    const run = crypto.randomUUID().slice(0, 8);
+    const [sender, receiver] = await Promise.all([relayChannel(`${run}-sender`, options.turnSender), relayChannel(`${run}-receiver`, options.turnReceiver)]);
+    const sendChannel = { send: bytes => sender.peer.send(bytes), get bufferedAmount() { return sender.peer.bufferedAmount(); } };
+    const receiveChannel = { send: bytes => receiver.peer.send(bytes) };
 
     // SFrame epoch exactly as Yap installs it: random keys and KIDs per member, the roster binding, compact or not.
     const call = crypto.randomUUID();
@@ -487,8 +510,7 @@ async function runBolt(options, source) {
         audioSent: 0, audioReceived: 0, videoFrames: 0, overhead: 0 };
     let measuring = false;
     const send = (bytes, mediaBytes = 0) => {
-        if (sendChannel.readyState !== 'open' || sendChannel.bufferedAmount > 256 * 1024) { counters.dropped++; return false; }
-        sendChannel.send(bytes);
+        if (sendChannel.bufferedAmount > 256 * 1024 || !sendChannel.send(bytes)) { counters.dropped++; return false; }
         if (measuring) { counters.messages++; counters.messageBytes += bytes.length; counters.mediaBytes += mediaBytes; }
         return true;
     };
@@ -555,8 +577,7 @@ async function runBolt(options, source) {
     const stopAudio = readTrack(source.audio, data => { try { audioEncoder.encode(data); } finally { data.close(); } });
 
     // Sender side of the reverse direction: NACKs answered from the retransmission buffer, keyframe requests honoured.
-    sendChannel.onmessage = event => {
-        const bytes = new Uint8Array(event.data);
+    sender.onmessage = bytes => {
         if (bytes[0] === FrameType.MediaKeyRequest) { if (now() - lastKeyframe >= 1000) keyframeWanted = true; return; }
         if (bytes[0] !== FrameType.NackRequest || !options.nack) return;
         const view = new DataView(bytes.buffer);
@@ -597,8 +618,7 @@ async function runBolt(options, source) {
         if (measuring) counters.nackRequests++;
     };
     const audioSeen = new Set();
-    receiveChannel.onmessage = event => {
-        const frame = new Uint8Array(event.data);
+    receiver.onmessage = frame => {
         if (frame[0] !== FrameType.MediaFrame || frame.length < MEDIA_HEADER) return;
         const view = new DataView(frame.buffer);
         const seq = view.getUint32(17, true), timestamp = view.getUint32(21, true);
@@ -623,12 +643,13 @@ async function runBolt(options, source) {
         sendNacks(nacks);
         decode(ready);
     }, 20);
-    const rttTimer = setInterval(async () => { const measured = await roundTripMs(pc2); if (measured) { rtt = measured; recovery.configure(rtt); } }, 1000);
+    // The receiver's round trip to the relay, as ICE measures it: what the product's recovery window follows.
+    const rttTimer = setInterval(() => { if (receiver.rttMs) { rtt = receiver.rttMs; recovery.configure(rtt); } }, 1000);
     recovery.configure(rtt);
 
     await sleep(options.warmupSeconds * 1000);
     await window.benchMark?.('start');
-    const before = { sender: await stats(pc1) };
+
     measuring = true;
     metrics.measuring = true;
     const started = now();
@@ -637,20 +658,19 @@ async function runBolt(options, source) {
     metrics.measuring = false;
     const elapsed = (now() - started) / 1000;
     await window.benchMark?.('end');
-    const after = { sender: await stats(pc1) };
+
     clearInterval(poller); clearInterval(rttTimer);
     stopVideo(); stopAudio();
     try { encoder.close(); audioEncoder.close(); decoder.close(); audioDecoder.close(); } catch { }
     tx.dispose(); rx.dispose();
-    pc1.close(); pc2.close();
-    const channelStats = list => list.find(x => x.type === 'data-channel') ?? {};
+    for (const side of [sender, receiver]) { side.peer.close(); side.socket.close(); }
     return {
         seconds: elapsed, rttMs: rtt, compact: options.compact, nack: options.nack,
         audioPacketMs: audioConfig.opus?.frameDuration ? audioConfig.opus.frameDuration / 1000 : 20,
         sframeBytesPerFrame: counters.overhead,
         mediaBytes: counters.mediaBytes,
         packetsSent: counters.messages,
-        channelBytesSent: (channelStats(after.sender).bytesSent ?? 0) - (channelStats(before.sender).bytesSent ?? 0),
+        channelBytesSent: counters.messageBytes, relayed: true,
         audioPacketsSent: counters.audioSent,
         audioDelivered: counters.audioSent ? +(100 * Math.min(counters.audioReceived, counters.audioSent) / counters.audioSent).toFixed(1) : null,
         videoTargetKbps: options.videoKbps,

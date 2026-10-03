@@ -6,7 +6,8 @@
 #
 # The receiver's TURN address is 127.0.0.3: packets from it (TURN to receiver) get the downlink netem (rate, delay,
 # loss), packets to it get the uplink netem (delay), so the receiver's round trip to TURN is the scenario's. The sender
-# (127.0.0.2) is unshaped. Needs coturn listening on both addresses (see call-media-benchmark.yml).
+# (127.0.0.2) and the Bolt relay's own leg (127.0.0.4) are unshaped. Needs coturn on all three addresses and
+# BOLT_RTC_SIDECAR (see call-media-benchmark.yml).
 set -euo pipefail
 scenario=$1 downlink=$2 uplink=$3 video_kbps=$4 audio_ms=$5 out=$6
 mkdir -p "$out"
@@ -28,6 +29,8 @@ sudo iptables -A BENCH -p udp -d 127.0.0.2 --dport 3478 -m comment --comment sen
 sudo iptables -A BENCH -p udp -s 127.0.0.2 --sport 3478 -m comment --comment sender_down
 sudo iptables -A BENCH -p udp -d 127.0.0.3 --dport 3478 -m comment --comment receiver_up
 sudo iptables -A BENCH -p udp -s 127.0.0.3 --sport 3478 -m comment --comment receiver_down
+sudo iptables -A BENCH -p udp -d 127.0.0.4 --dport 3478 -m comment --comment relay_up
+sudo iptables -A BENCH -p udp -s 127.0.0.4 --sport 3478 -m comment --comment relay_down
 
 for mode in native bolt-before bolt-after; do
     echo "::group::$scenario $mode"
