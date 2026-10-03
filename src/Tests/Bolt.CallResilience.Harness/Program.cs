@@ -607,9 +607,12 @@ internal static class Receiver
         long nackRequests = 0;
         void SendNacks(Guid stream)
         {
-            if (nacks.Count == 0) return;
-            var request = Frames.Write(w => BoltCodec.WriteNackRequest(w, stream, nacks.ToArray()));
-            if (datagram!.TrySend(request)) nackRequests++;
+            // At most 64 numbers a request, as the browser sends them.
+            for (var offset = 0; offset < nacks.Count; offset += 64)
+            {
+                var chunk = nacks.GetRange(offset, Math.Min(64, nacks.Count - offset)).ToArray();
+                if (datagram!.TrySend(Frames.Write(w => BoltCodec.WriteNackRequest(w, stream, chunk)))) nackRequests++;
+            }
             nacks.Clear();
         }
         int RecoveryRtt() => datagram?.RttMs is { } rtt ? (int)Math.Round(rtt) : 300;

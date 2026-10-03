@@ -134,4 +134,61 @@ public sealed partial class BoltGroupCallLifecycleTests
         var config = await AwaitTransport<MediaTransportConfig>(f.Peers["a"], MediaTransportKind.Config, x => x.Unavailable is null);
         Assert.That(MediaTransportFeatures.Has(config, MediaTransportFeatures.Nack), Is.False);
     }
+
+    [Test]
+    public async Task Datagram_AFrameTheUplinkOnlyReordered_TakesTheLanes_NotTheRetransmissionShortcut()
+    {
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var (relay, _, _) = await OpenDatagramAsync(f, network, "a");
+        var stream = await f.VideoConfig("b");
+        foreach (var sequence in new uint[] { 1, 2, 4, 3, 5 }) await f.Peers["b"].ProcessAsync(VideoFrame(stream, sequence, keyframe: sequence == 1));
+        await WaitUntil(() => MediaSequences(f.Peers["c"].Sent, stream).Count >= 4);
+        await Task.Delay(100);
+        Assert.Multiple(() =>
+        {
+            Assert.That(Connection(f, "a").RetransmittedFrames, Is.Zero, "nobody asked for 3: no lane policy is bypassed for it");
+            Assert.That(MediaSequences(relay.Sent, stream), Is.EqualTo(MediaSequences(f.Peers["c"].Sent, stream)),
+                "the channel and the socket get what the lanes decide, alike");
+        });
+    }
+
+    [Test]
+    public async Task Datagram_TransportStamps_AreUnwrappedOnce_AndRefusedNestedOrWhenNotOffered()
+    {
+        foreach (var offered in new[] { true, false })
+        {
+            var network = new FakeRtcNetwork();
+            await using var f = await Fixture.CreateAsync(configure: o =>
+            {
+                var transport = Transport(network, new FakeIceSource());
+                o.MediaTransport = new Bolt.Server.BoltMediaTransportOptions
+                {
+                    Peers = transport.Peers, IceServers = transport.IceServers, RequestSpacingSeconds = 0, TransportFeedback = offered,
+                };
+            });
+            f.Policy.Accepted.UnionWith(f.Peers.Keys);
+            foreach (var id in f.Peers.Keys) await f.Join(id);
+            var (_, participant, _) = await OpenDatagramAsync(f, network, "a");
+            var stream = await f.Config("a");
+            byte[] Stamp(ushort sequence, byte[] message)
+            {
+                var stamped = new byte[TransportSequenceCodec.HeaderSize + message.Length];
+                TransportSequenceCodec.Write(stamped, sequence, message);
+                return stamped;
+            }
+            var audio = Frame(w => BoltCodec.WriteMediaFrame(w, stream, 1, 960, MediaFrameFlags.Encrypted, [1, 2, 3]));
+            participant.TrySend(Stamp(1, audio));
+            participant.TrySend(Stamp(2, Stamp(3, Frame(w => BoltCodec.WriteMediaFrame(w, stream, 2, 1920, MediaFrameFlags.Encrypted, [1])))));
+            if (offered) await WaitUntil(() => f.Peers["b"].Media(stream).Count == 1);
+            await Task.Delay(150);
+            Assert.Multiple(() =>
+            {
+                Assert.That(f.Peers["b"].Media(stream).Count, Is.EqualTo(offered ? 1 : 0), "a stamp inside a stamp is refused");
+                Assert.That(Connection(f, "a").DatagramRejected, Is.EqualTo(offered ? 1 : 2));
+            });
+        }
+    }
 }

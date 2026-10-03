@@ -387,10 +387,12 @@ public sealed partial class BoltMediaService
             }
             // Recovery switched on or off: the two modes share nothing, so the decoder restarts from a keyframe.
             if (switched && _mediaClient is { } client) _ = client.RequestRemoteKeyframeAsync(streamId);
-            if (nacks.Count > 0 && transport is not null)
+            // At most 64 numbers a request: what the relay serves per request, and well inside one datagram.
+            for (var offset = 0; transport is not null && offset < nacks.Count; offset += 64)
             {
-                var writer = new System.Buffers.ArrayBufferWriter<byte>(BoltCodec.NackRequestHeaderSize + nacks.Count * 4);
-                BoltCodec.WriteNackRequest(writer, streamId, nacks.ToArray());
+                var chunk = nacks.GetRange(offset, Math.Min(64, nacks.Count - offset));
+                var writer = new System.Buffers.ArrayBufferWriter<byte>(BoltCodec.NackRequestHeaderSize + chunk.Count * 4);
+                BoltCodec.WriteNackRequest(writer, streamId, chunk.ToArray());
                 transport.TrySend(writer.WrittenSpan);
             }
             foreach (var picture in ready)

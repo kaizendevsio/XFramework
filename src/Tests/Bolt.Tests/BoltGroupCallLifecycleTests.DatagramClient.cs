@@ -335,7 +335,9 @@ public sealed partial class BoltGroupCallLifecycleTests
         var participant = (FakeRtcPeer)a.Transport.ActivePeer!;
         a.Transport.TrySend(Audio(31), audio: true);
         a.Transport.TrySend(Audio(32), audio: true);
-        Assert.That(participant.Sent.Last()[0], Is.EqualTo((byte)FrameType.MediaBundle), "the previous frame rides along");
+        // Stamped for this relay's transport feedback; inside the stamp, the previous frame rides along.
+        Assert.That(TransportSequenceCodec.TryRead(participant.Sent.Last(), out _, out var last), Is.True);
+        Assert.That(last[0], Is.EqualTo((byte)FrameType.MediaBundle), "the previous frame rides along");
         await WaitUntil(() => f.Peers["b"].Media(stream).Any(x => x.Sequence == 32));
         Assert.That(f.Peers["b"].Media(stream).GroupBy(x => x.Sequence).All(x => x.Count() == 1), Is.True, "every frame reaches b once");
         Assert.That(a.Transport.Status.AudioRedundancy, Is.True);

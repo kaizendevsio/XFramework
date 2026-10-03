@@ -24,6 +24,10 @@ public sealed partial class BoltMediaService
         RequireSFrame();
         await _sframe!.InstallEpochAsync(epochId, rosterHash, local, remote, compact: peerMediaFormat >= CallMediaFormat.Compact);
         PeerMediaFormat = peerMediaFormat;
+        // Fragments are sized by the overhead the format adds; the next picture measures the new one (from the
+        // conservative default until then, so a switch to the larger legacy format never overflows a datagram).
+        foreach (var id in new[] { _activeAudioStreamId, _activeVideoStreamId })
+            if (id != Guid.Empty) _mediaClient?.GetMediaStream(id)?.ResetEncryptionOverhead();
         // A member that only plays 20 ms packets joined: the next tick shrinks them.
         if (_rateLoop is { } loop) loop.Audio.MaxFrameMs = CallMediaFormat.MaxAudioFrameMs(peerMediaFormat);
     }

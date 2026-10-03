@@ -16,6 +16,9 @@ internal sealed class RelayRetransmitCache
     public const int DefaultMaxAgeMs = 2_000;
 
     private readonly (uint Sequence, long At, byte[]? Frame, bool Used)[] _slots;
+    /// <summary>Frames the relay asked the sender for (its uplink lost them), and the receivers waiting for each.</summary>
+    private readonly Dictionary<uint, HashSet<string>> _requested = [];
+    private const int MaxRequested = 512;
     private readonly int _maxFrameBytes, _maxAgeMs;
     private readonly object _sync = new();
     private uint _newest;
@@ -29,21 +32,42 @@ internal sealed class RelayRetransmitCache
     }
 
     /// <summary>
-    /// Record a frame that arrived from the sender. Returns <see cref="Arrival.Late"/> when it is older than the newest
-    /// one (a retransmission the sender made because a receiver asked), <see cref="Arrival.Duplicate"/> when it was
-    /// already here, and <see cref="Arrival.InOrder"/> otherwise.
+    /// Record a frame that arrived from the sender. Returns <see cref="Arrival.Requested"/> (with the receivers waiting
+    /// for it) when the relay had asked the sender for it, <see cref="Arrival.Duplicate"/> when it was already here, and
+    /// otherwise <see cref="Arrival.InOrder"/> or <see cref="Arrival.Late"/> (the uplink reordered it), which take the
+    /// receivers' lanes as any frame does.
     /// </summary>
-    public Arrival Store(uint sequence, ReadOnlySpan<byte> frame, long now)
+    public Arrival Store(uint sequence, ReadOnlySpan<byte> frame, long now, out IReadOnlyCollection<string>? waiting)
     {
         lock (_sync)
         {
+            waiting = null;
             var slot = (int)(sequence % (uint)_slots.Length);
             if (_slots[slot].Used && _slots[slot].Sequence == sequence && now - _slots[slot].At <= _maxAgeMs)
                 return Arrival.Duplicate;
             var late = _hasNewest && unchecked(_newest - sequence) is > 0 and < 0x8000_0000u;
             _slots[slot] = (sequence, now, frame.Length <= _maxFrameBytes ? frame.ToArray() : null, true);
             if (!late) { _newest = sequence; _hasNewest = true; }
+            if (late && _requested.Remove(sequence, out var receivers))
+            {
+                waiting = receivers;
+                return Arrival.Requested;
+            }
             return late ? Arrival.Late : Arrival.InOrder;
+        }
+    }
+
+    /// <summary>The relay asked the sender for this frame on behalf of <paramref name="receiver"/>.</summary>
+    public void Requested(uint sequence, string receiver)
+    {
+        lock (_sync)
+        {
+            if (!_requested.TryGetValue(sequence, out var receivers))
+            {
+                if (_requested.Count >= MaxRequested) _requested.Clear();
+                _requested[sequence] = receivers = new HashSet<string>(StringComparer.Ordinal);
+            }
+            receivers.Add(receiver);
         }
     }
 
@@ -68,7 +92,7 @@ internal sealed class RelayRetransmitCache
         }
     }
 
-    public enum Arrival { InOrder, Late, Duplicate }
+    public enum Arrival { InOrder, Late, Duplicate, Requested }
 
     public enum Holding
     {

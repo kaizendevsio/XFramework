@@ -154,6 +154,9 @@ public sealed class BoltMediaStream : IAsyncDisposable
     /// </summary>
     public int EncryptionOverhead => Volatile.Read(ref _encryptionOverhead);
 
+    /// <summary>A new epoch may use another SFrame format (compact or legacy): measure its overhead afresh.</summary>
+    public void ResetEncryptionOverhead() => Volatile.Write(ref _encryptionOverhead, 0);
+
     private void RecordEncryptionOverhead(int plaintext, int ciphertext)
     {
         var overhead = ciphertext - plaintext;
