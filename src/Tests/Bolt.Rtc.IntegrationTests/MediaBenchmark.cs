@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Bolt.Media.Congestion;
 using Bolt.Protocol.Transport;
 using Microsoft.Playwright;
 using NUnit.Framework;
@@ -131,6 +132,39 @@ public sealed class MediaBenchmark
         var wire = new Dictionary<string, Dictionary<string, (long Packets, long Bytes)>>();
         if (Env("BENCH_COUNTERS") == "1")
             await page.ExposeFunctionAsync("benchMark", (string phase) => { lock (wire) wire[phase] = ReadCounters(); return true; });
+        // The Bolt runs' rate control: the product's SendRateController and AudioPacketization, every 250 ms, fed what the
+        // page measured (what it sent, its channel's backlog, the receiver's delay report). Longer Opus packets only
+        // "after": the previous client never chose them.
+        var videoTarget = EnvInt("BENCH_VIDEO_KBPS", 300);
+        var controller = new SendRateController(videoTarget + 32 + 52, new SendRateOptions
+        {
+            AudioNormalKbps = 32, AudioLowKbps = 24, AudioHighKbps = 32, MaxTotalKbps = videoTarget + 200, RestartFloorKbps = 180 + 84,
+        });
+        var packets = new AudioPacketization { MaxFrameMs = mode == "bolt-after" ? 60 : 20 };
+        if (mode != "native")
+            await page.ExposeFunctionAsync("benchRate", (string json) =>
+            {
+                var sample = JsonDocument.Parse(json).RootElement;
+                var now = Environment.TickCount64;
+                ReceiverSignal? receiver = sample.GetProperty("receiver").ValueKind == JsonValueKind.Object
+                    ? new ReceiverSignal(now, sample.GetProperty("receiver").GetProperty("queueDelayMs").GetInt32(),
+                        sample.GetProperty("receiver").GetProperty("receivedKbps").GetInt32())
+                    : null;
+                SendRateDecision decision;
+                int? frameMs;
+                lock (controller)
+                {
+                    decision = controller.Update(new SendPathSample(now, sample.GetProperty("sentKbps").GetInt32(),
+                        sample.GetProperty("audioKbps").GetInt32(), sample.GetProperty("localQueueMs").GetInt32(), 0, false, null, receiver));
+                    frameMs = packets.Update(controller.CongestionKbps, decision.VideoSuspended, now);
+                    if (frameMs is { } applied) packets.Applied(applied);
+                }
+                return JsonSerializer.Serialize(new
+                {
+                    totalKbps = decision.TotalKbps, videoKbps = decision.VideoKbps, audioKbps = decision.AudioKbps,
+                    frameMs = packets.FrameMs, suspended = decision.VideoSuspended,
+                });
+            });
         await page.GotoAsync(origin + "/bench.html");
         await page.WaitForFunctionAsync("() => window.benchReady === true", null, new() { Timeout = 30_000 });
 
@@ -145,7 +179,8 @@ public sealed class MediaBenchmark
             fps = EnvInt("BENCH_FPS", 30),
             videoKbps = EnvInt("BENCH_VIDEO_KBPS", 300),
             audioKbps = EnvInt("BENCH_AUDIO_KBPS", 32),
-            audioFrameMs = mode == "bolt-after" ? EnvInt("BENCH_AUDIO_FRAME_MS", 20) : 20,
+            // Every run starts at 20 ms; in the Bolt runs the rate control may lengthen packets (bolt-after only).
+            audioFrameMs = 20,
             compact = mode == "bolt-after",
             nack = mode == "bolt-after",
             codec = Env("BENCH_CODEC") ?? "h264",

@@ -12,9 +12,11 @@
 //
 // What (b) is and is not: the wire format, the encryption, the channel and the encoder settings are the product's own
 // modules. The receiver's loss recovery (NACK timing, picture hold, give-up rules) is a line-by-line port of
-// VideoRecoveryBuffer. The relay here only forwards (NACKs go to the sender; the real relay answers most from its
-// cache, one hop), and nothing runs rate control: the product's .NET pipeline (pacer, SendRateController, lanes) is
-// measured by the call network harness instead. Native WebRTC runs its own GCC.
+// VideoRecoveryBuffer. Rate control is the product's own SendRateController and AudioPacketization (.NET, in the test
+// host, called every 250 ms with the receiver's delay report delivered half a round trip late, as it would travel); its
+// decision sets the encoder's bitrate (the picture size stays, as native WebRTC is told to keep it) and the Opus packet
+// length. Not here: the pacer, the relay's lanes and congestion reports, and its retransmission cache (this relay only
+// forwards; NACKs go to the sender). The call network harness runs those. Native WebRTC runs its own GCC.
 import { initializeSFrame, SFrameSession } from './bolt-sframe.mjs';
 import { encoderConfig, opusEncoderConfig, probeTemporalModes, temporalModeFor } from './bolt-media.js';
 import { createPeer } from './bolt-rtc.js';
@@ -509,8 +511,12 @@ async function runBolt(options, source) {
     const counters = { mediaBytes: 0, messages: 0, messageBytes: 0, dropped: 0, keyframes: 0, keyRequests: 0, retransmitted: 0, nackRequests: 0,
         audioSent: 0, audioReceived: 0, videoFrames: 0, overhead: 0 };
     let measuring = false;
+    const rate = { sent: 0, audio: 0, received: 0, transitFloor: Infinity, previousFloor: Infinity, floorSince: now(), latest: null,
+        videoKbps: options.videoKbps, audioKbps: options.audioKbps, frameMs: 20,
+        audioSentAt: new Map(), trace: [] };
     const send = (bytes, mediaBytes = 0) => {
         if (sendChannel.bufferedAmount > 256 * 1024 || !sendChannel.send(bytes)) { counters.dropped++; return false; }
+        rate.sent += bytes.length;
         if (measuring) { counters.messages++; counters.messageBytes += bytes.length; counters.mediaBytes += mediaBytes; }
         return true;
     };
@@ -569,12 +575,50 @@ async function runBolt(options, source) {
             const timestamp = Math.round(chunk.timestamp * 48 / 1000) >>> 0;
             const sealed = tx.encrypt(data, audioStreamId, seq, timestamp);
             if (measuring) { counters.audioSent++; counters.overhead = Math.max(counters.overhead, sealed.length - data.length); }
-            send(mediaFrame(audioStream, seq, timestamp, 0x10, sealed), data.length);
+            const frame = mediaFrame(audioStream, seq, timestamp, 0x10, sealed);
+            if (send(frame, data.length)) {
+                rate.audio += frame.length;
+                rate.audioSentAt.set(seq, now());
+                if (rate.audioSentAt.size > 2000) rate.audioSentAt.delete(rate.audioSentAt.keys().next().value);
+            }
         },
         error: error => console.error('bench audio encoder', error)
     });
     audioEncoder.configure(audioConfig);
+    rate.frameMs = audioConfig.opus?.frameDuration ? audioConfig.opus.frameDuration / 1000 : 20;
     const stopAudio = readTrack(source.audio, data => { try { audioEncoder.encode(data); } finally { data.close(); } });
+
+    // Rate control: the product's controller, fed the way the call feeds it (see the header).
+    const rateTimer = setInterval(async () => {
+        if (!window.benchRate) return;
+        const at = now();
+        // The receiver's report: queuing delay of audio over its 10 s floor, and what arrived; it reaches the sender half a
+        // round trip later.
+        const report = { queueDelayMs: Math.max(0, Math.round(rate.lastTransit - Math.min(rate.transitFloor, rate.previousFloor))) || 0,
+            receivedKbps: Math.round(rate.received * 8 / 250), at };
+        rate.received = 0;
+        setTimeout(() => { rate.latest = report; }, Math.max(0, rtt / 2));
+        const sample = { sentKbps: Math.round(rate.sent * 8 / 250), audioKbps: Math.round(rate.audio * 8 / 250),
+            localQueueMs: Math.round(sendChannel.bufferedAmount * 8 / Math.max(1, rate.sent * 8 / 250)),
+            receiver: rate.latest && at - rate.latest.at < 1500 ? rate.latest : null };
+        rate.sent = rate.audio = 0;
+        let decision;
+        try { decision = JSON.parse(await window.benchRate(JSON.stringify(sample))); } catch { return; }
+        const video = Math.max(60, Math.min(options.videoKbps, decision.videoKbps));
+        if (Math.abs(video - rate.videoKbps) / rate.videoKbps > 0.05 && encoder.state === 'configured') {
+            rate.videoKbps = video;
+            encoder.configure({ ...videoConfig, bitrate: video * 1000 });
+        }
+        const frameMs = decision.frameMs ?? rate.frameMs;
+        if ((frameMs !== rate.frameMs || decision.audioKbps !== rate.audioKbps) && audioEncoder.state === 'configured') {
+            const next = { ...audioConfig, bitrate: decision.audioKbps * 1000, opus: { ...(audioConfig.opus ?? {}), frameDuration: frameMs * 1000 } };
+            if ((await AudioEncoder.isConfigSupported(next)).config?.opus?.frameDuration === frameMs * 1000) {
+                audioConfig = next; rate.frameMs = frameMs; rate.audioKbps = decision.audioKbps;
+                audioEncoder.configure(next);
+            }
+        }
+        if (measuring && rate.trace.length < 400) rate.trace.push([Math.round(at), decision.totalKbps, video, rate.frameMs, report.queueDelayMs]);
+    }, 250);
 
     // Sender side of the reverse direction: NACKs answered from the retransmission buffer, keyframe requests honoured.
     sender.onmessage = bytes => {
@@ -620,6 +664,7 @@ async function runBolt(options, source) {
     const audioSeen = new Set();
     receiver.onmessage = frame => {
         if (frame[0] !== FrameType.MediaFrame || frame.length < MEDIA_HEADER) return;
+        rate.received += frame.length;
         const view = new DataView(frame.buffer);
         const seq = view.getUint32(17, true), timestamp = view.getUint32(21, true);
         const isVideo = frame.subarray(1, 17).every((b, i) => b === videoStream[i]);
@@ -627,6 +672,13 @@ async function runBolt(options, source) {
         try { plain = rx.decrypt(alice, frame.subarray(MEDIA_HEADER), isVideo ? videoStreamId : audioStreamId, seq, timestamp); }
         catch { return; } // A duplicate (a retransmission that raced its original) or garbage.
         if (!isVideo) {
+            const sentAt = rate.audioSentAt.get(seq);
+            if (sentAt !== undefined) {
+                const transit = now() - sentAt, at = now();
+                if (at - rate.floorSince >= 10000) { rate.previousFloor = rate.transitFloor; rate.transitFloor = Infinity; rate.floorSince = at; }
+                rate.transitFloor = Math.min(rate.transitFloor, transit);
+                rate.lastTransit = transit;
+            }
             if (measuring && !audioSeen.has(seq)) counters.audioReceived++;
             audioSeen.add(seq);
             if (audioDecoder.state === 'configured' && audioDecoder.decodeQueueSize < 8)
@@ -659,14 +711,14 @@ async function runBolt(options, source) {
     const elapsed = (now() - started) / 1000;
     await window.benchMark?.('end');
 
-    clearInterval(poller); clearInterval(rttTimer);
+    clearInterval(poller); clearInterval(rttTimer); clearInterval(rateTimer);
     stopVideo(); stopAudio();
     try { encoder.close(); audioEncoder.close(); decoder.close(); audioDecoder.close(); } catch { }
     tx.dispose(); rx.dispose();
     for (const side of [sender, receiver]) { side.peer.close(); side.socket.close(); }
     return {
         seconds: elapsed, rttMs: rtt, compact: options.compact, nack: options.nack,
-        audioPacketMs: audioConfig.opus?.frameDuration ? audioConfig.opus.frameDuration / 1000 : 20,
+        audioPacketMs: rate.frameMs, videoKbpsAtEnd: rate.videoKbps, rateTrace: rate.trace.filter((_, i) => i % 4 === 0),
         sframeBytesPerFrame: counters.overhead,
         mediaBytes: counters.mediaBytes,
         packetsSent: counters.messages,

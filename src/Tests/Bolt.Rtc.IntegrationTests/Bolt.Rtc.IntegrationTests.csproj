@@ -24,6 +24,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Rtc\Bolt.Rtc.csproj" />
+    <!-- The media benchmark's Bolt runs use the product's own rate control. -->
+    <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Media\Bolt.Media.csproj" />
   </ItemGroup>
 
   <ItemGroup>
