@@ -293,14 +293,19 @@ jobs:
       - name: Test focused IdentityServer and Portal contracts
         if: steps.scope.outputs.scope != 'yap'
         shell: bash
+        env:
+          PORTAL_TEST_REDIS_CONNECTION: localhost:6379,abortConnect=false
         run: |
           set -euo pipefail
           dotnet test src/Tests/IdentityServer.UnitTests/IdentityServer.UnitTests.csproj \
             --configuration Release --no-build --no-restore \
             --filter "FullyQualifiedName~BoltTransportTokenIssuerTests|FullyQualifiedName~LogoutAuthorizationContractTests|FullyQualifiedName~SessionValidation"
-          dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj \
-            --configuration Release --no-build --no-restore \
-            --filter "FullyQualifiedName~ServiceIdentityComposeContractTests"
+            dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj \
+              --configuration Release --no-build --no-restore \
+              --filter "TestCategory=Area:PortalContract|FullyQualifiedName~ServiceIdentityComposeContractTests"
+            dotnet test src/Tests/XFramework.Core.Tests/XFramework.Core.Tests.csproj \
+              --configuration Release --no-build --no-restore \
+              --filter "FullyQualifiedName~TenantDetailModuleFeatureTests|FullyQualifiedName~TenantModuleFeatureDefinitionResolverTests"
 
       - name: Test Yap chat application
         run: |
