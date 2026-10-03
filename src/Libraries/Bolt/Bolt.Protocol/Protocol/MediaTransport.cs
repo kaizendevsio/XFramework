@@ -34,6 +34,8 @@ public sealed record MediaTransportRequest(int Version, int MaxMessageBytes);
 /// The relay's answer to a request. When <paramref name="Unavailable"/> is set there is no session (no TURN
 /// credentials, disabled, or too many attempts) and the participant stays on the stream transport.
 /// <paramref name="IceServers"/> are short-lived credentials minted for this participant alone.
+/// <paramref name="Features"/> lists what this relay does on the path beyond carrying media
+/// (<see cref="MediaTransportFeatures"/>); an older relay sends none, and the participant then uses none.
 /// </summary>
 public sealed record MediaTransportConfig(
     string Session,
@@ -41,7 +43,21 @@ public sealed record MediaTransportConfig(
     string IceTransportPolicy,
     int MaxMessageBytes,
     long ExpiresAtUnixSeconds,
-    string? Unavailable = null);
+    string? Unavailable = null,
+    string[]? Features = null);
+
+/// <summary>What a relay announces in <see cref="MediaTransportConfig.Features"/>.</summary>
+public static class MediaTransportFeatures
+{
+    /// <summary>
+    /// The relay takes NackRequests on the data channel, resends video frames it still holds to that receiver alone,
+    /// forwards the rest to the sender, and declines (<see cref="FrameType.NackDeclined"/>) frames it dropped on purpose.
+    /// </summary>
+    public const string Nack = "nack";
+
+    public static bool Has(MediaTransportConfig? config, string feature) =>
+        config?.Features is { } features && Array.IndexOf(features, feature) >= 0;
+}
 
 /// <summary>An SDP offer or answer for one session.</summary>
 public sealed record MediaTransportDescription(string Session, string Sdp, bool IceRestart = false);

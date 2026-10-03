@@ -70,6 +70,12 @@ public enum FrameType : byte
     /// stream transport. See <see cref="MediaBundleCodec"/>.
     /// </summary>
     MediaBundle = 0x29,
+    /// <summary>
+    /// Relay to receiver, datagram path only: the relay will not resend these frames of this stream (it dropped them
+    /// on purpose for this receiver, or no longer holds them), so the receiver stops waiting for them. Same layout
+    /// as <see cref="NackRequest"/>: [1:type] [16:streamId] [2:count] [count * 4:sequences].
+    /// </summary>
+    NackDeclined = 0x2A,
 }
 
 /// <summary>Media type identifier.</summary>

@@ -157,6 +157,15 @@ public sealed class MediaTransportClient : IAsyncDisposable
     /// <summary>Audio leaves with the previous frame alongside: the relay reports loss on this participant's audio.</summary>
     public bool AudioRedundancy => Volatile.Read(ref _redundancy) != 0;
 
+    /// <summary>
+    /// The active path's relay resends lost video frames (<see cref="MediaTransportFeatures.Nack"/>). Only then does a
+    /// receiver ask: an older relay would refuse a NACK on the data channel.
+    /// </summary>
+    public bool SupportsNack
+    {
+        get { lock (_sync) return OpenPeerLocked() is not null && MediaTransportFeatures.Has(_active?.Config, MediaTransportFeatures.Nack); }
+    }
+
     public MediaPathStatus Status
     {
         get

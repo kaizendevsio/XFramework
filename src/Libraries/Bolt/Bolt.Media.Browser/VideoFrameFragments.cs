@@ -124,6 +124,31 @@ public sealed class VideoFrameAssembler
     /// <summary>Frames discarded because a fragment never arrived. Surfaces as a loss signal.</summary>
     public int Incomplete { get; private set; }
 
+    /// <summary>A fragment header that passed the checks every fragment must pass on its own.</summary>
+    internal readonly record struct FragmentHeader(int Total, int Index, uint FrameId, uint Timestamp, bool Keyframe, int Layer);
+
+    /// <summary>
+    /// Parse one fragment's header with the checks that need no other fragment: version, sizes, the count, and that a
+    /// non-final fragment is not short. Shared with <see cref="VideoRecoveryBuffer"/>.
+    /// </summary>
+    internal static bool TryParse(ReadOnlySpan<byte> fragment, out FragmentHeader header)
+    {
+        header = default;
+        if (fragment.Length <= VideoFrameFragments.HeaderSize ||
+            fragment.Length > VideoFrameFragments.MaxPlaintext ||
+            (fragment[0] & VersionMask) != Version) return false;
+        var total = fragment[1] + 1;
+        var index = BinaryPrimitives.ReadUInt16LittleEndian(fragment[2..]);
+        var payload = fragment.Length - VideoFrameFragments.HeaderSize;
+        if (total > VideoFrameFragments.MaxFragments || index >= total) return false;
+        if (index != total - 1 && payload < VideoFrameFragments.MinPayload) return false;
+        if ((long)(total - 1) * VideoFrameFragments.MinPayload > VideoFrameFragments.MaxPictureBytes) return false;
+        header = new FragmentHeader(total, index, BinaryPrimitives.ReadUInt32LittleEndian(fragment[4..]),
+            BinaryPrimitives.ReadUInt32LittleEndian(fragment[8..]), (fragment[0] & KeyframeFlag) != 0,
+            (fragment[0] & VideoFrameFragments.LayerMask) >> VideoFrameFragments.LayerShift);
+        return true;
+    }
+
     /// <summary>Feed one decrypted fragment. Returns the picture once its last missing piece lands.</summary>
     public VideoFramePayload? Add(ReadOnlySpan<byte> fragment)
     {

@@ -305,11 +305,15 @@ public sealed partial class BoltServer
         }
         if (evicted is not null) await CloseSessionAsync(transport, evicted, notify: true);
         await SendTransportAsync(transport.Connection, MediaTransportKind.Config, new MediaTransportConfig(
-            session.Id, grant.Client.ToArray(), "all", options.MaxMessageBytes, grant.ExpiresAt.ToUnixTimeSeconds()));
+            session.Id, grant.Client.ToArray(), "all", options.MaxMessageBytes, grant.ExpiresAt.ToUnixTimeSeconds(),
+            Features: TransportFeatures(options)));
         return session;
     }
 
     private static MediaTransportConfig Unavailable(string reason) => new("", [], "all", 0, 0, reason);
+
+    private static string[]? TransportFeatures(BoltMediaTransportOptions options) =>
+        options.Nack ? [MediaTransportFeatures.Nack] : null;
 
     private Task SendCandidateAsync(BoltHubConnection connection, TransportSession session, RtcCandidate candidate) =>
         SendTransportAsync(connection, MediaTransportKind.Candidate,
@@ -470,7 +474,8 @@ public sealed partial class BoltServer
     {
         if (data.IsEmpty || !connection.IsRegistered || !connection.IsAlive || !_mediaEnabled)
             return;
-        var type = (FrameType)data.Span[0];
+        var message = data.Span;
+        var type = (FrameType)message[0];
         if (!DatagramFramePolicy.AcceptFromParticipant(type))
         {
             connection.RecordDatagramRejected();
@@ -479,16 +484,16 @@ public sealed partial class BoltServer
         if (type == FrameType.MediaBundle)
         {
             Span<Range> frames = stackalloc Range[MediaBundleCodec.MaxFrames];
-            if (!MediaBundleCodec.TryRead(data.Span, frames, out var count))
+            if (!MediaBundleCodec.TryRead(message, frames, out var count))
             {
                 connection.RecordDatagramRejected();
                 return;
             }
             for (var index = 0; index < count; index++)
-                DispatchDatagramFrame(connection, data.Span[frames[index]]);
+                DispatchDatagramFrame(connection, message[frames[index]]);
             return;
         }
-        DispatchDatagramFrame(connection, data.Span);
+        DispatchDatagramFrame(connection, message);
     }
 
     private void DispatchDatagramFrame(BoltHubConnection connection, ReadOnlySpan<byte> frame)
@@ -501,7 +506,8 @@ public sealed partial class BoltServer
             task = (FrameType)buffer[0] switch
             {
                 FrameType.MediaFrame or FrameType.FecFrame => RouteMediaFrameAsync(connection, buffer, frame.Length, _shutdownCts.Token),
-                FrameType.MediaFeedback or FrameType.MediaKeyRequest => RouteMediaFeedbackAsync(connection, buffer, frame.Length, _shutdownCts.Token),
+                FrameType.MediaFeedback or FrameType.MediaKeyRequest or FrameType.NackRequest =>
+                    RouteMediaFeedbackAsync(connection, buffer, frame.Length, _shutdownCts.Token),
                 _ => Task.CompletedTask,
             };
         }

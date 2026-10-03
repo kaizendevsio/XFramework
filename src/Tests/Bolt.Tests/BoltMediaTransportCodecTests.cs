@@ -123,10 +123,12 @@ public sealed class BoltMediaTransportCodecTests
     [Test]
     public void DatagramPolicy_KeepsStateChangesOnTheAuthenticatedSocket()
     {
-        foreach (var type in new[] { FrameType.MediaConfig, FrameType.CallSignal, FrameType.Register, FrameType.MediaTransport, FrameType.Request, FrameType.MediaCongestion, FrameType.NackRequest })
+        foreach (var type in new[] { FrameType.MediaConfig, FrameType.CallSignal, FrameType.Register, FrameType.MediaTransport, FrameType.Request, FrameType.MediaCongestion, FrameType.NackDeclined })
             Assert.That(DatagramFramePolicy.AcceptFromParticipant(type), Is.False, type.ToString());
-        foreach (var type in new[] { FrameType.MediaFrame, FrameType.FecFrame, FrameType.MediaFeedback, FrameType.MediaKeyRequest, FrameType.MediaBundle })
+        // A receiver's NACK is its own feedback, like a keyframe request: it may take its own media path.
+        foreach (var type in new[] { FrameType.MediaFrame, FrameType.FecFrame, FrameType.MediaFeedback, FrameType.MediaKeyRequest, FrameType.MediaBundle, FrameType.NackRequest })
             Assert.That(DatagramFramePolicy.AcceptFromParticipant(type), Is.True, type.ToString());
+        Assert.That(DatagramFramePolicy.AcceptFromRelay(FrameType.NackDeclined), Is.True, "the relay's answer to a NACK takes the path the NACK came on");
         foreach (var type in new[] { FrameType.MediaConfig, FrameType.CallSignal, FrameType.MediaTransport, FrameType.RegisterAck, FrameType.Response })
             Assert.That(DatagramFramePolicy.AcceptFromRelay(type), Is.False, type.ToString());
         Assert.That(DatagramFramePolicy.AcceptFromRelay(FrameType.MediaCongestion), Is.True, "the relay's reports may take the media path");

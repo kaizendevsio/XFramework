@@ -178,6 +178,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
             if (OnCallEnded is not null) await OnCallEnded(callId);
         };
         mediaClient.OnKeyframeRequested += streamId => { _ = _video.RequestKeyframeAsync(); };
+        mediaClient.OnNackDeclined += (streamId, sequences) => { _ = DeclineVideoAsync(streamId, sequences); };
         mediaClient.OnMediaStreamConfigured += stream => { RegisterRemoteVideo(stream); StartPlaybackLoop(stream); };
         mediaClient.OnCongestionReport += report =>
             _signals.OnCongestionReport(report, report.StreamId == _activeVideoStreamId, Environment.TickCount64);
@@ -327,7 +328,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
                     if (stream.IsAudio)
                         await _audio.DecodeFrameAsync(stream.StreamId, frame.Data, frame.Timestamp);
                     else
-                        await PlayVideoFragmentAsync(stream, frame.Data);
+                        await PlayVideoFragmentAsync(stream, frame);
                 }
             }
             catch (OperationCanceledException) { }
