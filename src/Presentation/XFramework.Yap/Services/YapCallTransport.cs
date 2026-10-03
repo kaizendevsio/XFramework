@@ -33,6 +33,11 @@ public sealed class YapTurnOptions
     public int CredentialTtlSeconds { get; init; } = 3600;
     /// <summary>The relay's own peer uses relay candidates only (see <see cref="BoltMediaTransportOptions.RelayOnly"/>).</summary>
     public bool RelayOnly { get; init; } = true;
+    /// <summary>
+    /// Also hand out TURN over TCP and TLS. Off by default: through TURN over TCP, media rides TCP (twice, with SCTP's
+    /// own congestion control on top), which is worse than the call's plain WebSocket, the fallback when UDP fails.
+    /// </summary>
+    public bool AllowTcp { get; init; }
 
     public bool UsesCloudflare => !string.IsNullOrWhiteSpace(CloudflareKeyId) && !string.IsNullOrWhiteSpace(CloudflareApiToken);
     public bool UsesSharedSecret => Urls.Length > 0 && !string.IsNullOrEmpty(SharedSecret);
@@ -53,6 +58,7 @@ public sealed class YapTurnOptions
             Credential = section["Credential"],
             CredentialTtlSeconds = Math.Clamp(section.GetValue("CredentialTtlSeconds", 3600), 600, 6 * 3600),
             RelayOnly = section.GetValue("RelayOnly", true),
+            AllowTcp = section.GetValue("AllowTcp", false),
         };
     }
 }
@@ -83,7 +89,7 @@ public sealed class YapTurnCredentials(YapTurnOptions options, IHttpClientFactor
             var client = await MintCloudflareAsync(ttl, ct);
             var server = client is null ? null : await MintCloudflareAsync(ttl, ct);
             if (client is null || server is null) return null;
-            return new BoltIceGrant(ForBrowser(client), ForRelay(server), expires);
+            return new BoltIceGrant(ForBrowser(client, options.AllowTcp), ForRelay(server, options.AllowTcp), expires);
         }
         if (options.UsesSharedSecret)
         {
@@ -92,14 +98,14 @@ public sealed class YapTurnCredentials(YapTurnOptions options, IHttpClientFactor
             {
                 var username = $"{expires.ToUnixTimeSeconds()}:{label}";
                 var credential = Convert.ToBase64String(HMACSHA1.HashData(Encoding.UTF8.GetBytes(options.SharedSecret!), Encoding.UTF8.GetBytes(username)));
-                return (IReadOnlyList<RtcIceServer>)[new RtcIceServer(options.Urls, username, credential)];
+                return Keep([new RtcIceServer(options.Urls, username, credential)], url => options.AllowTcp || IsUdpTurn(url));
             };
             // The label is random: it identifies a session to the TURN server's logs, never a person.
             return new BoltIceGrant(servers(Convert.ToHexString(RandomNumberGenerator.GetBytes(8))), servers("relay"), expires);
         }
         if (options.UsesStatic)
         {
-            IReadOnlyList<RtcIceServer> servers = [new RtcIceServer(options.Urls, options.Username, options.Credential)];
+            var servers = Keep([new RtcIceServer(options.Urls, options.Username, options.Credential)], url => options.AllowTcp || IsUdpTurn(url));
             return new BoltIceGrant(servers, servers, expires);
         }
         return null;
@@ -159,19 +165,26 @@ public sealed class YapTurnCredentials(YapTurnOptions options, IHttpClientFactor
     }
 
     /// <summary>
-    /// What the browser gets: every TURN URL (UDP, TCP and TLS, so a network that blocks UDP can still reach
-    /// TURN over TLS on 443), minus port 53, which browsers block and which only delays gathering.
+    /// What the browser gets: TURN over UDP, minus port 53 (browsers block it). A network that blocks UDP gets no
+    /// datagram path and keeps the call on its WebSocket, which beats media over TCP through TURN. With
+    /// <paramref name="allowTcp"/>, TCP and TLS URLs too.
     /// </summary>
-    internal static IReadOnlyList<RtcIceServer> ForBrowser(IReadOnlyList<RtcIceServer> servers) =>
-        Keep(servers, url => !IsPort(url, 53));
+    internal static IReadOnlyList<RtcIceServer> ForBrowser(IReadOnlyList<RtcIceServer> servers, bool allowTcp = false) =>
+        Keep(servers, url => !IsPort(url, 53) && (allowTcp || IsUdpTurn(url)));
 
     /// <summary>
-    /// What the relay's own peer gets: TURN over UDP on 3478 (the host's outbound UDP works) and TURN over TLS on
-    /// 443 as the fallback. Each URL becomes an allocation, so the other four would only add load.
+    /// What the relay's own peer gets: TURN over UDP on 3478, and on 53 should 3478 be filtered. Never TCP or TLS
+    /// unless <paramref name="allowTcp"/> (then TLS on 443 too): in production every relay leg opened over TLS and
+    /// stalled on every keyframe (12:45-12:54 UTC). Each URL becomes an allocation, so the rest would only add load.
     /// </summary>
-    internal static IReadOnlyList<RtcIceServer> ForRelay(IReadOnlyList<RtcIceServer> servers) =>
-        Keep(servers, url => url.StartsWith("turn:", StringComparison.OrdinalIgnoreCase) && IsPort(url, 3478) && url.Contains("transport=udp", StringComparison.OrdinalIgnoreCase)
-                             || url.StartsWith("turns:", StringComparison.OrdinalIgnoreCase) && IsPort(url, 443));
+    internal static IReadOnlyList<RtcIceServer> ForRelay(IReadOnlyList<RtcIceServer> servers, bool allowTcp = false) =>
+        Keep(servers, url => IsUdpTurn(url) && (IsPort(url, 3478) || IsPort(url, 53))
+                             || allowTcp && url.StartsWith("turns:", StringComparison.OrdinalIgnoreCase) && IsPort(url, 443));
+
+    /// <summary>A TURN URL whose leg to the TURN server is UDP (the default when no transport is named).</summary>
+    internal static bool IsUdpTurn(string url) =>
+        url.StartsWith("turn:", StringComparison.OrdinalIgnoreCase) &&
+        (!url.Contains("transport=", StringComparison.OrdinalIgnoreCase) || url.Contains("transport=udp", StringComparison.OrdinalIgnoreCase));
 
     private static IReadOnlyList<RtcIceServer> Keep(IReadOnlyList<RtcIceServer> servers, Func<string, bool> keep) =>
         servers.Where(x => x.Credential is not null)
