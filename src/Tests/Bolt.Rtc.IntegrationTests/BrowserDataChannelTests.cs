@@ -206,13 +206,16 @@ public sealed class BrowserDataChannelTests
           const result = { Opened: peer.state() === 'open', Sent: 0, Echoed: 0, MaxBuffered: 0, StuckMs: 0, DrainedAfterStop: false, Held: 0 };
           if (result.Opened) {
             const message = new Uint8Array(1150); message[0] = 0x21;
-            const perTick = kbps * 1000 / 8 * 0.005;
-            let credit = 0, lastBuffered = 0, added = 0, lastProgress = performance.now();
+            // Credit by the clock, not per timer tick: engines clamp short timers differently.
+            const bytesPerMs = kbps / 8;
+            let credit = 0, lastBuffered = 0, added = 0, lastProgress = performance.now(), lastTick = performance.now();
             const started = performance.now();
             let nextSample = started + 250;
             while (performance.now() - started < seconds * 1000) {
               await new Promise(resolve => setTimeout(resolve, 5));
-              credit = Math.min(credit + perTick, 64 * 1024);
+              const tickAt = performance.now();
+              credit = Math.min(credit + (tickAt - lastTick) * bytesPerMs, 64 * 1024);
+              lastTick = tickAt;
               while (credit >= message.length) {
                 if (peer.bufferedAmount() > 48 * 1024) { result.Held++; break; }
                 if (!peer.send(message)) break;
