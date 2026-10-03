@@ -19,6 +19,9 @@ public static class YapApplication
     {
         var builder = WebApplication.CreateBuilder(args);
         builder.Logging.AddXFrameworkLogging(builder.Configuration);
+        // The container log (console) shows Warning and up. Calls are the exception: UDP status, each participant's
+        // media path and why it fell back, TURN mints (status codes only) and the WebRTC sidecar.
+        builder.Logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("Yap.Calls", LogLevel.Information);
         builder.Services.AddAntiforgery();
         // A staged attachment arrives in one request; anything larger arrives one part at a time.
         builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = ChatLimits.StagedFileBytes + 65536);

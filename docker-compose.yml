@@ -769,6 +769,8 @@ services:
       # WebSocket. The API token stays in this container: participants only ever get short-lived TURN credentials.
       Yap__Calls__Turn__CloudflareKeyId: ${YAP_CALLS_TURN_CLOUDFLARE_KEY_ID:-}
       Yap__Calls__Turn__CloudflareApiToken: ${YAP_CALLS_TURN_CLOUDFLARE_API_TOKEN:-}
+      # Kill switch for UDP call media: false keeps every call on its WebSocket and leaves the TURN values in place.
+      Yap__Calls__Udp__Enabled: ${YAP_CALLS_UDP_ENABLED:-true}
     ports:
       - "127.0.0.1:5188:8080"
     volumes:
