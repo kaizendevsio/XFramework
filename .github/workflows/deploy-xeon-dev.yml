@@ -1218,6 +1218,20 @@ jobs:
           rm -f "$REMOTE_RUN_DIR/mutation-started" "$REMOTE_RUN_DIR/bootstrap-without-rollback"
           REMOTE_SCRIPT
 
+      - name: Capture candidate service logs before rollback
+        if: ${{ (failure() || cancelled()) && steps.ssh_setup.outcome == 'success' }}
+        shell: bash
+        env:
+          DEPLOY_SSH_OPERATION_TIMEOUT_SECONDS: 300
+        run: |
+          set +e
+          # The rollback recreates the containers and their logs go with them: keep the candidate's logs in the
+          # owner-only release directory on the host and print only their redacted problem lines here.
+          ssh "$DEPLOY_HOST" \
+            "if [ -f '$REMOTE_RUN_DIR/mutation-started' ]; then python3 -B - --run-dir '$REMOTE_RUN_DIR' --env-file '$REMOTE_CANDIDATE_ENV' --since \"\$(stat -c %Y '$REMOTE_RUN_DIR/mutation-started')\"; else echo 'No remote service mutation began; no candidate logs to capture.'; fi" \
+            < scripts/capture-candidate-logs.py
+          exit 0
+
       - name: Restore previous release or stop Bolt Hub
         if: ${{ (failure() || cancelled()) && steps.ssh_setup.outcome == 'success' }}
         shell: bash
@@ -1402,7 +1416,7 @@ jobs:
           docker compose --project-name "$COMPOSE_PROJECT_NAME" \
             --env-file "$XFRAMEWORK_ENV_FILE" \
             -f "$REMOTE_CANDIDATE_COMPOSE" -f "$REMOTE_IMAGE_OVERRIDE" ps
-          echo "Raw container logs remain on xeon-dev and are not copied to GitHub Actions because they may contain credentials."
+          echo "Raw container logs are not copied to GitHub Actions because they may contain credentials; the failed candidate's are kept under its release directory's candidate-logs/ on xeon-dev."
           REMOTE_SCRIPT
 
       - name: Remove local compose token placeholders
