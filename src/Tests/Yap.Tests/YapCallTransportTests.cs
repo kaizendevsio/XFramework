@@ -86,13 +86,31 @@ public sealed class YapCallTransportTests
         {
             Assert.That(client.Credential, Is.EqualTo("CRED-1"));
             Assert.That(relay.Credential, Is.EqualTo("CRED-2"), "the relay's credential is not the one handed to the phone");
-            Assert.That(client.Urls, Has.None.Match(@":53(\?|$)"), "browsers block port 53");
-            Assert.That(client.Urls, Does.Contain("turns:turn.cloudflare.com:443?transport=tcp"), "TURN over TLS on 443 for networks that block UDP");
-            Assert.That(client.Urls, Does.Contain("turn:turn.cloudflare.com:3478?transport=udp"));
-            Assert.That(relay.Urls, Is.EquivalentTo(new[] { "turn:turn.cloudflare.com:3478?transport=udp", "turns:turn.cloudflare.com:443?transport=tcp" }),
-                "the relay allocates over UDP, with TLS on 443 as its fallback");
+            // Over TCP or TLS to TURN, media rides TCP (twice, with SCTP on top): worse than the plain WebSocket, which is
+            // the fallback. Production 12:45-12:54 UTC: every channel opened via TLS/relay and flapped on each keyframe.
+            Assert.That(client.Urls, Is.EqualTo(new[] { "turn:turn.cloudflare.com:3478?transport=udp" }),
+                "the phone gets UDP TURN only (port 53 is blocked by browsers)");
+            Assert.That(relay.Urls, Is.EquivalentTo(new[] { "turn:turn.cloudflare.com:3478?transport=udp", "turn:turn.cloudflare.com:53?transport=udp" }),
+                "the relay allocates over UDP only, on 3478 or 53");
             Assert.That(grant.Client.Concat(grant.Server).SelectMany(x => new[] { x.Username, x.Credential }.Concat(x.Urls)), Has.None.Contains(Token));
             Assert.That(grant.ExpiresAt, Is.EqualTo(before.AddSeconds(1800)).Within(TimeSpan.FromSeconds(5)));
+        });
+    }
+
+    [Test]
+    public async Task TurnOverTcp_IsOnlyOfferedWhenConfiguredSo()
+    {
+        var handler = new Handler((_, n) => Json(CloudflareArray, n));
+        var credentials = new YapTurnCredentials(new YapTurnOptions { CloudflareKeyId = KeyId, CloudflareApiToken = Token, AllowTcp = true },
+            new Factory(handler), NullLogger<YapTurnCredentials>.Instance);
+        var grant = await credentials.GrantAsync(Participant, CancellationToken.None);
+        Assert.Multiple(() =>
+        {
+            Assert.That(grant!.Client.Single().Urls, Does.Contain("turns:turn.cloudflare.com:443?transport=tcp"));
+            Assert.That(grant.Server.Single().Urls, Does.Contain("turns:turn.cloudflare.com:443?transport=tcp"));
+            Assert.That(YapTurnOptions.From(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+                { ["Yap:Calls:Turn:AllowTcp"] = "true" }).Build()).AllowTcp, Is.True);
+            Assert.That(YapTurnOptions.From(new ConfigurationBuilder().Build()).AllowTcp, Is.False);
         });
     }
 

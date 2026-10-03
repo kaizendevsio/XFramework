@@ -21,6 +21,13 @@ public sealed partial class BoltGroupCallLifecycleTests
         MaxRetryDelay = TimeSpan.FromSeconds(1), ReportInterval = TimeSpan.FromMilliseconds(200),
     };
 
+    /// <summary><see cref="FastClient"/> that leaves and returns without hysteresis, for tests of those mechanics.</summary>
+    private static readonly MediaTransportClientOptions QuickClient = new()
+    {
+        OpenTimeout = TimeSpan.FromMilliseconds(600), FirstRetryDelay = TimeSpan.FromMilliseconds(300),
+        MaxRetryDelay = TimeSpan.FromSeconds(1), ReportInterval = TimeSpan.FromMilliseconds(200), PathHysteresis = QuickPath,
+    };
+
     private sealed class Participant : IAsyncDisposable
     {
         public required BoltClient Client { get; init; }
@@ -91,7 +98,7 @@ public sealed partial class BoltGroupCallLifecycleTests
         f.Policy.Accepted.UnionWith(f.Peers.Keys);
         foreach (var id in f.Peers.Keys) await f.Join(id);
         var stream = await f.Config("a");
-        await using var a = Connect(f, "a", network);
+        await using var a = Connect(f, "a", network, QuickClient);
         var changes = new List<MediaPathStatus>();
         a.Transport.StatusChanged += status => { lock (changes) changes.Add(status); };
         var audio = Frame(w => BoltCodec.WriteMediaFrame(w, stream, 1, 960, MediaFrameFlags.Encrypted, [1, 2, 3]));
@@ -198,8 +205,8 @@ public sealed partial class BoltGroupCallLifecycleTests
     public async Task Client_ARestartAnswerThatCannotBeApplied_MovesMediaToTheSocket_AndTriesAgain()
     {
         var network = new FakeRtcNetwork();
-        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
-        await using var a = Connect(f, "a", network);
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource(), x => x.Hysteresis = QuickPath));
+        await using var a = Connect(f, "a", network, QuickClient);
         a.Transport.Start();
         await WaitUntil(() => a.Transport.IsDatagramActive);
         var participant = network.Created.Single(x => x.Role == RtcPeerRole.Offer);
@@ -214,14 +221,44 @@ public sealed partial class BoltGroupCallLifecycleTests
     }
 
     [Test]
-    public async Task Client_AStalledChannel_SendsOnTheSocket_AndTellsTheRelay_UntilItRecovers()
+    public async Task Client_AChannelThatFlaps_IsLeftOnce_NotEveryBlip()
     {
         var network = new FakeRtcNetwork();
         await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        await using var a = Connect(f, "a", network);
+        a.Transport.Start();
+        await WaitUntil(() => a.Transport.IsDatagramActive);
+        var participant = network.Created.Single(x => x.Role == RtcPeerRole.Offer);
+        var switches = 0;
+        var last = true;
+        var started = Environment.TickCount64;
+        var tick = 0;
+        while (Environment.TickCount64 - started < 4_000)
+        {
+            if (tick % 20 == 0) participant.Stall();
+            if (tick % 20 == 6) participant.Recover();
+            var now = a.Transport.IsDatagramActive;
+            if (now != last) { switches++; last = now; }
+            tick++;
+            await Task.Delay(20);
+        }
+        var reports = f.Peers["a"].Received.Count(x => MediaTransportCodec.TryRead(x, out var kind, out _) && kind == MediaTransportKind.State);
+        Assert.Multiple(() =>
+        {
+            Assert.That(switches, Is.LessThanOrEqualTo(2), "the path is left at the first blip and held off, not used again at every recovery");
+            Assert.That(reports, Is.LessThanOrEqualTo(2), "and the relay is not told stalled/open at every blip");
+        });
+    }
+
+    [Test]
+    public async Task Client_AStalledChannel_SendsOnTheSocket_AndTellsTheRelay_UntilItRecovers()
+    {
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource(), x => x.Hysteresis = QuickPath));
         f.Policy.Accepted.UnionWith(f.Peers.Keys);
         foreach (var id in f.Peers.Keys) await f.Join(id);
         var stream = await f.Config("a");
-        await using var a = Connect(f, "a", network);
+        await using var a = Connect(f, "a", network, QuickClient);
         a.Transport.Start();
         await WaitUntil(() => a.Transport.IsDatagramActive);
         var audio = Frame(w => BoltCodec.WriteMediaFrame(w, stream, 1, 960, MediaFrameFlags.Encrypted, [1, 2, 3]));

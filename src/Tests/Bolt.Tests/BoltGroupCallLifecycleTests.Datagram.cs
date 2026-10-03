@@ -21,6 +21,7 @@ public sealed partial class BoltGroupCallLifecycleTests
         {
             Peers = network.Factory(RtcPeerRole.Answer), IceServers = ice, RequestSpacingSeconds = builder.Spacing,
             MaxRequestsPerConnection = builder.MaxRequests, RenewBefore = builder.RenewBefore,
+            PathHysteresis = builder.Hysteresis ?? new DatagramHysteresisOptions(),
         };
     }
 
@@ -29,6 +30,7 @@ public sealed partial class BoltGroupCallLifecycleTests
         public int Spacing = 0;
         public int MaxRequests = 30;
         public TimeSpan RenewBefore = TimeSpan.FromMinutes(5);
+        public DatagramHysteresisOptions? Hysteresis;
     }
 
     private static async Task<T> AwaitTransport<T>(Peer peer, MediaTransportKind kind, Func<T, bool>? match = null, int skip = 0) where T : class
@@ -78,6 +80,9 @@ public sealed partial class BoltGroupCallLifecycleTests
         var relay = network.Created.Single(x => x.Role == RtcPeerRole.Answer && ReferenceEquals(x.Partner, participant));
         return (relay, participant, config.Session);
     }
+
+    /// <summary>For tests of the mechanics of leaving and returning, not of the hysteresis (DatagramPathHysteresisTests).</summary>
+    internal static readonly DatagramHysteresisOptions QuickPath = new() { FirstHoldMs = 0, MaxHoldMs = 0, HealthyForMs = 0, MaxFlaps = 100 };
 
     private static int MediaOn(FakeRtcPeer peer, FrameType type = FrameType.MediaFrame) => peer.Sent.Count(x => x[0] == (byte)type);
 
@@ -489,7 +494,7 @@ public sealed partial class BoltGroupCallLifecycleTests
         // The phone hears nothing on its channel (its ICE went quiet) while the relay still hears the phone: only the
         // phone knows the downlink is dead. It says so over its socket, and says so again when the channel is back.
         var network = new FakeRtcNetwork();
-        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource(), x => x.Hysteresis = QuickPath));
         f.Policy.Accepted.UnionWith(f.Peers.Keys);
         foreach (var id in f.Peers.Keys) await f.Join(id);
         var (relay, _, session) = await OpenDatagramAsync(f, network, "a");
@@ -502,6 +507,34 @@ public sealed partial class BoltGroupCallLifecycleTests
         await f.Send("b", stream);
         await WaitUntil(() => MediaOn(relay) == 1);
         Assert.That(f.Peers["a"].Count(FrameType.MediaFrame), Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task Datagram_AChannelThatFlaps_DoesNotDragMediaBackAndForth()
+    {
+        // Production 12:47-12:49 UTC: the channel stalled and recovered every few seconds, and every time the relay
+        // moved that receiver's media back onto it. Each switch reorders or loses frames and costs a keyframe.
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var (relay, _, _) = await OpenDatagramAsync(f, network, "a");
+        var stream = await f.Config("b");
+        var started = Environment.TickCount64;
+        var tick = 0;
+        while (Environment.TickCount64 - started < 4_000)
+        {
+            if (tick % 10 == 0) relay.Stall();
+            if (tick % 10 == 3) relay.Recover();
+            await f.Send("b", stream);
+            tick++;
+            await Task.Delay(20);
+        }
+        var onChannel = relay.Sent.Where(x => x[0] == (byte)FrameType.MediaFrame && BoltCodec.TryReadMediaFrame(x, out _))
+            .Select(x => { BoltCodec.TryReadMediaFrame(x, out var h); return h.SequenceNumber; }).ToHashSet();
+        var all = onChannel.Concat(f.Peers["a"].Media(stream).Select(x => x.Sequence)).Order().ToList();
+        var switches = all.Zip(all.Skip(1)).Count(x => onChannel.Contains(x.First) != onChannel.Contains(x.Second));
+        Assert.That(switches, Is.LessThanOrEqualTo(2), "one move to the socket, at most one back: not one per blip");
     }
 
     private static BoltHubConnection Connection(Fixture f, string id)

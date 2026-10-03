@@ -65,7 +65,17 @@ public sealed class RtcSidecar : IRtcPeerFactory, IAsyncDisposable
         var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
         try
         {
-            await socket.ConnectAsync(new UnixDomainSocketEndPoint(socketPath), ct);
+            try { await socket.ConnectAsync(new UnixDomainSocketEndPoint(socketPath), ct); }
+            catch (SocketException) when (_process is { } process)
+            {
+                // The sidecar died and its peers noticed before the process object did: its socket refuses. Let the
+                // exit land, start a new one and connect to that instead (once).
+                try { process.WaitForExit(1000); } catch { /* Gone. */ }
+                socket.Dispose();
+                socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+                socketPath = await EnsureStartedAsync(ct);
+                await socket.ConnectAsync(new UnixDomainSocketEndPoint(socketPath), ct);
+            }
             var stream = new NetworkStream(socket, ownsSocket: true);
             var hello = JsonSerializer.SerializeToUtf8Bytes(new SidecarHello(
                 _token, role == RtcPeerRole.Offer ? "offer" : "answer",

@@ -37,7 +37,8 @@ public sealed partial class BoltMediaService
         return snapshot is null ? null : snapshot with
         {
             SendQueue = _videoSend?.Reader.Count ?? 0,
-            Transport = path.Description, TransportReason = path.Reason, TransportRttMs = path.RttMs, AudioRedundancy = path.AudioRedundancy,
+            // Both legs: "UDP/relay (relay UDP/relay)". A TCP or TLS leg on either side is the first thing to look for.
+            Transport = path.RelayLeg is { } relayLeg ? $"{path.Description} (relay {relayLeg})" : path.Description, TransportReason = path.Reason, TransportRttMs = path.RttMs, AudioRedundancy = path.AudioRedundancy,
         };
     }
 

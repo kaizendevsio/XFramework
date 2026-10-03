@@ -5259,6 +5259,8 @@ public sealed class BoltHubConnection
         // A new channel: nothing it holds is stuck yet, and the participant has not reported it stalled.
         _datagramDrain = new DatagramDrainWatch();
         Volatile.Write(ref _datagramSuspended, 0);
+        // A first channel (or one after a network change) is used at once; a replacement after a failure waits out the
+        // hold of the path it replaces (see DatagramPathHysteresis).
         if (previous is not null) previous.BufferedAmountLow -= _wakeMedia;
         peer.BufferedAmountLow += _wakeMedia;
         SignalMediaWork();
@@ -5290,6 +5292,28 @@ public sealed class BoltHubConnection
     /// <summary>Raised (on the send loop) when the attached channel stops draining (true) or drains again (false).</summary>
     internal Action<bool>? DatagramDrainChanged { get; set; }
 
+    private DatagramPathHysteresis _pathHysteresis = new();
+
+    /// <summary>Hysteresis for this receiver's datagram path; set by the relay from its media transport options.</summary>
+    internal DatagramHysteresisOptions PathHysteresisOptions
+    {
+        // Once per connection: flaps count across sessions (a renewal, or a retry after a failure).
+        set { if (!ReferenceEquals(_pathHysteresis.Options, value) && _pathHysteresis.Switches == 0) _pathHysteresis = new DatagramPathHysteresis(value); }
+    }
+
+    /// <summary>Raised (on the send loop) when media moves onto the datagram path (true) or off it (false).</summary>
+    internal Action<bool, DatagramPathHysteresis>? DatagramPathChanged { get; set; }
+
+    /// <summary>Times this receiver's media moved between its data channel and its socket.</summary>
+    public long DatagramPathSwitches => _pathHysteresis.Switches;
+
+    /// <summary>A network change on the participant's side: its old path's flaps say nothing about the new one.</summary>
+    internal void ResetDatagramPath()
+    {
+        _pathHysteresis.Reset();
+        SignalMediaWork();
+    }
+
     /// <summary>The attached channel has held bytes without draining any for a while: it is not carrying media.</summary>
     internal bool DatagramDrainStalled => _datagramDrain.Stalled;
 
@@ -5299,13 +5323,25 @@ public sealed class BoltHubConnection
     /// </summary>
     private bool DatagramUsable(IRtcPeer datagram)
     {
-        if (datagram.State != RtcChannelState.Open || Volatile.Read(ref _datagramSuspended) != 0) return false;
-        var drain = _datagramDrain;
-        if (drain.Observe(datagram.BufferedAmount, Environment.TickCount64))
+        var now = Environment.TickCount64;
+        var healthy = datagram.State == RtcChannelState.Open && Volatile.Read(ref _datagramSuspended) == 0;
+        if (healthy)
         {
-            try { DatagramDrainChanged?.Invoke(drain.Stalled); } catch { /* Logging only. */ }
+            var drain = _datagramDrain;
+            if (drain.Observe(datagram.BufferedAmount, now))
+            {
+                try { DatagramDrainChanged?.Invoke(drain.Stalled); } catch { /* Logging only. */ }
+            }
+            healthy = !drain.Stalled;
         }
-        return !drain.Stalled;
+        // Leave at once, return only after a hold and sustained health, give up after repeated flaps: every switch costs
+        // reordered or lost frames and a keyframe.
+        var path = _pathHysteresis;
+        if (path.Observe(healthy, now))
+        {
+            try { DatagramPathChanged?.Invoke(path.Usable, path); } catch { /* Logging only. */ }
+        }
+        return healthy && path.Usable;
     }
 
     private bool TrySendDatagram(IRtcPeer datagram, BoltMediaSendQueue.Item item)

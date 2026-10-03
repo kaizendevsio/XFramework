@@ -331,7 +331,8 @@ internal static class Relay
         if (field?.GetValue(server) is not System.Collections.IDictionary connections) return null;
         foreach (System.Collections.DictionaryEntry entry in connections)
             if (entry.Value is BoltHubConnection { ClientId: "receiver" } receiver)
-                return new { sent = receiver.DatagramFramesSent, fellBackToSocket = receiver.DatagramFallbacks, redundantAudio = receiver.RedundantAudioFrames };
+                return new { sent = receiver.DatagramFramesSent, fellBackToSocket = receiver.DatagramFallbacks, redundantAudio = receiver.RedundantAudioFrames,
+                    switches = receiver.DatagramPathSwitches };
         return null;
     }
 #endif
@@ -587,6 +588,12 @@ internal static class Receiver
         // channel still says "open". The relay must notice and put the media back on the socket by itself.
         var udpStallAt = Env.Int("UDP_STALL_AT_S", -1);
         var udpStalled = false;
+        // UDP_FLAP_EVERY_S / UDP_FLAP_FOR_S: from 30 s on, the channel's UDP dies for a few seconds every so often and
+        // comes back by itself (a flaky radio, a TURN leg that stalls): the relay must not follow it back and forth.
+        var flapEvery = Env.Int("UDP_FLAP_EVERY_S", 0);
+        var flapFor = Env.Int("UDP_FLAP_FOR_S", 2);
+        List<string>? flapRules = null;
+        var nextFlapAt = 30.0;
         // A datagram path loses fragments; like the browser, a decoder that cannot show a picture asks its sender for a
         // keyframe (at most once a second per stream). Over a WebSocket nothing is lost, so the twins never need to.
         long lastKeyframeRequest = long.MinValue / 2;
@@ -624,6 +631,17 @@ internal static class Receiver
             {
                 var now = Env.NowMs();
 #if HARNESS_ADAPTIVE
+                if (datagram is not null && flapEvery > 0)
+                {
+                    var t = clock.Elapsed.TotalSeconds;
+                    if (flapRules is null && t >= nextFlapAt) flapRules = HarnessDatagram.BlackholeUdp();
+                    else if (flapRules is not null && t >= nextFlapAt + flapFor)
+                    {
+                        HarnessDatagram.RestoreUdp(flapRules);
+                        flapRules = null;
+                        nextFlapAt += flapEvery;
+                    }
+                }
                 if (datagram is not null && udpStallAt >= 0 && !udpStalled && clock.Elapsed.TotalSeconds >= udpStallAt)
                 {
                     udpStalled = true;

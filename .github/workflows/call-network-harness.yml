@@ -113,6 +113,9 @@ jobs:
           - { name: ws-20mbit-20ms, target: head, relaynet: "delay 10ms 2ms rate 20mbit", recvnet: "delay 10ms 2ms", at: -1, for: 0, expect: video-climbs, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=360" }
           # The data channel dies silently at 60 s (no network-change event; the channel still says "open"):
           # the relay must move the media back to the socket by itself within seconds.
+          # The channel's UDP dies for 4 s every 15 s (1 s every 10 s at 20 Mbit/s) and comes back by itself: media must not follow it back and forth.
+          - { name: udp-flap-4g, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: flap-bounded, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1 UDP_FLAP_EVERY_S=15 UDP_FLAP_FOR_S=4" }
+          - { name: udp-flap-20mbit, target: head, relaynet: "delay 10ms 2ms rate 20mbit", recvnet: "delay 10ms 2ms", at: -1, for: 0, expect: flap-bounded, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=360 UDP=1 UDP_FLAP_EVERY_S=10 UDP_FLAP_FOR_S=1" }
           - { name: udp-silent-stall-4g, target: head, relaynet: "delay 50ms 10ms rate 2mbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: audio-continues, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1 UDP_STALL_AT_S=60" }
           - { name: udp-512k-1000ms-1pct-sframe278, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: survive, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 UDP=1 SFRAME_OVERHEAD=278" }
           - { name: ws-512k-1000ms-1pct-sframe278, target: head, relaynet: "delay 500ms 20ms rate 512kbit loss 1%", recvnet: "delay 500ms 20ms", at: -1, for: 0, expect: any, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240 SFRAME_OVERHEAD=278" }

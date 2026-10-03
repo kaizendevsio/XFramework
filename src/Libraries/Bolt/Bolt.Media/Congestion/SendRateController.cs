@@ -334,12 +334,29 @@ public sealed class SendRateController
     }
 
     /// <summary>
-    /// The pipe under the sender changed because the old one died (a data channel that failed or stopped draining,
-    /// with media moving to the WebSocket). What was measured on it - a backlog that never drained, reports that never
-    /// came back - says nothing about the link, so the path starts over from the stable rate, as after an outage.
+    /// The pipe under the sender changed (a data channel was left for the WebSocket, or the other way round). The link
+    /// did not change, so neither does the estimate: it is kept, and raised back to the stable rate if the dead pipe's
+    /// undrained backlog had already cut it. Only what was measured on the old pipe is forgotten (its delay history and
+    /// a decrease in progress), and video that the dead pipe had suspended may come back at once. The picture is not
+    /// restarted: no keyframe for a switch. Restarting from half the stable rate here, with a path flapping every few
+    /// seconds, took the estimate from 5 Mbit/s to 300 kbps in five switches.
     /// </summary>
-    public void RestartAfterPathChange(long now) =>
-        RestartAfterOutage(now, _audioKbps + _options.AudioOverheadBytes * 8 * _options.AudioPacketsPerSecond / 1000);
+    public void RestartAfterPathChange(long now)
+    {
+        var audioWire = _audioKbps + _options.AudioOverheadBytes * 8 * _options.AudioPacketsPerSecond / 1000;
+        _estimate = Math.Clamp(Math.Max(_estimate, StableKbps), _options.MinTotalKbps, _options.MaxTotalKbps);
+        _history.Clear();
+        _risingStreak = _cutStreak = 0;
+        _lastDecreaseAt = long.MinValue / 2;
+        _delayAtDecrease = 0;
+        _calmSince = null;
+        _lowVideoSince = null;
+        if (_suspended && _estimate - audioWire >= _options.ResumeVideoKbps)
+        {
+            _suspended = false;
+            _resumedAt = now;
+        }
+    }
 
     private void RestartAfterOutage(long now, int audioWireKbps)
     {
