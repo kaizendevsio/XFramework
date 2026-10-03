@@ -1,5 +1,6 @@
 using System.Buffers;
 using Bolt.Client;
+using Bolt.Media.Congestion;
 using Bolt.Protocol;
 using Bolt.Protocol.Transport;
 using Microsoft.Extensions.Logging;
@@ -87,6 +88,9 @@ public sealed class MediaTransportClient : IAsyncDisposable
     private string? _relayLeg;
     /// <summary>The relay was told the active channel is stalled (and has not been told it is back).</summary>
     private bool _reportedStalled;
+    private readonly TransportFeedbackEstimator _feedback = new();
+    private readonly List<long> _arrivals = [];
+    private int _transportSequence;
 
     private sealed class Session(string id, MediaTransportConfig config, long createdAt)
     {
@@ -148,8 +152,23 @@ public sealed class MediaTransportClient : IAsyncDisposable
 
     public bool IsDatagramActive => ActivePeer is not null;
 
-    /// <summary>Largest message the active channel takes; 0 when media goes over the socket.</summary>
-    public int MaxMessageBytes => ActivePeer?.MaxMessageBytes ?? 0;
+    /// <summary>Largest message the active channel takes (less the transport stamp, when there is one); 0 when media goes over the socket.</summary>
+    public int MaxMessageBytes => ActivePeer is { } peer ? peer.MaxMessageBytes - (StampsMessages ? TransportSequenceCodec.HeaderSize : 0) : 0;
+
+    /// <summary>
+    /// The active path's relay reports when each message arrived (<see cref="MediaTransportFeatures.TransportFeedback"/>):
+    /// every message sent on it carries a transport-wide sequence number. An older relay gets them unstamped.
+    /// </summary>
+    public bool StampsMessages
+    {
+        get { lock (_sync) return MediaTransportFeatures.Has(_active?.Config, MediaTransportFeatures.TransportFeedback); }
+    }
+
+    /// <summary>The uplink as the relay's transport feedback describes it, after each report (see <see cref="TransportFeedbackEstimator"/>).</summary>
+    public event Action<TransportSignal>? TransportFeedback;
+
+    private static long NowMicroseconds() =>
+        (long)(System.Diagnostics.Stopwatch.GetTimestamp() * (1_000_000.0 / System.Diagnostics.Stopwatch.Frequency));
 
     /// <summary>Bytes the channel has accepted and not yet sent; part of the sender's transport backlog.</summary>
     public long BufferedAmount => ActivePeer?.BufferedAmount ?? 0;
@@ -240,19 +259,69 @@ public sealed class MediaTransportClient : IAsyncDisposable
     public bool TrySend(ReadOnlySpan<byte> frame, bool audio = false)
     {
         var peer = ActivePeer;
-        if (peer is null || frame.IsEmpty || frame.Length > peer.MaxMessageBytes)
+        var stamp = StampsMessages;
+        if (peer is null || frame.IsEmpty || frame.Length > peer.MaxMessageBytes - (stamp ? TransportSequenceCodec.HeaderSize : 0))
             return false;
         if (audio && frame[0] == (byte)FrameType.MediaFrame && BoltCodec.TryReadMediaFrameHeader(frame, out var streamId))
-            return SendAudio(peer, streamId, frame);
-        if (!peer.TrySend(frame)) return false;
-        _drain.Sent(frame.Length);
-        return true;
+            return SendAudio(peer, streamId, frame, stamp);
+        return SendMessage(peer, frame, stamp);
+    }
+
+    /// <summary>
+    /// One message on the channel, stamped when the relay reports arrivals. A refused message used up its number without
+    /// being recorded, so the gap it leaves is never counted as loss.
+    /// </summary>
+    private bool SendMessage(IRtcPeer peer, ReadOnlySpan<byte> message, bool stamp)
+    {
+        if (!stamp)
+        {
+            if (!peer.TrySend(message)) return false;
+            _drain.Sent(message.Length);
+            return true;
+        }
+        var size = TransportSequenceCodec.HeaderSize + message.Length;
+        if (size > peer.MaxMessageBytes) return false;
+        var buffer = ArrayPool<byte>.Shared.Rent(size);
+        try
+        {
+            var sequence = unchecked((ushort)Interlocked.Increment(ref _transportSequence));
+            TransportSequenceCodec.Write(buffer, sequence, message);
+            if (!peer.TrySend(buffer.AsSpan(0, size))) return false;
+            _feedback.OnSent(sequence, size, NowMicroseconds());
+            _drain.Sent(size);
+            return true;
+        }
+        finally { ArrayPool<byte>.Shared.Return(buffer); }
+    }
+
+    /// <summary>A message from the relay: transport feedback is this client's own, everything else goes to the frame handlers.</summary>
+    private void OnPeerMessage(ReadOnlyMemory<byte> data)
+    {
+        var message = data.Span;
+        if (message.IsEmpty) return;
+        if (message[0] != (byte)FrameType.TransportFeedback)
+        {
+            _client.DispatchDatagram(message);
+            return;
+        }
+        TransportSignal? signal;
+        lock (_arrivals)
+        {
+            if (!TransportFeedbackCodec.TryRead(message, out var first, _arrivals)) return;
+            _feedback.OnFeedback(first, _arrivals, _clock());
+            signal = _feedback.Signal;
+        }
+        if (signal is { } value)
+        {
+            try { TransportFeedback?.Invoke(value); }
+            catch (Exception ex) { _logger.LogDebug(ex, "A transport feedback listener failed"); }
+        }
     }
 
     // The previous audio frame per stream, for redundancy.
     private readonly Dictionary<Guid, byte[]> _lastAudio = new();
 
-    private bool SendAudio(IRtcPeer peer, Guid streamId, ReadOnlySpan<byte> frame)
+    private bool SendAudio(IRtcPeer peer, Guid streamId, ReadOnlySpan<byte> frame, bool stamp)
     {
         byte[]? previous;
         lock (_lastAudio) previous = _lastAudio.GetValueOrDefault(streamId);
@@ -266,17 +335,12 @@ public sealed class MediaTransportClient : IAsyncDisposable
                 try
                 {
                     MediaBundleCodec.Write(bundle, previous, frame);
-                    sent = peer.TrySend(bundle.AsSpan(0, size));
-                    if (sent) _drain.Sent(size);
+                    sent = SendMessage(peer, bundle.AsSpan(0, size), stamp);
                 }
                 finally { ArrayPool<byte>.Shared.Return(bundle); }
             }
         }
-        if (!sent)
-        {
-            if (!peer.TrySend(frame)) return false;
-            _drain.Sent(frame.Length);
-        }
+        if (!sent && !SendMessage(peer, frame, stamp)) return false;
         lock (_lastAudio)
         {
             if (_lastAudio.Count >= 8 && !_lastAudio.ContainsKey(streamId)) _lastAudio.Clear();
@@ -517,7 +581,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
         };
         peer.StateChanged += state => _ = OnPeerStateAsync(session, state);
         peer.PathChanged += _ => Raise();
-        peer.Message += data => _client.DispatchDatagram(data.Span);
+        peer.Message += OnPeerMessage;
         session.Candidates.Hold();
         var offer = await peer.CreateOfferAsync(iceRestart: false, _lifetime.Token);
         await SendAsync(MediaTransportKind.Offer, new MediaTransportDescription(session.Id, offer));

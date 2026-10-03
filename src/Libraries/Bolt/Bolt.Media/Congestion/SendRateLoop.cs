@@ -13,6 +13,7 @@ public sealed class SendPathSignals
     private bool _relayDropping, _relayBaseLost;
     private readonly List<(long At, bool Video, int DelayMs, int Kbps)> _feedback = [];
     private ReceiverSignal? _lastReceiver;
+    private TransportSignal? _transport;
     private const int FeedbackWindowMs = 1_000;
     /// <summary>A receiver that went quiet is still reported, as it last was, for this long (see <see cref="SendRateController"/>).</summary>
     public const int SilentReceiverMs = 15_000;
@@ -25,7 +26,20 @@ public sealed class SendPathSignals
             _relayDropping = _relayBaseLost = false;
             _feedback.Clear();
             _lastReceiver = null;
+            _transport = null;
         }
+    }
+
+    /// <summary>The relay's transport feedback on this sender's uplink (datagram paths whose relay reports it).</summary>
+    public void OnTransportFeedback(in TransportSignal signal)
+    {
+        lock (_sync) _transport = signal;
+    }
+
+    /// <summary>The latest transport feedback, when it is fresh.</summary>
+    public TransportSignal? TakeTransport(long nowMs, int freshMs = 1_500)
+    {
+        lock (_sync) return _transport is { } signal && nowMs - signal.ReceivedAtMs <= freshMs ? signal : null;
     }
 
     public void OnCongestionReport(in MediaCongestionData report, bool video, long nowMs)
@@ -121,7 +135,8 @@ public readonly record struct SendRateTick(
     MediaSendPacerSample Pacer,
     RelaySignal? Relay = null,
     ReceiverSignal? Receiver = null,
-    int? AudioFrameMs = null);
+    int? AudioFrameMs = null,
+    TransportSignal? Transport = null);
 
 /// <summary>
 /// Couples one sender's pacer, rate controller and picture ladder. The host calls <see cref="Tick"/> every
@@ -180,8 +195,9 @@ public sealed class SendRateLoop
         var pacer = Pacer.Sample();
         var sentVideo = Math.Max(0, pacer.SentKbps - pacer.AudioKbps);
         var (relay, receiver) = _signals.Take(nowMs, sentVideo, pacer.AudioKbps, Controller.Options.ReportFreshMs);
+        var transport = _signals.TakeTransport(nowMs, Controller.Options.ReportFreshMs);
         var decision = Controller.Update(new SendPathSample(nowMs, pacer.SentKbps, pacer.AudioKbps, pacer.QueueDelayMs,
-            pacer.CapacityKbps, pacer.BaseLosses > 0, relay, receiver));
+            pacer.CapacityKbps, pacer.BaseLosses > 0, relay, receiver, transport));
         Pacer.RateKbps = decision.TotalKbps;
 
         // A phone that cannot encode fast enough is capped on its own, whatever the network says.
@@ -215,6 +231,6 @@ public sealed class SendRateLoop
         int? audio = decision.AudioKbps != _audioKbps ? decision.AudioKbps : null;
         _audioKbps = decision.AudioKbps;
         var frameMs = Audio.Update(Controller.CongestionKbps, decision.VideoSuspended, nowMs);
-        return new SendRateTick(decision, video, suspend, resume, audio, pacer, relay, receiver, frameMs);
+        return new SendRateTick(decision, video, suspend, resume, audio, pacer, relay, receiver, frameMs, transport);
     }
 }

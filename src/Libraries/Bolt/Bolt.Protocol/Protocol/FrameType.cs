@@ -76,6 +76,16 @@ public enum FrameType : byte
     /// as <see cref="NackRequest"/>: [1:type] [16:streamId] [2:count] [count * 4:sequences].
     /// </summary>
     NackDeclined = 0x2A,
+    /// <summary>
+    /// Participant to relay, datagram path only: one message stamped with a transport-wide sequence number, so the relay
+    /// can report when it arrived: [1:type] [2:sequence] [message]. See <see cref="TransportSequenceCodec"/>.
+    /// </summary>
+    TransportSequenced = 0x2B,
+    /// <summary>
+    /// Relay to participant, datagram path only: arrival times of its transport-sequenced messages, for the sender's
+    /// delay-gradient and loss estimate. See <see cref="TransportFeedbackCodec"/>.
+    /// </summary>
+    TransportFeedback = 0x2C,
 }
 
 /// <summary>Media type identifier.</summary>

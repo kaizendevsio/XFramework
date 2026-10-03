@@ -4861,6 +4861,7 @@ public sealed partial class BoltServer : IDisposable
 
         _shutdownCts.Cancel();
         _mediaTransportTimer?.Dispose();
+        _transportFeedbackTimer?.Dispose();
         foreach (var transport in _mediaTransports.Values)
             _ = CloseMediaTransportAsync(transport.Connection);
         _mediaTapCts.Cancel();
@@ -5344,6 +5345,9 @@ public sealed class BoltHubConnection
     internal void RecordDatagramRejected() => Interlocked.Increment(ref _datagramRejected);
 
     private readonly VideoSendLedger _videoLedger = new();
+
+    /// <summary>When this participant's transport-sequenced datagrams arrived, for its next transport feedback report.</summary>
+    internal TransportFeedbackRecorder TransportArrivals { get; } = new();
     private long _retransmitted;
 
     /// <summary>Which video frames this receiver has been sent, per stream (see <see cref="VideoSendLedger"/>).</summary>

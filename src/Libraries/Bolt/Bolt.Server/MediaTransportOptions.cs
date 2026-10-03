@@ -76,6 +76,13 @@ public sealed class BoltMediaTransportOptions
     /// </summary>
     public bool Nack { get; init; } = true;
 
+    /// <summary>
+    /// Per-message delivery feedback on datagram paths: participants stamp what they send with a transport-wide sequence
+    /// number and the relay reports arrival times every 100 ms, for the sender's delay-gradient and loss estimate of its
+    /// uplink. Announced as <see cref="Bolt.Protocol.MediaTransportFeatures.TransportFeedback"/>.
+    /// </summary>
+    public bool TransportFeedback { get; init; } = true;
+
     /// <summary>ICE restarts one session may ask for; each re-allocates TURN on both ends. Then the session ends (the call goes on).</summary>
     public int MaxIceRestartsPerSession { get; init; } = 16;
 

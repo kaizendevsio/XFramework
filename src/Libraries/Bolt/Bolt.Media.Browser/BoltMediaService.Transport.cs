@@ -44,6 +44,8 @@ public sealed partial class BoltMediaService
         // A channel that failed or stopped draining under the sender: what the rate control measured on it was the
         // dead channel, not the link. It starts over on the WebSocket instead of suspending video for a dead pipe.
         transport.PathLost += () => _rateLoop?.PathChanged();
+        // The relay's per-message arrival times on this device's uplink: the rate loop's GCC-style delay-gradient and loss input.
+        transport.TransportFeedback += signal => _signals.OnTransportFeedback(signal);
         // Requests a session once the socket is registered, and keeps the path healthy from then on.
         transport.Start();
         return transport;

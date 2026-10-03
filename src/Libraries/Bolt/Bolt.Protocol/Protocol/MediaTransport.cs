@@ -55,6 +55,12 @@ public static class MediaTransportFeatures
     /// </summary>
     public const string Nack = "nack";
 
+    /// <summary>
+    /// The relay takes <see cref="FrameType.TransportSequenced"/> messages on the data channel and reports their arrival
+    /// times (<see cref="FrameType.TransportFeedback"/>) about every 100 ms.
+    /// </summary>
+    public const string TransportFeedback = "twcc";
+
     public static bool Has(MediaTransportConfig? config, string feature) =>
         config?.Features is { } features && Array.IndexOf(features, feature) >= 0;
 }

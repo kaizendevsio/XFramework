@@ -59,6 +59,13 @@ public sealed class SendRateOptions
     public int ReturnAfterSilenceMs { get; init; } = 5_000;
     /// <summary>Time constant of the stable rate: the calm operating point, not a probe's peak.</summary>
     public int StableTimeConstantMs { get; init; } = 10_000;
+    /// <summary>
+    /// Uplink loss (from transport feedback) above which the path is overused whatever the delay says: GCC's loss-based
+    /// half. Random loss on a mobile link sits well below it; a saturated uplink dropping at its queue does not.
+    /// </summary>
+    public double OveruseLossFraction { get; init; } = 0.10;
+    /// <summary>Between this and <see cref="OveruseLossFraction"/> the estimate holds instead of growing.</summary>
+    public double HoldLossFraction { get; init; } = 0.02;
     /// <summary>Bolt, SFrame and WS/TLS/TCP bytes on every audio packet, and packets per second.</summary>
     public int AudioOverheadBytes { get; init; } = 130;
     public int AudioPacketsPerSecond { get; init; } = 50;
@@ -95,7 +102,8 @@ public readonly record struct SendPathSample(
     int LocalCapacityKbps,
     bool LocalBaseLost,
     RelaySignal? Relay = null,
-    ReceiverSignal? Receiver = null);
+    ReceiverSignal? Receiver = null,
+    TransportSignal? Transport = null);
 
 public enum RateSignal { Normal, Overuse, Hold }
 
@@ -253,10 +261,13 @@ public sealed class SendRateController
         var fresh = _options.ReportFreshMs;
         var relay = sample.Relay is { } r && now - r.ReceivedAtMs <= fresh ? r : (RelaySignal?)null;
         var receiver = sample.Receiver is { } q && now - q.ReceivedAtMs <= fresh ? q : (ReceiverSignal?)null;
+        // Transport feedback measures the uplink per message; with it, the relay's coarser per-picture uplink delay
+        // describes the same leg and is not added again.
+        var transport = sample.Transport is { } t && now - t.ReceivedAtMs <= fresh ? t : (TransportSignal?)null;
         // A receiver that was reporting and went quiet: its reports ride back over the congested path (the ACKs for
         // them queue behind our own media), so silence during a queue means the queue is still there and growing.
         var silent = receiver is null && sample.Receiver is { } quiet && now - quiet.ReceivedAtMs <= SilentReceiverMs ? quiet : (ReceiverSignal?)null;
-        if (relay is not null || receiver is not null) _remoteSeen = true;
+        if (relay is not null || receiver is not null || transport is not null) _remoteSeen = true;
         if (receiver is { } back)
         {
             // Every receiver went quiet for a long time and reports again, calmly: that was an outage (a receiver
@@ -268,10 +279,11 @@ public sealed class SendRateController
         }
         // Increases need someone downstream saying the path is fine, unless nobody downstream ever reports.
         var informed = silent is null &&
-                       (relay is not null || receiver is not null || (!_remoteSeen && now - _startedAt >= _options.RemoteGraceMs));
+                       (relay is not null || receiver is not null || transport is not null || (!_remoteSeen && now - _startedAt >= _options.RemoteGraceMs));
 
         var delay = sample.LocalQueueDelayMs;
-        if (relay is { } rs) delay = Math.Max(delay, rs.QueueDelayMs + rs.UplinkDelayMs);
+        if (relay is { } rs) delay = Math.Max(delay, rs.QueueDelayMs + (transport is null ? rs.UplinkDelayMs : 0));
+        if (transport is { } ts) delay = Math.Max(delay, ts.QueueDelayMs + (relay?.QueueDelayMs ?? 0));
         if (receiver is { } rq) delay = Math.Max(delay, rq.QueueDelayMs);
         else if (silent is { } sq && sq.QueueDelayMs >= _options.TargetDelayMs)
             delay = Math.Max(delay, sq.QueueDelayMs + (int)Math.Min(int.MaxValue / 2, now - sq.ReceivedAtMs));
@@ -291,14 +303,17 @@ public sealed class SendRateController
         var starved = receiver is { ReceivedKbps: > 0 } got && delay >= _options.TargetDelayMs && _sentAverage > 0 &&
                       got.ReceivedKbps < _sentAverage * StarvedFraction;
         var overload = delay >= _options.HighDelayMs && (gradient >= OverloadGradientMsPerSecond || jump || starved);
-        var overuse = baseLost || standing || shedding || overload || _risingStreak >= RisingSamples;
+        // GCC's loss half, on the uplink: heavy loss is congestion whatever the delay says.
+        var lossy = transport is { } lt && lt.LossFraction > _options.OveruseLossFraction;
+        var overuse = baseLost || standing || shedding || overload || lossy || _risingStreak >= RisingSamples;
         // Probing needs the path quiet now as well: a spike (a stall, a keyframe) holds the estimate for that tick.
-        var calm = !overuse && informed && floor < _options.TargetDelayMs / 2 && delay < _options.TargetDelayMs;
+        var calm = !overuse && informed && floor < _options.TargetDelayMs / 2 && delay < _options.TargetDelayMs &&
+                   (transport is not { } lc || lc.LossFraction <= _options.HoldLossFraction);
         // After a decrease the queue keeps growing for a feedback delay and then drains: drops and a high delay in
         // that time are the old rate, not new congestion, and cutting again is how controllers undershoot. With a
         // capacity measurement the test is exact (the estimate already fits the link); without one, the delay must
         // not have grown much past where it was when the cut was made.
-        var capacityNow = Capacity(sample, relay, receiver ?? silent, delay);
+        var capacityNow = Capacity(sample, relay, receiver ?? silent, delay, transport);
         var draining = overuse && now - _lastDecreaseAt < DrainWindowMs && !overloadAfterCut(capacityNow) &&
                        (capacityNow > 0 ? _estimate <= capacityNow * 0.95 : delay <= _delayAtDecrease + Math.Max(150, _delayAtDecrease / 2));
         bool overloadAfterCut(double capacity) => capacity > 0 && _estimate > capacity * 1.2;
@@ -316,7 +331,7 @@ public sealed class SendRateController
             // Once decreased, wait for the queue to drain unless it keeps getting much worse.
             var deeper = delay >= _options.HighDelayMs * 2 && gradient > 0;
             if (now - _lastDecreaseAt >= _options.HoldAfterDecreaseMs || (deeper && now - _lastDecreaseAt >= _options.HoldAfterDecreaseMs / 2))
-                Decrease(now, sample, relay, receiver ?? silent, delay, severe: baseLost || overload || _cutStreak > 0);
+                Decrease(now, sample, relay, receiver ?? silent, delay, severe: baseLost || overload || lossy || _cutStreak > 0, transport);
         }
         else if (calm)
         {
@@ -392,24 +407,29 @@ public sealed class SendRateController
     /// agree the larger wins; when the relay claims far more, the receiver's end-to-end view wins. The sender's own
     /// uplink is a different link: the smaller of the two ends is the path.
     /// </summary>
-    private double Capacity(in SendPathSample sample, RelaySignal? relay, ReceiverSignal? receiver, int delay)
+    private double Capacity(in SendPathSample sample, RelaySignal? relay, ReceiverSignal? receiver, int delay, TransportSignal? transport = null)
     {
         var downstream = 0.0;
         if (relay is { CapacityKbps: > 0 } rs) downstream = rs.CapacityKbps;
         // What a receiver got while its queue grew is what the path carries.
         if (receiver is { ReceivedKbps: > 0 } rq && delay >= _options.TargetDelayMs)
             downstream = downstream > 0 && downstream <= rq.ReceivedKbps * 2 ? Math.Max(downstream, rq.ReceivedKbps) : rq.ReceivedKbps;
-        if (sample.LocalCapacityKbps > 0)
-            return downstream > 0 ? Math.Min(downstream, sample.LocalCapacityKbps) : sample.LocalCapacityKbps;
+        // What reached the relay while the uplink queued or dropped is what the uplink carries.
+        var uplink = sample.LocalCapacityKbps;
+        if (transport is { DeliveredKbps: > 0 } tu && (tu.QueueDelayMs >= _options.TargetDelayMs || tu.LossFraction > _options.OveruseLossFraction))
+            uplink = uplink > 0 ? Math.Min(uplink, tu.DeliveredKbps) : tu.DeliveredKbps;
+        if (uplink > 0)
+            return downstream > 0 ? Math.Min(downstream, uplink) : uplink;
         return downstream;
     }
 
     /// <param name="severe">A queue overflowed, is growing faster than a stall could make it, or is still there after a
     /// first cut: cut to the link. Otherwise (the first sign of a standing or growing queue, which a single TCP stall
     /// also produces) at most a quarter goes, and a path that turns calm again loses nothing more.</param>
-    private void Decrease(long now, in SendPathSample sample, RelaySignal? relay, ReceiverSignal? receiver, int delay, bool severe)
+    private void Decrease(long now, in SendPathSample sample, RelaySignal? relay, ReceiverSignal? receiver, int delay, bool severe,
+        TransportSignal? transport = null)
     {
-        var capacity = Capacity(sample, relay, receiver, delay);
+        var capacity = Capacity(sample, relay, receiver, delay, transport);
         var measured = capacity > 0;
         // No measurement yet (the first reports of an overload): a queue growing by g ms every second means the
         // link takes 1000 / (1000 + g) of what is sent.

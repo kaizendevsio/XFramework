@@ -22,6 +22,9 @@ public sealed partial class BoltServer
     private readonly BoltMediaTransportOptions? _mediaTransport;
     private readonly ConcurrentDictionary<string, ConnectionMediaTransport> _mediaTransports = new(StringComparer.Ordinal);
     private Timer? _mediaTransportTimer;
+    private Timer? _transportFeedbackTimer;
+    /// <summary>How often participants on a datagram path hear when their messages arrived.</summary>
+    internal const int TransportFeedbackIntervalMs = 100;
 
     /// <summary>Most signalling messages waiting for one connection's worker; more are dropped.</summary>
     private const int MaxQueuedTransportMessages = 64;
@@ -68,6 +71,8 @@ public sealed partial class BoltServer
     {
         if (_mediaTransport is null) return;
         _mediaTransportTimer = new Timer(_ => _ = MediaTransportTickAsync(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        if (_mediaTransport.TransportFeedback)
+            _transportFeedbackTimer = new Timer(_ => SendTransportFeedback(), null, TransportFeedbackIntervalMs, TransportFeedbackIntervalMs);
     }
 
     /// <summary>Signalling never runs on the connection's receive loop: one worker per connection, in order.</summary>
@@ -312,8 +317,26 @@ public sealed partial class BoltServer
 
     private static MediaTransportConfig Unavailable(string reason) => new("", [], "all", 0, 0, reason);
 
-    private static string[]? TransportFeatures(BoltMediaTransportOptions options) =>
-        options.Nack ? [MediaTransportFeatures.Nack] : null;
+    private static string[]? TransportFeatures(BoltMediaTransportOptions options)
+    {
+        List<string> features = [];
+        if (options.Nack) features.Add(MediaTransportFeatures.Nack);
+        if (options.TransportFeedback) features.Add(MediaTransportFeatures.TransportFeedback);
+        return features.Count > 0 ? features.ToArray() : null;
+    }
+
+    /// <summary>Every 100 ms: tell each participant on a datagram path when its stamped messages arrived.</summary>
+    private void SendTransportFeedback()
+    {
+        if (_shutdownCts.IsCancellationRequested) return;
+        foreach (var transport in _mediaTransports.Values)
+        {
+            var connection = transport.Connection;
+            if (transport.Closed || !connection.IsAlive || connection.TransportArrivals.TryBuild() is not { } report) continue;
+            try { connection.TryEnqueueMedia(report, BoltMediaLane.Feedback, Guid.Empty); }
+            catch (Exception ex) when (ex is not OutOfMemoryException) { _logger.LogDebug(ex, "Transport feedback to {ClientId} was not queued", connection.ClientId); }
+        }
+    }
 
     private Task SendCandidateAsync(BoltHubConnection connection, TransportSession session, RtcCandidate candidate) =>
         SendTransportAsync(connection, MediaTransportKind.Candidate,
@@ -475,8 +498,19 @@ public sealed partial class BoltServer
         if (data.IsEmpty || !connection.IsRegistered || !connection.IsAlive || !_mediaEnabled)
             return;
         var message = data.Span;
+        if ((FrameType)message[0] == FrameType.TransportSequenced)
+        {
+            // The stamp only says when the message arrived; what is inside is checked exactly as if it came alone.
+            if (_mediaTransport is not { TransportFeedback: true } || !TransportSequenceCodec.TryRead(message, out var sequence, out var inner))
+            {
+                connection.RecordDatagramRejected();
+                return;
+            }
+            connection.TransportArrivals.Record(sequence, TransportFeedbackRecorder.NowMicroseconds());
+            message = inner;
+        }
         var type = (FrameType)message[0];
-        if (!DatagramFramePolicy.AcceptFromParticipant(type))
+        if (type == FrameType.TransportSequenced || !DatagramFramePolicy.AcceptFromParticipant(type))
         {
             connection.RecordDatagramRejected();
             return;
