@@ -26,10 +26,12 @@ internal sealed class AdaptiveSender(Stopwatch clock) : IAsyncDisposable
     private SendRateLoop? _loop;
     private MediaSendPacer? _pacer;
     private volatile int _audioKbps = 32;
+    private volatile int _audioFrameMs = 20;
     private volatile bool _suspended;
     private VideoSetting _setting;
     private readonly object _settingSync = new();
     private readonly List<(double At, string Rung)> _rungTimeline = [];
+    private readonly List<(double At, int FrameMs)> _audioPacketTimeline = [];
     private readonly List<(double At, int Estimate, int Video, int Delay, bool Suspended)> _estimates = [];
     public long AudioSent, VideoSent, Keyframes, KeyRequests, PacerDroppedPictures, Reports, FeedbackReports;
     public bool TemporalLayers { get; private set; }
@@ -57,6 +59,8 @@ internal sealed class AdaptiveSender(Stopwatch clock) : IAsyncDisposable
         var controller = new SendRateController(_setting.BitrateKbps + profile.AudioKbps + 52,
             new SendRateOptions { AudioNormalKbps = profile.AudioKbps, AudioLowKbps = Math.Min(24, profile.AudioKbps) });
         _loop = new SendRateLoop(_pacer, controller, ladder);
+        // AUDIO_MAX_FRAME_MS: 60 (receivers that read long packets, the default) or 20 (a legacy receiver in the call).
+        _loop.Audio.MaxFrameMs = Env.Int("AUDIO_MAX_FRAME_MS", 60);
         _audioKbps = profile.AudioKbps;
         _loops = Task.WhenAll(
             Task.Run(() => AudioLoopAsync(call)),
@@ -113,10 +117,15 @@ internal sealed class AdaptiveSender(Stopwatch clock) : IAsyncDisposable
         using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(20));
         try
         {
+            var captured = 0;
             while (await timer.WaitForNextTickAsync(_stop.Token))
             {
-                // Opus bytes for 20 ms at the current rate, plus the SFrame header and tag.
-                var payload = Payload.Create(_audioKbps * 20 / 8 + Env.SFrameOverhead, Payload.Audio);
+                // One packet per Opus packet length (20 ms, or 60 ms on a scarce link): its bytes at the current rate,
+                // plus the SFrame header and tag.
+                var frameMs = _audioFrameMs;
+                if (++captured * 20 < frameMs) continue;
+                captured = 0;
+                var payload = Payload.Create(_audioKbps * frameMs / 8 + Env.SFrameOverhead, Payload.Audio);
                 var sequence = ++_audioSequence;
                 var timestamp = (uint)(clock.ElapsedMilliseconds * 48); // capture clock, 48 kHz
                 _pacer!.EnqueueAudio(Frames.Write(w => BoltCodec.WriteMediaFrame(w, _audio, sequence, timestamp, MediaFrameFlags.Encrypted, payload)));
@@ -205,6 +214,12 @@ internal sealed class AdaptiveSender(Stopwatch clock) : IAsyncDisposable
                 await Task.Delay(SendRateLoop.IntervalMs, _stop.Token);
                 var tick = _loop!.Tick(Environment.TickCount64);
                 if (tick.AudioKbps is { } audio) _audioKbps = audio;
+                if (tick.AudioFrameMs is { } frameMs)
+                {
+                    _audioFrameMs = frameMs;
+                    _loop.Audio.Applied(frameMs);
+                    _audioPacketTimeline.Add((Math.Round(clock.Elapsed.TotalSeconds, 2), frameMs));
+                }
                 if (tick.SuspendVideo) _suspended = true;
                 if (tick.ResumeVideo) _suspended = false;
                 if (tick.Video is { } video)
@@ -221,7 +236,7 @@ internal sealed class AdaptiveSender(Stopwatch clock) : IAsyncDisposable
                 {
                     lastLog = clock.ElapsedMilliseconds;
                     Env.Log($"RATE t={seconds:F0} estimate={tick.Decision.TotalKbps} video={(_suspended ? "suspended" : current.ToString())} " +
-                            $"audio={_audioKbps}k delay={tick.Decision.DelayMs} signal={tick.Decision.Signal} sent={tick.Pacer.SentKbps} " +
+                            $"audio={_audioKbps}k/{_audioFrameMs}ms delay={tick.Decision.DelayMs} signal={tick.Decision.Signal} sent={tick.Pacer.SentKbps} " +
                             $"localQueue={tick.Pacer.QueueDelayMs} relay={Describe(tick.Relay)} receiver={Describe(tick.Receiver)} fb={FeedbackReports} rep={Reports}");
                 }
             }
@@ -262,7 +277,9 @@ internal sealed class AdaptiveSender(Stopwatch clock) : IAsyncDisposable
                 rungTimeline = string.Join(" ", _rungTimeline.Take(40).Select(x => $"{x.At:F1}s:{x.Rung}")),
                 pacerDroppedPictures = PacerDroppedPictures,
                 congestionReports = Reports,
-                receiverDelayReports = FeedbackReports
+                receiverDelayReports = FeedbackReports,
+                audioPacketMs = _audioFrameMs,
+                audioPacketTimeline = string.Join(" ", _audioPacketTimeline.Take(20).Select(x => $"{x.At:F1}s:{x.FrameMs}ms")),
             };
         }
     }
