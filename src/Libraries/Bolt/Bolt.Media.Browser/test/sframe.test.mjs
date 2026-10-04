@@ -165,3 +165,29 @@ test('sender key IDs below 8 are reserved for the compact format marker', () => 
             local: entry('alice', 1, 1), remote: [entry('bob', 22, 22)], compact: true }), /key ID/);
     } finally { session.dispose(); }
 });
+
+test("a picture's orientation travels encrypted, and no change to it on the way decrypts", () => {
+    // A version 2 video fragment (VideoFrameFragments.Split): a 90° keyframe, one fragment, frame 7, timestamp 1000.
+    const fragment = new Uint8Array(12 + 64);
+    fragment.set([0x20 | 0x01 | 0x02, 0, 0, 1]);
+    new DataView(fragment.buffer).setUint32(4, 7, true);
+    new DataView(fragment.buffer).setUint32(8, 1000, true);
+    for (let i = 12; i < fragment.length; i++) fragment[i] = (i * 37) & 0xff;
+    const contains = (haystack, needle) => haystack.some((_, i) => needle.every((x, j) => haystack[i + j] === x));
+    for (const sessions of [setupCompact('call', 1, ['alice', 'bob']), setup('call', 1, ['alice', 'bob'])]) {
+        try {
+            const [alice, bob] = sessions;
+            const packet = alice.encrypt(fragment, 'video', 3, 90);
+            assert.ok(!contains(packet, [...fragment.subarray(0, 12)]), 'the header, orientation included, is not on the wire');
+            // Turning the picture means changing byte 3 of the plaintext (90° to 270°: 1 to 3). Whatever byte of the frame a
+            // relay changes to try it, including the ciphertext byte over it in a counter-mode cipher, the tag fails.
+            for (let i = 0; i < packet.length; i++) {
+                const tampered = packet.slice(); tampered[i] ^= 0x02;
+                assert.throws(() => bob.decrypt('alice', tampered, 'video', 3, 90), `byte ${i}`);
+            }
+            const clear = bob.decrypt('alice', packet, 'video', 3, 90);
+            assert.deepEqual(clear, fragment);
+            assert.equal(clear[3], 1);
+        } finally { close(sessions); }
+    }
+});

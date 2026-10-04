@@ -231,7 +231,7 @@ public sealed partial class BoltMediaService
 
     // ── Send path: fragment, then encrypt each fragment like an audio packet ──
 
-    private void QueueEncodedVideo(byte[] data, bool isKeyframe, uint frameId, uint timestamp, int layer)
+    private void QueueEncodedVideo(byte[] data, bool isKeyframe, uint frameId, uint timestamp, int layer, int orientation)
     {
         if (_activeVideoStreamId == Guid.Empty) return;
         if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame && _sframe?.IsReady != true) return;
@@ -248,7 +248,8 @@ public sealed partial class BoltMediaService
         var channel = _videoSend;
         if (channel is null) return;
         // A whole picture is queued or dropped as one: half a picture on the wire is wasted bandwidth.
-        if (!channel.Writer.TryWrite(new VideoFramePayload(data, timestamp, isKeyframe, FrameId: frameId, Layer: layer))) VideoDropped(layer);
+        if (!channel.Writer.TryWrite(new VideoFramePayload(data, timestamp, isKeyframe, FrameId: frameId, Layer: layer, Orientation: orientation)))
+            VideoDropped(layer);
     }
 
     /// <summary>
@@ -265,10 +266,14 @@ public sealed partial class BoltMediaService
             {
                 var stream = _mediaClient?.GetMediaStream(_activeVideoStreamId);
                 if (stream is null) continue;
+                // A turned picture encoded before a member who cannot read its orientation joined: that member would
+                // drop it (or show it on its side). The encoder is already switching to upright pixels on a keyframe;
+                // losing this picture asks for that keyframe too.
+                if (!CallMediaFormat.CanSend(PeerMediaFormat, picture.Orientation)) { VideoDropped(picture.Layer); continue; }
                 // Fragment only accepted pictures: dropped pictures allocate no fragment arrays. On a datagram path
                 // every fragment must fit one message after encryption; anything bigger rides the WebSocket.
                 var fragments = VideoFrameFragments.Split(picture.Data, picture.FrameId, picture.TimestampMicroseconds, picture.IsKeyframe,
-                    picture.Layer, VideoFragmentPayload(stream, picture.Data.Length));
+                    picture.Layer, VideoFragmentPayload(stream, picture.Data.Length), picture.Orientation);
                 try
                 {
                     var sent = await stream.SendPictureAsync(fragments, picture.IsKeyframe,
@@ -343,11 +348,14 @@ public sealed partial class BoltMediaService
     {
         try
         {
+            var wait = 20;
             while (!ct.IsCancellationRequested)
             {
-                await Task.Delay(20, ct);
+                await Task.Delay(wait, ct);
                 Guid[] streams;
                 lock (_remoteVideo) streams = _videoAssemblers.Where(x => x.Value.RecoveryMs > 0).Select(x => x.Key).ToArray();
+                // Nothing recovering (a WebSocket path): look again four times a second instead of fifty.
+                wait = streams.Length == 0 ? 250 : 20;
                 foreach (var streamId in streams)
                     await StepVideoAsync(streamId, (buffer, ready, nacks) => buffer.Poll(Environment.TickCount64, ready, nacks));
             }
@@ -396,7 +404,8 @@ public sealed partial class BoltMediaService
                 transport.TrySend(writer.WrittenSpan);
             }
             foreach (var picture in ready)
-                await _video.DecodeFrameAsync(streamId, picture.Data, picture.TimestampMicroseconds, picture.IsKeyframe, picture.Discontinuity);
+                await _video.DecodeFrameAsync(streamId, picture.Data, picture.TimestampMicroseconds, picture.IsKeyframe, picture.Discontinuity,
+                    picture.Orientation);
         }
         finally
         {
@@ -407,7 +416,14 @@ public sealed partial class BoltMediaService
     private async Task ReleaseRemoteVideoAsync(Guid streamId)
     {
         bool removed;
-        lock (_remoteVideo) { removed = _remoteVideo.Remove(streamId); _videoAssemblers.Remove(streamId); _videoGates.Remove(streamId); _videoLocalDrops.Remove(streamId); }
+        CancellationTokenSource? idle = null;
+        lock (_remoteVideo)
+        {
+            removed = _remoteVideo.Remove(streamId); _videoAssemblers.Remove(streamId); _videoGates.Remove(streamId); _videoLocalDrops.Remove(streamId);
+            // The last remote camera went off: nothing left to recover, so the 20 ms timer stops waking the page.
+            if (_remoteVideo.Count == 0) { idle = _recoveryLoop; _recoveryLoop = null; }
+        }
+        if (idle is not null) { try { await idle.CancelAsync(); } catch (ObjectDisposedException) { } idle.Dispose(); }
         if (!removed) return;
         await _video.RemoveRemoteAsync(streamId);
         OnRemoteVideoChanged?.Invoke();

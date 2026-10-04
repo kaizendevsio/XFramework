@@ -297,9 +297,14 @@
 
 /* ---------- Video ---------- */
 
+/* Nothing on the video screen filters its backdrop. A backdrop-filter over live video has to blur the picture
+   under it again for every frame (30-60 times a second, the tray's whole area at device pixels), and on WebKit
+   that re-composites the stage each time: steady heat on a phone, for a blur of a picture nobody is reading.
+   The same surfaces keep their look with a denser solid tint instead. The voice screen sits over a still
+   backdrop, so it keeps its glass. */
 .vidscreen {
-    --call-glass: rgba(34, 34, 38, .42);
-    --call-tray: rgba(34, 34, 38, .46);
+    --call-glass: rgba(30, 30, 34, .64);
+    --call-tray: rgba(30, 30, 34, .68);
     --call-key: rgba(255, 255, 255, .17);
     --call-key-on: #fff;
     --call-key-on-ink: #131315;
@@ -315,6 +320,19 @@
     --pip-top: calc(var(--call-top) + 6px);
     --pip-bottom: var(--call-bottom);
 }
+.vidscreen .call-round,
+.vidscreen .call-chip,
+.vidscreen .call-tray,
+.vidscreen .call-notice,
+.vidscreen .call-panel,
+.vidscreen .tile-name,
+.vidscreen .tile-away {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+.vidscreen .tile-name { background: rgba(24, 24, 28, .64); }
+.vidscreen .tile-away { background: rgba(24, 24, 28, .7); }
+.vidscreen .call-panel { background: color-mix(in srgb, var(--surface) 96%, transparent); }
 
 .vidtop {
     position: absolute;

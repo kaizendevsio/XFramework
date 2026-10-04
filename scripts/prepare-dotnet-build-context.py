@@ -64,8 +64,10 @@ def stage(root, project, destination, tracked):
         include = len(relative.parts) == 1 or relative.name.startswith("Directory.")
         # Docker's shared native stage is outside the MSBuild project graph.
         include = include or relative.is_relative_to(pathlib.Path("src/Libraries/XFramework.Opaque.Native"))
-        # So is the Bolt WebRTC sidecar's Go stage, which every image build resolves.
+        # So is the Bolt WebRTC sidecar's Go stage, which every image build resolves, and the patched
+        # Go module it replaces pion/sctp with.
         include = include or relative.is_relative_to(pathlib.Path("src/Libraries/Bolt/Bolt.Rtc/sidecar"))
+        include = include or relative.is_relative_to(pathlib.Path("src/Libraries/Bolt/Bolt.Rtc/third_party"))
         include = include or any(source == directory or source.is_relative_to(directory) for directory in directories)
         if not include:
             continue

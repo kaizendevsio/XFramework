@@ -2,8 +2,9 @@
 
   <!--
     Real browsers against the relay's WebRTC endpoint (the bolt-rtc sidecar driven by Bolt.Rtc) through a real
-    TURN server (coturn). Needs BOLT_RTC_SIDECAR, BOLT_RTC_TURN_HOST and BOLT_RTC_TURN_SECRET; without them every
-    test is skipped. CI runs it in .github/workflows/call-udp-integration.yml.
+    TURN server (coturn). Needs BOLT_RTC_SIDECAR, BOLT_RTC_TURN_HOST and BOLT_RTC_TURN_SECRET; without them those
+    tests are skipped. VideoOrientationBrowserTests needs only installed Chrome. CI runs it in
+    .github/workflows/call-udp-integration.yml.
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -38,6 +39,9 @@
     <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\bolt-rtc.js" Link="bench\bolt-rtc.js" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\sframe\bolt_sframe.js" Link="bench\sframe\bolt_sframe.js" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\sframe\bolt_sframe_bg.wasm" Link="bench\sframe\bolt_sframe_bg.wasm" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The orientation check (VideoOrientationBrowserTests.cs): its page script and the production module it drives. -->
+    <None Include="orientation\orientation.js" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\bolt-media.js" Link="orientation\bolt-media.js" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

@@ -29,3 +29,6 @@ require (
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 )
+
+// pion/sctp v1.11.3 with a partial-reliability fix (see ../third_party/pion-sctp/PATCHES.md).
+replace github.com/pion/sctp => ../third_party/pion-sctp

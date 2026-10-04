@@ -1,6 +1,7 @@
 // Browser preferences and DOM helpers; app state and interactions live in C#.
 window.yap = {
     getTheme: () => document.documentElement.dataset.theme,
+    pageHidden: () => document.hidden === true,
     applyTheme(theme) {
         document.documentElement.dataset.theme = theme;
         document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#1b1b1b' : '#f7f7f7';

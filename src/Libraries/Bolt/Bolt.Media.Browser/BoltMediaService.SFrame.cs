@@ -30,6 +30,9 @@ public sealed partial class BoltMediaService
             if (id != Guid.Empty) _mediaClient?.GetMediaStream(id)?.ResetEncryptionOverhead();
         // A member that only plays 20 ms packets joined: the next tick shrinks them.
         if (_rateLoop is { } loop) loop.Audio.MaxFrameMs = CallMediaFormat.MaxAudioFrameMs(peerMediaFormat);
+        // Orientation rides inside the SFrame plaintext, so it is only ever sent under an authenticated epoch, and only
+        // when every member reads it; a member that does not turns the camera back to upright pixels.
+        await _video.SetOrientationMetadataAsync(CallMediaFormat.SendsOrientation(peerMediaFormat));
     }
 
     public Task ActivateSFrameEpochAsync(string epochId, string rosterHash)

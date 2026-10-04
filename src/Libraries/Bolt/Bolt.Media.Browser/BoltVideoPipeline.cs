@@ -4,7 +4,9 @@ namespace Bolt.Media.Browser;
 
 /// <summary>What the browser reported about this device's video encoders, before any camera is opened.</summary>
 public sealed record VideoCapabilities(bool Supported, string? Reason, int Ceiling, VideoCodecProbe[] Codecs);
-public sealed record VideoCodecProbe(string Codec, bool Encode, bool Decode, bool Hardware, int MaxHeight, int DecodeMaxHeight = 1080);
+/// <param name="Hardware">Media Capabilities ('webrtc') reports the encoder power efficient: dedicated hardware.</param>
+/// <param name="DecodeHardware">The same for the decoder.</param>
+public sealed record VideoCodecProbe(string Codec, bool Encode, bool Decode, bool Hardware, int MaxHeight, int DecodeMaxHeight = 1080, bool DecodeHardware = false);
 /// <summary>The camera actually acquired, which may differ from what was asked for.
 /// <paramref name="Strategy"/> is how frames are read: "processor" or the "rvfc" fallback.</summary>
 public sealed record VideoCaptureState(bool Capturing, string DeviceId, string FacingMode, int Width, int Height,
@@ -23,9 +25,13 @@ public sealed class BoltVideoPipeline(IJSRuntime js, ILogger<BoltVideoPipeline> 
     private IJSObjectReference? pipeline;
     private DotNetObjectReference<BoltVideoPipeline>? self;
     private bool capturing;
+    private bool orientationMetadata;
 
-    /// <summary>An encoded picture: payload, keyframe flag, sender-assigned frame ID, capture time in µs, temporal layer.</summary>
-    public event Action<byte[], bool, uint, uint, int>? OnEncoded;
+    /// <summary>
+    /// An encoded picture: payload, keyframe flag, sender-assigned frame ID, capture time in µs, temporal layer, and the
+    /// orientation code it is to be shown with (<see cref="VideoFramePayload.Orientation"/>; 0 when its pixels are upright).
+    /// </summary>
+    public event Action<byte[], bool, uint, uint, int, int>? OnEncoded;
     /// <summary>The browser released the camera: "hidden", "ended", "denied" or "encoder".</summary>
     public event Action<string>? OnCaptureStopped;
     /// <summary>A remote decoder failed; the caller should ask that sender for a keyframe.</summary>
@@ -39,9 +45,24 @@ public sealed class BoltVideoPipeline(IJSRuntime js, ILogger<BoltVideoPipeline> 
     /// <summary>A participant who never turns a camera on still needs the pipeline to render others.</summary>
     private async Task<IJSObjectReference> PipelineAsync()
     {
-        pipeline ??= await (await ModuleAsync()).InvokeAsync<IJSObjectReference>("createVideoPipeline");
+        if (pipeline is null)
+        {
+            pipeline = await (await ModuleAsync()).InvokeAsync<IJSObjectReference>("createVideoPipeline");
+            if (orientationMetadata) await pipeline.InvokeVoidAsync("setOrientationMetadata", true);
+        }
         self ??= DotNetObjectReference.Create(this);
         return pipeline;
+    }
+
+    /// <summary>
+    /// Whether every receiver reads a picture's orientation from its (end-to-end encrypted) fragments, as their
+    /// authenticated key envelopes say (<see cref="CallMediaFormat.Oriented"/>). Then a rotated camera frame is encoded
+    /// as the sensor delivered it, with no redraw; otherwise it is redrawn upright first.
+    /// </summary>
+    public async Task SetOrientationMetadataAsync(bool enabled)
+    {
+        orientationMetadata = enabled;
+        if (pipeline is not null) await pipeline.InvokeVoidAsync("setOrientationMetadata", enabled);
     }
 
     /// <summary>Probe encoders and decoders. Safe to call before a call: it opens no device.</summary>
@@ -90,10 +111,13 @@ public sealed class BoltVideoPipeline(IJSRuntime js, ILogger<BoltVideoPipeline> 
         if (pipeline is not null) await pipeline.InvokeVoidAsync("removeRemote", streamId.ToString("D"));
     }
 
-    public async ValueTask DecodeFrameAsync(Guid streamId, byte[] data, uint timestampMicroseconds, bool isKeyframe, bool discontinuity = false)
+    /// <param name="orientation">The sender's orientation code from the authenticated fragment header; applied when painting.</param>
+    public async ValueTask DecodeFrameAsync(Guid streamId, byte[] data, uint timestampMicroseconds, bool isKeyframe, bool discontinuity = false,
+        int orientation = 0)
     {
         if (pipeline is null) return;
-        await pipeline.InvokeAsync<bool>("decodeFrame", streamId.ToString("D"), data, timestampMicroseconds, isKeyframe, discontinuity);
+        await pipeline.InvokeAsync<bool>("decodeFrame", streamId.ToString("D"), data, timestampMicroseconds, isKeyframe, discontinuity,
+            orientation & VideoFrameFragments.OrientationMask);
     }
 
     public async ValueTask<bool> ApplyTierAsync(VideoTier tier)
@@ -112,8 +136,8 @@ public sealed class BoltVideoPipeline(IJSRuntime js, ILogger<BoltVideoPipeline> 
         => pipeline is null ? null : await pipeline.InvokeAsync<VideoDiagnostics?>("getDiagnostics", enabled);
 
     [JSInvokable]
-    public void OnVideoEncoded(byte[] data, bool isKeyframe, uint frameId, uint timestamp, int temporalLayer)
-        => OnEncoded?.Invoke(data, isKeyframe, frameId, timestamp, Math.Clamp(temporalLayer, 0, 3));
+    public void OnVideoEncoded(byte[] data, bool isKeyframe, uint frameId, uint timestamp, int temporalLayer, int orientation)
+        => OnEncoded?.Invoke(data, isKeyframe, frameId, timestamp, Math.Clamp(temporalLayer, 0, 3), orientation & VideoFrameFragments.OrientationMask);
 
     [JSInvokable]
     public void OnVideoCaptureStopped(string reason)

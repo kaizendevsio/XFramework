@@ -520,6 +520,129 @@ export function fitTierToSource(width, height, sourceWidth, sourceHeight) {
     return portrait ? { width: across, height: along } : { width: along, height: across };
 }
 
+// ─── Picture orientation ────────────────────────────
+// A phone camera's frames arrive sensor-oriented (landscape) with the display rotation as VideoFrame metadata,
+// which a VideoEncoder does not put in the bitstream. When every receiver reads it, the sender encodes the sensor
+// pixels as they are and sends the orientation in the fragment header, inside the SFrame-encrypted plaintext; the
+// receiver applies it when it paints. The code is one byte: quarter turns clockwise (bits 0-1) and a horizontal
+// flip applied after the rotation (bit 2), as VideoFrame.rotation and VideoFrame.flip define them.
+
+export function normalizeRotation(rotation) {
+    return ((Math.round((Number(rotation) || 0) / 90) * 90) % 360 + 360) % 360;
+}
+
+export function orientationCode(rotation, flip) {
+    return (normalizeRotation(rotation) / 90) | (flip === true ? 4 : 0);
+}
+
+/// "90°", "180°, mirrored", or '' for an upright picture.
+export function describeOrientation(code) {
+    if (!(code & 7)) return '';
+    return `${(code & 3) * 90}°${code & 4 ? ', mirrored' : ''}`;
+}
+
+/// The displayed size of a width x height picture once `code` is applied: a quarter turn swaps the sides.
+export function orientedSize(width, height, code) {
+    return code & 1 ? { width: height, height: width } : { width, height };
+}
+
+/// The 2D canvas transform (a, b, c, d, e, f) that paints a width x height picture rotated and flipped by `code`
+/// into a canvas of orientedSize(width, height, code): the same picture drawImage gives for a VideoFrame that
+/// carries that rotation and flip itself.
+export function orientationMatrix(width, height, code) {
+    const quarter = code & 3;
+    const m = quarter === 0 ? [1, 0, 0, 1, 0, 0]
+        : quarter === 1 ? [0, 1, -1, 0, height, 0]
+        : quarter === 2 ? [-1, 0, 0, -1, width, height]
+        : [0, -1, 1, 0, 0, width];
+    if (code & 4) {
+        const across = quarter & 1 ? height : width;
+        m[0] = -m[0] || 0; m[2] = -m[2] || 0; m[4] = across - m[4];
+    }
+    return m;
+}
+
+/// One drawImage, as for an upright picture; the transform is free on a GPU canvas and needs no second surface.
+/// The canvas keeps the displayed size, so object-fit, the fit/fill choice and swapping read it as before.
+export function paintOriented(context, frame, width, height, code) {
+    if (!(code & 7)) { context.drawImage(frame, 0, 0, width, height); return; }
+    context.setTransform(...orientationMatrix(width, height, code));
+    try { context.drawImage(frame, 0, 0, width, height); }
+    finally { context.setTransform(1, 0, 0, 1, 0, 0); }
+}
+
+/// WebKit (Safari, and every iOS browser) turns a 2D canvas into a VideoFrame with a CPU readback. Its vendor
+/// string is the engine's own; there is no feature that reveals how a canvas becomes a frame.
+function webKitCanvasReadsBack() { return /^Apple/.test(globalThis.navigator?.vendor ?? ''); }
+
+/// Paints a <video> element's current picture, upright, into a WebGL canvas of a given size, entirely on the GPU.
+///
+/// Only the default-rect, level-0 RGBA/UNSIGNED_BYTE texImage2D of a video takes WebKit's GPU-to-GPU path
+/// (WebGLRenderingContextBase::texImageSource), so that is the only upload used. The first picture is checked
+/// once with a 2x2 readPixels: a texture that came back empty means this engine took a path that does not work,
+/// and the caller falls back to the 2D canvas rather than send black.
+export class GlFramePainter {
+    static create(doc) {
+        const canvas = doc?.createElement?.('canvas');
+        const gl = canvas?.getContext?.('webgl', { alpha: false, antialias: false, depth: false, stencil: false,
+            premultipliedAlpha: false, preserveDrawingBuffer: false, powerPreference: 'low-power' });
+        if (!gl || typeof gl.createShader !== 'function') return null;
+        const shader = (type, source) => {
+            const compiled = gl.createShader(type);
+            gl.shaderSource(compiled, source);
+            gl.compileShader(compiled);
+            if (!gl.getShaderParameter(compiled, gl.COMPILE_STATUS)) throw new Error('shader');
+            return compiled;
+        };
+        const program = gl.createProgram();
+        gl.attachShader(program, shader(gl.VERTEX_SHADER,
+            'attribute vec2 p;varying vec2 t;void main(){t=vec2(p.x*.5+.5,.5-p.y*.5);gl_Position=vec4(p,0.,1.);}'));
+        gl.attachShader(program, shader(gl.FRAGMENT_SHADER,
+            'precision mediump float;varying vec2 t;uniform sampler2D s;void main(){gl_FragColor=vec4(texture2D(s,t).rgb,1.);}'));
+        gl.linkProgram(program);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error('program');
+        gl.useProgram(program);
+        gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+        // A strip over the whole viewport; the vertex shader maps clip top to the texture's first row.
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+        const position = gl.getAttribLocation(program, 'p');
+        gl.enableVertexAttribArray(position);
+        gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+        gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
+        for (const [name, value] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR],
+            [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, name, value);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        return new GlFramePainter(canvas, gl);
+    }
+
+    constructor(canvas, gl) { this.canvas = canvas; this.gl = gl; this.checked = false; }
+
+    /// The canvas holding `video` at width x height. Throws when this engine cannot paint it on the GPU.
+    paint(video, width, height) {
+        const { gl, canvas } = this;
+        if (gl.isContextLost?.()) throw new Error('context lost');
+        if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+        gl.viewport(0, 0, width, height);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        if (gl.getError() !== gl.NO_ERROR) throw new Error('webgl');
+        if (!this.checked) {
+            // Once per capture: an all-zero centre after a successful draw means nothing was uploaded.
+            this.checked = true;
+            const pixels = new Uint8Array(16);
+            gl.readPixels(Math.max(0, (width >> 1) - 1), Math.max(0, (height >> 1) - 1), 2, 2, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+            if (pixels.every(x => x === 0)) throw new Error('empty texture');
+        }
+        return canvas;
+    }
+
+    release() {
+        try { this.gl.getExtension?.('WEBGL_lose_context')?.loseContext(); } catch { }
+        this.canvas.width = this.canvas.height = 0;
+    }
+}
+
 /// How this browser can get camera frames out of a MediaStreamTrack.
 ///
 /// Chromium exposes MediaStreamTrackProcessor on Window. Safari 18 has it too but only inside a
@@ -552,8 +675,8 @@ export async function probeVideoCodecs(maxHeight = 2160) {
                 const supported = await VideoEncoder.isConfigSupported(encoderConfig(codec, width, height, 2000, 30));
                 if (!supported?.supported) continue;
                 if (best === 0) best = height;
-                // WebCodecs has no require-hardware mode. prefer-hardware is only a hint,
-                // so isConfigSupported cannot prove acceleration; retain conservative limits.
+                // isConfigSupported cannot prove acceleration (WebKit ignores the hint for encoders);
+                // powerEfficient below is the hardware signal.
             } catch { /* An unsupported configuration is an answer, not a failure. */ }
         }
         for (const height of heights) {
@@ -563,9 +686,29 @@ export async function probeVideoCodecs(maxHeight = 2160) {
                 if (supported?.supported) { decode = true; decodeMaxHeight = height; break; }
             } catch { /* Same: treat a throw as unsupported. */ }
         }
-        results.push({ codec, encode: best > 0, decode, hardware, maxHeight: best, decodeMaxHeight });
+        if (best > 0) hardware = await powerEfficient('encodingInfo', codec);
+        const decodeHardware = decode && await powerEfficient('decodingInfo', codec);
+        results.push({ codec, encode: best > 0, decode, hardware, maxHeight: best, decodeMaxHeight, decodeHardware });
     }
     return results;
+}
+
+const RTP_VIDEO_TYPES = { av1: 'video/AV1', vp9: 'video/VP9', h264: 'video/H264' };
+
+/// Whether this device encodes (or decodes) `codec` on dedicated hardware, as far as the browser will say.
+///
+/// WebCodecs cannot tell: WebKit ignores `hardwareAcceleration` for encoders entirely (VideoEncoder::Config has no
+/// such field) and answers isConfigSupported the same for libvpx VP9 as for VideoToolbox H.264. Media Capabilities
+/// with type 'webrtc' can: WebKit reports H.264/HEVC power efficient and VP8/VP9/AV1 encode not
+/// (LibWebRTCProvider::videoEncodingCapabilitiesOverride), decode follows the hardware decoder it found, and
+/// Chromium reports power efficient only where a hardware encoder profile matches. Anything else is "not known",
+/// which the codec ladder treats as software.
+async function powerEfficient(method, codec) {
+    try {
+        const info = await globalThis.navigator?.mediaCapabilities?.[method]?.({ type: 'webrtc',
+            video: { contentType: RTP_VIDEO_TYPES[codec], width: 1280, height: 720, bitrate: 1_500_000, framerate: 30 } });
+        return info?.supported === true && info.powerEfficient === true;
+    } catch { return false; }
 }
 
 /// Battery can lower the ceiling; codec probes and measured pressure decide device capacity.
@@ -632,6 +775,15 @@ class VideoPipeline {
         this.sourceWidth = 0;
         this.sourceHeight = 0;
         this.hostRef = null;
+        // Orientation: whether every receiver reads it from the fragment header (set from the call's authenticated
+        // key envelopes), the orientation the encoder's pixels have baked in (a change needs a keyframe), the
+        // orientation of each submitted picture that is not upright (by capture timestamp), and what the last
+        // camera frame needed, for diagnostics.
+        this.orientationMetadata = false;
+        this.orientationUnwrap = null;
+        this.bakedOrientation = 0;
+        this.encodeOrientation = new Map();
+        this.orientationState = { code: 0, how: 'none' };
         this.hidden = () => { if (globalThis.document?.hidden && this.captureRunning) this.stopCapture('hidden'); };
         globalThis.document?.addEventListener('visibilitychange', this.hidden);
         globalThis.addEventListener?.('pagehide', this.hidden);
@@ -689,6 +841,9 @@ class VideoPipeline {
             this.stats.kbps = this.window.bytes * 8 / elapsed;
             this.window = { since: now, frames: 0, bytes: 0 };
         }
+        // The orientation the picture was captured with (only recorded when it is not upright).
+        const orientation = this.encodeOrientation.get(chunk.timestamp) ?? 0;
+        this.encodeOrientation.delete(chunk.timestamp);
         if (!this.captureRunning || !this.dotNetRef) return;
         // Frame IDs are the reassembly key on the far side; they must not restart mid-call.
         const frameId = (this.frameId = (this.frameId + 1) >>> 0);
@@ -697,8 +852,13 @@ class VideoPipeline {
         const layered = this.config?.scalabilityMode && this.config.scalabilityMode !== 'L1T1';
         const layer = key || !layered ? 0 : Math.max(0, Math.min(3, metadata?.svc?.temporalLayerId ?? 0));
         void this.dotNetRef.invokeMethodAsync('OnVideoEncoded', data, key,
-            frameId, Math.max(0, Math.round(chunk.timestamp)) >>> 0, layer);
+            frameId, Math.max(0, Math.round(chunk.timestamp)) >>> 0, layer, orientation);
     }
+
+    /// Whether every receiver of the call reads the orientation from the (end-to-end encrypted) fragment header.
+    /// Decided from the call's authenticated key envelopes; until then, and with any receiver that does not, the
+    /// picture is redrawn upright before it is encoded.
+    setOrientationMetadata(enabled) { this.orientationMetadata = enabled === true; }
 
     /// Opening the camera is the only place getUserMedia is called with video, and it happens
     /// only from an explicit user action on the call screen.
@@ -822,13 +982,32 @@ class VideoPipeline {
         } finally { frame.close(); }
     }
 
-    /// A video-element VideoFrame can retain sensor rotation, including on Safari. Paint the
-    /// displayed image into a reusable, encoder-sized canvas to bake orientation into the pixels.
-    /// No getImageData/readback and no full-resolution intermediate allocation.
+    /// A video-element VideoFrame can retain sensor rotation, including on Safari (WebKit exposes no
+    /// rotation attribute to tell), so the displayed image is painted upright, at the encoder size.
+    ///
+    /// WebGL first. On WebKit a 2D canvas becomes a VideoFrame by reading every pixel back to the CPU,
+    /// unpremultiplying it and copying it again to the GPU process for the encoder
+    /// (HTMLCanvasElement::toVideoFrame -> getPixelBuffer, then SharedVideoFrameWriter): about 30 MB of
+    /// copies per 1440p picture. A WebGL canvas uploads the camera's IOSurface as a texture on the GPU,
+    /// with its orientation undone (GraphicsContextGLCVCocoa::copyVideoSampleToTexture), and becomes a
+    /// VideoFrame as a GPU copy into another IOSurface (surfaceBufferToVideoFrame) that reaches
+    /// VideoToolbox as a mach port: no pixel touches the CPU. The 2D canvas stays as the fallback, and is
+    /// the only path elsewhere: Chromium's 2D canvas is GPU-backed already, and measured there the WebGL
+    /// round trip cost more main thread (1.5 vs 0.75 ms a 720p picture, 4 vs 2.2 ms at 1440p).
     _elementFrame(video, timestamp) {
         // WebKit throws InvalidStateError for an element below HAVE_CURRENT_DATA or with no decoded
         // frame in hand. rVFC should never hand us one, but a throw per frame would be expensive.
         if (!video.videoWidth || !video.videoHeight || (video.readyState ?? 2) < 2) return null;
+        const duration = Math.round(1e6 / this.config.framerate);
+        if (this.glPainter !== false && webKitCanvasReadsBack()) {
+            try {
+                this.glPainter ??= GlFramePainter.create(globalThis.document) ?? false;
+                const canvas = this.glPainter && this.glPainter.paint(video, this.config.width, this.config.height);
+                if (canvas) return new VideoFrame(canvas, { timestamp, duration });
+            } catch { /* Fall through to the 2D canvas for the rest of this capture. */ }
+            this.glPainter?.release?.();
+            this.glPainter = false;
+        }
         try {
             const canvas = this.captureCanvas ??= typeof OffscreenCanvas !== 'undefined'
                 ? new OffscreenCanvas(this.config.width, this.config.height)
@@ -837,7 +1016,7 @@ class VideoPipeline {
             { canvas.width = this.config.width; canvas.height = this.config.height; }
             this.captureContext ??= canvas.getContext('2d', { alpha: false, desynchronized: true });
             this.captureContext.drawImage(video, 0, 0, canvas.width, canvas.height);
-            return new VideoFrame(canvas, { timestamp, duration: Math.round(1e6 / this.config.framerate) });
+            return new VideoFrame(canvas, { timestamp, duration });
         } catch { return null; }
     }
 
@@ -847,6 +1026,10 @@ class VideoPipeline {
         const video = this.captureVideo;
         this.captureVideo = null;
         this.captureCanvas = this.captureContext = null;
+        // The WebGL painter is retried on the next capture: a lost context or a camera that only stalled is
+        // not a reason to read pixels back on the CPU for the rest of the call.
+        this.glPainter?.release?.();
+        this.glPainter = null;
         if (!video) return;
         if (this.captureCallbackId) { try { video.cancelVideoFrameCallback(this.captureCallbackId); } catch { } }
         this.captureCallbackId = 0;
@@ -870,9 +1053,12 @@ class VideoPipeline {
                 // Dropping the newest frame beats queueing it: a backlog is latency the call never recovers.
                 if (this.encoder.encodeQueueSize >= 2) { this.stats.dropped++; continue; }
                 if (!this._acceptCaptureTime(frame.timestamp)) continue;
-                frame = this._upright(frame);
+                const oriented = this._orient(frame);
+                frame = oriented.frame;
+                // The encoder is fitted to the pixels it is given: the sensor's shape when the orientation travels
+                // as metadata, the upright shape when it was redrawn.
                 this._noteSource(frame.displayWidth, frame.displayHeight);
-                this._encode(frame, this._takeKeyframe(Date.now()));
+                this._encode(frame, this._takeKeyframe(Date.now()), oriented.code);
             } finally { frame.close(); }
         }
     }
@@ -888,11 +1074,17 @@ class VideoPipeline {
         return due;
     }
 
-    _encode(frame, keyFrame) {
+    /// `orientation` is the orientation code this picture is to be shown with (0 when its pixels are upright).
+    _encode(frame, keyFrame, orientation = 0) {
         // Timing is opt-in and bounded even if the native encoder stops producing output.
         if (this.debugSample) {
             if (this.encodePending.size >= 32) this.encodePending.delete(this.encodePending.keys().next().value);
             this.encodePending.set(frame.timestamp, performance.now());
+        }
+        // Bounded the same way: a picture the encoder drops never comes out to claim its entry.
+        if (orientation) {
+            if (this.encodeOrientation.size >= 32) this.encodeOrientation.delete(this.encodeOrientation.keys().next().value);
+            this.encodeOrientation.set(frame.timestamp, orientation);
         }
         this.encoder.encode(frame, { keyFrame });
     }
@@ -918,10 +1110,13 @@ class VideoPipeline {
                 receivedKbps: before && elapsed > 0 ? rate(remote.bytes, before.bytes) * 8 / 1000 : null,
                 decoderQueue: remote.decoder?.decodeQueueSize ?? 0, pendingFrames: remote.pending.size,
                 decoderDelayMs: renderedFps > 0 ? remote.decodeDelayMs : null,
-                acceleration: remote.acceleration || 'no-preference', resets: remote.resets };
+                acceleration: remote.acceleration || 'no-preference', resets: remote.resets,
+                rotation: describeOrientation(remote.orientation) || 'none' };
         });
         const encodedFps = rate(this.encodeCount, previous?.encode);
-        const result = { capturing: this.captureRunning, strategy: this.strategy(), codec: this.config?.codec || this.codec,
+        // On the frame-callback path, which painter turns the camera into frames: "webgl" on the GPU, "2d" otherwise.
+        const strategy = this.strategy() === 'rvfc' && this.captureRunning ? `rvfc/${this.glPainter ? 'webgl' : '2d'}` : this.strategy();
+        const result = { capturing: this.captureRunning, strategy, codec: this.config?.codec || this.codec,
             width: this.captureRunning ? this.config?.width ?? 0 : 0, height: this.captureRunning ? this.config?.height ?? 0 : 0,
             targetFps: this.captureRunning ? this.config?.framerate ?? 0 : 0,
             cameraWidth: camera.width ?? 0, cameraHeight: camera.height ?? 0, cameraFps: camera.frameRate ?? null,
@@ -929,7 +1124,8 @@ class VideoPipeline {
             encodedKbps: previous && elapsed > 0 ? rate(this.encodedBytes, previous.bytes) * 8 / 1000 : null,
             encoderQueue: this.encoder?.encodeQueueSize ?? 0,
             encoderDelayMs: encodedFps > 0 ? this.encodeDelayMs : null,
-            acceleration: this.config?.hardwareAcceleration || 'no-preference', dropped: this.stats.dropped, remotes };
+            acceleration: this.config?.hardwareAcceleration || 'no-preference', dropped: this.stats.dropped,
+            orientation: this._orientationLabel(), remotes };
         this.debugSample = { at: now, capture: this.captureCount, encode: this.encodeCount, bytes: this.encodedBytes,
             remotes: new Map([...this.remotes.values()].map(r => [r.streamId, { received: r.received, rendered: r.rendered, bytes: r.bytes }])) };
         return result;
@@ -1030,6 +1226,66 @@ class VideoPipeline {
         this._configureForSource();
     }
 
+    /// Decide how a camera frame's orientation reaches the far side. Returns the frame to encode and the orientation
+    /// code to send with it (0 when its pixels are upright).
+    ///
+    /// When every receiver reads orientation metadata, the frame is encoded as the sensor delivered it, with no
+    /// copy: `new VideoFrame(frame, init)` composes rotation and flip with the frame's own (WebCodecs "add
+    /// rotations"), so the inverse yields a frame of the same pixels with no orientation. The encoder must not see
+    /// one: it keeps the first frame's orientation and throws on a different one without a reconfigure, and that
+    /// orientation never reaches a receiver anyway. Turning the phone then changes only the code: the sensor size,
+    /// the encoder configuration and the reference pictures all stay, so it costs no keyframe.
+    ///
+    /// Otherwise (a receiver predates it, or this browser cannot strip the orientation) the frame is redrawn
+    /// upright, as before. A change in what the pixels have baked in forces a keyframe: the far side must not
+    /// decode a turned picture against references that were not.
+    _orient(frame) {
+        const rotation = normalizeRotation(frame.rotation), flip = frame.flip === true;
+        const code = orientationCode(rotation, flip);
+        if (!code) {
+            this._bake(0);
+            this.orientationState = { code: 0, how: 'none' };
+            return { frame, code: 0 };
+        }
+        if (this.orientationMetadata && this.orientationUnwrap !== false) {
+            try {
+                const neutral = new VideoFrame(frame, { rotation: flip ? rotation : (360 - rotation) % 360, flip });
+                if (normalizeRotation(neutral.rotation) === 0 && neutral.flip !== true) {
+                    frame.close();
+                    this.orientationUnwrap = true;
+                    this._bake(0);
+                    this.orientationState = { code, how: 'metadata' };
+                    return { frame: neutral, code };
+                }
+                neutral.close();
+            } catch { /* A browser that cannot compose orientation: redraw, and stop trying. */ }
+            this.orientationUnwrap = false;
+        }
+        const upright = this._upright(frame);
+        const redrawn = upright !== frame;
+        this._bake(redrawn ? code : 0);
+        this.orientationState = { code, how: redrawn ? 'redrawn' : 'failed' };
+        return { frame: upright, code: 0 };
+    }
+
+    _bake(code) {
+        if (code === this.bakedOrientation) return;
+        this.bakedOrientation = code;
+        this.forceKeyframe = true;
+    }
+
+    /// The sender's orientation handling, for diagnostics.
+    _orientationLabel() {
+        if (!this.captureRunning) return '';
+        // The frame-callback path paints the element, which shows the camera upright already.
+        if (this.strategy() === 'rvfc') return `painted upright by the element (${this.glPainter ? 'webgl' : '2d canvas'})`;
+        const { code, how } = this.orientationState;
+        if (!code) return 'none';
+        const angle = describeOrientation(code);
+        return how === 'metadata' ? `sent as metadata (${angle})`
+            : how === 'redrawn' ? `redrawn upright (2d canvas; ${angle})` : `not corrected (${angle})`;
+    }
+
     /// Bake a frame's display rotation into its pixels.
     ///
     /// Camera frames can carry orientation metadata that the encoded elementary stream loses.
@@ -1073,7 +1329,10 @@ class VideoPipeline {
         if (!context) return false;
         const remote = { streamId, canvas, context, codec: codec || 'h264', decoder: null, width: 0, height: 0,
             primed: false, pending: new Map(), lateFrames: 0, software: false, fallbackTried: false,
-            received: 0, rendered: 0, bytes: 0, resets: 0, decodeDelayMs: null };
+            received: 0, rendered: 0, bytes: 0, resets: 0, decodeDelayMs: null,
+            // The sender's orientation for pictures in the decoder that are not upright (by timestamp), and the
+            // orientation of the picture on the canvas.
+            orientations: new Map(), orientation: 0 };
         this._openDecoder(streamId, remote);
         this.remotes.set(streamId, remote);
         return true;
@@ -1082,6 +1341,7 @@ class VideoPipeline {
     _openDecoder(streamId, remote) {
         remote.primed = false;
         remote.pending.clear();
+        remote.orientations.clear();
         remote.lateFrames = 0;
         remote.acceleration = remote.software ? 'prefer-software' : remote.hardwareFailed ? 'no-preference' : 'prefer-hardware';
         const decoder = new VideoDecoder({
@@ -1116,7 +1376,10 @@ class VideoPipeline {
         this.remotes.delete(streamId);
     }
 
-    decodeFrame(streamId, data, timestamp, isKeyframe, discontinuity = false) {
+    /// `orientation` comes from the sender's authenticated fragment header (0: upright), and is applied when the
+    /// decoded picture is painted. It is not given to the decoder (VideoDecoderConfig.rotation): a change would
+    /// mean a configure(), which discards the references and needs a keyframe for every turn of the phone.
+    decodeFrame(streamId, data, timestamp, isKeyframe, discontinuity = false, orientation = 0) {
         const remote = this.remotes.get(streamId);
         if (!remote || remote.decoder?.state !== 'configured') return false;
         remote.received++; remote.bytes += data.byteLength;
@@ -1137,6 +1400,11 @@ class VideoPipeline {
         try {
             if (remote.pending.size >= 32) remote.pending.delete(remote.pending.keys().next().value);
             remote.pending.set(timestamp, performance.now());
+            const code = orientation & 7;
+            if (code) {
+                if (remote.orientations.size >= 32) remote.orientations.delete(remote.orientations.keys().next().value);
+                remote.orientations.set(timestamp, code);
+            } else remote.orientations.delete(timestamp);
             remote.decoder.decode(new EncodedVideoChunk(
                 { type: isKeyframe ? 'key' : 'delta', timestamp, data }));
             remote.primed = true;
@@ -1161,11 +1429,17 @@ class VideoPipeline {
                 remote.decodeDelayMs = performance.now() - submitted;
                 void this._considerDecoderLatency(remote, frame, remote.decodeDelayMs);
             }
-            if (remote.width !== frame.displayWidth || remote.height !== frame.displayHeight) {
-                remote.width = remote.canvas.width = frame.displayWidth;
-                remote.height = remote.canvas.height = frame.displayHeight;
+            const code = remote.orientations.get(frame.timestamp) ?? 0;
+            if (code) remote.orientations.delete(frame.timestamp);
+            // The canvas is the displayed size, after the sender's rotation: the tile's fit, the swap and the
+            // picture-in-picture all read the shape from it.
+            const shown = orientedSize(frame.displayWidth, frame.displayHeight, code);
+            if (remote.width !== shown.width || remote.height !== shown.height) {
+                remote.width = remote.canvas.width = shown.width;
+                remote.height = remote.canvas.height = shown.height;
             }
-            remote.context.drawImage(frame, 0, 0, remote.width, remote.height);
+            remote.orientation = code;
+            paintOriented(remote.context, frame, frame.displayWidth, frame.displayHeight, code);
             remote.rendered++;
         } catch { /* A detached canvas is a closed tile, not a call failure. */ }
         finally { frame.close(); }
@@ -1209,6 +1483,10 @@ class VideoPipeline {
         // The next camera has its own shape; leaving these set would fit it to the old one's aspect.
         this.sourceWidth = this.sourceHeight = 0;
         this.rotateCanvas = this.rotateContext = null;
+        // The next camera starts on a keyframe with nothing baked in; its first frame says what it needs.
+        this.bakedOrientation = 0;
+        this.encodeOrientation.clear();
+        this.orientationState = { code: 0, how: 'none' };
         if (this.preview) this.preview.srcObject = null;
         if (this.mediaStream) { this.mediaStream.getTracks().forEach(t => t.stop()); this.mediaStream = null; }
         this.stats = { fps: 0, kbps: 0, dropped: this.stats.dropped, backlog: 0 };
