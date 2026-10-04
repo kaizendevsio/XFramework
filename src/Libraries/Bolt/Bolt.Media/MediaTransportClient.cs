@@ -42,6 +42,11 @@ public sealed class MediaTransportClientOptions
     public DatagramHysteresisOptions PathHysteresis { get; init; } = new();
     /// <summary>Redundancy is added only while the channel's own buffer is this short.</summary>
     public long RedundancyBacklogBytes { get; init; } = 8 * 1024;
+    /// <summary>
+    /// A video frame the relay's transport feedback reports lost on this device's uplink is sent again at once, while it
+    /// is younger than this (0: never). Receivers wait about this long for a lost frame (see VideoRecoveryBuffer).
+    /// </summary>
+    public int ResendLostVideoMs { get; init; } = 400;
 }
 
 /// <summary>
@@ -91,6 +96,12 @@ public sealed class MediaTransportClient : IAsyncDisposable
     private readonly TransportFeedbackEstimator _feedback = new();
     private readonly List<long> _arrivals = [];
     private int _transportSequence;
+    /// <summary>Stamped video messages, by transport sequence, until the relay reports them arrived or lost.</summary>
+    private readonly (ushort Sequence, byte[]? Message, long SentAt)[] _resendable = new (ushort, byte[]?, long)[1024];
+    private long _resent;
+
+    /// <summary>Video frames sent again because the relay reported them lost on the uplink.</summary>
+    public long UplinkResent => Interlocked.Read(ref _resent);
 
     private sealed class Session(string id, MediaTransportConfig config, long createdAt)
     {
@@ -264,14 +275,15 @@ public sealed class MediaTransportClient : IAsyncDisposable
             return false;
         if (audio && frame[0] == (byte)FrameType.MediaFrame && BoltCodec.TryReadMediaFrameHeader(frame, out var streamId))
             return SendAudio(peer, streamId, frame, stamp);
-        return SendMessage(peer, frame, stamp);
+        // Video is the only media a lost message costs more than itself of (the whole picture, and what refers to it).
+        return SendMessage(peer, frame, stamp, resendable: !audio && frame[0] == (byte)FrameType.MediaFrame);
     }
 
     /// <summary>
     /// One message on the channel, stamped when the relay reports arrivals. A refused message used up its number without
     /// being recorded, so the gap it leaves is never counted as loss.
     /// </summary>
-    private bool SendMessage(IRtcPeer peer, ReadOnlySpan<byte> message, bool stamp)
+    private bool SendMessage(IRtcPeer peer, ReadOnlySpan<byte> message, bool stamp, bool resendable = false)
     {
         if (!stamp)
         {
@@ -289,6 +301,8 @@ public sealed class MediaTransportClient : IAsyncDisposable
             if (!peer.TrySend(buffer.AsSpan(0, size))) return false;
             _feedback.OnSent(sequence, size, NowMicroseconds());
             _drain.Sent(size);
+            if (resendable && _options.ResendLostVideoMs > 0)
+                lock (_resendable) _resendable[sequence % _resendable.Length] = (sequence, message.ToArray(), _clock());
             return true;
         }
         finally { ArrayPool<byte>.Shared.Return(buffer); }
@@ -305,17 +319,43 @@ public sealed class MediaTransportClient : IAsyncDisposable
             return;
         }
         TransportSignal? signal;
+        List<byte[]>? resend = null;
         lock (_arrivals)
         {
             if (!TransportFeedbackCodec.TryRead(message, out var first, _arrivals)) return;
             _feedback.OnFeedback(first, _arrivals, _clock());
             signal = _feedback.Signal;
+            resend = TakeLost(first, _arrivals);
         }
+        // What never reached the relay goes again now: a receiver can only get it from this device, and asking for it
+        // (its NACK, forwarded by the relay) would take two more trips across both legs, longer than it waits.
+        if (resend is not null && ActivePeer is { } peer)
+            foreach (var lost in resend)
+                if (SendMessage(peer, lost, StampsMessages)) Interlocked.Increment(ref _resent);
         if (signal is { } value)
         {
             try { TransportFeedback?.Invoke(value); }
             catch (Exception ex) { _logger.LogDebug(ex, "A transport feedback listener failed"); }
         }
+    }
+
+    /// <summary>Video messages a report says never arrived (and are still worth sending); every reported one is forgotten.</summary>
+    private List<byte[]>? TakeLost(ushort first, List<long> arrivals)
+    {
+        List<byte[]>? lost = null;
+        var now = _clock();
+        lock (_resendable)
+        {
+            for (var index = 0; index < arrivals.Count; index++)
+            {
+                var sequence = unchecked((ushort)(first + index));
+                ref var slot = ref _resendable[sequence % _resendable.Length];
+                if (slot.Message is null || slot.Sequence != sequence) continue;
+                if (arrivals[index] < 0 && now - slot.SentAt <= _options.ResendLostVideoMs) (lost ??= []).Add(slot.Message);
+                slot = default;
+            }
+        }
+        return lost;
     }
 
     // The previous audio frame per stream, for redundancy.

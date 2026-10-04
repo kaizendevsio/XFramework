@@ -140,6 +140,9 @@ internal sealed class FakeRtcPeer(FakeRtcNetwork network, RtcPeerRole role, RtcP
     /// </summary>
     public bool Stuck { get; set; }
 
+    /// <summary>Lose the messages this peer sends that this says to (a lossy leg in one direction only).</summary>
+    public Func<byte[], bool>? LoseSent { get; set; }
+
     public bool TrySend(ReadOnlySpan<byte> message)
     {
         if (State != RtcChannelState.Open || Refuse || message.Length > MaxMessageBytes) { Dropped++; return false; }
@@ -148,6 +151,7 @@ internal sealed class FakeRtcPeer(FakeRtcNetwork network, RtcPeerRole role, RtcP
         Sent.Enqueue(copy);
         var count = Interlocked.Increment(ref _sent);
         if (network.DropEvery > 0 && count % network.DropEvery == 0) return true;
+        if (LoseSent?.Invoke(copy) == true) return true;
         Remote?.Deliver(copy);
         return true;
     }

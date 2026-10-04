@@ -13,7 +13,8 @@ namespace Bolt.Media.Browser;
 /// <list type="bullet">
 /// <item>Every missing MediaFrame sequence number (a gap, or a fragment a partly received picture still lacks) is asked
 /// for after a short reorder wait, again after a round trip if it is still missing, at most three times, and only while
-/// it can still arrive inside the recovery window (about one and a half round trips, at most 1.5 s).</item>
+/// it can still arrive inside the recovery window (about one and a half round trips, plus the time a fragment lost on
+/// the sender's uplink takes to come back from the sender; at least 250 ms, at most 1.5 s).</item>
 /// <item>Pictures go to the decoder in order. A complete picture waits behind an older one that is still being
 /// recovered, because it may refer to it; nothing waits behind a missing top-layer picture, which nothing refers to.</item>
 /// <item>A picture that cannot be recovered in time is given up the cheapest way the reference structure allows: a lost
@@ -33,6 +34,12 @@ public sealed class VideoRecoveryBuffer
     public const int ReorderMs = 15;
     public const int MaxTries = 3;
     public const int MaxRecoveryMs = 1_500;
+    /// <summary>
+    /// What a fragment lost on the sender's uplink adds: only the sender has it, and it learns of the loss from the
+    /// relay's transport feedback (every 100 ms) before it sends it again across both legs.
+    /// </summary>
+    public const int UplinkRepairMs = 150;
+    public const int MinRecoveryMs = 250;
     private const int MaxPictures = 48;
     private const long MaxBufferedBytes = 2 * 1024 * 1024;
     private const int MaxMissing = 1024;
@@ -96,7 +103,7 @@ public sealed class VideoRecoveryBuffer
     public bool Configure(bool recover, int rttMs)
     {
         RttMs = Math.Clamp(rttMs, 1, 5_000);
-        var window = recover ? Math.Clamp(RttMs * 3 / 2 + 50, 100, MaxRecoveryMs) : 0;
+        var window = recover ? Math.Clamp(RttMs * 3 / 2 + 50 + UplinkRepairMs, MinRecoveryMs, MaxRecoveryMs) : 0;
         var switched = (window == 0) != (RecoveryMs == 0);
         RecoveryMs = window;
         if (switched) Reset();

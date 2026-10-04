@@ -69,6 +69,28 @@ public sealed class VideoRecoveryBufferTests
     }
 
     [Test]
+    public void AFragmentTheSendersUplinkLost_IsStillWaitedFor_WhenItsSenderSendsItAgain()
+    {
+        // Production 2026-10-04 13:08 UTC, 13-14 ms round trips: a fragment lost between the sender and the relay can only
+        // come from the sender, after the relay's next transport feedback report (every 100 ms) and two more legs. With
+        // a window of 1.5 round trips + 50 ms (100 ms there) it always came too late: every large keyframe lost one, and
+        // nothing was shown.
+        var sender = new Sender();
+        var buffer = Recovering(rttMs: 14);
+        var key = sender.Picture(1, 0, key: true, fragments: 30);
+        var lost = key[17];
+        var ready = Push(buffer, key.Where(x => x.Sequence != lost.Sequence), now: 0);
+        Assert.That(ready, Is.Empty);
+        for (long t = 10; t <= 170; t += 10) ready.AddRange(Poll(buffer, t).Ready);
+        ready.AddRange(Push(buffer, [lost], now: 175));
+        Assert.Multiple(() =>
+        {
+            Assert.That(ready.Select(x => x.FrameId), Is.EqualTo(new[] { 1u }), "the keyframe is shown");
+            Assert.That(buffer.Incomplete, Is.Zero);
+        });
+    }
+
+    [Test]
     public void OnAWebSocket_NothingIsAskedFor_AndAGapIsTheAssemblersUsualBreak()
     {
         var sender = new Sender();
@@ -89,33 +111,33 @@ public sealed class VideoRecoveryBufferTests
     public void NacksRepeatAfterARoundTrip_AndStopWhenAnAnswerCouldNoLongerArriveInTime()
     {
         var sender = new Sender();
-        var buffer = Recovering(rttMs: 200); // window: 1.5 x 200 + 50 = 350 ms
-        Assert.That(buffer.RecoveryMs, Is.EqualTo(350));
+        var buffer = Recovering(rttMs: 200); // window: 1.5 x 200 + 50, plus 150 for a repair from the sender = 500 ms
+        Assert.That(buffer.RecoveryMs, Is.EqualTo(500));
         Push(buffer, sender.Picture(1, 0, key: true));
         var lost = sender.Picture(2, 0)[0];
         Push(buffer, sender.Picture(3, 0));
 
         var asked = new List<long>();
-        for (long t = 0; t < 400; t += 10)
+        for (long t = 0; t < 550; t += 10)
             if (Poll(buffer, t).Nacks.Contains(lost.Sequence)) asked.Add(t);
 
         Assert.Multiple(() =>
         {
-            Assert.That(asked, Has.Count.EqualTo(1), "a second ask would arrive after the window closes");
+            Assert.That(asked, Has.Count.EqualTo(2), "a third ask would arrive after the window closes");
             Assert.That(asked[0], Is.InRange(VideoRecoveryBuffer.ReorderMs, 30));
             Assert.That(buffer.Abandoned, Is.EqualTo(1));
         });
 
-        // A short path (20 ms, the 100 ms minimum window) has time to ask again a round trip later.
+        // A short path (20 ms, the 250 ms minimum window) has time to ask again a round trip later.
         var shorter = Recovering(rttMs: 20);
         var other = new Sender();
         Push(shorter, other.Picture(1, 0, key: true));
         var missing = other.Picture(2, 0)[0];
         Push(shorter, other.Picture(3, 0));
         var times = new List<long>();
-        for (long t = 0; t < 150; t += 2)
+        for (long t = 0; t < 300; t += 2)
             if (Poll(shorter, t).Nacks.Contains(missing.Sequence)) times.Add(t);
-        Assert.That(times, Has.Count.EqualTo(2));
+        Assert.That(times, Has.Count.EqualTo(VideoRecoveryBuffer.MaxTries));
         Assert.That(times[1] - times[0], Is.GreaterThanOrEqualTo(20 * 6 / 5 + 10));
     }
 
@@ -225,7 +247,7 @@ public sealed class VideoRecoveryBufferTests
         {
             Assert.That(buffer.Configure(recover: true, 300), Is.True);
             Assert.That(buffer.Configure(recover: true, 500), Is.False, "a new round trip only resizes the window");
-            Assert.That(buffer.RecoveryMs, Is.EqualTo(800));
+            Assert.That(buffer.RecoveryMs, Is.EqualTo(950));
             Assert.That(buffer.Configure(recover: true, 4_000), Is.False);
             Assert.That(buffer.RecoveryMs, Is.EqualTo(VideoRecoveryBuffer.MaxRecoveryMs));
             Assert.That(buffer.Configure(recover: false, 300), Is.True);
