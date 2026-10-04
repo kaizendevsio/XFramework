@@ -135,6 +135,27 @@ public sealed class VideoRecoveryBufferTests
         });
     }
 
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    public void AfterSwitchingRecoveryMidStream_TheFirstPictureIsABreak_UnlessItIsAKeyframe(bool startRecovering, bool key)
+    {
+        // The browser call test (uplink jitter) decoded 147 pictures without their reference: the receiver's path moved
+        // between the WebSocket and the data channel mid-stream, recovery switched on, and its state (pictures half
+        // received, the last picture released) was dropped. The next delta went to the decoder as if nothing were
+        // missing, and so did everything after it until a keyframe. In production a phone's path moves the same way.
+        var sender = new Sender();
+        var buffer = new VideoRecoveryBuffer();
+        buffer.Configure(startRecovering, 20);
+        var ready = Push(buffer, sender.Picture(1, 0, key: true).Concat(sender.Picture(2, 2)).Concat(sender.Picture(3, 1)));
+        Assert.That(ready.Select(x => x.FrameId), Is.EqualTo(new[] { 1u, 2u, 3u }));
+        Assert.That(buffer.Configure(!startRecovering, 20), Is.True, "switched");
+        sender.Picture(4, 2, fragments: 2); // On the wire during the switch: never seen whole.
+        var after = Push(buffer, sender.Picture(5, 0, key: key));
+        for (long t = 10; t < 2_000; t += 10) after.AddRange(Poll(buffer, t).Ready);
+        Assert.That(after.Select(x => (x.FrameId, x.Discontinuity)), Is.EqualTo(new[] { (5u, !key) }));
+    }
+
     [Test]
     public void OnAWebSocket_NothingIsAskedFor_AndAGapIsTheAssemblersUsualBreak()
     {

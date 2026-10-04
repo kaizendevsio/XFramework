@@ -163,9 +163,9 @@ jobs:
           BOLT_RTC_TURN_SECRET: ci-turn-secret
           CALL_SCENARIO: ${{ matrix.scenario }}
           CALL_A_FPS: "30"
-          # The Android phone sent 4.7 Mbit/s at 1440p: A's sending is capped near that (6 Mbit/s with audio), so the
-          # calls run at the production rates, 1440p30 at about 5 Mbit/s and 720p30 at about 2.5 Mbit/s.
-          CALL_A_MAX_KBPS: "6000"
+          # The Android phone sent 4.7 Mbit/s at 1440p: A's sending is capped near that (6.5 Mbit/s with audio), so the
+          # calls run at the production rates, 1440p30 at 5-6 Mbit/s and 720p30 at about 2.5 Mbit/s.
+          CALL_A_MAX_KBPS: "6500"
           # The rate control climbs from a mobile-safe start; the window measures the call once it has.
           CALL_WARMUP_SECONDS: "40"
           CALL_SECONDS: ${{ github.event.inputs.seconds || '60' }}

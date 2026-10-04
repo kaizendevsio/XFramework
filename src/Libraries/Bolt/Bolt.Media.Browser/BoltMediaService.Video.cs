@@ -411,7 +411,9 @@ public sealed partial class BoltMediaService
                 step(buffer, ready, nacks);
             }
             // Recovery switched on or off: the two modes share nothing, so the decoder restarts from a keyframe.
-            if (switched && _mediaClient is { } client) _ = client.RequestRemoteKeyframeAsync(streamId);
+            // Forced: the decoder waits from here, and a request coalesced away would leave it waiting for the sender's
+            // safety keyframe, seconds off.
+            if (switched && _mediaClient is { } client) _ = client.RequestRemoteKeyframeAsync(streamId, force: true);
             // At most 64 numbers a request: what the relay serves per request, and well inside one datagram.
             for (var offset = 0; transport is not null && offset < nacks.Count; offset += 64)
             {

@@ -332,7 +332,9 @@ public sealed class VideoRecoveryBuffer
             _skipAbove = null;
         }
         var gap = _hasReleased && unchecked(picture.FrameId - _lastReleased) != 1;
-        var discontinuity = gap && (!_layered || _localLoss);
+        // The first picture after a reset (recovery switched on or off mid-stream, a decoder restart) follows pictures
+        // this buffer no longer knows: unless it is a keyframe, the decoder must not take it as a continuation.
+        var discontinuity = (!_hasReleased && !picture.Keyframe) || (gap && (!_layered || _localLoss));
         if (picture.Keyframe || discontinuity) _localLoss = false;
         var data = new byte[picture.Bytes];
         var offset = 0;

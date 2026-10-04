@@ -248,8 +248,8 @@ public sealed class BrowserCallTests
             var renderedFps = remote?["fps"]?.GetValue<double>() ?? 0;
             var resets = (remote?["resets"]?.GetValue<int>() ?? 0) - (beforeRemote?["resets"]?.GetValue<int>() ?? 0);
             int Damage(JsonNode? r) => (r?["corrupt"]?.GetValue<int>() ?? 0) + (r?["brokenReference"]?.GetValue<int>() ?? 0);
-            // Damage in the measurement window; any before it is printed too, but the call is judged once it has settled.
-            var corrupt = Damage(remote) - Damage(beforeRemote);
+            // Damage over the whole call, warm-up included: a picture decoded without its reference is never acceptable.
+            var corrupt = Damage(remote);
             var freeze = remote?["longestFreezeMs"]?.GetValue<int>() ?? int.MaxValue;
             var audio = after[receiver]["audio"]!.AsArray().FirstOrDefault();
             var line = new JsonObject
