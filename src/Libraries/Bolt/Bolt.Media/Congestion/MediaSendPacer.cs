@@ -151,8 +151,17 @@ public sealed class MediaSendPacer : IAsyncDisposable
     /// </summary>
     public bool WouldAccept(bool keyframe, int layer)
     {
+        bool accept, request = false;
         lock (_sync)
-            return keyframe || (!_awaitingKeyframe && layer <= _layerLimit) || (layer == 0 && !_awaitingKeyframe);
+        {
+            accept = keyframe || (!_awaitingKeyframe && layer <= _layerLimit) || (layer == 0 && !_awaitingKeyframe);
+            // Waiting for a keyframe while pictures keep coming: the one asked for was dropped too (inside the request
+            // gap, so nothing asked again) or never came. Refused pictures never reach the pacer, so ask from here, at
+            // most once per gap; otherwise the stream waits for the encoder's own safety keyframe, seconds away.
+            if (!accept && _awaitingKeyframe) request = RequestKeyframe(_clock());
+        }
+        if (request) KeyframeNeeded?.Invoke();
+        return accept;
     }
 
     /// <summary>Queue one picture. Returns false when it (or the stream until a keyframe) was dropped.</summary>

@@ -296,6 +296,35 @@ public sealed class BoltCallCongestionTests
     }
 
     [Test]
+    public void Pacer_WaitingForAKeyframe_AsksAgain_WhenTheOneItAskedForWasDroppedToo()
+    {
+        // The pacer lost a base picture and asked for a keyframe; that keyframe also overflowed, within the request gap, so
+        // nothing asked again. Deltas are refused before they reach the pacer (WouldAccept), and the stream sat without
+        // video until the encoder's 10 s safety keyframe (browser call test, loss-1pct: 26-36 s, sender 49 kbps).
+        var now = 0L;
+        var wire = new TaskCompletionSource();
+        var pacer = new MediaSendPacer((_, _) => new ValueTask(wire.Task),
+            options: new MediaSendPacerOptions { VideoMaxQueuedBytes = 1_000, VideoMaxDelayMs = 60_000, KeyframeRequestGapMs = 500 }, clock: () => now);
+        var keyframes = 0;
+        pacer.KeyframeNeeded += () => keyframes++;
+        pacer.Start();
+        Assert.That(pacer.EnqueueVideo(Picture(true, 0, 1, 4, 200)), Is.True, "on the wire, its first fragment stuck there");
+        Thread.Sleep(50);
+        Assert.That(pacer.EnqueueVideo(Picture(false, 0, 2, 1, 1_100)), Is.False, "a base picture over the budget");
+        Assert.That(keyframes, Is.EqualTo(1));
+        now += 100;
+        Assert.That(pacer.EnqueueVideo(Picture(true, 0, 3, 1, 1_100)), Is.False, "the keyframe asked for overflows too");
+        Assert.That(keyframes, Is.EqualTo(1), "inside the request gap");
+        now += 600;
+        Assert.That(pacer.WouldAccept(false, 0), Is.False, "a delta is still useless");
+        Assert.That(keyframes, Is.EqualTo(2), "but the pacer asks again: nothing else would");
+        now += 100;
+        Assert.That(pacer.WouldAccept(false, 0), Is.False);
+        Assert.That(keyframes, Is.EqualTo(2), "at most once per request gap");
+        wire.SetResult();
+    }
+
+    [Test]
     public void Pacer_APictureLostBeforeIt_OnlyWithholdsItsLayerUntilTheNextBase()
     {
         var pacer = new MediaSendPacer((_, _) => ValueTask.CompletedTask);

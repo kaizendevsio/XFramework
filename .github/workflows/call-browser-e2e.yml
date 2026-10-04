@@ -36,48 +36,43 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Each browser's leg: about 14 ms round trip to TURN and Wi-Fi-class capacity, as the 13:08 UTC call measured.
+          # Each browser's leg: about 14 ms round trip to TURN, as the 13:08 UTC call measured. A's uplink carries 6 Mbit/s,
+          # so A (up to 1440p60) settles near the 4.7 Mbit/s the Android phone sent; B's ceiling (720p30) keeps it near the
+          # iPhone's 2.5 Mbit/s.
           - scenario: clean
             a_down: "delay 7ms rate 50mbit"
-            a_up: "delay 7ms rate 50mbit"
+            a_up: "delay 7ms rate 6mbit"
             b_down: "delay 7ms rate 50mbit"
             b_up: "delay 7ms rate 50mbit"
             relay: "delay 3ms"
             constrained: ""
           - scenario: loss-1pct
             a_down: "delay 7ms rate 50mbit loss 1%"
-            a_up: "delay 7ms rate 50mbit loss 1%"
+            a_up: "delay 7ms rate 6mbit loss 1%"
             b_down: "delay 7ms rate 50mbit loss 1%"
             b_up: "delay 7ms rate 50mbit loss 1%"
             relay: "delay 3ms"
             constrained: ""
-          # Where 1% loss hurts: on the browsers' uplinks only, then on their downlinks only.
-          - scenario: loss-1pct-up
+          # The production failure: 1% loss on the phones' uplinks alone froze video both ways, audio fine.
+          - scenario: loss-1pct-uplinks
             a_down: "delay 7ms rate 50mbit"
-            a_up: "delay 7ms rate 50mbit loss 1%"
+            a_up: "delay 7ms rate 6mbit loss 1%"
             b_down: "delay 7ms rate 50mbit"
             b_up: "delay 7ms rate 50mbit loss 1%"
-            relay: "delay 3ms"
-            constrained: ""
-          - scenario: loss-1pct-down
-            a_down: "delay 7ms rate 50mbit loss 1%"
-            a_up: "delay 7ms rate 50mbit"
-            b_down: "delay 7ms rate 50mbit loss 1%"
-            b_up: "delay 7ms rate 50mbit"
             relay: "delay 3ms"
             constrained: ""
           # Jitter on both uplinks: netem reorders packets, as a UDP path through an anycast relay may.
           - scenario: reorder
             a_down: "delay 7ms rate 50mbit"
-            a_up: "delay 7ms 3ms rate 50mbit"
+            a_up: "delay 7ms 3ms rate 6mbit"
             b_down: "delay 7ms rate 50mbit"
             b_up: "delay 7ms 3ms rate 50mbit"
             relay: "delay 3ms"
             constrained: ""
-          # A's downlink carries 1.5 Mbit/s: B (sending 720p30, ~2.5 Mbit/s on a free link) must fit under it.
+          # A's downlink carries 1.5 Mbit/s: B (720p30, ~2.5 Mbit/s on a free link) must fit its rate under it.
           - scenario: constrained-downlink
             a_down: "delay 7ms rate 1500kbit"
-            a_up: "delay 7ms rate 50mbit"
+            a_up: "delay 7ms rate 6mbit"
             b_down: "delay 7ms rate 50mbit"
             b_up: "delay 7ms rate 50mbit"
             relay: "delay 3ms"
