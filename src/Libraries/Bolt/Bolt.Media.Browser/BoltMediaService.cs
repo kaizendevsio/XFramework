@@ -59,6 +59,13 @@ public sealed partial class BoltMediaService : IAsyncDisposable
     /// <summary>The send estimate and its split, as the last rate-loop tick decided it.</summary>
     public SendRateDecision? SendRate { get; private set; }
 
+    /// <summary>The last rate-loop tick in full: what the pacer, the relay, the receivers and transport feedback said (diagnostics).</summary>
+    public SendRateTick? LastSendTick { get; private set; }
+
+    /// <summary>Pictures this sender's pacer dropped, and times it lost a base-layer picture, since the call started (diagnostics).</summary>
+    public long PacerDroppedPictures { get; private set; }
+    public long PacerBaseLosses { get; private set; }
+
     // ── Events for Blazor UI ──
 
     /// <summary>Incoming call. UI should show accept/reject prompt.</summary>
@@ -423,6 +430,9 @@ public sealed partial class BoltMediaService : IAsyncDisposable
                 await Task.Delay(Math.Max(100, _options.AdaptationIntervalMs), ct);
                 var tick = loop.Tick(Environment.TickCount64, _encodeBacklog);
                 SendRate = tick.Decision;
+                LastSendTick = tick;
+                PacerDroppedPictures += tick.Pacer.DroppedPictures;
+                PacerBaseLosses += tick.Pacer.BaseLosses;
                 if (tick.AudioKbps is { } audio && _options.AdaptiveAudioBitrate)
                     await _audio.ReconfigureBitrateAsync(_options.AudioSampleRate, _options.AudioChannels, audio);
                 if (tick.AudioFrameMs is { } frameMs)
@@ -451,6 +461,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         _rateTask = Task.CompletedTask;
         _rateLoop = null;
         SendRate = null;
+        LastSendTick = null;
         if (_pacer is { } pacer)
         {
             _pacer = null;

@@ -94,6 +94,15 @@ public static class CallDriver
             rate = rate is { } r ? new { r.TotalKbps, r.VideoKbps, r.AudioKbps, r.VideoSuspended, signal = r.Signal.ToString(), r.DelayMs } : null,
             transport = diagnostics?.Transport,
             receive = media.IsInitialized ? media.GetVideoReceiveStats() : [],
+            send = media.LastSendTick is { } tick ? new
+            {
+                pacerDelayMs = tick.Pacer.QueueDelayMs, pacerSentKbps = tick.Pacer.SentKbps, backlog = tick.Pacer.BacklogBytes,
+                capacityKbps = tick.Pacer.CapacityKbps, droppedPictures = media.PacerDroppedPictures, baseLosses = media.PacerBaseLosses,
+                uplinkDelayMs = tick.Transport?.QueueDelayMs, uplinkLoss = tick.Transport is { } t ? Math.Round(t.LossFraction, 3) : (double?)null,
+                uplinkDeliveredKbps = tick.Transport?.DeliveredKbps,
+                relayQueueMs = tick.Relay?.QueueDelayMs, relayCapacityKbps = tick.Relay?.CapacityKbps, relayDropping = tick.Relay?.Dropping,
+                relayBaseLost = tick.Relay?.BaseLost, receiverDelayMs = tick.Receiver?.QueueDelayMs, receiverKbps = tick.Receiver?.ReceivedKbps,
+            } : null,
         }, Json);
     }
 

@@ -51,6 +51,21 @@ jobs:
             b_up: "delay 7ms rate 50mbit loss 1%"
             relay: "delay 3ms"
             constrained: ""
+          # Where 1% loss hurts: on the browsers' uplinks only, then on their downlinks only.
+          - scenario: loss-1pct-up
+            a_down: "delay 7ms rate 50mbit"
+            a_up: "delay 7ms rate 50mbit loss 1%"
+            b_down: "delay 7ms rate 50mbit"
+            b_up: "delay 7ms rate 50mbit loss 1%"
+            relay: "delay 3ms"
+            constrained: ""
+          - scenario: loss-1pct-down
+            a_down: "delay 7ms rate 50mbit loss 1%"
+            a_up: "delay 7ms rate 50mbit"
+            b_down: "delay 7ms rate 50mbit loss 1%"
+            b_up: "delay 7ms rate 50mbit"
+            relay: "delay 3ms"
+            constrained: ""
           # Jitter on both uplinks: netem reorders packets, as a UDP path through an anycast relay may.
           - scenario: reorder
             a_down: "delay 7ms rate 50mbit"

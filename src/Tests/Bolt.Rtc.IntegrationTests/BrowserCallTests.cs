@@ -157,7 +157,11 @@ public sealed class BrowserCallTests
                     (() => {
                         const Native = globalThis.RTCPeerConnection;
                         if (!Native) return;
-                        const Relayed = function (config, ...rest) { return new Native({ ...(config || {}), iceTransportPolicy: 'relay' }, ...rest); };
+                        const Relayed = function (config, ...rest) {
+                            const pc = new Native({ ...(config || {}), iceTransportPolicy: 'relay' }, ...rest);
+                            (globalThis.__boltPeers ??= []).push(pc);
+                            return pc;
+                        };
                         Relayed.prototype = Native.prototype;
                         Object.setPrototypeOf(Relayed, Native);
                         globalThis.RTCPeerConnection = Relayed;
@@ -202,9 +206,11 @@ public sealed class BrowserCallTests
             {
                 var stats = await Stats(name);
                 timeline.Add($"{clock.Elapsed.TotalSeconds,6:F1}s {label} {name}: path={stats["path"]} ({stats["pathKind"]}{(stats["pathReason"] is { } r ? " " + r : "")}) " +
-                             $"tier={stats["tier"]?.ToJsonString()} rate={stats["rate"]?.ToJsonString()} receive={stats["receive"]?.ToJsonString()}");
+                             $"tier={stats["tier"]?.ToJsonString()} rate={stats["rate"]?.ToJsonString()} send={stats["send"]?.ToJsonString()} receive={stats["receive"]?.ToJsonString()}");
             }
             timeline.Add($"{clock.Elapsed.TotalSeconds,6:F1}s {label} relay: {RelayStats(server)}");
+            foreach (var name in new[] { "A", "B" })
+                timeline.Add($"{clock.Elapsed.TotalSeconds,6:F1}s {label} {name} channel: {await pages[name].EvaluateAsync<string>(ChannelStats)}");
         }
 
         // Both on their data channels (the production log line "Datagram media path open ... via UDP/relay").
@@ -281,6 +287,24 @@ public sealed class BrowserCallTests
         await app.StopAsync();
         Assert.That(failures, Is.Empty, text);
     }
+
+    /// <summary>The browser's own view of its data channel: what it sent and received, and what it still holds.</summary>
+    private const string ChannelStats = """
+        async () => {
+            const out = [];
+            for (const pc of globalThis.__boltPeers ?? []) {
+                if (pc.connectionState === 'closed') continue;
+                const report = await pc.getStats();
+                for (const s of report.values()) {
+                    if (s.type === 'data-channel' && s.label === 'bolt-media')
+                        out.push(`msgs sent=${s.messagesSent} recv=${s.messagesReceived} bytes sent=${s.bytesSent} recv=${s.bytesReceived}`);
+                    if (s.type === 'candidate-pair' && (s.nominated || s.selected) && s.state === 'succeeded')
+                        out.push(`pair rtt=${Math.round((s.currentRoundTripTime ?? 0) * 1000)}ms out=${s.availableOutgoingBitrate ?? '-'} pkts sent=${s.packetsSent ?? '-'} recv=${s.packetsReceived ?? '-'}`);
+                }
+            }
+            return out.join(' | ');
+        }
+        """;
 
     /// <summary>A participant's call identity, shaped as Yap's (YapCallGateway.ClientId).</summary>
     private static string Media(Guid call, string who) => $"yap-media-{call:N}-{Guid.NewGuid():N}";
