@@ -38,7 +38,16 @@ func (l *pionLogs) NewLogger(scope string) logging.LeveledLogger {
 	return &pionLogger{logs: l, scope: scope, warn: scope == "ice" || scope == "turnc"}
 }
 
+// pionNoise are warnings pion repeats in normal operation (checks before the other side's candidates arrive, reads on a
+// candidate that is being closed); they would only use up the session's budget.
+var pionNoise = []string{"Failed to ping without candidate pairs", "Failed to read from candidate", "use of closed network connection"}
+
 func (l *pionLogs) write(scope, level, message string) {
+	for _, noise := range pionNoise {
+		if strings.Contains(message, noise) {
+			return
+		}
+	}
 	if l.written.Add(1) > pionLogLimit {
 		return
 	}

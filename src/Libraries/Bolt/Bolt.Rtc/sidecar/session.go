@@ -32,6 +32,19 @@ const (
 	dataQueue         = 2048
 )
 
+// Variables, not constants, only so a test can show what pion's defaults did.
+var (
+	// maxBindingRequests is how many connectivity checks a candidate pair gets before pion gives it up (its default, 7, is
+	// 1.4 s of checks at one per 200 ms, and pion never resets the count). Through TURN the first checks are lost until
+	// both servers hold a permission for the other side, and on a lossy leg half of the rest are too: with 7 the only
+	// pair failed for good within 2 s and the channel never opened. 60 is 12 s, inside the host's 15 s open window.
+	maxBindingRequests uint16 = 60
+	// dtlsRetransmission is the DTLS handshake's first retransmission timeout; it doubles on each retry (to 60 s). pion's
+	// 1 s start, doubling, left a handshake that lost two flights on a lossy leg waiting 7 s or more (browsers start from
+	// twice the ICE round trip, at least 50 ms). Handshake flights are a few kilobytes, so an early retry costs little.
+	dtlsRetransmission = 250 * time.Millisecond
+)
+
 type sessionConfig struct {
 	token string
 }
@@ -160,6 +173,8 @@ func (s *session) start(h hello) error {
 	// and its hysteresis keeps media on the WebSocket for a while. Not shorter: a leg to TURN over TCP (only when the
 	// host allows it) queues keepalives behind a keyframe, and 3 s turned every keyframe into a path switch.
 	settings.SetICETimeouts(5*time.Second, 20*time.Second, 1*time.Second)
+	settings.SetICEMaxBindingRequests(maxBindingRequests)
+	settings.SetDTLSRetransmissionInterval(dtlsRetransmission)
 	// mDNS host candidates are for browsers hiding LAN addresses; the relay never needs them, and the
 	// multicast listener would be one more socket open on the host.
 	settings.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)

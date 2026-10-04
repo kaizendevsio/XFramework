@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"math/rand"
 	"net"
 	"strconv"
 	"strings"
@@ -52,6 +53,17 @@ type testTurn struct {
 // startTurn runs a pion TURN server on loopback: UDP (behind the given drop function) and TCP.
 func startTurn(t *testing.T, drop func(net.Addr) bool) testTurn {
 	t.Helper()
+	return startTurnWrapped(t, func(conn net.PacketConn) net.PacketConn {
+		if drop == nil {
+			return conn
+		}
+		return &blackholeConn{PacketConn: conn, drop: drop}
+	})
+}
+
+// startTurnWrapped runs a pion TURN server on loopback, UDP (its socket wrapped as given) and TCP.
+func startTurnWrapped(t *testing.T, wrap func(net.PacketConn) net.PacketConn) testTurn {
+	t.Helper()
 	udp, err := net.ListenPacket("udp4", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -63,10 +75,7 @@ func startTurn(t *testing.T, drop func(net.Addr) bool) testTurn {
 	relay := func() turn.RelayAddressGenerator {
 		return &turn.RelayAddressGeneratorStatic{RelayAddress: net.ParseIP("127.0.0.1"), Address: "127.0.0.1"}
 	}
-	var conn net.PacketConn = udp
-	if drop != nil {
-		conn = &blackholeConn{PacketConn: udp, drop: drop}
-	}
+	conn := wrap(udp)
 	quiet := logging.NewDefaultLoggerFactory()
 	quiet.DefaultLogLevel = logging.LogLevelDisabled
 	server, err := turn.NewServer(turn.ServerConfig{
@@ -297,4 +306,91 @@ func mustStdNet(t *testing.T) *stdnet.Net {
 		t.Fatal(err)
 	}
 	return base
+}
+
+// lossyConn loses a share of the datagrams through a TURN server's socket, each way, at random.
+type lossyConn struct {
+	net.PacketConn
+	loss float64
+}
+
+func (c *lossyConn) ReadFrom(p []byte) (int, net.Addr, error) {
+	for {
+		n, addr, err := c.PacketConn.ReadFrom(p)
+		if err != nil || rand.Float64() >= c.loss {
+			return n, addr, err
+		}
+	}
+}
+
+func (c *lossyConn) WriteTo(p []byte, addr net.Addr) (int, error) {
+	if rand.Float64() < c.loss {
+		return len(p), nil
+	}
+	return c.PacketConn.WriteTo(p, addr)
+}
+
+// overLossyLeg connects a peer through a clean TURN server to one whose leg loses 30% of datagrams each way (about half
+// of all round trips) and says when ICE and DTLS had connected both sides (0: not within 20 s).
+func overLossyLeg(t *testing.T) time.Duration {
+	t.Helper()
+	clean := startTurn(t, nil)
+	lossy := startTurnWrapped(t, func(conn net.PacketConn) net.PacketConn { return &lossyConn{PacketConn: conn, loss: 0.3} })
+	offerer, answerer := startHost(t), startHost(t)
+	offerer.hello("offer", func(h *hello) { h.RelayOnly = true; h.ICEServers = []iceServer{turnServer(t, clean.udpURL)} })
+	answerer.hello("answer", func(h *hello) { h.RelayOnly = true; h.ICEServers = []iceServer{turnServer(t, lossy.udpURL)} })
+	started := time.Now()
+	offerer.sendJSON(msgCreateOffer, offerRequest{})
+	connected := func(f frame) bool {
+		var state stateMessage
+		return f.kind == msgState && json.Unmarshal(f.payload, &state) == nil && state.Peer == "connected"
+	}
+	doneA, doneB := false, false
+	deadline := time.After(20 * time.Second)
+	for !doneA || !doneB {
+		select {
+		case f := <-offerer.frames:
+			if f.kind == msgSDP || f.kind == msgCandidate {
+				answerer.send(f.kind, f.payload)
+			}
+			doneA = doneA || connected(f)
+		case f := <-answerer.frames:
+			if f.kind == msgSDP || f.kind == msgCandidate {
+				offerer.send(f.kind, f.payload)
+			}
+			doneB = doneB || connected(f)
+		case <-deadline:
+			return 0
+		}
+	}
+	return time.Since(started)
+}
+
+// Through a TURN leg that loses half of its round trips, ICE and DTLS connect well inside the host's 15 s window. With
+// pion's defaults (7 connectivity checks per pair, never reset; DTLS retransmission from 1 s, doubling) the only pair
+// could fail for good before both TURN servers held permissions, or the handshake backed off past the window.
+func TestIceAndDtlsConnectThroughATurnLegThatLosesHalfItsRoundTrips(t *testing.T) {
+	if testing.Short() {
+		t.Skip("slow")
+	}
+	const runs = 4
+	var tuned []time.Duration
+	for i := 0; i < runs; i++ {
+		took := overLossyLeg(t)
+		tuned = append(tuned, took)
+		if took == 0 || took > 12*time.Second {
+			t.Errorf("run %d: ICE and DTLS took %v (0: not within 20 s)", i, took)
+		}
+	}
+	t.Logf("tuned: %v", tuned)
+	if testing.Verbose() {
+		savedChecks, savedDTLS := maxBindingRequests, dtlsRetransmission
+		maxBindingRequests, dtlsRetransmission = 7, time.Second
+		defer func() { maxBindingRequests, dtlsRetransmission = savedChecks, savedDTLS }()
+		var before []time.Duration
+		for i := 0; i < runs; i++ {
+			before = append(before, overLossyLeg(t))
+		}
+		t.Logf("pion's defaults (0 = not within 20 s): %v", before)
+	}
 }
