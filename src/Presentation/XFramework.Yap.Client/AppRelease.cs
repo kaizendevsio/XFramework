@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.74";
+    public const string Version = "1.3.75";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
-        (Version, "3 October 2026", [
+        (Version, "4 October 2026", [
+            "Calls use much less data: encryption overhead per frame drops from about 278 to 19 bytes, so video stays smoother on slow connections.",
+            "On slow links audio is packed more efficiently, and lost video is repaired by resending just the missing pieces instead of a whole new picture."]),
+        ("1.3.74", "3 October 2026", [
             "Calls over UDP no longer switch back and forth between connections, so video stays on instead of pausing.",
             "Yap only uses the fast UDP route for calls; slower relayed TCP routes are no longer used."]),
         ("1.3.73", "3 October 2026", [
