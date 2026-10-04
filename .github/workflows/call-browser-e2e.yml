@@ -1,7 +1,7 @@
 name: Call browser E2E
 
 # A whole call between two real browsers, the way production runs one (BrowserCallTests.cs): Chromium as the Android
-# phone (up to 1440p60) and WebKit as the iPhone (720p30), each the production Blazor WASM media stack (AOT, as Yap
+# phone (up to 1440p30) and WebKit as the iPhone (720p30), each the production Blazor WASM media stack (AOT, as Yap
 # publishes it) with synthetic devices, through the production relay (BoltServer with Yap's options, the bolt-rtc
 # sidecar, NACK and transport feedback on) and coturn over UDP on every leg. netem shapes each browser's leg and the
 # relay's. The test asserts pictures arrive at the rate they are sent, no freeze over 1 s, at most one decoder restart,
@@ -36,19 +36,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Each browser's leg: about 14 ms round trip to TURN, as the 13:08 UTC call measured. A's uplink carries 6 Mbit/s
-          # behind a 200-packet (about 300 ms) buffer, so A (up to 1440p60) settles near the 4.7 Mbit/s the Android phone
-          # sent; B's ceiling (720p30) keeps it near the iPhone's 2.5 Mbit/s.
+          # Each browser's leg: about 14 ms round trip to TURN and Wi-Fi capacity, as the 13:08 UTC call measured. A plays
+          # the Android phone at up to 1440p30 (it climbs past the 4.7 Mbit/s that phone sent), B the iPhone at 720p30
+          # (about 2.5 Mbit/s).
           - scenario: clean
             a_down: "delay 7ms rate 50mbit"
-            a_up: "delay 7ms rate 6mbit limit 200"
+            a_up: "delay 7ms rate 50mbit"
             b_down: "delay 7ms rate 50mbit"
             b_up: "delay 7ms rate 50mbit"
             relay: "delay 3ms"
             constrained: ""
           - scenario: loss-1pct
             a_down: "delay 7ms rate 50mbit loss 1%"
-            a_up: "delay 7ms rate 6mbit limit 200 loss 1%"
+            a_up: "delay 7ms rate 50mbit loss 1%"
             b_down: "delay 7ms rate 50mbit loss 1%"
             b_up: "delay 7ms rate 50mbit loss 1%"
             relay: "delay 3ms"
@@ -56,7 +56,7 @@ jobs:
           # The production failure: 1% loss on the phones' uplinks alone froze video both ways, audio fine.
           - scenario: loss-1pct-uplinks
             a_down: "delay 7ms rate 50mbit"
-            a_up: "delay 7ms rate 6mbit limit 200 loss 1%"
+            a_up: "delay 7ms rate 50mbit loss 1%"
             b_down: "delay 7ms rate 50mbit"
             b_up: "delay 7ms rate 50mbit loss 1%"
             relay: "delay 3ms"
@@ -64,7 +64,7 @@ jobs:
           # Jitter on both uplinks: netem reorders packets, as a UDP path through an anycast relay may.
           - scenario: reorder
             a_down: "delay 7ms rate 50mbit"
-            a_up: "delay 7ms 3ms rate 6mbit limit 200"
+            a_up: "delay 7ms 3ms rate 50mbit"
             b_down: "delay 7ms rate 50mbit"
             b_up: "delay 7ms 3ms rate 50mbit"
             relay: "delay 3ms"
@@ -72,7 +72,7 @@ jobs:
           # A's downlink carries 1.5 Mbit/s: B (720p30, ~2.5 Mbit/s on a free link) must fit its rate under it.
           - scenario: constrained-downlink
             a_down: "delay 7ms rate 1500kbit"
-            a_up: "delay 7ms rate 6mbit limit 200"
+            a_up: "delay 7ms rate 50mbit"
             b_down: "delay 7ms rate 50mbit"
             b_up: "delay 7ms rate 50mbit"
             relay: "delay 3ms"
@@ -148,6 +148,9 @@ jobs:
           BOLT_RTC_SIDECAR: ${{ runner.temp }}/bolt-rtc
           BOLT_RTC_TURN_SECRET: ci-turn-secret
           CALL_SCENARIO: ${{ matrix.scenario }}
+          CALL_A_FPS: "30"
+          # The rate control climbs from a mobile-safe start; the window measures the call once it has.
+          CALL_WARMUP_SECONDS: "40"
           CALL_SECONDS: ${{ github.event.inputs.seconds || '60' }}
           CALL_CONSTRAINED: ${{ matrix.constrained }}
           CALL_OUT: ${{ runner.temp }}/call-${{ matrix.scenario }}.json
