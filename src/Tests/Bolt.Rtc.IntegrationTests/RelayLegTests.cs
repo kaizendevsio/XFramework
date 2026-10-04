@@ -287,7 +287,10 @@ public sealed partial class BrowserDataChannelTests
     /// checks, DTLS, SCTP, the channel), so like the client (which retries after 5 s) it gets up to three attempts of 15 s.
     /// The relay's channel must never leave open. The browser's may blip: Chrome's own consent checks cross the lossy leg,
     /// and a few lost in a row read as ICE "disconnected" for a moment (one 160 ms blip in 25 s in run 37181598529), which
-    /// no setting on the relay's side can prevent; each blip must be over within a second.
+    /// no setting on the relay's side can prevent; each blip must be over within a second. The relay's buffer is not held to
+    /// the 2 s drain window here: with half the SACKs and FORWARD-TSNs lost, SCTP's retransmission timer backs off (1, 2,
+    /// 4 s...) and the buffer can sit for seconds (12 calls of 25 s: once, 12.9 s; with #578's SCTP patch, once, 4.8 s).
+    /// The relay's drain watchdog then moves that participant's media to the WebSocket, which is the intended outcome.
     /// </summary>
     [Category("RelayLeg")]
     [TestCase("chromium")]
@@ -295,7 +298,8 @@ public sealed partial class BrowserDataChannelTests
     public async Task WhenTheRelaysUdpLosesHalfItsRoundTrips_TheCallStillOpensOverUdp_AndHolds(string engine)
     {
         RequireCondition("lossy");
-        await HoldsAsync(engine, "UDP/relay", new DownlinkPlan(600, 40, 5, 25), minDelivered: 0.4, attempts: 3, browserBlips: 2);
+        await HoldsAsync(engine, "UDP/relay", new DownlinkPlan(600, 40, 5, 25), minDelivered: 0.4, attempts: 3, browserBlips: 2,
+            maxStuckMs: null);
     }
 
     /// <summary>
@@ -316,7 +320,7 @@ public sealed partial class BrowserDataChannelTests
     }
 
     private async Task HoldsAsync(string engine, string relayPath, DownlinkPlan plan, int timeoutMs = 15000, double minDelivered = 0.85,
-        int attempts = 1, int browserBlips = 0)
+        int attempts = 1, int browserBlips = 0, double? maxStuckMs = 2000)
     {
         await using var browser = await LaunchAsync(engine);
         DownResult result;
@@ -339,7 +343,8 @@ public sealed partial class BrowserDataChannelTests
             Assert.That(relay?.Down.Flaps, Is.Empty, "the relay's channel never left open while media ran: " + description);
             Assert.That(BrowserFlaps(result), Has.Length.LessThanOrEqualTo(browserBlips), "the browser's channel never left open while media ran: " + description);
             Assert.That(BrowserBlipMs(result), Is.All.LessThan(1000), "a blip on the browser's side is over within a second: " + description);
-            Assert.That(relay?.Down.MaxStuckMs, Is.LessThan(2000), "the relay's buffer never stopped draining for the stall window");
+            if (maxStuckMs is { } stuckLimit)
+                Assert.That(relay?.Down.MaxStuckMs, Is.LessThan(stuckLimit), "the relay's buffer never stopped draining for the stall window");
             Assert.That(delivered, Is.GreaterThanOrEqualTo(minDelivered), "what the relay sent arrived");
         });
     }
