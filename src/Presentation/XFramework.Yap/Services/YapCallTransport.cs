@@ -38,6 +38,13 @@ public sealed class YapTurnOptions
     /// own congestion control on top), which is worse than the call's plain WebSocket, the fallback when UDP fails.
     /// </summary>
     public bool AllowTcp { get; init; }
+    /// <summary>
+    /// Give the relay's own peer a TURN-over-TLS leg (443) as well, which it only uses when no TURN-over-UDP leg answers:
+    /// the bolt-rtc sidecar holds a TCP/TLS leg back while UDP may still answer and drops it when UDP does, so the browser
+    /// can never pick it over a working UDP leg. Default true: the relay's hop to TURN is short and clean, unlike the
+    /// phone's, whose leg stays UDP; without it a network that drops the relay's UDP to TURN leaves calls on WebSockets.
+    /// </summary>
+    public bool RelayTlsFallback { get; init; } = true;
 
     public bool UsesCloudflare => !string.IsNullOrWhiteSpace(CloudflareKeyId) && !string.IsNullOrWhiteSpace(CloudflareApiToken);
     public bool UsesSharedSecret => Urls.Length > 0 && !string.IsNullOrEmpty(SharedSecret);
@@ -59,6 +66,7 @@ public sealed class YapTurnOptions
             CredentialTtlSeconds = Math.Clamp(section.GetValue("CredentialTtlSeconds", 3600), 600, 6 * 3600),
             RelayOnly = section.GetValue("RelayOnly", true),
             AllowTcp = section.GetValue("AllowTcp", false),
+            RelayTlsFallback = section.GetValue("RelayTlsFallback", true),
         };
     }
 }
@@ -89,27 +97,33 @@ public sealed class YapTurnCredentials(YapTurnOptions options, IHttpClientFactor
             var client = await MintCloudflareAsync(ttl, ct);
             var server = client is null ? null : await MintCloudflareAsync(ttl, ct);
             if (client is null || server is null) return null;
-            return new BoltIceGrant(ForBrowser(client, options.AllowTcp), ForRelay(server, options.AllowTcp), expires);
+            return new BoltIceGrant(ForBrowser(client, options.AllowTcp), ForRelay(server, options.AllowTcp, options.RelayTlsFallback), expires);
         }
         if (options.UsesSharedSecret)
         {
             // TURN REST API (coturn use-auth-secret): username "expiry:label", password base64(HMAC-SHA1(secret, username)).
-            var servers = (string label) =>
+            var servers = (string label, Func<string, bool> keep) =>
             {
                 var username = $"{expires.ToUnixTimeSeconds()}:{label}";
                 var credential = Convert.ToBase64String(HMACSHA1.HashData(Encoding.UTF8.GetBytes(options.SharedSecret!), Encoding.UTF8.GetBytes(username)));
-                return Keep([new RtcIceServer(options.Urls, username, credential)], url => options.AllowTcp || IsUdpTurn(url));
+                return Keep([new RtcIceServer(options.Urls, username, credential)], keep);
             };
             // The label is random: it identifies a session to the TURN server's logs, never a person.
-            return new BoltIceGrant(servers(Convert.ToHexString(RandomNumberGenerator.GetBytes(8))), servers("relay"), expires);
+            return new BoltIceGrant(servers(Convert.ToHexString(RandomNumberGenerator.GetBytes(8)), BrowserKeeps), servers("relay", RelayKeeps), expires);
         }
         if (options.UsesStatic)
         {
-            var servers = Keep([new RtcIceServer(options.Urls, options.Username, options.Credential)], url => options.AllowTcp || IsUdpTurn(url));
-            return new BoltIceGrant(servers, servers, expires);
+            var server = new RtcIceServer(options.Urls, options.Username, options.Credential);
+            return new BoltIceGrant(Keep([server], BrowserKeeps), Keep([server], RelayKeeps), expires);
         }
         return null;
     }
+
+    /// <summary>A TURN server other than Cloudflare: the browser gets UDP (TCP/TLS too with AllowTcp).</summary>
+    private bool BrowserKeeps(string url) => options.AllowTcp || IsUdpTurn(url);
+
+    /// <summary>A TURN server other than Cloudflare: the relay gets UDP, and TLS as its fallback (TCP too with AllowTcp).</summary>
+    private bool RelayKeeps(string url) => options.AllowTcp || IsUdpTurn(url) || options.RelayTlsFallback && IsTlsTurn(url);
 
     private async Task<IReadOnlyList<RtcIceServer>?> MintCloudflareAsync(TimeSpan ttl, CancellationToken ct)
     {
@@ -173,18 +187,25 @@ public sealed class YapTurnCredentials(YapTurnOptions options, IHttpClientFactor
         Keep(servers, url => !IsPort(url, 53) && (allowTcp || IsUdpTurn(url)));
 
     /// <summary>
-    /// What the relay's own peer gets: TURN over UDP on 3478, and on 53 should 3478 be filtered. Never TCP or TLS
-    /// unless <paramref name="allowTcp"/> (then TLS on 443 too): in production every relay leg opened over TLS and
-    /// stalled on every keyframe (12:45-12:54 UTC). Each URL becomes an allocation, so the rest would only add load.
+    /// What the relay's own peer gets: TURN over UDP on 3478, and on 53 should 3478 be filtered; and, unless
+    /// <paramref name="tlsFallback"/> is off, TURN over TLS on 443 as a fallback. The sidecar starts each UDP allocation
+    /// from several sockets (production, 04:09 UTC 2026-10-04: from xeon-dev's ISP most UDP flows to Cloudflare's TURN
+    /// anycast got no answer, so every allocation from pion's single socket failed and nothing was gathered), and only
+    /// dials the TLS leg when no UDP leg answers within 2.5 s, so a working UDP leg is never competed with (in production
+    /// at 12:45-12:54 UTC an iPhone nominated the relay's TLS leg over UDP). With <paramref name="allowTcp"/>, TLS always.
+    /// Each URL becomes an allocation, so the rest would only add load.
     /// </summary>
-    internal static IReadOnlyList<RtcIceServer> ForRelay(IReadOnlyList<RtcIceServer> servers, bool allowTcp = false) =>
+    internal static IReadOnlyList<RtcIceServer> ForRelay(IReadOnlyList<RtcIceServer> servers, bool allowTcp = false, bool tlsFallback = true) =>
         Keep(servers, url => IsUdpTurn(url) && (IsPort(url, 3478) || IsPort(url, 53))
-                             || allowTcp && url.StartsWith("turns:", StringComparison.OrdinalIgnoreCase) && IsPort(url, 443));
+                             || (allowTcp || tlsFallback) && IsTlsTurn(url) && IsPort(url, 443));
 
     /// <summary>A TURN URL whose leg to the TURN server is UDP (the default when no transport is named).</summary>
     internal static bool IsUdpTurn(string url) =>
         url.StartsWith("turn:", StringComparison.OrdinalIgnoreCase) &&
         (!url.Contains("transport=", StringComparison.OrdinalIgnoreCase) || url.Contains("transport=udp", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>A TURN URL whose leg to the TURN server is TLS.</summary>
+    internal static bool IsTlsTurn(string url) => url.StartsWith("turns:", StringComparison.OrdinalIgnoreCase);
 
     private static IReadOnlyList<RtcIceServer> Keep(IReadOnlyList<RtcIceServer> servers, Func<string, bool> keep) =>
         servers.Where(x => x.Credential is not null)
