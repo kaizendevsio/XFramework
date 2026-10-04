@@ -98,6 +98,7 @@ public static class CallDriver
             {
                 pacerDelayMs = tick.Pacer.QueueDelayMs, pacerSentKbps = tick.Pacer.SentKbps, backlog = tick.Pacer.BacklogBytes,
                 capacityKbps = tick.Pacer.CapacityKbps, droppedPictures = media.PacerDroppedPictures, baseLosses = media.PacerBaseLosses,
+                onSocket = media.SocketFallbackFrames,
                 uplinkDelayMs = tick.Transport?.QueueDelayMs, uplinkLoss = tick.Transport is { } t ? Math.Round(t.LossFraction, 3) : (double?)null,
                 uplinkDeliveredKbps = tick.Transport?.DeliveredKbps,
                 relayQueueMs = tick.Relay?.QueueDelayMs, relayCapacityKbps = tick.Relay?.CapacityKbps, relayDropping = tick.Relay?.Dropping,

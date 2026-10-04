@@ -231,6 +231,9 @@ internal sealed class BoltMediaSendQueue
     public long KeyframeRequests => Interlocked.Read(ref _keyframeRequests);
     /// <summary>Enhancement-layer pictures dropped so the base layer could keep flowing.</summary>
     public long LayerDrops => Interlocked.Read(ref _layerDrops);
+    /// <summary>Video frames that arrived behind a later one of their stream and were still sent with their picture.</summary>
+    public long LateForwarded => Interlocked.Read(ref _lateForwarded);
+    private long _lateForwarded;
 
     public long QueuedBytes { get { lock (_sync) return _audioBytes + _videoBytes + _feedback.Sum(static x => (long)x.Length); } }
     public long QueuedVideoBytes { get { lock (_sync) return _videoBytes; } }
@@ -340,6 +343,7 @@ internal sealed class BoltMediaSendQueue
                         fate = layer <= state.LayerLimit && !IsVideoCongested(now, frame.Length) ? PictureFate.Forwarded : PictureFate.Dropped;
                     if (fate == PictureFate.Forwarded && !IsVideoCongested(now, frame.Length))
                     {
+                        _lateForwarded++;
                         state.Decide(late, forwarded: true);
                         _offeredBytes += frame.Length;
                         state.OfferedBytes += frame.Length;

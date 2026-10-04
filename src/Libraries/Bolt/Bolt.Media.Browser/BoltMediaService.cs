@@ -64,6 +64,8 @@ public sealed partial class BoltMediaService : IAsyncDisposable
 
     /// <summary>Pictures this sender's pacer dropped, and times it lost a base-layer picture, since the call started (diagnostics).</summary>
     public long PacerDroppedPictures { get; private set; }
+    /// <summary>Frames the pacer sent on the socket because the data channel would not take them (diagnostics).</summary>
+    public long SocketFallbackFrames { get; private set; }
     public long PacerBaseLosses { get; private set; }
 
     // ── Events for Blazor UI ──
@@ -378,9 +380,12 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         var datagram = _transport;
         _signals.Clear();
         var pacer = _pacer = new MediaSendPacer(
-            (frame, audio, ct) => datagram?.TrySend(frame.Span, audio) == true
-                ? ValueTask.CompletedTask
-                : client.GetPrimaryConnection().SendAsync(frame, ct),
+            (frame, audio, ct) =>
+            {
+                if (datagram?.TrySend(frame.Span, audio) == true) return ValueTask.CompletedTask;
+                if (datagram is not null) SocketFallbackFrames++;
+                return client.GetPrimaryConnection().SendAsync(frame, ct);
+            },
             () =>
             {
                 try { return client.GetPrimaryConnection().PendingBytes + _audio.TransportBufferedBytes() + (datagram?.BufferedAmount ?? 0); }

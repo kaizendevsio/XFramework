@@ -324,8 +324,13 @@ public sealed class BrowserCallTests
             var id = (Get("ClientId") as string ?? "?");
             parts.Add($"{id[^4..]}: sent={Get("DatagramFramesSent")} socket={Get("DatagramFallbacks")} rexmit={Get("RetransmittedFrames")} " +
                       $"videoDrops={Q("DroppedVideoFrames")} stale={Q("StaleFrames")} purges={Q("VideoPurges")} keyReq={Q("KeyframeRequests")} " +
-                      $"layerDrops={Q("LayerDrops")} sidecarDropped={datagram?.Dropped} buffered={datagram?.BufferedAmount} cwnd={datagram?.CongestionWindow}");
+                      $"layerDrops={Q("LayerDrops")} lateForwarded={Q("LateForwarded")} sidecarDropped={datagram?.Dropped} buffered={datagram?.BufferedAmount} cwnd={datagram?.CongestionWindow}");
         }
+        // Per sending stream: frames that reached the relay behind a later one (reordered on the uplink, or sent again).
+        var routes = (System.Collections.IDictionary)typeof(BoltServer).GetField("_activeMediaStreams", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(server)!;
+        foreach (System.Collections.DictionaryEntry route in routes)
+            if (route.Value!.GetType().GetProperty("Retransmits")?.GetValue(route.Value) is { } cache)
+                parts.Add($"route {route.Key.ToString()![..4]}: late={cache.GetType().GetProperty("LateArrivals")?.GetValue(cache)}");
         return string.Join(" | ", parts);
     }
 

@@ -23,6 +23,10 @@ internal sealed class RelayRetransmitCache
     private readonly object _sync = new();
     private uint _newest;
     private bool _hasNewest;
+    private long _late;
+
+    /// <summary>Frames that arrived after a later one of the stream (reordered, or sent again), for diagnostics.</summary>
+    public long LateArrivals { get { lock (_sync) return _late; } }
 
     public RelayRetransmitCache(int capacity = DefaultCapacity, int maxFrameBytes = RtcDefaults.MaxMessageBytes, int maxAgeMs = DefaultMaxAgeMs)
     {
@@ -53,6 +57,7 @@ internal sealed class RelayRetransmitCache
                 waiting = receivers;
                 return Arrival.Requested;
             }
+            if (late) _late++;
             return late ? Arrival.Late : Arrival.InOrder;
         }
     }
