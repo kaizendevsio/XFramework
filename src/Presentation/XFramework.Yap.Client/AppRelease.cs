@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.78";
+    public const string Version = "1.3.79";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
-        (Version, "4 October 2026", [
+        (Version, "5 October 2026", [
+            "Video no longer freezes on calls over UDP: large pictures still arriving are no longer thrown away, so video decodes at full quality.",
+            "Lost video on the sender's connection is resent right away, and out-of-order pieces are kept instead of dropped."]),
+        ("1.3.78", "4 October 2026", [
             "Calls connect over UDP far more reliably on networks that drop many UDP connections, with a secure fallback for the server's side.",
             "Call traffic overhead drops sharply: a WebRTC library bug that sent a control packet for almost every acknowledgement is fixed."]),
         ("1.3.77", "4 October 2026", [
