@@ -90,8 +90,12 @@ public sealed class YapCallTransportTests
             // the fallback. Production 12:45-12:54 UTC: every channel opened via TLS/relay and flapped on each keyframe.
             Assert.That(client.Urls, Is.EqualTo(new[] { "turn:turn.cloudflare.com:3478?transport=udp" }),
                 "the phone gets UDP TURN only (port 53 is blocked by browsers)");
-            Assert.That(relay.Urls, Is.EquivalentTo(new[] { "turn:turn.cloudflare.com:3478?transport=udp", "turn:turn.cloudflare.com:53?transport=udp" }),
-                "the relay allocates over UDP only, on 3478 or 53");
+            Assert.That(relay.Urls, Is.EquivalentTo(new[]
+                {
+                    "turn:turn.cloudflare.com:3478?transport=udp", "turn:turn.cloudflare.com:53?transport=udp",
+                    "turns:turn.cloudflare.com:443?transport=tcp",
+                }),
+                "the relay allocates over UDP on 3478 or 53, with TLS on 443 as the fallback its sidecar only dials when UDP gets no answer");
             Assert.That(grant.Client.Concat(grant.Server).SelectMany(x => new[] { x.Username, x.Credential }.Concat(x.Urls)), Has.None.Contains(Token));
             Assert.That(grant.ExpiresAt, Is.EqualTo(before.AddSeconds(1800)).Within(TimeSpan.FromSeconds(5)));
         });
@@ -111,6 +115,30 @@ public sealed class YapCallTransportTests
             Assert.That(YapTurnOptions.From(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
                 { ["Yap:Calls:Turn:AllowTcp"] = "true" }).Build()).AllowTcp, Is.True);
             Assert.That(YapTurnOptions.From(new ConfigurationBuilder().Build()).AllowTcp, Is.False);
+        });
+    }
+
+    [Test]
+    public async Task TheRelaysTlsFallback_CanBeTurnedOff_AndOtherTurnServersGetItToo()
+    {
+        var handler = new Handler((_, n) => Json(CloudflareArray, n));
+        var off = new YapTurnCredentials(new YapTurnOptions { CloudflareKeyId = KeyId, CloudflareApiToken = Token, RelayTlsFallback = false },
+            new Factory(handler), NullLogger<YapTurnCredentials>.Instance);
+        var withoutTls = await off.GrantAsync(Participant, CancellationToken.None);
+        var coturn = new YapTurnCredentials(new YapTurnOptions
+            {
+                Urls = ["turn:coturn:3478?transport=udp", "turn:coturn:3478?transport=tcp", "turns:coturn:5349?transport=tcp"], SharedSecret = "coturn-secret",
+            }, new Factory(handler), NullLogger<YapTurnCredentials>.Instance);
+        var shared = await coturn.GrantAsync(Participant, CancellationToken.None);
+        Assert.Multiple(() =>
+        {
+            Assert.That(withoutTls!.Server.Single().Urls, Is.EquivalentTo(new[] { "turn:turn.cloudflare.com:3478?transport=udp", "turn:turn.cloudflare.com:53?transport=udp" }));
+            Assert.That(shared!.Server.Single().Urls, Is.EquivalentTo(new[] { "turn:coturn:3478?transport=udp", "turns:coturn:5349?transport=tcp" }),
+                "the relay: UDP, and TLS as its fallback");
+            Assert.That(shared.Client.Single().Urls, Is.EqualTo(new[] { "turn:coturn:3478?transport=udp" }), "the phone: UDP only");
+            Assert.That(YapTurnOptions.From(new ConfigurationBuilder().Build()).RelayTlsFallback, Is.True);
+            Assert.That(YapTurnOptions.From(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+                { ["Yap:Calls:Turn:RelayTlsFallback"] = "false" }).Build()).RelayTlsFallback, Is.False);
         });
     }
 

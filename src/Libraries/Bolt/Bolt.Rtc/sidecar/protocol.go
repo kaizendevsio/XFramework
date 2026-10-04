@@ -77,6 +77,9 @@ type hello struct {
 	MaxMessageBytes int         `json:"maxMessageBytes"`
 	MinCwnd         uint32      `json:"minCwnd"`
 	AllowLoopback   bool        `json:"allowLoopback"`
+	// TurnFlows is how many sockets each UDP TURN allocation starts from (0: defaultTurnFlows; 1: pion's own single
+	// socket, for comparison in tests).
+	TurnFlows int `json:"turnFlows,omitempty"`
 }
 
 type sdpMessage struct {

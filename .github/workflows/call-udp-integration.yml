@@ -11,6 +11,7 @@ on:
       - src/Libraries/Bolt/**
       - src/Tests/Bolt.Rtc.IntegrationTests/**
       - .github/workflows/call-udp-integration.yml
+      - .github/scripts/call-shape-legs.sh
 
 permissions:
   contents: read
@@ -95,8 +96,118 @@ jobs:
           # Everything here crosses loopback (browser, coturn, sidecar): 5 ms each way per hop and 0.5% loss per packet.
           sudo tc qdisc add dev lo root netem delay 5ms 1ms loss 0.5%
           trap 'sudo tc qdisc del dev lo root || true' EXIT
-          dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj             --configuration Release --no-build --filter "FullyQualifiedName~AtVideoRates" --logger "console;verbosity=normal"
+          dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj \
+            --configuration Release --no-build --filter "FullyQualifiedName~AtVideoRates" --logger "console;verbosity=normal"
+
+      - name: Start the relay's own TURN server (UDP and TLS)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A second coturn for the relay's leg alone, so each step below can degrade that leg and nothing else.
+          # TLS with a throwaway self-signed certificate for 127.0.0.1, trusted by the sidecar only through SSL_CERT_FILE.
+          dir="$RUNNER_TEMP/turn-tls"
+          mkdir -p "$dir"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=127.0.0.1" -addext "subjectAltName=IP:127.0.0.1" \
+            -keyout "$dir/key.pem" -out "$dir/cert.pem" 2>/dev/null
+          chmod 644 "$dir/key.pem" "$dir/cert.pem"
+          cat /etc/ssl/certs/ca-certificates.crt "$dir/cert.pem" > "$dir/bundle.pem"
+          docker run --detach --name coturn-relay --network host -v "$dir:/tls:ro" \
+            coturn/coturn:4.18.0-debian@sha256:bbefd3e1fdfdc0d58770fe01b581fd8b00d9f3a5580d00acb77cf719a6bc78e3 \
+            -n --verbose --log-file=stdout --listening-ip=127.0.0.1 --relay-ip=127.0.0.1 --listening-port=3480 \
+            --tls-listening-port=5350 --cert=/tls/cert.pem --pkey=/tls/key.pem \
+            --use-auth-secret --static-auth-secret=ci-turn-secret --realm=bolt.test --fingerprint \
+            --allow-loopback-peers --min-port=49401 --max-port=49600
+          for attempt in $(seq 1 30); do
+            if ss -lnu | grep -q '127.0.0.1:3480 ' && ss -lnt | grep -q '127.0.0.1:5350 '; then exit 0; fi
+            sleep 1
+          done
+          docker logs coturn-relay
+          exit 1
+
+      # The relay's leg to TURN, degraded alone (production 04:09 UTC 2026-10-04: every relay allocation over UDP failed).
+      # Drops are on INPUT: a DROP on OUTPUT fails the sender's sendto with EPERM (coturn then closes the allocation),
+      # where a real network loses the datagram silently.
+      # shape_legs puts the browser's leg (port 3478) on 40 ms each way, 1% loss, 4 Mbit/s, and the relay's leg (3480 and
+      # 5350) on 8 ms each way at 8 Mbit/s, a residential uplink; the hop between the two TURN servers stays clean.
+      - name: "Relay leg: half of its UDP flows to TURN dropped"
+        env:
+          BOLT_RTC_SIDECAR: ${{ runner.temp }}/bolt-rtc
+          BOLT_RTC_TURN_HOST: 127.0.0.1
+          BOLT_RTC_TURN_SECRET: ci-turn-secret
+          BOLT_RTC_RELAY_TURN_UDP_PORT: "3480"
+          BOLT_RTC_RELAY_TURN_TLS_PORT: "5350"
+          BOLT_RTC_RELAY_CONDITION: half-flows
+          SSL_CERT_FILE: ${{ runner.temp }}/turn-tls/bundle.pem
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Every datagram to the relay's TURN server from an odd source port is dropped: each flow all or nothing, as
+          # from xeon-dev's ISP to Cloudflare's TURN anycast.
+          sudo iptables -I INPUT -i lo -p udp --dport 3480 -m u32 --u32 "0>>22&0x3C@0>>16&0x1=1" -j DROP
+          trap 'sudo iptables -D INPUT -i lo -p udp --dport 3480 -m u32 --u32 "0>>22&0x3C@0>>16&0x1=1" -j DROP || true' EXIT
+          dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj \
+            --configuration Release --no-build --filter "TestCategory=RelayLeg" --logger "console;verbosity=normal"
+
+      - name: "Relay leg: clean (baseline)"
+        env:
+          BOLT_RTC_SIDECAR: ${{ runner.temp }}/bolt-rtc
+          BOLT_RTC_TURN_HOST: 127.0.0.1
+          BOLT_RTC_TURN_SECRET: ci-turn-secret
+          BOLT_RTC_RELAY_TURN_UDP_PORT: "3480"
+          BOLT_RTC_RELAY_TURN_TLS_PORT: "5350"
+          BOLT_RTC_RELAY_CONDITION: clean
+          SSL_CERT_FILE: ${{ runner.temp }}/turn-tls/bundle.pem
+        shell: bash
+        run: |
+          set -euo pipefail
+          source .github/scripts/call-shape-legs.sh
+          shape_legs
+          trap 'unshape_legs' EXIT
+          dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj \
+            --configuration Release --no-build --filter "TestCategory=RelayLeg" --logger "console;verbosity=normal"
+
+      - name: "Relay leg: UDP to TURN blocked, TLS fallback"
+        env:
+          BOLT_RTC_SIDECAR: ${{ runner.temp }}/bolt-rtc
+          BOLT_RTC_TURN_HOST: 127.0.0.1
+          BOLT_RTC_TURN_SECRET: ci-turn-secret
+          BOLT_RTC_RELAY_TURN_UDP_PORT: "3480"
+          BOLT_RTC_RELAY_TURN_TLS_PORT: "5350"
+          BOLT_RTC_RELAY_CONDITION: udp-blocked
+          SSL_CERT_FILE: ${{ runner.temp }}/turn-tls/bundle.pem
+        shell: bash
+        run: |
+          set -euo pipefail
+          source .github/scripts/call-shape-legs.sh
+          shape_legs
+          sudo iptables -I INPUT -i lo -p udp --dport 3480 -j DROP
+          trap 'sudo iptables -D INPUT -i lo -p udp --dport 3480 -j DROP || true; unshape_legs' EXIT
+          dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj \
+            --configuration Release --no-build --filter "TestCategory=RelayLeg" --logger "console;verbosity=normal"
+
+      - name: "Relay leg: half of its UDP round trips to TURN lost"
+        env:
+          BOLT_RTC_SIDECAR: ${{ runner.temp }}/bolt-rtc
+          BOLT_RTC_TURN_HOST: 127.0.0.1
+          BOLT_RTC_TURN_SECRET: ci-turn-secret
+          BOLT_RTC_RELAY_TURN_UDP_PORT: "3480"
+          BOLT_RTC_RELAY_TURN_TLS_PORT: "5350"
+          BOLT_RTC_RELAY_CONDITION: lossy
+          SSL_CERT_FILE: ${{ runner.temp }}/turn-tls/bundle.pem
+        shell: bash
+        run: |
+          set -euo pipefail
+          source .github/scripts/call-shape-legs.sh
+          shape_legs
+          # 30% of packets each way: about half of all round trips (a request and its answer) are lost.
+          sudo iptables -I INPUT -i lo -p udp --dport 3480 -m statistic --mode random --probability 0.3 -j DROP
+          sudo iptables -I INPUT -i lo -p udp --sport 3480 -m statistic --mode random --probability 0.3 -j DROP
+          trap 'sudo iptables -D INPUT -i lo -p udp --dport 3480 -m statistic --mode random --probability 0.3 -j DROP || true; sudo iptables -D INPUT -i lo -p udp --sport 3480 -m statistic --mode random --probability 0.3 -j DROP || true; unshape_legs' EXIT
+          dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj \
+            --configuration Release --no-build --filter "TestCategory=RelayLeg" --logger "console;verbosity=normal"
 
       - name: TURN server log
         if: failure()
-        run: docker logs coturn 2>&1 | tail -200
+        run: |
+          docker logs coturn 2>&1 | tail -200
+          docker logs coturn-relay 2>&1 | tail -200 || true
