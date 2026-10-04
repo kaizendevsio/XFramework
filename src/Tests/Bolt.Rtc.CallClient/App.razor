@@ -1,0 +1,35 @@
+@implements IDisposable
+@inject BoltMediaService Media
+@inject HttpClient Http
+@inject ILoggerFactory Logs
+
+@* One canvas per remote camera, attached as the Yap call screen does (VoiceState.AttachRemoteVideoAsync). *@
+<div id="ready">@(CallDriver.Ready ? "ready" : "loading")</div>
+@foreach (var remote in Media.RemoteVideo)
+{
+    <canvas @key="remote.StreamId" @ref="_canvases[remote.StreamId]" width="2" height="2"></canvas>
+}
+
+@code {
+    private readonly Dictionary<Guid, ElementReference> _canvases = [];
+    private readonly HashSet<Guid> _attached = [];
+
+    protected override void OnInitialized()
+    {
+        CallDriver.Bind(Media, Http, Logs);
+        Media.OnRemoteVideoChanged += Changed;
+    }
+
+    private void Changed() => _ = InvokeAsync(StateHasChanged);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        foreach (var remote in Media.RemoteVideo)
+            if (_canvases.TryGetValue(remote.StreamId, out var canvas) && _attached.Add(remote.StreamId))
+                await Media.AttachRemoteVideoAsync(remote.StreamId, canvas);
+        var live = Media.RemoteVideo.Select(x => x.StreamId).ToHashSet();
+        _attached.RemoveWhere(x => !live.Contains(x));
+    }
+
+    public void Dispose() => Media.OnRemoteVideoChanged -= Changed;
+}

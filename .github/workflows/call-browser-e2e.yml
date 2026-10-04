@@ -1,0 +1,182 @@
+name: Call browser E2E
+
+# A whole call between two real browsers, the way production runs one (BrowserCallTests.cs): Chromium as the Android
+# phone (up to 1440p60) and WebKit as the iPhone (720p30), each the production Blazor WASM media stack (AOT, as Yap
+# publishes it) with synthetic devices, through the production relay (BoltServer with Yap's options, the bolt-rtc
+# sidecar, NACK and transport feedback on) and coturn over UDP on every leg. netem shapes each browser's leg and the
+# relay's. The test asserts pictures arrive at the rate they are sent, no freeze over 1 s, at most one decoder restart,
+# audio delivered, and, on the constrained link, a sender that fits under it.
+on:
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: Measured seconds per scenario
+        default: "60"
+  pull_request:
+    paths:
+      - src/Libraries/Bolt/**
+      - src/Tests/Bolt.Rtc.IntegrationTests/**
+      - src/Tests/Bolt.Rtc.CallClient/**
+      - .github/workflows/call-browser-e2e.yml
+      - .github/scripts/call-shape-browsers.sh
+
+permissions:
+  contents: read
+
+concurrency:
+  group: call-browser-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  call:
+    name: ${{ matrix.scenario }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Each browser's leg: about 14 ms round trip to TURN and Wi-Fi-class capacity, as the 13:08 UTC call measured.
+          - scenario: clean
+            a_down: "delay 7ms rate 50mbit"
+            a_up: "delay 7ms rate 50mbit"
+            b_down: "delay 7ms rate 50mbit"
+            b_up: "delay 7ms rate 50mbit"
+            relay: "delay 3ms"
+            constrained: ""
+          - scenario: loss-1pct
+            a_down: "delay 7ms rate 50mbit loss 1%"
+            a_up: "delay 7ms rate 50mbit loss 1%"
+            b_down: "delay 7ms rate 50mbit loss 1%"
+            b_up: "delay 7ms rate 50mbit loss 1%"
+            relay: "delay 3ms"
+            constrained: ""
+          # Jitter on both uplinks: netem reorders packets, as a UDP path through an anycast relay may.
+          - scenario: reorder
+            a_down: "delay 7ms rate 50mbit"
+            a_up: "delay 7ms 3ms rate 50mbit"
+            b_down: "delay 7ms rate 50mbit"
+            b_up: "delay 7ms 3ms rate 50mbit"
+            relay: "delay 3ms"
+            constrained: ""
+          # A's downlink carries 1.5 Mbit/s: B (sending 720p30, ~2.5 Mbit/s on a free link) must fit under it.
+          - scenario: constrained-downlink
+            a_down: "delay 7ms rate 1500kbit"
+            a_up: "delay 7ms rate 50mbit"
+            b_down: "delay 7ms rate 50mbit"
+            b_up: "delay 7ms rate 50mbit"
+            relay: "delay 3ms"
+            constrained: "B>1500"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 10.x
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: src/Libraries/Bolt/Bolt.Rtc/sidecar/go.mod
+          cache-dependency-path: src/Libraries/Bolt/Bolt.Rtc/sidecar/go.sum
+
+      - name: Build the relay's WebRTC sidecar
+        shell: bash
+        working-directory: src/Libraries/Bolt/Bolt.Rtc/sidecar
+        run: CGO_ENABLED=0 go build -trimpath -o "$RUNNER_TEMP/bolt-rtc" .
+
+      - name: Enable netem
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! sudo modprobe sch_netem 2>/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq "linux-modules-extra-$(uname -r)"
+            sudo modprobe sch_netem
+          fi
+
+      - name: Start coturn on three loopback addresses
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A's TURN (.2), B's (.3) and the relay's own (.4): each leg shaped on its own. UDP only, as Yap configures it.
+          docker run --detach --name coturn --network host \
+            coturn/coturn:4.18.0-debian@sha256:bbefd3e1fdfdc0d58770fe01b581fd8b00d9f3a5580d00acb77cf719a6bc78e3 \
+            -n --log-file=stdout --listening-ip=127.0.0.2 --listening-ip=127.0.0.3 --listening-ip=127.0.0.4 --relay-ip=127.0.0.1 --listening-port=3478 \
+            --use-auth-secret --static-auth-secret=ci-turn-secret --realm=bolt.test --fingerprint \
+            --no-tls --no-tcp-relay --allow-loopback-peers --min-port=49160 --max-port=49400
+          for attempt in $(seq 1 30); do
+            if ss -lnu | grep -q '127.0.0.4:3478 '; then exit 0; fi
+            sleep 1
+          done
+          docker logs coturn
+          exit 1
+
+      - name: Publish the call participant (Blazor WASM, AOT as production)
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet workload install wasm-tools --skip-manifest-update
+          dotnet publish src/Tests/Bolt.Rtc.CallClient/Bolt.Rtc.CallClient.csproj --configuration Release \
+            -p:CALL_CLIENT_AOT=1 -o "$RUNNER_TEMP/call-client"
+
+      - name: Build tests and install browsers
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet build src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj --configuration Release
+          pwsh src/Tests/Bolt.Rtc.IntegrationTests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium webkit
+
+      - name: Call
+        shell: bash
+        env:
+          CALL_CLIENT_DIR: ${{ runner.temp }}/call-client/wwwroot
+          BOLT_RTC_SIDECAR: ${{ runner.temp }}/bolt-rtc
+          BOLT_RTC_TURN_SECRET: ci-turn-secret
+          CALL_SCENARIO: ${{ matrix.scenario }}
+          CALL_SECONDS: ${{ github.event.inputs.seconds || '60' }}
+          CALL_CONSTRAINED: ${{ matrix.constrained }}
+          CALL_OUT: ${{ runner.temp }}/call-${{ matrix.scenario }}.json
+        run: |
+          set -euo pipefail
+          source .github/scripts/call-shape-browsers.sh
+          shape_call "${{ matrix.a_down }}" "${{ matrix.a_up }}" "${{ matrix.b_down }}" "${{ matrix.b_up }}" "${{ matrix.relay }}"
+          trap 'unshape_call' EXIT
+          dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj --configuration Release --no-build \
+            --filter "TestCategory=BrowserCall" --logger "console;verbosity=normal"
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          file="$RUNNER_TEMP/call-${{ matrix.scenario }}.json"
+          [ -f "$file" ] || exit 0
+          python3 - "$file" "${{ matrix.scenario }}" >>"$GITHUB_STEP_SUMMARY" <<'EOF'
+          import json, sys
+          r = json.load(open(sys.argv[1]))
+          print(f"### {sys.argv[2]}\n")
+          print("| direction | sent fps | sent kbps | rendered fps | longest freeze ms | decoder resets | damaged | audio delivered | audio p99 ms | sender settled |")
+          print("|---|---|---|---|---|---|---|---|---|---|")
+          for key in ("A->B", "B->A"):
+              d = r.get(key, {})
+              t, rate = d.get("senderTier") or {}, d.get("senderRate") or {}
+              settled = f"{t.get('height')}p{t.get('framerate')} @ {rate.get('totalKbps')} kbps" if t else "-"
+              print(f"| {key} | {d.get('sentFps')} | {d.get('sentKbps')} | {d.get('renderedFps')} | {d.get('longestFreezeMs')} | {d.get('decoderResets')} | {d.get('corrupt')} | {d.get('audioDelivered')} | {d.get('audioP99')} | {settled} |")
+          print(f"\nrelay: {r.get('relay')}\n\nfailures: {r.get('failures')}\n")
+          EOF
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: call-browser-e2e-${{ matrix.scenario }}
+          path: ${{ runner.temp }}/call-*.json
+          if-no-files-found: warn
+
+      - name: TURN server log
+        if: failure()
+        run: docker logs coturn 2>&1 | tail -100

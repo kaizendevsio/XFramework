@@ -83,6 +83,9 @@ public sealed class VideoRecoveryBuffer
     /// <summary>Pictures given up because a fragment never arrived.</summary>
     public int Incomplete => _incomplete + _plain.Incomplete;
     private int _incomplete;
+    /// <summary>Fragments pushed (after decryption), and whole pictures handed on to the decoder.</summary>
+    public long Fragments { get; private set; }
+    public long Pictures { get; private set; }
 
     public bool Layered => RecoveryMs == 0 ? _plain.Layered : _layered;
 
@@ -122,9 +125,10 @@ public sealed class VideoRecoveryBuffer
     /// <summary>Feed one decrypted fragment with its MediaFrame sequence number. Pictures ready to decode are added to <paramref name="ready"/>.</summary>
     public void Push(uint sequence, ReadOnlySpan<byte> fragment, long nowMs, List<VideoFramePayload> ready)
     {
+        Fragments++;
         if (RecoveryMs == 0)
         {
-            if (_plain.Add(fragment) is { } picture) ready.Add(picture);
+            if (_plain.Add(fragment) is { } picture) { ready.Add(picture); Pictures++; }
             return;
         }
         if (!VideoFrameAssembler.TryParse(fragment, out var header)) return;
@@ -313,6 +317,7 @@ public sealed class VideoRecoveryBuffer
         foreach (var part in picture.Parts) { part!.CopyTo(data, offset); offset += part.Length; }
         _lastReleased = picture.FrameId;
         _hasReleased = true;
+        Pictures++;
         ready.Add(new VideoFramePayload(data, picture.Timestamp, picture.Keyframe, discontinuity, picture.FrameId,
             picture.Keyframe ? 0 : picture.Layer, picture.Orientation));
     }
