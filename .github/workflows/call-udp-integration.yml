@@ -125,6 +125,8 @@ jobs:
           exit 1
 
       # The relay's leg to TURN, degraded alone (production 04:09 UTC 2026-10-04: every relay allocation over UDP failed).
+      # Drops are on INPUT: a DROP on OUTPUT fails the sender's sendto with EPERM (coturn then closes the allocation),
+      # where a real network loses the datagram silently.
       # shape_legs puts the browser's leg (port 3478) on 40 ms each way, 1% loss, 4 Mbit/s, and the relay's leg (3480 and
       # 5350) on 8 ms each way at 8 Mbit/s, a residential uplink; the hop between the two TURN servers stays clean.
       - name: "Relay leg: half of its UDP flows to TURN dropped"
@@ -141,8 +143,8 @@ jobs:
           set -euo pipefail
           # Every datagram to the relay's TURN server from an odd source port is dropped: each flow all or nothing, as
           # from xeon-dev's ISP to Cloudflare's TURN anycast.
-          sudo iptables -I OUTPUT -o lo -p udp --dport 3480 -m u32 --u32 "0>>22&0x3C@0>>16&0x1=1" -j DROP
-          trap 'sudo iptables -D OUTPUT -o lo -p udp --dport 3480 -m u32 --u32 "0>>22&0x3C@0>>16&0x1=1" -j DROP || true' EXIT
+          sudo iptables -I INPUT -i lo -p udp --dport 3480 -m u32 --u32 "0>>22&0x3C@0>>16&0x1=1" -j DROP
+          trap 'sudo iptables -D INPUT -i lo -p udp --dport 3480 -m u32 --u32 "0>>22&0x3C@0>>16&0x1=1" -j DROP || true' EXIT
           dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj \
             --configuration Release --no-build --filter "TestCategory=RelayLeg" --logger "console;verbosity=normal"
 
@@ -178,8 +180,8 @@ jobs:
           set -euo pipefail
           source .github/scripts/call-shape-legs.sh
           shape_legs
-          sudo iptables -I OUTPUT -o lo -p udp --dport 3480 -j DROP
-          trap 'sudo iptables -D OUTPUT -o lo -p udp --dport 3480 -j DROP || true; unshape_legs' EXIT
+          sudo iptables -I INPUT -i lo -p udp --dport 3480 -j DROP
+          trap 'sudo iptables -D INPUT -i lo -p udp --dport 3480 -j DROP || true; unshape_legs' EXIT
           dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj \
             --configuration Release --no-build --filter "TestCategory=RelayLeg" --logger "console;verbosity=normal"
 
@@ -198,9 +200,9 @@ jobs:
           source .github/scripts/call-shape-legs.sh
           shape_legs
           # 30% of packets each way: about half of all round trips (a request and its answer) are lost.
-          sudo iptables -I OUTPUT -o lo -p udp --dport 3480 -m statistic --mode random --probability 0.3 -j DROP
-          sudo iptables -I OUTPUT -o lo -p udp --sport 3480 -m statistic --mode random --probability 0.3 -j DROP
-          trap 'sudo iptables -D OUTPUT -o lo -p udp --dport 3480 -m statistic --mode random --probability 0.3 -j DROP || true; sudo iptables -D OUTPUT -o lo -p udp --sport 3480 -m statistic --mode random --probability 0.3 -j DROP || true; unshape_legs' EXIT
+          sudo iptables -I INPUT -i lo -p udp --dport 3480 -m statistic --mode random --probability 0.3 -j DROP
+          sudo iptables -I INPUT -i lo -p udp --sport 3480 -m statistic --mode random --probability 0.3 -j DROP
+          trap 'sudo iptables -D INPUT -i lo -p udp --dport 3480 -m statistic --mode random --probability 0.3 -j DROP || true; sudo iptables -D INPUT -i lo -p udp --sport 3480 -m statistic --mode random --probability 0.3 -j DROP || true; unshape_legs' EXIT
           dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj \
             --configuration Release --no-build --filter "TestCategory=RelayLeg" --logger "console;verbosity=normal"
 
