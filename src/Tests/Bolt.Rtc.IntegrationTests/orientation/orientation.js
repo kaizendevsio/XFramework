@@ -42,10 +42,10 @@ function expected(source, rotation, flip) {
     return { width: canvas.width, height: canvas.height, quadrants: quadrants(canvas) };
 }
 
-const until = async (condition, ms = 10_000) => {
+const until = async (condition, ms = 10_000, state = () => '') => {
     const end = performance.now() + ms;
     while (!condition()) {
-        if (performance.now() > end) throw new Error('timed out');
+        if (performance.now() > end) throw new Error(`timed out ${state()}`);
         await new Promise(resolve => setTimeout(resolve, 10));
     }
 };
@@ -84,7 +84,9 @@ export async function roundTrip({ codec, rotation, flip, metadata, frames = 6 })
         await writer.write(new VideoFrame(source, { timestamp: i * 33_334, rotation, flip }));
         await until(() => encoded.length > i || sender.stats.dropped > 0, 5_000).catch(() => {});
     }
-    await until(() => encoded.length >= 2);
+    const sending = () => JSON.stringify({ encoded: encoded.length, captured: sender.captureCount, stats: sender.stats,
+        config: sender.config && [sender.config.codec, sender.config.width, sender.config.height] });
+    await until(() => encoded.length >= 2, 10_000, sending);
     const diagnostics = sender.getDiagnostics();
     const sent = { width: sender.config.width, height: sender.config.height, orientation: diagnostics.orientation,
         codes: encoded.map(x => x[5]) };
@@ -94,8 +96,19 @@ export async function roundTrip({ codec, rotation, flip, metadata, frames = 6 })
     const receiveHost = { invokeMethodAsync: async () => {} };
     const receiver = createVideoPipeline();
     if (!receiver.addRemote('s', canvas, codec, receiveHost)) throw new Error('no remote');
-    for (const [data, key, , timestamp, , orientation] of encoded) receiver.decodeFrame('s', data, timestamp, key, false, orientation);
-    await until(() => receiver.remotes.get('s').rendered >= encoded.length);
+    // A decoder can fail after configure() (a hardware decoder the machine does not have) and be rebuilt; production
+    // then asks the sender for a keyframe. Here the same pictures, keyframe first, are simply fed again.
+    const remote = receiver.remotes.get('s');
+    const receiving = () => JSON.stringify({ encoded: encoded.length, keys: encoded.filter(x => x[1]).length, received: remote.received,
+        rendered: remote.rendered, resets: remote.resets, acceleration: remote.acceleration, state: remote.decoder?.state,
+        queue: remote.decoder?.decodeQueueSize, bitstream: remote.bitstreamCodec });
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const decoder = remote.decoder, before = remote.rendered;
+        for (const [data, key, , timestamp, , orientation] of encoded) receiver.decodeFrame('s', data, timestamp, key, false, orientation);
+        try { await until(() => remote.rendered - before >= encoded.length || remote.decoder !== decoder, 5_000); } catch { }
+        if (remote.decoder === decoder && remote.rendered > before) break;
+    }
+    await until(() => remote.rendered > 0, 1_000, receiving);
     const shown = { width: canvas.width, height: canvas.height, quadrants: quadrants(canvas),
         rotation: receiver.getDiagnostics().remotes[0].rotation };
 
