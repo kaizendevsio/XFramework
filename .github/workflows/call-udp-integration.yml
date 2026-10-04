@@ -109,7 +109,7 @@ jobs:
           openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=127.0.0.1" -addext "subjectAltName=IP:127.0.0.1"             -keyout "$dir/key.pem" -out "$dir/cert.pem" 2>/dev/null
           chmod 644 "$dir/key.pem" "$dir/cert.pem"
           cat /etc/ssl/certs/ca-certificates.crt "$dir/cert.pem" > "$dir/bundle.pem"
-          docker run --detach --name coturn-relay --network host -v "$dir:/tls:ro"             coturn/coturn:4.18.0-debian@sha256:bbefd3e1fdfdc0d58770fe01b581fd8b00d9f3a5580d00acb77cf719a6bc78e3             -n --verbose --log-file=stdout --listening-ip=127.0.0.1 --relay-ip=127.0.0.1 --listening-port=3480             --tls-listening-port=5350 --cert=/tls/cert.pem --pkey=/tls/key.pem --no-dtls             --use-auth-secret --static-auth-secret=ci-turn-secret --realm=bolt.test --fingerprint             --allow-loopback-peers --min-port=49401 --max-port=49600
+          docker run --detach --name coturn-relay --network host -v "$dir:/tls:ro"             coturn/coturn:4.18.0-debian@sha256:bbefd3e1fdfdc0d58770fe01b581fd8b00d9f3a5580d00acb77cf719a6bc78e3             -n --verbose --log-file=stdout --listening-ip=127.0.0.1 --relay-ip=127.0.0.1 --listening-port=3480             --tls-listening-port=5350 --cert=/tls/cert.pem --pkey=/tls/key.pem             --use-auth-secret --static-auth-secret=ci-turn-secret --realm=bolt.test --fingerprint             --allow-loopback-peers --min-port=49401 --max-port=49600
           for attempt in $(seq 1 30); do
             if ss -lnu | grep -q '127.0.0.1:3480 ' && ss -lnt | grep -q '127.0.0.1:5350 '; then exit 0; fi
             sleep 1
