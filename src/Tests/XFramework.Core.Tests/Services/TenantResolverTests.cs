@@ -64,8 +64,9 @@ public sealed class TenantResolverTests
 
         Func<Task> act = () => CreateResolver(db).GetTenant(tenantId);
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*could not be found*");
+        // A distinct type, so a caller can answer an unusable tenant with a client error instead of a 500.
+        (await act.Should().ThrowAsync<TenantUnavailableException>()
+            .WithMessage("*could not be found*")).Which.TenantId.Should().Be(tenantId);
     }
 
     [Test]

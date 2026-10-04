@@ -8,6 +8,7 @@ namespace IdentityServer.Api.Services;
 
 public sealed class IdentityAuthorizationService(
     IDataContext dataContext,
+    DbContext dbContext,
     ITrustedInvocationContextAccessor trustedInvocationContextAccessor,
     XFramework.Core.Services.FeatureGates.ITenantModuleFeatureService tenantModuleFeatureService,
     ICrossTenantWriteAuthorizationScopeFactory crossTenantWriteAuthorizationScopeFactory,
@@ -85,17 +86,29 @@ public sealed class IdentityAuthorizationService(
             .Distinct(StringComparer.OrdinalIgnoreCase).Count() != normalized.Count)
             return Result.Failure("Duplicate module feature keys are not allowed", 400);
 
-        var existing = await dataContext.Query<TenantModuleFeature>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => x.TenantId == request.TenantId)
-            .ToListAsync(ct);
-        var existingByKey = existing.ToDictionary(x => x.Key, StringComparer.OrdinalIgnoreCase);
+        using var crossTenantWriteScope =
+            trustedInvocationContextAccessor.Current?.EffectiveTenantId == request.TenantId
+                ? null
+                : crossTenantWriteAuthorizationScopeFactory.BeginTenantAdministrationScope();
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(ct);
         var now = DateTime.UtcNow;
 
         dataContext.Update(tenant);
         tenant.ModifiedAt = now;
         tenant.ConcurrencyStamp = Guid.NewGuid();
+
+        // Check and lock the tenant version before inserts: a combined batch can raise
+        // a duplicate-key error before EF observes the losing tenant update's zero rows.
+        var tenantSaveResult = await dataContext.SaveChangesAsync(ct);
+        if (!tenantSaveResult.IsSuccess)
+            return Result.Failure("Tenant module features could not be saved", tenantSaveResult.StatusCode);
+
+        var existing = await dataContext.Query<TenantModuleFeature>()
+            .IgnoreQueryFilters() // Tenant administrators must also restore deleted, cross-tenant rows.
+            .NoCache()
+            .Where(x => x.TenantId == request.TenantId)
+            .ToListAsync(ct);
+        var existingByKey = existing.ToDictionary(x => x.Key, StringComparer.OrdinalIgnoreCase);
 
         foreach (var item in normalized)
         {
@@ -128,13 +141,10 @@ public sealed class IdentityAuthorizationService(
             }
         }
 
-        using var crossTenantWriteScope =
-            trustedInvocationContextAccessor.Current?.EffectiveTenantId == request.TenantId
-                ? null
-                : crossTenantWriteAuthorizationScopeFactory.BeginTenantAdministrationScope();
         var saveResult = await dataContext.SaveChangesAsync(ct);
         if (!saveResult.IsSuccess)
             return Result.Failure("Tenant module features could not be saved", saveResult.StatusCode);
+        await transaction.CommitAsync(ct);
 
         foreach (var item in normalized)
             tenantModuleFeatureService.Invalidate(request.TenantId, item.ModuleKey, item.SubFeatureKey);

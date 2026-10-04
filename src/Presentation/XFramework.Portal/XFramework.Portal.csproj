@@ -14,6 +14,7 @@
         <PackageReference Include="BlazorBlueprint.Icons.Lucide" />
         <PackageReference Include="HtmlSanitizer" />
         <PackageReference Include="BCrypt.Net-Next" />
+        <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
         <!-- ZLogger logging is provided transitively via XFramework.Integration -->
     </ItemGroup>
 

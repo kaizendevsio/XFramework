@@ -208,7 +208,8 @@ public sealed class AuthenticationSecurityTests : IntegrationTestBase
         var result = await IntegrationTestFixture.ServiceWrapper.AuthenticateIdentity(
             CreateAuthRequest(seeded.TenantId, seeded.RoleTypeId, seeded.Username, seeded.Password));
 
-        result.HttpStatusCode.Should().NotBe(HttpStatusCode.OK);
+        // A rejected sign-in, not a server fault: a 500 here once made a soft-deleted tenant look like a broken release.
+        result.HttpStatusCode.Should().Be(HttpStatusCode.Unauthorized);
         result.Response.Should().BeNull();
         await AssertNoSessionExists(seeded.CredentialId);
     }

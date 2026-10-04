@@ -44,11 +44,21 @@ public sealed class TenantResolver(IDataContext dataContext) : ITenantResolver
 
         if (tenant is null)
         {
-            throw new InvalidOperationException($"Tenant '{id}' could not be found.");
+            throw new TenantUnavailableException(id.Value);
         }
 
         return tenant;
     }
 
     public void Invalidate(Guid id) { }
+}
+
+/// <summary>
+/// The tenant does not exist or cannot be used now: deleted, disabled, not yet available or expired. A caller's input,
+/// not a server fault; callers that take the tenant from a request should answer with a client error.
+/// </summary>
+public sealed class TenantUnavailableException(Guid tenantId)
+    : InvalidOperationException($"Tenant '{tenantId}' could not be found.")
+{
+    public Guid TenantId { get; } = tenantId;
 }

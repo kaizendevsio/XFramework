@@ -373,9 +373,13 @@ public static class QueryDescriptorExecutor
             return Expression.Constant(null, targetType);
 
         var underlyingType = Nullable.GetUnderlyingType(targetType) ?? targetType;
-        var converted = Convert.ChangeType(value, underlyingType);
-        return Expression.Constant(converted, targetType);
+        var constant = Expression.Constant(ConvertScalarValue(value, underlyingType), underlyingType);
+        return underlyingType == targetType ? constant : Expression.Convert(constant, targetType);
     }
+
+    private static object? ConvertScalarValue(object? value, Type targetType) => targetType.IsEnum
+        ? Enum.ToObject(targetType, Convert.ChangeType(value, Enum.GetUnderlyingType(targetType))!)
+        : Convert.ChangeType(value, targetType);
 
     private static Expression BuildStringMethodCall(Expression property, string methodName, object? value)
     {
@@ -417,7 +421,7 @@ public static class QueryDescriptorExecutor
         // Build: new[] { val1, val2, val3 }.Contains(e.Property)
         var convertedValues = values
             .Where(v => v is not null)
-            .Select(v => Convert.ChangeType(v, underlyingType)!)
+            .Select(v => ConvertScalarValue(v, underlyingType)!)
             .ToArray();
 
         var arrayType = Array.CreateInstance(underlyingType, convertedValues.Length);

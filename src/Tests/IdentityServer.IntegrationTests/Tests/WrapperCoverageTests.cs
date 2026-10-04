@@ -1173,6 +1173,66 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
     }
 
     [Test]
+    public async Task SetTenantModuleFeatures_ForManagedTenant_RepeatedBulkWriteUpdatesExistingRows()
+    {
+        var tenantName = $"Bulk Feature Tenant {Guid.NewGuid():N}";
+        var create = await IntegrationTestFixture.ServiceWrapper.CreateTenant(new CreateTenantRequest
+        {
+            Name = tenantName,
+            Version = 1.0m,
+            Status = 1,
+            ParentTenantId = IntegrationTestFixture.TestTenantId,
+            Metadata = CreateMetadata()
+        });
+        create.HttpStatusCode.Should().Be(HttpStatusCode.OK, create.Message);
+
+        await using var db = CreateDbContext();
+        var tenant = await db.Set<Tenant>().IgnoreQueryFilters().AsNoTracking()
+            .SingleAsync(item => item.Name == tenantName);
+        var features = TenantModuleFeatureKeys.All.Select(definition => new TenantModuleFeatureUpdate
+        {
+            ModuleKey = definition.ModuleKey,
+            SubFeatureKey = definition.SubFeatureKey,
+            DisplayName = definition.DisplayName,
+            Description = definition.Description,
+            IsEnabled = definition.DefaultEnabled
+        }).ToList();
+
+        var first = await IntegrationTestFixture.ServiceWrapper.SetTenantModuleFeatures(new SetTenantModuleFeaturesRequest
+        {
+            TenantId = tenant.Id,
+            ExpectedConcurrencyStamp = tenant.ConcurrencyStamp,
+            Metadata = CreateMetadata(),
+            Features = features
+        });
+        first.HttpStatusCode.Should().Be(HttpStatusCode.OK, first.Message);
+
+        var originalRows = await db.Set<TenantModuleFeature>().IgnoreQueryFilters().AsNoTracking()
+            .Where(item => item.TenantId == tenant.Id).ToListAsync();
+        originalRows.Should().HaveCount(features.Count);
+        var stamp = await db.Set<Tenant>().IgnoreQueryFilters()
+            .Where(item => item.Id == tenant.Id).Select(item => item.ConcurrencyStamp).SingleAsync();
+        foreach (var feature in features)
+            feature.IsEnabled = !feature.IsEnabled;
+
+        var second = await IntegrationTestFixture.ServiceWrapper.SetTenantModuleFeatures(new SetTenantModuleFeaturesRequest
+        {
+            TenantId = tenant.Id,
+            ExpectedConcurrencyStamp = stamp,
+            Metadata = CreateMetadata(),
+            Features = features
+        });
+        second.HttpStatusCode.Should().Be(HttpStatusCode.OK, second.Message);
+
+        var updatedRows = await db.Set<TenantModuleFeature>().IgnoreQueryFilters().AsNoTracking()
+            .Where(item => item.TenantId == tenant.Id).ToListAsync();
+        updatedRows.Select(item => item.Id).Should().BeEquivalentTo(originalRows.Select(item => item.Id));
+        foreach (var feature in features)
+            updatedRows.Single(item => item.Key == TenantModuleFeatureKeys.Combine(feature.ModuleKey, feature.SubFeatureKey))
+                .IsEnabled.Should().Be(feature.IsEnabled);
+    }
+
+    [Test]
     public async Task SetTenantModuleFeatures_WithStaleTenantVersion_ReturnsConflict()
     {
         var result = await IntegrationTestFixture.ServiceWrapper.SetTenantModuleFeatures(

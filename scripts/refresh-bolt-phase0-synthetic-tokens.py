@@ -115,6 +115,14 @@ def _raise(code: str) -> None:
     raise RefreshError(code)
 
 
+def _at(step: str, call: Callable[[], Any]) -> Any:
+    """Run one request and its validation; a failure's fixed code is prefixed with the request it came from."""
+    try:
+        return call()
+    except RefreshError as error:
+        raise RefreshError(f"{step}_{error.code}") from None
+
+
 def _read_regular_file(path: str, *, maximum: int, private: bool, code: str) -> bytes:
     if not path or not os.path.isabs(path) or os.path.realpath(path) != os.path.abspath(path):
         _raise(code)
@@ -864,80 +872,95 @@ def execute(
         "clientId": COMMUNICATIONS_CLIENT_ID,
         "clientSecret": config.communications_secret,
     }
-    communications_transport = _parse_transport_token(
-        _post_json(
+    communications_transport = _at(
+        "COMMUNICATIONS_TRANSPORT",
+        lambda: _parse_transport_token(
+            _post_json(
+                config,
+                "/api/service-identity/bolt-transport-token",
+                communications_body,
+                connection_factory=connection_factory,
+                context_factory=context_factory,
+            ),
             config,
-            "/api/service-identity/bolt-transport-token",
-            communications_body,
-            connection_factory=connection_factory,
-            context_factory=context_factory,
+            expected_client_id=COMMUNICATIONS_CLIENT_ID,
+            now=now,
+            expiry=False,
         ),
-        config,
-        expected_client_id=COMMUNICATIONS_CLIENT_ID,
-        now=now,
-        expiry=False,
     )
-    portal_transport = _parse_transport_token(
-        _post_json(
+    portal_transport = _at(
+        "PORTAL_TRANSPORT",
+        lambda: _parse_transport_token(
+            _post_json(
+                config,
+                "/api/service-identity/bolt-transport-token",
+                {"clientId": PORTAL_CLIENT_ID, "clientSecret": config.portal_secret},
+                connection_factory=connection_factory,
+                context_factory=context_factory,
+            ),
             config,
-            "/api/service-identity/bolt-transport-token",
-            {"clientId": PORTAL_CLIENT_ID, "clientSecret": config.portal_secret},
-            connection_factory=connection_factory,
-            context_factory=context_factory,
+            expected_client_id=PORTAL_CLIENT_ID,
+            now=now,
+            expiry=False,
         ),
-        config,
-        expected_client_id=PORTAL_CLIENT_ID,
-        now=now,
-        expiry=False,
     )
-    portal_identity_service = _parse_service_token(
-        _post_json(
+    portal_identity_service = _at(
+        "PORTAL_IDENTITY_SERVICE",
+        lambda: _parse_service_token(
+            _post_json(
+                config,
+                "/api/service-identity/token",
+                {
+                    "clientId": PORTAL_CLIENT_ID,
+                    "clientSecret": config.portal_secret,
+                    "audience": SERVICE_AUDIENCE,
+                    "scopes": list(PORTAL_SERVICE_SCOPES),
+                },
+                connection_factory=connection_factory,
+                context_factory=context_factory,
+            ),
             config,
-            "/api/service-identity/token",
-            {
-                "clientId": PORTAL_CLIENT_ID,
-                "clientSecret": config.portal_secret,
-                "audience": SERVICE_AUDIENCE,
-                "scopes": list(PORTAL_SERVICE_SCOPES),
-            },
-            connection_factory=connection_factory,
-            context_factory=context_factory,
+            expected_client_id=PORTAL_CLIENT_ID,
+            expected_scopes=PORTAL_SERVICE_SCOPES,
+            now=now,
         ),
-        config,
-        expected_client_id=PORTAL_CLIENT_ID,
-        expected_scopes=PORTAL_SERVICE_SCOPES,
-        now=now,
     )
-    communications_identity_service = _parse_service_token(
-        _post_json(
+    communications_identity_service = _at(
+        "COMMUNICATIONS_IDENTITY_SERVICE",
+        lambda: _parse_service_token(
+            _post_json(
+                config,
+                "/api/service-identity/token",
+                {
+                    "clientId": COMMUNICATIONS_CLIENT_ID,
+                    "clientSecret": config.communications_secret,
+                    "audience": SERVICE_AUDIENCE,
+                    "scopes": list(COMMUNICATIONS_SERVICE_SCOPES),
+                },
+                connection_factory=connection_factory,
+                context_factory=context_factory,
+            ),
             config,
-            "/api/service-identity/token",
-            {
-                "clientId": COMMUNICATIONS_CLIENT_ID,
-                "clientSecret": config.communications_secret,
-                "audience": SERVICE_AUDIENCE,
-                "scopes": list(COMMUNICATIONS_SERVICE_SCOPES),
-            },
-            connection_factory=connection_factory,
-            context_factory=context_factory,
+            expected_client_id=COMMUNICATIONS_CLIENT_ID,
+            expected_scopes=COMMUNICATIONS_SERVICE_SCOPES,
+            now=now,
         ),
-        config,
-        expected_client_id=COMMUNICATIONS_CLIENT_ID,
-        expected_scopes=COMMUNICATIONS_SERVICE_SCOPES,
-        now=now,
     )
-    expiry_transport = _parse_transport_token(
-        _post_json(
+    expiry_transport = _at(
+        "EXPIRY_TRANSPORT",
+        lambda: _parse_transport_token(
+            _post_json(
+                config,
+                "/api/service-identity/bolt-transport-token",
+                communications_body,
+                connection_factory=connection_factory,
+                context_factory=context_factory,
+            ),
             config,
-            "/api/service-identity/bolt-transport-token",
-            communications_body,
-            connection_factory=connection_factory,
-            context_factory=context_factory,
+            expected_client_id=COMMUNICATIONS_CLIENT_ID,
+            now=now,
+            expiry=True,
         ),
-        config,
-        expected_client_id=COMMUNICATIONS_CLIENT_ID,
-        now=now,
-        expiry=True,
     )
 
     authentication_body = {
@@ -955,16 +978,19 @@ def execute(
             "requestId": str(uuid.uuid4()),
         },
     }
-    user_actor = _parse_user_token(
-        _post_json(
+    user_actor = _at(
+        "USER_ACTOR",
+        lambda: _parse_user_token(
+            _post_json(
+                config,
+                "/api/auth/authenticate",
+                authentication_body,
+                connection_factory=connection_factory,
+                context_factory=context_factory,
+            ),
             config,
-            "/api/auth/authenticate",
-            authentication_body,
-            connection_factory=connection_factory,
-            context_factory=context_factory,
+            now=now,
         ),
-        config,
-        now=now,
     )
     tokens = [
         communications_transport,
