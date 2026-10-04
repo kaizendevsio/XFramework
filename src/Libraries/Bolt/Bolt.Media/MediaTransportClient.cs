@@ -43,8 +43,9 @@ public sealed class MediaTransportClientOptions
     /// <summary>Redundancy is added only while the channel's own buffer is this short.</summary>
     public long RedundancyBacklogBytes { get; init; } = 8 * 1024;
     /// <summary>
-    /// A video frame the relay's transport feedback reports lost on this device's uplink is sent again at once, while it
-    /// is younger than this (0: never). Receivers wait about this long for a lost frame (see VideoRecoveryBuffer).
+    /// A video frame the relay's transport feedback reports lost on this device's uplink is sent again at once (and again
+    /// if that copy is lost too), while it is younger than this (0: never). Receivers wait about this long for a lost
+    /// frame (see VideoRecoveryBuffer).
     /// </summary>
     public int ResendLostVideoMs { get; init; } = 400;
 }
@@ -283,7 +284,9 @@ public sealed class MediaTransportClient : IAsyncDisposable
     /// One message on the channel, stamped when the relay reports arrivals. A refused message used up its number without
     /// being recorded, so the gap it leaves is never counted as loss.
     /// </summary>
-    private bool SendMessage(IRtcPeer peer, ReadOnlySpan<byte> message, bool stamp, bool resendable = false)
+    /// <param name="firstSentAt">For a message sent again: when it was first sent (a resend may itself be lost, and is
+    /// sent again while the original is still young enough to matter).</param>
+    private bool SendMessage(IRtcPeer peer, ReadOnlySpan<byte> message, bool stamp, bool resendable = false, long? firstSentAt = null)
     {
         if (!stamp)
         {
@@ -302,7 +305,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
             _feedback.OnSent(sequence, size, NowMicroseconds());
             _drain.Sent(size);
             if (resendable && _options.ResendLostVideoMs > 0)
-                lock (_resendable) _resendable[sequence % _resendable.Length] = (sequence, message.ToArray(), _clock());
+                lock (_resendable) _resendable[sequence % _resendable.Length] = (sequence, message.ToArray(), firstSentAt ?? _clock());
             return true;
         }
         finally { ArrayPool<byte>.Shared.Return(buffer); }
@@ -319,7 +322,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
             return;
         }
         TransportSignal? signal;
-        List<byte[]>? resend = null;
+        List<(byte[] Message, long FirstSentAt)>? resend = null;
         lock (_arrivals)
         {
             if (!TransportFeedbackCodec.TryRead(message, out var first, _arrivals)) return;
@@ -330,8 +333,8 @@ public sealed class MediaTransportClient : IAsyncDisposable
         // What never reached the relay goes again now: a receiver can only get it from this device, and asking for it
         // (its NACK, forwarded by the relay) would take two more trips across both legs, longer than it waits.
         if (resend is not null && ActivePeer is { } peer)
-            foreach (var lost in resend)
-                if (SendMessage(peer, lost, StampsMessages)) Interlocked.Increment(ref _resent);
+            foreach (var (lost, firstSentAt) in resend)
+                if (SendMessage(peer, lost, StampsMessages, resendable: true, firstSentAt)) Interlocked.Increment(ref _resent);
         if (signal is { } value)
         {
             try { TransportFeedback?.Invoke(value); }
@@ -340,9 +343,9 @@ public sealed class MediaTransportClient : IAsyncDisposable
     }
 
     /// <summary>Video messages a report says never arrived (and are still worth sending); every reported one is forgotten.</summary>
-    private List<byte[]>? TakeLost(ushort first, List<long> arrivals)
+    private List<(byte[] Message, long FirstSentAt)>? TakeLost(ushort first, List<long> arrivals)
     {
-        List<byte[]>? lost = null;
+        List<(byte[] Message, long FirstSentAt)>? lost = null;
         var now = _clock();
         lock (_resendable)
         {
@@ -351,7 +354,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
                 var sequence = unchecked((ushort)(first + index));
                 ref var slot = ref _resendable[sequence % _resendable.Length];
                 if (slot.Message is null || slot.Sequence != sequence) continue;
-                if (arrivals[index] < 0 && now - slot.SentAt <= _options.ResendLostVideoMs) (lost ??= []).Add(slot.Message);
+                if (arrivals[index] < 0 && now - slot.SentAt <= _options.ResendLostVideoMs) (lost ??= []).Add((slot.Message, slot.SentAt));
                 slot = default;
             }
         }

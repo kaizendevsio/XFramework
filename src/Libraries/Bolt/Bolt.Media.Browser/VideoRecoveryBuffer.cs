@@ -14,7 +14,7 @@ namespace Bolt.Media.Browser;
 /// <item>Every missing MediaFrame sequence number (a gap, or a fragment a partly received picture still lacks) is asked
 /// for after a short reorder wait, again after a round trip if it is still missing, at most three times, and only while
 /// it can still arrive inside the recovery window (about one and a half round trips, plus the time a fragment lost on
-/// the sender's uplink takes to come back from the sender; at least 250 ms, at most 1.5 s).</item>
+/// the sender's uplink takes to come back from the sender; at least 350 ms, at most 1.5 s).</item>
 /// <item>Pictures go to the decoder in order. A complete picture waits behind an older one that is still being
 /// recovered, because it may refer to it; nothing waits behind a missing top-layer picture, which nothing refers to.</item>
 /// <item>A picture that cannot be recovered in time is given up the cheapest way the reference structure allows: a lost
@@ -36,10 +36,11 @@ public sealed class VideoRecoveryBuffer
     public const int MaxRecoveryMs = 1_500;
     /// <summary>
     /// What a fragment lost on the sender's uplink adds: only the sender has it, and it learns of the loss from the
-    /// relay's transport feedback (every 100 ms) before it sends it again across both legs.
+    /// relay's transport feedback (every 100 ms) before it sends it again across both legs; room for a second try if
+    /// that copy is lost too.
     /// </summary>
-    public const int UplinkRepairMs = 150;
-    public const int MinRecoveryMs = 250;
+    public const int UplinkRepairMs = 250;
+    public const int MinRecoveryMs = 350;
 
     /// <summary>
     /// How long the stream must have been quiet before the rest of an incomplete picture counts as lost: a sender's pacer

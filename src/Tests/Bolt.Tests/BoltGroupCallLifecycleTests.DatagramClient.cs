@@ -434,11 +434,14 @@ public sealed partial class BoltGroupCallLifecycleTests
         await using var a = Connect(f, "a", network, QuickClient);
         a.Transport.Start();
         await WaitUntil(() => a.Transport.IsDatagramActive && a.Transport.StampsMessages);
-        // The uplink loses the first copy of every fifth video frame.
-        var seen = new HashSet<uint>();
+        // The uplink loses the first copy of every fifth video frame, and of frame 10 the second copy too.
+        var copies = new Dictionary<uint, int>();
         network.Created.Single(x => x.Role == Bolt.Protocol.Transport.RtcPeerRole.Offer).LoseSent = message =>
-            TransportSequenceCodec.TryRead(message, out _, out var inner) && BoltCodec.TryReadMediaFrame(inner, out var media) &&
-            media.SequenceNumber % 5 == 0 && seen.Add(media.SequenceNumber);
+        {
+            if (!TransportSequenceCodec.TryRead(message, out _, out var inner) || !BoltCodec.TryReadMediaFrame(inner, out var media)) return false;
+            var copy = copies[media.SequenceNumber] = copies.GetValueOrDefault(media.SequenceNumber) + 1;
+            return media.SequenceNumber % 5 == 0 && (copy == 1 || (copy == 2 && media.SequenceNumber == 10));
+        };
 
         // One picture of 40 fragments (a keyframe), then single-fragment pictures.
         uint sequence = 0;
@@ -452,7 +455,7 @@ public sealed partial class BoltGroupCallLifecycleTests
         await WaitUntil(() => f.Peers["b"].Media(video).Select(x => x.Sequence).Distinct().Count() == expected.Length, 3_000);
         Assert.That(f.Peers["b"].Media(video).Select(x => x.Sequence).Distinct().Order(), Is.EqualTo(expected),
             "every fragment reached the receiver, the lost ones sent again by the phone");
-        Assert.That(a.Transport.UplinkResent, Is.EqualTo(sequence / 5));
+        Assert.That(a.Transport.UplinkResent, Is.EqualTo(sequence / 5 + 1), "frame 10 twice: its first copy sent again was lost too");
     }
 }
 

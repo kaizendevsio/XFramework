@@ -156,14 +156,14 @@ public sealed class VideoRecoveryBufferTests
     public void NacksRepeatAfterARoundTrip_AndStopWhenAnAnswerCouldNoLongerArriveInTime()
     {
         var sender = new Sender();
-        var buffer = Recovering(rttMs: 200); // window: 1.5 x 200 + 50, plus 150 for a repair from the sender = 500 ms
-        Assert.That(buffer.RecoveryMs, Is.EqualTo(500));
+        var buffer = Recovering(rttMs: 200); // window: 1.5 x 200 + 50, plus 250 for a repair from the sender = 600 ms
+        Assert.That(buffer.RecoveryMs, Is.EqualTo(600));
         Push(buffer, sender.Picture(1, 0, key: true));
         var lost = sender.Picture(2, 0)[0];
         Push(buffer, sender.Picture(3, 0));
 
         var asked = new List<long>();
-        for (long t = 0; t < 550; t += 10)
+        for (long t = 0; t < 650; t += 10)
             if (Poll(buffer, t).Nacks.Contains(lost.Sequence)) asked.Add(t);
 
         Assert.Multiple(() =>
@@ -173,7 +173,7 @@ public sealed class VideoRecoveryBufferTests
             Assert.That(buffer.Abandoned, Is.EqualTo(1));
         });
 
-        // A short path (20 ms, the 250 ms minimum window) has time to ask again a round trip later.
+        // A short path (20 ms, the 350 ms minimum window) has time to ask again a round trip later.
         var shorter = Recovering(rttMs: 20);
         var other = new Sender();
         Push(shorter, other.Picture(1, 0, key: true));
@@ -292,7 +292,7 @@ public sealed class VideoRecoveryBufferTests
         {
             Assert.That(buffer.Configure(recover: true, 300), Is.True);
             Assert.That(buffer.Configure(recover: true, 500), Is.False, "a new round trip only resizes the window");
-            Assert.That(buffer.RecoveryMs, Is.EqualTo(950));
+            Assert.That(buffer.RecoveryMs, Is.EqualTo(1_050));
             Assert.That(buffer.Configure(recover: true, 4_000), Is.False);
             Assert.That(buffer.RecoveryMs, Is.EqualTo(VideoRecoveryBuffer.MaxRecoveryMs));
             Assert.That(buffer.Configure(recover: false, 300), Is.True);
