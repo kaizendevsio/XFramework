@@ -301,8 +301,26 @@ public sealed class BoltMediaEnablementSafetyTests
         controller.DelayReport(now).Should().BeNull("nothing arrived yet");
         uint ts = 0;
         for (uint sequence = 1; sequence <= 20; sequence++, ts += 960) controller.RecordFrameReceived(sequence, ts, 100);
-        controller.DelayReport(now + 250).Should().NotBeNull();
-        controller.DelayReport(now + 500).Should().BeNull("a stream that went quiet has no current delay to report");
+        controller.DelayReport(now + 1_250).Should().NotBeNull();
+        controller.DelayReport(now + 1_500).Should().BeNull("a stream that went quiet has no current delay to report");
+        connection.CompleteSendChannel();
+    }
+
+    [Test]
+    public async Task ReceiverDelayReport_WaitsUntilTheStreamHasFlowedForASecond()
+    {
+        // A camera that starts mid-window, its first pictures over the WebSocket before the data channel takes over,
+        // reported a few kbps "received" at a high delay: the sender read a receiver getting a fraction of what it sent,
+        // cut to the minimum and suspended video, then took most of a minute to climb back (browser call test, WebKit).
+        var connection = new BoltConnection(new NoopConnection());
+        await using var controller = new AdaptiveBitrateController(connection, Guid.NewGuid(), 400, isAudio: false);
+        var now = Environment.TickCount64;
+        controller.DelayReport(now).Should().BeNull();
+        uint ts = 0;
+        for (uint sequence = 1; sequence <= 5; sequence++, ts += 3000) controller.RecordFrameReceived(sequence, ts, 1_000);
+        controller.DelayReport(now + 250).Should().BeNull("a stream that has only just started says nothing about the path yet");
+        for (uint sequence = 6; sequence <= 10; sequence++, ts += 3000) controller.RecordFrameReceived(sequence, ts, 1_000);
+        controller.DelayReport(now + 1_250).Should().NotBeNull("a second on, it does");
         connection.CompleteSendChannel();
     }
 
