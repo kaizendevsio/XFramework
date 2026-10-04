@@ -8,7 +8,9 @@ RUN cargo build --release --locked
 # The call relay's WebRTC data-channel sidecar (Pion, see src/Libraries/Bolt/Bolt.Rtc/sidecar). Only Yap
 # ships it; no Go toolchain enters runtime images.
 FROM golang:1.25.14-bookworm@sha256:c268a04d59aea0b180ed9946a658cfab9e7b3391dc90eed6e4969ccff98c851f AS bolt-rtc
-WORKDIR /bolt-rtc
+WORKDIR /bolt-rtc/sidecar
+# go.mod replaces pion/sctp with the patched copy in ../third_party (see its PATCHES.md).
+COPY src/Libraries/Bolt/Bolt.Rtc/third_party/ ../third_party/
 COPY src/Libraries/Bolt/Bolt.Rtc/sidecar/go.mod src/Libraries/Bolt/Bolt.Rtc/sidecar/go.sum ./
 RUN go mod download && go mod verify
 COPY src/Libraries/Bolt/Bolt.Rtc/sidecar/*.go ./

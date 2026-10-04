@@ -258,6 +258,9 @@ jobs:
         run: |
           go vet ./...
           go test -count=1 ./...
+          # The patched pion/sctp the sidecar builds with (go.mod replace); its own suite plus our regression test.
+          cd ../third_party/pion-sctp
+          go test -count=1 ./...
 
       - name: Test complete Bolt suite
         if: steps.scope.outputs.scope != 'yap'
