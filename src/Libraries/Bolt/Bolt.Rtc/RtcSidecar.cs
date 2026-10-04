@@ -18,6 +18,12 @@ public sealed class RtcSidecarOptions
     public TimeSpan StartupTimeout { get; set; } = TimeSpan.FromSeconds(10);
     /// <summary>A sidecar that keeps crashing is not restarted more often than this.</summary>
     public TimeSpan RestartBackoff { get; set; } = TimeSpan.FromSeconds(5);
+    /// <summary>
+    /// How many sockets each UDP TURN allocation starts from; the first the TURN server answers is kept. Null keeps the
+    /// sidecar's default (16): some networks drop most UDP flows to a TURN anycast address but pass others. 1 is
+    /// pion's own single socket, for tests that show the difference.
+    /// </summary>
+    public int? TurnFlows { get; set; }
 
     public string ResolveExecutable() => ExecutablePath is { Length: > 0 } path
         ? path
@@ -80,7 +86,7 @@ public sealed class RtcSidecar : IRtcPeerFactory, IAsyncDisposable
             var hello = JsonSerializer.SerializeToUtf8Bytes(new SidecarHello(
                 _token, role == RtcPeerRole.Offer ? "offer" : "answer",
                 options.IceServers.Select(x => new SidecarIceServer(x.Urls, x.Username, x.Credential)).ToArray(),
-                options.RelayOnly, options.MaxMessageBytes, options.MinCwndBytes, options.AllowLoopback), SidecarJson.Default.SidecarHello);
+                options.RelayOnly, options.MaxMessageBytes, options.MinCwndBytes, options.AllowLoopback, _options.TurnFlows), SidecarJson.Default.SidecarHello);
             var peer = new SidecarRtcPeer(stream, role, options.MaxMessageBytes, _logger);
             await peer.StartAsync(hello, ct);
             return peer;
@@ -219,7 +225,7 @@ public sealed class RtcSidecar : IRtcPeerFactory, IAsyncDisposable
 internal sealed record SidecarIceServer(string[] Urls, string? Username, string? Credential);
 
 internal sealed record SidecarHello(string Token, string Role, SidecarIceServer[] IceServers, bool RelayOnly, int MaxMessageBytes,
-    int MinCwnd, bool AllowLoopback);
+    int MinCwnd, bool AllowLoopback, int? TurnFlows = null);
 
 internal sealed record SidecarDescription(string Type, string Sdp);
 

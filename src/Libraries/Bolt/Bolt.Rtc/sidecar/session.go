@@ -8,11 +8,14 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/pion/ice/v4"
+	"github.com/pion/transport/v5"
+	"github.com/pion/transport/v5/stdnet"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -57,6 +60,12 @@ type session struct {
 	dropped atomic.Uint32
 	cwnd    atomic.Uint32
 	srttMs  atomic.Uint32
+
+	// gatherStarted is when the last local description was set, which starts gathering (unix nanoseconds).
+	gatherStarted atomic.Int64
+
+	// baseNet replaces the host's network in tests (pion vnet); nil is the real one.
+	baseNet transport.Net
 }
 
 func newSession(id uint64, conn net.Conn, cfg sessionConfig, logger *log.Logger) *session {
@@ -158,9 +167,33 @@ func (s *session) start(h hello) error {
 		// Tests: loopback only, so a test run opens nothing on the host's real interfaces.
 		settings.SetIncludeLoopbackCandidate(true)
 		settings.SetIPFilter(func(ip net.IP) bool { return ip.IsLoopback() })
-		settings.SetNetworkTypes([]webrtc.NetworkType{webrtc.NetworkTypeUDP4})
+		networkTypes := []webrtc.NetworkType{webrtc.NetworkTypeUDP4}
+		if h.RelayOnly {
+			// A relay-only peer gathers no host candidates, so TCP only adds TURN over TCP legs.
+			networkTypes = append(networkTypes, webrtc.NetworkTypeTCP4)
+		}
+		settings.SetNetworkTypes(networkTypes)
 	}
 	settings.SetSCTPMaxMessageSize(uint32(s.maxMessage))
+	// pion's own warnings about gathering and TURN allocations, which its default logger drops, go to the host's log.
+	settings.LoggerFactory = newPionLogs(s.id, func(line string) { s.logger.Print(line) }, h.ICEServers)
+	// TURN legs: UDP from several flows at once, keeping the first the server answers; TCP/TLS only as a fallback.
+	base := s.baseNet
+	if base == nil {
+		standard, err := stdnet.NewNet()
+		if err != nil {
+			return fmt.Errorf("network: %w", err)
+		}
+		base = standard
+	}
+	flows := h.TurnFlows
+	if flows <= 0 {
+		flows = defaultTurnFlows
+	}
+	if flows > 32 {
+		flows = 32
+	}
+	settings.SetNet(newTurnNet(base, flows, hasUDPTurn(h.ICEServers), func(line string) { s.logger.Printf("session %d: %s", s.id, line) }))
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(settings))
 
 	config := webrtc.Configuration{}
@@ -211,7 +244,11 @@ func (s *session) start(h hello) error {
 		if candidate == nil {
 			// What this side can offer, for the host's log: no addresses, only kinds. A relay that only has a TLS or TCP
 			// leg to TURN (or none) is the first thing to know when a datagram path will not carry media well.
-			s.logger.Printf("session %d: gathered %v", s.id, gathered)
+			elapsed := time.Duration(0)
+			if started := s.gatherStarted.Load(); started != 0 {
+				elapsed = time.Since(time.Unix(0, started))
+			}
+			s.logger.Printf("session %d: gathered %v in %.1f s", s.id, gathered, elapsed.Seconds())
 			gathered = map[string]int{}
 		} else {
 			gathered[candidateKind(candidate)]++
@@ -244,6 +281,20 @@ func candidateKind(candidate *webrtc.ICECandidate) string {
 	default:
 		return "relay/tls"
 	}
+}
+
+// hasUDPTurn says whether any of the servers is TURN over UDP (a "turn:" URL with no transport or transport=udp). Only
+// then is a TCP/TLS TURN leg held back as a fallback.
+func hasUDPTurn(servers []iceServer) bool {
+	for _, server := range servers {
+		for _, url := range server.URLs {
+			lower := strings.ToLower(url)
+			if strings.HasPrefix(lower, "turn:") && (!strings.Contains(lower, "transport=") || strings.Contains(lower, "transport=udp")) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // isMediaChannel accepts only what the relay can rely on: the media label, unordered, no retransmission.
@@ -351,6 +402,7 @@ func (s *session) applySDP(message sdpMessage) error {
 		if err != nil {
 			return fmt.Errorf("answer: %w", err)
 		}
+		s.gatherStarted.Store(time.Now().UnixNano())
 		if err := pc.SetLocalDescription(answer); err != nil {
 			return fmt.Errorf("local answer: %w", err)
 		}
@@ -377,6 +429,7 @@ func (s *session) createOffer(iceRestart bool) error {
 	if err != nil {
 		return fmt.Errorf("offer: %w", err)
 	}
+	s.gatherStarted.Store(time.Now().UnixNano())
 	if err := pc.SetLocalDescription(offer); err != nil {
 		return fmt.Errorf("local offer: %w", err)
 	}
