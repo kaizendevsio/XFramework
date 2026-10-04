@@ -47,6 +47,50 @@ public sealed class ManagedOpusCodec : IDisposable
 
     public byte[] Decode(ReadOnlySpan<byte> packet) => _decoder.Decode(packet);
 
+    private readonly short[] _pending = new short[SamplesPerFrame * 3];
+    private int _pendingFrames;
+    private double _pendingCapture;
+    private int _frameMs = 20;
+
+    /// <summary>
+    /// Opus packet length: 20, 40 or 60 ms. Longer packets carry several 20 ms captures each, so the framing below
+    /// them is paid less often on a scarce link. A change applies from the next packet; a partly filled one is dropped.
+    /// </summary>
+    public int FrameMs
+    {
+        get => _frameMs;
+        set
+        {
+            var frameMs = value is 40 or 60 ? value : 20;
+            if (frameMs == _frameMs) return;
+            _frameMs = frameMs;
+            _pendingFrames = 0;
+        }
+    }
+
+    /// <summary>
+    /// Add one 20 ms capture. Returns a packet once <see cref="FrameMs"/> of audio is in, with the capture time of its
+    /// first 20 ms; otherwise false.
+    /// </summary>
+    public bool TryEncode(ReadOnlySpan<byte> pcm, double captureMicroseconds, out byte[] packet, out double packetCapture)
+    {
+        if (pcm.Length != SamplesPerFrame * sizeof(short))
+            throw new ArgumentException("Expected one 20 ms mono PCM frame.", nameof(pcm));
+        if (_pendingFrames == 0) _pendingCapture = captureMicroseconds;
+        var target = _pending.AsSpan(_pendingFrames * SamplesPerFrame, SamplesPerFrame);
+        for (var i = 0; i < SamplesPerFrame; i++)
+            target[i] = BinaryPrimitives.ReadInt16LittleEndian(pcm[(i * 2)..]);
+        _pendingFrames++;
+        packetCapture = _pendingCapture;
+        if (_pendingFrames < _frameMs / 20) { packet = []; return false; }
+        var samples = _pendingFrames * SamplesPerFrame;
+        _pendingFrames = 0;
+        Span<byte> buffer = stackalloc byte[1275];
+        var length = _encoder.Encode(_pending.AsSpan(0, samples), samples, buffer, buffer.Length);
+        packet = buffer[..length].ToArray();
+        return true;
+    }
+
     public void Dispose()
     {
         _encoder.Dispose();

@@ -582,13 +582,20 @@ public static class BoltCodec
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static int WriteNackRequest(IBufferWriter<byte> writer, Guid streamId, ReadOnlySpan<uint> missingSequences)
+    public static int WriteNackRequest(IBufferWriter<byte> writer, Guid streamId, ReadOnlySpan<uint> missingSequences) =>
+        WriteSequenceList(writer, FrameType.NackRequest, streamId, missingSequences);
+
+    /// <summary>Relay to receiver: frames of <paramref name="streamId"/> the relay will not resend (see <see cref="FrameType.NackDeclined"/>).</summary>
+    public static int WriteNackDeclined(IBufferWriter<byte> writer, Guid streamId, ReadOnlySpan<uint> sequences) =>
+        WriteSequenceList(writer, FrameType.NackDeclined, streamId, sequences);
+
+    private static int WriteSequenceList(IBufferWriter<byte> writer, FrameType type, Guid streamId, ReadOnlySpan<uint> missingSequences)
     {
         if (missingSequences.Length > ushort.MaxValue)
             throw new ArgumentOutOfRangeException(nameof(missingSequences), "A NACK frame cannot contain more than 65535 sequence numbers.");
         var totalSize = ValidateFrameSize((long)NackRequestHeaderSize + missingSequences.Length * 4L);
         var span = writer.GetSpan(totalSize);
-        span[0] = (byte)FrameType.NackRequest;
+        span[0] = (byte)type;
         WriteGuid(span.Slice(1), streamId);
         BinaryPrimitives.WriteUInt16LittleEndian(span.Slice(17), (ushort)missingSequences.Length);
         for (int i = 0; i < missingSequences.Length; i++)

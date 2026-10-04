@@ -2099,6 +2099,91 @@ public sealed partial class BoltServer : IDisposable
         }
     }
 
+    /// <summary>
+    /// The route's retransmission cache, when this relay offers datagram paths with NACK and one of the route's receivers
+    /// has a data channel: nobody else could ever ask for a frame again, so nothing is copied for them.
+    /// </summary>
+    private RelayRetransmitCache? RetransmitsFor(MediaStreamRoute route)
+    {
+        if (_mediaTransport is not { Nack: true } transport) return null;
+        if (route.Retransmits is { } cache) return cache;
+        if (!route.GetRecipientSnapshot().Any(static recipient => recipient.Datagram is not null)) return null;
+        return route.Retransmits = new RelayRetransmitCache(maxFrameBytes: transport.MaxMessageBytes);
+    }
+
+    /// <summary>
+    /// A frame the relay asked the sender for goes to the receivers that asked, alone, on their data channels: they lack
+    /// it because the sender's uplink lost it, not because any lane policy dropped it for them.
+    /// </summary>
+    private void DeliverRequestedVideo(MediaStreamRoute route, ServerCallState owningCall, BoltHubConnection sender, Guid streamId,
+        uint sequence, ReadOnlySpan<byte> frame, IReadOnlyCollection<string> waiting)
+    {
+        lock (owningCall.Participants)
+        {
+            foreach (var recipient in route.GetRecipientSnapshot())
+            {
+                if (recipient.StreamId == sender.StreamId || !waiting.Contains(recipient.StreamId) || !recipient.IsAlive ||
+                    !IsCallParticipant(owningCall, recipient))
+                    continue;
+                if (route.SimulcastLayerId is { } layer && owningCall.RecipientPreferredLayer.TryGetValue(recipient.StreamId, out var preferred) &&
+                    preferred != layer)
+                    continue;
+                if (recipient.VideoLedger.Lookup(streamId, sequence) == VideoSendLedger.Status.Sent)
+                    continue;
+                if (recipient.TrySendRetransmission(frame))
+                    recipient.VideoLedger.Record(streamId, sequence);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A receiver on a datagram path lost video frames. Each one the relay holds and had sent it goes again, to it alone;
+    /// one the sender's uplink lost is asked of the sender; one the relay dropped on purpose, or no longer has, is
+    /// declined, so the receiver stops waiting and recovers from the next reference picture or a keyframe.
+    /// </summary>
+    private void ServeNack(MediaStreamRoute route, BoltHubConnection receiver, Guid streamId, ReadOnlySpan<byte> request)
+    {
+        if (!BoltCodec.TryReadNackRequest(request, out var nack) || RetransmitsFor(route) is not { } cache)
+            return;
+        var now = Environment.TickCount64;
+        List<uint>? forward = null, declined = null;
+        var asked = 0;
+        foreach (var sequence in nack.GetMissingSequences(request).Distinct())
+        {
+            if (++asked > 64) break;
+            var holding = cache.Lookup(sequence, now, out var frame);
+            var sent = receiver.VideoLedger.Lookup(streamId, sequence);
+            switch (holding)
+            {
+                case RelayRetransmitCache.Holding.Held when sent == VideoSendLedger.Status.Sent:
+                    // Lost after the relay. A full channel answers nothing; the receiver asks again if it still has time.
+                    receiver.TrySendRetransmission(frame!);
+                    break;
+                case RelayRetransmitCache.Holding.Held when sent == VideoSendLedger.Status.Pending:
+                    break; // Still queued for this receiver.
+                case RelayRetransmitCache.Holding.NeverSeen when sent != VideoSendLedger.Status.Unknown:
+                    (forward ??= []).Add(sequence);
+                    cache.Requested(sequence, receiver.StreamId);
+                    break;
+                default:
+                    (declined ??= []).Add(sequence);
+                    break;
+            }
+        }
+        if (forward is { Count: > 0 } && route.Sender.IsAlive && route.Sender.MediaQueue is not null)
+        {
+            var writer = new ArrayBufferWriter<byte>(BoltCodec.NackRequestHeaderSize + forward.Count * 4);
+            BoltCodec.WriteNackRequest(writer, streamId, forward.ToArray());
+            route.Sender.TryEnqueueMedia(writer.WrittenSpan, BoltMediaLane.Feedback, streamId);
+        }
+        if (declined is { Count: > 0 })
+        {
+            var writer = new ArrayBufferWriter<byte>(BoltCodec.NackRequestHeaderSize + declined.Count * 4);
+            BoltCodec.WriteNackDeclined(writer, streamId, declined.ToArray());
+            receiver.TryEnqueueMedia(writer.WrittenSpan, BoltMediaLane.Feedback, streamId);
+        }
+    }
+
     private void FanOutMediaFrame(
         MediaStreamRoute route,
         ServerCallState owningCall,
@@ -2130,6 +2215,21 @@ public sealed partial class BoltServer : IDisposable
         else
         {
             isMediaFrame = false;
+        }
+
+        if (isMediaFrame && lane == BoltMediaLane.Video && RetransmitsFor(route) is { } cache)
+        {
+            switch (cache.Store(sequence, frame, now, out var waiting))
+            {
+                case RelayRetransmitCache.Arrival.Duplicate:
+                    return;
+                case RelayRetransmitCache.Arrival.Requested:
+                    // The sender resent a frame its uplink lost, because receivers asked: the lanes have moved past it,
+                    // so it goes straight to those receivers' data channels. Anything else (an uplink that merely
+                    // reordered) takes the lanes like every frame.
+                    DeliverRequestedVideo(route, owningCall, sender, streamId, sequence, frame, waiting!);
+                    return;
+            }
         }
 
         var needsKeyframe = false;
@@ -2408,6 +2508,13 @@ public sealed partial class BoltServer : IDisposable
                     callState.RecipientPreferredLayer[sender.StreamId] = (byte)(currentLayer + 1);
                     break;
             }
+        }
+
+        // A video NACK is served at the relay where it can be: only the requesting receiver's own leg resends.
+        if ((FrameType)buffer[0] == FrameType.NackRequest && route.MediaType != MediaType.Audio && _mediaTransport is { Nack: true })
+        {
+            ServeNack(route, sender, streamId, span);
+            return;
         }
 
         // Feedback goes back to the stream's sender. It is lossy by nature, so it takes the sender's
@@ -4769,6 +4876,7 @@ public sealed partial class BoltServer : IDisposable
 
         _shutdownCts.Cancel();
         _mediaTransportTimer?.Dispose();
+        _transportFeedbackTimer?.Dispose();
         foreach (var transport in _mediaTransports.Values)
             _ = CloseMediaTransportAsync(transport.Connection);
         _mediaTapCts.Cancel();
@@ -5251,6 +5359,47 @@ public sealed class BoltHubConnection
 
     internal void RecordDatagramRejected() => Interlocked.Increment(ref _datagramRejected);
 
+    private readonly VideoSendLedger _videoLedger = new();
+
+    /// <summary>When this participant's transport-sequenced datagrams arrived, for its next transport feedback report.</summary>
+    internal TransportFeedbackRecorder TransportArrivals { get; } = new();
+    private long _retransmitted;
+    // Retransmissions are budgeted per receiver: a burst of 64, then 100 frames a second (about 0.9 Mbit/s of 1150-byte
+    // frames). A receiver asking again and again only gets its budget's worth.
+    private const double RetransmitBurst = 64, RetransmitPerSecond = 100;
+    private double _retransmitTokens = RetransmitBurst;
+    private long _retransmitRefilledAt = Environment.TickCount64;
+    private readonly object _retransmitSync = new();
+
+    /// <summary>Which video frames this receiver has been sent, per stream (see <see cref="VideoSendLedger"/>).</summary>
+    internal VideoSendLedger VideoLedger => _videoLedger;
+
+    /// <summary>Video frames resent to this receiver on its data channel because it lost them.</summary>
+    public long RetransmittedFrames => Interlocked.Read(ref _retransmitted);
+
+    /// <summary>
+    /// Resend one video frame on this receiver's data channel, outside its lanes (the lanes have moved past it). Only
+    /// while the channel carries media and has room: a congested channel gets nothing extra, the receiver asks again.
+    /// </summary>
+    internal bool TrySendRetransmission(ReadOnlySpan<byte> frame)
+    {
+        var datagram = Volatile.Read(ref _datagram);
+        if (datagram is null || datagram.State != RtcChannelState.Open || DatagramSuspended || !_pathHysteresis.Usable ||
+            frame.Length > datagram.MaxMessageBytes || datagram.BufferedAmount >= DatagramBacklogLimit(datagram.CongestionWindow))
+            return false;
+        lock (_retransmitSync)
+        {
+            var now = Environment.TickCount64;
+            _retransmitTokens = Math.Min(RetransmitBurst, _retransmitTokens + (now - _retransmitRefilledAt) * RetransmitPerSecond / 1000.0);
+            _retransmitRefilledAt = now;
+            if (_retransmitTokens < 1) return false;
+            _retransmitTokens--;
+        }
+        if (!datagram.TrySend(frame)) return false;
+        Interlocked.Increment(ref _retransmitted);
+        return true;
+    }
+
     /// <summary>Make <paramref name="peer"/> this connection's media pipe, replacing any previous one.</summary>
     internal void AttachDatagram(IRtcPeer peer)
     {
@@ -5620,6 +5769,9 @@ public sealed class BoltHubConnection
                         return;
                     if (!_media.TryDequeue(out var item))
                         break;
+                    if (item.Lane == BoltMediaLane.Video && item.Length >= BoltCodec.MediaFrameHeaderSize &&
+                        item.Buffer![0] == (byte)FrameType.MediaFrame)
+                        _videoLedger.Record(item.StreamId, BinaryPrimitives.ReadUInt32LittleEndian(item.Buffer.AsSpan(17)));
                     if (datagram is not null)
                     {
                         if (TrySendDatagram(datagram, item))
@@ -6083,6 +6235,9 @@ internal sealed class MediaStreamRoute
 
     /// <summary>Audio sequence numbers seen from <see cref="Sender"/>: drops duplicates and measures uplink loss.</summary>
     public SequenceWindow AudioSequences { get; } = new();
+
+    /// <summary>Recent video frames, for receivers on a datagram path that lost one (see <see cref="RelayRetransmitCache"/>).</summary>
+    public RelayRetransmitCache? Retransmits { get; set; }
 
     public bool ContainsRecipient(BoltHubConnection connection)
     {

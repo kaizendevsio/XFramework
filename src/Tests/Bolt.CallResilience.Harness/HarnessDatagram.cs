@@ -35,6 +35,10 @@ internal sealed class HarnessDatagram : IAsyncDisposable
     public static bool Enabled => Env.Int("UDP", 0) == 1;
 
     public bool IsOpen => _peer is { State: RtcChannelState.Open };
+    /// <summary>The channel's round trip as ICE measures it, when known.</summary>
+    public double? RttMs => _peer?.Path?.RttMs is > 0 and var rtt ? rtt : null;
+    /// <summary>Send one message on the open channel (a NACK); false when there is none or it is full.</summary>
+    public bool TrySend(ReadOnlySpan<byte> message) => _peer is { State: RtcChannelState.Open } peer && peer.TrySend(message);
     public string Path => _peer is { State: RtcChannelState.Open } peer ? peer.Path?.Describe() ?? "UDP" : "WebSocket";
     public double? OpenedAtS { get; private set; }
     /// <summary>The path media last took on the channel (the summary is written after the call ended and closed it).</summary>

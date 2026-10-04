@@ -26,9 +26,10 @@ public sealed class RetransmitBuffer
     public void Store(uint sequenceNumber, uint timestamp, byte flags, ReadOnlyMemory<byte> payload)
     {
         var index = (int)(sequenceNumber % _capacity);
+        var now = Environment.TickCount64;
         lock (_lock)
         {
-            _buffer[index] = new BufferedSentFrame(sequenceNumber, timestamp, flags, payload.ToArray());
+            _buffer[index] = new BufferedSentFrame(sequenceNumber, timestamp, flags, payload.ToArray(), now);
         }
     }
 
@@ -48,4 +49,5 @@ public sealed class RetransmitBuffer
 }
 
 /// <summary>A sent media frame stored for retransmission.</summary>
-public readonly record struct BufferedSentFrame(uint SequenceNumber, uint Timestamp, byte Flags, byte[]? Payload);
+/// <param name="StoredAtMs"><see cref="Environment.TickCount64"/> when it was sent.</param>
+public readonly record struct BufferedSentFrame(uint SequenceNumber, uint Timestamp, byte Flags, byte[]? Payload, long StoredAtMs = 0);

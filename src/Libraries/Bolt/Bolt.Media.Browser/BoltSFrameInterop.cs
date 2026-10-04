@@ -32,14 +32,23 @@ public sealed class BoltSFrameInterop(IJSRuntime js) : IAsyncDisposable
         finally { _gate.Release(); }
     }
 
-    public async Task InstallEpochAsync(string epochId, string rosterBinding, SFrameSenderKey local, IReadOnlyList<SFrameSenderKey> remote)
+    /// <summary>Whether the installed epoch sends compact frames (see <see cref="CallMediaFormat.Compact"/>).</summary>
+    public bool Compact { get; private set; }
+
+    /// <param name="compact">
+    /// Send compact frames: about 20 bytes of SFrame per frame instead of about 278. Only when every remote member of
+    /// this epoch announced <see cref="CallMediaFormat.Compact"/> in its authenticated envelope; receiving takes both.
+    /// </param>
+    public async Task InstallEpochAsync(string epochId, string rosterBinding, SFrameSenderKey local, IReadOnlyList<SFrameSenderKey> remote,
+        bool compact = false)
     {
         _ready = false; Interlocked.Increment(ref _generation);
         await _gate.WaitAsync();
         try
         {
             if (_session is null || local.SenderId != _localSenderId) throw new InvalidOperationException("SFrame call not configured.");
-            await _session.InvokeVoidAsync("installEpoch", new { epochId, rosterBinding, local, remote });
+            await _session.InvokeVoidAsync("installEpoch", new { epochId, rosterBinding, local, remote, compact });
+            Compact = compact;
             _remoteSenders = remote.Select(x => x.SenderId).ToHashSet(StringComparer.Ordinal);
         }
         finally { _gate.Release(); }

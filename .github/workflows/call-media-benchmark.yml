@@ -1,0 +1,150 @@
+name: Call media benchmark
+
+# Bandwidth efficiency against native WebRTC: the same synthetic camera and microphone, at the same target bitrates,
+# in headless Chrome, through (a) native WebRTC media (RTCPeerConnection tracks with an SFrame-sized encoded transform)
+# and (b) Bolt's datagram path (the production WebCodecs settings, SFrame adapter, framing and fragmentation on the
+# unordered, unretransmitted data channel), before and after this branch's efficiency changes. Both peers reach each
+# other only through coturn; netem shapes the receiver's TURN leg and iptables counts every byte on each leg.
+# See src/Tests/Bolt.Rtc.IntegrationTests/bench/bench.js for what (b) does and does not include.
+on:
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: Measured seconds per run
+        default: "60"
+  pull_request:
+    paths:
+      - src/Libraries/Bolt/Bolt.Media.Browser/**
+      - src/Tests/Bolt.Rtc.IntegrationTests/**
+      - .github/workflows/call-media-benchmark.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: call-media-benchmark-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run:
+    name: ${{ matrix.scenario }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # One way each: the receiver's round trip to TURN is twice the delay. Video targets fit each link with audio.
+          - { scenario: clean-20mbit, downlink: "delay 10ms rate 20mbit", uplink: "delay 10ms", video: 1500, audio: 20 }
+          - { scenario: 512k-500ms-1pct, downlink: "delay 250ms 10ms rate 512kbit loss 1%", uplink: "delay 250ms 10ms", video: 300, audio: 60 }
+          - { scenario: 512k-1000ms-3pct, downlink: "delay 500ms 20ms rate 512kbit loss 3%", uplink: "delay 500ms 20ms", video: 300, audio: 60 }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 10.x
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: src/Libraries/Bolt/Bolt.Rtc/sidecar/go.mod
+          cache-dependency-path: src/Libraries/Bolt/Bolt.Rtc/sidecar/go.sum
+
+      - name: Build the relay's WebRTC sidecar
+        shell: bash
+        working-directory: src/Libraries/Bolt/Bolt.Rtc/sidecar
+        run: CGO_ENABLED=0 go build -trimpath -o "$RUNNER_TEMP/bolt-rtc" .
+
+      - name: Enable netem
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! sudo modprobe sch_netem 2>/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq "linux-modules-extra-$(uname -r)"
+            sudo modprobe sch_netem
+          fi
+
+      - name: Start coturn on three loopback addresses
+        shell: bash
+        run: |
+          set -euo pipefail
+          # One TURN address per side (sender .2, receiver .3, the Bolt relay .4), so each leg can be shaped and counted on
+          # its own. UDP only, as Yap configures it.
+          docker run --detach --name coturn --network host \
+            coturn/coturn:4.18.0-debian@sha256:bbefd3e1fdfdc0d58770fe01b581fd8b00d9f3a5580d00acb77cf719a6bc78e3 \
+            -n --log-file=stdout --listening-ip=127.0.0.2 --listening-ip=127.0.0.3 --listening-ip=127.0.0.4 --relay-ip=127.0.0.1 --listening-port=3478 \
+            --use-auth-secret --static-auth-secret=ci-turn-secret --realm=bolt.test --fingerprint \
+            --no-tls --no-tcp-relay --allow-loopback-peers --min-port=49160 --max-port=49400
+          for attempt in $(seq 1 30); do
+            if ss -lnu | grep -q '127.0.0.3:3478 '; then exit 0; fi
+            sleep 1
+          done
+          docker logs coturn
+          exit 1
+
+      - name: Build and install the browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet build src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj --configuration Release
+          # Google Chrome (preinstalled on the runner) has the H.264 codecs; Chromium is the fallback.
+          pwsh src/Tests/Bolt.Rtc.IntegrationTests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+          google-chrome --version || true
+
+      - name: Benchmark
+        shell: bash
+        env:
+          BENCH_SECONDS: ${{ github.event.inputs.seconds || '60' }}
+          BOLT_RTC_SIDECAR: ${{ runner.temp }}/bolt-rtc
+          SCENARIO: ${{ matrix.scenario }}
+          DOWNLINK: ${{ matrix.downlink }}
+          UPLINK: ${{ matrix.uplink }}
+          VIDEO: ${{ matrix.video }}
+          AUDIO: ${{ matrix.audio }}
+        run: |
+          set -euo pipefail
+          bash src/Tests/Bolt.Rtc.IntegrationTests/bench/run-bench.sh "$SCENARIO" "$DOWNLINK" "$UPLINK" "$VIDEO" "$AUDIO" "$RUNNER_TEMP/bench"
+          python3 src/Tests/Bolt.Rtc.IntegrationTests/bench/summarize-bench.py "$RUNNER_TEMP/bench" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ -f "$RUNNER_TEMP/bench/failures.txt" ]; then cat "$RUNNER_TEMP/bench/failures.txt"; exit 1; fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: call-media-benchmark-${{ matrix.scenario }}
+          path: ${{ runner.temp }}/bench
+          if-no-files-found: warn
+
+      - name: TURN server log
+        if: failure()
+        run: docker logs coturn 2>&1 | tail -100
+
+  report:
+    name: Report
+    needs: run
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Download results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: call-media-benchmark-*
+          path: bench-results
+
+      - name: Summarize
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 src/Tests/Bolt.Rtc.IntegrationTests/bench/summarize-bench.py bench-results | tee summary.md
+          cat summary.md >>"$GITHUB_STEP_SUMMARY"

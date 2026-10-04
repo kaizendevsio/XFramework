@@ -110,7 +110,8 @@ public sealed partial class BoltGroupCallLifecycleTests
         {
             Assert.That(a.Transport.Status.Kind, Is.EqualTo(MediaPathKind.Datagram));
             Assert.That(a.Transport.Status.Description, Is.EqualTo("UDP/relay"));
-            Assert.That(a.Transport.MaxMessageBytes, Is.EqualTo(RtcDefaults.MaxMessageBytes));
+            Assert.That(a.Transport.MaxMessageBytes, Is.EqualTo(RtcDefaults.MaxMessageBytes - TransportSequenceCodec.HeaderSize),
+                "every message carries the 3-byte transport stamp this relay reports on");
             Assert.That(a.Transport.TrySend(audio), Is.True);
         });
         await WaitUntil(() => f.Peers["b"].Media(stream).Count == 1);
@@ -334,7 +335,9 @@ public sealed partial class BoltGroupCallLifecycleTests
         var participant = (FakeRtcPeer)a.Transport.ActivePeer!;
         a.Transport.TrySend(Audio(31), audio: true);
         a.Transport.TrySend(Audio(32), audio: true);
-        Assert.That(participant.Sent.Last()[0], Is.EqualTo((byte)FrameType.MediaBundle), "the previous frame rides along");
+        // Stamped for this relay's transport feedback; inside the stamp, the previous frame rides along.
+        Assert.That(TransportSequenceCodec.TryRead(participant.Sent.Last(), out _, out var last), Is.True);
+        Assert.That(last[0], Is.EqualTo((byte)FrameType.MediaBundle), "the previous frame rides along");
         await WaitUntil(() => f.Peers["b"].Media(stream).Any(x => x.Sequence == 32));
         Assert.That(f.Peers["b"].Media(stream).GroupBy(x => x.Sequence).All(x => x.Count() == 1), Is.True, "every frame reaches b once");
         Assert.That(a.Transport.Status.AudioRedundancy, Is.True);
@@ -364,5 +367,48 @@ public sealed partial class BoltGroupCallLifecycleTests
             Assert.That(a.Client.DispatchDatagram(bundle.AsSpan(0, bundle.Length - 1)), Is.Zero, "a truncated bundle is dropped whole");
             Assert.That(seen, Is.EqualTo(new[] { FrameType.MediaFrame, FrameType.MediaFrame, FrameType.MediaFrame }));
         });
+    }
+}
+
+public sealed partial class BoltGroupCallLifecycleTests
+{
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task Client_StampsWhatItSends_OnlyForARelayThatReports_AndHearsHowItsUplinkDid(bool relayReports)
+    {
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o =>
+        {
+            var transport = Transport(network, new FakeIceSource(), x => x.Hysteresis = QuickPath);
+            o.MediaTransport = new Bolt.Server.BoltMediaTransportOptions
+            {
+                Peers = transport.Peers, IceServers = transport.IceServers, RequestSpacingSeconds = 0, PathHysteresis = QuickPath,
+                TransportFeedback = relayReports,
+            };
+        });
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var stream = await f.Config("a");
+        await using var a = Connect(f, "a", network, QuickClient);
+        Bolt.Media.Congestion.TransportSignal? heard = null;
+        a.Transport.TransportFeedback += signal => heard = signal;
+        a.Transport.Start();
+        await WaitUntil(() => a.Transport.IsDatagramActive);
+        Assert.That(a.Transport.StampsMessages, Is.EqualTo(relayReports));
+
+        for (uint sequence = 1; sequence <= 20; sequence++)
+            Assert.That(a.Transport.TrySend(Frame(w => BoltCodec.WriteMediaFrame(w, stream, sequence, 960 * sequence, MediaFrameFlags.Encrypted, new byte[100])), audio: true), Is.True);
+        await WaitUntil(() => f.Peers["b"].Media(stream).Count == 20);
+
+        var participant = network.Created.Single(x => x.Role == Bolt.Protocol.Transport.RtcPeerRole.Offer);
+        Assert.That(participant.Sent.All(x => x[0] == (byte)(relayReports ? FrameType.TransportSequenced : FrameType.MediaFrame)), Is.True);
+        if (!relayReports)
+        {
+            await Task.Delay(300);
+            Assert.That(heard, Is.Null, "an older relay never reports, and is never sent a stamp it would refuse");
+            return;
+        }
+        await WaitUntil(() => heard is { } s && s.LossFraction == 0, 2_000);
+        Assert.That(Connection(f, "a").DatagramRejected, Is.Zero, "every stamped message was unwrapped and taken");
     }
 }

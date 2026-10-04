@@ -19,11 +19,15 @@ function identifier(value) {
         throw new Error('Invalid SFrame identity');
     return value;
 }
+/// Sender KIDs below 8 are reserved: a compact frame's RFC 9605 header uses KID 1 as its format marker.
+const minSenderKid = 8n;
 function keyId(value) {
     if (typeof value !== 'string' || !/^(0|[1-9][0-9]{0,19})$/.test(value)
-        || BigInt(value) > 18446744073709551615n) throw new Error('Invalid SFrame key ID');
+        || BigInt(value) > 18446744073709551615n || BigInt(value) < minSenderKid) throw new Error('Invalid SFrame key ID');
     return BigInt(value);
 }
+/// A compact frame: RFC 9605 config byte with X = 0 and KID = 1 (the format marker), whatever its counter.
+function isCompact(payload) { return (payload[0] & 0xf0) === 0x10; }
 function keyBytes(value) {
     if (!(value instanceof Uint8Array) || value.length !== 32)
         throw new Error('Invalid SFrame base key');
@@ -35,7 +39,7 @@ function sameKey(left, right) { return left.every((byte, index) => byte === righ
 // This class cannot authenticate the directory or membership on its own.
 export class SFrameSession {
     #callId; #localSenderId; #epoch; #sender; #receivers = new Map();
-    #usedKids = new Set(); #epochs = 0; #active = false; #disposed = false;
+    #usedKids = new Set(); #epochs = 0; #active = false; #disposed = false; #compact = false;
 
     constructor(callId, localSenderId) {
         this.#callId = identifier(callId);
@@ -45,7 +49,9 @@ export class SFrameSession {
     // Pause immediately on any membership change, before asynchronous key exchange.
     pause() { this.#active = false; }
 
-    installEpoch({ epochId, rosterBinding, local, remote }) {
+    /// compact: send compact frames (about 20 bytes of SFrame per frame instead of about 278). Set it only when every
+    /// remote member of this epoch said, in its authenticated key envelope, that it reads them. Receiving takes both.
+    installEpoch({ epochId, rosterBinding, local, remote, compact = false }) {
         this.pause();
         if (this.#disposed || this.#epochs >= maxEpochs) throw new Error('SFrame session ended');
         identifier(epochId);
@@ -80,6 +86,7 @@ export class SFrameSession {
         this.#clearKeys();
         this.#sender = sender; this.#receivers = receivers;
         this.#epoch = { epochId, rosterBinding };
+        this.#compact = compact === true;
         for (const kid of kids) this.#usedKids.add(kid);
         ++this.#epochs;
         // Caller wipes envelope plaintext/base-key arrays after installing them.
@@ -92,19 +99,25 @@ export class SFrameSession {
         this.#active = true;
     }
 
-    #aad(senderId, streamId, sequence, timestamp) {
+    /// The authenticated context. Legacy frames carry it inside the ciphertext; compact frames authenticate it as
+    /// associated data and never send it. The label separates the two formats' contexts.
+    #aad(senderId, streamId, sequence, timestamp, compact) {
         if (!Number.isInteger(sequence) || sequence < 0 || sequence > 0xffffffff
             || !Number.isInteger(timestamp) || timestamp < 0 || timestamp > 0xffffffff)
             throw new Error('Invalid SFrame media routing');
-        return encoder.encode(JSON.stringify(['bolt-sframe-v1', this.#callId, this.#epoch.epochId,
+        return encoder.encode(JSON.stringify([compact ? 'bolt-sframe-v2' : 'bolt-sframe-v1', this.#callId, this.#epoch.epochId,
             this.#epoch.rosterBinding, senderId, identifier(streamId), sequence, timestamp]));
     }
+
+    /// Whether this epoch sends compact frames.
+    get compact() { return this.#compact; }
 
     encrypt(payload, streamId, sequence, timestamp) {
         if (!this.#active || this.#disposed) throw new Error('SFrame sending paused');
         if (!(payload instanceof Uint8Array) || payload.length < 1 || payload.length > 4096)
             throw new Error('Invalid audio payload');
-        return this.#sender.encrypt(payload, this.#aad(this.#localSenderId, streamId, sequence, timestamp));
+        const compact = this.#compact;
+        return this.#sender.encrypt(payload, this.#aad(this.#localSenderId, streamId, sequence, timestamp, compact), compact);
     }
 
     decrypt(senderId, payload, streamId, sequence, timestamp) {
@@ -113,7 +126,8 @@ export class SFrameSession {
             throw new Error('Invalid encrypted audio payload');
         const receiver = this.#receivers.get(senderId);
         if (!receiver) throw new Error('Unknown SFrame sender');
-        return receiver.decrypt(payload, this.#aad(senderId, streamId, sequence, timestamp));
+        // The header names the format; a frame that lies about it fails authentication like any other edit.
+        return receiver.decrypt(payload, this.#aad(senderId, streamId, sequence, timestamp, isCompact(payload)));
     }
 
     #clearKeys() {
@@ -122,7 +136,7 @@ export class SFrameSession {
         this.#receivers.clear();
     }
     dispose() {
-        this.pause(); this.#clearKeys(); this.#epoch = undefined;
+        this.pause(); this.#clearKeys(); this.#epoch = undefined; this.#compact = false;
         this.#usedKids.clear(); this.#disposed = true;
     }
 }

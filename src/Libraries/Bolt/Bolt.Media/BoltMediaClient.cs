@@ -87,6 +87,7 @@ public sealed class BoltMediaClient : IAsyncDisposable
         RegisterBorrowedFrameHandler(FrameType.MediaKeyRequest, HandleMediaKeyRequest);
         RegisterBorrowedFrameHandler(FrameType.FecFrame, HandleFecFrame);
         RegisterBorrowedFrameHandler(FrameType.NackRequest, HandleNackRequest);
+        RegisterBorrowedFrameHandler(FrameType.NackDeclined, HandleNackDeclined);
         RegisterBorrowedFrameHandler(FrameType.CallSignal, HandleCallSignal);
         RegisterBorrowedFrameHandler(FrameType.MediaCongestion, HandleMediaCongestion);
     }
@@ -417,6 +418,17 @@ public sealed class BoltMediaClient : IAsyncDisposable
         }
     }
 
+    /// <summary>The relay will not resend these frames of a stream this client receives.</summary>
+    public event Action<Guid, uint[]>? OnNackDeclined;
+
+    private void HandleNackDeclined(BoltConnection conn, byte[] buffer, int length)
+    {
+        Touch();
+        if (!BoltCodec.TryReadNackRequest(buffer.AsSpan(0, length), out var header) || header.NackCount > 256) return;
+        if (_mediaStreams.ContainsKey(header.StreamId))
+            OnNackDeclined?.Invoke(header.StreamId, header.GetMissingSequences(buffer.AsSpan(0, length)));
+    }
+
     private void HandleCallSignal(BoltConnection conn, byte[] buffer, int length)
     {
         Touch();
@@ -532,6 +544,7 @@ public sealed class BoltMediaClient : IAsyncDisposable
         _client.UnregisterFrameHandler(FrameType.MediaKeyRequest, HandleMediaKeyRequest);
         _client.UnregisterFrameHandler(FrameType.FecFrame, HandleFecFrame);
         _client.UnregisterFrameHandler(FrameType.NackRequest, HandleNackRequest);
+        _client.UnregisterFrameHandler(FrameType.NackDeclined, HandleNackDeclined);
         _client.UnregisterFrameHandler(FrameType.CallSignal, HandleCallSignal);
         _client.UnregisterFrameHandler(FrameType.MediaCongestion, HandleMediaCongestion);
 

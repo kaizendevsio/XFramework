@@ -36,7 +36,15 @@ PAIRS = [
     ("udp-512k-500ms-1pct", "ws-512k-500ms-1pct"),
     ("udp-4g-2mbit", "after-4g-2mbit"),
     ("udp-4g-outage-2s", "after-4g-outage-2s"),
-    ("udp-512k-1000ms-1pct-sframe278", "ws-512k-1000ms-1pct-sframe278"),
+]
+
+# Bandwidth efficiency: this branch's client (compact SFrame, 60 ms audio on a scarce link, NACK) against the same
+# relay with the previous client's choices (legacy SFrame, 20 ms audio, no NACK), same link.
+EFFICIENCY = [
+    ("udp-512k-1000ms-1pct", "udp-512k-1000ms-1pct-before"),
+    ("udp-512k-1000ms-3pct", "udp-512k-1000ms-3pct-before"),
+    ("udp-512k-500ms-1pct", "udp-512k-500ms-1pct-before"),
+    ("ws-512k-1000ms-1pct", "ws-512k-1000ms-1pct-before"),
 ]
 
 
@@ -108,6 +116,35 @@ def main(directory):
             )
     if len(compare) > 5:
         print("\n".join(compare))
+
+    efficiency = [
+        "",
+        "Bandwidth efficiency, after against before (the previous client's legacy SFrame, 20 ms audio and no NACK) on the "
+        "same relay and link. Audio delay is one way after 20 s; NACK is asked / recovered / given up / declined.",
+        "",
+        "| run | audio p50 / p99 ms | audio delivered | audio packet | settled video kbps | final picture | decodable / sent | "
+        "frozen / suspended s | NACK | keyframe requests | media kbps received |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
+    ]
+    for after, before in EFFICIENCY:
+        for name in (after, before):
+            if name not in by_name:
+                continue
+            relay, receiver = by_name[name]
+            settled = receiver.get("audioDelayAfter20sMs", {})
+            rate = relay.get("rate") or {}
+            transport = receiver.get("transport") or {}
+            nack = transport.get("nack") if isinstance(transport, dict) else None
+            nack_text = f"{nack.get('asked')} / {nack.get('recovered')} / {nack.get('abandoned')} / {nack.get('declined')}" if nack else "off"
+            efficiency.append(
+                f"| {name} | {settled.get('p50', '-')} / {settled.get('p99', '-')} | {receiver.get('audioDelivered', '-')}% | "
+                f"{rate.get('audioPacketMs', '-')} ms | {rate.get('settledVideoKbpsMedian', '-')} | {rate.get('finalRung', '-')} | "
+                f"{receiver.get('picturesDecodable', '-')} / {relay.get('videoPicturesSent', '-')} | "
+                f"{receiver.get('frozenSeconds', '-')} / {rate.get('suspendedSeconds', '-')} | {nack_text} | "
+                f"{transport.get('keyframeRequests', '-') if isinstance(transport, dict) else '-'} | {receiver.get('mediaKbps', '-')} |"
+            )
+    if len(efficiency) > 6:
+        print("\n".join(efficiency))
 
     transports = [(name, relay, receiver) for name, relay, receiver in runs if datagram(receiver)]
     if transports:

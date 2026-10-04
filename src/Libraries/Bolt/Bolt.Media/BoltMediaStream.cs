@@ -56,6 +56,9 @@ public sealed class BoltMediaStream : IAsyncDisposable
     // NACK retransmission
     private RetransmitBuffer? _retransmitBuffer;
     private NackTracker? _nackTracker;
+    private Func<ReadOnlyMemory<byte>, bool>? _retransmitSend;
+    private int _retransmitMaxAgeMs;
+    private long _retransmitted;
 
     // QUIC datagram transport
     private Func<ReadOnlyMemory<byte>, ValueTask>? _datagramSend;
@@ -151,6 +154,9 @@ public sealed class BoltMediaStream : IAsyncDisposable
     /// </summary>
     public int EncryptionOverhead => Volatile.Read(ref _encryptionOverhead);
 
+    /// <summary>A new epoch may use another SFrame format (compact or legacy): measure its overhead afresh.</summary>
+    public void ResetEncryptionOverhead() => Volatile.Write(ref _encryptionOverhead, 0);
+
     private void RecordEncryptionOverhead(int plaintext, int ciphertext)
     {
         var overhead = ciphertext - plaintext;
@@ -229,6 +235,23 @@ public sealed class BoltMediaStream : IAsyncDisposable
         _nackTracker = new NackTracker(_connection, StreamId);
         _nackTracker.Start();
     }
+
+    /// <summary>
+    /// Keep sent frames so a receiver on a datagram path can get a lost one again. A NACK the relay could not serve
+    /// itself (the frame never reached it) comes here, and the frame goes out again through <paramref name="send"/>
+    /// (the data channel), which refuses it when there is none: nothing is ever resent on a stream transport, which
+    /// does not lose data. Frames older than <paramref name="maxAgeMs"/> are past any receiver's recovery window.
+    /// </summary>
+    public void EnableRetransmission(Func<ReadOnlyMemory<byte>, bool> send, int capacity = 512, int maxAgeMs = 2_000)
+    {
+        ArgumentNullException.ThrowIfNull(send);
+        _retransmitBuffer ??= new RetransmitBuffer(capacity);
+        _retransmitSend = send;
+        _retransmitMaxAgeMs = maxAgeMs;
+    }
+
+    /// <summary>Frames sent again because a receiver asked for them.</summary>
+    public long RetransmittedFrames => Interlocked.Read(ref _retransmitted);
 
     /// <summary>
     /// Enable delay-based congestion control (GCC-style).
@@ -498,6 +521,21 @@ public sealed class BoltMediaStream : IAsyncDisposable
     public async ValueTask HandleNackAsync(uint[] missingSequences, CancellationToken ct = default)
     {
         if (_retransmitBuffer == null) return;
+
+        if (_retransmitSend is { } datagram)
+        {
+            var now = Environment.TickCount64;
+            foreach (var seq in missingSequences.Distinct().Take(64))
+            {
+                if (!_retransmitBuffer.TryGet(seq, out var sent) || sent.Payload is null || now - sent.StoredAtMs > _retransmitMaxAgeMs)
+                    continue;
+                // The path is gone or full: the receiver gives this frame up and recovers without it.
+                if (!datagram(Frame(sent.SequenceNumber, sent.Timestamp, sent.Flags, sent.Payload))) break;
+                Interlocked.Increment(ref _retransmitted);
+            }
+            return;
+        }
+        if (IsReliableTransport) return;
 
         var conn = _directManager?.IsDirectActive == true ? _directManager.ActiveConnection : _connection;
         foreach (var seq in missingSequences.Distinct().Take(64))

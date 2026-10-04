@@ -71,6 +71,7 @@ export class SFrameReceiver {
         return this;
     }
     /**
+     * Either format: the header says which, and the tag decides whether it told the truth.
      * @param {Uint8Array} payload
      * @param {Uint8Array} aad
      * @returns {Uint8Array}
@@ -123,16 +124,18 @@ export class SFrameSender {
         return this;
     }
     /**
+     * `compact` picks the frame format. Both draw on this sender's one counter, so no nonce repeats under its key.
      * @param {Uint8Array} payload
      * @param {Uint8Array} aad
+     * @param {boolean} compact
      * @returns {Uint8Array}
      */
-    encrypt(payload, aad) {
+    encrypt(payload, aad, compact) {
         const ptr0 = passArray8ToWasm0(payload, wasm.__wbindgen_malloc);
         const len0 = WASM_VECTOR_LEN;
         const ptr1 = passArray8ToWasm0(aad, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
-        const ret = wasm.sframesender_encrypt(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        const ret = wasm.sframesender_encrypt(this.__wbg_ptr, ptr0, len0, ptr1, len1, compact);
         if (ret[3]) {
             throw takeFromExternrefTable0(ret[2]);
         }

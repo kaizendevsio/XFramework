@@ -10,7 +10,10 @@ public sealed record RemoteVideoStream(Guid StreamId, string SenderId, VideoCode
 
 public sealed partial class BoltMediaService
 {
-    private readonly Dictionary<Guid, VideoFrameAssembler> _videoAssemblers = [];
+    private readonly Dictionary<Guid, VideoRecoveryBuffer> _videoAssemblers = [];
+    /// <summary>One remote picture stream decodes in order: fragments, recovery polls and declines take turns.</summary>
+    private readonly Dictionary<Guid, SemaphoreSlim> _videoGates = [];
+    private CancellationTokenSource? _recoveryLoop;
     private readonly Dictionary<Guid, long> _videoLocalDrops = [];
     private readonly Dictionary<Guid, RemoteVideoStream> _remoteVideo = [];
     private Channel<VideoFramePayload>? _videoSend;
@@ -168,6 +171,9 @@ public sealed partial class BoltMediaService
         else if (_options.EnableFec) stream.EnableFec(_options.FecVideoGroupSize);
         // No-op over the WebSocket path: TCP already retransmits, and a gap there is a deliberate drop.
         stream.EnableNack(256);
+        // A lost fragment the relay never got (the uplink lost it) is asked of this sender; it goes again on the data
+        // channel only. With no channel the request cannot even arrive: NACKs exist on datagram paths alone.
+        stream.EnableRetransmission(frame => _transport?.TrySend(frame.Span) == true);
         stream.SetPacer(_pacer);
         var tier = _adaptation?.Current ?? VideoAdaptation.Ladder[_options.VideoStartTier];
         // Receiver loss hints are not wired to the encoder: over TCP a sequence gap is a deliberate relay drop
@@ -304,34 +310,104 @@ public sealed partial class BoltMediaService
         lock (_remoteVideo)
         {
             _remoteVideo[stream.StreamId] = new(stream.StreamId, stream.SenderId, codec);
-            _videoAssemblers[stream.StreamId] = new VideoFrameAssembler();
+            _videoAssemblers[stream.StreamId] = new VideoRecoveryBuffer();
+            _videoGates[stream.StreamId] = new SemaphoreSlim(1, 1);
             _videoLocalDrops[stream.StreamId] = 0;
+            if (_recoveryLoop is null)
+            {
+                var loop = _recoveryLoop = new CancellationTokenSource();
+                _ = RecoverVideoAsync(loop.Token);
+            }
         }
         OnRemoteVideoChanged?.Invoke();
     }
 
-    private async Task PlayVideoFragmentAsync(BoltMediaStream stream, ReadOnlyMemory<byte> fragment)
-    {
-        VideoFrameAssembler? assembler;
-        lock (_remoteVideo)
+    private Task PlayVideoFragmentAsync(BoltMediaStream stream, MediaFrameData frame) =>
+        StepVideoAsync(stream.StreamId, (buffer, ready, _) =>
         {
-            assembler = _videoAssemblers.GetValueOrDefault(stream.StreamId);
             // Fragments this device dropped itself were not dropped by any layer policy: the next gap is a break.
             var drops = stream.LocalDrops;
-            if (assembler is not null && _videoLocalDrops.GetValueOrDefault(stream.StreamId) != drops)
+            if (_videoLocalDrops.GetValueOrDefault(stream.StreamId) != drops)
             {
                 _videoLocalDrops[stream.StreamId] = drops;
-                assembler.MarkLocalLoss();
+                buffer.MarkLocalLoss();
+            }
+            buffer.Push(frame.SequenceNumber, frame.Data.Span, Environment.TickCount64, ready);
+        });
+
+    /// <summary>
+    /// Every 20 ms while remote video plays: ask the relay again for what is still missing and release pictures whose
+    /// wait is over (see <see cref="VideoRecoveryBuffer"/>). Idle on a WebSocket path, where recovery is off.
+    /// </summary>
+    private async Task RecoverVideoAsync(CancellationToken ct)
+    {
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                await Task.Delay(20, ct);
+                Guid[] streams;
+                lock (_remoteVideo) streams = _videoAssemblers.Where(x => x.Value.RecoveryMs > 0).Select(x => x.Key).ToArray();
+                foreach (var streamId in streams)
+                    await StepVideoAsync(streamId, (buffer, ready, nacks) => buffer.Poll(Environment.TickCount64, ready, nacks));
             }
         }
-        if (assembler?.Add(fragment.Span) is not { } picture) return;
-        await _video.DecodeFrameAsync(stream.StreamId, picture.Data, picture.TimestampMicroseconds, picture.IsKeyframe, picture.Discontinuity);
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { _logger.LogDebug(ex, "Video recovery loop ended"); }
+    }
+
+    private Task DeclineVideoAsync(Guid streamId, uint[] sequences) =>
+        StepVideoAsync(streamId, (buffer, ready, _) => buffer.Decline(sequences, ready));
+
+    /// <summary>
+    /// One step of a remote stream's reassembly, under that stream's turn: recovery follows the path (on with a data
+    /// channel whose relay resends, sized by its round trip), NACKs go out on the channel, and released pictures are
+    /// decoded in order.
+    /// </summary>
+    private async Task StepVideoAsync(Guid streamId, Action<VideoRecoveryBuffer, List<VideoFramePayload>, List<uint>> step)
+    {
+        SemaphoreSlim? gate;
+        lock (_remoteVideo) gate = _videoGates.GetValueOrDefault(streamId);
+        if (gate is null) return;
+        try { await gate.WaitAsync(); }
+        catch (ObjectDisposedException) { return; }
+        try
+        {
+            var ready = new List<VideoFramePayload>();
+            var nacks = new List<uint>();
+            var transport = _transport;
+            var recover = transport?.SupportsNack == true;
+            var rtt = transport?.Status.RttMs is double measured && measured > 0 ? (int)Math.Round(measured) : 300;
+            var switched = false;
+            lock (_remoteVideo)
+            {
+                if (_videoAssemblers.GetValueOrDefault(streamId) is not { } buffer) return;
+                switched = buffer.Configure(recover, rtt);
+                step(buffer, ready, nacks);
+            }
+            // Recovery switched on or off: the two modes share nothing, so the decoder restarts from a keyframe.
+            if (switched && _mediaClient is { } client) _ = client.RequestRemoteKeyframeAsync(streamId);
+            // At most 64 numbers a request: what the relay serves per request, and well inside one datagram.
+            for (var offset = 0; transport is not null && offset < nacks.Count; offset += 64)
+            {
+                var chunk = nacks.GetRange(offset, Math.Min(64, nacks.Count - offset));
+                var writer = new System.Buffers.ArrayBufferWriter<byte>(BoltCodec.NackRequestHeaderSize + chunk.Count * 4);
+                BoltCodec.WriteNackRequest(writer, streamId, chunk.ToArray());
+                transport.TrySend(writer.WrittenSpan);
+            }
+            foreach (var picture in ready)
+                await _video.DecodeFrameAsync(streamId, picture.Data, picture.TimestampMicroseconds, picture.IsKeyframe, picture.Discontinuity);
+        }
+        finally
+        {
+            try { gate.Release(); } catch (ObjectDisposedException) { }
+        }
     }
 
     private async Task ReleaseRemoteVideoAsync(Guid streamId)
     {
         bool removed;
-        lock (_remoteVideo) { removed = _remoteVideo.Remove(streamId); _videoAssemblers.Remove(streamId); _videoLocalDrops.Remove(streamId); }
+        lock (_remoteVideo) { removed = _remoteVideo.Remove(streamId); _videoAssemblers.Remove(streamId); _videoGates.Remove(streamId); _videoLocalDrops.Remove(streamId); }
         if (!removed) return;
         await _video.RemoveRemoteAsync(streamId);
         OnRemoteVideoChanged?.Invoke();
@@ -418,7 +494,13 @@ public sealed partial class BoltMediaService
         _videoPump = Task.CompletedTask;
         _videoSend = null;
         Guid[] remotes;
-        lock (_remoteVideo) { remotes = _remoteVideo.Keys.ToArray(); _remoteVideo.Clear(); _videoAssemblers.Clear(); _videoLocalDrops.Clear(); }
+        CancellationTokenSource? recovery;
+        lock (_remoteVideo)
+        {
+            remotes = _remoteVideo.Keys.ToArray(); _remoteVideo.Clear(); _videoAssemblers.Clear(); _videoGates.Clear(); _videoLocalDrops.Clear();
+            recovery = _recoveryLoop; _recoveryLoop = null;
+        }
+        if (recovery is not null) { try { await recovery.CancelAsync(); } catch (ObjectDisposedException) { } recovery.Dispose(); }
         foreach (var streamId in remotes)
         { try { await _video.RemoveRemoteAsync(streamId); } catch (JSException) { /* The page is going away. */ } }
         _adaptation = null;
