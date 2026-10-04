@@ -108,6 +108,63 @@ public sealed class BoltRelayResilienceTests
     }
 
     [Test]
+    public void Queue_AVideoFragmentTheUplinkReordered_GoesOutWithItsPicture()
+    {
+        // A datagram uplink delivers in arrival order, not sequence order. The relay forwarded these pictures: a fragment
+        // that arrives after a later one is part of them, not a stale retransmission. Dropping it cost the whole
+        // picture at every receiver (their NACK for it was declined), and the pictures after it, until a keyframe.
+        var queue = new BoltMediaSendQueue(new BoltMediaSendQueueOptions());
+        Assert.That(queue.TryEnqueue(Frame(1), BoltMediaLane.Video, Video, 1, keyStart: true, picture: 100).Queued, Is.True);
+        Assert.That(queue.TryEnqueue(Frame(3), BoltMediaLane.Video, Video, 3, keyStart: false, picture: 100).Queued, Is.True);
+        Assert.That(queue.TryEnqueue(Frame(2), BoltMediaLane.Video, Video, 2, keyStart: false, picture: 100).Queued, Is.True,
+            "the keyframe's middle fragment, overtaken by its last");
+        Assert.That(queue.TryEnqueue(Frame(5), BoltMediaLane.Video, Video, 5, keyStart: false, picture: 200).Queued, Is.True);
+        Assert.That(queue.TryEnqueue(Frame(4), BoltMediaLane.Video, Video, 4, keyStart: false, picture: 200).Queued, Is.True,
+            "the next picture's first fragment, overtaken by its second");
+        Assert.That(queue.TryEnqueue(Frame(6), BoltMediaLane.Video, Video, 6, keyStart: false, picture: 300).Queued, Is.True);
+        Assert.That(queue.TryEnqueue(Frame(7), BoltMediaLane.Video, Video, 4, keyStart: false, picture: 200).Queued, Is.True,
+            "a second copy is the receiver's to discard (the relay's retransmission cache drops duplicates before the lanes)");
+        Assert.That(Drain(queue), Is.EqualTo(new byte[] { 1, 3, 2, 5, 4, 6, 7 }));
+        Assert.That(queue.StaleFrames, Is.Zero);
+    }
+
+    [Test]
+    public void Queue_AWholePictureItsSenderSentAgain_GoesOut()
+    {
+        // The uplink lost all of picture 200; the relay's transport feedback told the sender, which sent it again after
+        // picture 300. Every receiver still waiting for it can use it (and one that gave up discards it).
+        var queue = new BoltMediaSendQueue(new BoltMediaSendQueueOptions());
+        Assert.That(queue.TryEnqueue(Frame(1), BoltMediaLane.Video, Video, 1, keyStart: true, picture: 100).Queued, Is.True);
+        Assert.That(queue.TryEnqueue(Frame(3), BoltMediaLane.Video, Video, 3, keyStart: false, picture: 300).Queued, Is.True);
+        Assert.That(queue.TryEnqueue(Frame(2), BoltMediaLane.Video, Video, 2, keyStart: false, picture: 200).Queued, Is.True);
+        // An enhancement picture above the layer this receiver gets now is still not for it.
+        var shed = new BoltMediaSendQueue(new BoltMediaSendQueueOptions { VideoMaxQueuedBytes = 1000, VideoMaxQueueDelayMs = 60_000, VideoLayerShedFraction = 0.2 });
+        Assert.That(shed.TryEnqueue(Frame(1, 500), BoltMediaLane.Video, Video, 1, keyStart: true, picture: 100).Queued, Is.True);
+        Assert.That(shed.TryEnqueue(Frame(3, 10), BoltMediaLane.Video, Video, 3, keyStart: false, picture: 300, layer: 0).Queued, Is.True);
+        Assert.That(shed.TryEnqueue(Frame(2, 10), BoltMediaLane.Video, Video, 2, keyStart: false, picture: 200, layer: 2).Queued, Is.False);
+        Assert.That(Drain(queue), Is.EqualTo(new byte[] { 1, 3, 2 }));
+    }
+
+    [Test]
+    public void Queue_ALateFragmentOfAPictureTheRelayDidNotForward_StaysDropped()
+    {
+        var queue = new BoltMediaSendQueue(new BoltMediaSendQueueOptions { VideoMaxQueuedBytes = 300, VideoMaxQueueDelayMs = 60_000 });
+        // A new receiver waits for a keyframe: delta picture 100 is not forwarded.
+        Assert.That(queue.TryEnqueue(Frame(2), BoltMediaLane.Video, Video, 2, keyStart: false, picture: 100).Queued, Is.False);
+        Assert.That(queue.TryEnqueue(Frame(4, 100), BoltMediaLane.Video, Video, 4, keyStart: true, picture: 200).Queued, Is.True);
+        Assert.That(queue.TryEnqueue(Frame(3), BoltMediaLane.Video, Video, 3, keyStart: false, picture: 100).Queued, Is.False,
+            "a late fragment of the picture that was dropped");
+        Assert.That(queue.TryEnqueue(Frame(1), BoltMediaLane.Video, Video, 1, keyStart: false, picture: 50).Queued, Is.False,
+            "a picture this receiver never got any of");
+        // Over budget: the queue drops the stream's pictures and waits for a keyframe; nothing from before comes back.
+        Assert.That(queue.TryEnqueue(Frame(5, 100), BoltMediaLane.Video, Video, 5, keyStart: false, picture: 300).Queued, Is.True);
+        Assert.That(queue.TryEnqueue(Frame(7, 150), BoltMediaLane.Video, Video, 7, keyStart: false, picture: 400).Queued, Is.False);
+        Assert.That(queue.TryEnqueue(Frame(6, 10), BoltMediaLane.Video, Video, 6, keyStart: false, picture: 300).Queued, Is.False,
+            "a late fragment of a picture the purge already discarded");
+        Assert.That(Drain(queue), Is.Empty);
+    }
+
+    [Test]
     public void Queue_PersistentCongestion_BacksKeyframeRequestsOff()
     {
         var now = 0L;

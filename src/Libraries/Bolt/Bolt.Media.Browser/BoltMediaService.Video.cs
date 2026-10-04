@@ -8,6 +8,10 @@ namespace Bolt.Media.Browser;
 /// <summary>A remote participant's camera stream, as announced by its MediaConfig.</summary>
 public sealed record RemoteVideoStream(Guid StreamId, string SenderId, VideoCodec Codec);
 
+/// <summary>One remote camera stream's receive path, cumulative (see <see cref="BoltMediaService.GetVideoReceiveStats"/>).</summary>
+public sealed record VideoReceiveStats(Guid StreamId, long Fragments, long LocalDrops, int Nacked, int Recovered, int Abandoned,
+    int Declined, int Incomplete, int Skipped, long Pictures, int RecoveryMs);
+
 public sealed partial class BoltMediaService
 {
     private readonly Dictionary<Guid, VideoRecoveryBuffer> _videoAssemblers = [];
@@ -43,6 +47,19 @@ public sealed partial class BoltMediaService
             // Both legs: "UDP/relay (relay UDP/relay)". A TCP or TLS leg on either side is the first thing to look for.
             Transport = path.RelayLeg is { } relayLeg ? $"{path.Description} (relay {relayLeg})" : path.Description, TransportReason = path.Reason, TransportRttMs = path.RttMs, AudioRedundancy = path.AudioRedundancy,
         };
+    }
+
+    /// <summary>
+    /// What each remote camera stream's receive path did with what arrived, cumulative since it appeared: fragments that
+    /// reached reassembly, fragments this device dropped itself before decrypting them (a backlog), what loss recovery
+    /// asked for and got, and pictures handed to the decoder or given up.
+    /// </summary>
+    public IReadOnlyList<VideoReceiveStats> GetVideoReceiveStats()
+    {
+        lock (_remoteVideo)
+            return _videoAssemblers.Select(x => new VideoReceiveStats(x.Key, x.Value.Fragments,
+                _mediaClient?.GetMediaStream(x.Key)?.LocalDrops ?? 0, x.Value.Nacked, x.Value.Recovered, x.Value.Abandoned,
+                x.Value.Declined, x.Value.Incomplete, x.Value.Skipped, x.Value.Pictures, x.Value.RecoveryMs)).ToArray();
     }
 
     public bool IsCameraOn => _video.IsCapturing;
@@ -394,7 +411,9 @@ public sealed partial class BoltMediaService
                 step(buffer, ready, nacks);
             }
             // Recovery switched on or off: the two modes share nothing, so the decoder restarts from a keyframe.
-            if (switched && _mediaClient is { } client) _ = client.RequestRemoteKeyframeAsync(streamId);
+            // Forced: the decoder waits from here, and a request coalesced away would leave it waiting for the sender's
+            // safety keyframe, seconds off.
+            if (switched && _mediaClient is { } client) _ = client.RequestRemoteKeyframeAsync(streamId, force: true);
             // At most 64 numbers a request: what the relay serves per request, and well inside one datagram.
             for (var offset = 0; transport is not null && offset < nacks.Count; offset += 64)
             {

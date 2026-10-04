@@ -140,7 +140,53 @@ internal sealed class BoltMediaSendQueue
         public long OfferedBytes;
         public long DroppedPictures;
         public long BaseLosses;
+
+        /// <summary>
+        /// What was decided for the last pictures of this stream (by their clear picture key), so a frame the uplink
+        /// reordered behind a later one, or that its sender sent again, follows its picture: out if the picture went
+        /// out, dropped if it was dropped. Frames before <see cref="Floor"/> belong to pictures before this receiver's
+        /// latest restart (a keyframe it started over from, or a purge) and are never sent.
+        /// </summary>
+        private readonly (uint Picture, PictureFate Fate)[] _decided = new (uint, PictureFate)[DecidedPictures];
+        private int _decidedNext;
+        public uint Floor;
+        public bool HasFloor;
+
+        public void Decide(uint picture, bool forwarded)
+        {
+            var fate = forwarded ? PictureFate.Forwarded : PictureFate.Dropped;
+            for (var index = 0; index < _decided.Length; index++)
+            {
+                if (_decided[index].Fate == PictureFate.Unknown || _decided[index].Picture != picture) continue;
+                _decided[index].Fate = fate;
+                return;
+            }
+            _decided[_decidedNext] = (picture, fate);
+            _decidedNext = (_decidedNext + 1) % _decided.Length;
+        }
+
+        public PictureFate FateOf(uint picture)
+        {
+            foreach (var entry in _decided)
+                if (entry.Fate != PictureFate.Unknown && entry.Picture == picture) return entry.Fate;
+            return PictureFate.Unknown;
+        }
+
+        /// <summary>Nothing before <paramref name="sequence"/> is sent to this receiver again.</summary>
+        public void StartOver(uint sequence)
+        {
+            Array.Clear(_decided);
+            Floor = sequence;
+            HasFloor = true;
+        }
+
+        public bool BeforeFloor(uint sequence) => HasFloor && unchecked(Floor - sequence) is > 0 and < 0x8000_0000u;
     }
+
+    internal enum PictureFate : byte { Unknown, Forwarded, Dropped }
+
+    /// <summary>Pictures per stream whose late frames still follow their picture: about half a second of video.</summary>
+    private const int DecidedPictures = 16;
 
     private const int MaxTrackedStreams = 64;
     private const int MaxLayer = 3;
@@ -185,6 +231,9 @@ internal sealed class BoltMediaSendQueue
     public long KeyframeRequests => Interlocked.Read(ref _keyframeRequests);
     /// <summary>Enhancement-layer pictures dropped so the base layer could keep flowing.</summary>
     public long LayerDrops => Interlocked.Read(ref _layerDrops);
+    /// <summary>Video frames that arrived behind a later one of their stream and were still sent with their picture.</summary>
+    public long LateForwarded => Interlocked.Read(ref _lateForwarded);
+    private long _lateForwarded;
 
     public long QueuedBytes { get { lock (_sync) return _audioBytes + _videoBytes + _feedback.Sum(static x => (long)x.Length); } }
     public long QueuedVideoBytes { get { lock (_sync) return _videoBytes; } }
@@ -282,7 +331,27 @@ internal sealed class BoltMediaSendQueue
         switch (Order(state, sequence))
         {
             case SequenceOrder.Stale:
-                // Retransmissions of pictures this receiver was never sent, or already moved past.
+                // A datagram uplink delivers in arrival order, and its sender resends what the relay reports lost: a
+                // frame behind a later one may belong to a picture this receiver is being given, and goes out with it
+                // (the receiver reassembles out of order and discards what it no longer needs). A picture never seen
+                // (all of it was late) is decided now, as a fresh one would be. Anything from before this receiver's
+                // last restart, of a picture it was not given, or towards a congested queue, is dropped.
+                if (pictureAware && picture is { } late && !state.AwaitingKeyframe && !state.BeforeFloor(sequence))
+                {
+                    var fate = state.FateOf(late);
+                    if (fate == PictureFate.Unknown)
+                        fate = layer <= state.LayerLimit && !IsVideoCongested(now, frame.Length) ? PictureFate.Forwarded : PictureFate.Dropped;
+                    if (fate == PictureFate.Forwarded && !IsVideoCongested(now, frame.Length))
+                    {
+                        _lateForwarded++;
+                        state.Decide(late, forwarded: true);
+                        _offeredBytes += frame.Length;
+                        state.OfferedBytes += frame.Length;
+                        Append(frame, now, streamId, (byte)layer, late);
+                        return BoltMediaEnqueueResult.Accepted;
+                    }
+                    state.Decide(late, forwarded: false);
+                }
                 _staleFrames++;
                 return BoltMediaEnqueueResult.Dropped;
             case SequenceOrder.Restart:
@@ -345,6 +414,7 @@ internal sealed class BoltMediaSendQueue
                 state.LayerLimit = 0;
             if (state.PictureLayer > 0)
             {
+                state.Decide(state.Picture, forwarded: false);
                 state.PictureDropped = true;
                 state.DroppedPictures++;
                 _layerDrops++;
@@ -369,7 +439,12 @@ internal sealed class BoltMediaSendQueue
         }
 
         if (keyStart)
+        {
+            // The picture this receiver starts over from: nothing before it is sent to it any more.
+            if (state.AwaitingKeyframe) state.StartOver(sequence);
             state.AwaitingKeyframe = false;
+        }
+        if (picture is { } key) state.Decide(key, forwarded: true);
         Append(frame, now, streamId, (byte)layer, state.Picture);
         return BoltMediaEnqueueResult.Accepted;
     }
@@ -377,6 +452,7 @@ internal sealed class BoltMediaSendQueue
     /// <summary>The rest of the arriving picture is discarded along with this fragment.</summary>
     private void DropPicture(StreamState state)
     {
+        state.Decide(state.Picture, forwarded: false);
         state.PictureDropped = true;
         state.DroppedPictures++;
         DroppedVideo();
@@ -416,7 +492,7 @@ internal sealed class BoltMediaSendQueue
             var next = node.Next;
             if (node.Value.StreamId == streamId && node.Value.Layer > 0)
             {
-                if (last != node.Value.Picture) { pictures++; last = node.Value.Picture; }
+                if (last != node.Value.Picture) { pictures++; last = node.Value.Picture; state.Decide(node.Value.Picture, forwarded: false); }
                 _videoBytes -= node.Value.Length;
                 Release(node.Value);
                 _video.Remove(node);
@@ -616,6 +692,7 @@ internal sealed class BoltMediaSendQueue
 
     private void PurgeVideo(Guid streamId)
     {
+        if (_streams.TryGetValue(streamId, out var purged) && purged.HasSequence) purged.StartOver(purged.LastSequence);
         var node = _video.First;
         while (node is not null)
         {

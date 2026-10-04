@@ -224,8 +224,9 @@ public sealed class VideoFrameAssembler
             if (!slot.Keyframe) localLoss = true;
         }
         var gap = hasCompleted && unchecked(frameId - lastCompleted) != 1;
-        // With temporal layers a gap is a policy drop, and what arrived is decodable (see the class remarks).
-        var discontinuity = gap && (!Layered || localLoss);
+        // With temporal layers a gap is a policy drop, and what arrived is decodable (see the class remarks). The first
+        // picture after a reset follows pictures this assembler no longer knows: a break unless it is a keyframe.
+        var discontinuity = (!hasCompleted && !slot.Keyframe) || (gap && (!Layered || localLoss));
         if (slot.Keyframe || discontinuity) localLoss = false;
         lastCompleted = frameId; hasCompleted = true;
         return new(data, slot.Timestamp, slot.Keyframe, discontinuity, frameId, slot.Keyframe ? 0 : slot.Layer, slot.Orientation);

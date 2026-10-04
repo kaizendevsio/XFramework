@@ -27,6 +27,8 @@
     <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Rtc\Bolt.Rtc.csproj" />
     <!-- The media benchmark's Bolt runs use the product's own rate control. -->
     <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Media\Bolt.Media.csproj" />
+    <!-- The browser call tests run the production relay in process. -->
+    <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Server\Bolt.Server.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -41,6 +43,8 @@
     <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\sframe\bolt_sframe_bg.wasm" Link="bench\sframe\bolt_sframe_bg.wasm" CopyToOutputDirectory="PreserveNewest" />
     <!-- The orientation check (VideoOrientationBrowserTests.cs): its page script and the production module it drives. -->
     <None Include="orientation\orientation.js" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The browser call tests (BrowserCallTests.cs): the synthetic devices served in place of bolt-media.js. -->
+    <None Include="call\bolt-media.synthetic.js" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\bolt-media.js" Link="orientation\bolt-media.js" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

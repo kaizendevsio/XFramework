@@ -68,6 +68,94 @@ public sealed class VideoRecoveryBufferTests
         });
     }
 
+    [TestCase(14)]
+    [TestCase(200)]
+    public void APictureStillArriving_IsNotAskedFor_NorGivenUp_HoweverLongItTakesToSend(int rttMs)
+    {
+        // Production 2026-10-04 13:08 UTC: a 1440p keyframe (about 200 KB) through a phone's 4.7 Mbit/s uplink takes about
+        // 350 ms to arrive, a 720p one at 2.5 Mbit/s about 250 ms. The fragments not sent yet were counted missing from
+        // the picture's first fragment: asked for after 15 ms (the sender asked to send again what it was still
+        // sending) and given up after the recovery window (100 ms there). No keyframe was ever shown.
+        var sender = new Sender();
+        var buffer = Recovering(rttMs);
+        var key = sender.Picture(1, 0, key: true, fragments: 200);
+        var next = sender.Picture(2, 0);
+        var ready = new List<VideoFramePayload>();
+        var nacks = new List<uint>();
+        for (var index = 0; index < key.Count; index++)
+        {
+            var now = index * 2L; // one fragment every 2 ms: 400 ms for the picture
+            ready.AddRange(Push(buffer, [key[index]], now));
+            if (index % 5 == 0) { var poll = Poll(buffer, now); ready.AddRange(poll.Ready); nacks.AddRange(poll.Nacks); }
+        }
+        ready.AddRange(Push(buffer, next, 402));
+        Assert.Multiple(() =>
+        {
+            Assert.That(nacks, Is.Empty, "nothing was lost: the rest of the picture was still on its way");
+            Assert.That(ready.Select(x => x.FrameId), Is.EqualTo(new[] { 1u, 2u }));
+            Assert.That(buffer.Incomplete, Is.Zero);
+        });
+    }
+
+    [Test]
+    public void TheLastFragmentsOfAPicture_LostWithNothingAfterThem_AreStillAskedFor()
+    {
+        // Nothing newer arrives to reveal them (the sender paused): once the stream has been quiet for a moment they are
+        // asked for, and given up only a recovery window after that.
+        var sender = new Sender();
+        var buffer = Recovering(rttMs: 20);
+        var key = sender.Picture(1, 0, key: true, fragments: 5);
+        Push(buffer, key.Take(3), now: 0);
+        var asked = new List<uint>();
+        for (long t = 10; t <= 200; t += 10) asked.AddRange(Poll(buffer, t).Nacks);
+        Assert.That(asked.Distinct(), Is.EquivalentTo(new[] { key[3].Sequence, key[4].Sequence }));
+        var ready = Push(buffer, key.Skip(3), now: 200);
+        Assert.That(ready.Select(x => x.FrameId), Is.EqualTo(new[] { 1u }));
+    }
+
+    [Test]
+    public void AFragmentTheSendersUplinkLost_IsStillWaitedFor_WhenItsSenderSendsItAgain()
+    {
+        // Production 2026-10-04 13:08 UTC, 13-14 ms round trips: a fragment lost between the sender and the relay can only
+        // come from the sender, after the relay's next transport feedback report (every 100 ms) and two more legs. With
+        // a window of 1.5 round trips + 50 ms (100 ms there) it always came too late: every large keyframe lost one, and
+        // nothing was shown.
+        var sender = new Sender();
+        var buffer = Recovering(rttMs: 14);
+        var key = sender.Picture(1, 0, key: true, fragments: 30);
+        var lost = key[17];
+        var ready = Push(buffer, key.Where(x => x.Sequence != lost.Sequence), now: 0);
+        Assert.That(ready, Is.Empty);
+        for (long t = 10; t <= 170; t += 10) ready.AddRange(Poll(buffer, t).Ready);
+        ready.AddRange(Push(buffer, [lost], now: 175));
+        Assert.Multiple(() =>
+        {
+            Assert.That(ready.Select(x => x.FrameId), Is.EqualTo(new[] { 1u }), "the keyframe is shown");
+            Assert.That(buffer.Incomplete, Is.Zero);
+        });
+    }
+
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    public void AfterSwitchingRecoveryMidStream_TheFirstPictureIsABreak_UnlessItIsAKeyframe(bool startRecovering, bool key)
+    {
+        // The browser call test (uplink jitter) decoded 147 pictures without their reference: the receiver's path moved
+        // between the WebSocket and the data channel mid-stream, recovery switched on, and its state (pictures half
+        // received, the last picture released) was dropped. The next delta went to the decoder as if nothing were
+        // missing, and so did everything after it until a keyframe. In production a phone's path moves the same way.
+        var sender = new Sender();
+        var buffer = new VideoRecoveryBuffer();
+        buffer.Configure(startRecovering, 20);
+        var ready = Push(buffer, sender.Picture(1, 0, key: true).Concat(sender.Picture(2, 2)).Concat(sender.Picture(3, 1)));
+        Assert.That(ready.Select(x => x.FrameId), Is.EqualTo(new[] { 1u, 2u, 3u }));
+        Assert.That(buffer.Configure(!startRecovering, 20), Is.True, "switched");
+        sender.Picture(4, 2, fragments: 2); // On the wire during the switch: never seen whole.
+        var after = Push(buffer, sender.Picture(5, 0, key: key));
+        for (long t = 10; t < 2_000; t += 10) after.AddRange(Poll(buffer, t).Ready);
+        Assert.That(after.Select(x => (x.FrameId, x.Discontinuity)), Is.EqualTo(new[] { (5u, !key) }));
+    }
+
     [Test]
     public void OnAWebSocket_NothingIsAskedFor_AndAGapIsTheAssemblersUsualBreak()
     {
@@ -89,33 +177,33 @@ public sealed class VideoRecoveryBufferTests
     public void NacksRepeatAfterARoundTrip_AndStopWhenAnAnswerCouldNoLongerArriveInTime()
     {
         var sender = new Sender();
-        var buffer = Recovering(rttMs: 200); // window: 1.5 x 200 + 50 = 350 ms
-        Assert.That(buffer.RecoveryMs, Is.EqualTo(350));
+        var buffer = Recovering(rttMs: 200); // window: 1.5 x 200 + 50, plus 250 for a repair from the sender = 600 ms
+        Assert.That(buffer.RecoveryMs, Is.EqualTo(600));
         Push(buffer, sender.Picture(1, 0, key: true));
         var lost = sender.Picture(2, 0)[0];
         Push(buffer, sender.Picture(3, 0));
 
         var asked = new List<long>();
-        for (long t = 0; t < 400; t += 10)
+        for (long t = 0; t < 650; t += 10)
             if (Poll(buffer, t).Nacks.Contains(lost.Sequence)) asked.Add(t);
 
         Assert.Multiple(() =>
         {
-            Assert.That(asked, Has.Count.EqualTo(1), "a second ask would arrive after the window closes");
+            Assert.That(asked, Has.Count.EqualTo(2), "a third ask would arrive after the window closes");
             Assert.That(asked[0], Is.InRange(VideoRecoveryBuffer.ReorderMs, 30));
             Assert.That(buffer.Abandoned, Is.EqualTo(1));
         });
 
-        // A short path (20 ms, the 100 ms minimum window) has time to ask again a round trip later.
+        // A short path (20 ms, the 350 ms minimum window) has time to ask again a round trip later.
         var shorter = Recovering(rttMs: 20);
         var other = new Sender();
         Push(shorter, other.Picture(1, 0, key: true));
         var missing = other.Picture(2, 0)[0];
         Push(shorter, other.Picture(3, 0));
         var times = new List<long>();
-        for (long t = 0; t < 150; t += 2)
+        for (long t = 0; t < 300; t += 2)
             if (Poll(shorter, t).Nacks.Contains(missing.Sequence)) times.Add(t);
-        Assert.That(times, Has.Count.EqualTo(2));
+        Assert.That(times, Has.Count.EqualTo(VideoRecoveryBuffer.MaxTries));
         Assert.That(times[1] - times[0], Is.GreaterThanOrEqualTo(20 * 6 / 5 + 10));
     }
 
@@ -225,7 +313,7 @@ public sealed class VideoRecoveryBufferTests
         {
             Assert.That(buffer.Configure(recover: true, 300), Is.True);
             Assert.That(buffer.Configure(recover: true, 500), Is.False, "a new round trip only resizes the window");
-            Assert.That(buffer.RecoveryMs, Is.EqualTo(800));
+            Assert.That(buffer.RecoveryMs, Is.EqualTo(1_050));
             Assert.That(buffer.Configure(recover: true, 4_000), Is.False);
             Assert.That(buffer.RecoveryMs, Is.EqualTo(VideoRecoveryBuffer.MaxRecoveryMs));
             Assert.That(buffer.Configure(recover: false, 300), Is.True);

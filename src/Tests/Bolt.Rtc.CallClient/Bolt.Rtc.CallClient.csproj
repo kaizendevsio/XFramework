@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <!--
+    A call participant for the browser call tests (Bolt.Rtc.IntegrationTests/BrowserCallTests.cs): the production browser
+    media stack (Bolt.Media.Browser's BoltMediaService over a BoltClient, the SFrame WASM, bolt-rtc.js) in a page with no
+    UI. The test host serves the published wwwroot and swaps only bolt-media.js for a synthetic camera, microphone and
+    decoder (call/bolt-media.synthetic.js), so the same page runs in Chromium and WebKit with no devices or codecs.
+    Not a product; never deployed.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <!-- Production's publish settings (XFramework.Yap.Client): trimmed, invariant globalization, AOT in CI. Only the
+         framework is trimmed (partial), so the driver's [JSInvokable] entry points stay. -->
+    <TrimMode>partial</TrimMode>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <BlazorEnableTimeZoneSupport>false</BlazorEnableTimeZoneSupport>
+    <BlazorEnableCompression>false</BlazorEnableCompression>
+    <!-- Production publishes AOT (XFramework.Yap.Client); CALL_CLIENT_AOT=1 does the same here (needs wasm-tools). -->
+    <RunAOTCompilation Condition="'$(CALL_CLIENT_AOT)' == '1'">true</RunAOTCompilation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Media.Browser\Bolt.Media.Browser.csproj" />
+  </ItemGroup>
+
+</Project>

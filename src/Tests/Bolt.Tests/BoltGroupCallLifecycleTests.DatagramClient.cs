@@ -411,4 +411,51 @@ public sealed partial class BoltGroupCallLifecycleTests
         await WaitUntil(() => heard is { } s && s.LossFraction == 0, 2_000);
         Assert.That(Connection(f, "a").DatagramRejected, Is.Zero, "every stamped message was unwrapped and taken");
     }
+    [Test]
+    [CancelAfter(30_000)]
+    public async Task Client_ResendsTheVideoItsUplinkLost_AsSoonAsTheRelayReportsIt()
+    {
+        // Production 2026-10-04 13:08 UTC: a fragment the phone's uplink lost could only come back from the phone, after
+        // a receiver noticed, asked the relay, and the relay asked the phone: longer than the receiver waited. Every
+        // keyframe of a large picture lost a fragment that way, so none was ever shown. The relay's transport feedback
+        // already says within 100 ms what never arrived: the sender sends that video again then, unasked.
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o =>
+        {
+            var transport = Transport(network, new FakeIceSource(), x => x.Hysteresis = QuickPath);
+            o.MediaTransport = new Bolt.Server.BoltMediaTransportOptions
+            {
+                Peers = transport.Peers, IceServers = transport.IceServers, RequestSpacingSeconds = 0, PathHysteresis = QuickPath,
+            };
+        });
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var video = await f.VideoConfig("a");
+        await using var a = Connect(f, "a", network, QuickClient);
+        a.Transport.Start();
+        await WaitUntil(() => a.Transport.IsDatagramActive && a.Transport.StampsMessages);
+        // The uplink loses the first copy of every fifth video frame, and of frame 10 the second copy too.
+        var copies = new Dictionary<uint, int>();
+        network.Created.Single(x => x.Role == Bolt.Protocol.Transport.RtcPeerRole.Offer).LoseSent = message =>
+        {
+            if (!TransportSequenceCodec.TryRead(message, out _, out var inner) || !BoltCodec.TryReadMediaFrame(inner, out var media)) return false;
+            var copy = copies[media.SequenceNumber] = copies.GetValueOrDefault(media.SequenceNumber) + 1;
+            return media.SequenceNumber % 5 == 0 && (copy == 1 || (copy == 2 && media.SequenceNumber == 10));
+        };
+
+        // One picture of 40 fragments (a keyframe), then single-fragment pictures.
+        uint sequence = 0;
+        for (var fragment = 0; fragment < 40; fragment++)
+            a.Transport.TrySend(Frame(w => BoltCodec.WriteMediaFrame(w, video, ++sequence, 3000,
+                (byte)(fragment == 0 ? MediaFrameFlags.Keyframe | MediaFrameFlags.Encrypted : MediaFrameFlags.Encrypted), new byte[800])));
+        for (var picture = 2; picture <= 20; picture++)
+            a.Transport.TrySend(Frame(w => BoltCodec.WriteMediaFrame(w, video, ++sequence, 3000u * (uint)picture, MediaFrameFlags.Encrypted, new byte[800])));
+
+        var expected = Enumerable.Range(1, (int)sequence).Select(x => (uint)x).ToArray();
+        await WaitUntil(() => f.Peers["b"].Media(video).Select(x => x.Sequence).Distinct().Count() == expected.Length, 3_000);
+        Assert.That(f.Peers["b"].Media(video).Select(x => x.Sequence).Distinct().Order(), Is.EqualTo(expected),
+            "every fragment reached the receiver, the lost ones sent again by the phone");
+        Assert.That(a.Transport.UplinkResent, Is.EqualTo(sequence / 5 + 1), "frame 10 twice: its first copy sent again was lost too");
+    }
 }
+

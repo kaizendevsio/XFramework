@@ -34,6 +34,14 @@ public sealed class AdaptiveBitrateController : IAsyncDisposable
     private long _windowStartedAt;
     private double _receivedKbps;
     private bool _haveTimestamps;
+    /// <summary>When this stream's first frame arrived (0: none yet).</summary>
+    private long _flowingSince;
+    /// <summary>
+    /// A stream reports no delay until it has flowed this long: the first windows of a camera that has just started
+    /// (and whose first pictures may have come over the WebSocket before the data channel took over) measure a fraction
+    /// of what is being sent, at a delay the path's floor has not settled under yet.
+    /// </summary>
+    internal const int ReportAfterFlowingMs = 1_000;
 
     // ── Feedback loop ──
     private CancellationTokenSource? _loopCts;
@@ -66,6 +74,7 @@ public sealed class AdaptiveBitrateController : IAsyncDisposable
     public void RecordFrameReceived(uint seq, uint? timestamp = null, int bytes = 0)
     {
         var now = Environment.TickCount64;
+        if (Interlocked.Read(ref _flowingSince) == 0) Interlocked.CompareExchange(ref _flowingSince, now, 0);
         Interlocked.Add(ref _receivedBytes, bytes);
         if (timestamp is { } mediaTime)
         {
@@ -204,6 +213,8 @@ public sealed class AdaptiveBitrateController : IAsyncDisposable
         var elapsed = _windowStartedAt == 0 ? 0 : now - _windowStartedAt;
         _windowStartedAt = now;
         if (bytes == 0) return null;
+        var flowing = Interlocked.Read(ref _flowingSince);
+        if (flowing == 0 || now - flowing < ReportAfterFlowingMs) return null;
         if (elapsed > 0)
         {
             var kbps = bytes * 8.0 / elapsed;
