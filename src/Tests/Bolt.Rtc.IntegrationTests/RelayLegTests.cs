@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Bolt.Protocol.Transport;
+using Microsoft.Extensions.Logging;
 using Microsoft.Playwright;
 using NUnit.Framework;
 
@@ -23,7 +24,7 @@ public sealed partial class BrowserDataChannelTests
     private RtcSidecar SingleFlowSidecar()
     {
         lock (_sidecarLock)
-            return _singleFlowSidecar ??= new RtcSidecar(new RtcSidecarOptions { ExecutablePath = _sidecarPath, TurnFlows = 1 });
+            return _singleFlowSidecar ??= new RtcSidecar(new RtcSidecarOptions { ExecutablePath = _sidecarPath, TurnFlows = 1 }, SidecarLog.Instance);
     }
 
     /// <summary>"udp"/"tcp": the shared TURN server; "relay-udp"/"relay-tls": the relay's own one.</summary>
@@ -265,8 +266,9 @@ public sealed partial class BrowserDataChannelTests
 
     /// <summary>
     /// About half of the relay's UDP round trips to its TURN server are lost (30% of packets each way). The allocation
-    /// still succeeds (16 flows race each request), so the leg is UDP, and the call holds: what arrives keeps ICE and
-    /// SCTP alive, and the loss is the media's to handle.
+    /// still succeeds (16 flows race each request), so the leg is UDP, and once open the call holds: what arrives keeps
+    /// ICE and SCTP alive, and the loss is the media's to handle. Opening takes many round trips (allocation, permissions,
+    /// checks, DTLS, SCTP, the channel), so like the client (which retries after 5 s) it gets up to three attempts of 15 s.
     /// </summary>
     [Category("RelayLeg")]
     [TestCase("chromium")]
@@ -274,7 +276,7 @@ public sealed partial class BrowserDataChannelTests
     public async Task WhenTheRelaysUdpLosesHalfItsRoundTrips_TheCallStillOpensOverUdp_AndHolds(string engine)
     {
         RequireCondition("lossy");
-        await HoldsAsync(engine, "UDP/relay", new DownlinkPlan(600, 40, 5, 25), timeoutMs: 30000, minDelivered: 0.4);
+        await HoldsAsync(engine, "UDP/relay", new DownlinkPlan(600, 40, 5, 25), minDelivered: 0.4, attempts: 3);
     }
 
     /// <summary>
@@ -294,12 +296,20 @@ public sealed partial class BrowserDataChannelTests
         if (!result.Opened) Assert.Inconclusive("the channel did not open: " + Describe(result, relay));
     }
 
-    private async Task HoldsAsync(string engine, string relayPath, DownlinkPlan plan, int timeoutMs = 20000, double minDelivered = 0.85)
+    private async Task HoldsAsync(string engine, string relayPath, DownlinkPlan plan, int timeoutMs = 15000, double minDelivered = 0.85,
+        int attempts = 1)
     {
         await using var browser = await LaunchAsync(engine);
-        var (result, relay) = await DownAsync(browser, "relay-udp,relay-tls", plan, timeoutMs: timeoutMs);
+        DownResult result;
+        RelaySide? relay;
+        var attempt = 0;
+        do
+        {
+            attempt++;
+            (result, relay) = await DownAsync(browser, "relay-udp,relay-tls", plan, timeoutMs: timeoutMs);
+            TestContext.Out.WriteLine($"{engine} attempt {attempt}: {Describe(result, relay)}");
+        } while (!result.Opened && attempt < attempts);
         var description = Describe(result, relay);
-        TestContext.Out.WriteLine($"{engine}: {description}");
         Assert.That(result.Opened, Is.True, description);
         var delivered = relay is { Down.Sent: > 0 } ? (double)result.Received / relay.Down.Sent : 0;
         TestContext.Out.WriteLine($"{engine}: delivered {delivered:P1}, browser flaps {BrowserFlaps(result).Length}, relay flaps {relay?.Down.Flaps.Length}");
@@ -313,4 +323,14 @@ public sealed partial class BrowserDataChannelTests
             Assert.That(delivered, Is.GreaterThanOrEqualTo(minDelivered), "what the relay sent arrived");
         });
     }
+}
+
+/// <summary>The sidecar's own log (gathering, TURN flows, pion's warnings) in the test output, as the relay's log has it.</summary>
+internal sealed class SidecarLog : ILogger<RtcSidecar>
+{
+    public static readonly SidecarLog Instance = new();
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+    public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Information;
+    public void Log<TState>(LogLevel level, EventId id, TState state, Exception? error, Func<TState, Exception?, string> format) =>
+        TestContext.Progress.WriteLine("[sidecar] " + format(state, error));
 }

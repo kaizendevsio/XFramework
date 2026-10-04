@@ -48,7 +48,7 @@ public sealed partial class BrowserDataChannelTests
             return;
         }
         (_sidecarPath, _turnHost, _turnSecret) = (sidecar, host, secret);
-        _sidecar = new RtcSidecar(new RtcSidecarOptions { ExecutablePath = _sidecarPath });
+        _sidecar = new RtcSidecar(new RtcSidecarOptions { ExecutablePath = _sidecarPath }, SidecarLog.Instance);
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Logging.SetMinimumLevel(LogLevel.Warning);
