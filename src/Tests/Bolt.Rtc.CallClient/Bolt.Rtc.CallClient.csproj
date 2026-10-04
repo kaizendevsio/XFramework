@@ -13,7 +13,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <PublishTrimmed>false</PublishTrimmed>
+    <!-- Production's publish settings (XFramework.Yap.Client): trimmed, invariant globalization, AOT in CI. Only the
+         framework is trimmed (partial), so the driver's [JSInvokable] entry points stay. -->
+    <TrimMode>partial</TrimMode>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <BlazorEnableTimeZoneSupport>false</BlazorEnableTimeZoneSupport>
     <BlazorEnableCompression>false</BlazorEnableCompression>
     <!-- Production publishes AOT (XFramework.Yap.Client); CALL_CLIENT_AOT=1 does the same here (needs wasm-tools). -->
     <RunAOTCompilation Condition="'$(CALL_CLIENT_AOT)' == '1'">true</RunAOTCompilation>
