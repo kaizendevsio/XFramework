@@ -173,7 +173,7 @@ class SyntheticVideoPipeline {
         this.hostRef = hostRef ?? this.hostRef;
         state.remotes.set(streamId, {
             streamId, primed: false, received: 0, bytes: 0, rendered: 0, resets: 0, waiting: 0, corrupt: 0, brokenReference: 0,
-            keyframes: 0, decoded: new Set(), order: [], renders: [], lastRender: 0,
+            keyframes: 0, decoded: new Set(), order: [], renders: [], lastRender: 0, events: [],
         });
         return true;
     }
@@ -195,6 +195,7 @@ class SyntheticVideoPipeline {
         if (!header || header.key !== isKeyframe) {
             // A real decoder errors on a damaged bitstream: it is rebuilt and asks for a keyframe.
             remote.corrupt++; remote.primed = false;
+            if (remote.events.length < 30) remote.events.push({ at: Math.round(performance.now()), what: 'corrupt', bytes: data.byteLength, isKeyframe, header });
             void this.hostRef?.invokeMethodAsync('OnVideoDecodeFailed', streamId);
             return false;
         }
@@ -203,6 +204,8 @@ class SyntheticVideoPipeline {
         else if (!remote.decoded.has(header.refId)) {
             // A real decoder shows this as corruption: the pipeline must never hand it a picture whose reference it lost.
             remote.brokenReference++;
+            if (remote.events.length < 30) remote.events.push({ at: Math.round(performance.now()), what: 'broken', frameId: header.frameId,
+                refId: header.refId, layer: header.layer, discontinuity, recent: remote.order.slice(-6) });
             return true;
         }
         remote.decoded.add(header.frameId); remote.order.push(header.frameId);
@@ -305,6 +308,9 @@ export async function checkVideoCapabilities() {
         codecs: [{ codec: 'h264', encode: true, decode: true, hardware: true, maxHeight: 2160, decodeMaxHeight: 2160, decodeHardware: true }] };
 }
 
+/// Damage so far, cheap enough to sample every few seconds.
+globalThis.__boltCallDamage = () => [...state.remotes.values()].map(r => `corrupt=${r.corrupt} broken=${r.brokenReference} resets=${r.resets}`).join(' ');
+
 /// Measurement window: everything below counts renders and audio from this moment on.
 globalThis.__boltCallMeasure = () => { state.measureFrom = performance.now(); };
 
@@ -323,6 +329,7 @@ globalThis.__boltCallResult = () => {
         return { streamId: remote.streamId, received: remote.received, rendered: remote.rendered, renderedInWindow: renders.length,
             fps: renders.length * 1000 / Math.max(1, now - from), longestFreezeMs: Math.round(longest), frozenMs: Math.round(frozen),
             resets: remote.resets, corrupt: remote.corrupt, brokenReference: remote.brokenReference, waitingForKeyframe: remote.waiting,
+            events: remote.events,
             keyframes: remote.keyframes, bytes: remote.bytes };
     });
     const audio = [...state.audio.entries()].map(([streamId, a]) => {

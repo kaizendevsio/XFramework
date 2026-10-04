@@ -21,12 +21,15 @@ public static class CallDriver
 
     public static bool Ready => _media is not null;
 
-    internal static void Bind(BoltMediaService media, HttpClient http, ILoggerFactory logs) => (_media, _http, _logs) = (media, http, logs);
+    private static MediaServiceOptions? _options;
+
+    internal static void Bind(BoltMediaService media, HttpClient http, ILoggerFactory logs, MediaServiceOptions options) =>
+        (_media, _http, _logs, _options) = (media, http, logs, options);
 
     public sealed record Peer(string Id, string Kid, string Key);
 
     public sealed record Config(string Endpoint, string Join, Guid CallId, string Epoch, string Binding, Peer Local, Peer[] Remote,
-        int Height, int Framerate, int Ceiling, bool Video = true);
+        int Height, int Framerate, int Ceiling, bool Video = true, int MaxSendKbps = 0);
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -35,6 +38,8 @@ public static class CallDriver
     {
         var config = JsonSerializer.Deserialize<Config>(json, Json)!;
         var media = _media ?? throw new InvalidOperationException("The page has not rendered yet.");
+        // A ceiling on what this participant sends (production's is the default), set before the send path starts.
+        if (config.MaxSendKbps > 0 && _options is { } options) options.MaxSendKbps = config.MaxSendKbps;
         try
         {
             _phase = "voice";

@@ -417,6 +417,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
                     AudioLowKbps = Math.Min(24, audio),
                     AudioHighKbps = _options.AdaptiveAudioBitrate ? Math.Max(40, audio) : audio,
                     RestartFloorKbps = startTierKbps + AudioWireKbps,
+                    MaxTotalKbps = Math.Max(startTierKbps + AudioWireKbps, _options.MaxSendKbps),
                 });
         var loop = _rateLoop = new SendRateLoop(pacer, controller, ladder, _signals);
         // Longer Opus packets only if every receiver plays them; the encoder may already use some from the last path.

@@ -188,7 +188,7 @@ public sealed class BrowserCallTests
             callId, epoch = "1", binding = Convert.ToHexString(SHA256.HashData(callId.ToByteArray())).ToLowerInvariant(),
             local = new { id = self.Id, kid = self.Kid, key = Convert.ToBase64String(self.Key) },
             remote = new[] { new { id = other.Id, kid = other.Kid, key = Convert.ToBase64String(other.Key) } },
-            height = self.Height, framerate = self.Framerate, ceiling = self.Ceiling,
+            height = self.Height, framerate = self.Framerate, ceiling = self.Ceiling, maxSendKbps = EnvInt($"CALL_{self.Name}_MAX_KBPS", 0),
         });
         var started = await Task.WhenAll(
             pages["A"].EvaluateAsync<string>("c => DotNet.invokeMethodAsync('Bolt.Rtc.CallClient', 'Start', c)", Config(a, b)),
@@ -210,7 +210,8 @@ public sealed class BrowserCallTests
             }
             timeline.Add($"{clock.Elapsed.TotalSeconds,6:F1}s {label} relay: {RelayStats(server)}");
             foreach (var name in new[] { "A", "B" })
-                timeline.Add($"{clock.Elapsed.TotalSeconds,6:F1}s {label} {name} channel: {await pages[name].EvaluateAsync<string>(ChannelStats)}");
+                timeline.Add($"{clock.Elapsed.TotalSeconds,6:F1}s {label} {name} channel: {await pages[name].EvaluateAsync<string>(ChannelStats)} " +
+                             $"decoder: {await pages[name].EvaluateAsync<string>("() => globalThis.__boltCallDamage()")}");
         }
 
         // Both on their data channels (the production log line "Datagram media path open ... via UDP/relay").
@@ -246,7 +247,9 @@ public sealed class BrowserCallTests
             var beforeRemote = before[receiver]["remotes"]!.AsArray().FirstOrDefault();
             var renderedFps = remote?["fps"]?.GetValue<double>() ?? 0;
             var resets = (remote?["resets"]?.GetValue<int>() ?? 0) - (beforeRemote?["resets"]?.GetValue<int>() ?? 0);
-            var corrupt = (remote?["corrupt"]?.GetValue<int>() ?? 0) + (remote?["brokenReference"]?.GetValue<int>() ?? 0);
+            int Damage(JsonNode? r) => (r?["corrupt"]?.GetValue<int>() ?? 0) + (r?["brokenReference"]?.GetValue<int>() ?? 0);
+            // Damage in the measurement window; any before it is printed too, but the call is judged once it has settled.
+            var corrupt = Damage(remote) - Damage(beforeRemote);
             var freeze = remote?["longestFreezeMs"]?.GetValue<int>() ?? int.MaxValue;
             var audio = after[receiver]["audio"]!.AsArray().FirstOrDefault();
             var line = new JsonObject
@@ -255,6 +258,7 @@ public sealed class BrowserCallTests
                 ["longestFreezeMs"] = freeze, ["frozenMs"] = remote?["frozenMs"]?.GetValue<int>(), ["decoderResets"] = resets, ["corrupt"] = corrupt,
                 ["largestKeyframe"] = sent["largestKeyframe"]?.GetValue<long>(), ["audioDelivered"] = audio?["delivered"]?.GetValue<double>(),
                 ["audioP50"] = audio?["p50"]?.GetValue<int?>(), ["audioP99"] = audio?["p99"]?.GetValue<int?>(),
+                ["damagedBeforeWindow"] = Damage(beforeRemote), ["decoderEvents"] = remote?["events"]?.DeepClone(),
                 ["receive"] = final[receiver]["receive"]?.DeepClone(), ["senderTier"] = final[sender]["tier"]?.DeepClone(), ["senderRate"] = final[sender]["rate"]?.DeepClone(),
                 ["senderPath"] = final[sender]["path"]?.DeepClone(), ["receiverPath"] = final[receiver]["path"]?.DeepClone(),
             };

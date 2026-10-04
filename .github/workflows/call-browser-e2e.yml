@@ -69,6 +69,20 @@ jobs:
             b_up: "delay 7ms 3ms rate 50mbit"
             relay: "delay 3ms"
             constrained: ""
+          - scenario: reorder-again
+            a_down: "delay 7ms rate 50mbit"
+            a_up: "delay 7ms 3ms rate 50mbit"
+            b_down: "delay 7ms rate 50mbit"
+            b_up: "delay 7ms 3ms rate 50mbit"
+            relay: "delay 3ms"
+            constrained: ""
+          - scenario: reorder-third
+            a_down: "delay 7ms rate 50mbit"
+            a_up: "delay 7ms 3ms rate 50mbit"
+            b_down: "delay 7ms rate 50mbit"
+            b_up: "delay 7ms 3ms rate 50mbit"
+            relay: "delay 3ms"
+            constrained: ""
           # A's downlink carries 1.5 Mbit/s: B (720p30, ~2.5 Mbit/s on a free link) must fit its rate under it.
           - scenario: constrained-downlink
             a_down: "delay 7ms rate 1500kbit"
@@ -149,6 +163,9 @@ jobs:
           BOLT_RTC_TURN_SECRET: ci-turn-secret
           CALL_SCENARIO: ${{ matrix.scenario }}
           CALL_A_FPS: "30"
+          # The Android phone sent 4.7 Mbit/s at 1440p: A's sending is capped near that (6 Mbit/s with audio), so the
+          # calls run at the production rates, 1440p30 at about 5 Mbit/s and 720p30 at about 2.5 Mbit/s.
+          CALL_A_MAX_KBPS: "6000"
           # The rate control climbs from a mobile-safe start; the window measures the call once it has.
           CALL_WARMUP_SECONDS: "40"
           CALL_SECONDS: ${{ github.event.inputs.seconds || '60' }}

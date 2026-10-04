@@ -2,6 +2,7 @@
 @inject BoltMediaService Media
 @inject HttpClient Http
 @inject ILoggerFactory Logs
+@inject MediaServiceOptions Options
 
 @* One canvas per remote camera, attached as the Yap call screen does (VoiceState.AttachRemoteVideoAsync). *@
 <div id="ready">@(CallDriver.Ready ? "ready" : "loading")</div>
@@ -16,7 +17,7 @@
 
     protected override void OnInitialized()
     {
-        CallDriver.Bind(Media, Http, Logs);
+        CallDriver.Bind(Media, Http, Logs, Options);
         Media.OnRemoteVideoChanged += Changed;
     }
 

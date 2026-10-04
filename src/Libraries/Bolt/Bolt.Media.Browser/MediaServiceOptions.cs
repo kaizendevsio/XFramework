@@ -35,6 +35,8 @@ public sealed class MediaServiceOptions
     /// ceiling the ladder climbs towards on measured headroom, never where a call begins.
     /// </summary>
     public int VideoStartTier { get; set; } = 0;
+    /// <summary>The most a call sends, audio and video together, however much the path would carry.</summary>
+    public int MaxSendKbps { get; set; } = 40_000;
     /// <summary>
     /// Safety interval between unrequested keyframes. Keyframes are otherwise sent on demand: a new
     /// receiver, a decoder reset or a relay that dropped pictures asks for one.
