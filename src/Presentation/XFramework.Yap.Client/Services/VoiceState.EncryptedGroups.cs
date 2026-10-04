@@ -403,7 +403,7 @@ public sealed partial class VoiceState
             if (!Current(attempt)) return;
             var ladder = new VideoCodecLadder();
             foreach (var codec in capabilities.Codecs)
-                ladder.Record(new(VideoCodecLadder.Parse(codec.Codec), codec.Encode, codec.Decode, codec.Hardware, codec.MaxHeight));
+                ladder.Record(new(VideoCodecLadder.Parse(codec.Codec), codec.Encode, codec.Decode, codec.Hardware, codec.MaxHeight, codec.DecodeHardware));
             attempt.Ladder = ladder;
             attempt.Ceiling = capabilities.Ceiling;
             attempt.DecodeCeiling = capabilities.Codecs.Where(x => x.Decode).Select(x => x.DecodeMaxHeight).DefaultIfEmpty(0).Min();

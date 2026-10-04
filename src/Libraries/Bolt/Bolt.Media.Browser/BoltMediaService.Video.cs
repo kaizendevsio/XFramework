@@ -343,11 +343,14 @@ public sealed partial class BoltMediaService
     {
         try
         {
+            var wait = 20;
             while (!ct.IsCancellationRequested)
             {
-                await Task.Delay(20, ct);
+                await Task.Delay(wait, ct);
                 Guid[] streams;
                 lock (_remoteVideo) streams = _videoAssemblers.Where(x => x.Value.RecoveryMs > 0).Select(x => x.Key).ToArray();
+                // Nothing recovering (a WebSocket path): look again four times a second instead of fifty.
+                wait = streams.Length == 0 ? 250 : 20;
                 foreach (var streamId in streams)
                     await StepVideoAsync(streamId, (buffer, ready, nacks) => buffer.Poll(Environment.TickCount64, ready, nacks));
             }
@@ -407,7 +410,14 @@ public sealed partial class BoltMediaService
     private async Task ReleaseRemoteVideoAsync(Guid streamId)
     {
         bool removed;
-        lock (_remoteVideo) { removed = _remoteVideo.Remove(streamId); _videoAssemblers.Remove(streamId); _videoGates.Remove(streamId); _videoLocalDrops.Remove(streamId); }
+        CancellationTokenSource? idle = null;
+        lock (_remoteVideo)
+        {
+            removed = _remoteVideo.Remove(streamId); _videoAssemblers.Remove(streamId); _videoGates.Remove(streamId); _videoLocalDrops.Remove(streamId);
+            // The last remote camera went off: nothing left to recover, so the 20 ms timer stops waking the page.
+            if (_remoteVideo.Count == 0) { idle = _recoveryLoop; _recoveryLoop = null; }
+        }
+        if (idle is not null) { try { await idle.CancelAsync(); } catch (ObjectDisposedException) { } idle.Dispose(); }
         if (!removed) return;
         await _video.RemoveRemoteAsync(streamId);
         OnRemoteVideoChanged?.Invoke();

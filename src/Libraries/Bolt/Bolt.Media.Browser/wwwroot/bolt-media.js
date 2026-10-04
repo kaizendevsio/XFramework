@@ -520,6 +520,78 @@ export function fitTierToSource(width, height, sourceWidth, sourceHeight) {
     return portrait ? { width: across, height: along } : { width: along, height: across };
 }
 
+/// WebKit (Safari, and every iOS browser) turns a 2D canvas into a VideoFrame with a CPU readback. Its vendor
+/// string is the engine's own; there is no feature that reveals how a canvas becomes a frame.
+function webKitCanvasReadsBack() { return /^Apple/.test(globalThis.navigator?.vendor ?? ''); }
+
+/// Paints a <video> element's current picture, upright, into a WebGL canvas of a given size, entirely on the GPU.
+///
+/// Only the default-rect, level-0 RGBA/UNSIGNED_BYTE texImage2D of a video takes WebKit's GPU-to-GPU path
+/// (WebGLRenderingContextBase::texImageSource), so that is the only upload used. The first picture is checked
+/// once with a 2x2 readPixels: a texture that came back empty means this engine took a path that does not work,
+/// and the caller falls back to the 2D canvas rather than send black.
+export class GlFramePainter {
+    static create(doc) {
+        const canvas = doc?.createElement?.('canvas');
+        const gl = canvas?.getContext?.('webgl', { alpha: false, antialias: false, depth: false, stencil: false,
+            premultipliedAlpha: false, preserveDrawingBuffer: false, powerPreference: 'low-power' });
+        if (!gl || typeof gl.createShader !== 'function') return null;
+        const shader = (type, source) => {
+            const compiled = gl.createShader(type);
+            gl.shaderSource(compiled, source);
+            gl.compileShader(compiled);
+            if (!gl.getShaderParameter(compiled, gl.COMPILE_STATUS)) throw new Error('shader');
+            return compiled;
+        };
+        const program = gl.createProgram();
+        gl.attachShader(program, shader(gl.VERTEX_SHADER,
+            'attribute vec2 p;varying vec2 t;void main(){t=vec2(p.x*.5+.5,.5-p.y*.5);gl_Position=vec4(p,0.,1.);}'));
+        gl.attachShader(program, shader(gl.FRAGMENT_SHADER,
+            'precision mediump float;varying vec2 t;uniform sampler2D s;void main(){gl_FragColor=vec4(texture2D(s,t).rgb,1.);}'));
+        gl.linkProgram(program);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error('program');
+        gl.useProgram(program);
+        gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+        // A strip over the whole viewport; the vertex shader maps clip top to the texture's first row.
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+        const position = gl.getAttribLocation(program, 'p');
+        gl.enableVertexAttribArray(position);
+        gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+        gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
+        for (const [name, value] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR],
+            [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, name, value);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        return new GlFramePainter(canvas, gl);
+    }
+
+    constructor(canvas, gl) { this.canvas = canvas; this.gl = gl; this.checked = false; }
+
+    /// The canvas holding `video` at width x height. Throws when this engine cannot paint it on the GPU.
+    paint(video, width, height) {
+        const { gl, canvas } = this;
+        if (gl.isContextLost?.()) throw new Error('context lost');
+        if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+        gl.viewport(0, 0, width, height);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        if (gl.getError() !== gl.NO_ERROR) throw new Error('webgl');
+        if (!this.checked) {
+            // Once per capture: an all-zero centre after a successful draw means nothing was uploaded.
+            this.checked = true;
+            const pixels = new Uint8Array(16);
+            gl.readPixels(Math.max(0, (width >> 1) - 1), Math.max(0, (height >> 1) - 1), 2, 2, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+            if (pixels.every(x => x === 0)) throw new Error('empty texture');
+        }
+        return canvas;
+    }
+
+    release() {
+        try { this.gl.getExtension?.('WEBGL_lose_context')?.loseContext(); } catch { }
+        this.canvas.width = this.canvas.height = 0;
+    }
+}
+
 /// How this browser can get camera frames out of a MediaStreamTrack.
 ///
 /// Chromium exposes MediaStreamTrackProcessor on Window. Safari 18 has it too but only inside a
@@ -552,8 +624,8 @@ export async function probeVideoCodecs(maxHeight = 2160) {
                 const supported = await VideoEncoder.isConfigSupported(encoderConfig(codec, width, height, 2000, 30));
                 if (!supported?.supported) continue;
                 if (best === 0) best = height;
-                // WebCodecs has no require-hardware mode. prefer-hardware is only a hint,
-                // so isConfigSupported cannot prove acceleration; retain conservative limits.
+                // isConfigSupported cannot prove acceleration (WebKit ignores the hint for encoders);
+                // powerEfficient below is the hardware signal.
             } catch { /* An unsupported configuration is an answer, not a failure. */ }
         }
         for (const height of heights) {
@@ -563,9 +635,29 @@ export async function probeVideoCodecs(maxHeight = 2160) {
                 if (supported?.supported) { decode = true; decodeMaxHeight = height; break; }
             } catch { /* Same: treat a throw as unsupported. */ }
         }
-        results.push({ codec, encode: best > 0, decode, hardware, maxHeight: best, decodeMaxHeight });
+        if (best > 0) hardware = await powerEfficient('encodingInfo', codec);
+        const decodeHardware = decode && await powerEfficient('decodingInfo', codec);
+        results.push({ codec, encode: best > 0, decode, hardware, maxHeight: best, decodeMaxHeight, decodeHardware });
     }
     return results;
+}
+
+const RTP_VIDEO_TYPES = { av1: 'video/AV1', vp9: 'video/VP9', h264: 'video/H264' };
+
+/// Whether this device encodes (or decodes) `codec` on dedicated hardware, as far as the browser will say.
+///
+/// WebCodecs cannot tell: WebKit ignores `hardwareAcceleration` for encoders entirely (VideoEncoder::Config has no
+/// such field) and answers isConfigSupported the same for libvpx VP9 as for VideoToolbox H.264. Media Capabilities
+/// with type 'webrtc' can: WebKit reports H.264/HEVC power efficient and VP8/VP9/AV1 encode not
+/// (LibWebRTCProvider::videoEncodingCapabilitiesOverride), decode follows the hardware decoder it found, and
+/// Chromium reports power efficient only where a hardware encoder profile matches. Anything else is "not known",
+/// which the codec ladder treats as software.
+async function powerEfficient(method, codec) {
+    try {
+        const info = await globalThis.navigator?.mediaCapabilities?.[method]?.({ type: 'webrtc',
+            video: { contentType: RTP_VIDEO_TYPES[codec], width: 1280, height: 720, bitrate: 1_500_000, framerate: 30 } });
+        return info?.supported === true && info.powerEfficient === true;
+    } catch { return false; }
 }
 
 /// Battery can lower the ceiling; codec probes and measured pressure decide device capacity.
@@ -822,13 +914,32 @@ class VideoPipeline {
         } finally { frame.close(); }
     }
 
-    /// A video-element VideoFrame can retain sensor rotation, including on Safari. Paint the
-    /// displayed image into a reusable, encoder-sized canvas to bake orientation into the pixels.
-    /// No getImageData/readback and no full-resolution intermediate allocation.
+    /// A video-element VideoFrame can retain sensor rotation, including on Safari (WebKit exposes no
+    /// rotation attribute to tell), so the displayed image is painted upright, at the encoder size.
+    ///
+    /// WebGL first. On WebKit a 2D canvas becomes a VideoFrame by reading every pixel back to the CPU,
+    /// unpremultiplying it and copying it again to the GPU process for the encoder
+    /// (HTMLCanvasElement::toVideoFrame -> getPixelBuffer, then SharedVideoFrameWriter): about 30 MB of
+    /// copies per 1440p picture. A WebGL canvas uploads the camera's IOSurface as a texture on the GPU,
+    /// with its orientation undone (GraphicsContextGLCVCocoa::copyVideoSampleToTexture), and becomes a
+    /// VideoFrame as a GPU copy into another IOSurface (surfaceBufferToVideoFrame) that reaches
+    /// VideoToolbox as a mach port: no pixel touches the CPU. The 2D canvas stays as the fallback, and is
+    /// the only path elsewhere: Chromium's 2D canvas is GPU-backed already, and measured there the WebGL
+    /// round trip cost more main thread (1.5 vs 0.75 ms a 720p picture, 4 vs 2.2 ms at 1440p).
     _elementFrame(video, timestamp) {
         // WebKit throws InvalidStateError for an element below HAVE_CURRENT_DATA or with no decoded
         // frame in hand. rVFC should never hand us one, but a throw per frame would be expensive.
         if (!video.videoWidth || !video.videoHeight || (video.readyState ?? 2) < 2) return null;
+        const duration = Math.round(1e6 / this.config.framerate);
+        if (this.glPainter !== false && webKitCanvasReadsBack()) {
+            try {
+                this.glPainter ??= GlFramePainter.create(globalThis.document) ?? false;
+                const canvas = this.glPainter && this.glPainter.paint(video, this.config.width, this.config.height);
+                if (canvas) return new VideoFrame(canvas, { timestamp, duration });
+            } catch { /* Fall through to the 2D canvas for the rest of this capture. */ }
+            this.glPainter?.release?.();
+            this.glPainter = false;
+        }
         try {
             const canvas = this.captureCanvas ??= typeof OffscreenCanvas !== 'undefined'
                 ? new OffscreenCanvas(this.config.width, this.config.height)
@@ -837,7 +948,7 @@ class VideoPipeline {
             { canvas.width = this.config.width; canvas.height = this.config.height; }
             this.captureContext ??= canvas.getContext('2d', { alpha: false, desynchronized: true });
             this.captureContext.drawImage(video, 0, 0, canvas.width, canvas.height);
-            return new VideoFrame(canvas, { timestamp, duration: Math.round(1e6 / this.config.framerate) });
+            return new VideoFrame(canvas, { timestamp, duration });
         } catch { return null; }
     }
 
@@ -847,6 +958,10 @@ class VideoPipeline {
         const video = this.captureVideo;
         this.captureVideo = null;
         this.captureCanvas = this.captureContext = null;
+        // The WebGL painter is retried on the next capture: a lost context or a camera that only stalled is
+        // not a reason to read pixels back on the CPU for the rest of the call.
+        this.glPainter?.release?.();
+        this.glPainter = null;
         if (!video) return;
         if (this.captureCallbackId) { try { video.cancelVideoFrameCallback(this.captureCallbackId); } catch { } }
         this.captureCallbackId = 0;
@@ -921,7 +1036,9 @@ class VideoPipeline {
                 acceleration: remote.acceleration || 'no-preference', resets: remote.resets };
         });
         const encodedFps = rate(this.encodeCount, previous?.encode);
-        const result = { capturing: this.captureRunning, strategy: this.strategy(), codec: this.config?.codec || this.codec,
+        // On the frame-callback path, which painter turns the camera into frames: "webgl" on the GPU, "2d" otherwise.
+        const strategy = this.strategy() === 'rvfc' && this.captureRunning ? `rvfc/${this.glPainter ? 'webgl' : '2d'}` : this.strategy();
+        const result = { capturing: this.captureRunning, strategy, codec: this.config?.codec || this.codec,
             width: this.captureRunning ? this.config?.width ?? 0 : 0, height: this.captureRunning ? this.config?.height ?? 0 : 0,
             targetFps: this.captureRunning ? this.config?.framerate ?? 0 : 0,
             cameraWidth: camera.width ?? 0, cameraHeight: camera.height ?? 0, cameraFps: camera.frameRate ?? null,
