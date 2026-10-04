@@ -16,8 +16,10 @@ shape_call() {
   for band in 1 2 3 4 5; do
     local spec=${specs[$((band - 1))]}
     if [ "$spec" != "none" ]; then
+      # A deep queue unless the scenario sizes it (a link's buffer decides whether overload shows as delay or loss).
+      case "$spec" in *limit*) ;; *) spec="$spec limit 10000" ;; esac
       # shellcheck disable=SC2086
-      sudo tc qdisc add dev lo parent "1:$band" handle "${band}0:" netem $spec limit 10000
+      sudo tc qdisc add dev lo parent "1:$band" handle "${band}0:" netem $spec
     fi
   done
   sudo tc qdisc add dev lo parent 1:6 handle 60: pfifo_fast 2>/dev/null || true

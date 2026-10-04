@@ -40,6 +40,12 @@ public sealed class VideoRecoveryBuffer
     /// </summary>
     public const int UplinkRepairMs = 150;
     public const int MinRecoveryMs = 250;
+
+    /// <summary>
+    /// How long the stream must have been quiet before the rest of an incomplete picture counts as lost: a sender's pacer
+    /// and its transport pause between fragments (audio goes first, the channel drains), but not for two round trips.
+    /// </summary>
+    private int TailQuietMs => Math.Clamp(RttMs * 2, 40, 300);
     private const int MaxPictures = 48;
     private const long MaxBufferedBytes = 2 * 1024 * 1024;
     private const int MaxMissing = 1024;
@@ -50,6 +56,7 @@ public sealed class VideoRecoveryBuffer
     private readonly Dictionary<uint, Picture> _pictures = [];
     private readonly Dictionary<uint, Missing> _missing = [];
     private long _bytes;
+    private long _lastArrivalAt;
     private uint _highest;
     private bool _hasHighest;
     private uint _lastReleased, _lastHandled;
@@ -64,7 +71,8 @@ public sealed class VideoRecoveryBuffer
         public int Total, Received, Bytes, FragmentSize, Layer, Orientation;
         public byte[]?[] Parts = [];
         public bool Keyframe, Complete, Lost;
-        public long FirstSeenAt;
+        /// <summary>When its latest fragment arrived: a picture still arriving is not late, however long it is.</summary>
+        public long LastSeenAt;
     }
 
     private sealed class Missing(long since)
@@ -139,6 +147,7 @@ public sealed class VideoRecoveryBuffer
             return;
         }
         if (!VideoFrameAssembler.TryParse(fragment, out var header)) return;
+        _lastArrivalAt = nowMs;
 
         if (_missing.Remove(sequence, out var asked) && asked.Tries > 0) Recovered++;
         if (!_hasHighest)
@@ -168,7 +177,7 @@ public sealed class VideoRecoveryBuffer
             _pictures[header.FrameId] = slot = new Picture
             {
                 FrameId = header.FrameId, FirstSequence = first, Total = header.Total, Orientation = header.Orientation,
-                Parts = new byte[header.Total][], FirstSeenAt = nowMs,
+                Parts = new byte[header.Total][], LastSeenAt = nowMs,
             };
         }
         else if (slot.Total != header.Total || slot.FirstSequence != first || slot.Orientation != header.Orientation)
@@ -192,6 +201,7 @@ public sealed class VideoRecoveryBuffer
             return;
         }
         if (size != 0) slot.FragmentSize = size;
+        slot.LastSeenAt = nowMs;
         slot.Parts[header.Index] = payload.ToArray();
         slot.Received++;
         slot.Bytes += payload.Length;
@@ -218,16 +228,20 @@ public sealed class VideoRecoveryBuffer
     {
         if (RecoveryMs == 0) return;
 
-        // The tail of a picture no later frame revealed as missing.
-        foreach (var picture in _pictures.Values)
-        {
-            if (picture.Complete || picture.Lost) continue;
-            for (var index = 0; index < picture.Total; index++)
+        // The tail of a picture no later frame revealed as missing. Fragments arrive at the rate the sender's link
+        // carries them, so a large picture takes as long as it takes (a 1440p keyframe through a 4.7 Mbit/s uplink, about
+        // 350 ms): what has not arrived yet is not missing while the stream is still arriving. Only once it has gone
+        // quiet is the rest of an incomplete picture asked for, and timed from then.
+        if (_hasHighest && nowMs - _lastArrivalAt >= TailQuietMs)
+            foreach (var picture in _pictures.Values)
             {
-                var sequence = unchecked(picture.FirstSequence + (uint)index);
-                if (picture.Parts[index] is null && _hasHighest && Newer(sequence, _highest)) AddMissing(sequence, picture.FirstSeenAt);
+                if (picture.Complete || picture.Lost) continue;
+                for (var index = 0; index < picture.Total; index++)
+                {
+                    var sequence = unchecked(picture.FirstSequence + (uint)index);
+                    if (picture.Parts[index] is null && Newer(sequence, _highest)) AddMissing(sequence, _lastArrivalAt);
+                }
             }
-        }
 
         foreach (var (sequence, missing) in _missing.ToArray())
         {
@@ -254,9 +268,9 @@ public sealed class VideoRecoveryBuffer
             }
         }
 
-        // A picture still incomplete well past the window (its missing numbers were bounded away): give it up.
+        // A picture that has made no progress for well past the window (its missing numbers were bounded away): give it up.
         foreach (var picture in _pictures.Values)
-            if (!picture.Complete && !picture.Lost && nowMs - picture.FirstSeenAt >= RecoveryMs + RttMs)
+            if (!picture.Complete && !picture.Lost && nowMs - picture.LastSeenAt >= RecoveryMs + RttMs)
                 Lose(picture);
 
         Release(ready);

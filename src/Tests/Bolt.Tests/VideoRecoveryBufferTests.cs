@@ -68,6 +68,51 @@ public sealed class VideoRecoveryBufferTests
         });
     }
 
+    [TestCase(14)]
+    [TestCase(200)]
+    public void APictureStillArriving_IsNotAskedFor_NorGivenUp_HoweverLongItTakesToSend(int rttMs)
+    {
+        // Production 2026-10-04 13:08 UTC: a 1440p keyframe (about 200 KB) through a phone's 4.7 Mbit/s uplink takes about
+        // 350 ms to arrive, a 720p one at 2.5 Mbit/s about 250 ms. The fragments not sent yet were counted missing from
+        // the picture's first fragment: asked for after 15 ms (the sender asked to send again what it was still
+        // sending) and given up after the recovery window (100 ms there). No keyframe was ever shown.
+        var sender = new Sender();
+        var buffer = Recovering(rttMs);
+        var key = sender.Picture(1, 0, key: true, fragments: 200);
+        var next = sender.Picture(2, 0);
+        var ready = new List<VideoFramePayload>();
+        var nacks = new List<uint>();
+        for (var index = 0; index < key.Count; index++)
+        {
+            var now = index * 2L; // one fragment every 2 ms: 400 ms for the picture
+            ready.AddRange(Push(buffer, [key[index]], now));
+            if (index % 5 == 0) { var poll = Poll(buffer, now); ready.AddRange(poll.Ready); nacks.AddRange(poll.Nacks); }
+        }
+        ready.AddRange(Push(buffer, next, 402));
+        Assert.Multiple(() =>
+        {
+            Assert.That(nacks, Is.Empty, "nothing was lost: the rest of the picture was still on its way");
+            Assert.That(ready.Select(x => x.FrameId), Is.EqualTo(new[] { 1u, 2u }));
+            Assert.That(buffer.Incomplete, Is.Zero);
+        });
+    }
+
+    [Test]
+    public void TheLastFragmentsOfAPicture_LostWithNothingAfterThem_AreStillAskedFor()
+    {
+        // Nothing newer arrives to reveal them (the sender paused): once the stream has been quiet for a moment they are
+        // asked for, and given up only a recovery window after that.
+        var sender = new Sender();
+        var buffer = Recovering(rttMs: 20);
+        var key = sender.Picture(1, 0, key: true, fragments: 5);
+        Push(buffer, key.Take(3), now: 0);
+        var asked = new List<uint>();
+        for (long t = 10; t <= 200; t += 10) asked.AddRange(Poll(buffer, t).Nacks);
+        Assert.That(asked.Distinct(), Is.EquivalentTo(new[] { key[3].Sequence, key[4].Sequence }));
+        var ready = Push(buffer, key.Skip(3), now: 200);
+        Assert.That(ready.Select(x => x.FrameId), Is.EqualTo(new[] { 1u }));
+    }
+
     [Test]
     public void AFragmentTheSendersUplinkLost_IsStillWaitedFor_WhenItsSenderSendsItAgain()
     {
