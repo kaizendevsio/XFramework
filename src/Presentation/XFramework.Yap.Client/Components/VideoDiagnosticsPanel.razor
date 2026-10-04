@@ -19,6 +19,7 @@
                 <div>Encoded: @Number(info.EncodedKbps) kbps · last encode: @Number(info.EncoderDelayMs) ms</div>
                 <div>Queue: encoder @info.EncoderQueue / send @info.SendQueue · capture pressure drops: @info.Dropped</div>
                 <div>Path: @info.Strategy · @info.Acceleration</div>
+                <div>Orientation: @(string.IsNullOrEmpty(info.Orientation) ? "—" : info.Orientation)</div>
             }
         </div>
         @for (var i = 0; i < info.Remotes.Length; i++)
@@ -30,6 +31,7 @@
                 <div>Received: @Number(remote.ReceivedKbps) kbps · last decode: @Number(remote.DecoderDelayMs) ms</div>
                 <div>Queue: decoder @remote.DecoderQueue / pending @remote.PendingFrames · resets: @remote.Resets</div>
                 <div>Decoder preference: @remote.Acceleration</div>
+                <div>Rotation applied: @(string.IsNullOrEmpty(remote.Rotation) ? "—" : remote.Rotation)</div>
             </div>
         }
         @if (info.Remotes.Length == 0) { <div>No incoming video stream.</div> }

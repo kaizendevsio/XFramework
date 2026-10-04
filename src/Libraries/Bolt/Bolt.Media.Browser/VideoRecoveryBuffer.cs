@@ -54,7 +54,7 @@ public sealed class VideoRecoveryBuffer
     private sealed class Picture
     {
         public uint FrameId, FirstSequence, Timestamp;
-        public int Total, Received, Bytes, FragmentSize, Layer;
+        public int Total, Received, Bytes, FragmentSize, Layer, Orientation;
         public byte[]?[] Parts = [];
         public bool Keyframe, Complete, Lost;
         public long FirstSeenAt;
@@ -156,10 +156,11 @@ public sealed class VideoRecoveryBuffer
             if (_pictures.Count >= MaxPictures) LoseOldest();
             _pictures[header.FrameId] = slot = new Picture
             {
-                FrameId = header.FrameId, FirstSequence = first, Total = header.Total, Parts = new byte[header.Total][], FirstSeenAt = nowMs,
+                FrameId = header.FrameId, FirstSequence = first, Total = header.Total, Orientation = header.Orientation,
+                Parts = new byte[header.Total][], FirstSeenAt = nowMs,
             };
         }
-        else if (slot.Total != header.Total || slot.FirstSequence != first)
+        else if (slot.Total != header.Total || slot.FirstSequence != first || slot.Orientation != header.Orientation)
         {
             Lose(slot);
             Release(ready);
@@ -313,7 +314,7 @@ public sealed class VideoRecoveryBuffer
         _lastReleased = picture.FrameId;
         _hasReleased = true;
         ready.Add(new VideoFramePayload(data, picture.Timestamp, picture.Keyframe, discontinuity, picture.FrameId,
-            picture.Keyframe ? 0 : picture.Layer));
+            picture.Keyframe ? 0 : picture.Layer, picture.Orientation));
     }
 
     /// <summary>The cheapest recovery the reference structure allows for a picture that will not be shown.</summary>

@@ -231,7 +231,7 @@ public sealed partial class BoltMediaService
 
     // ── Send path: fragment, then encrypt each fragment like an audio packet ──
 
-    private void QueueEncodedVideo(byte[] data, bool isKeyframe, uint frameId, uint timestamp, int layer)
+    private void QueueEncodedVideo(byte[] data, bool isKeyframe, uint frameId, uint timestamp, int layer, int orientation)
     {
         if (_activeVideoStreamId == Guid.Empty) return;
         if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame && _sframe?.IsReady != true) return;
@@ -248,7 +248,8 @@ public sealed partial class BoltMediaService
         var channel = _videoSend;
         if (channel is null) return;
         // A whole picture is queued or dropped as one: half a picture on the wire is wasted bandwidth.
-        if (!channel.Writer.TryWrite(new VideoFramePayload(data, timestamp, isKeyframe, FrameId: frameId, Layer: layer))) VideoDropped(layer);
+        if (!channel.Writer.TryWrite(new VideoFramePayload(data, timestamp, isKeyframe, FrameId: frameId, Layer: layer, Orientation: orientation)))
+            VideoDropped(layer);
     }
 
     /// <summary>
@@ -265,10 +266,14 @@ public sealed partial class BoltMediaService
             {
                 var stream = _mediaClient?.GetMediaStream(_activeVideoStreamId);
                 if (stream is null) continue;
+                // A turned picture encoded before a member who cannot read its orientation joined: that member would
+                // drop it (or show it on its side). The encoder is already switching to upright pixels on a keyframe;
+                // losing this picture asks for that keyframe too.
+                if (!CallMediaFormat.CanSend(PeerMediaFormat, picture.Orientation)) { VideoDropped(picture.Layer); continue; }
                 // Fragment only accepted pictures: dropped pictures allocate no fragment arrays. On a datagram path
                 // every fragment must fit one message after encryption; anything bigger rides the WebSocket.
                 var fragments = VideoFrameFragments.Split(picture.Data, picture.FrameId, picture.TimestampMicroseconds, picture.IsKeyframe,
-                    picture.Layer, VideoFragmentPayload(stream, picture.Data.Length));
+                    picture.Layer, VideoFragmentPayload(stream, picture.Data.Length), picture.Orientation);
                 try
                 {
                     var sent = await stream.SendPictureAsync(fragments, picture.IsKeyframe,
@@ -399,7 +404,8 @@ public sealed partial class BoltMediaService
                 transport.TrySend(writer.WrittenSpan);
             }
             foreach (var picture in ready)
-                await _video.DecodeFrameAsync(streamId, picture.Data, picture.TimestampMicroseconds, picture.IsKeyframe, picture.Discontinuity);
+                await _video.DecodeFrameAsync(streamId, picture.Data, picture.TimestampMicroseconds, picture.IsKeyframe, picture.Discontinuity,
+                    picture.Orientation);
         }
         finally
         {

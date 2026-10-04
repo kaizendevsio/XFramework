@@ -20,6 +20,11 @@ public sealed record VideoDiagnostics
     public int SendQueue { get; init; }
     public double? EncoderDelayMs { get; init; }
     public int Dropped { get; init; }
+    /// <summary>
+    /// How the camera's orientation reaches the far side: "sent as metadata (90°)", "redrawn upright (2d canvas; 90°)",
+    /// "painted upright by the element (webgl)" on the frame-callback path, or "none" for frames that arrive upright.
+    /// </summary>
+    public string Orientation { get; init; } = "";
     /// <summary>The media path: "UDP/relay", "TLS/relay", "WebSocket" and so on.</summary>
     public string Transport { get; init; } = "";
     /// <summary>Why media is on the WebSocket, when it is (no TURN offered, ICE failed, negotiating).</summary>
@@ -44,4 +49,6 @@ public sealed record RemoteVideoDiagnostics
     public int PendingFrames { get; init; }
     public double? DecoderDelayMs { get; init; }
     public int Resets { get; init; }
+    /// <summary>The sender's orientation applied when painting: "90°", "180°, mirrored" or "none".</summary>
+    public string Rotation { get; init; } = "";
 }
