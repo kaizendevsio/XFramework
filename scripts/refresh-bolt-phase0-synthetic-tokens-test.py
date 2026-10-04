@@ -1023,6 +1023,63 @@ class RefreshTokenHookTests(unittest.TestCase):
             self.assertFalse(workspace.communications_identity_service.exists())
             self.assertFalse(workspace.receipt.exists())
 
+    def test_failure_code_names_the_request_that_failed(self) -> None:
+        # A bare HTTP_STATUS_500 did not say whether the service tokens or the synthetic user's sign-in failed.
+        now = int(time.time())
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Workspace(Path(temporary))
+            workspace.write_env()
+            factory = ConnectionFactory(
+                [
+                    FakeResponse(service_response(service_claims(now, uuid.uuid4().hex))),
+                    FakeResponse(
+                        service_response(
+                            service_claims(now, uuid.uuid4().hex, client_id="XFramework.Portal")
+                        )
+                    ),
+                    FakeResponse(identity_service_response(identity_service_claims(now, uuid.uuid4().hex))),
+                    FakeResponse(
+                        identity_service_response(
+                            identity_service_claims(
+                                now, uuid.uuid4().hex, client_id="XFramework.Communications"
+                            )
+                        )
+                    ),
+                    FakeResponse(service_response(service_claims(now, uuid.uuid4().hex, exp=now + 90))),
+                    FakeResponse(status=401),
+                ]
+            )
+
+            with self.assertRaises(refresh.RefreshError) as raised:
+                refresh.execute(
+                    str(workspace.env),
+                    str(workspace.receipt),
+                    True,
+                    connection_factory=factory,
+                    context_factory=lambda: FakeContext(),
+                    now_provider=lambda: now,
+                )
+
+            self.assertEqual(raised.exception.code, "USER_ACTOR_HTTP_STATUS_401")
+            self.assertFalse(workspace.receipt.exists())
+
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Workspace(Path(temporary))
+            workspace.write_env()
+            factory = ConnectionFactory([FakeResponse(status=403)])
+
+            with self.assertRaises(refresh.RefreshError) as raised:
+                refresh.execute(
+                    str(workspace.env),
+                    str(workspace.receipt),
+                    True,
+                    connection_factory=factory,
+                    context_factory=lambda: FakeContext(),
+                    now_provider=lambda: now,
+                )
+
+            self.assertEqual(raised.exception.code, "COMMUNICATIONS_TRANSPORT_HTTP_STATUS_403")
+
     def test_disabled_expiry_writes_private_empty_placeholder_and_omits_receipt_entry(self) -> None:
         now = int(time.time())
         with tempfile.TemporaryDirectory() as temporary:

@@ -488,7 +488,19 @@ public sealed partial class AuthService : IAuthService, IPasswordResetProcessor
             if (!rateLimitDecision.IsAllowed)
                 return Result<AuthenticateIdentityResponse>.Failure("Too many requests.", 429);
 
-            var tenant = await _tenantService.GetTenant(CurrentTenantId, ct);
+            Tenant tenant;
+            try
+            {
+                tenant = await _tenantService.GetTenant(CurrentTenantId, ct);
+            }
+            catch (TenantUnavailableException ex)
+            {
+                // A deleted, disabled or expired tenant is a rejected sign-in, answered like an unknown user (same
+                // message, same hashing cost), not a server fault.
+                _ = VerifyPasswordHash(request.Password, DummyPasswordHash);
+                _logger.LogWarning("Authentication rejected: tenant {TenantId} is missing, disabled, deleted or expired", ex.TenantId);
+                return Result<AuthenticateIdentityResponse>.Failure("Invalid credentials", 401);
+            }
             var now = _timeProvider.GetUtcNow().UtcDateTime;
 
             // Validate authorization (multi-type user lookup) - SECURITY CRITICAL
