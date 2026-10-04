@@ -14,7 +14,7 @@ const source = readFileSync(new URL('../wwwroot/bolt-media.js', import.meta.url)
 // Safari (MediaStreamTrackProcessor is worker-only there, so undefined on the page) and 'none' is
 // a browser too old for either.
 function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 8, battery = null, cameras = 1,
-    capture = 'processor', frameFromElement = true, clock = () => performance.now() } = {}) {
+    capture = 'processor', frameFromElement = true, clock = () => performance.now(), webgl = null, mediaCapabilities = undefined } = {}) {
     const listeners = new Map();
     const stats = { encoded: [], decoded: [], stopped: 0, opened: [], invoked: [], closedFrames: 0, frames: [] };
 
@@ -45,7 +45,8 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
             scale: (x, y) => canvas.ops.push(['scale', x, y]),
             drawImage: (...args) => canvas.ops.push(['drawImage', ...args])
         };
-        canvas.getContext = () => canvas.context;
+        // No WebGL unless the test describes one: the 2D canvas is then the only painter.
+        canvas.getContext = type => type === 'webgl' ? (webgl ? (canvas.gl ??= webgl(canvas)) : null) : canvas.context;
         canvases.push(canvas);
         return canvas;
     };
@@ -137,6 +138,7 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
         navigator: {
             hardwareConcurrency,
             getBattery: battery ? async () => battery : undefined,
+            mediaCapabilities,
             mediaDevices: {
                 async getUserMedia(constraints) {
                     if (cameras === 0) throw new Error('NotAllowedError');
@@ -176,7 +178,8 @@ this.ceiling = videoDeviceCeiling;
 this.capabilities = checkVideoCapabilities;
 this.strategyOf = typeof videoCaptureStrategy === 'function' ? videoCaptureStrategy : () => 'absent';
 this.codecString = videoCodecString;
-this.fitTier = fitTierToSource;`, sandbox);
+this.fitTier = fitTierToSource;
+this.GlFramePainter = GlFramePainter;`, sandbox);
 
     const host = { invokeMethodAsync: async (...args) => { stats.invoked.push(args); } };
     const canvas = { width: 0, height: 0, getContext: () => ({ drawImage() {} }) };
@@ -199,7 +202,7 @@ test('probing reports codec limits without treating an acceleration preference a
     } });
     const probed = await f.sandbox.probe(1080);
     const by = Object.fromEntries(probed.map(x => [x.codec, x]));
-    assert.deepEqual(plain(by.av1), { codec: 'av1', encode: false, decode: false, hardware: false, maxHeight: 0, decodeMaxHeight: 0 });
+    assert.deepEqual(plain(by.av1), { codec: 'av1', encode: false, decode: false, hardware: false, maxHeight: 0, decodeMaxHeight: 0, decodeHardware: false });
     assert.equal(by.vp9.encode, true);
     assert.equal(by.vp9.hardware, false, 'acceleration is unknown, so use conservative limits');
     assert.equal(by.vp9.maxHeight, 720);
@@ -443,7 +446,7 @@ test('the frame-callback path paints displayed pixels into one reusable canvas a
     assert.equal(f.stats.frames.length, 5);
     assert.ok(f.stats.frames.every(x => x.closed), 'one leaked VideoFrame per picture exhausts memory in seconds');
     assert.ok(f.stats.frames.every(x => x.source === f.p.captureCanvas));
-    assert.equal(f.canvases.length, 1, 'reuse the canvas across pictures');
+    assert.equal(f.canvases.filter(x => x.ops.length).length, 1, 'reuse the canvas across pictures');
     assert.equal(f.stats.frames[3].timestamp, Math.round(3e6 / 30), 'mediaTime seconds become WebCodecs microseconds');
     assert.equal(f.stats.encoded[0].options.keyFrame, true, 'the first picture of a send must be a keyframe');
     assert.equal(f.video.callbacks.size, 1, 'the loop re-arms itself for the next frame');
@@ -880,7 +883,7 @@ test('on-screen diagnostics measure independent capture and encoder rates withou
     assert.equal(info.encodedFps, 30);
     assert.equal(info.encodedKbps, 30 * 8 * 8 / 1000);
     assert.equal(info.acceleration, 'prefer-hardware');
-    assert.equal(info.strategy, 'rvfc');
+    assert.equal(info.strategy, 'rvfc/2d', 'the frame-callback path names the painter it used');
     assert.deepEqual(plain(f.p.stats), before, 'debug polling does not consume adaptation statistics');
     now = 2000;
     const stalled = f.p.getDiagnostics();
@@ -1050,4 +1053,141 @@ test('the transport meter sums what open sockets still buffer and forgets closed
     assert.equal(f.sandbox.meter(), 1_500);
     b.readyState = 3;
     assert.equal(f.sandbox.meter(), 1_000);
+});
+
+// ── Safari capture without a CPU readback ──
+
+/// A WebKit page: the only engine whose 2D canvas reads back to the CPU to become a VideoFrame.
+const apple = options => { const f = fixture(options); f.sandbox.navigator.vendor = 'Apple Computer, Inc.'; return f; };
+
+/// A WebGL context that records what was asked of it. `pixels` is what the 2x2 centre check reads back; `fail`
+/// makes getError report an error after a draw.
+function fakeGl({ pixels = 7, fail = false, lost = false } = {}) {
+    return canvas => {
+        const gl = { calls: [], uploads: [], draws: 0, lost, released: false,
+            VERTEX_SHADER: 1, FRAGMENT_SHADER: 2, COMPILE_STATUS: 3, LINK_STATUS: 4, ARRAY_BUFFER: 5, STATIC_DRAW: 6, FLOAT: 7,
+            TEXTURE_2D: 8, TEXTURE_MIN_FILTER: 9, TEXTURE_MAG_FILTER: 10, TEXTURE_WRAP_S: 11, TEXTURE_WRAP_T: 12, LINEAR: 13,
+            CLAMP_TO_EDGE: 14, UNPACK_FLIP_Y_WEBGL: 15, UNPACK_PREMULTIPLY_ALPHA_WEBGL: 16, RGBA: 17, UNSIGNED_BYTE: 18,
+            TRIANGLE_STRIP: 19, NO_ERROR: 0,
+            createShader: () => ({}), shaderSource() {}, compileShader() {}, getShaderParameter: () => true,
+            createProgram: () => ({}), attachShader() {}, linkProgram() {}, getProgramParameter: () => true, useProgram() {},
+            createBuffer: () => ({}), bindBuffer() {}, bufferData() {}, getAttribLocation: () => 0, enableVertexAttribArray() {},
+            vertexAttribPointer() {}, createTexture: () => ({}), bindTexture() {}, texParameteri() {},
+            pixelStorei(name, value) { gl.calls.push(['pixelStorei', name, value]); },
+            viewport(x, y, w, h) { gl.calls.push(['viewport', w, h]); },
+            texImage2D(...args) { gl.uploads.push(args); },
+            drawArrays() { gl.draws++; },
+            getError: () => fail ? 1282 : 0,
+            readPixels(x, y, w, h, format, type, target) { target.fill(pixels); },
+            isContextLost: () => gl.lost,
+            getExtension: name => name === 'WEBGL_lose_context' ? { loseContext() { gl.released = true; } } : null };
+        gl.canvas = canvas;
+        return gl;
+    };
+}
+
+test('on the frame-callback path the camera is painted on the GPU, upright, at the encoder size', async () => {
+    const f = apple({ capture: 'rvfc', webgl: fakeGl() });
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    for (let i = 0; i < 4; i++) f.video.emit(i / 30);
+    const gl = f.p.glPainter.gl;
+    assert.equal(f.stats.encoded.length, 4);
+    assert.ok(f.stats.frames.every(x => x.source === gl.canvas && x.closed), 'frames come from the WebGL canvas and are closed');
+    assert.equal(gl.uploads.length, 4, 'one texture upload a picture');
+    assert.ok(gl.uploads.every(args => args.length === 6 && args[1] === 0 && args[2] === gl.RGBA && args[4] === gl.UNSIGNED_BYTE && args[5] === f.video),
+        "only the level-0 RGBA/UNSIGNED_BYTE upload of the element itself takes WebKit's GPU-to-GPU path");
+    assert.deepEqual(plain(gl.calls.find(x => x[0] === 'viewport')), ['viewport', 1280, 720]);
+    assert.deepEqual([gl.canvas.width, gl.canvas.height], [1280, 720]);
+    assert.ok(gl.calls.some(x => x[0] === 'pixelStorei' && x[1] === gl.UNPACK_FLIP_Y_WEBGL && x[2] === false),
+        'WebKit undoes the camera orientation in the upload; flipping again would turn the picture over');
+    assert.equal(f.canvases.filter(x => x.ops.length).length, 0, 'the 2D canvas, and its CPU readback, is never used');
+});
+
+test('an engine whose WebGL upload comes back empty falls back to the 2D canvas instead of sending black', async () => {
+    const f = apple({ capture: 'rvfc', webgl: fakeGl({ pixels: 0 }) });
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    f.video.emit(0); f.video.emit(1 / 30);
+    assert.equal(f.p.glPainter, false);
+    assert.equal(f.stats.encoded.length, 2, 'no picture is lost to the switch');
+    assert.ok(f.stats.frames.every(x => x.source === f.p.captureCanvas));
+    assert.equal(f.canvases.find(x => x.gl)?.gl.released, true, 'the abandoned context is released');
+});
+
+test('a WebGL error or a lost context also falls back, and the next capture tries WebGL again', async () => {
+    for (const options of [{ fail: true }, { lost: true }]) {
+        const f = apple({ capture: 'rvfc', webgl: fakeGl(options) });
+        await init(f);
+        await f.p.startCapture(f.host, {});
+        f.video.emit(0);
+        assert.equal(f.p.glPainter, false);
+        assert.equal(f.stats.encoded.length, 1);
+        f.p.stopCapture();
+        assert.equal(f.p.glPainter, null, 'a lost context is not a verdict on this device');
+    }
+});
+
+test('the painter checks its first picture once, not every picture', () => {
+    const gl = fakeGl()({ width: 0, height: 0 });
+    let reads = 0;
+    gl.readPixels = (x, y, w, h, format, type, target) => { reads++; target.fill(9); };
+    const canvas = { width: 0, height: 0, getContext: () => gl };
+    const sandbox = fixture().sandbox;
+    const painter = sandbox.GlFramePainter.create({ createElement: () => canvas });
+    for (let i = 0; i < 30; i++) painter.paint({}, 720, 1280);
+    assert.equal(reads, 1);
+    assert.deepEqual([canvas.width, canvas.height], [720, 1280]);
+    painter.release();
+    assert.equal(gl.released, true);
+});
+
+// ── Which encoders are hardware: Media Capabilities, since WebCodecs cannot say ──
+
+/// Safari's answers (LibWebRTCProvider::videoEncodingCapabilitiesOverride): H.264 power efficient, VP8/VP9/AV1
+/// encode not; decode as the device found hardware.
+const safariCapabilities = (vp9HardwareDecode = true) => ({
+    queries: [],
+    async encodingInfo(query) { this.queries.push(['encode', query]); return { supported: true, smooth: query.video.contentType === 'video/H264', powerEfficient: query.video.contentType === 'video/H264' }; },
+    async decodingInfo(query) { this.queries.push(['decode', query]); const hw = query.video.contentType === 'video/H264' || (vp9HardwareDecode && query.video.contentType === 'video/VP9');
+        return { supported: true, smooth: hw, powerEfficient: hw }; }
+});
+
+test('hardware is what Media Capabilities says is power efficient, so software VP9 on an iPhone is known as software', async () => {
+    const mediaCapabilities = safariCapabilities(false);
+    const f = fixture({ mediaCapabilities, support: config => !config.codec.startsWith('av01') });
+    const by = Object.fromEntries((await f.sandbox.probe(2160)).map(x => [x.codec, x]));
+    assert.equal(by.h264.hardware, true, 'VideoToolbox');
+    assert.equal(by.vp9.hardware, false, 'libvpx in the web process');
+    assert.equal(by.h264.decodeHardware, true);
+    assert.equal(by.vp9.decodeHardware, false, 'this iPhone has no VP9 decoder');
+    const query = mediaCapabilities.queries[0][1];
+    assert.equal(query.type, 'webrtc');
+    assert.deepEqual(Object.keys(query.video).sort(), ['bitrate', 'contentType', 'framerate', 'height', 'width'], 'every field WebKit requires');
+    assert.ok(!mediaCapabilities.queries.some(([kind, q]) => kind === 'encode' && q.video.contentType === 'video/AV1'), 'nothing is asked about an encoder that does not exist');
+});
+
+test('no Media Capabilities, a refusal or a throw all mean "not known to be hardware"', async () => {
+    assert.equal((await fixture().sandbox.probe(1080)).some(x => x.hardware || x.decodeHardware), false);
+    const refusing = { async encodingInfo() { return { supported: false, powerEfficient: true }; }, async decodingInfo() { throw new TypeError('bad'); } };
+    assert.equal((await fixture({ mediaCapabilities: refusing }).sandbox.probe(1080)).some(x => x.hardware || x.decodeHardware), false);
+});
+
+test('other engines keep the 2D canvas, which is GPU-backed there and cheaper than a WebGL round trip', async () => {
+    const f = fixture({ capture: 'rvfc', webgl: fakeGl() });
+    f.sandbox.navigator.vendor = 'Google Inc.';
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    f.video.emit(0);
+    assert.ok(!f.p.glPainter);
+    assert.ok(f.stats.frames.every(x => x.source === f.p.captureCanvas));
+    assert.equal(f.p.getDiagnostics().strategy, 'rvfc/2d');
+});
+
+test('diagnostics say which painter an iPhone is using', async () => {
+    const f = apple({ capture: 'rvfc', webgl: fakeGl() });
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    f.video.emit(0);
+    assert.equal(f.p.getDiagnostics().strategy, 'rvfc/webgl');
 });

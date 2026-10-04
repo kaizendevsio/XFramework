@@ -119,11 +119,45 @@ public sealed class VideoCallTests
     {
         var ladder = Ladder(Full(VideoCodec.Av1, hardware: false), Full(VideoCodec.Vp9), Full(VideoCodec.H264));
         VideoCodec[] peer = [VideoCodec.Av1, VideoCodec.Vp9, VideoCodec.H264];
+        var allSoftware = Ladder(Full(VideoCodec.Av1, hardware: false), Full(VideoCodec.Vp9, hardware: false), Full(VideoCodec.H264, hardware: false));
         Assert.Multiple(() =>
         {
             Assert.That(ladder.Negotiate([peer], 1080), Is.EqualTo(VideoCodec.Vp9));
-            Assert.That(ladder.Negotiate([peer], 360), Is.EqualTo(VideoCodec.Av1),
-                "software AV1 is worth its CPU at the small sizes, which is where low bandwidth lands");
+            Assert.That(ladder.Negotiate([peer], 360), Is.EqualTo(VideoCodec.Vp9),
+                "a hardware encoder further down the order beats a software one at any size");
+            Assert.That(allSoftware.Negotiate([peer], 360), Is.EqualTo(VideoCodec.Av1),
+                "with nothing in hardware, software AV1 is worth its CPU at the small sizes, where low bandwidth lands");
+        });
+    }
+
+    // What an iPhone reports: VP9 encodes in libvpx in the web process, H.264 in VideoToolbox. VP9 used to win
+    // at 540p and below (a four-person call, a low battery), running a software encoder for the whole call.
+    [Test]
+    public void OnAnIPhone_SoftwareVp9IsNeverPickedOverHardwareH264()
+    {
+        var iphone = Ladder(Full(VideoCodec.Vp9, hardware: false, maxHeight: 2160), Full(VideoCodec.H264, hardware: true, maxHeight: 2160));
+        VideoCodec[] peer = [VideoCodec.Vp9, VideoCodec.H264];
+        foreach (var height in new[] { 240, 360, 540, 720, 1080, 1440 })
+            Assert.That(iphone.Negotiate([peer], height), Is.EqualTo(VideoCodec.H264), $"{height}p");
+        var unknown = Ladder(Full(VideoCodec.Vp9, hardware: false), Full(VideoCodec.H264, hardware: false));
+        Assert.That(unknown.Negotiate([peer], 540), Is.EqualTo(VideoCodec.Vp9), "without a hardware signal the old rule stands");
+    }
+
+    [Test]
+    public void ADeviceDecodingH264InHardware_DoesNotAskPeersForCodecsItWouldDecodeInSoftware()
+    {
+        var iphone = new VideoCodecLadder();
+        iphone.Record(new(VideoCodec.Vp9, true, true, false, 2160, DecodeHardware: false));
+        iphone.Record(new(VideoCodec.H264, true, true, true, 2160, DecodeHardware: true));
+        var withVp9Decoder = new VideoCodecLadder();
+        withVp9Decoder.Record(new(VideoCodec.Vp9, true, true, false, 2160, DecodeHardware: true));
+        withVp9Decoder.Record(new(VideoCodec.H264, true, true, true, 2160, DecodeHardware: true));
+        var noSignal = Ladder(Full(VideoCodec.Vp9, hardware: false), Full(VideoCodec.H264, hardware: false));
+        Assert.Multiple(() =>
+        {
+            Assert.That(iphone.Decodable, Is.EqualTo(new[] { VideoCodec.H264 }));
+            Assert.That(withVp9Decoder.Decodable, Is.EqualTo(new[] { VideoCodec.Vp9, VideoCodec.H264 }));
+            Assert.That(noSignal.Decodable, Is.EqualTo(new[] { VideoCodec.Vp9, VideoCodec.H264 }), "unknown hardware keeps every decoder");
         });
     }
 

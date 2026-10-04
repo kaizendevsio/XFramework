@@ -9,9 +9,13 @@ public enum VideoCodec { None = 0, Av1 = 1, Vp9 = 2, H264 = 3 }
 /// <param name="Codec">The codec family.</param>
 /// <param name="Encode">The encoder accepted a configuration at <paramref name="MaxHeight"/>.</param>
 /// <param name="Decode">The decoder accepted a configuration at <paramref name="MaxHeight"/>.</param>
-/// <param name="Hardware">Whether hardware encoding is known. A WebCodecs preference hint alone cannot establish this.</param>
+/// <param name="Hardware">
+/// Hardware encoding is known: Media Capabilities ('webrtc') reported the encoder power efficient. A WebCodecs
+/// preference hint cannot establish this; WebKit ignores it for encoders.
+/// </param>
 /// <param name="MaxHeight">Tallest probed frame the encoder accepted, 0 when it accepted none.</param>
-public sealed record VideoCodecSupport(VideoCodec Codec, bool Encode, bool Decode, bool Hardware, int MaxHeight);
+/// <param name="DecodeHardware">The same signal for the decoder.</param>
+public sealed record VideoCodecSupport(VideoCodec Codec, bool Encode, bool Decode, bool Hardware, int MaxHeight, bool DecodeHardware = false);
 
 /// <summary>
 /// Per-device codec probing results plus the peer intersection that picks the wire codec.
@@ -42,8 +46,15 @@ public sealed class VideoCodecLadder
 
     public VideoCodecSupport? For(VideoCodec codec) => support.GetValueOrDefault(codec);
 
-    /// <summary>Codecs this device can decode, in compression order. This is what peers are told.</summary>
-    public VideoCodec[] Decodable => Preference.Where(codec => support.GetValueOrDefault(codec)?.Decode == true).ToArray();
+    /// <summary>
+    /// Codecs this device can decode, in compression order. This is what peers are told.
+    ///
+    /// Where H.264 decodes in hardware, a codec this device would decode in software is left out: a sender that
+    /// picks it saves some bits and costs this device a CPU core for the whole call (an iPhone without a VP9 decoder
+    /// runs libvpx in the web process). A device with no hardware H.264 decoder keeps every decoder it has.
+    /// </summary>
+    public VideoCodec[] Decodable => Preference.Where(codec => support.GetValueOrDefault(codec) is { Decode: true } local &&
+        (local.DecodeHardware || codec == VideoCodec.H264 || support.GetValueOrDefault(VideoCodec.H264)?.DecodeHardware != true)).ToArray();
 
     /// <summary>Maximum safe height for the selected encoder, including software limits.</summary>
     public int EncodingCeiling(VideoCodec codec) => support.GetValueOrDefault(codec) is { Encode: true } local
@@ -52,16 +63,19 @@ public sealed class VideoCodecLadder
     /// <summary>
     /// Pick the codec to encode with: the first in compression order that this device can encode
     /// at <paramref name="height"/> without a software stall, and that every peer can decode.
+    /// A software encoder is never chosen over a hardware one further down the order: on an iPhone VP9 is libvpx
+    /// and H.264 is VideoToolbox, and the bits VP9 saves are not worth a phone's CPU for a whole call.
     /// Peers that advertised nothing are treated as H.264-only, which is the universal baseline.
     /// </summary>
     public VideoCodec Negotiate(IEnumerable<VideoCodec[]> peerDecoders, int height)
     {
         var peers = peerDecoders.Select(x => x is { Length: > 0 } ? x : [VideoCodec.H264]).ToArray();
-        foreach (var codec in Preference)
+        bool Usable(VideoCodec codec) => support.GetValueOrDefault(codec) is { Encode: true } local && local.MaxHeight >= height &&
+            (local.Hardware || height <= SoftwareCeiling(codec)) && peers.All(peer => peer.Contains(codec));
+        var candidates = Preference.Where(Usable).ToArray();
+        foreach (var codec in candidates)
         {
-            if (support.GetValueOrDefault(codec) is not { Encode: true } local || local.MaxHeight < height) continue;
-            if (!local.Hardware && height > SoftwareCeiling(codec)) continue;
-            if (peers.All(peer => peer.Contains(codec))) return codec;
+            if (support[codec].Hardware || !candidates.Any(other => support[other].Hardware)) return codec;
         }
         return VideoCodec.None;
     }
