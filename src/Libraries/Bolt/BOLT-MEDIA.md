@@ -8,7 +8,7 @@ For standard XFramework module RPC, prefer the generated `[BoltHandler]` plus `I
 
 **Current status:** the general Hub media, ECDH and group-conference paths remain quarantined. A separate, explicitly scoped implementation now serves Yap through its authenticated HTTPS host. See [Yap voice trusted-server relay](../../../docs/solutions/architecture-patterns/yap-voice-trusted-server-relay.md) for its security decision, browser verification and device limitations. This transport-encrypted relay is not end-to-end encrypted and is not a replacement for WebRTC.
 
-Yap's encrypted group path additionally carries camera video under the same per-epoch SFrame key as the audio. Because the SFrame session accepts at most 4096 plaintext bytes per operation, an encoded picture is cut into fragments that each go through the same authenticated encryption as an Opus packet; the fragment header (picture ID, index, count, keyframe flag, timestamp) travels inside that plaintext, so the relay cannot see or forge a picture boundary. The relay routes `MediaType.Video` only for `AV1`, `VP9` and `H264`, and only with the encrypted-payload flag set. Nothing outside that path is unquarantined.
+Yap's encrypted group path additionally carries camera video under the same per-epoch SFrame key as the audio. Because the SFrame session accepts at most 4096 plaintext bytes per operation, an encoded picture is cut into fragments that each go through the same authenticated encryption as an Opus packet; the fragment header (picture ID, index, count, keyframe flag, timestamp, and the picture's orientation) travels inside that plaintext, so the relay cannot see or forge a picture boundary or turn a picture. The relay routes `MediaType.Video` only for `AV1`, `VP9` and `H264`, and only with the encrypted-payload flag set. Nothing outside that path is unquarantined.
 
 ### Deployment Containment
 
@@ -84,6 +84,21 @@ The intended SFU path forwards encoded payloads without codec decoding. The curr
 - **flags** — bit 0: keyframe (first fragment of a keyframe), bits 1-2: temporal layer of a video picture (0 = base), bit 3: FEC-protected, bit 4: encrypted, bit 6: drop-eligible, bit 7: compressed. Bit 2 means "silence indicator" on the legacy unencrypted audio path.
 
 The flags and the timestamp are clear and not covered by the SFrame AAD (which binds call, epoch, roster, sender, stream, sequence and timestamp values the receiver checks). They only steer what a relay forwards: receivers take the keyframe flag and the temporal layer from the fragment header inside the ciphertext, so a relay that rewrites them can only drop more or less, which it can do anyway. The relay learns each picture's layer, a coarse view of the frame structure comparable to WebRTC's dependency descriptor.
+
+### Camera orientation
+
+A phone camera hands over sensor-oriented (landscape) pixels with the display rotation and flip as `VideoFrame`
+metadata, which a `VideoEncoder` does not carry. When every member announced `CallMediaFormat.Oriented` in its signed key
+envelope, the sender encodes the sensor pixels as they are (a `new VideoFrame(frame, {rotation, flip})` with the inverse
+orientation strips the metadata without a copy; an encoder must never see an orientation, since it refuses a change
+without a reconfigure) and sends the orientation in the fragment header: version 2, byte 3 (quarter turns clockwise in
+bits 0-1, a horizontal flip after the rotation in bit 2). The header is inside the SFrame plaintext, so the orientation is
+encrypted and authenticated with the picture; a relay can neither read nor change it. The receiver applies it with one
+transformed `drawImage` into a canvas of the displayed size. Turning the phone then changes only that byte: the sensor
+raster, the encoder and the reference pictures stay, so it costs no keyframe. With any older member, or a browser that
+cannot strip orientation, the sender redraws the frame upright first (as before), and a change in what the pixels have
+baked in forces a keyframe. Upright pictures always use header version 1. Safari's frame-callback path paints the camera
+element, which is upright already, and is unchanged.
 
 ### Congestion control on the WebSocket path
 

@@ -4,8 +4,12 @@ namespace Bolt.Media.Browser;
 
 /// <summary>A reassembled encoded picture, ready for the decoder.</summary>
 /// <param name="Layer">Temporal layer (0 = base, or a sender without layers).</param>
+/// <param name="Orientation">
+/// How the receiver turns the decoded picture: quarter turns clockwise (bits 0-1), then a horizontal flip (bit 2), as
+/// VideoFrame.rotation and VideoFrame.flip define them. 0 is upright.
+/// </param>
 public readonly record struct VideoFramePayload(byte[] Data, uint TimestampMicroseconds, bool IsKeyframe, bool Discontinuity = false, uint FrameId = 0,
-    int Layer = 0);
+    int Layer = 0, int Orientation = 0);
 
 /// <summary>
 /// Splits an encoded picture into SFrame-sized pieces and puts it back together.
@@ -22,6 +26,13 @@ public readonly record struct VideoFramePayload(byte[] Data, uint TimestampMicro
 ///
 /// Header byte 0 is the version (high nibble), the keyframe (0x01) and last-fragment (0x02) bits and
 /// the temporal layer (bits 2-3). Receivers that predate layers ignore bits 2-3.
+///
+/// Version 2 differs only in bytes 2-3: the fragment index is byte 2 alone (a picture has at most 256 fragments, so
+/// the index's high byte was always zero) and byte 3 is the picture's orientation (bits 0-2; the rest must be zero).
+/// A sender uses it only for a picture that is not upright, and only when every receiver announced
+/// <see cref="CallMediaFormat.Oriented"/> in its authenticated key envelope: an older receiver drops version 2. Being
+/// in the plaintext, the orientation is encrypted and authenticated with the picture, so a relay can neither read
+/// nor turn it.
 ///
 /// The fragment size depends on the sender's path: 4 KB on a WebSocket, about 800 bytes on a data
 /// channel, where each fragment must fit one unretransmitted datagram. Within one picture every
@@ -44,6 +55,9 @@ public static class VideoFrameFragments
     /// <summary>Room for the authenticated context to grow (its sequence and timestamp digits).</summary>
     public const int ContextSlack = 24;
     private const byte Version = 0x10;
+    internal const byte OrientedVersion = 0x20;
+    /// <summary>Quarter turns (bits 0-1) and the flip (bit 2).</summary>
+    public const int OrientationMask = 0x07;
     private const byte KeyframeFlag = 0x01, LastFlag = 0x02;
     internal const byte LayerMask = 0x0C;
     internal const int LayerShift = 2;
@@ -56,9 +70,11 @@ public static class VideoFrameFragments
     /// Cut one encoded picture into wire fragments. Returns an empty list when the picture is
     /// larger than the reassembly bound: dropping it is correct, a partial picture is not.
     /// </summary>
+    /// <param name="orientation">The picture's orientation code (see <see cref="VideoFramePayload.Orientation"/>); 0 keeps version 1.</param>
     public static List<byte[]> Split(ReadOnlySpan<byte> encoded, uint frameId, uint timestampMicroseconds, bool isKeyframe, int layer = 0,
-        int payload = MaxPayload)
+        int payload = MaxPayload, int orientation = 0)
     {
+        ArgumentOutOfRangeException.ThrowIfNotEqual(orientation & ~OrientationMask, 0, nameof(orientation));
         payload = Math.Clamp(payload, MinPayload, MaxPayload);
         var layerBits = (byte)((isKeyframe ? 0 : Math.Clamp(layer, 0, 3)) << LayerShift);
         var count = FragmentCount(encoded.Length, payload);
@@ -69,9 +85,11 @@ public static class VideoFrameFragments
             var offset = index * payload;
             var size = Math.Min(payload, encoded.Length - offset);
             var fragment = new byte[HeaderSize + size];
-            fragment[0] = (byte)(Version | (isKeyframe ? KeyframeFlag : 0) | (index == count - 1 ? LastFlag : 0) | layerBits);
+            fragment[0] = (byte)((orientation == 0 ? Version : OrientedVersion) | (isKeyframe ? KeyframeFlag : 0) |
+                                 (index == count - 1 ? LastFlag : 0) | layerBits);
             fragment[1] = (byte)(count - 1);
-            BinaryPrimitives.WriteUInt16LittleEndian(fragment.AsSpan(2), (ushort)index);
+            if (orientation == 0) BinaryPrimitives.WriteUInt16LittleEndian(fragment.AsSpan(2), (ushort)index);
+            else { fragment[2] = (byte)index; fragment[3] = (byte)orientation; }
             BinaryPrimitives.WriteUInt32LittleEndian(fragment.AsSpan(4), frameId);
             BinaryPrimitives.WriteUInt32LittleEndian(fragment.AsSpan(8), timestampMicroseconds);
             encoded.Slice(offset, size).CopyTo(fragment.AsSpan(HeaderSize));
@@ -105,7 +123,7 @@ public sealed class VideoFrameAssembler
         public int FragmentSize;
         public uint Timestamp;
         public bool Keyframe;
-        public int Layer;
+        public int Layer, Orientation;
         public long Order;
     }
 
@@ -125,55 +143,56 @@ public sealed class VideoFrameAssembler
     public int Incomplete { get; private set; }
 
     /// <summary>A fragment header that passed the checks every fragment must pass on its own.</summary>
-    internal readonly record struct FragmentHeader(int Total, int Index, uint FrameId, uint Timestamp, bool Keyframe, int Layer);
+    internal readonly record struct FragmentHeader(int Total, int Index, uint FrameId, uint Timestamp, bool Keyframe, int Layer, int Orientation);
 
     /// <summary>
-    /// Parse one fragment's header with the checks that need no other fragment: version, sizes, the count, and that a
-    /// non-final fragment is not short. Shared with <see cref="VideoRecoveryBuffer"/>.
+    /// Parse one fragment's header with the checks that need no other fragment: version, sizes, the count, that a
+    /// non-final fragment is not short, and that a version 2 orientation byte has no unknown bits. Shared with
+    /// <see cref="VideoRecoveryBuffer"/>.
     /// </summary>
     internal static bool TryParse(ReadOnlySpan<byte> fragment, out FragmentHeader header)
     {
         header = default;
-        if (fragment.Length <= VideoFrameFragments.HeaderSize ||
-            fragment.Length > VideoFrameFragments.MaxPlaintext ||
-            (fragment[0] & VersionMask) != Version) return false;
+        if (fragment.Length <= VideoFrameFragments.HeaderSize || fragment.Length > VideoFrameFragments.MaxPlaintext) return false;
+        var version = fragment[0] & VersionMask;
+        if (version != Version && version != VideoFrameFragments.OrientedVersion) return false;
         var total = fragment[1] + 1;
-        var index = BinaryPrimitives.ReadUInt16LittleEndian(fragment[2..]);
+        int index, orientation = 0;
+        if (version == Version) index = BinaryPrimitives.ReadUInt16LittleEndian(fragment[2..]);
+        else
+        {
+            index = fragment[2];
+            orientation = fragment[3];
+            if ((orientation & ~VideoFrameFragments.OrientationMask) != 0) return false;
+        }
         var payload = fragment.Length - VideoFrameFragments.HeaderSize;
         if (total > VideoFrameFragments.MaxFragments || index >= total) return false;
+        // Fragments of one picture share one size, set by the sender's path; only the final one may be short.
+        // Anything else is a truncated or forged split. The whole picture stays within the reassembly bound.
         if (index != total - 1 && payload < VideoFrameFragments.MinPayload) return false;
         if ((long)(total - 1) * VideoFrameFragments.MinPayload > VideoFrameFragments.MaxPictureBytes) return false;
         header = new FragmentHeader(total, index, BinaryPrimitives.ReadUInt32LittleEndian(fragment[4..]),
             BinaryPrimitives.ReadUInt32LittleEndian(fragment[8..]), (fragment[0] & KeyframeFlag) != 0,
-            (fragment[0] & VideoFrameFragments.LayerMask) >> VideoFrameFragments.LayerShift);
+            (fragment[0] & VideoFrameFragments.LayerMask) >> VideoFrameFragments.LayerShift, orientation);
         return true;
     }
 
     /// <summary>Feed one decrypted fragment. Returns the picture once its last missing piece lands.</summary>
     public VideoFramePayload? Add(ReadOnlySpan<byte> fragment)
     {
-        if (fragment.Length <= VideoFrameFragments.HeaderSize ||
-            fragment.Length > VideoFrameFragments.MaxPlaintext ||
-            (fragment[0] & VersionMask) != Version) return null;
-        var total = fragment[1] + 1;
-        var index = BinaryPrimitives.ReadUInt16LittleEndian(fragment[2..]);
-        var frameId = BinaryPrimitives.ReadUInt32LittleEndian(fragment[4..]);
-        var timestamp = BinaryPrimitives.ReadUInt32LittleEndian(fragment[8..]);
+        if (!TryParse(fragment, out var header)) return null;
+        var (total, index, frameId, timestamp) = (header.Total, header.Index, header.FrameId, header.Timestamp);
         var payload = fragment[VideoFrameFragments.HeaderSize..];
-        if (total > VideoFrameFragments.MaxFragments || index >= total) return null;
-        // Fragments of one picture share one size, set by the sender's path; only the final one may be short.
-        // Anything else is a truncated or forged split. The whole picture stays within the reassembly bound.
-        if (index != total - 1 && payload.Length < VideoFrameFragments.MinPayload) return null;
-        if ((long)(total - 1) * VideoFrameFragments.MinPayload > VideoFrameFragments.MaxPictureBytes) return null;
         // A picture already handed to the decoder must not be rebuilt from replayed fragments.
         if (hasCompleted && unchecked(frameId - lastCompleted) is 0 or > 0x8000_0000u) return null;
 
         if (!pending.TryGetValue(frameId, out var slot))
         {
             if (pending.Count >= MaxPending) DropOldest();
-            pending[frameId] = slot = new Pending { Parts = new byte[total][], Total = total, Order = ++sequence };
+            pending[frameId] = slot = new Pending { Parts = new byte[total][], Total = total, Orientation = header.Orientation, Order = ++sequence };
         }
-        else if (slot.Total != total) { pending.Remove(frameId); Lost(); return null; }
+        // One picture has one fragment count and one orientation; a fragment that disagrees is not part of it.
+        else if (slot.Total != total || slot.Orientation != header.Orientation) { pending.Remove(frameId); Lost(); return null; }
 
         if (slot.Parts[index] is not null) return null;
         var size = index != total - 1 ? payload.Length : 0;
@@ -184,8 +203,8 @@ public sealed class VideoFrameAssembler
         slot.Parts[index] = payload.ToArray();
         slot.Received++; slot.Bytes += payload.Length;
         slot.Timestamp = timestamp;
-        if ((fragment[0] & KeyframeFlag) != 0) slot.Keyframe = true;
-        slot.Layer = (fragment[0] & VideoFrameFragments.LayerMask) >> VideoFrameFragments.LayerShift;
+        if (header.Keyframe) slot.Keyframe = true;
+        slot.Layer = header.Layer;
         if (slot.Layer > 0) Layered = true;
         if (slot.Received != slot.Total) return null;
         // A one-fragment picture has no size to check; otherwise the last part must not exceed the others.
@@ -209,7 +228,7 @@ public sealed class VideoFrameAssembler
         var discontinuity = gap && (!Layered || localLoss);
         if (slot.Keyframe || discontinuity) localLoss = false;
         lastCompleted = frameId; hasCompleted = true;
-        return new(data, slot.Timestamp, slot.Keyframe, discontinuity, frameId, slot.Keyframe ? 0 : slot.Layer);
+        return new(data, slot.Timestamp, slot.Keyframe, discontinuity, frameId, slot.Keyframe ? 0 : slot.Layer, slot.Orientation);
     }
 
     public void Reset() { pending.Clear(); hasCompleted = false; Incomplete = 0; localLoss = false; }

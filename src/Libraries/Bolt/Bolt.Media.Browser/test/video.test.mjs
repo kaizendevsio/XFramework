@@ -14,19 +14,32 @@ const source = readFileSync(new URL('../wwwroot/bolt-media.js', import.meta.url)
 // Safari (MediaStreamTrackProcessor is worker-only there, so undefined on the page) and 'none' is
 // a browser too old for either.
 function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 8, battery = null, cameras = 1,
-    capture = 'processor', frameFromElement = true, clock = () => performance.now(), webgl = null, mediaCapabilities = undefined } = {}) {
+    capture = 'processor', frameFromElement = true, clock = () => performance.now(), webgl = null, mediaCapabilities = undefined,
+    orientationInit = true } = {}) {
     const listeners = new Map();
     const stats = { encoded: [], decoded: [], stopped: 0, opened: [], invoked: [], closedFrames: 0, frames: [] };
 
     class Frame {
         constructor(source, init) {
             if (source?.isVideoElement && !frameFromElement) throw new TypeError('unsupported source');
-            this.source = source; this.timestamp = init?.timestamp; this.closed = false;
+            this.source = source; this.timestamp = init?.timestamp ?? source?.timestamp; this.closed = false;
             // Canvas frames start upright. Pixel-level orientation is also checked in a real browser.
             this.rotation = init?.rotation ?? source?.rotation ?? 0;
             this.flip = init?.flip ?? source?.flip ?? false;
             this.displayWidth = source?.displayWidth ?? source?.width ?? source?.videoWidth ?? 0;
             this.displayHeight = source?.displayHeight ?? source?.height ?? source?.videoHeight ?? 0;
+            if (source?.camera || source instanceof Frame) {
+                // A frame wrapping a frame composes orientation (WebCodecs "add rotations"), as Chromium does: the
+                // rotation adds (subtracts once flipped), the flips cancel, and a quarter turn swaps the displayed sides.
+                // orientationInit: false is a browser that predates orientation in VideoFrameInit and ignores it.
+                const base = source.rotation ?? 0, baseFlip = source.flip === true;
+                const rotation = orientationInit ? init?.rotation ?? 0 : 0, flip = orientationInit && init?.flip === true;
+                this.rotation = (((baseFlip ? base - rotation : base + rotation) % 360) + 360) % 360;
+                this.flip = baseFlip !== flip;
+                if ((this.rotation / 90) % 2 !== (base / 90) % 2)
+                    [this.displayWidth, this.displayHeight] = [this.displayHeight, this.displayWidth];
+                this.wraps = source;
+            }
             stats.frames.push(this);
         }
         close() { this.closed = true; stats.closedFrames++; }
@@ -43,6 +56,7 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
             translate: (x, y) => canvas.ops.push(['translate', x, y]),
             rotate: angle => canvas.ops.push(['rotate', angle]),
             scale: (x, y) => canvas.ops.push(['scale', x, y]),
+            setTransform: (...m) => canvas.ops.push(['setTransform', ...m]),
             drawImage: (...args) => canvas.ops.push(['drawImage', ...args])
         };
         // No WebGL unless the test describes one: the 2D canvas is then the only painter.
@@ -95,7 +109,7 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
             return { supported: !!support(config, 'encode'), config };
         }
         constructor(callbacks) { this.callbacks = callbacks; this.state = 'unconfigured'; this.encodeQueueSize = 0; }
-        configure(config) { this.state = 'configured'; this.config = config; }
+        configure(config) { this.state = 'configured'; this.config = config; stats.configured = (stats.configured ?? 0) + 1; }
         encode(frame, options) {
             stats.encoded.push({ frame, options, config: this.config });
             this.callbacks.output({ byteLength: 8, type: options?.keyFrame ? 'key' : 'delta', timestamp: frame.timestamp,
@@ -179,7 +193,10 @@ this.capabilities = checkVideoCapabilities;
 this.strategyOf = typeof videoCaptureStrategy === 'function' ? videoCaptureStrategy : () => 'absent';
 this.codecString = videoCodecString;
 this.fitTier = fitTierToSource;
-this.GlFramePainter = GlFramePainter;`, sandbox);
+this.GlFramePainter = GlFramePainter;
+this.orientationMatrix = orientationMatrix;
+this.orientedSize = orientedSize;
+this.orientationCode = orientationCode;`, sandbox);
 
     const host = { invokeMethodAsync: async (...args) => { stats.invoked.push(args); } };
     const canvas = { width: 0, height: 0, getContext: () => ({ drawImage() {} }) };
@@ -705,6 +722,243 @@ test('Safari paints upright element pixels, rather than retaining sensor metadat
     assert.deepEqual([canvas.width, canvas.height], [720, 1280]);
     assert.equal(canvas.ops.find(op => op[0] === 'drawImage')[1], f.video);
     assert.equal(canvas.ops.some(op => op[0] === 'rotate'), false);
+});
+
+// ── Orientation as metadata ──
+// When every receiver announced (in its authenticated key envelope) that it reads the orientation from the
+// fragment header, the sender stops redrawing: the sensor pixels are encoded as they are, and the receiver turns
+// the picture when it paints it.
+
+const sent = f => f.stats.invoked.filter(x => x[0] === 'OnVideoEncoded');
+const settle = () => new Promise(resolve => setImmediate(resolve));
+/// A portrait phone on MediaStreamTrackProcessor: 1280x720 sensor pixels shown as 720x1280.
+const portrait = (f, rotation = 90, timestamp = 0, flip = false) =>
+    f.pushFrame({ displayWidth: rotation % 180 ? 720 : 1280, displayHeight: rotation % 180 ? 1280 : 720, rotation, flip, timestamp });
+
+test('with every receiver reading orientation, a rotated Android frame is encoded as the sensor gave it, with no redraw', async () => {
+    const f = fixture();
+    await init(f);
+    f.p.setOrientationMetadata(true);
+    await f.p.startCapture(f.host, {});
+    const camera = portrait(f, 90);
+    await settle();
+
+    assert.ok(f.canvases.every(c => c.ops.length === 0), 'no canvas, no drawImage, no pixel copy');
+    const encoded = f.stats.encoded.at(-1).frame;
+    assert.equal(encoded.wraps, camera, 'the encoder gets the camera frame itself, its orientation taken off');
+    assert.equal(encoded.rotation, 0, 'an encoder must never see an orientation: it would throw on the next one');
+    assert.equal(encoded.flip, false);
+    assert.deepEqual([encoded.displayWidth, encoded.displayHeight], [1280, 720]);
+    assert.deepEqual([f.p.encoder.config.width, f.p.encoder.config.height], [1280, 720], 'fitted to the sensor raster');
+    assert.equal(f.stats.encoded.at(-1).options.keyFrame, true);
+    assert.equal(sent(f).at(-1)[6], 1, 'a quarter turn clockwise goes with the picture');
+    assert.equal(camera.closed, true);
+    assert.equal(encoded.closed, true);
+});
+
+test('every rotation and flip is carried as its code, and an upright frame as none', async () => {
+    const f = fixture();
+    await init(f);
+    f.p.setOrientationMetadata(true);
+    await f.p.startCapture(f.host, {});
+    const cases = [[0, false, 0], [90, false, 1], [180, false, 2], [270, false, 3], [0, true, 4], [90, true, 5], [180, true, 6], [270, true, 7]];
+    for (const [i, [rotation, flip]] of cases.entries()) { portrait(f, rotation, (i + 1) * 40_000, flip); await settle(); }
+    assert.deepEqual(sent(f).map(x => x[6]), cases.map(x => x[2]));
+    assert.ok(f.stats.encoded.every(x => x.frame.rotation === 0 && x.frame.flip === false));
+    assert.ok(f.canvases.every(c => c.ops.length === 0));
+    assert.equal(f.p.encodeOrientation.size, 0, 'each recorded orientation is claimed by its output');
+});
+
+test('without that promise from every receiver, the frame is still redrawn upright and sent with no code', async () => {
+    const f = fixture();
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    portrait(f, 90);
+    await settle();
+    assert.ok(f.canvases.some(c => c.ops.some(op => op[0] === 'drawImage')), 'an older receiver gets upright pixels');
+    assert.equal(sent(f).at(-1)[6], 0);
+    assert.deepEqual([f.p.encoder.config.width, f.p.encoder.config.height], [720, 1280]);
+});
+
+test('an older client joining switches to the redraw on a keyframe, and leaving switches back on one', async () => {
+    const f = fixture();
+    await init(f);
+    f.p.setOrientationMetadata(true);
+    await f.p.startCapture(f.host, {});
+    portrait(f, 180);
+    await settle();
+    f.p._takeKeyframe(Date.now());
+    portrait(f, 180, 40_000);
+    await settle();
+    assert.equal(f.stats.encoded.at(-1).options.keyFrame, false);
+    // A half turn keeps the shape, so nothing reshapes the encoder: the switch itself must ask for the keyframe.
+    f.p.setOrientationMetadata(false);
+    portrait(f, 180, 80_000);
+    await settle();
+    assert.equal(f.stats.encoded.at(-1).options.keyFrame, true, 'turned pixels must not be decoded against unturned references');
+    assert.equal(sent(f).at(-1)[6], 0);
+    f.p.setOrientationMetadata(true);
+    portrait(f, 180, 120_000);
+    await settle();
+    assert.equal(f.stats.encoded.at(-1).options.keyFrame, true);
+    assert.equal(sent(f).at(-1)[6], 2);
+});
+
+test('a browser that cannot take the orientation off a frame falls back to the redraw, and stops trying', async () => {
+    const f = fixture({ orientationInit: false });
+    await init(f);
+    f.p.setOrientationMetadata(true);
+    await f.p.startCapture(f.host, {});
+    portrait(f, 90);
+    await settle();
+    assert.equal(f.p.orientationUnwrap, false);
+    assert.equal(sent(f).at(-1)[6], 0, 'the redrawn picture is upright: no code');
+    assert.ok(f.canvases.some(c => c.ops.some(op => op[0] === 'drawImage')));
+    const wrapped = f.stats.frames.filter(x => x.wraps).length;
+    portrait(f, 90, 40_000);
+    await settle();
+    assert.equal(f.stats.frames.filter(x => x.wraps).length, wrapped, 'no second attempt per frame');
+    assert.ok(f.stats.frames.every(x => x.closed), 'the abandoned wrapper and every camera frame are closed');
+});
+
+test('turning the phone mid-call changes only the code: no reconfigure and no keyframe', async () => {
+    const f = fixture();
+    await init(f);
+    f.p.setOrientationMetadata(true);
+    await f.p.startCapture(f.host, {});
+    portrait(f, 90);
+    await settle();
+    const configured = f.stats.configured;
+    for (const [i, rotation] of [0, 270, 180, 90].entries()) { portrait(f, rotation, (i + 1) * 40_000); await settle(); }
+    assert.equal(f.stats.configured, configured, 'the sensor raster never changed');
+    assert.deepEqual(f.stats.encoded.slice(1).map(x => x.options.keyFrame), [false, false, false, false]);
+    assert.deepEqual(sent(f).map(x => x[6]), [1, 0, 3, 2, 1]);
+    assert.deepEqual([f.p.encoder.config.width, f.p.encoder.config.height], [1280, 720]);
+});
+
+test('with the redraw, turning the phone over reshapes on a keyframe, and a half turn now forces one too', async () => {
+    const f = fixture();
+    await init(f);
+    await f.p.startCapture(f.host, {});
+    portrait(f, 90);
+    await settle();
+    f.p._takeKeyframe(Date.now());
+    portrait(f, 0, 40_000);
+    await settle();
+    assert.equal(f.stats.encoded.at(-1).options.keyFrame, true, 'a new raster');
+    assert.equal(f.p.encoder.config.width, 1280);
+    f.p._takeKeyframe(Date.now());
+    portrait(f, 180, 80_000);
+    await settle();
+    assert.equal(f.stats.encoded.at(-1).options.keyFrame, true, 'same raster, upside-down pixels: references no longer fit');
+});
+
+test('tier fitting on the sensor raster gives the same picture, turned, as fitting the upright one', async () => {
+    const f = fixture();
+    const { fitTier, orientedSize } = f.sandbox;
+    for (const [tierWidth, tierHeight] of [[3840, 2160], [1920, 1080], [1280, 720], [960, 540], [640, 360], [426, 240]])
+        for (const [sensorWidth, sensorHeight] of [[1280, 720], [1920, 1080], [1440, 1080], [640, 480]]) {
+            const sensor = plain(fitTier(tierWidth, tierHeight, sensorWidth, sensorHeight));
+            const upright = plain(fitTier(tierWidth, tierHeight, sensorHeight, sensorWidth));
+            assert.deepEqual(plain(orientedSize(sensor.width, sensor.height, 1)), upright, `${tierWidth}x${tierHeight} on ${sensorWidth}x${sensorHeight}`);
+        }
+    await init(f);
+    f.p.setOrientationMetadata(true);
+    await f.p.startCapture(f.host, {});
+    portrait(f, 90);
+    await settle();
+    assert.equal(await f.p.applyTier(640, 360, 400, 20), true);
+    assert.deepEqual([f.p.encoder.config.width, f.p.encoder.config.height], [640, 360], 'shown 360x640 portrait');
+    assert.equal(f.p.encoder.config.codec, f.sandbox.codecString('h264', 360, 20), 'the level follows the short edge either way');
+});
+
+test('the receiver paints each code at the displayed size, with one transformed drawImage', () => {
+    const f = fixture();
+    const canvas = f.sandbox.document.createElement('canvas');
+    f.p.addRemote('s', canvas, 'h264', f.host);
+    const remote = f.p.remotes.get('s');
+    for (let code = 0; code < 8; code++) {
+        const timestamp = 1000 * (code + 1);
+        assert.equal(f.p.decodeFrame('s', new Uint8Array([1]), timestamp, true, false, code), true);
+        canvas.ops.length = 0;
+        remote.decoder.callbacks.output({ timestamp, displayWidth: 1280, displayHeight: 720, close() {} });
+        const [width, height] = code & 1 ? [720, 1280] : [1280, 720];
+        assert.deepEqual([canvas.width, canvas.height], [width, height], `code ${code}`);
+        assert.deepEqual([remote.width, remote.height], [width, height]);
+        const draws = canvas.ops.filter(op => op[0] === 'drawImage');
+        assert.equal(draws.length, 1);
+        assert.deepEqual(draws[0].slice(2), [0, 0, 1280, 720], 'the decoded picture is drawn at its own size');
+        const transforms = canvas.ops.filter(op => op[0] === 'setTransform');
+        if (code === 0) { assert.equal(transforms.length, 0, 'an upright picture is painted exactly as before'); continue; }
+        assert.deepEqual(transforms[0].slice(1), plain(f.sandbox.orientationMatrix(1280, 720, code)));
+        assert.deepEqual(transforms.at(-1).slice(1), [1, 0, 0, 1, 0, 0], 'the context is left as it was found');
+    }
+});
+
+test('the transform maps the picture onto the canvas exactly, as rotation then flip', () => {
+    const { orientationMatrix, orientedSize } = fixture().sandbox;
+    const apply = ([a, b, c, d, e, f], x, y) => [a * x + c * y + e, b * x + d * y + f];
+    const w = 4, h = 2;
+    // Where the picture's top-left corner lands, per code (clockwise quarter turns, then a horizontal flip).
+    const topLeft = { 0: [0, 0], 1: [2, 0], 2: [4, 2], 3: [0, 4], 4: [4, 0], 5: [0, 0], 6: [0, 2], 7: [2, 4] };
+    for (let code = 0; code < 8; code++) {
+        const m = orientationMatrix(w, h, code);
+        const size = orientedSize(w, h, code);
+        assert.deepEqual(apply(m, 0, 0), topLeft[code], `code ${code}`);
+        const corners = [[0, 0], [w, 0], [0, h], [w, h]].map(([x, y]) => apply(m, x, y));
+        assert.ok(corners.every(([x, y]) => x >= 0 && y >= 0 && x <= size.width && y <= size.height), 'nothing falls off the canvas');
+        assert.equal(new Set(corners.map(String)).size, 4);
+    }
+});
+
+test('a decoded picture is turned by the code it was sent with, not by the latest one', () => {
+    const f = fixture();
+    const canvas = f.sandbox.document.createElement('canvas');
+    f.p.addRemote('s', canvas, 'h264', f.host);
+    const remote = f.p.remotes.get('s');
+    f.p.decodeFrame('s', new Uint8Array([1]), 100, true, false, 1);
+    f.p.decodeFrame('s', new Uint8Array([1]), 200, false, false, 0);
+    remote.decoder.callbacks.output({ timestamp: 100, displayWidth: 1280, displayHeight: 720, close() {} });
+    assert.deepEqual([canvas.width, canvas.height], [720, 1280]);
+    remote.decoder.callbacks.output({ timestamp: 200, displayWidth: 1280, displayHeight: 720, close() {} });
+    assert.deepEqual([canvas.width, canvas.height], [1280, 720], 'the phone was turned back between the two');
+    for (let i = 0; i < 100; i++) f.p.decodeFrame('s', new Uint8Array([1]), 1000 + i, false, false, 3);
+    assert.equal(remote.orientations.size, 32, 'bounded while the decoder holds pictures back');
+});
+
+test('diagnostics say how the sender handles orientation and what the receiver applied', async () => {
+    const metadata = fixture();
+    await init(metadata);
+    metadata.p.setOrientationMetadata(true);
+    await metadata.p.startCapture(metadata.host, {});
+    assert.equal(metadata.p.getDiagnostics().orientation, 'none');
+    portrait(metadata, 90);
+    await settle();
+    assert.equal(metadata.p.getDiagnostics().orientation, 'sent as metadata (90°)');
+    portrait(metadata, 270, 40_000, true);
+    await settle();
+    assert.equal(metadata.p.getDiagnostics().orientation, 'sent as metadata (270°, mirrored)');
+
+    const redraw = fixture();
+    await init(redraw);
+    await redraw.p.startCapture(redraw.host, {});
+    portrait(redraw, 90);
+    await settle();
+    assert.equal(redraw.p.getDiagnostics().orientation, 'redrawn upright (2d canvas; 90°)');
+
+    const safari = fixture({ capture: 'rvfc' });
+    await init(safari);
+    await safari.p.startCapture(safari.host, {});
+    assert.equal(safari.p.getDiagnostics().orientation, 'painted upright by the element (2d canvas)');
+
+    const canvas = metadata.sandbox.document.createElement('canvas');
+    metadata.p.addRemote('s', canvas, 'h264', metadata.host);
+    assert.equal(metadata.p.getDiagnostics().remotes[0].rotation, 'none');
+    metadata.p.decodeFrame('s', new Uint8Array([1]), 5, true, false, 1);
+    metadata.p.remotes.get('s').decoder.callbacks.output({ timestamp: 5, displayWidth: 1280, displayHeight: 720, close() {} });
+    const remote = metadata.p.getDiagnostics().remotes[0];
+    assert.equal(remote.rotation, '90°');
+    assert.deepEqual([remote.width, remote.height], [720, 1280], 'the incoming size is the displayed one');
 });
 
 

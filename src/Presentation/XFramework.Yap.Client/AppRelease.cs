@@ -2,10 +2,12 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.76";
+    public const string Version = "1.3.77";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "4 October 2026", [
+            "Android phones held upright no longer redraw every camera frame: the picture's rotation travels with it, encrypted, and the other phone turns it while drawing."]),
+        ("1.3.76", "4 October 2026", [
             "iPhone video calls run cooler: Safari now captures the camera on the GPU instead of copying every frame through the CPU, at the same quality.",
             "Phones never fall back to slow software video encoding when a hardware encoder is available, and the call screen no longer blurs over live video."]),
         ("1.3.75", "4 October 2026", [
