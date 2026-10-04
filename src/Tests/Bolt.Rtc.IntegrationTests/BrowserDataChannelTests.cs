@@ -26,7 +26,7 @@ namespace Bolt.Rtc.IntegrationTests;
 [TestFixture]
 [NonParallelizable]
 [CancelAfter(120_000)]
-public sealed class BrowserDataChannelTests
+public sealed partial class BrowserDataChannelTests
 {
     private static string? Env(string name) => Environment.GetEnvironmentVariable(name) is { Length: > 0 } value ? value : null;
 
@@ -67,6 +67,7 @@ public sealed class BrowserDataChannelTests
     {
         while (_relayPeers.TryDequeue(out var peer)) await peer.DisposeAsync();
         if (_sidecar is not null) await _sidecar.DisposeAsync();
+        if (_singleFlowSidecar is not null) await _singleFlowSidecar.DisposeAsync();
         if (_app is not null) await _app.DisposeAsync();
         _playwright?.Dispose();
     }
@@ -84,6 +85,8 @@ public sealed class BrowserDataChannelTests
     {
         public IRtcPeer Peer { get; } = peer;
         public int Received;
+        /// <summary>Downlink runs (<see cref="RunDownlinkAsync"/>): what the relay sent and how its buffer drained.</summary>
+        public DownlinkStats Down { get; } = new();
         /// <summary>What the relay's peer did and sent, in order, for failure messages.</summary>
         public System.Collections.Concurrent.ConcurrentQueue<string> Log { get; } = new();
     }
@@ -104,21 +107,36 @@ public sealed class BrowserDataChannelTests
             finally { sendGate.Release(); }
         }
         // ?relay=udp,tcp gives the relay's peer TURN over TCP as well (as a host allowing TCP would); UDP must still win.
+        // relay-udp and relay-tls are the relay's own TURN server (RelayTurn): its leg alone can be degraded by the workflow.
         var relayUrls = (context.Request.Query["relay"].ToString() is { Length: > 0 } relayList ? relayList : "udp").Split(',')
-            .Select(transport => $"turn:{_turnHost}:3478?transport={transport}").ToArray();
-        var peer = await _sidecar!.CreateAsync(RtcPeerRole.Answer, new RtcPeerOptions(
+            .Select(RelayUrl).ToArray();
+        // ?flows=1: a sidecar that allocates from a single socket per TURN URL, as pion does on its own (before the fix).
+        var sidecar = context.Request.Query["flows"] == "1" ? SingleFlowSidecar() : _sidecar!;
+        var peer = await sidecar.CreateAsync(RtcPeerRole.Answer, new RtcPeerOptions(
             [.. relayUrls.Select(url => Turn(url, "relay"))], RelayOnly: true, RtcDefaults.MaxMessageBytes, 128 * 1024), CancellationToken.None);
         _relayPeers.Enqueue(peer);
         var relay = _relays[id] = new RelaySide(peer);
         var started = Environment.TickCount64;
         void Note(string what) => relay.Log.Enqueue($"{Environment.TickCount64 - started}ms {what}");
         peer.StateChanged += state => Note("state=" + state);
+        var plan = DownlinkPlan.Parse(context.Request.Query["down"]);
+        if (plan is not null)
+        {
+            var started2 = 0;
+            peer.StateChanged += state =>
+            {
+                relay.Down.Note(state);
+                if (state == RtcChannelState.Open && Interlocked.Exchange(ref started2, 1) == 0)
+                    _ = Task.Run(() => RunDownlinkAsync(peer, relay.Down, plan));
+            };
+        }
         peer.LocalCandidate += candidate =>
         {
             Note("send candidate " + (candidate.Candidate.Split(' ').ElementAtOrDefault(7) ?? "end"));
             _ = Send(new { type = "candidate", candidate = candidate.Candidate, sdpMid = candidate.SdpMid, sdpMLineIndex = candidate.SdpMLineIndex });
         };
-        peer.Message += data => { Interlocked.Increment(ref relay.Received); peer.TrySend(data.Span); };
+        // Echo every message back, except in a downlink run, where the relay sends its own stream.
+        peer.Message += data => { Interlocked.Increment(ref relay.Received); if (plan is null) peer.TrySend(data.Span); };
         var buffer = new byte[64 * 1024];
         while (socket.State == WebSocketState.Open)
         {
@@ -270,6 +288,53 @@ public sealed class BrowserDataChannelTests
             result.DrainedAfterStop = peer.bufferedAmount() === 0;
             await new Promise(resolve => setTimeout(resolve, 1000));
             result.Echoed = echoed;
+          }
+          ws.send(JSON.stringify({ type: 'done' }));
+          peer.close(); ws.close();
+          return result;
+        };
+        // A call carrying media the relay's way: the relay sends (RunDownlinkAsync, with keyframe-sized bursts) while the
+        // browser sends a little back. Every state the browser's channel goes through is kept with its time, so a test can
+        // tell a channel that held from one that flapped.
+        window.runDown = async ({ id, iceServers, relay, flows, down, upKbps, seconds, timeoutMs }) => {
+          const ws = new WebSocket(`ws://${location.host}/signal?id=${id}&relay=${relay || ''}&flows=${flows || ''}&down=${down}`);
+          await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
+          const t0 = performance.now();
+          const result = { Opened: false, OpenedAtMs: -1, States: [], Received: 0, Sent: 0, Path: null };
+          let opened; const open = new Promise(resolve => opened = resolve);
+          const dotnet = { invokeMethodAsync: async (method, ...args) => {
+            if (method === 'OnCandidate') ws.send(JSON.stringify({ type: 'candidate', candidate: args[0], sdpMid: args[1], sdpMLineIndex: args[2] }));
+            else if (method === 'OnState') {
+              result.States.push(`${Math.round(performance.now() - t0)}ms ${args[0]}`);
+              if (args[0] === 'open' && result.OpenedAtMs < 0) { result.OpenedAtMs = Math.round(performance.now() - t0); opened(); }
+            }
+            else if (method === 'OnPath') result.Path = `${(args[2] || args[1] || '').toUpperCase()}/${args[0]}`;
+            else if (method === 'OnMessage') result.Received++;
+          } };
+          const peer = createPeer(dotnet, { iceServers, iceTransportPolicy: 'relay', maxMessageBytes: 1150 });
+          ws.onmessage = async event => {
+            const message = JSON.parse(event.data);
+            if (message.type === 'answer') await peer.setAnswer(message.sdp);
+            else if (message.type === 'candidate') await peer.addCandidate(message.candidate, message.sdpMid, message.sdpMLineIndex);
+          };
+          ws.send(JSON.stringify({ type: 'offer', sdp: await peer.createOffer(false) }));
+          await Promise.race([open, new Promise(resolve => setTimeout(resolve, timeoutMs))]);
+          result.Opened = result.OpenedAtMs >= 0;
+          if (result.Opened) {
+            const message = new Uint8Array(1150); message[0] = 0x22;
+            const bytesPerMs = upKbps / 8;
+            let credit = 0, last = performance.now();
+            const until = performance.now() + seconds * 1000;
+            while (performance.now() < until) {
+              await new Promise(resolve => setTimeout(resolve, 10));
+              const now = performance.now();
+              credit = Math.min(credit + (now - last) * bytesPerMs, 16 * 1024); last = now;
+              while (credit >= message.length && peer.bufferedAmount() < 32 * 1024) {
+                if (peer.state() === 'open' && peer.send(message)) result.Sent++;
+                credit -= message.length;
+              }
+            }
+            await new Promise(resolve => setTimeout(resolve, 1500));
           }
           ws.send(JSON.stringify({ type: 'done' }));
           peer.close(); ws.close();
