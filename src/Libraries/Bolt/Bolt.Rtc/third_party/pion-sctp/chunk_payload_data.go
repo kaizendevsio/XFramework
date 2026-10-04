@@ -70,7 +70,8 @@ type chunkPayloadData struct {
 
 	// Partial-reliability parameters used only by sender
 	since        time.Time
-	nSent        uint32 // number of transmission made for this chunk
+	firstSent    time.Time // first transmission, for timed reliability
+	nSent        uint32    // number of transmission made for this chunk
 	_abandoned   bool
 	_allInflight bool // valid only with the first fragment
 

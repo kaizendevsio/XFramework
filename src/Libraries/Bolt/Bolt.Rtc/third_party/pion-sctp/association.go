@@ -302,6 +302,12 @@ type Association struct {
 	sendZeroChecksum        bool
 	recvZeroChecksum        bool
 
+	// The FORWARD TSN chosen for this round of outbound packets, the
+	// Advanced.Peer.Ack.Point it carried when last sent, and when.
+	forwardTSNToSend    chunk
+	forwardTSNSentPoint uint32
+	forwardTSNSentAt    time.Time
+
 	// Congestion control parameters
 	maxReceiveBufferSize      uint32
 	maxMessageSize            uint32
@@ -847,6 +853,7 @@ func createAssociationFromConfigWithTsn(cfg *Config, tsn uint32) *Association {
 		handshakeCompletedCh:    make(chan error),
 		cumulativeTSNAckPoint:   tsn - 1,
 		advancedPeerTSNAckPoint: tsn - 1,
+		forwardTSNSentPoint:     tsn - 1,
 		recvZeroChecksum:        cfg.EnableZeroChecksum,
 		localInterleaving:       cfg.enableInterleaving,
 		silentError:             ErrSilentlyDiscard,
@@ -1367,7 +1374,7 @@ func (a *Association) handleInbound(raw []byte) error {
 // The caller should hold the lock.
 func (a *Association) gatherDataPacketsToRetransmit(rawPackets [][]byte, budgetUnits *int64, consumed *bool) [][]byte {
 	for _, p := range a.getDataPacketsToRetransmit(budgetUnits, consumed) {
-		raw, err := a.marshalPacket(p)
+		raw, err := a.marshalPacketWithForwardTSN(p)
 		if err != nil {
 			a.log.Warnf("[%s] failed to serialize a DATA packet to be retransmitted", a.name)
 
@@ -1417,7 +1424,7 @@ func (a *Association) gatherOutboundDataAndReconfigPackets(
 		a.log.Tracef("[%s] T3-rtx timer start (pt1)", a.name)
 		a.t3RTX.start(a.rtoMgr.getRTO())
 		for _, p := range a.bundleDataChunksIntoPackets(chunks) {
-			raw, err := a.marshalPacket(p)
+			raw, err := a.marshalPacketWithForwardTSN(p)
 			if err != nil {
 				a.log.Warnf("[%s] failed to serialize a DATA packet", a.name)
 
@@ -1498,6 +1505,11 @@ func (a *Association) gatherOutboundFastRetransmissionPackets( //nolint:gocognit
 			continue
 		}
 
+		// RFC 3758 Sec 3.5 A3: abandoned instead of retransmitted.
+		if a.checkPartialReliabilityStatus(chunkPayload) {
+			continue
+		}
+
 		// RFC 4960 Sec 7.2.4 Fast Retransmit on Gap Reports
 		//  3)  Determine how many of the earliest (i.e., lowest TSN) DATA chunks
 		//      marked for retransmission will fit into a single packet, subject
@@ -1561,7 +1573,6 @@ func (a *Association) gatherOutboundFastRetransmissionPackets( //nolint:gocognit
 		a.rackRemove(chunkPayload)
 		a.rackInsert(chunkPayload)
 
-		a.checkPartialReliabilityStatus(chunkPayload)
 		toFastRetrans = append(toFastRetrans, chunkPayload)
 		a.log.Tracef("[%s] fast-retransmit: tsn=%d sent=%d htna=%d",
 			a.name, chunkPayload.tsn, chunkPayload.nSent, a.fastRecoverExitPoint)
@@ -1572,7 +1583,7 @@ func (a *Association) gatherOutboundFastRetransmissionPackets( //nolint:gocognit
 	}
 
 	for _, p := range a.bundleDataChunksIntoPackets(toFastRetrans) {
-		raw, err := a.marshalPacket(p)
+		raw, err := a.marshalPacketWithForwardTSN(p)
 		if err != nil {
 			a.log.Warnf("[%s] failed to serialize a DATA packet to be fast-retransmitted", a.name)
 
@@ -1591,7 +1602,7 @@ func (a *Association) gatherOutboundSackPackets(rawPackets [][]byte) [][]byte {
 		sack := a.createSelectiveAckChunk()
 		a.stats.incSACKsSent()
 		a.log.Debugf("[%s] sending SACK: %s", a.name, sack)
-		raw, err := a.marshalPacket(a.createPacket([]chunk{sack}))
+		raw, err := a.marshalPacketWithForwardTSN(a.createPacket([]chunk{sack}))
 		if err != nil {
 			a.log.Warnf("[%s] failed to serialize a SACK packet", a.name)
 		} else {
@@ -1602,30 +1613,91 @@ func (a *Association) gatherOutboundSackPackets(rawPackets [][]byte) [][]byte {
 	return rawPackets
 }
 
+// gatherOutboundForwardTSNPackets sends the FORWARD TSN chosen by
+// chooseForwardTSN on its own when no DATA or SACK packet had room for it.
 // The caller should hold the lock.
 func (a *Association) gatherOutboundForwardTSNPackets(rawPackets [][]byte) [][]byte {
-	if a.willSendForwardTSN { //nolint:nestif
-		a.willSendForwardTSN = false
-		if sna32GT(a.advancedPeerTSNAckPoint, a.cumulativeTSNAckPoint) {
-			var fwdtsn chunk
-			if a.useIForwardTSN {
-				fwdtsn = a.createIForwardTSN()
-			} else if a.useForwardTSN {
-				fwdtsn = a.createForwardTSN()
-			}
-			if fwdtsn == nil {
-				return rawPackets
-			}
-			raw, err := a.marshalPacket(a.createPacket([]chunk{fwdtsn}))
-			if err != nil {
-				a.log.Warnf("[%s] failed to serialize a Forward TSN packet", a.name)
-			} else {
-				rawPackets = append(rawPackets, raw)
-			}
-		}
+	if a.forwardTSNToSend == nil {
+		return rawPackets
+	}
+	fwdtsn := a.forwardTSNToSend
+	a.forwardTSNToSend = nil
+	raw, err := a.marshalPacket(a.createPacket([]chunk{fwdtsn}))
+	if err != nil {
+		a.log.Warnf("[%s] failed to serialize a Forward TSN packet", a.name)
+	} else {
+		rawPackets = append(rawPackets, raw)
 	}
 
 	return rawPackets
+}
+
+// chooseForwardTSN decides whether this round of outbound packets carries a
+// FORWARD TSN (RFC 3758 Sec 3.5 C3, F2) and builds it.
+//
+// C3 asks for one after every SACK that leaves the Advanced.Peer.Ack.Point
+// ahead of the Cumulative TSN Ack, but every SACK sent in the round trip after
+// a FORWARD TSN still does that, and resending it each time only makes the
+// peer SACK each copy. So a FORWARD TSN is sent when the
+// Advanced.Peer.Ack.Point moved since the last one; an unchanged one is sent
+// again only after a smoothed round trip without the peer catching up, or on
+// T3-rtx expiry (A5). It rides in an outbound DATA or SACK packet when there
+// is room.
+// The caller should hold the lock.
+func (a *Association) chooseForwardTSN() {
+	if !a.willSendForwardTSN {
+		return
+	}
+	a.willSendForwardTSN = false
+	if !sna32GT(a.advancedPeerTSNAckPoint, a.cumulativeTSNAckPoint) {
+		return
+	}
+
+	now := time.Now()
+	if a.advancedPeerTSNAckPoint == a.forwardTSNSentPoint {
+		resendAfter := a.SRTT()
+		if resendAfter == 0 {
+			resendAfter = a.rtoMgr.getRTO()
+		}
+		if now.Sub(a.forwardTSNSentAt) < time.Duration(resendAfter*float64(time.Millisecond)) {
+			return
+		}
+	}
+
+	var fwdtsn chunk
+	if a.useIForwardTSN {
+		fwdtsn = a.createIForwardTSN()
+	} else if a.useForwardTSN {
+		fwdtsn = a.createForwardTSN()
+	}
+	if fwdtsn == nil {
+		return
+	}
+	a.forwardTSNToSend = fwdtsn
+	a.forwardTSNSentPoint = a.advancedPeerTSNAckPoint
+	a.forwardTSNSentAt = now
+}
+
+// marshalPacketWithForwardTSN marshals p, with the pending FORWARD TSN at its
+// front if the packet still fits in the MTU (RFC 3758 Sec 3.5 F2; control
+// chunks precede DATA, RFC 9260 Sec 6.10).
+// The caller should hold the lock.
+func (a *Association) marshalPacketWithForwardTSN(p *packet) ([]byte, error) {
+	raw, err := a.marshalPacket(p)
+	if err != nil || a.forwardTSNToSend == nil {
+		return raw, err
+	}
+	fwdtsn, err := a.forwardTSNToSend.marshal()
+	if err != nil || len(raw)+len(fwdtsn)+getPadding(len(fwdtsn)) > int(a.MTU()) {
+		return raw, nil //nolint:nilerr // the FORWARD TSN goes on its own instead
+	}
+	bundled, err := a.marshalPacket(a.createPacket(append([]chunk{a.forwardTSNToSend}, p.chunks...)))
+	if err != nil {
+		return raw, nil //nolint:nilerr // the FORWARD TSN goes on its own instead
+	}
+	a.forwardTSNToSend = nil
+
+	return bundled, nil
 }
 
 func (a *Association) gatherOutboundShutdownPackets(rawPackets [][]byte) ([][]byte, bool) {
@@ -1772,6 +1844,9 @@ func (a *Association) gatherOutbound() ([][]byte, bool) {
 		budgetUnits := a.tlrCurrentBurstBudgetScaledLocked()
 		consumed := false
 
+		a.abandonChunksToRetransmit()
+		a.chooseForwardTSN()
+
 		rawPackets = a.gatherDataPacketsToRetransmit(rawPackets, &budgetUnits, &consumed)
 		rawPackets = a.gatherOutboundDataAndReconfigPackets(rawPackets, &budgetUnits, &consumed)
 		rawPackets = a.gatherOutboundFastRetransmissionPackets(rawPackets, &budgetUnits, &consumed)
@@ -1782,6 +1857,9 @@ func (a *Association) gatherOutbound() ([][]byte, bool) {
 	case shutdownPending, shutdownReceived:
 		budgetUnits := a.tlrCurrentBurstBudgetScaledLocked()
 		consumed := false
+
+		a.abandonChunksToRetransmit()
+		a.chooseForwardTSN()
 
 		rawPackets = a.gatherDataPacketsToRetransmit(rawPackets, &budgetUnits, &consumed)
 		rawPackets = a.gatherOutboundDataAndReconfigPackets(rawPackets, &budgetUnits, &consumed)
@@ -2786,7 +2864,8 @@ func (a *Association) processSelectiveAck(selectiveAckChunk *chunkSelectiveAck) 
 			//        packets that were retransmitted (and thus for which it is
 			//        ambiguous whether the reply was for the first instance of the
 			//        chunk or for a later instance)
-			if sna32GTE(chunkPayload.tsn, a.minTSN2MeasureRTT) {
+			//   An abandoned chunk was skipped by a FORWARD TSN, not delivered.
+			if sna32GTE(chunkPayload.tsn, a.minTSN2MeasureRTT) && !chunkPayload.abandoned() {
 				// Only original transmissions for classic RTT measurement (Karn's rule)
 				if chunkPayload.nSent == 1 {
 					a.minTSN2MeasureRTT = a.myNextTSN
@@ -2806,7 +2885,7 @@ func (a *Association) processSelectiveAck(selectiveAckChunk *chunkSelectiveAck) 
 
 			// RFC 8985 (RACK) sec 5.2: RACK.segment is the most recently sent
 			// segment that has been delivered, including retransmissions.
-			if chunkPayload.since.After(newestDeliveredSendTime) {
+			if !chunkPayload.abandoned() && chunkPayload.since.After(newestDeliveredSendTime) {
 				newestDeliveredSendTime = chunkPayload.since
 				newestDeliveredOrigTSN = chunkPayload.tsn
 				deliveredFound = true
@@ -3108,31 +3187,95 @@ func (a *Association) finishAcknowledgement(
 	}
 
 	if a.partialReliabilityEnabled() {
-		// RFC 3758 Sec 3.5 C1
-		if sna32LT(a.advancedPeerTSNAckPoint, a.cumulativeTSNAckPoint) {
-			a.advancedPeerTSNAckPoint = a.cumulativeTSNAckPoint
-		}
-
-		// RFC 3758 Sec 3.5 C2
-		for i := a.advancedPeerTSNAckPoint + 1; ; i++ {
-			c, ok := a.inflightQueue.get(i)
-			if !ok {
-				break
-			}
-			if !c.abandoned() {
-				break
-			}
-			a.advancedPeerTSNAckPoint = i
-		}
-
-		// RFC 3758 Sec 3.5 C3
-		if sna32GT(a.advancedPeerTSNAckPoint, a.cumulativeTSNAckPoint) {
-			a.willSendForwardTSN = true
+		if a.advancePeerTSNAckPoint() {
+			// postprocessSack starts it again.
+			a.t3RTX.stop()
 		}
 		a.awakeWriteLoop()
 	}
 
 	return nil
+}
+
+// advancePeerTSNAckPoint moves the Advanced.Peer.Ack.Point over abandoned
+// chunks and asks for a FORWARD TSN if it is ahead of the Cumulative TSN Ack
+// (RFC 3758 Sec 3.5 C1-C3). It returns true if the point moved.
+//
+// When it moves, the caller restarts T3-rtx, as RFC 9260 Sec 6.3.2 R3 does
+// when the earliest outstanding TSN is acknowledged: an abandoned chunk is no
+// longer outstanding, and the peer cannot acknowledge the skip before the
+// FORWARD TSN has made a round trip. Without the restart, every loss on a path
+// whose RTO is under two round trips would end in a T3-rtx expiry.
+// The caller should hold the lock.
+func (a *Association) advancePeerTSNAckPoint() bool {
+	before := a.advancedPeerTSNAckPoint
+
+	// RFC 3758 Sec 3.5 C1
+	if sna32LT(a.advancedPeerTSNAckPoint, a.cumulativeTSNAckPoint) {
+		a.advancedPeerTSNAckPoint = a.cumulativeTSNAckPoint
+	}
+
+	// RFC 3758 Sec 3.5 C2. Chunks the peer has acknowledged in a gap block do
+	// not stop the point: otherwise each FORWARD TSN could only skip the holes
+	// up to the next received chunk, one round trip per hole, and with more
+	// than one loss per round trip the peer's cumulative TSN would fall ever
+	// further behind. The point stops at the last abandoned chunk, so newly
+	// acknowledged chunks alone never call for another FORWARD TSN.
+	for i := a.advancedPeerTSNAckPoint + 1; ; i++ {
+		c, ok := a.inflightQueue.get(i)
+		if !ok {
+			break
+		}
+		if c.abandoned() {
+			a.advancedPeerTSNAckPoint = i
+		} else if !c.acked {
+			break
+		}
+	}
+
+	// RFC 3758 Sec 3.5 C3
+	if sna32GT(a.advancedPeerTSNAckPoint, a.cumulativeTSNAckPoint) {
+		a.willSendForwardTSN = true
+	}
+
+	return sna32GT(a.advancedPeerTSNAckPoint, before) && sna32GT(a.advancedPeerTSNAckPoint, a.cumulativeTSNAckPoint)
+}
+
+// abandonChunksToRetransmit applies RFC 3758 Sec 3.5 A3 to every chunk that
+// is about to be retransmitted: marked by T3-rtx, RACK or a tail loss probe,
+// or by three miss indications for fast retransmit. A chunk the stream's
+// policy forbids retransmitting is abandoned instead, and the
+// Advanced.Peer.Ack.Point moves over it. Doing this for all of them before any
+// DATA is gathered lets a resulting FORWARD TSN ride in this round's packets.
+// The caller should hold the lock.
+func (a *Association) abandonChunksToRetransmit() {
+	if !a.partialReliabilityEnabled() {
+		return
+	}
+
+	abandoned := false
+	for i := uint32(1); ; i++ {
+		c, ok := a.inflightQueue.get(a.cumulativeTSNAckPoint + i)
+		if !ok {
+			break
+		}
+		if c.acked || c.abandoned() {
+			continue
+		}
+		fastRetransmit := c.nSent == 1 && c.missIndicator >= 3
+		if !c.retransmit && !fastRetransmit {
+			continue
+		}
+		if a.checkPartialReliabilityStatus(c) {
+			c.retransmit = false
+			abandoned = true
+		}
+	}
+
+	if abandoned && a.advancePeerTSNAckPoint() && a.t3RTX.isRunning() {
+		a.t3RTX.stop()
+		a.t3RTX.start(a.rtoMgr.getRTO())
+	}
 }
 
 // The caller should hold the lock.
@@ -3413,7 +3556,9 @@ func (a *Association) createForwardTSN() *chunkForwardTSN {
 		if !ok {
 			break
 		}
-		if chunkPayload.unordered {
+		// C4: up to the Advanced.Peer.Ack.Point a chunk is abandoned or acked;
+		// only abandoned ones are reported, the peer has the acked ones.
+		if chunkPayload.unordered || chunkPayload.acked {
 			continue
 		}
 
@@ -3456,6 +3601,9 @@ func (a *Association) createIForwardTSN() *chunkIForwardTSN {
 		c, ok := a.inflightQueue.get(i)
 		if !ok {
 			break
+		}
+		if c.acked {
+			continue
 		}
 		if c.unordered {
 			mid, ok := unordered[c.streamIdentifier]
@@ -3789,9 +3937,13 @@ func (a *Association) movePendingDataChunkToInflightQueue(chunkPayload *chunkPay
 	// Assign TSN and original send time
 	chunkPayload.tsn = a.generateNextTSN()
 	chunkPayload.since = time.Now()
+	chunkPayload.firstSent = chunkPayload.since
 	chunkPayload.nSent = 1
 
-	a.checkPartialReliabilityStatus(chunkPayload)
+	// The PR-SCTP policy is checked when the chunk is about to be
+	// retransmitted (RFC 3758 Sec 3.5 A3), not now: abandoning a chunk in
+	// flight lets the Advanced.Peer.Ack.Point, and a FORWARD TSN, move over
+	// data the peer has not had a chance to receive.
 
 	a.log.Tracef(
 		"[%s] sending ppi=%d tsn=%d ssn=%d sent=%d len=%d (%v,%v)",
@@ -3999,10 +4151,15 @@ func (a *Association) sendPayloadData(ctx context.Context, chunks []*chunkPayloa
 	return nil
 }
 
+// checkPartialReliabilityStatus is called when chunkPayload is about to be
+// retransmitted, before nSent counts that retransmission. It marks the chunk
+// abandoned, and returns true, if the stream's PR-SCTP policy forbids the
+// retransmission (RFC 3758 Sec 3.5 A3, RFC 7496 Sec 3.1); the caller must
+// then not retransmit it.
 // The caller should hold the lock.
-func (a *Association) checkPartialReliabilityStatus(chunkPayload *chunkPayloadData) {
+func (a *Association) checkPartialReliabilityStatus(chunkPayload *chunkPayloadData) bool {
 	if !a.partialReliabilityEnabled() {
-		return
+		return false
 	}
 
 	// draft-ietf-rtcweb-data-protocol-09.txt section 6
@@ -4011,29 +4168,30 @@ func (a *Association) checkPartialReliabilityStatus(chunkPayload *chunkPayloadDa
 	//		ordered delivery and reliable transmission.
 	//
 	if chunkPayload.payloadType == PayloadTypeWebRTCDCEP {
-		return
+		return false
 	}
 
 	// PR-SCTP
+	abandon := false
 	if stream, ok := a.streams[chunkPayload.streamIdentifier]; ok { //nolint:nestif
 		stream.lock.RLock()
 		if stream.reliabilityType == ReliabilityTypeRexmit {
-			// nSent counts transmissions, the first one included. Once it exceeds
-			// the limit, every allowed retransmission has been used, and the next
-			// one "would exceed the provided limit" (RFC 7496 Sec 3.1).
+			// nSent counts transmissions so far, the first one included, so this
+			// would be retransmission number nSent, which "would exceed the
+			// provided limit" (RFC 7496 Sec 3.1) if nSent is above it.
 			if chunkPayload.nSent > stream.reliabilityValue {
-				chunkPayload.setAbandoned(true)
-				a.rackRemove(chunkPayload)
+				abandon = true
 				a.log.Tracef(
 					"[%s] marked as abandoned: tsn=%d ppi=%d (remix: %d)",
 					a.name, chunkPayload.tsn, chunkPayload.payloadType, chunkPayload.nSent,
 				)
 			}
 		} else if stream.reliabilityType == ReliabilityTypeTimed {
-			elapsed := int64(time.Since(chunkPayload.since).Seconds() * 1000)
+			// The lifetime runs from the first transmission; since is reset by
+			// every retransmission.
+			elapsed := int64(time.Since(chunkPayload.firstSent).Seconds() * 1000)
 			if elapsed >= int64(stream.reliabilityValue) {
-				chunkPayload.setAbandoned(true)
-				a.rackRemove(chunkPayload)
+				abandon = true
 				a.log.Tracef(
 					"[%s] marked as abandoned: tsn=%d ppi=%d (timed: %d)",
 					a.name, chunkPayload.tsn, chunkPayload.payloadType, elapsed,
@@ -4045,6 +4203,13 @@ func (a *Association) checkPartialReliabilityStatus(chunkPayload *chunkPayloadDa
 		// Remote has reset its send side of the stream, we can still send data.
 		a.log.Tracef("[%s] stream %d not found, remote reset", a.name, chunkPayload.streamIdentifier)
 	}
+
+	if abandon {
+		chunkPayload.setAbandoned(true)
+		a.rackRemove(chunkPayload)
+	}
+
+	return abandon
 }
 
 // getDataPacketsToRetransmit is called when T3-rtx is timed out and retransmit outstanding data chunks
@@ -4065,6 +4230,13 @@ func (a *Association) getDataPacketsToRetransmit(budgetScaled *int64, consumed *
 		}
 
 		if !chunkPayload.retransmit {
+			continue
+		}
+
+		// RFC 3758 Sec 3.5 A3: abandoned instead of retransmitted.
+		if a.checkPartialReliabilityStatus(chunkPayload) {
+			chunkPayload.retransmit = false
+
 			continue
 		}
 
@@ -4111,8 +4283,6 @@ func (a *Association) getDataPacketsToRetransmit(budgetScaled *int64, consumed *
 		chunkPayload.since = currRtxTimestamp
 		a.rackRemove(chunkPayload)
 		a.rackInsert(chunkPayload)
-
-		a.checkPartialReliabilityStatus(chunkPayload)
 
 		a.log.Tracef(
 			"[%s] retransmitting tsn=%d ssn=%d sent=%d",
@@ -4379,22 +4549,9 @@ func (a *Association) onRetransmissionTimeout(id int, nRtos uint) { //nolint:cyc
 		//  SHOULD try to advance the "Advanced.Peer.Ack.Point" by following
 		//  the procedures outlined in C2 - C5.
 		if a.partialReliabilityEnabled() {
-			// RFC 3758 Sec 3.5 C2
-			for i := a.advancedPeerTSNAckPoint + 1; ; i++ {
-				c, ok := a.inflightQueue.get(i)
-				if !ok {
-					break
-				}
-				if !c.abandoned() {
-					break
-				}
-				a.advancedPeerTSNAckPoint = i
-			}
-
-			// RFC 3758 Sec 3.5 C3
-			if sna32GT(a.advancedPeerTSNAckPoint, a.cumulativeTSNAckPoint) {
-				a.willSendForwardTSN = true
-			}
+			a.advancePeerTSNAckPoint()
+			// The last FORWARD TSN may have been lost: it may be sent again now.
+			a.forwardTSNSentAt = time.Time{}
 		}
 
 		a.log.Debugf("[%s] T3-rtx timed out: nRtos=%d cwnd=%d ssthresh=%d", a.name, nRtos, a.CWND(), a.ssthresh)
