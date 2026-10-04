@@ -271,7 +271,9 @@
     private void Changed() => _ = InvokeAsync(() => { if (!Voice.IsCalling) { outputOpen = false; outputs = null; outputError = null; playbackSuspended = false; debugVideo = false; videoDiagnostics = null; if (!Surface) { backdropFailed = null; Release(); } } StateHasChanged(); });
     private void Release(){ canvases.Clear(); attached.Clear(); previewAttached = null; opened = null; }
     // Ringing counts: the output picker is usable before the call connects, so it must refresh then too.
-    private async Task Tick(){ try { while(!lifetime.IsCancellationRequested){await Task.Delay(1000,lifetime.Token);if(Voice.IsCalling || Voice.Ended is not null)await InvokeAsync(async () => { if (outputOpen && !outputBusy) await RefreshOutputsAsync(); await CheckPlaybackAsync(); await RefreshDiagnosticsAsync(); StateHasChanged(); });} }catch(OperationCanceledException){} }
+    // Nothing to tick in the background: no clock is visible, and diagnostics must not keep sampling the pipeline.
+    private async Task Tick(){ try { while(!lifetime.IsCancellationRequested){await Task.Delay(1000,lifetime.Token);if((Voice.IsCalling || Voice.Ended is not null) && !await PageHiddenAsync())await InvokeAsync(async () => { if (outputOpen && !outputBusy) await RefreshOutputsAsync(); await CheckPlaybackAsync(); await RefreshDiagnosticsAsync(); StateHasChanged(); });} }catch(OperationCanceledException){} }
+    private async Task<bool> PageHiddenAsync() { try { return await JS.InvokeAsync<bool>("yap.pageHidden"); } catch (JSException) { return false; } }
     private async Task ToggleOutputAsync() { outputOpen = !outputOpen; if (outputOpen) { outputError = null; await RefreshOutputsAsync(); await RefreshCamerasAsync(); } }
     private async Task RefreshOutputsAsync()
     {
