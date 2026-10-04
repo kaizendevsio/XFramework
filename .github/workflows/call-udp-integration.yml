@@ -96,7 +96,8 @@ jobs:
           # Everything here crosses loopback (browser, coturn, sidecar): 5 ms each way per hop and 0.5% loss per packet.
           sudo tc qdisc add dev lo root netem delay 5ms 1ms loss 0.5%
           trap 'sudo tc qdisc del dev lo root || true' EXIT
-          dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj             --configuration Release --no-build --filter "FullyQualifiedName~AtVideoRates" --logger "console;verbosity=normal"
+          dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj \
+            --configuration Release --no-build --filter "FullyQualifiedName~AtVideoRates" --logger "console;verbosity=normal"
 
       - name: Start the relay's own TURN server (UDP and TLS)
         shell: bash
@@ -106,10 +107,16 @@ jobs:
           # TLS with a throwaway self-signed certificate for 127.0.0.1, trusted by the sidecar only through SSL_CERT_FILE.
           dir="$RUNNER_TEMP/turn-tls"
           mkdir -p "$dir"
-          openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=127.0.0.1" -addext "subjectAltName=IP:127.0.0.1"             -keyout "$dir/key.pem" -out "$dir/cert.pem" 2>/dev/null
+          openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=127.0.0.1" -addext "subjectAltName=IP:127.0.0.1" \
+            -keyout "$dir/key.pem" -out "$dir/cert.pem" 2>/dev/null
           chmod 644 "$dir/key.pem" "$dir/cert.pem"
           cat /etc/ssl/certs/ca-certificates.crt "$dir/cert.pem" > "$dir/bundle.pem"
-          docker run --detach --name coturn-relay --network host -v "$dir:/tls:ro"             coturn/coturn:4.18.0-debian@sha256:bbefd3e1fdfdc0d58770fe01b581fd8b00d9f3a5580d00acb77cf719a6bc78e3             -n --verbose --log-file=stdout --listening-ip=127.0.0.1 --relay-ip=127.0.0.1 --listening-port=3480             --tls-listening-port=5350 --cert=/tls/cert.pem --pkey=/tls/key.pem             --use-auth-secret --static-auth-secret=ci-turn-secret --realm=bolt.test --fingerprint             --allow-loopback-peers --min-port=49401 --max-port=49600
+          docker run --detach --name coturn-relay --network host -v "$dir:/tls:ro" \
+            coturn/coturn:4.18.0-debian@sha256:bbefd3e1fdfdc0d58770fe01b581fd8b00d9f3a5580d00acb77cf719a6bc78e3 \
+            -n --verbose --log-file=stdout --listening-ip=127.0.0.1 --relay-ip=127.0.0.1 --listening-port=3480 \
+            --tls-listening-port=5350 --cert=/tls/cert.pem --pkey=/tls/key.pem \
+            --use-auth-secret --static-auth-secret=ci-turn-secret --realm=bolt.test --fingerprint \
+            --allow-loopback-peers --min-port=49401 --max-port=49600
           for attempt in $(seq 1 30); do
             if ss -lnu | grep -q '127.0.0.1:3480 ' && ss -lnt | grep -q '127.0.0.1:5350 '; then exit 0; fi
             sleep 1
@@ -136,7 +143,8 @@ jobs:
           # from xeon-dev's ISP to Cloudflare's TURN anycast.
           sudo iptables -I OUTPUT -o lo -p udp --dport 3480 -m u32 --u32 "0>>22&0x3C@0>>16&0x1=1" -j DROP
           trap 'sudo iptables -D OUTPUT -o lo -p udp --dport 3480 -m u32 --u32 "0>>22&0x3C@0>>16&0x1=1" -j DROP || true' EXIT
-          dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj             --configuration Release --no-build --filter "TestCategory=RelayLeg" --logger "console;verbosity=normal"
+          dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj \
+            --configuration Release --no-build --filter "TestCategory=RelayLeg" --logger "console;verbosity=normal"
 
       - name: "Relay leg: clean (baseline)"
         env:
@@ -153,7 +161,8 @@ jobs:
           source .github/scripts/call-shape-legs.sh
           shape_legs
           trap 'unshape_legs' EXIT
-          dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj             --configuration Release --no-build --filter "TestCategory=RelayLeg" --logger "console;verbosity=normal"
+          dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj \
+            --configuration Release --no-build --filter "TestCategory=RelayLeg" --logger "console;verbosity=normal"
 
       - name: "Relay leg: UDP to TURN blocked, TLS fallback"
         env:
@@ -171,7 +180,8 @@ jobs:
           shape_legs
           sudo iptables -I OUTPUT -o lo -p udp --dport 3480 -j DROP
           trap 'sudo iptables -D OUTPUT -o lo -p udp --dport 3480 -j DROP || true; unshape_legs' EXIT
-          dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj             --configuration Release --no-build --filter "TestCategory=RelayLeg" --logger "console;verbosity=normal"
+          dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj \
+            --configuration Release --no-build --filter "TestCategory=RelayLeg" --logger "console;verbosity=normal"
 
       - name: "Relay leg: half of its UDP round trips to TURN lost"
         env:
@@ -191,7 +201,8 @@ jobs:
           sudo iptables -I OUTPUT -o lo -p udp --dport 3480 -m statistic --mode random --probability 0.3 -j DROP
           sudo iptables -I OUTPUT -o lo -p udp --sport 3480 -m statistic --mode random --probability 0.3 -j DROP
           trap 'sudo iptables -D OUTPUT -o lo -p udp --dport 3480 -m statistic --mode random --probability 0.3 -j DROP || true; sudo iptables -D OUTPUT -o lo -p udp --sport 3480 -m statistic --mode random --probability 0.3 -j DROP || true; unshape_legs' EXIT
-          dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj             --configuration Release --no-build --filter "TestCategory=RelayLeg" --logger "console;verbosity=normal"
+          dotnet test src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj \
+            --configuration Release --no-build --filter "TestCategory=RelayLeg" --logger "console;verbosity=normal"
 
       - name: TURN server log
         if: failure()
