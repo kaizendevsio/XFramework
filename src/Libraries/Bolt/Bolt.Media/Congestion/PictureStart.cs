@@ -41,10 +41,11 @@ public sealed class PictureStart(SendRateController controller)
         var estimate = Choose(_hints);
         controller.StartPicture(estimate.TotalKbps);
         controller.IgnoreLocalUntil(nowMs + LocalGraceMs);
+        controller.BeginStartWindow(nowMs + WindowMs);
         Estimate = estimate with { TotalKbps = controller.EstimateKbps };
         controller.StartCeilingKbps = Ceiling(_hints);
         if (Ceiling(_hints) is { } limit) controller.MeasuredLimit(limit);
-        return ladder.Start(Math.Max(0, controller.EstimateKbps - audioWireKbps), FirstPictureMaxHeight);
+        return ladder.Start(Math.Max(0, controller.EstimateKbps - audioWireKbps), FirstPictureMaxHeight, nowMs + WindowMs);
     }
 
     /// <summary>This device's start probe finished.</summary>

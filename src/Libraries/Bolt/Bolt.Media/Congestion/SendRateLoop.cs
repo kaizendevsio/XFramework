@@ -266,7 +266,12 @@ public sealed class SendRateLoop
             video = Ladder.Restart(decision.VideoKbps);
         else if (!_suspended)
         {
+            var before = Ladder.Current.Rung;
+            var fresh = Ladder.Fresh;
             video = Ladder.Place(decision.VideoKbps, nowMs, congested: decision.Signal != RateSignal.Normal);
+            // A fast climb sends a keyframe of the new size into a channel that may still be warming: like the first one,
+            // it is not this device's congestion while it drains.
+            if (fresh && video is { } up && up.Rung.Height > before.Height) Controller.IgnoreLocalUntil(nowMs + PictureStart.LocalGraceMs);
             if ((resume || cpuChanged) && video is null) video = Ladder.Current;
         }
 

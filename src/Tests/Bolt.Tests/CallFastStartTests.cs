@@ -273,6 +273,35 @@ public sealed class CallFastStartTests
     }
 
     [Test]
+    public void AStartTransient_IsRecoveredFromInSeconds_ButALinkThatStaysSmallIsNotFlappedAt()
+    {
+        // The receiver's page is busy starting its own picture for 1.5 s: its reports say 900 ms of delay.
+        var sim = new StartSimulation(capacityKbps: 20_000, oneWayMs: 15, preferredHeight: 1080);
+        sim.Begin(new StartHints(UplinkKbps: 7_500, UplinkAtLeast: true));
+        sim.ExtraDelay = (1_000, 2_500, 900);
+        sim.Run(30_000);
+        TestContext.Out.WriteLine(sim);
+        Assert.Multiple(() =>
+        {
+            Assert.That(sim.EstimateAt(2_500), Is.LessThan(4_000), "it did react: the receiver was behind");
+            Assert.That(sim.Height, Is.EqualTo(1080), "and is back at the preference");
+            Assert.That(sim.LastRungChangeMs, Is.LessThanOrEqualTo(9_000), "within seconds, not half a minute");
+            Assert.That(sim.RungChangesAfter(10_000), Is.Zero);
+        });
+
+        // The same start on a link that really is 2 Mbit/s (nothing measured it): one climb back, then it stays down.
+        var small = new StartSimulation(capacityKbps: 2_000, oneWayMs: 15, preferredHeight: 1080);
+        small.Begin(new StartHints(UplinkKbps: 7_500, UplinkAtLeast: true));
+        small.Run(60_000);
+        TestContext.Out.WriteLine(small);
+        Assert.Multiple(() =>
+        {
+            Assert.That(small.RungChangesAfter(15_000), Is.LessThanOrEqualTo(2), "no flapping");
+            Assert.That(small.MaxQueueMs(15_000, 60_000), Is.LessThan(800));
+        });
+    }
+
+    [Test]
     public void ANewPicturesOwnQueue_IsNotCongestion_ButTheRelaysReportsStillAre()
     {
         // WebKit drains a fresh data channel's first keyframe slowly: the pacer's queue stands while the relay sees none.
@@ -363,6 +392,9 @@ public sealed class CallFastStartTests
         public PictureStart Start { get; }
         public int CapacityKbps { get; set; }
         public (int Kbps, bool AtLeast)? ReceiversDownlink { get; set; }
+        /// <summary>A receiver's page busy from..to: its reports carry this much more delay (and no capacity).</summary>
+        public (long From, long To, int Ms)? ExtraDelay { get; set; }
+        public long LastRungChangeMs => _rungs[^1].At;
         public long Now { get; private set; }
         public int Estimate => _controller.EstimateKbps;
         public int Height => _ladder.Current.Rung.Height;
@@ -406,7 +438,8 @@ public sealed class CallFastStartTests
                 if (Now >= _nextReport)
                 {
                     _nextReport = Now + 250;
-                    _inFlight.Enqueue((Now + _oneWayMs, new RelaySignal(0, queueMs, 0, queueMs >= 40 ? CapacityKbps : 0, _dropping, BaseLost: _dropping)));
+                    var busy = ExtraDelay is { } extra && Now >= extra.From && Now < extra.To ? extra.Ms : 0;
+                    _inFlight.Enqueue((Now + _oneWayMs, new RelaySignal(0, queueMs + busy, 0, queueMs >= 40 ? CapacityKbps : 0, _dropping, BaseLost: _dropping)));
                 }
                 while (_inFlight.Count > 0 && _inFlight.Peek().At <= Now) _relay = _inFlight.Dequeue().Signal with { ReceivedAtMs = Now };
                 if (Now >= _nextTick)

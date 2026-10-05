@@ -73,6 +73,9 @@ public sealed class VideoRateLadder
     private int _bitrate;
     /// <summary>This picture has never come down: it climbs straight to what the budget holds (see <see cref="FastUpHoldMs"/>).</summary>
     private bool _fresh = true;
+    private long _freshUntil = long.MinValue;
+    private long? _freeDownsFrom;
+    private const int FreeDownsMs = 2_000;
 
     /// <param name="startIndex">Rung to start on.</param>
     /// <param name="allow60">The user allows 60 fps; it is still only used when the budget supports it.</param>
@@ -129,6 +132,8 @@ public sealed class VideoRateLadder
     /// </summary>
     public VideoSetting? Place(int budgetKbps, long nowMs, bool congested)
     {
+        // A picture that used its start transient's free steps down climbs fast only inside the start window.
+        if (_fresh && _freeDownsFrom is not null && nowMs >= _freshUntil) _fresh = false;
         var ceiling = Ceiling;
         var index = Math.Min(_index, ceiling);
         var sixty = _at60 && _allow60;
@@ -178,6 +183,20 @@ public sealed class VideoRateLadder
         var changedRung = index != _index || sixty != _at60;
         if (changedRung && (index < _index || (index == _index && !sixty)))
         {
+            // A start transient (the steps down of one cut sequence, within 2 s of the first): the picture may climb
+            // straight back once the budget holds again.
+            if (_fresh && nowMs < _freshUntil && (_freeDownsFrom is null || nowMs - _freeDownsFrom.Value < FreeDownsMs))
+            {
+                _freeDownsFrom ??= nowMs;
+                // Should the start window end before it climbs back, the ordinary backoff applies from here.
+                _upBackoffMs = nowMs - _lastUpAt <= FailedUpWindowMs ? Math.Min(_upBackoffMs * 2, MaxUpBackoffMs) : UpBackoffMs;
+                _upBlockedUntil = nowMs + _upBackoffMs;
+                _upSince = null;
+                _bitrate = bitrate;
+                _index = index;
+                _at60 = sixty;
+                return Current;
+            }
             // The first step down ends the fast climb: this link has a limit, and from now on it is approached slowly.
             _fresh = false;
             _upBackoffMs = nowMs - _lastUpAt <= FailedUpWindowMs ? Math.Min(_upBackoffMs * 2, MaxUpBackoffMs) : UpBackoffMs;
@@ -219,8 +238,12 @@ public sealed class VideoRateLadder
     /// cannot hold it sends the picture down within a second, and the first step down ends the fast climb.
     /// </summary>
     /// <param name="maxHeight">The first picture goes no higher (the fast climb takes it on): see <see cref="PictureStart.FirstPictureMaxHeight"/>.</param>
-    public VideoSetting Start(int budgetKbps, int maxHeight = int.MaxValue)
+    /// <param name="freshUntilMs">Until then, the first cut's steps down keep the climb fast (a start transient, see
+    /// <see cref="SendRateController.BeginStartWindow"/>); a later one ends it as usual.</param>
+    public VideoSetting Start(int budgetKbps, int maxHeight = int.MaxValue, long freshUntilMs = long.MinValue)
     {
+        _freshUntil = freshUntilMs;
+        _freeDownsFrom = null;
         var (index, sixty) = FastUp(0, false, Math.Min(Ceiling, IndexForHeight(maxHeight)), budgetKbps, fromBottom: true) ?? (0, false);
         _index = index;
         _at60 = sixty;

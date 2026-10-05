@@ -270,6 +270,8 @@ public sealed class SendRateController
         _stable = _lastCalmEstimate = _estimate;
         _suspended = false;
         _lowVideoSince = null;
+        _recoveryUsed = _recoveryClimbing = false;
+        RecoveringToKbps = null;
     }
 
     public void Reset(int totalKbps)
@@ -286,6 +288,24 @@ public sealed class SendRateController
     private long _firstCongestionAt = long.MinValue / 2;
     /// <summary>For this long after the path's first congestion, a cut takes at most half (see <see cref="Decrease"/>).</summary>
     private const int StartupCutWindowMs = 3_000;
+
+    /// <summary>
+    /// A new picture's first seconds (see <see cref="PictureStart"/>): the first congestion inside them is a start
+    /// transient until shown otherwise (both pages starting, channels warming, first keyframes), and once it has passed
+    /// the estimate climbs back fast to 70% of where the start had put it (<see cref="RecoveringToKbps"/>). Congestion
+    /// again during that climb ends it: then the link really is smaller, and the ordinary slow probing applies.
+    /// </summary>
+    public void BeginStartWindow(long untilMs)
+    {
+        _startWindowUntil = untilMs;
+        _recoveryUsed = false;
+        RecoveringToKbps = null;
+    }
+    private long _startWindowUntil = long.MinValue;
+    private bool _recoveryUsed, _recoveryClimbing;
+
+    /// <summary>Where a start transient's cut climbs back to at the start-up rate, while it does.</summary>
+    public int? RecoveringToKbps { get; private set; }
 
     /// <summary>
     /// The start measured where this path's limit is (a probe step that built a queue, a receiver's downlink). The
@@ -423,7 +443,8 @@ public sealed class SendRateController
             _lastCalmEstimate = _estimate;
             if (dt > 0) _stable += (_estimate - _stable) * Math.Min(1, dt * 1000 / Math.Max(1, _options.StableTimeConstantMs));
             if (now - _calmSince.Value >= _options.IncreaseAfterMs) _cutStreak = 0;
-            var hold = _congestedOnce ? _options.IncreaseAfterMs : _options.FastStartIncreaseAfterMs;
+            var recovering = RecoveringToKbps is { } target && _estimate < target;
+            var hold = _congestedOnce && !recovering ? _options.IncreaseAfterMs : _options.FastStartIncreaseAfterMs;
             if (informed && now - _calmSince.Value >= hold && now - _lastDecreaseAt >= hold)
                 Increase(dt, sample);
         }
@@ -541,7 +562,16 @@ public sealed class SendRateController
         // can measure a capacity of almost nothing; halving per cut still reaches a real small link within a few cuts.
         if (!_congestionObserved) _firstCongestionAt = now;
         if (now - _firstCongestionAt < StartupCutWindowMs) next = Math.Max(next, _estimate * 0.5);
+        var beforeCut = _estimate;
         _estimate = Math.Max(_options.MinTotalKbps, Math.Min(_estimate, next));
+        if (now < _startWindowUntil && !_recoveryUsed)
+        {
+            // The first cut inside a picture's start: remember where the start was, to climb back to once it passes.
+            _recoveryUsed = true;
+            RecoveringToKbps = (int)Math.Round(beforeCut * 0.7);
+            _recoveryClimbing = false;
+        }
+        else if (_recoveryClimbing) RecoveringToKbps = null; // Congestion again on the way back: the link is smaller.
         _lastDecreaseAt = now;
         _delayAtDecrease = delay;
         _cutStreak++;
@@ -553,6 +583,11 @@ public sealed class SendRateController
         double gain;
         // Before any congestion, and far below the last congestion point (after draining a flooded buffer), climb fast.
         if (!_congestedOnce) gain = _options.FastStartGainPerSecond;
+        else if (RecoveringToKbps is { } target && _estimate < target)
+        {
+            gain = _options.FastStartGainPerSecond;
+            _recoveryClimbing = true;
+        }
         else if (_lastCongestionKbps > 0 && _estimate < _lastCongestionKbps * 0.5) gain = _options.StartupGainPerSecond;
         else if (_lastCongestionKbps > 0 && _estimate >= _lastCongestionKbps * 0.9 && _estimate <= _lastCongestionKbps * 1.2)
             gain = _options.NearGainPerSecond;
@@ -564,6 +599,7 @@ public sealed class SendRateController
         var ceiling = _suspended ? floorForResume : Math.Max(sample.SentKbps * 1.5 + 64, floorForResume);
         if (!_congestionObserved && StartCeilingKbps is { } measured) ceiling = Math.Min(ceiling, Math.Max(measured, floorForResume));
         if (next > ceiling) next = Math.Max(_estimate, ceiling);
+        if (RecoveringToKbps is { } back && _estimate < back && next >= back) { next = back; RecoveringToKbps = null; }
         _estimate = next;
         if (_lastCongestionKbps > 0 && _estimate > _lastCongestionKbps * 1.3) _lastCongestionKbps = 0;
     }
