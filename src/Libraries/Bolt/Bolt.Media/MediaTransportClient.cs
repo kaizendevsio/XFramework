@@ -390,7 +390,8 @@ public sealed class MediaTransportClient : IAsyncDisposable
                 }
                 var verdict = probe.Judge(step, stamped: true, echo, pageBusy: lagMs > PageBusyLagMs);
                 steps.Add(verdict);
-                if (sentMessages == 0 || !verdict.UplinkPassed) break;
+                // A step the device's own channel held back ends the probe: higher rates would only be held back more.
+                if (sentMessages == 0 || !verdict.UplinkPassed || verdict.HeldBack) break;
                 if (echo && !verdict.EchoPassed) echo = false;
             }
         }

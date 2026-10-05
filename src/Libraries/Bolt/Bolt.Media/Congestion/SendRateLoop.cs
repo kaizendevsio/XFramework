@@ -268,7 +268,8 @@ public sealed class SendRateLoop
         {
             var before = Ladder.Current.Rung;
             var fresh = Ladder.Fresh;
-            video = Ladder.Place(decision.VideoKbps, nowMs, congested: decision.Signal != RateSignal.Normal);
+            // A fresh picture jumps several sizes at once: only once the receivers say they keep up (fast confirmation).
+            video = Ladder.Place(decision.VideoKbps, nowMs, congested: decision.Signal != RateSignal.Normal || (fresh && !decision.ReceiversCalm));
             // A fast climb sends a keyframe of the new size into a channel that may still be warming: like the first one,
             // it is not this device's congestion while it drains.
             if (fresh && video is { } up && up.Rung.Height > before.Height) Controller.IgnoreLocalUntil(nowMs + PictureStart.LocalGraceMs);

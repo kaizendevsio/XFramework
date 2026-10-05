@@ -122,7 +122,10 @@ public enum RateSignal { Normal, Overuse, Hold }
 /// <param name="VideoSuspended">Video stands down so voice keeps the link.</param>
 /// <param name="Signal">What the last window was judged to be.</param>
 /// <param name="DelayMs">The queuing delay the decision was based on.</param>
-public readonly record struct SendRateDecision(int TotalKbps, int AudioKbps, int VideoKbps, bool VideoSuspended, RateSignal Signal, int DelayMs);
+/// <param name="ReceiversCalm">Every receiver that reports says its queue is short (or none has ever reported): a
+/// picture may grow. A receiver still busy starting (its page handling a new call) is not yet ready for a larger picture.</param>
+public readonly record struct SendRateDecision(int TotalKbps, int AudioKbps, int VideoKbps, bool VideoSuspended, RateSignal Signal, int DelayMs,
+    bool ReceiversCalm = true);
 
 /// <summary>
 /// Delay-based send-rate control for a call on a reliable (TCP) path, GCC/BBR-flavoured and deliberately simple.
@@ -285,6 +288,7 @@ public sealed class SendRateController
     /// <summary>The path has never shown congestion: a picture's start may still be revised (see <see cref="PictureStart"/>).</summary>
     public bool StartingUp => !_congestionObserved;
     private bool _congestionObserved;
+    private bool _receiverHeard;
     private long _firstCongestionAt = long.MinValue / 2;
     /// <summary>For this long after the path's first congestion, a cut takes at most half (see <see cref="Decrease"/>).</summary>
     private const int StartupCutWindowMs = 3_000;
@@ -455,7 +459,9 @@ public sealed class SendRateController
         }
 
         _estimate = Math.Clamp(_estimate, _options.MinTotalKbps, _options.MaxTotalKbps);
-        return Allocate(now, sample, signal, delay);
+        if (receiver is not null) _receiverHeard = true;
+        var receiversCalm = receiver is { } heard ? heard.QueueDelayMs < _options.TargetDelayMs / 2 : silent is null && !_receiverHeard;
+        return Allocate(now, sample, signal, delay) with { ReceiversCalm = receiversCalm };
     }
 
     /// <summary>

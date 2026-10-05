@@ -17,6 +17,9 @@ namespace Bolt.Media.Congestion;
 public readonly record struct ProbeStep(int OfferedKbps, int Sent, int UplinkKbps, int UplinkLost, int UplinkDelayGrowthMs,
     int EchoKbps, int Echoed, int EchoDelayGrowthMs, bool UplinkPassed, bool EchoPassed, bool EchoRequested = true, int SentKbps = 0)
 {
+    /// <summary>The device sent clearly less than the step's pace: its own channel held it back.</summary>
+    public bool HeldBack => SentKbps > 0 && SentKbps < OfferedKbps * LinkProbe.MinDeliveredShare;
+
     /// <summary>The rate the step really tested: its pace, or less when the device could not send that much.</summary>
     public int TestedKbps => SentKbps > 0 ? Math.Min(OfferedKbps, SentKbps) : OfferedKbps;
 
@@ -161,6 +164,9 @@ public sealed class LinkProbe
             var sentKbps = log.Sent >= 4 && sendSpanUs >= 40_000
                 ? (int)Math.Round((log.SentBytes - log.SentBytes / log.Sent) * 8.0 / (sendSpanUs / 1000.0)) : 0;
             var tested = sentKbps > 0 ? Math.Min(log.OfferedKbps, sentKbps) : log.OfferedKbps;
+            // A step the device could not even send at (its own channel held it back: a fresh association's slow start, a
+            // browser that drains its buffer coarsely) says nothing about the link beyond what it did send: it passes at
+            // that, and the probe ends there (see Conclude) with the uplink a lower bound.
             var upPassed = stamped && reported > 0 && log.Lost <= Math.Max(2, reported * MaxLossShare) &&
                            (upKbps == 0 || upKbps >= tested * MinDeliveredShare) && upGrowth < MaxDelayGrowthMs &&
                            reported >= log.Sent * 0.9;
@@ -185,9 +191,14 @@ public sealed class LinkProbe
         bool upAtLeast = steps.Count > 0, downAtLeast = true, downKnown = false;
         foreach (var step in steps)
         {
+            // A step the device's own channel held back is the probe's last: higher steps were never sent.
+            var last = step.UplinkPassed && step.HeldBack;
             if (upAtLeast)
             {
-                if (step.UplinkPassed) up = Math.Max(up, step.TestedKbps);
+                if (step.UplinkPassed)
+                {
+                    up = Math.Max(up, step.TestedKbps);
+                }
                 else
                 {
                     // A step that failed delivered what the link carries, never more than it was offered.
@@ -196,11 +207,12 @@ public sealed class LinkProbe
                     upAtLeast = false;
                 }
             }
-            if (!step.EchoRequested || !downAtLeast) continue;
+            if (!step.EchoRequested || !downAtLeast) { if (last) break; continue; }
             if (step.EchoPassed)
             {
                 down = Math.Max(down, step.TestedKbps);
                 downKnown = true;
+                if (last) break;
                 continue;
             }
             var back = step.EchoKbps > 0 ? Math.Min(step.EchoKbps, step.TestedKbps) : 0;

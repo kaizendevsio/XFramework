@@ -73,6 +73,41 @@ public sealed class CallFastStartTests
     }
 
     [Test]
+    public void Probe_AStepTheDeviceHeldBack_IsALowerBound_NotTheLinksLimit()
+    {
+        // The browser's own channel let only 16 messages of a 3500 kbit/s step out (a fresh association's slow start).
+        var probe = new LinkProbe();
+        var step = probe.BeginStep(3_500);
+        var arrivals = new List<long>();
+        for (uint index = 0; index < 16; index++)
+        {
+            var sent = index * 12_500L; // ~700 kbit/s of 1100-byte messages
+            probe.OnSent(step, index, (ushort)index, 1_100, sent);
+            arrivals.Add(sent + 10_000);
+        }
+        probe.OnFeedback(0, arrivals);
+        var verdict = probe.Judge(step, stamped: true, echo: false);
+        var result = LinkProbe.Conclude([verdict], 0);
+        Assert.Multiple(() =>
+        {
+            Assert.That(verdict.HeldBack, Is.True);
+            Assert.That(verdict.UplinkPassed, Is.True, "the link carried all it was given");
+            Assert.That(result.UplinkAtLeast, Is.True, "so it is a lower bound, never a limit");
+            Assert.That(result.UplinkKbps, Is.InRange(600, 800));
+        });
+    }
+
+    [Test]
+    public void APictureGrowsOnlyWhileTheReceiversKeepUp()
+    {
+        var controller = new SendRateController(2_000);
+        Assert.That(controller.Update(new SendPathSample(0, 2_000, 80, 0, 0, false)).ReceiversCalm, Is.True, "nobody has reported yet");
+        Assert.That(controller.Update(new SendPathSample(250, 2_000, 80, 0, 0, false, Receiver: new ReceiverSignal(250, 900, 1_000))).ReceiversCalm,
+            Is.False, "a receiver whose page is still starting reports 900 ms");
+        Assert.That(controller.Update(new SendPathSample(500, 2_000, 80, 0, 0, false, Receiver: new ReceiverSignal(500, 20, 1_900))).ReceiversCalm, Is.True);
+    }
+
+    [Test]
     public void PaddingAndDownlinkFeedback_RoundTrip_AndOldReadersIgnoreTheExtension()
     {
         var padding = new byte[200];
