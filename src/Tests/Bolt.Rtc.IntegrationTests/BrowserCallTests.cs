@@ -256,6 +256,16 @@ public sealed class BrowserCallTests
             await Task.Delay(500);
         }
         await Sample("open");
+        // The pictures' first seconds, closely: where each start went and what the rate control read.
+        for (var t = 0; t < 16; t++)
+        {
+            await Wait(500);
+            foreach (var name in new[] { "A", "B" })
+            {
+                var stats = await Stats(name);
+                timeline.Add($"{clock.Elapsed.TotalSeconds,6:F1}s start {name}: tier={stats["tier"]?.ToJsonString()} rate={stats["rate"]?.ToJsonString()} send={stats["send"]?.ToJsonString()}");
+            }
+        }
         // The rate control climbs from a mobile-safe start (VideoStartTier) on measured headroom, as in production.
         for (var t = 0; t < warmup; t += 5) { await Wait(5_000); await Sample("warmup"); }
 

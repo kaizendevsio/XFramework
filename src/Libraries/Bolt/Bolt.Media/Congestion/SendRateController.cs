@@ -299,13 +299,16 @@ public sealed class SendRateController
     /// the estimate climbs back fast to 70% of where the start had put it (<see cref="RecoveringToKbps"/>). Congestion
     /// again during that climb ends it: then the link really is smaller, and the ordinary slow probing applies.
     /// </summary>
-    public void BeginStartWindow(long untilMs)
+    public void BeginStartWindow(long nowMs, int windowMs)
     {
-        _startWindowUntil = untilMs;
+        _pictureStartedAt = nowMs;
+        _startWindowUntil = nowMs + windowMs;
         _recoveryUsed = false;
         RecoveringToKbps = null;
     }
-    private long _startWindowUntil = long.MinValue;
+    private long _startWindowUntil = long.MinValue, _pictureStartedAt = long.MinValue / 2;
+    /// <summary>A new picture waits this long for a receiver's first report before it may grow without one (a receiver too old to report).</summary>
+    private const int ReceiverReportWaitMs = 3_000;
     private bool _recoveryUsed, _recoveryClimbing;
 
     /// <summary>Where a start transient's cut climbs back to at the start-up rate, while it does.</summary>
@@ -460,7 +463,9 @@ public sealed class SendRateController
 
         _estimate = Math.Clamp(_estimate, _options.MinTotalKbps, _options.MaxTotalKbps);
         if (receiver is not null) _receiverHeard = true;
-        var receiversCalm = receiver is { } heard ? heard.QueueDelayMs < _options.TargetDelayMs / 2 : silent is null && !_receiverHeard;
+        // Receivers report once a stream has flowed a second: a new picture waits for that before it grows.
+        var receiversCalm = receiver is { } heard ? heard.QueueDelayMs < _options.TargetDelayMs / 2
+            : silent is null && !_receiverHeard && now - _pictureStartedAt >= ReceiverReportWaitMs;
         return Allocate(now, sample, signal, delay) with { ReceiversCalm = receiversCalm };
     }
 
