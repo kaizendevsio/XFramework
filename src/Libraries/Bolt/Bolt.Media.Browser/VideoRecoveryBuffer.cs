@@ -109,13 +109,28 @@ public sealed class VideoRecoveryBuffer
     /// Recovery for a path with this round trip, or off. Returns true when recovery was switched on or off: the two modes
     /// share no state, so the caller asks for a keyframe to start the decoder cleanly.
     /// </summary>
+    /// <summary>The buffer's last decisions, newest last, for diagnostics: what it released, gave up, skipped or broke on.</summary>
+    public string RecentDecisions { get { lock (_log) return string.Join(" ", _first) + " | " + string.Join(" ", _log); } }
+    private readonly Queue<string> _log = new();
+    private readonly List<string> _first = [];
+    private void Note(string what)
+    {
+        lock (_log)
+        {
+            // The stream's first decisions (its start, where trouble shows) and its latest.
+            if (_first.Count < 160) { _first.Add(what); return; }
+            _log.Enqueue(what);
+            while (_log.Count > 48) _log.Dequeue();
+        }
+    }
+
     public bool Configure(bool recover, int rttMs)
     {
         RttMs = Math.Clamp(rttMs, 1, 5_000);
         var window = recover ? Math.Clamp(RttMs * 3 / 2 + 50 + UplinkRepairMs, MinRecoveryMs, MaxRecoveryMs) : 0;
         var switched = (window == 0) != (RecoveryMs == 0);
         RecoveryMs = window;
-        if (switched) Reset();
+        if (switched) { Note(recover ? "recovery-on" : "recovery-off"); Reset(); }
         return switched;
     }
 
@@ -165,6 +180,7 @@ public sealed class VideoRecoveryBuffer
             {
                 _missing.Clear();
                 _localLoss = true;
+                Note($"jump{gap}");
             }
             _highest = sequence;
         }
@@ -253,6 +269,7 @@ public sealed class VideoRecoveryBuffer
             {
                 _missing.Remove(sequence);
                 Abandoned++;
+                Note($"abandon{sequence}{(owner is null ? "?" : "")}");
                 // A fragment of a picture we know: give that picture up. Nothing of it arrived: it may have been a base
                 // picture, so the next gap is a break.
                 if (owner is not null) Lose(owner);
@@ -285,6 +302,7 @@ public sealed class VideoRecoveryBuffer
         {
             if (!_missing.Remove(sequence)) continue;
             Declined++;
+            Note($"decline{sequence}{(Owner(sequence) is null ? "?" : "")}");
             // Half a picture the relay will not finish is lost; a whole picture it dropped on purpose is a policy gap.
             if (Owner(sequence) is { Complete: false } owner) Lose(owner);
             // A whole picture of unknown layer: the relay sheds enhancement layers (it never declines a base picture it
@@ -331,6 +349,7 @@ public sealed class VideoRecoveryBuffer
             {
                 // It refers to the lost enhancement picture: not shown, and no keyframe needed for it.
                 Skipped++;
+                Note($"skip{picture.FrameId}");
                 return;
             }
             _skipAbove = null;
@@ -340,6 +359,7 @@ public sealed class VideoRecoveryBuffer
         // this buffer no longer knows: unless it is a keyframe, the decoder must not take it as a continuation.
         var discontinuity = (!_hasReleased && !picture.Keyframe) || (gap && (!_layered || _localLoss));
         if (picture.Keyframe || discontinuity) _localLoss = false;
+        Note($"{(picture.Keyframe ? "K" : "")}{picture.FrameId}L{picture.Layer}{(discontinuity ? "!" : "")}{(gap ? "g" : "")}");
         var data = new byte[picture.Bytes];
         var offset = 0;
         foreach (var part in picture.Parts) { part!.CopyTo(data, offset); offset += part.Length; }
@@ -353,6 +373,7 @@ public sealed class VideoRecoveryBuffer
     /// <summary>The cheapest recovery the reference structure allows for a picture that will not be shown.</summary>
     private void GiveUp(Picture picture)
     {
+        Note($"giveup{picture.FrameId}L{picture.Layer}");
         Handled(picture.FrameId);
         _incomplete++;
         if (picture.Keyframe || picture.Layer == 0 || !_layered) _localLoss = true;

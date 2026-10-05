@@ -10,7 +10,7 @@ public sealed record RemoteVideoStream(Guid StreamId, string SenderId, VideoCode
 
 /// <summary>One remote camera stream's receive path, cumulative (see <see cref="BoltMediaService.GetVideoReceiveStats"/>).</summary>
 public sealed record VideoReceiveStats(Guid StreamId, long Fragments, long LocalDrops, int Nacked, int Recovered, int Abandoned,
-    int Declined, int Incomplete, int Skipped, long Pictures, int RecoveryMs);
+    int Declined, int Incomplete, int Skipped, long Pictures, int RecoveryMs, string? Recent = null);
 
 public sealed partial class BoltMediaService
 {
@@ -59,7 +59,7 @@ public sealed partial class BoltMediaService
         lock (_remoteVideo)
             return _videoAssemblers.Select(x => new VideoReceiveStats(x.Key, x.Value.Fragments,
                 _mediaClient?.GetMediaStream(x.Key)?.LocalDrops ?? 0, x.Value.Nacked, x.Value.Recovered, x.Value.Abandoned,
-                x.Value.Declined, x.Value.Incomplete, x.Value.Skipped, x.Value.Pictures, x.Value.RecoveryMs)).ToArray();
+                x.Value.Declined, x.Value.Incomplete, x.Value.Skipped, x.Value.Pictures, x.Value.RecoveryMs, x.Value.RecentDecisions)).ToArray();
     }
 
     public bool IsCameraOn => _video.IsCapturing;
