@@ -320,6 +320,8 @@ public sealed class MediaTransportClient : IAsyncDisposable
     /// that held back is judged on what it did send.
     /// </summary>
     private const int ProbeBacklogMs = 60;
+    /// <summary>A step whose timers ran this late was measured on a busy page: its echo timing says nothing about the downlink.</summary>
+    private const int PageBusyLagMs = 40;
 
     /// <summary>A start probe finished (its padding may still sit in the channel's buffer for a moment).</summary>
     public event Action? ProbeEnded;
@@ -354,6 +356,14 @@ public sealed class MediaTransportClient : IAsyncDisposable
                 long sent = 0;
                 uint index = 0;
                 var sentMessages = 0;
+                // How late the page ran this step's timers: a busy page also handles the echoes late, in bursts.
+                var lagMs = 0L;
+                async Task Pause(int ms)
+                {
+                    var before = _clock();
+                    await Task.Delay(ms, ct);
+                    lagMs = Math.Max(lagMs, _clock() - before - ms);
+                }
                 var backlogLimit = Math.Max(16_384L, rate * ProbeBacklogMs / 8);
                 while (!ct.IsCancellationRequested)
                 {
@@ -367,7 +377,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
                         sent += size;
                         sentMessages++;
                     }
-                    await Task.Delay(5, ct);
+                    await Pause(5);
                 }
                 // Wait for the relay to report every message of the step (and its echoes), a couple of round trips at most.
                 var rtt = ActivePeer?.Path?.RttMs is double measured && measured > 0 ? measured : 100;
@@ -376,9 +386,9 @@ public sealed class MediaTransportClient : IAsyncDisposable
                 {
                     var (uplink, echoes) = probe.Pending(step, echo);
                     if (uplink == 0 && echoes == 0) break;
-                    await Task.Delay(10, ct);
+                    await Pause(10);
                 }
-                var verdict = probe.Judge(step, stamped: true, echo);
+                var verdict = probe.Judge(step, stamped: true, echo, pageBusy: lagMs > PageBusyLagMs);
                 steps.Add(verdict);
                 if (sentMessages == 0 || !verdict.UplinkPassed) break;
                 if (echo && !verdict.EchoPassed) echo = false;

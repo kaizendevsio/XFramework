@@ -146,7 +146,9 @@ public sealed class LinkProbe
     }
 
     /// <summary>The verdict on one step from what has been reported so far.</summary>
-    public ProbeStep Judge(int step, bool stamped, bool echo)
+    /// <param name="pageBusy">The page ran late while the step ran (its timers fired late): echoes were handled late and
+    /// in bursts, so only their loss is judged, never their timing.</param>
+    public ProbeStep Judge(int step, bool stamped, bool echo, bool pageBusy = false)
     {
         lock (_sync)
         {
@@ -164,8 +166,8 @@ public sealed class LinkProbe
                            reported >= log.Sent * 0.9;
             // The echo crosses both legs: its loss is up to twice the uplink's, and it can only bring back what got there.
             var echoPassed = echo && log.Sent > 0 && log.Echoes.Count >= Math.Max(1, log.Sent * (1 - 2 * MaxLossShare) - 2) &&
-                             (echoKbps == 0 || echoKbps >= Math.Min(tested, upKbps > 0 ? upKbps : tested) * MinDeliveredShare) &&
-                             echoGrowth < MaxEchoGrowthMs;
+                             (pageBusy || ((echoKbps == 0 || echoKbps >= Math.Min(tested, upKbps > 0 ? upKbps : tested) * MinDeliveredShare) &&
+                                           echoGrowth < MaxEchoGrowthMs));
             return new ProbeStep(log.OfferedKbps, log.Sent, upKbps, log.Lost, upGrowth, echoKbps, log.Echoes.Count, echoGrowth, upPassed, echoPassed, echo,
                 sentKbps);
         }

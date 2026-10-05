@@ -157,8 +157,9 @@ public sealed class CallFastStartTests
         sim.Run(20_000);
         Assert.Multiple(() =>
         {
-            Assert.That(sim.TimeToHeightMs(1080), Is.Zero, "1080p from the first picture");
-            Assert.That(sim.RungChanges, Is.Zero, "and it stays there");
+            Assert.That(sim.FirstHeight, Is.EqualTo(PictureStart.FirstPictureMaxHeight), "a 720p first keyframe into channels that just opened");
+            Assert.That(sim.TimeToHeightMs(1080), Is.LessThanOrEqualTo(1_250), "then 1080p within about a second");
+            Assert.That(sim.RungChanges, Is.EqualTo(1), "and it stays there");
         });
     }
 
@@ -234,12 +235,12 @@ public sealed class CallFastStartTests
     {
         var sim = new StartSimulation(capacityKbps: 20_000, oneWayMs: 15, preferredHeight: 1080);
         sim.Begin(new StartHints(UplinkKbps: 7_500, UplinkAtLeast: true));
-        sim.Run(1_000);
+        sim.Run(1_500);
         Assert.That(sim.Height, Is.EqualTo(1080));
         // The receiver's own probe finished: its downlink carries 1.5 Mbit/s.
         sim.ReceiversDownlink = (1_500, false);
         sim.Run(500);
-        Assert.That(sim.Estimate, Is.LessThanOrEqualTo(1_500 * StartRate.MeasuredHeadroom + 1), "before any queue could say so");
+        Assert.That(sim.Estimate, Is.LessThanOrEqualTo(1_500), "under the receiver's limit before any queue could say so");
         Assert.That(sim.Height, Is.LessThanOrEqualTo(720));
         sim.Run(8_000);
         Assert.That(sim.Estimate, Is.LessThanOrEqualTo(1_500), "the start-up ramp stops at the receiver's measured limit");

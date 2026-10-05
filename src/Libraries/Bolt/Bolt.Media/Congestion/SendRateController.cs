@@ -283,6 +283,9 @@ public sealed class SendRateController
     /// <summary>The path has never shown congestion: a picture's start may still be revised (see <see cref="PictureStart"/>).</summary>
     public bool StartingUp => !_congestionObserved;
     private bool _congestionObserved;
+    private long _firstCongestionAt = long.MinValue / 2;
+    /// <summary>For this long after the path's first congestion, a cut takes at most half (see <see cref="Decrease"/>).</summary>
+    private const int StartupCutWindowMs = 3_000;
 
     /// <summary>
     /// The start measured where this path's limit is (a probe step that built a queue, a receiver's downlink). The
@@ -533,6 +536,11 @@ public sealed class SendRateController
             next = Math.Max(next, _estimate * 0.75);
             next = Math.Max(next, Math.Min(_estimate, AudioWireKbps(sample) + _options.SuspendVideoKbps + 20));
         }
+        // The path's first congestion, and the next few seconds: at most half per cut. A new picture's start is a
+        // transient (first keyframes, warming channels, receivers' pages still busy starting their own) whose reports
+        // can measure a capacity of almost nothing; halving per cut still reaches a real small link within a few cuts.
+        if (!_congestionObserved) _firstCongestionAt = now;
+        if (now - _firstCongestionAt < StartupCutWindowMs) next = Math.Max(next, _estimate * 0.5);
         _estimate = Math.Max(_options.MinTotalKbps, Math.Min(_estimate, next));
         _lastDecreaseAt = now;
         _delayAtDecrease = delay;

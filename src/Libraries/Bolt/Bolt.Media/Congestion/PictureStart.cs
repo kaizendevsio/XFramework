@@ -13,6 +13,13 @@ public sealed class PictureStart(SendRateController controller)
 {
     /// <summary>How long after a picture starts late evidence may still revise its rate.</summary>
     public const int WindowMs = 10_000;
+    /// <summary>
+    /// The first picture is at most this tall even when the start rate affords more: a 1080p or 1440p keyframe (150-220 KB)
+    /// into channels that have just opened, while both pages are still starting, was the start's own congestion. The
+    /// ladder's fast climb takes it to the rate's size once that budget has held (<see cref="VideoRateLadder.FastUpHoldMs"/>),
+    /// about a second later.
+    /// </summary>
+    public const int FirstPictureMaxHeight = 720;
     /// <summary>How long a new picture's own queues are not read as congestion (see <see cref="SendRateController.IgnoreLocalUntil"/>).</summary>
     public const int LocalGraceMs = 3_000;
 
@@ -37,7 +44,7 @@ public sealed class PictureStart(SendRateController controller)
         Estimate = estimate with { TotalKbps = controller.EstimateKbps };
         controller.StartCeilingKbps = Ceiling(_hints);
         if (Ceiling(_hints) is { } limit) controller.MeasuredLimit(limit);
-        return ladder.Start(Math.Max(0, controller.EstimateKbps - audioWireKbps));
+        return ladder.Start(Math.Max(0, controller.EstimateKbps - audioWireKbps), FirstPictureMaxHeight);
     }
 
     /// <summary>This device's start probe finished.</summary>

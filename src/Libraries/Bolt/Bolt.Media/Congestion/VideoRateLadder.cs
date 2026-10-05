@@ -218,9 +218,10 @@ public sealed class VideoRateLadder
     /// ceiling allows, when that is allowed) whose up-threshold the budget clears, fresh, with no backoff. A link that
     /// cannot hold it sends the picture down within a second, and the first step down ends the fast climb.
     /// </summary>
-    public VideoSetting Start(int budgetKbps)
+    /// <param name="maxHeight">The first picture goes no higher (the fast climb takes it on): see <see cref="PictureStart.FirstPictureMaxHeight"/>.</param>
+    public VideoSetting Start(int budgetKbps, int maxHeight = int.MaxValue)
     {
-        var (index, sixty) = FastUp(0, false, Ceiling, budgetKbps, fromBottom: true) ?? (0, false);
+        var (index, sixty) = FastUp(0, false, Math.Min(Ceiling, IndexForHeight(maxHeight)), budgetKbps, fromBottom: true) ?? (0, false);
         _index = index;
         _at60 = sixty;
         _fresh = true;
@@ -242,7 +243,7 @@ public sealed class VideoRateLadder
     {
         var top = fromBottom ? 0 : index;
         for (var rung = top + 1; rung <= ceiling && budgetKbps >= Rungs[rung].UpKbps; rung++) top = rung;
-        var topSixty = top == ceiling && _allow60 && Rungs[top].Height >= 720 && budgetKbps >= Rung(top, true).UpKbps;
+        var topSixty = top == Ceiling && _allow60 && Rungs[top].Height >= 720 && budgetKbps >= Rung(top, true).UpKbps;
         if (fromBottom || top > index || (top == index && topSixty && !sixty)) return (top, topSixty);
         return null;
     }
