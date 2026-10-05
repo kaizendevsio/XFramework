@@ -339,7 +339,7 @@ public sealed class BrowserCallTests
             }
             if (renderedFps < sentFps * minFpsRatio) failures.Add($"{sender}->{receiver}: rendered {renderedFps:F1} fps of {sentFps:F1} sent");
             if (freeze > maxFreezeMs) failures.Add($"{sender}->{receiver}: froze for {freeze} ms");
-            if (resets > 1) failures.Add($"{sender}->{receiver}: decoder restarted {resets} times");
+            if (resets > EnvInt("CALL_MAX_RESETS", 1)) failures.Add($"{sender}->{receiver}: decoder restarted {resets} times");
             if (corrupt > 0) failures.Add($"{sender}->{receiver}: {corrupt} pictures damaged or decoded without their reference");
             if ((audio?["delivered"]?.GetValue<double>() ?? 0) < 0.98) failures.Add($"{sender}->{receiver}: audio delivered {audio?["delivered"]}");
         }

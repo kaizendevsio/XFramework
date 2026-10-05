@@ -14,8 +14,10 @@ namespace Bolt.Media.Congestion;
 /// <param name="EchoRequested">The step asked the relay for its echo (only while every earlier round trip passed).</param>
 /// <param name="SentKbps">What the device actually handed to its channel over the step (a browser holding back its own
 /// buffer sends less than the pace); 0 when too few messages to tell.</param>
+/// <param name="Inconclusive">The relay's reports on the step did not come back in time: it says nothing either way.</param>
 public readonly record struct ProbeStep(int OfferedKbps, int Sent, int UplinkKbps, int UplinkLost, int UplinkDelayGrowthMs,
-    int EchoKbps, int Echoed, int EchoDelayGrowthMs, bool UplinkPassed, bool EchoPassed, bool EchoRequested = true, int SentKbps = 0)
+    int EchoKbps, int Echoed, int EchoDelayGrowthMs, bool UplinkPassed, bool EchoPassed, bool EchoRequested = true, int SentKbps = 0,
+    bool Inconclusive = false)
 {
     /// <summary>The device sent clearly less than the step's pace: its own channel held it back.</summary>
     public bool HeldBack => SentKbps > 0 && SentKbps < OfferedKbps * LinkProbe.MinDeliveredShare;
@@ -24,7 +26,7 @@ public readonly record struct ProbeStep(int OfferedKbps, int Sent, int UplinkKbp
     public int TestedKbps => SentKbps > 0 ? Math.Min(OfferedKbps, SentKbps) : OfferedKbps;
 
     public override string ToString() =>
-        $"{OfferedKbps}k{(TestedKbps < OfferedKbps ? $" (sent {SentKbps}k)" : "")}: up {UplinkKbps}k{(UplinkPassed ? "" : "!")} (lost {UplinkLost}/{Sent}, +{UplinkDelayGrowthMs}ms)" +
+        $"{OfferedKbps}k{(TestedKbps < OfferedKbps ? $" (sent {SentKbps}k)" : "")}{(Inconclusive ? " no reports" : "")}: up {UplinkKbps}k{(UplinkPassed ? "" : "!")} (lost {UplinkLost}/{Sent}, +{UplinkDelayGrowthMs}ms)" +
         (EchoRequested ? $" echo {EchoKbps}k{(EchoPassed ? "" : "!")} ({Echoed}/{Sent}, +{EchoDelayGrowthMs}ms)" : "");
 }
 
@@ -167,15 +169,20 @@ public sealed class LinkProbe
             // A step the device could not even send at (its own channel held it back: a fresh association's slow start, a
             // browser that drains its buffer coarsely) says nothing about the link beyond what it did send: it passes at
             // that, and the probe ends there (see Conclude) with the uplink a lower bound.
-            var upPassed = stamped && reported > 0 && log.Lost <= Math.Max(2, reported * MaxLossShare) &&
-                           (upKbps == 0 || upKbps >= tested * MinDeliveredShare) && upGrowth < MaxDelayGrowthMs &&
-                           reported >= log.Sent * 0.9;
+            // Loss is judged on its own: what arrived is compared with what was sent less what was lost, not with all of it.
+            var arrivedShare = reported > 0 ? (double)log.Arrivals.Count / reported : 1;
+            var echoShare = log.Sent > 0 ? (double)log.Echoes.Count / log.Sent : 1;
+            // The relay's reports for the step did not come back in time (they ride this device's downlink, which media
+            // may already fill): nothing can be said about the uplink from it.
+            var inconclusive = stamped && reported < log.Sent * 0.9;
+            var upPassed = stamped && !inconclusive && reported > 0 && log.Lost <= Math.Max(2, reported * MaxLossShare) &&
+                           (upKbps == 0 || upKbps >= tested * arrivedShare * MinDeliveredShare) && upGrowth < MaxDelayGrowthMs;
             // The echo crosses both legs: its loss is up to twice the uplink's, and it can only bring back what got there.
             var echoPassed = echo && log.Sent > 0 && log.Echoes.Count >= Math.Max(1, log.Sent * (1 - 2 * MaxLossShare) - 2) &&
-                             (pageBusy || ((echoKbps == 0 || echoKbps >= Math.Min(tested, upKbps > 0 ? upKbps : tested) * MinDeliveredShare) &&
+                             (pageBusy || ((echoKbps == 0 || echoKbps >= Math.Min(tested, upKbps > 0 ? upKbps : tested) * echoShare * MinDeliveredShare) &&
                                            echoGrowth < MaxEchoGrowthMs));
             return new ProbeStep(log.OfferedKbps, log.Sent, upKbps, log.Lost, upGrowth, echoKbps, log.Echoes.Count, echoGrowth, upPassed, echoPassed, echo,
-                sentKbps);
+                sentKbps, inconclusive);
         }
     }
 
@@ -193,6 +200,8 @@ public sealed class LinkProbe
         {
             // A step the device's own channel held back is the probe's last: higher steps were never sent.
             var last = step.UplinkPassed && step.HeldBack;
+            // No reports in time: the probe ends on what it knew, the uplink a lower bound (or unknown, on the first step).
+            if (step.Inconclusive) break;
             if (upAtLeast)
             {
                 if (step.UplinkPassed)

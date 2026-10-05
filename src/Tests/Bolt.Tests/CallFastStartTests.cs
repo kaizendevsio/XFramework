@@ -98,6 +98,20 @@ public sealed class CallFastStartTests
     }
 
     [Test]
+    public void Probe_ReportsThatDoNotComeBack_SayNothing()
+    {
+        // The relay's feedback rides this device's downlink, which the other side's picture already fills.
+        var probe = new LinkProbe();
+        var step = probe.BeginStep(600);
+        for (uint index = 0; index < 13; index++) probe.OnSent(step, index, (ushort)index, 1_100, index * 15_000L);
+        probe.OnFeedback(0, [10_000, 25_000]);
+        var verdict = probe.Judge(step, stamped: true, echo: false);
+        var result = LinkProbe.Conclude([verdict], 0);
+        Assert.That(verdict.Inconclusive, Is.True);
+        Assert.That(result.UplinkKbps, Is.Zero, "unknown: the start falls back to the last call or a middle picture, not 300 kbit/s");
+    }
+
+    [Test]
     public void APictureGrowsOnlyWhileTheReceiversKeepUp()
     {
         var controller = new SendRateController(2_000);

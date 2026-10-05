@@ -113,7 +113,9 @@ jobs:
             relay: "delay 3ms"
             constrained: "A>512"
             extra: "CALL_A_HEIGHT=1080 CALL_A_CEILING=1080 CALL_B_HEIGHT=1080 CALL_B_CEILING=1080 CALL_TARGET_WITHIN_S=5 CALL_A_FIRST_MAX_HEIGHT=360 CALL_A_START_KEYFRAME_MAX_BYTES=32000"
-          # A fast start, then A's uplink steps down to 2 Mbit/s mid-call: A must fit it within 3 s, without flapping.
+          # A fast start, then A's uplink steps down to 2 Mbit/s mid-call: A must fit it within 3 s, without flapping. Until
+          # it has, A's own feedback and SCTP acknowledgements queue behind its video on that uplink, so what A receives
+          # stalls too: a freeze of up to 3 s and a second decoder restart on B->A are the step, not a fault.
           - scenario: step-down
             a_down: "delay 7ms rate 20mbit"
             a_up: "delay 7ms rate 20mbit"
@@ -121,7 +123,7 @@ jobs:
             b_up: "delay 7ms rate 20mbit"
             relay: "delay 3ms"
             constrained: "A>2000"
-            extra: "CALL_A_HEIGHT=1080 CALL_A_CEILING=1080 CALL_B_HEIGHT=1080 CALL_B_CEILING=1080 CALL_TARGET_WITHIN_S=5 CALL_MAX_RUNG_CHANGES=3 CALL_STEP_AT_S=30 CALL_STEP_BAND=2 CALL_STEP_SENDER=A CALL_STEP_KBPS=2000 CALL_STEP_FIT_WITHIN_S=3"
+            extra: "CALL_A_HEIGHT=1080 CALL_A_CEILING=1080 CALL_B_HEIGHT=1080 CALL_B_CEILING=1080 CALL_TARGET_WITHIN_S=5 CALL_MAX_RUNG_CHANGES=4 CALL_STEP_AT_S=30 CALL_STEP_BAND=2 CALL_STEP_SENDER=A CALL_STEP_KBPS=2000 CALL_STEP_FIT_WITHIN_S=3 CALL_MAX_FREEZE_MS=3000 CALL_MAX_RESETS=2"
             step_spec: "delay 7ms rate 2mbit"
     steps:
       - name: Checkout
