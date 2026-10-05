@@ -98,6 +98,18 @@ public sealed class CallFastStartTests
     }
 
     [Test]
+    public void ABrowserChannelThatStalls_IsCutGently_NotCollapsed()
+    {
+        // WebKit holds 280 KB in its channel for two seconds while the relay, the uplink and the receiver see no queue.
+        var controller = new SendRateController(2_100);
+        for (long now = 0; now <= 2_000; now += 250)
+            controller.Update(new SendPathSample(now, 35, 30, 3_000 + (int)now, 40, now == 500, Transport: new TransportSignal(now, 2, 0, 0, 600),
+                Receiver: new ReceiverSignal(now, 20, 900)));
+        Assert.That(controller.EstimateKbps, Is.GreaterThan(2_100 / 3), "a few gentle cuts, not 48 kbit/s");
+        Assert.That(controller.VideoSuspended, Is.False);
+    }
+
+    [Test]
     public void Probe_ReportsThatDoNotComeBack_SayNothing()
     {
         // The relay's feedback rides this device's downlink, which the other side's picture already fills.

@@ -438,10 +438,19 @@ public sealed class SendRateController
         {
             signal = RateSignal.Overuse;
             _calmSince = null;
+            // Only this device's own queue says so, while the relay, the uplink feedback and the receivers all report a
+            // short one: the browser's channel itself stalled (WebKit holds hundreds of KB for a second or two). A real
+            // uplink limit shows remotely too (its queue or its loss), so this is cut gently, never collapsed to a
+            // capacity measured on a stalled pipe.
+            var remoteDelay = Math.Max(relay is { } rr ? rr.QueueDelayMs + (transport is null ? rr.UplinkDelayMs : 0) : 0,
+                Math.Max(transport is { } tt ? tt.QueueDelayMs : 0, (receiver ?? silent) is { } rv ? rv.QueueDelayMs : 0));
+            var localOnly = remoteDelay < _options.TargetDelayMs && relay?.BaseLost != true && !lossy &&
+                            (relay is not null || transport is not null || receiver is not null);
             // Once decreased, wait for the queue to drain unless it keeps getting much worse.
-            var deeper = delay >= _options.HighDelayMs * 2 && gradient > 0;
+            var deeper = !localOnly && delay >= _options.HighDelayMs * 2 && gradient > 0;
             if (now - _lastDecreaseAt >= _options.HoldAfterDecreaseMs || (deeper && now - _lastDecreaseAt >= _options.HoldAfterDecreaseMs / 2))
-                Decrease(now, sample, relay, receiver ?? silent, delay, severe: baseLost || overload || lossy || _cutStreak > 0, transport);
+                Decrease(now, localOnly ? sample with { LocalCapacityKbps = 0 } : sample, relay, receiver ?? silent, delay,
+                    severe: !localOnly && (baseLost || overload || lossy || _cutStreak > 0), transport);
         }
         else if (calm)
         {
