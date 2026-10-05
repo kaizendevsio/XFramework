@@ -17,9 +17,6 @@ on:
       only:
         description: Run only this scenario (empty runs all)
         default: ""
-      repeat:
-        description: Attempts per scenario, as a JSON array, e.g. [1,2,3,4,5] (repeatability)
-        default: "[1]"
   pull_request:
     paths:
       - src/Libraries/Bolt/**
@@ -32,12 +29,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: call-browser-e2e-${{ github.ref }}
+  # A dispatched run (repeatability: several at once) never cancels another.
+  group: call-browser-e2e-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
   cancel-in-progress: true
 
 jobs:
   call:
-    name: "${{ matrix.scenario }}${{ matrix.attempt > 1 && format(' ({0})', matrix.attempt) || '' }}"
+    name: ${{ matrix.scenario }}
     runs-on: ubuntu-latest
     env:
       # workflow_dispatch "only": every other scenario's job skips its steps.
@@ -46,7 +44,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        attempt: ${{ fromJSON(github.event.inputs.repeat || '[1]') }}
         include:
           # Each browser's leg: about 14 ms round trip to TURN and Wi-Fi capacity, as the 13:08 UTC call measured. A plays
           # the Android phone at up to 1440p30 (it climbs past the 4.7 Mbit/s that phone sent), B the iPhone at 720p30
@@ -269,7 +266,7 @@ jobs:
         if: always() && env.RUN_SCENARIO == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: call-browser-e2e-${{ matrix.scenario }}${{ matrix.attempt > 1 && format('-{0}', matrix.attempt) || '' }}
+          name: call-browser-e2e-${{ matrix.scenario }}
           path: ${{ runner.temp }}/call-*.json
           if-no-files-found: warn
 
