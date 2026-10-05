@@ -275,6 +275,7 @@ public sealed class SendRateController
         _lowVideoSince = null;
         _recoveryUsed = _recoveryClimbing = false;
         RecoveringToKbps = null;
+        _pictureStartKbps = _estimate;
     }
 
     public void Reset(int totalKbps)
@@ -314,7 +315,7 @@ public sealed class SendRateController
     private bool _recoveryUsed, _recoveryClimbing;
     private int _recoveries;
     private long _recoveredAt = long.MinValue / 2;
-    private double _recoveryPeak;
+    private double _recoveryPeak, _pictureStartKbps;
     /// <summary>A recovered rate that held this long was a start transient's: a later cut in the window may be one too.</summary>
     private const int RecoveryHeldMs = 1_500;
     private const int MaxRecoveries = 3;
@@ -605,8 +606,9 @@ public sealed class SendRateController
             _recoveryUsed = true;
             _recoveries++;
             RecoveryGrants++;
-            RecoveringToKbps = (int)Math.Round(Math.Max(beforeCut, _recoveryPeak) * 0.7);
-            _recoveryPeak = Math.Max(beforeCut, _recoveryPeak);
+            // Back to 70% of the best this start had: its own start rate (the probe's measurement), or more if it climbed.
+            _recoveryPeak = Math.Max(Math.Max(beforeCut, _recoveryPeak), _pictureStartKbps);
+            RecoveringToKbps = (int)Math.Round(_recoveryPeak * 0.7);
             _recoveryClimbing = false;
         }
         else if (_recoveryClimbing) RecoveringToKbps = null; // Congestion again on the way back: the link is smaller.
