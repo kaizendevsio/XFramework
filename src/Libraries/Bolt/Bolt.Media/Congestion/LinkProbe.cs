@@ -174,10 +174,12 @@ public sealed class LinkProbe
             var arrivedShare = reported > 0 ? (double)log.Arrivals.Count / reported : 1;
             var echoShare = log.Sent > 0 ? (double)log.Echoes.Count / log.Sent : 1;
             // The relay's reports for the step did not come back in time (they ride this device's downlink, which media
-            // may already fill): nothing can be said about the uplink from it.
-            var inconclusive = stamped && reported < log.Sent * 0.9;
-            var upPassed = stamped && !inconclusive && reported > 0 && log.Lost <= Math.Max(2, reported * MaxLossShare) &&
-                           (upKbps == 0 || upKbps >= tested * arrivedShare * MinDeliveredShare) && upGrowth < MaxDelayGrowthMs;
+            // may already fill), and those that did show nothing wrong: nothing can be said about the uplink from it. Late
+            // reports that already show a queue or a shortfall are the uplink saying no (its queue delayed them too).
+            var looksFine = upGrowth < MaxDelayGrowthMs && (upKbps == 0 || upKbps >= tested * arrivedShare * MinDeliveredShare);
+            var inconclusive = stamped && reported < log.Sent * 0.9 && looksFine;
+            var upPassed = stamped && !inconclusive && reported >= log.Sent * 0.9 && log.Lost <= Math.Max(2, reported * MaxLossShare) &&
+                           looksFine;
             // The echo crosses both legs: its loss is up to twice the uplink's, and it can only bring back what got there.
             var echoPassed = echo && log.Sent > 0 && log.Echoes.Count >= Math.Max(1, log.Sent * (1 - 2 * MaxLossShare) - 2) &&
                              (pageBusy || ((echoKbps == 0 || echoKbps >= Math.Min(tested, upKbps > 0 ? upKbps : tested) * echoShare * MinDeliveredShare) &&

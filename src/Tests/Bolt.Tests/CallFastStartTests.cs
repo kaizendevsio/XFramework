@@ -135,6 +135,20 @@ public sealed class CallFastStartTests
         var result = LinkProbe.Conclude([verdict], 0);
         Assert.That(verdict.Inconclusive, Is.True);
         Assert.That(result.UplinkKbps, Is.Zero, "unknown: the start falls back to the last call or a middle picture, not 300 kbit/s");
+
+        // Late reports that already show a queue are the uplink's own (a 512 kbit/s link queued them as well).
+        var slow = new LinkProbe();
+        var first = slow.BeginStep(600);
+        var arrivals = new List<long>();
+        for (uint index = 0; index < 13; index++)
+        {
+            slow.OnSent(first, index, (ushort)index, 1_100, index * 15_000L);
+            if (index < 10) arrivals.Add(10_000 + index * 22_000L); // drained at about 400 kbit/s: the delay grows
+        }
+        slow.OnFeedback(0, arrivals);
+        var judged = slow.Judge(first, stamped: true, echo: false);
+        Assert.That((judged.Inconclusive, judged.UplinkPassed), Is.EqualTo((false, false)));
+        Assert.That(LinkProbe.Conclude([judged], 0).UplinkKbps, Is.InRange(300, 500));
     }
 
     [Test]
