@@ -542,8 +542,11 @@ public sealed partial class BoltServer
     /// its ramp), not a stream. Reflection to the sender alone, same size as what it sent: nothing is amplified.
     /// </summary>
     internal const long PaddingEchoBudgetBytes = 2 * 1024 * 1024;
-    /// <summary>The echo stands back while this much already waits on the participant's channel (its media comes first).</summary>
-    internal const long PaddingEchoBacklogBytes = 32 * 1024;
+    /// <summary>
+    /// The echo stands back while this much already waits on the participant's channel (its media comes first). The
+    /// channel counts bytes in flight too: at a 7.5 Mbit/s step over a 20 ms round trip that alone is about 20 KB.
+    /// </summary>
+    internal const long PaddingEchoBacklogBytes = 96 * 1024;
 
     private static void EchoPadding(BoltHubConnection connection, ReadOnlySpan<byte> message)
     {

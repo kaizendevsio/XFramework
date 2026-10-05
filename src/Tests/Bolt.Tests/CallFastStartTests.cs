@@ -271,6 +271,22 @@ public sealed class CallFastStartTests
         });
     }
 
+    [Test]
+    public void ANewPicturesOwnQueue_IsNotCongestion_ButTheRelaysReportsStillAre()
+    {
+        // WebKit drains a fresh data channel's first keyframe slowly: the pacer's queue stands while the relay sees none.
+        var controller = new SendRateController(300);
+        var start = new PictureStart(controller);
+        start.Begin(0, new StartHints(UplinkKbps: 7_500, UplinkAtLeast: true), AudioWire, new VideoRateLadder(1), null);
+        var begun = controller.EstimateKbps;
+        for (long now = 250; now <= 2_500; now += 250)
+            controller.Update(new SendPathSample(now, 800, 60, 600, 120, now == 750, Transport: new TransportSignal(now, 5, 0, 0, 800)));
+        Assert.That(controller.EstimateKbps, Is.GreaterThanOrEqualTo(begun), "its own queue did not cut it");
+        for (long now = 2_750; now <= 3_500; now += 250)
+            controller.Update(new SendPathSample(now, 800, 60, 0, 0, false, new RelaySignal(now, 900, 0, 1_000, true, BaseLost: true)));
+        Assert.That(controller.EstimateKbps, Is.LessThan(begun / 2), "the relay's report of a lost picture did");
+    }
+
     // ── Helpers ──
 
     /// <summary>

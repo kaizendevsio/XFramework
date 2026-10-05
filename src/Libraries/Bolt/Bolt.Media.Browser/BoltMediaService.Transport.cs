@@ -52,6 +52,8 @@ public sealed partial class BoltMediaService
         transport.PathLost += () => _rateLoop?.PathChanged();
         // The relay's per-message arrival times on this device's uplink: the rate loop's GCC-style delay-gradient and loss input.
         transport.TransportFeedback += signal => _signals.OnTransportFeedback(signal);
+        // The probe's padding can still sit in the channel's buffer as it ends: not this device's congestion.
+        transport.ProbeEnded += () => _rateLoop?.Controller.IgnoreLocalUntil(Environment.TickCount64 + 1_500);
         // Requests a session once the socket is registered, and keeps the path healthy from then on.
         transport.Start();
         return transport;

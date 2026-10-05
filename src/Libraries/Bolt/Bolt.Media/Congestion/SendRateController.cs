@@ -318,8 +318,20 @@ public sealed class SendRateController
         return true;
     }
 
-    public SendRateDecision Update(in SendPathSample sample)
+    /// <summary>
+    /// Until then, this device's own queues (the pacer's wait, the transport's backlog, a picture its pacer dropped) do
+    /// not count as congestion while the path has shown none: a picture's first keyframe filling a data channel that
+    /// is still warming up (WebKit drains its first bursts slowly), or a start probe's padding, is not the link. The
+    /// relay's and the receivers' reports still count, and so does everything once the path has shown congestion.
+    /// </summary>
+    public void IgnoreLocalUntil(long nowMs) => _ignoreLocalUntil = Math.Max(_ignoreLocalUntil, nowMs);
+    private long _ignoreLocalUntil = long.MinValue;
+
+    public SendRateDecision Update(in SendPathSample input)
     {
+        var sample = input.NowMs < _ignoreLocalUntil && !_congestionObserved
+            ? input with { LocalQueueDelayMs = 0, LocalCapacityKbps = 0, LocalBaseLost = false }
+            : input;
         var now = sample.NowMs;
         if (_startedAt == long.MinValue) _startedAt = now;
         var dt = _lastUpdateAt == long.MinValue ? 0 : Math.Clamp((now - _lastUpdateAt) / 1000.0, 0, 1);

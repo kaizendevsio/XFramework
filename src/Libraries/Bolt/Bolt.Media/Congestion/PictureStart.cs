@@ -13,6 +13,8 @@ public sealed class PictureStart(SendRateController controller)
 {
     /// <summary>How long after a picture starts late evidence may still revise its rate.</summary>
     public const int WindowMs = 10_000;
+    /// <summary>How long a new picture's own queues are not read as congestion (see <see cref="SendRateController.IgnoreLocalUntil"/>).</summary>
+    public const int LocalGraceMs = 3_000;
 
     private long _startedAt;
     private bool _active;
@@ -31,6 +33,7 @@ public sealed class PictureStart(SendRateController controller)
         _active = true;
         var estimate = Choose(_hints);
         controller.StartPicture(estimate.TotalKbps);
+        controller.IgnoreLocalUntil(nowMs + LocalGraceMs);
         Estimate = estimate with { TotalKbps = controller.EstimateKbps };
         controller.StartCeilingKbps = Ceiling(_hints);
         if (Ceiling(_hints) is { } limit) controller.MeasuredLimit(limit);

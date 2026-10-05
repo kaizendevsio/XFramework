@@ -321,6 +321,9 @@ public sealed class MediaTransportClient : IAsyncDisposable
     /// </summary>
     private const int ProbeBacklogMs = 60;
 
+    /// <summary>A start probe finished (its padding may still sit in the channel's buffer for a moment).</summary>
+    public event Action? ProbeEnded;
+
     /// <summary>A start probe is running: its padding sits in the channel's buffer and the relay's feedback, so the rate loop holds still.</summary>
     public bool Probing => Volatile.Read(ref _probe) is not null;
     private const int ProbeMessageBytes = 1_100;
@@ -382,7 +385,11 @@ public sealed class MediaTransportClient : IAsyncDisposable
             }
         }
         catch (OperationCanceledException) { return null; }
-        finally { Volatile.Write(ref _probe, null); }
+        finally
+        {
+            Volatile.Write(ref _probe, null);
+            ProbeEnded?.Invoke();
+        }
         var result = LinkProbe.Conclude(steps, _clock() - started, probe.MinRoundTripMs());
         _logger.LogInformation("Start probe: {Result}", result);
         return result;
@@ -399,8 +406,9 @@ public sealed class MediaTransportClient : IAsyncDisposable
             var sequence = unchecked((ushort)Interlocked.Increment(ref _transportSequence));
             buffer[0] = (byte)FrameType.TransportSequenced;
             System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(buffer.AsSpan(1), sequence);
-            if (!peer.TrySend(buffer.AsSpan(0, total))) return false;
+            // Timed before the send: the page's own clock for an echo it times itself starts here too.
             var now = NowMicroseconds();
+            if (!peer.TrySend(buffer.AsSpan(0, total))) return false;
             // Not recorded for the media's own estimate: the probe judges its padding itself, and a probe step that builds
             // a queue on purpose must not read as the media's congestion.
             probe.OnSent(step, index, sequence, total, now);
@@ -732,6 +740,8 @@ public sealed class MediaTransportClient : IAsyncDisposable
         peer.StateChanged += state => _ = OnPeerStateAsync(session, state);
         peer.PathChanged += _ => Raise();
         peer.Message += OnPeerMessage;
+        // A peer that times probe echoes where they land (a browser's page) hands them over that way instead.
+        if (peer is IRtcProbeEchoSource echoes) echoes.ProbeEcho += (step, index, arrivedUs) => Volatile.Read(ref _probe)?.OnEcho(step, index, arrivedUs);
         session.Candidates.Hold();
         var offer = await peer.CreateOfferAsync(iceRestart: false, _lifetime.Token);
         await SendAsync(MediaTransportKind.Offer, new MediaTransportDescription(session.Id, offer));

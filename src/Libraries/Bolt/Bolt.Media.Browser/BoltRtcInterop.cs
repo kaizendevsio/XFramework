@@ -47,7 +47,7 @@ public sealed class BoltRtcInterop(IJSRuntime js, ILogger<BoltRtcInterop> logger
 /// An <see cref="IRtcPeer"/> backed by the browser's RTCPeerConnection. Sends and the buffered amount are
 /// synchronous calls into the page (the sender's pacer makes one per frame); everything else is async.
 /// </summary>
-public sealed class BrowserRtcPeer : IRtcPeer
+public sealed class BrowserRtcPeer : IRtcPeer, IRtcProbeEchoSource
 {
     private readonly ILogger _logger;
     private IJSObjectReference? _peer;
@@ -126,6 +126,16 @@ public sealed class BrowserRtcPeer : IRtcPeer
     }
 
     private IJSObjectReference Require() => _peer ?? throw new ObjectDisposedException(nameof(BrowserRtcPeer));
+
+    public event Action<byte, uint, long>? ProbeEcho;
+
+    /// <summary>A start-probe echo, timed by the page when it arrived (performance.now(), ms; the WebAssembly Stopwatch runs on the same clock).</summary>
+    [JSInvokable]
+    public void OnProbeEcho(byte step, uint index, double arrivedAtMs)
+    {
+        try { ProbeEcho?.Invoke(step, index, (long)Math.Round(arrivedAtMs * 1000)); }
+        catch (Exception ex) { _logger.LogDebug(ex, "A probe echo handler failed"); }
+    }
 
     [JSInvokable]
     public void OnMessage(byte[] data)
