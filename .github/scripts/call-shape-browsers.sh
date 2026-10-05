@@ -32,6 +32,15 @@ shape_call() {
   sudo tc -s qdisc show dev lo | head -40
 }
 
+# Change one leg mid-call (a step down): band 1 A down, 2 A up, 3 B down, 4 B up, 5 the relay's leg.
+reshape_leg() {
+  local band=$1 spec=$2
+  case "$spec" in *limit*) ;; *) spec="$spec limit 10000" ;; esac
+  # shellcheck disable=SC2086
+  sudo tc qdisc change dev lo parent "1:$band" handle "${band}0:" netem $spec
+  echo "reshaped band $band: $spec"
+}
+
 unshape_call() {
   sudo tc -s qdisc show dev lo 2>/dev/null | head -60 || true
   sudo tc qdisc del dev lo root 2>/dev/null || true

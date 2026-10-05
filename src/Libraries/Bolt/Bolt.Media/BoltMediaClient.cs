@@ -267,6 +267,12 @@ public sealed class BoltMediaClient : IAsyncDisposable
     }
 
     /// <summary>Attach feedback to the local video stream, not just the receiver's stream copy.</summary>
+    /// <summary>
+    /// This device's downlink as its start probe measured it (or null): every report to a remote sender carries it, so
+    /// senders fit the first picture to the worst receiver (<see cref="MediaFeedbackData.DownlinkKbps"/>).
+    /// </summary>
+    public Func<(uint Kbps, bool AtLeast)?>? DownlinkReport { get; set; }
+
     public void ConfigureVideoFeedback(Guid streamId, int bitrateKbps)
     {
         if (!_mediaStreams.TryGetValue(streamId, out var stream) || stream.IsAudio) return;
@@ -354,7 +360,7 @@ public sealed class BoltMediaClient : IAsyncDisposable
         // VAD/PLC primitives operate on decoded PCM, not compressed Opus packets.
         // Encoded frames must reach the codec unchanged.
 
-        var controller = new AdaptiveBitrateController(conn, config.StreamId, config.BitrateKbps, isAudio);
+        var controller = new AdaptiveBitrateController(conn, config.StreamId, config.BitrateKbps, isAudio) { Downlink = () => DownlinkReport?.Invoke() };
         _bitrateControllers[config.StreamId] = controller;
         controller.Start();
         controller.OnBitrateChanged += kbps => stream.RaiseBitrateChanged(kbps);

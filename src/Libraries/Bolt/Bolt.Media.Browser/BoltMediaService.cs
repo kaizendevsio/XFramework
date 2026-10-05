@@ -147,6 +147,8 @@ public sealed partial class BoltMediaService : IAsyncDisposable
                              _rtc is not null && await _rtc.IsSupportedAsync();
 
         _mediaClient = CreateMediaClient(client);
+        // The browser's view of the network, for this device's downlink reports before any probe (a slow connection).
+        _networkHint = await _audio.NetworkHintAsync();
 
         _initialized = true;
         _logger.LogInformation("BoltMediaService initialized");
@@ -194,6 +196,8 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         mediaClient.OnReceiverFeedback += feedback =>
             _signals.OnReceiverFeedback(feedback, feedback.StreamId == _activeVideoStreamId, Environment.TickCount64);
         mediaClient.OnHeartbeat += (_, stamp) => OnHeartbeatEcho?.Invoke(stamp);
+        // Remote senders start their pictures under this device's downlink (its start probe).
+        mediaClient.DownlinkReport = DownlinkForReports;
         _transport = CreateDatagramTransport(client, mediaClient);
         return mediaClient;
     }
@@ -434,6 +438,8 @@ public sealed partial class BoltMediaService : IAsyncDisposable
             while (!ct.IsCancellationRequested)
             {
                 await Task.Delay(Math.Max(100, _options.AdaptationIntervalMs), ct);
+                // The start probe's padding fills the channel's buffer and the relay's feedback on purpose: no decision on that.
+                if (_transport?.Probing == true) continue;
                 var tick = loop.Tick(Environment.TickCount64, _encodeBacklog);
                 SendRate = tick.Decision;
                 LastSendTick = tick;
@@ -452,6 +458,16 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         catch (OperationCanceledException) { }
         catch (JSException ex) { _logger.LogDebug(ex, "Send rate loop ended with the page"); }
         catch (Exception ex) { _logger.LogWarning(ex, "Send rate loop ended"); }
+    }
+
+    /// <summary>A picture that ran this long settled somewhere worth starting the next call on this kind of network from.</summary>
+    private const int RememberAfterMs = 15_000;
+
+    private async Task RememberSettledRateAsync()
+    {
+        if (_rateLoop is not { } loop || _videoStartedAt is not { } started || Environment.TickCount64 - started < RememberAfterMs) return;
+        _videoStartedAt = null;
+        await _audio.RememberNetworkRateAsync(loop.Controller.StableKbps);
     }
 
     private async Task StopSendPathAsync()
@@ -490,6 +506,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
             catch (ObjectDisposedException) { /* The completed loop has already released its token. */ }
         }
         await Task.WhenAll(loops.Select(loop => loop.Completion));
+        await RememberSettledRateAsync();
         await StopSendPathAsync();
         _resumeFrom = null;
         _activeAudioStreamId = Guid.Empty;

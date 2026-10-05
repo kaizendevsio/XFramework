@@ -146,6 +146,41 @@ public sealed class BoltRelayResilienceTests
     }
 
     [Test]
+    public void RetransmitCache_AFrameTooLargeForADatagram_IsOnItsWay_NotGone()
+    {
+        // A picture its sender sent over the socket (its channel was not open yet) travels to each receiver over its socket
+        // too. A receiver's NACK for it must not be declined (it would take what follows as a policy gap).
+        var cache = new RelayRetransmitCache();
+        cache.Store(1, new byte[200], 0, out _);
+        cache.Store(2, new byte[4_000], 0, out _);
+        Assert.Multiple(() =>
+        {
+            Assert.That(cache.Lookup(1, 10, out var frame), Is.EqualTo(RelayRetransmitCache.Holding.Held));
+            Assert.That(frame, Has.Length.EqualTo(200));
+            Assert.That(cache.Lookup(2, 10, out _), Is.EqualTo(RelayRetransmitCache.Holding.TooLarge));
+            Assert.That(cache.Lookup(2, RelayRetransmitCache.DefaultMaxAgeMs + 10, out _), Is.EqualTo(RelayRetransmitCache.Holding.Gone));
+        });
+    }
+
+    [Test]
+    public void Queue_ALateBasePictureItCannotForward_IsABaseLoss()
+    {
+        // All of base picture 200 arrived late (the sender's channel stalled and it went over the socket), towards a queue
+        // too full to take it. The receiver cannot tell that gap from a shed enhancement layer, so picture 300, which
+        // refers to 200, must not follow it out: as any base loss, the queue waits for a keyframe and asks for one.
+        long now = 0;
+        var queue = new BoltMediaSendQueue(new BoltMediaSendQueueOptions { VideoMaxQueuedBytes = 1000, VideoMaxQueueDelayMs = 60_000 }, () => now);
+        Assert.That(queue.TryEnqueue(Frame(1, 900), BoltMediaLane.Video, Video, 1, keyStart: true, picture: 100).Queued, Is.True);
+        Assert.That(queue.TryEnqueue(Frame(3, 50), BoltMediaLane.Video, Video, 3, keyStart: false, picture: 300, layer: 0).Queued, Is.True);
+        var late = queue.TryEnqueue(Frame(2, 400), BoltMediaLane.Video, Video, 2, keyStart: false, picture: 200, layer: 0);
+        Assert.That((late.Queued, late.RequestKeyframe), Is.EqualTo((false, true)), "dropped, and a keyframe asked for");
+        Assert.That(queue.TryEnqueue(Frame(4, 50), BoltMediaLane.Video, Video, 4, keyStart: false, picture: 400, layer: 0).Queued, Is.False,
+            "nothing more until the keyframe");
+        Assert.That(queue.TryEnqueue(Frame(5, 50), BoltMediaLane.Video, Video, 5, keyStart: true, picture: 500).Queued, Is.True);
+        Assert.That(Drain(queue), Is.EqualTo(new byte[] { 5 }), "what was queued went with it (300 refers to the lost 200): the receiver goes on from the keyframe");
+    }
+
+    [Test]
     public void Queue_ALateFragmentOfAPictureTheRelayDidNotForward_StaysDropped()
     {
         var queue = new BoltMediaSendQueue(new BoltMediaSendQueueOptions { VideoMaxQueuedBytes = 300, VideoMaxQueueDelayMs = 60_000 });

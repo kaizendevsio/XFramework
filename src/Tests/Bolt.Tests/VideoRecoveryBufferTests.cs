@@ -280,6 +280,23 @@ public sealed class VideoRecoveryBufferTests
     }
 
     [Test]
+    public void AT1PictureTheRelayDeclined_TakesTheT2PicturesThatReferToIt_ButNothingElse()
+    {
+        // L1T3: 1 (key), 2 (T2), 3 (T1), 4 (T2, refers to 3), 5 (base). The relay declined all of 3.
+        var sender = new Sender();
+        var buffer = Recovering();
+        var ready = Push(buffer, sender.Picture(1, 0, key: true).Concat(sender.Picture(2, 2)));
+        var dropped = sender.Picture(3, 1);
+        ready.AddRange(Push(buffer, sender.Picture(4, 2).Concat(sender.Picture(5, 0))));
+        buffer.Decline(dropped.Select(x => x.Sequence).ToArray(), ready);
+        Assert.Multiple(() =>
+        {
+            Assert.That(ready.Select(x => x.FrameId), Is.EqualTo(new[] { 1u, 2u, 5u }), "4 referred to 3: not shown; 5 is a base picture");
+            Assert.That(ready.Any(x => x.Discontinuity), Is.False, "and no keyframe for it");
+        });
+    }
+
+    [Test]
     public void AWholePictureLostInTransit_IsABreakWhenItCannotBeRepaired()
     {
         // Nothing of picture 2 arrived, so its layer is unknown: it may have been a base picture.

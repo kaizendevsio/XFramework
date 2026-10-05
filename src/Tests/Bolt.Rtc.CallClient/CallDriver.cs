@@ -98,6 +98,7 @@ public static class CallDriver
             tier = media.ActiveVideoTier is { } tier ? new { tier.Width, tier.Height, tier.Framerate, tier.BitrateKbps } : null,
             rate = rate is { } r ? new { r.TotalKbps, r.VideoKbps, r.AudioKbps, r.VideoSuspended, signal = r.Signal.ToString(), r.DelayMs } : null,
             transport = diagnostics?.Transport,
+            start = media.VideoStart?.ToString(), probe = media.LinkProbe?.ToString(),
             receive = media.IsInitialized ? media.GetVideoReceiveStats() : [],
             send = media.LastSendTick is { } tick ? new
             {

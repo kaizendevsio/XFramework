@@ -14,6 +14,9 @@ public sealed class SendPathSignals
     private readonly List<(long At, bool Video, int DelayMs, int Kbps)> _feedback = [];
     private ReceiverSignal? _lastReceiver;
     private TransportSignal? _transport;
+    private readonly List<(long At, int Kbps, bool AtLeast)> _downlinks = [];
+    /// <summary>Receivers repeat their downlink with every report (four a second); this window holds each one's latest.</summary>
+    public const int DownlinkWindowMs = 3_000;
     private const int FeedbackWindowMs = 1_000;
     /// <summary>A receiver that went quiet is still reported, as it last was, for this long (see <see cref="SendRateController"/>).</summary>
     public const int SilentReceiverMs = 15_000;
@@ -27,6 +30,23 @@ public sealed class SendPathSignals
             _feedback.Clear();
             _lastReceiver = null;
             _transport = null;
+            _downlinks.Clear();
+        }
+    }
+
+    /// <summary>
+    /// The smallest downlink any receiver reported recently (its start probe or hints; see
+    /// <see cref="MediaFeedbackData.DownlinkKbps"/>), and whether that one is only a lower bound. Null when none did.
+    /// </summary>
+    public (int Kbps, bool AtLeast)? ReceiversDownlink(long nowMs)
+    {
+        lock (_sync)
+        {
+            _downlinks.RemoveAll(x => nowMs - x.At > DownlinkWindowMs);
+            if (_downlinks.Count == 0) return null;
+            // A receiver that found its limit bounds the sender; lower bounds only count when no receiver found one.
+            var exact = _downlinks.Where(x => !x.AtLeast).ToArray();
+            return exact.Length > 0 ? (exact.Min(x => x.Kbps), false) : (_downlinks.Min(x => x.Kbps), true);
         }
     }
 
@@ -55,6 +75,12 @@ public sealed class SendPathSignals
 
     public void OnReceiverFeedback(in MediaFeedbackData feedback, bool video, long nowMs)
     {
+        if (feedback.DownlinkKbps > 0)
+            lock (_sync)
+            {
+                _downlinks.Add((nowMs, (int)Math.Min(feedback.DownlinkKbps, int.MaxValue), feedback.DownlinkAtLeast));
+                _downlinks.RemoveAll(x => nowMs - x.At > DownlinkWindowMs);
+            }
         if (!feedback.HasDelayReport) return;
         lock (_sync)
         {
@@ -157,6 +183,8 @@ public sealed class SendRateLoop
     private int _cpuStrained, _cpuCalm;
     private int _restarts;
     private int _pathChanged;
+    private readonly PictureStart _pictureStart;
+    private int _recoveryGrants;
 
     public SendRateLoop(MediaSendPacer pacer, SendRateController controller, VideoRateLadder ladder, SendPathSignals? signals = null)
     {
@@ -164,6 +192,7 @@ public sealed class SendRateLoop
         Controller = controller;
         Ladder = ladder;
         _signals = signals ?? new SendPathSignals();
+        _pictureStart = new PictureStart(controller);
         _audioKbps = controller.Options.AudioNormalKbps;
     }
 
@@ -175,6 +204,19 @@ public sealed class SendRateLoop
     public bool VideoSuspended => _suspended;
     /// <summary>Opus packet length. The host sets <see cref="AudioPacketization.MaxFrameMs"/> from what every receiver plays.</summary>
     public AudioPacketization Audio { get; } = new();
+
+    /// <summary>The start rate of the current picture, as last placed or revised (diagnostics).</summary>
+    public StartEstimate? StartedAt => _pictureStart.Estimate;
+
+    /// <summary>
+    /// A picture starts (see <see cref="PictureStart.Begin"/>): place the estimate and the ladder on what is known now,
+    /// the worst receiver's reported downlink included. Returns the video setting to start the encoder on.
+    /// </summary>
+    public VideoSetting BeginPicture(long nowMs, StartHints hints, int audioWireKbps) =>
+        _pictureStart.Begin(nowMs, hints, audioWireKbps, Ladder, _signals.ReceiversDownlink(nowMs));
+
+    /// <summary>This device's start probe finished (possibly after the picture started).</summary>
+    public void UplinkMeasured(LinkProbeResult probe) => _pictureStart.UplinkMeasured(probe.UplinkKbps, probe.UplinkAtLeast);
 
     /// <summary>
     /// The media path died under the sender and media moved to another (see
@@ -192,6 +234,7 @@ public sealed class SendRateLoop
             _signals.Clear();
             Controller.RestartAfterPathChange(nowMs);
         }
+        _pictureStart.Tick(nowMs, _signals.ReceiversDownlink(nowMs));
         var pacer = Pacer.Sample();
         var sentVideo = Math.Max(0, pacer.SentKbps - pacer.AudioKbps);
         var (relay, receiver) = _signals.Take(nowMs, sentVideo, pacer.AudioKbps, Controller.Options.ReportFreshMs);
@@ -224,7 +267,18 @@ public sealed class SendRateLoop
             video = Ladder.Restart(decision.VideoKbps);
         else if (!_suspended)
         {
-            video = Ladder.Place(decision.VideoKbps, nowMs, congested: decision.Signal != RateSignal.Normal);
+            if (Controller.RecoveryGrants != _recoveryGrants)
+            {
+                _recoveryGrants = Controller.RecoveryGrants;
+                Ladder.TransientCut(nowMs);
+            }
+            var before = Ladder.Current.Rung;
+            var fresh = Ladder.Fresh;
+            // A fresh picture jumps several sizes at once: only once the receivers say they keep up (fast confirmation).
+            video = Ladder.Place(decision.VideoKbps, nowMs, congested: decision.Signal != RateSignal.Normal || (fresh && !decision.ReceiversCalm));
+            // A fast climb sends a keyframe of the new size into a channel that may still be warming: like the first one,
+            // it is not this device's congestion while it drains.
+            if (fresh && video is { } up && up.Rung.Height > before.Height) Controller.IgnoreLocalUntil(nowMs + PictureStart.LocalGraceMs);
             if ((resume || cpuChanged) && video is null) video = Ladder.Current;
         }
 

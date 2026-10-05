@@ -34,6 +34,12 @@ namespace Bolt.Rtc.IntegrationTests;
 /// call, lets the rate control climb, measures a window and asserts what a person would see: pictures arriving at the
 /// rate they are sent, no freeze, no decoder restarts, audio delivered, and (CALL_CONSTRAINED) a sender that fits its
 /// rate to a link that cannot carry it. Every number is printed and written to CALL_OUT.
+///
+/// How each picture started is measured too: its first size, how long after the camera started it reached the sender's
+/// preference (CALL_TARGET_WITHIN_S asserts it), its largest keyframe in the first seconds, and how often its size
+/// changed in the measured window (CALL_MAX_RUNG_CHANGES). CALL_STEP_AT_S, CALL_STEP_BAND and CALL_STEP_SPEC change one
+/// leg mid-call (call-shape-browsers.sh reshape_leg); CALL_STEP_SENDER must then fit CALL_STEP_KBPS within
+/// CALL_STEP_FIT_WITHIN_S.
 /// </summary>
 [TestFixture]
 [NonParallelizable]
@@ -214,6 +220,34 @@ public sealed class BrowserCallTests
                              $"decoder: {await pages[name].EvaluateAsync<string>("() => globalThis.__boltCallDamage()")}");
         }
 
+        var callStarted = System.Diagnostics.Stopwatch.StartNew();
+        // A leg that changes mid-call (a step down): reshaped from here, so its time is known to the millisecond.
+        var stepAt = EnvInt("CALL_STEP_AT_S", 0);
+        Task step = Task.CompletedTask;
+        TimeSpan? steppedAt = null;
+        if (stepAt > 0 && Env("CALL_STEP_SPEC") is { } stepSpec && Env("CALL_SHAPE_SCRIPT") is { } shapeScript)
+            step = Task.Run(async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(Math.Max(0, stepAt - callStarted.Elapsed.TotalSeconds)));
+                var reshape = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("bash",
+                    ["-c", "source \"$CALL_SHAPE_SCRIPT\" && reshape_leg \"$CALL_STEP_BAND\" \"$CALL_STEP_SPEC\""]) { UseShellExecute = false })!;
+                await reshape.WaitForExitAsync();
+                steppedAt = callStarted.Elapsed;
+                console.Enqueue($"step: band {Env("CALL_STEP_BAND")} -> {stepSpec} at {steppedAt.Value.TotalSeconds:F1}s (exit {reshape.ExitCode})");
+            });
+        var stepSender = Env("CALL_STEP_SENDER");
+        var stepKbps = EnvInt("CALL_STEP_KBPS", 0);
+        TimeSpan? fitAt = null;
+        async Task WatchStep()
+        {
+            if (steppedAt is null || fitAt is not null || stepSender is null) return;
+            if ((await Stats(stepSender))["rate"]?["totalKbps"]?.GetValue<int>() is { } total && total <= stepKbps) fitAt = callStarted.Elapsed;
+        }
+        async Task Wait(int milliseconds)
+        {
+            for (var waited = 0; waited < milliseconds; waited += 250) { await Task.Delay(250); await WatchStep(); }
+        }
+
         // Both on their data channels (the production log line "Datagram media path open ... via UDP/relay").
         var deadline = DateTime.UtcNow.AddSeconds(45);
         while (DateTime.UtcNow < deadline)
@@ -222,14 +256,29 @@ public sealed class BrowserCallTests
             await Task.Delay(500);
         }
         await Sample("open");
+        // The pictures' first seconds, closely: where each start went and what the rate control read.
+        for (var t = 0; t < 16; t++)
+        {
+            await Wait(500);
+            foreach (var name in new[] { "A", "B" })
+            {
+                var stats = await Stats(name);
+                timeline.Add($"{clock.Elapsed.TotalSeconds,6:F1}s start {name}: tier={stats["tier"]?.ToJsonString()} rate={stats["rate"]?.ToJsonString()} send={stats["send"]?.ToJsonString()}");
+            }
+        }
         // The rate control climbs from a mobile-safe start (VideoStartTier) on measured headroom, as in production.
-        for (var t = 0; t < warmup; t += 5) { await Task.Delay(5_000); await Sample("warmup"); }
+        for (var t = 0; t < warmup; t += 5) { await Wait(5_000); await Sample("warmup"); }
 
         foreach (var page in pages.Values) await page.EvaluateAsync("() => globalThis.__boltCallMeasure()");
         var before = new Dictionary<string, JsonNode> { ["A"] = await Result("A"), ["B"] = await Result("B") };
-        for (var t = 0; t < seconds; t += 5) { await Task.Delay(5_000); await Sample("measure"); }
+        for (var t = 0; t < seconds; t += 5) { await Wait(5_000); await Sample("measure"); }
+        await step;
         var after = new Dictionary<string, JsonNode> { ["A"] = await Result("A"), ["B"] = await Result("B") };
         var final = new Dictionary<string, JsonNode> { ["A"] = await Stats("A"), ["B"] = await Stats("B") };
+        var heights = new Dictionary<string, int> { ["A"] = Math.Min(a.Height, a.Ceiling), ["B"] = Math.Min(b.Height, b.Ceiling) };
+        var starts = new Dictionary<string, JsonNode>();
+        foreach (var name in new[] { "A", "B" })
+            starts[name] = JsonNode.Parse(await pages[name].EvaluateAsync<string>("h => JSON.stringify(globalThis.__boltCallStart(h))", heights[name]))!;
 
         // ── What each side saw of the other ──
         var summary = new JsonObject { ["scenario"] = Env("CALL_SCENARIO") ?? "local", ["a"] = $"{a.Engine} {a.Height}p{a.Framerate}", ["b"] = $"{b.Engine} {b.Height}p{b.Framerate}" };
@@ -261,8 +310,24 @@ public sealed class BrowserCallTests
                 ["damagedBeforeWindow"] = Damage(beforeRemote), ["decoderEvents"] = remote?["events"]?.DeepClone(),
                 ["receive"] = final[receiver]["receive"]?.DeepClone(), ["senderTier"] = final[sender]["tier"]?.DeepClone(), ["senderRate"] = final[sender]["rate"]?.DeepClone(),
                 ["senderPath"] = final[sender]["path"]?.DeepClone(), ["receiverPath"] = final[receiver]["path"]?.DeepClone(),
+                ["targetHeight"] = heights[sender], ["timeToTargetMs"] = starts[sender]["timeToHeightMs"]?.DeepClone(),
+                ["firstHeight"] = starts[sender]["firstHeight"]?.DeepClone(), ["firstKbps"] = starts[sender]["firstKbps"]?.DeepClone(),
+                ["largestStartKeyframe"] = starts[sender]["largestStartKeyframe"]?.DeepClone(),
+                ["rungChangesInWindow"] = starts[sender]["rungChangesInWindow"]?.DeepClone(), ["startRungs"] = starts[sender]["rungs"]?.DeepClone(),
+                ["senderStart"] = final[sender]["start"]?.DeepClone(), ["senderProbe"] = final[sender]["probe"]?.DeepClone(),
             };
             summary[$"{sender}->{receiver}"] = line;
+            // How the picture started, for every scenario that asks: time to the preference, the first size, its first keyframes, flapping.
+            var timeToTarget = starts[sender]["timeToHeightMs"] is { } reachedAt ? reachedAt.GetValue<int>() : (int?)null;
+            if (EnvInt($"CALL_{sender}_TARGET_WITHIN_S", EnvInt("CALL_TARGET_WITHIN_S", 0)) is > 0 and var within && Env("CALL_CONSTRAINED")?.StartsWith(sender + ">") != true &&
+                (timeToTarget is null || timeToTarget > within * 1000))
+                failures.Add($"{sender}->{receiver}: reached {heights[sender]}p {(timeToTarget is { } ms ? $"{ms} ms" : "never")} after the camera started (limit {within} s)");
+            if (EnvInt($"CALL_{sender}_FIRST_MAX_HEIGHT", 0) is > 0 and var firstMax && starts[sender]["firstHeight"]?.GetValue<int>() > firstMax)
+                failures.Add($"{sender}->{receiver}: started at {starts[sender]["firstHeight"]}p on a link that carries {firstMax}p");
+            if (EnvInt($"CALL_{sender}_START_KEYFRAME_MAX_BYTES", 0) is > 0 and var keyMax && starts[sender]["largestStartKeyframe"]?.GetValue<int>() > keyMax)
+                failures.Add($"{sender}->{receiver}: a {starts[sender]["largestStartKeyframe"]}-byte keyframe in the first seconds (limit {keyMax})");
+            if (EnvInt("CALL_MAX_RUNG_CHANGES", -1) is >= 0 and var maxChanges && starts[sender]["rungChangesInWindow"]?.GetValue<int>() > maxChanges)
+                failures.Add($"{sender}->{receiver}: the picture changed size {starts[sender]["rungChangesInWindow"]} times in the window (flapping)");
             if (Env("CALL_CONSTRAINED") is { } constrained && constrained.Split('>') is [var limitedSender, var kbpsText] && limitedSender == sender)
             {
                 // The link towards the receiver carries kbpsText: the sender must fit under it, and the picture keep moving.
@@ -274,10 +339,19 @@ public sealed class BrowserCallTests
             }
             if (renderedFps < sentFps * minFpsRatio) failures.Add($"{sender}->{receiver}: rendered {renderedFps:F1} fps of {sentFps:F1} sent");
             if (freeze > maxFreezeMs) failures.Add($"{sender}->{receiver}: froze for {freeze} ms");
-            if (resets > 1) failures.Add($"{sender}->{receiver}: decoder restarted {resets} times");
+            if (resets > EnvInt("CALL_MAX_RESETS", 1)) failures.Add($"{sender}->{receiver}: decoder restarted {resets} times");
             if (corrupt > 0) failures.Add($"{sender}->{receiver}: {corrupt} pictures damaged or decoded without their reference");
             if ((audio?["delivered"]?.GetValue<double>() ?? 0) < 0.98) failures.Add($"{sender}->{receiver}: audio delivered {audio?["delivered"]}");
         }
+        if (stepSender is not null && steppedAt is { } stepped)
+        {
+            var fitMs = fitAt is { } fit ? (int)(fit - stepped).TotalMilliseconds : (int?)null;
+            summary["stepFitMs"] = fitMs;
+            var limitS = EnvInt("CALL_STEP_FIT_WITHIN_S", 3);
+            if (fitMs is null || fitMs > limitS * 1000)
+                failures.Add($"{stepSender}: after the step down it took {(fitMs is { } ms ? ms + " ms" : "forever")} to fit {stepKbps} kbps (limit {limitS} s)");
+        }
+        else if (stepSender is not null) failures.Add("the step down never ran");
         summary["relay"] = RelayStats(server);
         summary["failures"] = new JsonArray(failures.Select(x => (JsonNode)x).ToArray());
         var text = summary.ToJsonString(new JsonSerializerOptions { WriteIndented = true });

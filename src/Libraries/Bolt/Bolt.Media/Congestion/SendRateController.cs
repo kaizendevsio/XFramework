@@ -18,8 +18,16 @@ public sealed class SendRateOptions
     public int HoldAfterDecreaseMs { get; init; } = 700;
     /// <summary>Calm time required before any increase.</summary>
     public int IncreaseAfterMs { get; init; } = 1_500;
-    /// <summary>Growth per second before the path has ever shown congestion.</summary>
+    /// <summary>Growth per second far below the last congestion point (after draining a flooded buffer).</summary>
     public double StartupGainPerSecond { get; init; } = 0.15;
+    /// <summary>
+    /// Growth per second before the path has ever shown congestion: the start-up ramp. Fast enough to go from a middle
+    /// picture to 1080p in about three seconds on a link that carries it; the first sign of a queue ends it (and a
+    /// 30% overshoot is what the half second before that sign costs at most).
+    /// </summary>
+    public double FastStartGainPerSecond { get; init; } = 0.6;
+    /// <summary>Calm time required before an increase while the path has never shown congestion.</summary>
+    public int FastStartIncreaseAfterMs { get; init; } = 500;
     /// <summary>Growth per second far from the last congestion point.</summary>
     public double ProbeGainPerSecond { get; init; } = 0.08;
     /// <summary>Growth per second close to the last congestion point.</summary>
@@ -114,7 +122,10 @@ public enum RateSignal { Normal, Overuse, Hold }
 /// <param name="VideoSuspended">Video stands down so voice keeps the link.</param>
 /// <param name="Signal">What the last window was judged to be.</param>
 /// <param name="DelayMs">The queuing delay the decision was based on.</param>
-public readonly record struct SendRateDecision(int TotalKbps, int AudioKbps, int VideoKbps, bool VideoSuspended, RateSignal Signal, int DelayMs);
+/// <param name="ReceiversCalm">Every receiver that reports says its queue is short (or none has ever reported): a
+/// picture may grow. A receiver still busy starting (its page handling a new call) is not yet ready for a larger picture.</param>
+public readonly record struct SendRateDecision(int TotalKbps, int AudioKbps, int VideoKbps, bool VideoSuspended, RateSignal Signal, int DelayMs,
+    bool ReceiversCalm = true);
 
 /// <summary>
 /// Delay-based send-rate control for a call on a reliable (TCP) path, GCC/BBR-flavoured and deliberately simple.
@@ -134,9 +145,11 @@ public readonly record struct SendRateDecision(int TotalKbps, int AudioKbps, int
 ///   itself): what the relay drained a backlogged receiver at, what the sender's own transport drained, or what a
 ///   receiver actually got; without any, the sent rate divided by how fast the queue grows. A 1080p offer on a
 ///   512 kbps link lands on the link within about a second, then holds while the queue drains.
-/// - <b>Slow up.</b> Only after <see cref="SendRateOptions.IncreaseAfterMs"/> of calm, only with fresh remote reports
-///   (no news is not good news on a dead link), faster before the first congestion, cautiously near the last
-///   congestion point, and never far above what is actually being sent.
+/// - <b>Fast start, then slow up.</b> Before the path has ever shown congestion, the start-up ramp
+///   (<see cref="SendRateOptions.FastStartGainPerSecond"/> after <see cref="SendRateOptions.FastStartIncreaseAfterMs"/>
+///   of calm) takes a picture from where the start probe put it to the user's preference in seconds. After that, only
+///   after <see cref="SendRateOptions.IncreaseAfterMs"/> of calm, only with fresh remote reports (no news is not good
+///   news on a dead link), cautiously near the last congestion point, and never far above what is actually being sent.
 /// - <b>Hysteresis.</b> Between "calm" and "overuse" the estimate holds. Video suspension needs a sustained low
 ///   budget, and a resume that fails doubles the wait before the next one.
 /// </summary>
@@ -242,6 +255,29 @@ public sealed class SendRateController
     /// Start over from a new offer, for example when the camera is turned on: the path's history stays, only the
     /// estimate moves (and never above what was last found to congest it).
     /// </summary>
+    /// <summary>
+    /// A first picture starts on measured evidence: whatever an audio-only path showed (a queue while the start probe ran,
+    /// a congestion point measured on a few dozen kbit/s of voice) says nothing about video, so it is forgotten and the
+    /// estimate placed at <paramref name="totalKbps"/>.
+    /// </summary>
+    public void StartPicture(int totalKbps)
+    {
+        _history.Clear();
+        _lastCongestionKbps = 0;
+        _congestedOnce = _congestionObserved = false;
+        _lastDecreaseAt = long.MinValue / 2;
+        _delayAtDecrease = 0;
+        _risingStreak = _cutStreak = 0;
+        _calmSince = null;
+        _estimate = Math.Clamp(totalKbps, _options.MinTotalKbps, _options.MaxTotalKbps);
+        _stable = _lastCalmEstimate = _estimate;
+        _suspended = false;
+        _lowVideoSince = null;
+        _recoveryUsed = _recoveryClimbing = false;
+        RecoveringToKbps = null;
+        _pictureStartKbps = _estimate;
+    }
+
     public void Reset(int totalKbps)
     {
         var ceiling = _lastCongestionKbps > 0 ? _lastCongestionKbps : _options.MaxTotalKbps;
@@ -250,8 +286,95 @@ public sealed class SendRateController
         _lowVideoSince = null;
     }
 
-    public SendRateDecision Update(in SendPathSample sample)
+    /// <summary>The path has never shown congestion: a picture's start may still be revised (see <see cref="PictureStart"/>).</summary>
+    public bool StartingUp => !_congestionObserved;
+    private bool _congestionObserved;
+    private bool _receiverHeard;
+    private long _firstCongestionAt = long.MinValue / 2;
+    /// <summary>For this long after the path's first congestion, a cut takes at most half (see <see cref="Decrease"/>).</summary>
+    private const int StartupCutWindowMs = 3_000;
+
+    /// <summary>
+    /// A new picture's first seconds (see <see cref="PictureStart"/>): the first congestion inside them is a start
+    /// transient until shown otherwise (both pages starting, channels warming, first keyframes), and once it has passed
+    /// (the path calm again for the start-up hold) the estimate goes straight back to 70% of where the start had put it
+    /// (<see cref="RecoveringToKbps"/>). If the link really is smaller, the congestion that follows is cut as usual.
+    /// </summary>
+    public void BeginStartWindow(long nowMs, int windowMs)
     {
+        _pictureStartedAt = nowMs;
+        _startWindowUntil = nowMs + windowMs;
+        _recoveryUsed = false;
+        _recoveries = 0;
+        _recoveryPeak = 0;
+        RecoveringToKbps = null;
+    }
+    private long _startWindowUntil = long.MinValue, _pictureStartedAt = long.MinValue / 2;
+    /// <summary>A new picture waits this long for a receiver's first report before it may grow without one (a receiver too old to report).</summary>
+    private const int ReceiverReportWaitMs = 3_000;
+    private bool _recoveryUsed, _recoveryClimbing;
+    private int _recoveries;
+    private long _recoveredAt = long.MinValue / 2;
+    private double _recoveryPeak, _pictureStartKbps;
+    /// <summary>A recovered rate that held this long was a start transient's: a later cut in the window may be one too.</summary>
+    private const int RecoveryHeldMs = 1_500;
+    private const int MaxRecoveries = 3;
+
+    /// <summary>Start transients granted a recovery so far (the loop lets the ladder climb back fast after each).</summary>
+    public int RecoveryGrants { get; private set; }
+
+    /// <summary>Where a start transient's cut climbs back to at the start-up rate, while it does.</summary>
+    public int? RecoveringToKbps { get; private set; }
+
+    /// <summary>
+    /// The start measured where this path's limit is (a probe step that built a queue, a receiver's downlink). The
+    /// start-up ramp is for a path whose limit is unknown: this one, once past its start window's cap
+    /// (<see cref="StartCeilingKbps"/>), probes on at the ordinary rate, as a path does after congestion. A measurement
+    /// is not trusted as far as a congestion point the path showed itself: a lossy step can read low.
+    /// </summary>
+    public void MeasuredLimit(int totalKbps)
+    {
+        if (totalKbps <= 0 || _congestionObserved) return;
+        _congestedOnce = true;
+    }
+
+    /// <summary>
+    /// While starting up, a limit the start measured exactly (this device's uplink, the worst receiver's downlink): the
+    /// start-up ramp stops there instead of finding it with a queue. Null: no measured limit.
+    /// </summary>
+    public int? StartCeilingKbps { get; set; }
+
+    /// <summary>
+    /// What the start knew changed while the path is still starting up (no congestion yet): a receiver's downlink
+    /// report or a start probe arrived after the picture started. A lower start rate takes effect at once (before
+    /// the queue it would cause); a higher one lifts the estimate to it (the ladder climbs there quickly). Once the
+    /// path has shown congestion, measured signals rule and this does nothing. Returns true when the estimate moved.
+    /// </summary>
+    public bool Revise(int startTotalKbps)
+    {
+        if (_congestionObserved) return false;
+        var next = Math.Clamp(startTotalKbps, _options.MinTotalKbps, _options.MaxTotalKbps);
+        if (Math.Abs(next - _estimate) < Math.Max(32, _estimate * 0.1)) return false;
+        _estimate = next;
+        _pictureStartKbps = next;
+        if (next < _stable) _stable = _lastCalmEstimate = next;
+        return true;
+    }
+
+    /// <summary>
+    /// Until then, this device's own queues (the pacer's wait, the transport's backlog, a picture its pacer dropped) do
+    /// not count as congestion: a picture's first keyframe, or the larger one of a climb, filling a data channel that is
+    /// still warming up (WebKit drains such bursts slowly), or a start probe's padding, is not the link. The relay's,
+    /// the uplink feedback's and the receivers' reports still count. Granted only for those moments (see callers).
+    /// </summary>
+    public void IgnoreLocalUntil(long nowMs) => _ignoreLocalUntil = Math.Max(_ignoreLocalUntil, nowMs);
+    private long _ignoreLocalUntil = long.MinValue;
+
+    public SendRateDecision Update(in SendPathSample input)
+    {
+        var sample = input.NowMs < _ignoreLocalUntil
+            ? input with { LocalQueueDelayMs = 0, LocalCapacityKbps = 0, LocalBaseLost = false }
+            : input;
         var now = sample.NowMs;
         if (_startedAt == long.MinValue) _startedAt = now;
         var dt = _lastUpdateAt == long.MinValue ? 0 : Math.Clamp((now - _lastUpdateAt) / 1000.0, 0, 1);
@@ -328,10 +451,19 @@ public sealed class SendRateController
         {
             signal = RateSignal.Overuse;
             _calmSince = null;
+            // Only this device's own queue says so, while the relay, the uplink feedback and the receivers all report a
+            // short one: the browser's channel itself stalled (WebKit holds hundreds of KB for a second or two). A real
+            // uplink limit shows remotely too (its queue or its loss), so this is cut gently, never collapsed to a
+            // capacity measured on a stalled pipe.
+            var remoteDelay = Math.Max(relay is { } rr ? rr.QueueDelayMs + (transport is null ? rr.UplinkDelayMs : 0) : 0,
+                Math.Max(transport is { } tt ? tt.QueueDelayMs : 0, (receiver ?? silent) is { } rv ? rv.QueueDelayMs : 0));
+            var localOnly = remoteDelay < _options.TargetDelayMs && relay?.BaseLost != true && !lossy &&
+                            (relay is not null || transport is not null || receiver is not null);
             // Once decreased, wait for the queue to drain unless it keeps getting much worse.
-            var deeper = delay >= _options.HighDelayMs * 2 && gradient > 0;
+            var deeper = !localOnly && delay >= _options.HighDelayMs * 2 && gradient > 0;
             if (now - _lastDecreaseAt >= _options.HoldAfterDecreaseMs || (deeper && now - _lastDecreaseAt >= _options.HoldAfterDecreaseMs / 2))
-                Decrease(now, sample, relay, receiver ?? silent, delay, severe: baseLost || overload || lossy || _cutStreak > 0, transport);
+                Decrease(now, localOnly ? sample with { LocalCapacityKbps = 0 } : sample, relay, receiver ?? silent, delay,
+                    severe: !localOnly && (baseLost || overload || lossy || _cutStreak > 0), transport);
         }
         else if (calm)
         {
@@ -340,7 +472,9 @@ public sealed class SendRateController
             _lastCalmEstimate = _estimate;
             if (dt > 0) _stable += (_estimate - _stable) * Math.Min(1, dt * 1000 / Math.Max(1, _options.StableTimeConstantMs));
             if (now - _calmSince.Value >= _options.IncreaseAfterMs) _cutStreak = 0;
-            if (informed && now - _calmSince.Value >= _options.IncreaseAfterMs && now - _lastDecreaseAt >= _options.IncreaseAfterMs)
+            var recovering = RecoveringToKbps is { } target && _estimate < target;
+            var hold = _congestedOnce && !recovering ? _options.IncreaseAfterMs : _options.FastStartIncreaseAfterMs;
+            if (informed && now - _calmSince.Value >= hold && now - _lastDecreaseAt >= hold)
                 Increase(dt, sample);
         }
         else
@@ -350,7 +484,11 @@ public sealed class SendRateController
         }
 
         _estimate = Math.Clamp(_estimate, _options.MinTotalKbps, _options.MaxTotalKbps);
-        return Allocate(now, sample, signal, delay);
+        if (receiver is not null) _receiverHeard = true;
+        // Receivers report once a stream has flowed a second: a new picture waits for that before it grows.
+        var receiversCalm = receiver is { } heard ? heard.QueueDelayMs < _options.TargetDelayMs / 2
+            : silent is null && !_receiverHeard && now - _pictureStartedAt >= ReceiverReportWaitMs;
+        return Allocate(now, sample, signal, delay) with { ReceiversCalm = receiversCalm };
     }
 
     /// <summary>
@@ -384,7 +522,7 @@ public sealed class SendRateController
         Restarts++;
         _history.Clear();
         _lastCongestionKbps = 0;
-        _congestedOnce = false;
+        _congestedOnce = _congestionObserved = false;
         _lastDecreaseAt = long.MinValue / 2;
         _delayAtDecrease = 0;
         _risingStreak = _cutStreak = 0;
@@ -444,7 +582,7 @@ public sealed class SendRateController
             : _options.DecreaseFactor;
         // The congestion point is the link's measured capacity where there is one: probing slows near it.
         _lastCongestionKbps = measured ? capacity : basis;
-        _congestedOnce = true;
+        _congestedOnce = _congestionObserved = true;
         var next = basis * factor;
         if (!severe)
         {
@@ -452,7 +590,32 @@ public sealed class SendRateController
             next = Math.Max(next, _estimate * 0.75);
             next = Math.Max(next, Math.Min(_estimate, AudioWireKbps(sample) + _options.SuspendVideoKbps + 20));
         }
+        // The path's first congestion, and the next few seconds: at most half per cut. A new picture's start is a
+        // transient (first keyframes, warming channels, receivers' pages still busy starting their own) whose reports
+        // can measure a capacity of almost nothing; halving per cut still reaches a real small link within a few cuts.
+        if (!_congestionObserved) _firstCongestionAt = now;
+        if (now - _firstCongestionAt < StartupCutWindowMs) next = Math.Max(next, _estimate * 0.5);
+        var beforeCut = _estimate;
         _estimate = Math.Max(_options.MinTotalKbps, Math.Min(_estimate, next));
+        // A cut inside a picture's start, the first one or one after the last recovery held: a start transient. Remember
+        // where the start was, to go back to once it passes. One that follows a recovery within RecoveryHeldMs is the
+        // link itself, and so is a fourth.
+        var transient = now < _startWindowUntil && RecoveringToKbps is null && _recoveries < MaxRecoveries &&
+                        (!_recoveryUsed || now - _recoveredAt >= RecoveryHeldMs);
+        if (transient)
+        {
+            _recoveryUsed = true;
+            _recoveries++;
+            RecoveryGrants++;
+            // Back to 70% of the best this start had: its own start rate (the probe's measurement), or more if it climbed.
+            _recoveryPeak = Math.Max(Math.Max(beforeCut, _recoveryPeak), _pictureStartKbps);
+            var target = _recoveryPeak * 0.7;
+            // Never past a limit the start measured (the worst receiver's downlink): that cut was the link, not a transient.
+            if (StartCeilingKbps is { } limit) target = Math.Min(target, limit * StartRate.MeasuredHeadroom);
+            RecoveringToKbps = target > _estimate * 1.1 ? (int)Math.Round(target) : null;
+            _recoveryClimbing = false;
+        }
+        else if (_recoveryClimbing) RecoveringToKbps = null; // Congestion again on the way back: the link is smaller.
         _lastDecreaseAt = now;
         _delayAtDecrease = delay;
         _cutStreak++;
@@ -463,7 +626,13 @@ public sealed class SendRateController
         if (dt <= 0) return;
         double gain;
         // Before any congestion, and far below the last congestion point (after draining a flooded buffer), climb fast.
-        if (!_congestedOnce || (_lastCongestionKbps > 0 && _estimate < _lastCongestionKbps * 0.5)) gain = _options.StartupGainPerSecond;
+        if (!_congestedOnce) gain = _options.FastStartGainPerSecond;
+        else if (RecoveringToKbps is { } target && _estimate < target)
+        {
+            gain = _options.FastStartGainPerSecond;
+            _recoveryClimbing = true;
+        }
+        else if (_lastCongestionKbps > 0 && _estimate < _lastCongestionKbps * 0.5) gain = _options.StartupGainPerSecond;
         else if (_lastCongestionKbps > 0 && _estimate >= _lastCongestionKbps * 0.9 && _estimate <= _lastCongestionKbps * 1.2)
             gain = _options.NearGainPerSecond;
         else gain = _options.ProbeGainPerSecond;
@@ -472,7 +641,19 @@ public sealed class SendRateController
         // tested. While video is suspended there is nothing to test with, so the ceiling is the resume point.
         var floorForResume = ResumeTotalKbps(sample) + 16;
         var ceiling = _suspended ? floorForResume : Math.Max(sample.SentKbps * 1.5 + 64, floorForResume);
+        // A limit the start measured holds for its window, congestion or not (StartCeilingKbps is null outside it).
+        if (StartCeilingKbps is { } measured) ceiling = Math.Min(ceiling, Math.Max(measured, floorForResume));
         if (next > ceiling) next = Math.Max(_estimate, ceiling);
+        // A start transient that has passed (the path calm again): straight back, not a ramp. A link that really is smaller
+        // shows it within a second, and that congestion is cut as any other (there is one recovery per picture start).
+        if (RecoveringToKbps is { } back && _estimate < back)
+        {
+            // Bounded by a limit the start measured, should it have arrived since the cut.
+            if (StartCeilingKbps is { } limit) back = Math.Min(back, (int)Math.Round(limit * StartRate.MeasuredHeadroom));
+            next = Math.Max(next, back);
+            RecoveringToKbps = null;
+            _recoveredAt = sample.NowMs;
+        }
         _estimate = next;
         if (_lastCongestionKbps > 0 && _estimate > _lastCongestionKbps * 1.3) _lastCongestionKbps = 0;
     }

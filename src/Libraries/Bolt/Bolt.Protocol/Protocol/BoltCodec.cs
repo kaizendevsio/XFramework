@@ -43,6 +43,12 @@ public static class BoltCodec
     /// Older senders read only the first <see cref="MediaFeedbackSize"/> bytes, so the extension is compatible.
     /// </summary>
     public const int MediaFeedbackExtendedSize = MediaFeedbackSize + 2 + 4 + 1 + 1; // 40 bytes
+    /// <summary>
+    /// The extended MediaFeedback with the receiver's downlink estimate appended: [4:downlinkKbps]. Flag
+    /// <see cref="MediaFeedbackData.DownlinkFlag"/> marks it present, <see cref="MediaFeedbackData.DownlinkAtLeastFlag"/> a
+    /// lower bound (the probe never found the link's limit). Readers that predate it stop at 40 bytes.
+    /// </summary>
+    public const int MediaFeedbackDownlinkSize = MediaFeedbackExtendedSize + 4; // 44 bytes
     public const int MediaCongestionSize = 1 + 16 + 1 + 1 + 1 + 2 + 2 + 4 + 2 + 1 + 1; // 32 bytes
     public const byte MediaCongestionVersion = 1;
     public const int CallSignalHeaderSize = 1 + 16 + 1 + 4;              // 22 bytes
@@ -521,6 +527,38 @@ public static class BoltCodec
         span[39] = 0;
         writer.Advance(MediaFeedbackExtendedSize);
         return MediaFeedbackExtendedSize;
+    }
+
+    /// <summary>
+    /// MediaFeedback with whichever extensions the receiver has: its delay report (when <paramref name="delay"/> is set)
+    /// and its downlink estimate (when <paramref name="downlink"/> is set: what this receiver's own link can take, so a
+    /// sender starting a picture can fit it to the worst receiver before any of its media arrived).
+    /// </summary>
+    public static int WriteMediaFeedback(IBufferWriter<byte> writer, Guid streamId, uint highestSeqReceived, uint cumulativeLost,
+        uint jitterX100, ushort rttMs, QualityHint qualityHint, (ushort QueueDelayMs, uint ReceivedKbps)? delay,
+        (uint Kbps, bool AtLeast)? downlink)
+    {
+        if (downlink is null)
+            return delay is { } only
+                ? WriteMediaFeedback(writer, streamId, highestSeqReceived, cumulativeLost, jitterX100, rttMs, qualityHint, only.QueueDelayMs, only.ReceivedKbps)
+                : WriteMediaFeedback(writer, streamId, highestSeqReceived, cumulativeLost, jitterX100, rttMs, qualityHint);
+        var span = writer.GetSpan(MediaFeedbackDownlinkSize);
+        span[0] = (byte)FrameType.MediaFeedback;
+        WriteGuid(span.Slice(1), streamId);
+        BinaryPrimitives.WriteUInt32LittleEndian(span.Slice(17), highestSeqReceived);
+        BinaryPrimitives.WriteUInt32LittleEndian(span.Slice(21), cumulativeLost);
+        BinaryPrimitives.WriteUInt32LittleEndian(span.Slice(25), jitterX100);
+        BinaryPrimitives.WriteUInt16LittleEndian(span.Slice(29), rttMs);
+        span[31] = (byte)qualityHint;
+        BinaryPrimitives.WriteUInt16LittleEndian(span.Slice(32), delay?.QueueDelayMs ?? 0);
+        BinaryPrimitives.WriteUInt32LittleEndian(span.Slice(34), delay?.ReceivedKbps ?? 0);
+        var (kbps, atLeast) = downlink.Value;
+        span[38] = (byte)((delay is null ? 0 : MediaFeedbackData.DelayReportFlag) | MediaFeedbackData.DownlinkFlag |
+                          (atLeast ? MediaFeedbackData.DownlinkAtLeastFlag : 0));
+        span[39] = 0;
+        BinaryPrimitives.WriteUInt32LittleEndian(span.Slice(40), kbps);
+        writer.Advance(MediaFeedbackDownlinkSize);
+        return MediaFeedbackDownlinkSize;
     }
 
     /// <summary>Relay-to-sender congestion report. Only a relay writes these; see <see cref="MediaCongestionData"/>.</summary>
@@ -1049,6 +1087,11 @@ public static class BoltCodec
             feedback.QueueDelayMs = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(32));
             feedback.ReceivedKbps = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(34));
         }
+        if (buffer.Length >= MediaFeedbackDownlinkSize && (buffer[38] & MediaFeedbackData.DownlinkFlag) != 0)
+        {
+            feedback.DownlinkKbps = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(40));
+            feedback.DownlinkAtLeast = (buffer[38] & MediaFeedbackData.DownlinkAtLeastFlag) != 0;
+        }
         return true;
     }
 
@@ -1574,6 +1617,8 @@ public struct MediaConfigData
 public struct MediaFeedbackData
 {
     internal const byte DelayReportFlag = 0x01;
+    internal const byte DownlinkFlag = 0x02;
+    internal const byte DownlinkAtLeastFlag = 0x04;
 
     public Guid StreamId;
     public uint HighestSeqReceived;
@@ -1587,6 +1632,13 @@ public struct MediaFeedbackData
     public ushort QueueDelayMs;
     /// <summary>What the receiver actually received of this stream recently.</summary>
     public uint ReceivedKbps;
+    /// <summary>
+    /// What the receiver's own downlink carries, as its start probe or its hints measured it (0: not reported). A sender
+    /// fits a new picture under the smallest of these before any congestion report could say so.
+    /// </summary>
+    public uint DownlinkKbps;
+    /// <summary>The downlink carried everything the probe offered: it can take at least <see cref="DownlinkKbps"/>.</summary>
+    public bool DownlinkAtLeast;
 }
 
 /// <summary>

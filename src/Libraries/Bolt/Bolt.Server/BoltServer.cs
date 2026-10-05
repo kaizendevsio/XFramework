@@ -2161,6 +2161,11 @@ public sealed partial class BoltServer : IDisposable
                     break;
                 case RelayRetransmitCache.Holding.Held when sent == VideoSendLedger.Status.Pending:
                     break; // Still queued for this receiver.
+                case RelayRetransmitCache.Holding.TooLarge when sent != VideoSendLedger.Status.Skipped:
+                    // On its way over the receiver's socket (a frame that came over the sender's): declining it would
+                    // have the receiver stop waiting for a picture that is about to arrive, and take what follows it as
+                    // a policy gap.
+                    break;
                 case RelayRetransmitCache.Holding.NeverSeen when sent != VideoSendLedger.Status.Unknown:
                     (forward ??= []).Add(sequence);
                     cache.Requested(sequence, receiver.StreamId);
@@ -5358,6 +5363,18 @@ public sealed class BoltHubConnection
     public long RedundantAudioFrames => Interlocked.Read(ref _redundantAudio);
 
     internal void RecordDatagramRejected() => Interlocked.Increment(ref _datagramRejected);
+
+    private long _paddingEchoed;
+    /// <summary>Probe bytes this connection got back (see BoltServer.EchoPadding); bounded by its budget.</summary>
+    public long PaddingEchoedBytes => Interlocked.Read(ref _paddingEchoed);
+
+    /// <summary>Take <paramref name="bytes"/> of this connection's probe echo budget; false once it is spent.</summary>
+    internal bool TryTakePaddingEcho(int bytes)
+    {
+        if (Interlocked.Add(ref _paddingEchoed, bytes) <= BoltServer.PaddingEchoBudgetBytes) return true;
+        Interlocked.Add(ref _paddingEchoed, -bytes);
+        return false;
+    }
 
     private readonly VideoSendLedger _videoLedger = new();
 

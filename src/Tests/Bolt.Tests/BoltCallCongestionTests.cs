@@ -325,6 +325,21 @@ public sealed class BoltCallCongestionTests
     }
 
     [Test]
+    public void Pacer_TheKeyframeItWaitsFor_EndsTheWaitForThePicturesAfterIt_BeforeItIsQueued()
+    {
+        // Browser e2e: keyframe 15 was taken (WouldAccept), 16 and 17 were refused because 15 had not reached the queue yet
+        // (the encoder's output waits its turn), then 18, which refers to 17, went out: decoded without its reference.
+        var pacer = new MediaSendPacer((_, _) => ValueTask.CompletedTask);
+        pacer.NotePictureLost(0);
+        Assert.That(pacer.WouldAccept(false, 2), Is.False, "waiting for a keyframe");
+        Assert.That(pacer.WouldAccept(true, 0), Is.True, "15, the keyframe");
+        Assert.That((pacer.WouldAccept(false, 2), pacer.WouldAccept(false, 1)), Is.EqualTo((true, true)), "16 and 17 refer to it");
+        // The keyframe overflowed on its way in after all: the wait starts over, and what follows is refused again.
+        pacer.NotePictureLost(0);
+        Assert.That(pacer.WouldAccept(false, 2), Is.False);
+    }
+
+    [Test]
     public void Pacer_APictureLostBeforeIt_OnlyWithholdsItsLayerUntilTheNextBase()
     {
         var pacer = new MediaSendPacer((_, _) => ValueTask.CompletedTask);

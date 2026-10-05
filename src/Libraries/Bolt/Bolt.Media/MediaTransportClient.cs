@@ -301,11 +301,136 @@ public sealed class MediaTransportClient : IAsyncDisposable
         {
             var sequence = unchecked((ushort)Interlocked.Increment(ref _transportSequence));
             TransportSequenceCodec.Write(buffer, sequence, message);
+            // Timed before the send: WebKit's send() can block the page for hundreds of ms when its buffer is full, and a
+            // send time taken after that is late. One late send time lowered the delay floor for every later message, so
+            // the uplink read a standing 400 ms queue that was not there for the next 10-20 s.
+            var sentAt = NowMicroseconds();
             if (!peer.TrySend(buffer.AsSpan(0, size))) return false;
-            _feedback.OnSent(sequence, size, NowMicroseconds());
+            _feedback.OnSent(sequence, size, sentAt);
             _drain.Sent(size);
             if (resendable && _options.ResendLostVideoMs > 0)
                 lock (_resendable) _resendable[sequence % _resendable.Length] = (sequence, message.ToArray(), firstSentAt ?? _clock());
+            return true;
+        }
+        finally { ArrayPool<byte>.Shared.Return(buffer); }
+    }
+
+    // ── Start probe ──
+
+    private LinkProbe? _probe;
+    /// <summary>
+    /// A probe step stops sending while the channel holds more than this many milliseconds of its rate (at least 16 KB,
+    /// as WebKit reports its buffer coarsely): audio sent meanwhile never waits behind much more than that, and a step
+    /// that held back is judged on what it did send.
+    /// </summary>
+    private const int ProbeBacklogMs = 60;
+    /// <summary>A step whose timers ran this late was measured on a busy page: its echo timing says nothing about the downlink.</summary>
+    private const int PageBusyLagMs = 40;
+
+    /// <summary>A start probe finished (its padding may still sit in the channel's buffer for a moment).</summary>
+    public event Action? ProbeEnded;
+
+    /// <summary>A start probe is running: its padding sits in the channel's buffer and the relay's feedback, so the rate loop holds still.</summary>
+    public bool Probing => Volatile.Read(ref _probe) is not null;
+    private const int ProbeMessageBytes = 1_100;
+
+    /// <summary>
+    /// Measure the link before media needs it (WebRTC-style initial probing, see <see cref="LinkProbe"/>): short bursts of
+    /// padding at <paramref name="stepsKbps"/>, each <paramref name="stepMs"/> long, timed by the relay's transport
+    /// feedback (uplink) and its echo (downlink). Stops at the first step the uplink does not carry; stops asking for
+    /// echoes at the first the downlink does not. Each step holds back while the channel has a backlog, so audio sent
+    /// meanwhile never waits behind it. Null when there is no open channel, or its relay does not time arrivals.
+    /// </summary>
+    public async Task<LinkProbeResult?> ProbeAsync(IReadOnlyList<int> stepsKbps, int stepMs = LinkProbe.DefaultStepMs, CancellationToken ct = default)
+    {
+        if (ActivePeer is not { } first || !StampsMessages || stepsKbps.Count == 0) return null;
+        var probe = new LinkProbe();
+        Volatile.Write(ref _probe, probe);
+        var started = _clock();
+        var steps = new List<ProbeStep>();
+        var echo = true;
+        var echoFailures = 0;
+        var size = Math.Clamp(first.MaxMessageBytes - TransportSequenceCodec.HeaderSize, PaddingCodec.HeaderSize + 64, ProbeMessageBytes);
+        try
+        {
+            foreach (var rate in stepsKbps)
+            {
+                var step = probe.BeginStep(rate);
+                var flags = echo ? PaddingCodec.Echo : (byte)0;
+                var begin = NowMicroseconds();
+                long sent = 0;
+                uint index = 0;
+                var sentMessages = 0;
+                // How late the page ran this step's timers: a busy page also handles the echoes late, in bursts.
+                var lagMs = 0L;
+                async Task Pause(int ms)
+                {
+                    var before = _clock();
+                    await Task.Delay(ms, ct);
+                    lagMs = Math.Max(lagMs, _clock() - before - ms);
+                }
+                var backlogLimit = Math.Max(16_384L, rate * ProbeBacklogMs / 8);
+                while (!ct.IsCancellationRequested)
+                {
+                    var elapsedUs = NowMicroseconds() - begin;
+                    if (elapsedUs >= stepMs * 1000L) break;
+                    // Token bucket: whatever the timer's jitter, the step offers its rate over its length.
+                    var owed = rate * elapsedUs / 8_000;
+                    while (sent + size <= owed && ActivePeer is { } peer && peer.BufferedAmount <= backlogLimit)
+                    {
+                        if (!SendPadding(peer, probe, step, index++, flags, size)) break;
+                        sent += size;
+                        sentMessages++;
+                    }
+                    await Pause(5);
+                }
+                // Wait for the relay to report every message of the step (and its echoes), a couple of round trips at most.
+                var rtt = ActivePeer?.Path?.RttMs is double measured && measured > 0 ? measured : 100;
+                var deadline = _clock() + (long)Math.Clamp(rtt * 2 + 120, 150, 900);
+                while (_clock() < deadline && !ct.IsCancellationRequested)
+                {
+                    var (uplink, echoes) = probe.Pending(step, echo);
+                    if (uplink == 0 && echoes == 0) break;
+                    await Pause(10);
+                }
+                var verdict = probe.Judge(step, stamped: true, echo, pageBusy: lagMs > PageBusyLagMs);
+                steps.Add(verdict);
+                // A step the device's own channel held back ends the probe: higher rates would only be held back more.
+                if (sentMessages == 0 || !verdict.UplinkPassed || verdict.HeldBack || verdict.Inconclusive) break;
+                // Echoes stop after two failed round trips in a row (the downlink's limit, confirmed; see LinkProbe.Conclude).
+                if (echo) echoFailures = verdict.EchoPassed ? 0 : echoFailures + 1;
+                if (echoFailures >= 2) echo = false;
+            }
+        }
+        catch (OperationCanceledException) { return null; }
+        finally
+        {
+            Volatile.Write(ref _probe, null);
+            ProbeEnded?.Invoke();
+        }
+        var result = LinkProbe.Conclude(steps, _clock() - started, probe.MinRoundTripMs());
+        _logger.LogInformation("Start probe: {Result}", result);
+        return result;
+    }
+
+    /// <summary>One stamped probe message. False when the channel would not take it.</summary>
+    private bool SendPadding(IRtcPeer peer, LinkProbe probe, int step, uint index, byte flags, int size)
+    {
+        var total = TransportSequenceCodec.HeaderSize + size;
+        var buffer = ArrayPool<byte>.Shared.Rent(total);
+        try
+        {
+            PaddingCodec.Write(buffer.AsSpan(TransportSequenceCodec.HeaderSize, size), flags, (byte)step, index);
+            var sequence = unchecked((ushort)Interlocked.Increment(ref _transportSequence));
+            buffer[0] = (byte)FrameType.TransportSequenced;
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(buffer.AsSpan(1), sequence);
+            // Timed before the send: the page's own clock for an echo it times itself starts here too.
+            var now = NowMicroseconds();
+            if (!peer.TrySend(buffer.AsSpan(0, total))) return false;
+            // Not recorded for the media's own estimate: the probe judges its padding itself, and a probe step that builds
+            // a queue on purpose must not read as the media's congestion.
+            probe.OnSent(step, index, sequence, total, now);
+            _drain.Sent(total);
             return true;
         }
         finally { ArrayPool<byte>.Shared.Return(buffer); }
@@ -316,6 +441,13 @@ public sealed class MediaTransportClient : IAsyncDisposable
     {
         var message = data.Span;
         if (message.IsEmpty) return;
+        if (message[0] == (byte)FrameType.Padding)
+        {
+            // The echo of a start probe message: only the probe reads it.
+            if (PaddingCodec.TryRead(message, out var flags, out var step, out var index) && (flags & PaddingCodec.Echoed) != 0)
+                Volatile.Read(ref _probe)?.OnEcho(step, index, NowMicroseconds());
+            return;
+        }
         if (message[0] != (byte)FrameType.TransportFeedback)
         {
             _client.DispatchDatagram(message);
@@ -327,6 +459,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
         {
             if (!TransportFeedbackCodec.TryRead(message, out var first, _arrivals)) return;
             _feedback.OnFeedback(first, _arrivals, _clock());
+            Volatile.Read(ref _probe)?.OnFeedback(first, _arrivals);
             signal = _feedback.Signal;
             resend = TakeLost(first, _arrivals);
         }
@@ -625,6 +758,8 @@ public sealed class MediaTransportClient : IAsyncDisposable
         peer.StateChanged += state => _ = OnPeerStateAsync(session, state);
         peer.PathChanged += _ => Raise();
         peer.Message += OnPeerMessage;
+        // A peer that times probe echoes where they land (a browser's page) hands them over that way instead.
+        if (peer is IRtcProbeEchoSource echoes) echoes.ProbeEcho += (step, index, arrivedUs) => Volatile.Read(ref _probe)?.OnEcho(step, index, arrivedUs);
         session.Candidates.Hold();
         var offer = await peer.CreateOfferAsync(iceRestart: false, _lifetime.Token);
         await SendAsync(MediaTransportKind.Offer, new MediaTransportDescription(session.Id, offer));

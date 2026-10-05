@@ -339,6 +339,7 @@ internal sealed class BoltMediaSendQueue
                 if (pictureAware && picture is { } late && !state.AwaitingKeyframe && !state.BeforeFloor(sequence))
                 {
                     var fate = state.FateOf(late);
+                    var undecided = fate == PictureFate.Unknown;
                     if (fate == PictureFate.Unknown)
                         fate = layer <= state.LayerLimit && !IsVideoCongested(now, frame.Length) ? PictureFate.Forwarded : PictureFate.Dropped;
                     if (fate == PictureFate.Forwarded && !IsVideoCongested(now, frame.Length))
@@ -351,6 +352,16 @@ internal sealed class BoltMediaSendQueue
                         return BoltMediaEnqueueResult.Accepted;
                     }
                     state.Decide(late, forwarded: false);
+                    if (undecided && layer == 0)
+                    {
+                        // A base picture this receiver will now never get (it all arrived late, towards a congested queue):
+                        // every later picture refers to it, and the receiver cannot tell its gap from a shed enhancement
+                        // layer. As any base loss: what is queued after it goes, and nothing more until a keyframe.
+                        PurgeVideo(streamId);
+                        state.AwaitingKeyframe = true;
+                        _staleFrames++;
+                        return new(false, ShouldRequestKeyframe(state, now));
+                    }
                 }
                 _staleFrames++;
                 return BoltMediaEnqueueResult.Dropped;

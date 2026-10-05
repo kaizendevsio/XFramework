@@ -115,6 +115,17 @@ public interface IRtcPeer : IAsyncDisposable
     event Action<RtcPath>? PathChanged;
 }
 
+/// <summary>
+/// A peer that times the relay's echoes of start-probe padding (<see cref="FrameType.Padding"/>) where they arrive,
+/// before handing anything over: a browser hands data channel messages to .NET in bursts, which would read as a queue.
+/// Such a peer raises <see cref="ProbeEcho"/> instead of <see cref="IRtcPeer.Message"/> for them.
+/// </summary>
+public interface IRtcProbeEchoSource
+{
+    /// <summary>An echo arrived: its probe step, its index in the step, and when (µs, on the same clock rate as Stopwatch).</summary>
+    event Action<byte, uint, long>? ProbeEcho;
+}
+
 public interface IRtcPeerFactory
 {
     ValueTask<IRtcPeer> CreateAsync(RtcPeerRole role, RtcPeerOptions options, CancellationToken ct);
@@ -129,7 +140,8 @@ public static class DatagramFramePolicy
     /// </summary>
     public static bool AcceptFromParticipant(FrameType type) =>
         type is FrameType.MediaFrame or FrameType.FecFrame or FrameType.MediaFeedback or
-            FrameType.MediaKeyRequest or FrameType.MediaBundle or FrameType.NackRequest or FrameType.TransportSequenced;
+            FrameType.MediaKeyRequest or FrameType.MediaBundle or FrameType.NackRequest or FrameType.TransportSequenced or
+            FrameType.Padding;
 
     /// <summary>Relay to participant: what the relay's media lanes carry (media, feedback, congestion reports, keyframe requests).</summary>
     public static bool AcceptFromRelay(FrameType type) =>

@@ -145,3 +145,18 @@ The panel separates requested quality, camera-reported settings, encoder configu
 Acceleration values are preferences (`prefer-hardware`, `no-preference`, `prefer-software`), never claims that a GPU or CPU is actually active. The first snapshot shows unavailable rates; subsequent idle windows show zero and clear stale timing values. Camera-off participants can still inspect incoming streams. Sampling has its own counters/window and does not consume or reset adaptation statistics. Additional encoder timing is opt-in, bounded to 32 entries, and cleared when hidden or disposed. Remote counters add constant work per frame; no per-frame JS/.NET diagnostic calls or server polling are introduced.
 
 Validation: 308 JavaScript tests passed, including rate math, first/idle snapshots, receive-only operation, adaptation isolation and bounded timing state. The Yap build and 201 integration tests passed. A Chromium layout fixture using the actual panel CSS verified scrolling, accessible Hide, no horizontal overflow and unobstructed call controls at 375x667; physical phone testing remains necessary. The user confirmed the previous release resolved the iOS-to-Android freeze.
+
+## Default 1080p30, and calls start at the quality the link carries
+
+The default video preference is now 1080p at 30 fps (it was 1440p60). The preference is stored per half: a user who
+never chose a size or a frame rate follows the default, and follows it again if it changes; a choice is kept. The old
+storage wrote both halves whenever either changed, so a stored 1440p or 60 fps (the old defaults) cannot be told from
+one never chosen and migrates to the default; any other stored value is kept.
+
+A call's picture no longer starts at 240p15. The data channel's start probe (Bolt `LinkProbe`, see BOLT-MEDIA.md)
+measures this device's uplink and downlink while the call rings or connects, receivers report their downlink in their
+feedback, and the picture starts at the largest size the worst of those carries, up to the preference; with nothing
+measured it starts at 540p. The first picture is at most 720p and climbs to the measured size about a second in, once
+the receiver reports it keeps up; until the link first shows congestion it climbs fast (60% a second, several rungs at
+once). In the browser e2e on a clean 20 Mbit/s path both sides reach 1080p about 1 s after the camera starts (develop:
+22 s and 41 s); on a 512 kbit/s uplink the picture starts at 240p with a 14 KB keyframe.

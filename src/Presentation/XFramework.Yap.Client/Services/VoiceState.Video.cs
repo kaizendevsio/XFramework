@@ -14,8 +14,13 @@ public sealed record VideoTile(Guid StreamId, Guid CredentialId, bool Frozen = f
 
 public sealed partial class VoiceState
 {
-    public int PreferredVideoHeight { get; private set; } = 1440;
-    public int PreferredVideoFramerate { get; private set; } = 60;
+    /// <summary>
+    /// The picture a user who never chose one sends at most: 1080p30. Higher sizes and 60 fps cost a phone's battery and
+    /// data for little a call shows, and every call now starts at the best size its link carries up to this.
+    /// </summary>
+    public const int DefaultVideoHeight = 1080, DefaultVideoFramerate = 30;
+    public int PreferredVideoHeight { get; private set; } = DefaultVideoHeight;
+    public int PreferredVideoFramerate { get; private set; } = DefaultVideoFramerate;
     private bool videoPreferenceLoaded;
     public async Task LoadVideoPreferenceAsync()
     {
@@ -23,24 +28,33 @@ public sealed partial class VoiceState
         videoPreferenceLoaded = true;
         try
         {
+            // 0 is a half the user never chose: the default applies (see yap.videoPreference).
             var preference = await js.InvokeAsync<int[]>("yap.videoPreference");
             if (preference is { Length: 2 })
             {
-                PreferredVideoHeight = ValidVideoHeight(preference[0]);
-                PreferredVideoFramerate = preference[1] == 60 ? 60 : 30;
+                PreferredVideoHeight = preference[0] == 0 ? DefaultVideoHeight : ValidVideoHeight(preference[0]);
+                PreferredVideoFramerate = preference[1] == 0 ? DefaultVideoFramerate : preference[1] == 60 ? 60 : 30;
             }
         }
         catch { /* Storage may be unavailable. Keep the default. */ }
     }
-    private static int ValidVideoHeight(int height) => height is 360 or 540 or 720 or 1080 or 1440 or 2160 ? height : 1440;
+    private static int ValidVideoHeight(int height) => height is 360 or 540 or 720 or 1080 or 1440 or 2160 ? height : DefaultVideoHeight;
 
     public async Task SetVideoPreferenceAsync(int height, int framerate)
     {
         if (CameraBusy) return;
         videoPreferenceLoaded = true;
+        var previousHeight = PreferredVideoHeight;
+        var previousFramerate = PreferredVideoFramerate;
         PreferredVideoHeight = ValidVideoHeight(height);
         PreferredVideoFramerate = framerate == 60 ? 60 : 30;
-        try { await js.InvokeVoidAsync("yap.setVideoPreference", PreferredVideoHeight, PreferredVideoFramerate); } catch { }
+        // Only the half the user changed becomes theirs; the other keeps following the default.
+        try
+        {
+            await js.InvokeVoidAsync("yap.setVideoPreference", PreferredVideoHeight != previousHeight ? PreferredVideoHeight : 0,
+                PreferredVideoFramerate != previousFramerate ? PreferredVideoFramerate : 0);
+        }
+        catch { }
         if (active is { CameraOn: false, Media: { } inactiveCamera }) inactiveCamera.ResetVideoPreference();
         if (active is { CameraOn: true, Media: { } media } attempt && Current(attempt))
         {

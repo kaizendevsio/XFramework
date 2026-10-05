@@ -207,7 +207,11 @@ internal static class Relay
             KeyframeRatio: Env.Int("KF_RATIO", 6),
             KeyframeIntervalMs: Env.Int("KF_MS", 10_000),
             TemporalLayers: Env.Int("SVC", 1) == 1,
-            Overshoot: Env.Int("OVERSHOOT_PCT", 100) / 100.0);
+            Overshoot: Env.Int("OVERSHOOT_PCT", 100) / 100.0,
+            FastStart: Env.Int("FAST_START", 0) == 1,
+            TargetHeight: Env.Int("TARGET_HEIGHT", 1080),
+            StartUplinkKbps: Env.Int("START_UP_KBPS", 0),
+            StartUplinkAtLeast: Env.Int("START_UP_AT_LEAST", 0) == 1);
         await using var adaptiveSender = adaptive ? new AdaptiveSender(clock) : null;
         if (adaptive) Env.Log($"RELAY adaptive {JsonSerializer.Serialize(adaptiveProfile)}");
 #else

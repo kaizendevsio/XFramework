@@ -72,7 +72,15 @@ export class BoltRtcPeer {
         channel.onbufferedamountlow = () => this.#notify('OnBufferedLow');
         channel.onmessage = event => {
             if (!(event.data instanceof ArrayBuffer) || event.data.byteLength === 0 || event.data.byteLength > this.#maxMessage) return;
-            this.#notify('OnMessage', new Uint8Array(event.data));
+            const bytes = new Uint8Array(event.data);
+            // The echo of a start-probe message (0x2D, flagged echoed): timed here, where it arrives. Handing it to .NET
+            // first would time it when .NET gets to it, and a busy page hands messages over in bursts.
+            if (bytes[0] === 0x2d && bytes.length >= 8 && (bytes[1] & 0x02) !== 0) {
+                const index = new DataView(event.data).getUint32(4, true);
+                this.#notify('OnProbeEcho', bytes[2], index, performance.now());
+                return;
+            }
+            this.#notify('OnMessage', bytes);
         };
         this.#pc.onicecandidate = event => {
             const candidate = event.candidate;

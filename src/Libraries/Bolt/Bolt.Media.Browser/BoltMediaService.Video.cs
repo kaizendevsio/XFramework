@@ -10,7 +10,7 @@ public sealed record RemoteVideoStream(Guid StreamId, string SenderId, VideoCode
 
 /// <summary>One remote camera stream's receive path, cumulative (see <see cref="BoltMediaService.GetVideoReceiveStats"/>).</summary>
 public sealed record VideoReceiveStats(Guid StreamId, long Fragments, long LocalDrops, int Nacked, int Recovered, int Abandoned,
-    int Declined, int Incomplete, int Skipped, long Pictures, int RecoveryMs);
+    int Declined, int Incomplete, int Skipped, long Pictures, int RecoveryMs, string? Recent = null);
 
 public sealed partial class BoltMediaService
 {
@@ -59,7 +59,7 @@ public sealed partial class BoltMediaService
         lock (_remoteVideo)
             return _videoAssemblers.Select(x => new VideoReceiveStats(x.Key, x.Value.Fragments,
                 _mediaClient?.GetMediaStream(x.Key)?.LocalDrops ?? 0, x.Value.Nacked, x.Value.Recovered, x.Value.Abandoned,
-                x.Value.Declined, x.Value.Incomplete, x.Value.Skipped, x.Value.Pictures, x.Value.RecoveryMs)).ToArray();
+                x.Value.Declined, x.Value.Incomplete, x.Value.Skipped, x.Value.Pictures, x.Value.RecoveryMs, x.Value.RecentDecisions)).ToArray();
     }
 
     public bool IsCameraOn => _video.IsCapturing;
@@ -98,14 +98,23 @@ public sealed partial class BoltMediaService
         if (_options.SecurityMode == MediaSecurityMode.AuthenticatedSFrame && !IsSFrameReady)
             throw new InvalidOperationException("The call's encryption keys are not active yet.");
 
-        // Every call starts on a mobile-safe rung and climbs on measured headroom. The user's
-        // preference is how high it may climb, never where it starts: starting at 1080p on a
-        // 512 kbps link filled the relay's queue within a second.
+        // A new picture starts where the link is known to carry it: this device's start probe (measured while the call
+        // rang), the worst receiver's reported downlink, the last call on this network, or a middle picture, never above
+        // the user's preference. Starting at 1080p on a 512 kbps link filled the relay's queue within a second; starting
+        // at 240p on a fast one took half a minute to reach the preference. The start-up ramp takes it from there.
         var startHeight = VideoAdaptation.Ladder[Math.Clamp(_options.VideoStartTier, 0, VideoAdaptation.Ladder.Length - 1)].Height;
         _videoDeviceCeiling = Math.Min(preferredHeight ?? _options.VideoMaxHeight, Math.Min(ceilingHeight, _options.VideoMaxHeight));
+        var fresh = _adaptation is null;
         var adaptation = _adaptation ??= new VideoAdaptation(
             VideoAdaptation.IndexForHeight(Math.Min(startHeight, _videoDeviceCeiling)), preferredFramerate);
         adaptation.SetCeiling(_videoDeviceCeiling);
+        if (fresh && _rateLoop is { } starting)
+        {
+            var hints = await StartHintsAsync();
+            starting.Ladder = adaptation.Rates;
+            starting.BeginPicture(Environment.TickCount64, hints, AudioWireKbps);
+            _logger.LogInformation("Video starts at {Tier}: {Start} (probe {Probe})", adaptation.Current, starting.StartedAt, LinkProbe);
+        }
         var tier = adaptation.Current ?? VideoAdaptation.Ladder[0];
         if (_videoCodec != codec || !_video.IsCapturing)
         {
@@ -139,9 +148,11 @@ public sealed partial class BoltMediaService
         if (_rateLoop is { } loop)
         {
             loop.Ladder = adaptation.Rates;
-            loop.Controller.Reset(tier.BitrateKbps + AudioWireKbps);
+            // A camera turned on again keeps the path's history: the picture it last held, never above a known limit.
+            if (!fresh) loop.Controller.Reset(tier.BitrateKbps + AudioWireKbps);
             adaptation.Suspended = false;
         }
+        _videoStartedAt ??= Environment.TickCount64;
         StartAdaptationLoop(); // Camera callbacks can arrive before startCapture's promise resolves.
         try { return await _video.StartCaptureAsync(deviceId, facingMode); }
         catch
@@ -511,6 +522,8 @@ public sealed partial class BoltMediaService
 
     private VideoTier? _appliedTier;
     private int _encodeBacklog;
+    /// <summary>When this call's camera first started (for remembering where the call settled).</summary>
+    private long? _videoStartedAt;
 
     private void DrainVideoSend()
     {
@@ -540,6 +553,7 @@ public sealed partial class BoltMediaService
         { try { await _video.RemoveRemoteAsync(streamId); } catch (JSException) { /* The page is going away. */ } }
         _adaptation = null;
         _appliedTier = null;
+        _videoStartedAt = null;
         MeasuredVideoFps = null;
         _videoCodec = VideoCodec.None;
         _encodeBacklog = 0;

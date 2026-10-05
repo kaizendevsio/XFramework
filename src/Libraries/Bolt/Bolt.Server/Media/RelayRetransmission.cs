@@ -88,7 +88,8 @@ internal sealed class RelayRetransmitCache
             var slot = _slots[(int)(sequence % (uint)_slots.Length)];
             if (slot.Used && slot.Sequence == sequence)
             {
-                if (now - slot.At > _maxAgeMs || slot.Frame is null) return Holding.Gone;
+                if (now - slot.At > _maxAgeMs) return Holding.Gone;
+                if (slot.Frame is null) return Holding.TooLarge;
                 frame = slot.Frame;
                 return Holding.Held;
             }
@@ -105,8 +106,13 @@ internal sealed class RelayRetransmitCache
         Held,
         /// <summary>The relay never got it (the sender's uplink lost it): only the sender can resend it.</summary>
         NeverSeen,
-        /// <summary>Too old, or too large for a datagram: nobody will resend it.</summary>
+        /// <summary>Too old: nobody will resend it.</summary>
         Gone,
+        /// <summary>
+        /// It arrived, too large for a datagram (it came over the sender's socket): it travels to the receiver over its
+        /// socket, which does not lose it, so it is neither resent nor declined: the receiver only has to wait for it.
+        /// </summary>
+        TooLarge,
     }
 }
 
