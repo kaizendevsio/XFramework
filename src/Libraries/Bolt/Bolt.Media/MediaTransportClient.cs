@@ -301,8 +301,12 @@ public sealed class MediaTransportClient : IAsyncDisposable
         {
             var sequence = unchecked((ushort)Interlocked.Increment(ref _transportSequence));
             TransportSequenceCodec.Write(buffer, sequence, message);
+            // Timed before the send: WebKit's send() can block the page for hundreds of ms when its buffer is full, and a
+            // send time taken after that is late. One late send time lowered the delay floor for every later message, so
+            // the uplink read a standing 400 ms queue that was not there for the next 10-20 s.
+            var sentAt = NowMicroseconds();
             if (!peer.TrySend(buffer.AsSpan(0, size))) return false;
-            _feedback.OnSent(sequence, size, NowMicroseconds());
+            _feedback.OnSent(sequence, size, sentAt);
             _drain.Sent(size);
             if (resendable && _options.ResendLostVideoMs > 0)
                 lock (_resendable) _resendable[sequence % _resendable.Length] = (sequence, message.ToArray(), firstSentAt ?? _clock());
