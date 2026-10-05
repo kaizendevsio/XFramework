@@ -391,6 +391,23 @@ public sealed class CallFastStartTests
     }
 
     [Test]
+    public void TwoStartTransients_AreBothRecoveredFrom()
+    {
+        // WebKit's page stalled twice while both sides started (2.0 s and 6.0 s in): each cut is a transient.
+        var sim = new StartSimulation(capacityKbps: 20_000, oneWayMs: 15, preferredHeight: 1080);
+        sim.Begin(new StartHints(UplinkKbps: 7_500, UplinkAtLeast: true));
+        sim.ExtraDelay = (2_000, 3_000, 1_500);
+        sim.SecondExtraDelay = (6_000, 7_000, 1_500);
+        sim.Run(30_000);
+        TestContext.Out.WriteLine(sim);
+        Assert.Multiple(() =>
+        {
+            Assert.That(sim.Height, Is.EqualTo(1080));
+            Assert.That(sim.LastRungChangeMs, Is.LessThanOrEqualTo(10_000), "back at the preference within the start window, not by the slow ramp");
+        });
+    }
+
+    [Test]
     public void ANewPicturesOwnQueue_IsNotCongestion_ButTheRelaysReportsStillAre()
     {
         // WebKit drains a fresh data channel's first keyframe slowly: the pacer's queue stands while the relay sees none.
@@ -471,6 +488,7 @@ public sealed class CallFastStartTests
         private bool _dropping, _keyframe = true;
         private readonly List<(long At, int Estimate, int QueueMs, VideoSetting Setting)> _trace = [];
         private readonly List<(long At, int Height)> _rungs = [];
+        private int _grants;
 
         public StartSimulation(int capacityKbps, int oneWayMs, int preferredHeight)
         {
@@ -485,6 +503,7 @@ public sealed class CallFastStartTests
         public (int Kbps, bool AtLeast)? ReceiversDownlink { get; set; }
         /// <summary>A receiver's page busy from..to: its reports carry this much more delay (and no capacity).</summary>
         public (long From, long To, int Ms)? ExtraDelay { get; set; }
+        public (long From, long To, int Ms)? SecondExtraDelay { get; set; }
         public long LastRungChangeMs => _rungs[^1].At;
         public long Now { get; private set; }
         public int Estimate => _controller.EstimateKbps;
@@ -529,7 +548,8 @@ public sealed class CallFastStartTests
                 if (Now >= _nextReport)
                 {
                     _nextReport = Now + 250;
-                    var busy = ExtraDelay is { } extra && Now >= extra.From && Now < extra.To ? extra.Ms : 0;
+                    var busy = ExtraDelay is { } extra && Now >= extra.From && Now < extra.To ? extra.Ms
+                        : SecondExtraDelay is { } again && Now >= again.From && Now < again.To ? again.Ms : 0;
                     _inFlight.Enqueue((Now + _oneWayMs, new RelaySignal(0, queueMs + busy, 0, queueMs >= 40 ? CapacityKbps : 0, _dropping, BaseLost: _dropping)));
                 }
                 while (_inFlight.Count > 0 && _inFlight.Peek().At <= Now) _relay = _inFlight.Dequeue().Signal with { ReceivedAtMs = Now };
@@ -541,6 +561,8 @@ public sealed class CallFastStartTests
                     _sentWindowBytes = _audioWindowBytes = 0;
                     Start.Tick(Now, ReceiversDownlink);
                     var decision = _controller.Update(new SendPathSample(Now, sent, audio, 0, 0, false, _relay));
+                    // As SendRateLoop does: a start transient's steps down keep the ladder's fast climb.
+                    if (_controller.RecoveryGrants != _grants) { _grants = _controller.RecoveryGrants; _ladder.TransientCut(Now); }
                     if (!decision.VideoSuspended && _ladder.Place(decision.VideoKbps, Now, decision.Signal != RateSignal.Normal) is { } placed &&
                         placed.Rung.Height != _rungs[^1].Height)
                     {

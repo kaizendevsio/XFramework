@@ -22,6 +22,14 @@ public sealed class MediaSendPacerOptions
     public int MinBacklogBytes { get; init; } = 6 * 1024;
     public int MaxBacklogBytes { get; init; } = 48 * 1024;
     public int PollMs { get; init; } = 5;
+    /// <summary>
+    /// Video leaves at no more than this multiple of the send rate (WebRTC's pacer uses 2.5), audio unpaced. A keyframe is
+    /// several pictures' worth of bytes; handed over at once it lands in the browser's channel buffer, which some browsers
+    /// (WebKit) report late and drain in bursts, so the transport backlog above cannot hold it back in time. 0: unpaced.
+    /// </summary>
+    public double PacingFactor { get; init; } = 2.5;
+    /// <summary>The most video sent back to back without pacing (at least 8 KB): a few pictures' fragments.</summary>
+    public int PacingBurstMs { get; init; } = 20;
     /// <summary>Fewest milliseconds between two keyframe requests this pacer raises.</summary>
     public int KeyframeRequestGapMs { get; init; } = 500;
 }
@@ -93,6 +101,8 @@ public sealed class MediaSendPacer : IAsyncDisposable
     private int _droppedPictures, _droppedAudio, _baseLosses;
     private int _rateKbps = 256;
     private int _capacityKbps;
+    private double _videoTokens = double.NaN;
+    private long _tokensAt;
 
     public MediaSendPacer(
         Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> send,
@@ -394,7 +404,14 @@ public sealed class MediaSendPacer : IAsyncDisposable
                     lock (_sync) _blockedMs += _clock() - waitStarted;
                     continue;
                 }
+                // Pace video: a keyframe goes out over a few tens of milliseconds, not into the channel all at once.
+                if (VideoMustWait())
+                {
+                    await Task.Delay(_options.PollMs, ct);
+                    continue;
+                }
                 if (!TryTake(out var frame, out var audio)) continue;
+                if (!audio) lock (_sync) _videoTokens -= frame.Length;
                 try { await _send(frame, audio, ct); }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
                 catch { lock (_sync) { if (audio) _droppedAudio++; } continue; }
@@ -407,6 +424,26 @@ public sealed class MediaSendPacer : IAsyncDisposable
             }
         }
         catch (OperationCanceledException) { }
+    }
+
+    /// <summary>The next frame is video and the pacing budget does not cover it yet (refilled at the paced rate).</summary>
+    private bool VideoMustWait()
+    {
+        if (_options.PacingFactor <= 0) return false;
+        lock (_sync)
+        {
+            if (_audio.Count > 0) return false;
+            int next;
+            if (_current is not null && _currentIndex < _current.Frames.Count) next = _current.Frames[_currentIndex].Length;
+            else if (_video.First is { } picture && picture.Value.Picture.Frames.Count > 0) next = picture.Value.Picture.Frames[0].Length;
+            else return false;
+            var now = _clock();
+            var bytesPerMs = RateKbps * _options.PacingFactor / 8.0;
+            var burst = Math.Max(8 * 1024, bytesPerMs * _options.PacingBurstMs);
+            _videoTokens = double.IsNaN(_videoTokens) ? burst : Math.Min(burst, _videoTokens + bytesPerMs * Math.Max(0, now - _tokensAt));
+            _tokensAt = now;
+            return _videoTokens < next;
+        }
     }
 
     /// <summary>Close the observation window and report on it.</summary>

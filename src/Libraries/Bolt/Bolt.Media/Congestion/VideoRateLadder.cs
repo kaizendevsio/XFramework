@@ -233,6 +233,19 @@ public sealed class VideoRateLadder
     }
 
     /// <summary>
+    /// The rate controller found another start transient (see <see cref="SendRateController.RecoveryGrants"/>): the steps
+    /// down of this cut keep the fast climb too, while the start window lasts.
+    /// </summary>
+    public void TransientCut(long nowMs)
+    {
+        if (nowMs < _freshUntil && (_fresh || _freeDownsFrom is not null))
+        {
+            _fresh = true;
+            _freeDownsFrom = null;
+        }
+    }
+
+    /// <summary>
     /// Start a picture on a budget the start probe or hints vouched for: the largest rung (60 fps on the top one the
     /// ceiling allows, when that is allowed) whose up-threshold the budget clears, fresh, with no backoff. A link that
     /// cannot hold it sends the picture down within a second, and the first step down ends the fast climb.

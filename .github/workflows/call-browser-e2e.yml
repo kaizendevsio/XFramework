@@ -14,6 +14,12 @@ on:
       seconds:
         description: Measured seconds per scenario
         default: "60"
+      only:
+        description: Run only this scenario (empty runs all)
+        default: ""
+      repeat:
+        description: Attempts per scenario, as a JSON array, e.g. [1,2,3,4,5] (repeatability)
+        default: "[1]"
   pull_request:
     paths:
       - src/Libraries/Bolt/**
@@ -31,12 +37,16 @@ concurrency:
 
 jobs:
   call:
-    name: ${{ matrix.scenario }}
+    name: ${{ matrix.scenario }}${{ matrix.attempt > 1 && format(' #{0}', matrix.attempt) || '' }}
     runs-on: ubuntu-latest
+    env:
+      # workflow_dispatch "only": every other scenario's job skips its steps.
+      RUN_SCENARIO: ${{ github.event.inputs.only == '' || github.event.inputs.only == null || github.event.inputs.only == matrix.scenario }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
+        attempt: ${{ fromJSON(github.event.inputs.repeat || '[1]') }}
         include:
           # Each browser's leg: about 14 ms round trip to TURN and Wi-Fi capacity, as the 13:08 UTC call measured. A plays
           # the Android phone at up to 1440p30 (it climbs past the 4.7 Mbit/s that phone sent), B the iPhone at 720p30
@@ -130,27 +140,32 @@ jobs:
             step_spec: "delay 7ms rate 2mbit"
     steps:
       - name: Checkout
+        if: env.RUN_SCENARIO == 'true'
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
 
       - name: Set up .NET 10
+        if: env.RUN_SCENARIO == 'true'
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: 10.x
 
       - name: Set up Go
+        if: env.RUN_SCENARIO == 'true'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: src/Libraries/Bolt/Bolt.Rtc/sidecar/go.mod
           cache-dependency-path: src/Libraries/Bolt/Bolt.Rtc/sidecar/go.sum
 
       - name: Build the relay's WebRTC sidecar
+        if: env.RUN_SCENARIO == 'true'
         shell: bash
         working-directory: src/Libraries/Bolt/Bolt.Rtc/sidecar
         run: CGO_ENABLED=0 go build -trimpath -o "$RUNNER_TEMP/bolt-rtc" .
 
       - name: Enable netem
+        if: env.RUN_SCENARIO == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -161,6 +176,7 @@ jobs:
           fi
 
       - name: Start coturn on three loopback addresses
+        if: env.RUN_SCENARIO == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -178,6 +194,7 @@ jobs:
           exit 1
 
       - name: Publish the call participant (Blazor WASM, AOT as production)
+        if: env.RUN_SCENARIO == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -186,6 +203,7 @@ jobs:
             -p:CALL_CLIENT_AOT=1 -o "$RUNNER_TEMP/call-client"
 
       - name: Build tests and install browsers
+        if: env.RUN_SCENARIO == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -193,6 +211,7 @@ jobs:
           pwsh src/Tests/Bolt.Rtc.IntegrationTests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium webkit
 
       - name: Call
+        if: env.RUN_SCENARIO == 'true'
         shell: bash
         env:
           CALL_CLIENT_DIR: ${{ runner.temp }}/call-client/wwwroot
@@ -220,7 +239,7 @@ jobs:
             --filter "TestCategory=BrowserCall" --logger "console;verbosity=normal"
 
       - name: Summary
-        if: always()
+        if: always() && env.RUN_SCENARIO == 'true'
         shell: bash
         run: |
           file="$RUNNER_TEMP/call-${{ matrix.scenario }}.json"
@@ -247,13 +266,13 @@ jobs:
           EOF
 
       - name: Upload results
-        if: always()
+        if: always() && env.RUN_SCENARIO == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: call-browser-e2e-${{ matrix.scenario }}
+          name: call-browser-e2e-${{ matrix.scenario }}${{ matrix.attempt > 1 && format('-{0}', matrix.attempt) || '' }}
           path: ${{ runner.temp }}/call-*.json
           if-no-files-found: warn
 
       - name: TURN server log
-        if: failure()
+        if: failure() && env.RUN_SCENARIO == 'true'
         run: docker logs coturn 2>&1 | tail -100

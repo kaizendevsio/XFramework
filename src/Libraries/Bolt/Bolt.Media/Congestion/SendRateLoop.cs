@@ -184,6 +184,7 @@ public sealed class SendRateLoop
     private int _restarts;
     private int _pathChanged;
     private readonly PictureStart _pictureStart;
+    private int _recoveryGrants;
 
     public SendRateLoop(MediaSendPacer pacer, SendRateController controller, VideoRateLadder ladder, SendPathSignals? signals = null)
     {
@@ -266,6 +267,11 @@ public sealed class SendRateLoop
             video = Ladder.Restart(decision.VideoKbps);
         else if (!_suspended)
         {
+            if (Controller.RecoveryGrants != _recoveryGrants)
+            {
+                _recoveryGrants = Controller.RecoveryGrants;
+                Ladder.TransientCut(nowMs);
+            }
             var before = Ladder.Current.Rung;
             var fresh = Ladder.Fresh;
             // A fresh picture jumps several sizes at once: only once the receivers say they keep up (fast confirmation).

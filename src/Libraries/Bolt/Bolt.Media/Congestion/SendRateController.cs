@@ -304,12 +304,23 @@ public sealed class SendRateController
         _pictureStartedAt = nowMs;
         _startWindowUntil = nowMs + windowMs;
         _recoveryUsed = false;
+        _recoveries = 0;
+        _recoveryPeak = 0;
         RecoveringToKbps = null;
     }
     private long _startWindowUntil = long.MinValue, _pictureStartedAt = long.MinValue / 2;
     /// <summary>A new picture waits this long for a receiver's first report before it may grow without one (a receiver too old to report).</summary>
     private const int ReceiverReportWaitMs = 3_000;
     private bool _recoveryUsed, _recoveryClimbing;
+    private int _recoveries;
+    private long _recoveredAt = long.MinValue / 2;
+    private double _recoveryPeak;
+    /// <summary>A recovered rate that held this long was a start transient's: a later cut in the window may be one too.</summary>
+    private const int RecoveryHeldMs = 1_500;
+    private const int MaxRecoveries = 3;
+
+    /// <summary>Start transients granted a recovery so far (the loop lets the ladder climb back fast after each).</summary>
+    public int RecoveryGrants { get; private set; }
 
     /// <summary>Where a start transient's cut climbs back to at the start-up rate, while it does.</summary>
     public int? RecoveringToKbps { get; private set; }
@@ -350,16 +361,16 @@ public sealed class SendRateController
 
     /// <summary>
     /// Until then, this device's own queues (the pacer's wait, the transport's backlog, a picture its pacer dropped) do
-    /// not count as congestion while the path has shown none: a picture's first keyframe filling a data channel that
-    /// is still warming up (WebKit drains its first bursts slowly), or a start probe's padding, is not the link. The
-    /// relay's and the receivers' reports still count, and so does everything once the path has shown congestion.
+    /// not count as congestion: a picture's first keyframe, or the larger one of a climb, filling a data channel that is
+    /// still warming up (WebKit drains such bursts slowly), or a start probe's padding, is not the link. The relay's,
+    /// the uplink feedback's and the receivers' reports still count. Granted only for those moments (see callers).
     /// </summary>
     public void IgnoreLocalUntil(long nowMs) => _ignoreLocalUntil = Math.Max(_ignoreLocalUntil, nowMs);
     private long _ignoreLocalUntil = long.MinValue;
 
     public SendRateDecision Update(in SendPathSample input)
     {
-        var sample = input.NowMs < _ignoreLocalUntil && !_congestionObserved
+        var sample = input.NowMs < _ignoreLocalUntil
             ? input with { LocalQueueDelayMs = 0, LocalCapacityKbps = 0, LocalBaseLost = false }
             : input;
         var now = sample.NowMs;
@@ -584,11 +595,18 @@ public sealed class SendRateController
         if (now - _firstCongestionAt < StartupCutWindowMs) next = Math.Max(next, _estimate * 0.5);
         var beforeCut = _estimate;
         _estimate = Math.Max(_options.MinTotalKbps, Math.Min(_estimate, next));
-        if (now < _startWindowUntil && !_recoveryUsed)
+        // A cut inside a picture's start, the first one or one after the last recovery held: a start transient. Remember
+        // where the start was, to go back to once it passes. One that follows a recovery within RecoveryHeldMs is the
+        // link itself, and so is a fourth.
+        var transient = now < _startWindowUntil && RecoveringToKbps is null && _recoveries < MaxRecoveries &&
+                        (!_recoveryUsed || now - _recoveredAt >= RecoveryHeldMs);
+        if (transient)
         {
-            // The first cut inside a picture's start: remember where the start was, to climb back to once it passes.
             _recoveryUsed = true;
-            RecoveringToKbps = (int)Math.Round(beforeCut * 0.7);
+            _recoveries++;
+            RecoveryGrants++;
+            RecoveringToKbps = (int)Math.Round(Math.Max(beforeCut, _recoveryPeak) * 0.7);
+            _recoveryPeak = Math.Max(beforeCut, _recoveryPeak);
             _recoveryClimbing = false;
         }
         else if (_recoveryClimbing) RecoveringToKbps = null; // Congestion again on the way back: the link is smaller.
@@ -621,7 +639,7 @@ public sealed class SendRateController
         if (next > ceiling) next = Math.Max(_estimate, ceiling);
         // A start transient that has passed (the path calm again): straight back, not a ramp. A link that really is smaller
         // shows it within a second, and that congestion is cut as any other (there is one recovery per picture start).
-        if (RecoveringToKbps is { } back && _estimate < back) { next = Math.Max(next, back); RecoveringToKbps = null; }
+        if (RecoveringToKbps is { } back && _estimate < back) { next = Math.Max(next, back); RecoveringToKbps = null; _recoveredAt = sample.NowMs; }
         _estimate = next;
         if (_lastCongestionKbps > 0 && _estimate > _lastCongestionKbps * 1.3) _lastCongestionKbps = 0;
     }
