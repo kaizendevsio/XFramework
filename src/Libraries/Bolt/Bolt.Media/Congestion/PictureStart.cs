@@ -6,7 +6,8 @@ namespace Bolt.Media.Congestion;
 /// congestion, evidence that arrives later revises it: a receiver's downlink report (the worst receiver's, lowering the
 /// rate before the queue it would cause) or this device's start probe (raising it to what the link carried). While the
 /// picture is new, a limit measured exactly also caps the start-up ramp (<see cref="SendRateController.StartCeilingKbps"/>).
-/// A guess never moves the estimate: once the ramp is running, only a measurement may.
+/// A guess never moves the estimate: once the ramp is running, only a measurement may. <see cref="Begin"/> is for a call's
+/// first picture: what the audio-only path showed before it is forgotten.
 /// </summary>
 public sealed class PictureStart(SendRateController controller)
 {
@@ -29,7 +30,7 @@ public sealed class PictureStart(SendRateController controller)
         _startedAt = nowMs;
         _active = true;
         var estimate = Choose(_hints);
-        controller.Reset(estimate.TotalKbps);
+        controller.StartPicture(estimate.TotalKbps);
         Estimate = estimate with { TotalKbps = controller.EstimateKbps };
         controller.StartCeilingKbps = Ceiling(_hints);
         if (Ceiling(_hints) is { } limit) controller.MeasuredLimit(limit);

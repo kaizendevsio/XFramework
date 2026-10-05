@@ -252,6 +252,26 @@ public sealed class SendRateController
     /// Start over from a new offer, for example when the camera is turned on: the path's history stays, only the
     /// estimate moves (and never above what was last found to congest it).
     /// </summary>
+    /// <summary>
+    /// A first picture starts on measured evidence: whatever an audio-only path showed (a queue while the start probe ran,
+    /// a congestion point measured on a few dozen kbit/s of voice) says nothing about video, so it is forgotten and the
+    /// estimate placed at <paramref name="totalKbps"/>.
+    /// </summary>
+    public void StartPicture(int totalKbps)
+    {
+        _history.Clear();
+        _lastCongestionKbps = 0;
+        _congestedOnce = _congestionObserved = false;
+        _lastDecreaseAt = long.MinValue / 2;
+        _delayAtDecrease = 0;
+        _risingStreak = _cutStreak = 0;
+        _calmSince = null;
+        _estimate = Math.Clamp(totalKbps, _options.MinTotalKbps, _options.MaxTotalKbps);
+        _stable = _lastCalmEstimate = _estimate;
+        _suspended = false;
+        _lowVideoSince = null;
+    }
+
     public void Reset(int totalKbps)
     {
         var ceiling = _lastCongestionKbps > 0 ? _lastCongestionKbps : _options.MaxTotalKbps;
@@ -265,15 +285,14 @@ public sealed class SendRateController
     private bool _congestionObserved;
 
     /// <summary>
-    /// The start measured where this path's limit is (a probe step that built a queue, a receiver's downlink): that is
-    /// its congestion point. The start-up ramp is for a path whose limit is unknown; this one is approached the way a
-    /// path is after congestion, slowly near the limit. Until the path shows congestion itself, newer start evidence
-    /// replaces it.
+    /// The start measured where this path's limit is (a probe step that built a queue, a receiver's downlink). The
+    /// start-up ramp is for a path whose limit is unknown: this one, once past its start window's cap
+    /// (<see cref="StartCeilingKbps"/>), probes on at the ordinary rate, as a path does after congestion. A measurement
+    /// is not trusted as far as a congestion point the path showed itself: a lossy step can read low.
     /// </summary>
     public void MeasuredLimit(int totalKbps)
     {
         if (totalKbps <= 0 || _congestionObserved) return;
-        _lastCongestionKbps = totalKbps;
         _congestedOnce = true;
     }
 

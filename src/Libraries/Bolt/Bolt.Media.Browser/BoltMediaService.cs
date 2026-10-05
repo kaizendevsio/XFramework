@@ -438,6 +438,8 @@ public sealed partial class BoltMediaService : IAsyncDisposable
             while (!ct.IsCancellationRequested)
             {
                 await Task.Delay(Math.Max(100, _options.AdaptationIntervalMs), ct);
+                // The start probe's padding fills the channel's buffer and the relay's feedback on purpose: no decision on that.
+                if (_transport?.Probing == true) continue;
                 var tick = loop.Tick(Environment.TickCount64, _encodeBacklog);
                 SendRate = tick.Decision;
                 LastSendTick = tick;

@@ -12,11 +12,16 @@ namespace Bolt.Media.Congestion;
 /// <param name="UplinkPassed">The uplink carried the step: the rate, without loss or a queue.</param>
 /// <param name="EchoPassed">The round trip carried it too.</param>
 /// <param name="EchoRequested">The step asked the relay for its echo (only while every earlier round trip passed).</param>
+/// <param name="SentKbps">What the device actually handed to its channel over the step (a browser holding back its own
+/// buffer sends less than the pace); 0 when too few messages to tell.</param>
 public readonly record struct ProbeStep(int OfferedKbps, int Sent, int UplinkKbps, int UplinkLost, int UplinkDelayGrowthMs,
-    int EchoKbps, int Echoed, int EchoDelayGrowthMs, bool UplinkPassed, bool EchoPassed, bool EchoRequested = true)
+    int EchoKbps, int Echoed, int EchoDelayGrowthMs, bool UplinkPassed, bool EchoPassed, bool EchoRequested = true, int SentKbps = 0)
 {
+    /// <summary>The rate the step really tested: its pace, or less when the device could not send that much.</summary>
+    public int TestedKbps => SentKbps > 0 ? Math.Min(OfferedKbps, SentKbps) : OfferedKbps;
+
     public override string ToString() =>
-        $"{OfferedKbps}k: up {UplinkKbps}k{(UplinkPassed ? "" : "!")} (lost {UplinkLost}/{Sent}, +{UplinkDelayGrowthMs}ms)" +
+        $"{OfferedKbps}k{(TestedKbps < OfferedKbps ? $" (sent {SentKbps}k)" : "")}: up {UplinkKbps}k{(UplinkPassed ? "" : "!")} (lost {UplinkLost}/{Sent}, +{UplinkDelayGrowthMs}ms)" +
         (EchoRequested ? $" echo {EchoKbps}k{(EchoPassed ? "" : "!")} ({Echoed}/{Sent}, +{EchoDelayGrowthMs}ms)" : "");
 }
 
@@ -50,10 +55,15 @@ public sealed class LinkProbe
     public const int DefaultStepMs = 200;
     /// <summary>A queue that grew this much over one step is the link saying no.</summary>
     public const int MaxDelayGrowthMs = 25;
+    /// <summary>
+    /// The same for the round trip, which also carries the time a busy page takes to handle each echo (WebKit delivers a
+    /// data channel's messages to .NET in bursts): only a queue well beyond that counts.
+    /// </summary>
+    public const int MaxEchoGrowthMs = 60;
     /// <summary>A step must deliver at least this share of its rate.</summary>
     public const double MinDeliveredShare = 0.85;
-    /// <summary>Random loss on a mobile link stays under this; a full queue does not.</summary>
-    public const double MaxLossShare = 0.06;
+    /// <summary>Random loss on a mobile link stays under this; a full shallow queue does not.</summary>
+    public const double MaxLossShare = 0.1;
 
     private readonly object _sync = new();
     private readonly Dictionary<ushort, (int Step, int Bytes, long SentUs)> _byTransport = [];
@@ -64,6 +74,7 @@ public sealed class LinkProbe
     {
         public int OfferedKbps { get; } = offeredKbps;
         public int Sent;
+        public long SentBytes, FirstSentUs = long.MaxValue, LastSentUs;
         public readonly List<(long SentUs, long ArrivalUs, int Bytes)> Arrivals = [];
         public int Lost;
         public readonly List<(long SentUs, long ArrivalUs, int Bytes)> Echoes = [];
@@ -85,7 +96,11 @@ public sealed class LinkProbe
         lock (_sync)
         {
             if (step < 0 || step >= _steps.Count) return;
-            _steps[step].Sent++;
+            var log = _steps[step];
+            log.Sent++;
+            log.SentBytes += bytes;
+            log.FirstSentUs = Math.Min(log.FirstSentUs, sentUs);
+            log.LastSentUs = Math.Max(log.LastSentUs, sentUs);
             _byIndex[(step, index)] = (bytes, sentUs);
             if (transportSequence is { } sequence) _byTransport[sequence] = (step, bytes, sentUs);
         }
@@ -139,12 +154,20 @@ public sealed class LinkProbe
             var (upKbps, upGrowth) = Delivered(log.Arrivals);
             var (echoKbps, echoGrowth) = Delivered(log.Echoes);
             var reported = log.Arrivals.Count + log.Lost;
-            var upPassed = stamped && reported > 0 && log.Lost <= Math.Max(1, reported * MaxLossShare) &&
-                           (upKbps == 0 || upKbps >= log.OfferedKbps * MinDeliveredShare) && upGrowth < MaxDelayGrowthMs &&
+            // Bytes after the first over the span they were sent in: what this device really offered.
+            var sendSpanUs = log.LastSentUs - log.FirstSentUs;
+            var sentKbps = log.Sent >= 4 && sendSpanUs >= 40_000
+                ? (int)Math.Round((log.SentBytes - log.SentBytes / log.Sent) * 8.0 / (sendSpanUs / 1000.0)) : 0;
+            var tested = sentKbps > 0 ? Math.Min(log.OfferedKbps, sentKbps) : log.OfferedKbps;
+            var upPassed = stamped && reported > 0 && log.Lost <= Math.Max(2, reported * MaxLossShare) &&
+                           (upKbps == 0 || upKbps >= tested * MinDeliveredShare) && upGrowth < MaxDelayGrowthMs &&
                            reported >= log.Sent * 0.9;
-            var echoPassed = echo && log.Sent > 0 && log.Echoes.Count >= Math.Max(1, log.Sent * (1 - MaxLossShare) - 1) &&
-                             (echoKbps == 0 || echoKbps >= log.OfferedKbps * MinDeliveredShare) && echoGrowth < MaxDelayGrowthMs;
-            return new ProbeStep(log.OfferedKbps, log.Sent, upKbps, log.Lost, upGrowth, echoKbps, log.Echoes.Count, echoGrowth, upPassed, echoPassed, echo);
+            // The echo crosses both legs: its loss is up to twice the uplink's, and it can only bring back what got there.
+            var echoPassed = echo && log.Sent > 0 && log.Echoes.Count >= Math.Max(1, log.Sent * (1 - 2 * MaxLossShare) - 2) &&
+                             (echoKbps == 0 || echoKbps >= Math.Min(tested, upKbps > 0 ? upKbps : tested) * MinDeliveredShare) &&
+                             echoGrowth < MaxEchoGrowthMs;
+            return new ProbeStep(log.OfferedKbps, log.Sent, upKbps, log.Lost, upGrowth, echoKbps, log.Echoes.Count, echoGrowth, upPassed, echoPassed, echo,
+                sentKbps);
         }
     }
 
@@ -162,23 +185,23 @@ public sealed class LinkProbe
         {
             if (upAtLeast)
             {
-                if (step.UplinkPassed) up = Math.Max(up, step.OfferedKbps);
+                if (step.UplinkPassed) up = Math.Max(up, step.TestedKbps);
                 else
                 {
                     // A step that failed delivered what the link carries, never more than it was offered.
-                    var delivered = step.UplinkKbps > 0 ? Math.Min(step.UplinkKbps, step.OfferedKbps) : 0;
-                    up = up > 0 ? Math.Max(up, delivered) : delivered > 0 ? delivered : step.OfferedKbps / 2;
+                    var delivered = step.UplinkKbps > 0 ? Math.Min(step.UplinkKbps, step.TestedKbps) : 0;
+                    up = up > 0 ? Math.Max(up, delivered) : delivered > 0 ? delivered : step.TestedKbps / 2;
                     upAtLeast = false;
                 }
             }
             if (!step.EchoRequested || !downAtLeast) continue;
             if (step.EchoPassed)
             {
-                down = Math.Max(down, step.OfferedKbps);
+                down = Math.Max(down, step.TestedKbps);
                 downKnown = true;
                 continue;
             }
-            var back = step.EchoKbps > 0 ? Math.Min(step.EchoKbps, step.OfferedKbps) : 0;
+            var back = step.EchoKbps > 0 ? Math.Min(step.EchoKbps, step.TestedKbps) : 0;
             if (step.Echoed > 0 || step.UplinkPassed) downKnown = true;
             down = Math.Max(down, back);
             // Only a round trip that failed where the uplink did not is the downlink's own limit; where the uplink failed

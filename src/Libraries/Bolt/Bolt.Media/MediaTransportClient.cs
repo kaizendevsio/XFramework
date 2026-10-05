@@ -315,10 +315,14 @@ public sealed class MediaTransportClient : IAsyncDisposable
 
     private LinkProbe? _probe;
     /// <summary>
-    /// A probe step stops sending while the channel holds more than this many milliseconds of its rate (at least 4 KB):
-    /// audio sent meanwhile never waits behind more than that.
+    /// A probe step stops sending while the channel holds more than this many milliseconds of its rate (at least 16 KB,
+    /// as WebKit reports its buffer coarsely): audio sent meanwhile never waits behind much more than that, and a step
+    /// that held back is judged on what it did send.
     /// </summary>
-    private const int ProbeBacklogMs = 40;
+    private const int ProbeBacklogMs = 60;
+
+    /// <summary>A start probe is running: its padding sits in the channel's buffer and the relay's feedback, so the rate loop holds still.</summary>
+    public bool Probing => Volatile.Read(ref _probe) is not null;
     private const int ProbeMessageBytes = 1_100;
 
     /// <summary>
@@ -347,7 +351,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
                 long sent = 0;
                 uint index = 0;
                 var sentMessages = 0;
-                var backlogLimit = Math.Max(4_096L, rate * ProbeBacklogMs / 8);
+                var backlogLimit = Math.Max(16_384L, rate * ProbeBacklogMs / 8);
                 while (!ct.IsCancellationRequested)
                 {
                     var elapsedUs = NowMicroseconds() - begin;
@@ -397,7 +401,8 @@ public sealed class MediaTransportClient : IAsyncDisposable
             System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(buffer.AsSpan(1), sequence);
             if (!peer.TrySend(buffer.AsSpan(0, total))) return false;
             var now = NowMicroseconds();
-            _feedback.OnSent(sequence, total, now);
+            // Not recorded for the media's own estimate: the probe judges its padding itself, and a probe step that builds
+            // a queue on purpose must not read as the media's congestion.
             probe.OnSent(step, index, sequence, total, now);
             _drain.Sent(total);
             return true;
