@@ -5,7 +5,9 @@ name: Call browser E2E
 # publishes it) with synthetic devices, through the production relay (BoltServer with Yap's options, the bolt-rtc
 # sidecar, NACK and transport feedback on) and coturn over UDP on every leg. netem shapes each browser's leg and the
 # relay's. The test asserts pictures arrive at the rate they are sent, no freeze over 1 s, at most one decoder restart,
-# audio delivered, and, on the constrained link, a sender that fits under it.
+# audio delivered, and, on the constrained link, a sender that fits under it. Every scenario reports how each picture
+# started (first size, time to the sender's preference, first keyframes); the fast-start scenarios assert it, and the
+# step-down one changes a leg mid-call and asserts the sender fits the smaller link within seconds.
 on:
   workflow_dispatch:
     inputs:
@@ -91,6 +93,36 @@ jobs:
             b_up: "delay 7ms rate 50mbit"
             relay: "delay 3ms"
             constrained: "B>1500"
+          # Fast start: a clean 20 Mbit/s path, both at the default preference (1080p30). Each picture must reach 1080p
+          # within 5 s of its camera starting (it used to take 30-40 s from 240p), and stay there.
+          - scenario: fast-start-20mbit
+            a_down: "delay 7ms rate 20mbit"
+            a_up: "delay 7ms rate 20mbit"
+            b_down: "delay 7ms rate 20mbit"
+            b_up: "delay 7ms rate 20mbit"
+            relay: "delay 3ms"
+            constrained: ""
+            extra: "CALL_A_HEIGHT=1080 CALL_A_CEILING=1080 CALL_B_HEIGHT=1080 CALL_B_CEILING=1080 CALL_TARGET_WITHIN_S=5 CALL_MAX_RUNG_CHANGES=1"
+          # A's uplink carries 512 kbit/s: its picture must start at a size that fits (360p or less, no keyframe that takes
+          # the link half a second), while B (on a fast path to A) still reaches 1080p within 5 s.
+          - scenario: fast-start-512k
+            a_down: "delay 7ms rate 20mbit"
+            a_up: "delay 7ms rate 512kbit"
+            b_down: "delay 7ms rate 20mbit"
+            b_up: "delay 7ms rate 20mbit"
+            relay: "delay 3ms"
+            constrained: "A>512"
+            extra: "CALL_A_HEIGHT=1080 CALL_A_CEILING=1080 CALL_B_HEIGHT=1080 CALL_B_CEILING=1080 CALL_TARGET_WITHIN_S=5 CALL_A_FIRST_MAX_HEIGHT=360 CALL_A_START_KEYFRAME_MAX_BYTES=32000"
+          # A fast start, then A's uplink steps down to 2 Mbit/s mid-call: A must fit it within 3 s, without flapping.
+          - scenario: step-down
+            a_down: "delay 7ms rate 20mbit"
+            a_up: "delay 7ms rate 20mbit"
+            b_down: "delay 7ms rate 20mbit"
+            b_up: "delay 7ms rate 20mbit"
+            relay: "delay 3ms"
+            constrained: "A>2000"
+            extra: "CALL_A_HEIGHT=1080 CALL_A_CEILING=1080 CALL_B_HEIGHT=1080 CALL_B_CEILING=1080 CALL_TARGET_WITHIN_S=5 CALL_MAX_RUNG_CHANGES=3 CALL_STEP_AT_S=30 CALL_STEP_BAND=2 CALL_STEP_SENDER=A CALL_STEP_KBPS=2000 CALL_STEP_FIT_WITHIN_S=3"
+            step_spec: "delay 7ms rate 2mbit"
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -166,13 +198,16 @@ jobs:
           # The Android phone sent 4.7 Mbit/s at 1440p: A's sending is capped near that (6.5 Mbit/s with audio), so the
           # calls run at the production rates, 1440p30 at 5-6 Mbit/s and 720p30 at about 2.5 Mbit/s.
           CALL_A_MAX_KBPS: "6500"
-          # The rate control climbs from a mobile-safe start; the window measures the call once it has.
-          CALL_WARMUP_SECONDS: "40"
+          # The window measures the call once its pictures have started and settled.
+          CALL_WARMUP_SECONDS: "20"
           CALL_SECONDS: ${{ github.event.inputs.seconds || '60' }}
           CALL_CONSTRAINED: ${{ matrix.constrained }}
           CALL_OUT: ${{ runner.temp }}/call-${{ matrix.scenario }}.json
+          CALL_STEP_SPEC: ${{ matrix.step_spec }}
+          CALL_SHAPE_SCRIPT: ${{ github.workspace }}/.github/scripts/call-shape-browsers.sh
         run: |
           set -euo pipefail
+          for setting in ${{ matrix.extra }}; do export "$setting"; done
           source .github/scripts/call-shape-browsers.sh
           shape_call "${{ matrix.a_down }}" "${{ matrix.a_up }}" "${{ matrix.b_down }}" "${{ matrix.b_up }}" "${{ matrix.relay }}"
           trap 'unshape_call' EXIT
@@ -196,6 +231,13 @@ jobs:
               t, rate = d.get("senderTier") or {}, d.get("senderRate") or {}
               settled = f"{t.get('height')}p{t.get('framerate')} @ {rate.get('totalKbps')} kbps" if t else "-"
               print(f"| {key} | {d.get('sentFps')} | {d.get('sentKbps')} | {d.get('renderedFps')} | {d.get('longestFreezeMs')} | {d.get('decoderResets')} | {d.get('corrupt')} | {d.get('audioDelivered')} | {d.get('audioP99')} | {settled} |")
+          print("\n| direction | first picture | time to target | largest keyframe, first 5 s | size changes in window | start | probe |")
+          print("|---|---|---|---|---|---|---|")
+          for key in ("A->B", "B->A"):
+              d = r.get(key, {})
+              reached = d.get("timeToTargetMs")
+              print(f"| {key} | {d.get('firstHeight')}p @ {d.get('firstKbps')} kbps | {d.get('targetHeight')}p {'never' if reached is None else str(reached) + ' ms'} | {d.get('largestStartKeyframe')} B | {d.get('rungChangesInWindow')} | {d.get('senderStart') or '-'} | {d.get('senderProbe') or '-'} |")
+          if r.get("stepFitMs") is not None: print(f"\nstep down fitted in {r.get('stepFitMs')} ms")
           print(f"\nrelay: {r.get('relay')}\n\nfailures: {r.get('failures')}\n")
           EOF
 

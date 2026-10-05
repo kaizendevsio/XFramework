@@ -25,6 +25,9 @@ const KEYFRAME_REQUEST_GAP_MS = 1000;
 
 const state = globalThis.__boltCall = {
     sender: { encoded: 0, bytes: 0, keyframes: 0, largestKeyframe: 0, tiers: [], audioSent: 0, encodeStarted: 0 },
+    // The start of the picture, for time-to-preference: every size change (all of them, not the last 20 tiers), and every
+    // keyframe in the first seconds.
+    start: { rungs: [], keyframes: [] },
     remotes: new Map(),
     audio: new Map(),
     measureFrom: 0,
@@ -89,6 +92,8 @@ class SyntheticVideoPipeline {
         this.mode = this.layers ? temporalModeFor(tier.framerate, new Set(['L1T2', 'L1T3'])) : 'L1T1';
         state.sender.tiers.push({ at: performance.now(), ...tier });
         if (state.sender.tiers.length > 200) state.sender.tiers.shift();
+        if (!previous || previous.height !== tier.height || previous.framerate !== tier.framerate)
+            state.start.rungs.push({ at: performance.now(), height: tier.height, framerate: tier.framerate, kbps: tier.bitrateKbps });
         return !previous || previous.width !== tier.width || previous.height !== tier.height || previous.framerate !== tier.framerate;
     }
 
@@ -139,6 +144,7 @@ class SyntheticVideoPipeline {
         const data = picture(frameId, refId, size, key, layer);
         state.sender.encoded++; state.sender.bytes += data.length;
         if (key) { state.sender.keyframes++; state.sender.largestKeyframe = Math.max(state.sender.largestKeyframe, data.length); }
+        if (key && state.start.keyframes.length < 50) state.start.keyframes.push({ at: performance.now(), bytes: data.length, height: this.tier.height });
         if (this.window.since === 0) this.window.since = now;
         this.window.frames++; this.window.bytes += data.length;
         if (now - this.window.since >= 1000) {
@@ -307,6 +313,21 @@ export async function checkVideoCapabilities() {
     return { supported: true, reason: null, ceiling: 2160,
         codecs: [{ codec: 'h264', encode: true, decode: true, hardware: true, maxHeight: 2160, decodeMaxHeight: 2160, decodeHardware: true }] };
 }
+
+/// How this side's picture started: when the camera started, each size it took since (ms after the camera started, a size
+/// set before it counts as at 0), the first moment it reached `height`, and its keyframes in the first `windowMs`.
+globalThis.__boltCallStart = (height, windowMs = 5000) => {
+    const started = state.sender.encodeStarted;
+    if (!started) return { started: false };
+    const rungs = state.start.rungs.map(r => ({ atMs: Math.max(0, Math.round(r.at - started)), height: r.height, framerate: r.framerate, kbps: r.kbps }));
+    const reached = rungs.find(r => r.height >= height);
+    const keyframes = state.start.keyframes.filter(k => k.at - started <= windowMs);
+    const first = rungs.filter(r => r.atMs === 0).at(-1) ?? rungs[0];
+    return { started: true, firstHeight: first?.height ?? 0, firstKbps: first?.kbps ?? 0, timeToHeightMs: reached ? reached.atMs : null,
+        largestStartKeyframe: keyframes.reduce((max, k) => Math.max(max, k.bytes), 0), rungs: rungs.slice(0, 40),
+        measureFromMs: state.measureFrom ? Math.round(state.measureFrom - started) : null,
+        rungChangesInWindow: state.measureFrom ? state.start.rungs.filter(r => r.at >= state.measureFrom).length : 0 };
+};
 
 /// Damage so far, cheap enough to sample every few seconds.
 globalThis.__boltCallDamage = () => [...state.remotes.values()].map(r => `corrupt=${r.corrupt} broken=${r.brokenReference} resets=${r.resets}`).join(' ');
