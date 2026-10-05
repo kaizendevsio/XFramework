@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.79";
+    public const string Version = "1.3.80";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "5 October 2026", [
+            "Video calls now default to 1080p at 30 fps for smoother, lighter calls; your own choice is kept if you set one.",
+            "Calls start at the right quality straight away: Yap measures the connection while the call connects and reaches your chosen resolution in about a second instead of half a minute."]),
+        ("1.3.79", "5 October 2026", [
             "Video no longer freezes on calls over UDP: large pictures still arriving are no longer thrown away, so video decodes at full quality.",
             "Lost video on the sender's connection is resent right away, and out-of-order pieces are kept instead of dropped."]),
         ("1.3.78", "4 October 2026", [
