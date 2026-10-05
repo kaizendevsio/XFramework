@@ -165,6 +165,10 @@ public sealed class MediaSendPacer : IAsyncDisposable
         lock (_sync)
         {
             accept = keyframe || (!_awaitingKeyframe && layer <= _layerLimit) || (layer == 0 && !_awaitingKeyframe);
+            // A keyframe taken here ends the wait for the pictures after it, which refer to it, though it reaches the queue
+            // only later (the encoder's output waits its turn): refusing them, and then taking the ones that refer to them,
+            // sent pictures whose reference never left. If the keyframe is dropped on its way in, the wait starts over.
+            if (keyframe) { _awaitingKeyframe = false; _layerLimit = MaxLayer; }
             // Waiting for a keyframe while pictures keep coming: the one asked for was dropped too (inside the request
             // gap, so nothing asked again) or never came. Refused pictures never reach the pacer, so ask from here, at
             // most once per gap; otherwise the stream waits for the encoder's own safety keyframe, seconds away.
