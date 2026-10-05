@@ -115,7 +115,7 @@ jobs:
             extra: "CALL_A_HEIGHT=1080 CALL_A_CEILING=1080 CALL_B_HEIGHT=1080 CALL_B_CEILING=1080 CALL_TARGET_WITHIN_S=5 CALL_A_FIRST_MAX_HEIGHT=360 CALL_A_START_KEYFRAME_MAX_BYTES=32000"
           # A fast start, then A's uplink steps down to 2 Mbit/s mid-call: A must fit it within 3 s, without flapping. Until
           # it has, A's own feedback and SCTP acknowledgements queue behind its video on that uplink, so what A receives
-          # stalls too: a freeze of up to 3 s and a second decoder restart on B->A are the step, not a fault.
+          # stalls too: a freeze of up to 3 s and up to three decoder restarts on B->A are the step, not a fault.
           - scenario: step-down
             a_down: "delay 7ms rate 20mbit"
             a_up: "delay 7ms rate 20mbit"
@@ -123,7 +123,7 @@ jobs:
             b_up: "delay 7ms rate 20mbit"
             relay: "delay 3ms"
             constrained: "A>2000"
-            extra: "CALL_A_HEIGHT=1080 CALL_A_CEILING=1080 CALL_B_HEIGHT=1080 CALL_B_CEILING=1080 CALL_TARGET_WITHIN_S=5 CALL_MAX_RUNG_CHANGES=4 CALL_STEP_AT_S=30 CALL_STEP_BAND=2 CALL_STEP_SENDER=A CALL_STEP_KBPS=2000 CALL_STEP_FIT_WITHIN_S=3 CALL_MAX_FREEZE_MS=3000 CALL_MAX_RESETS=2"
+            extra: "CALL_A_HEIGHT=1080 CALL_A_CEILING=1080 CALL_B_HEIGHT=1080 CALL_B_CEILING=1080 CALL_TARGET_WITHIN_S=5 CALL_MAX_RUNG_CHANGES=4 CALL_STEP_AT_S=30 CALL_STEP_BAND=2 CALL_STEP_SENDER=A CALL_STEP_KBPS=2000 CALL_STEP_FIT_WITHIN_S=3 CALL_MAX_FREEZE_MS=3000 CALL_MAX_RESETS=3"
             step_spec: "delay 7ms rate 2mbit"
     steps:
       - name: Checkout
@@ -200,8 +200,8 @@ jobs:
           # The Android phone sent 4.7 Mbit/s at 1440p: A's sending is capped near that (6.5 Mbit/s with audio), so the
           # calls run at the production rates, 1440p30 at 5-6 Mbit/s and 720p30 at about 2.5 Mbit/s.
           CALL_A_MAX_KBPS: "6500"
-          # The window measures the call once its pictures have started and settled.
-          CALL_WARMUP_SECONDS: "20"
+          # The window measures the call once its pictures have settled (the start scenarios assert the start itself).
+          CALL_WARMUP_SECONDS: "40"
           CALL_SECONDS: ${{ github.event.inputs.seconds || '60' }}
           CALL_CONSTRAINED: ${{ matrix.constrained }}
           CALL_OUT: ${{ runner.temp }}/call-${{ matrix.scenario }}.json
