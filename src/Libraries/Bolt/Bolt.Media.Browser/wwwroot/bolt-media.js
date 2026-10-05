@@ -29,6 +29,48 @@ export function socketBufferedAmount() {
 }
 installSocketMeter();
 
+// ─── Network hints for a call's start rate ──────────
+// What the browser says about the network (Network Information API, where it exists) and where this device's last
+// call on the same kind of network settled. The start probe measures; these only fill in when it cannot, and cap
+// the start on a connection the browser itself calls slow. Stored locally only, per network kind, never sent.
+
+const NETWORK_RATES_KEY = 'bolt-network-rates';
+const NETWORK_RATE_MAX_AGE_MS = 14 * 24 * 3600 * 1000;
+
+export function networkKind(connection = globalThis.navigator?.connection) {
+    return `${connection?.type || 'unknown'}|${connection?.effectiveType || 'unknown'}`;
+}
+
+/// Total kbps the browser's own hints allow a call to start at: a connection it rates 2G/3G, or data saver. 0: no cap.
+export function networkCapKbps(connection = globalThis.navigator?.connection) {
+    if (!connection) return 0;
+    const byType = { 'slow-2g': 60, '2g': 150, '3g': 700 }[connection.effectiveType] ?? 0;
+    const saver = connection.saveData === true ? 1000 : 0;
+    const caps = [byType, saver].filter(x => x > 0);
+    return caps.length ? Math.min(...caps) : 0;
+}
+
+export function networkHint(storage = globalThis.localStorage, now = Date.now()) {
+    const kind = networkKind();
+    let cachedKbps = 0;
+    try {
+        const entry = JSON.parse(storage?.getItem(NETWORK_RATES_KEY) || '{}')[kind];
+        if (entry && now - entry.at < NETWORK_RATE_MAX_AGE_MS && entry.kbps > 0) cachedKbps = Math.round(entry.kbps);
+    } catch { /* Storage unavailable or corrupt: no hint. */ }
+    return { kind, capKbps: networkCapKbps(), cachedKbps };
+}
+
+export function rememberNetworkRate(kbps, storage = globalThis.localStorage, now = Date.now()) {
+    if (!(kbps > 0)) return false;
+    try {
+        const rates = JSON.parse(storage?.getItem(NETWORK_RATES_KEY) || '{}');
+        rates[networkKind()] = { kbps: Math.round(kbps), at: now };
+        for (const [key, entry] of Object.entries(rates)) if (!(now - entry?.at < NETWORK_RATE_MAX_AGE_MS)) delete rates[key];
+        storage?.setItem(NETWORK_RATES_KEY, JSON.stringify(rates));
+        return true;
+    } catch { return false; }
+}
+
 // ─── Audio Pipeline ─────────────────────────────────
 
 class AudioPipeline {

@@ -64,9 +64,14 @@ def main(directory):
     ]
     rate_rows = [
         "| run | settled video kbps (median) | settled estimate kbps | final picture | converged at | "
-        "picture changes (after settling) | video suspended s | picture timeline |",
-        "|---|---|---|---|---|---|---|---|",
+        "picture changes (after settling) | video suspended s | first picture | time to target | picture timeline |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
+    def reached_text(rate):
+        if "targetHeight" not in rate: return "-"
+        reached = rate.get("reachedTargetAtS")
+        return f"{rate['targetHeight']}p after {reached:.1f} s" if reached is not None else f"{rate['targetHeight']}p never"
+
     for name, relay, receiver in runs:
         delay = receiver.get("audioDelayMs", {})
         settled = receiver.get("audioDelayAfter20sMs", {})
@@ -87,7 +92,8 @@ def main(directory):
                 f"| {name} | {rate.get('settledVideoKbpsMedian', '-')} | {rate.get('settledEstimateKbpsMedian', '-')} | "
                 f"{rate.get('finalRung', '-')} | {f'{converged:.1f} s' if converged is not None else '-'} | "
                 f"{rate.get('rungChanges', '-')} ({rate.get('rungChangesAfterSettle', '-')}) | "
-                f"{rate.get('suspendedSeconds', '-')} | {rate.get('rungTimeline', '')} |"
+                f"{rate.get('suspendedSeconds', '-')} | {rate.get('firstRung', '-')} | "
+                f"{reached_text(rate)} | {rate.get('rungTimeline', '')} |"
             )
     print("\n".join(rows))
 

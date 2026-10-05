@@ -311,11 +311,112 @@ public sealed class MediaTransportClient : IAsyncDisposable
         finally { ArrayPool<byte>.Shared.Return(buffer); }
     }
 
+    // ── Start probe ──
+
+    private LinkProbe? _probe;
+    /// <summary>
+    /// A probe step stops sending while the channel holds more than this many milliseconds of its rate (at least 4 KB):
+    /// audio sent meanwhile never waits behind more than that.
+    /// </summary>
+    private const int ProbeBacklogMs = 40;
+    private const int ProbeMessageBytes = 1_100;
+
+    /// <summary>
+    /// Measure the link before media needs it (WebRTC-style initial probing, see <see cref="LinkProbe"/>): short bursts of
+    /// padding at <paramref name="stepsKbps"/>, each <paramref name="stepMs"/> long, timed by the relay's transport
+    /// feedback (uplink) and its echo (downlink). Stops at the first step the uplink does not carry; stops asking for
+    /// echoes at the first the downlink does not. Each step holds back while the channel has a backlog, so audio sent
+    /// meanwhile never waits behind it. Null when there is no open channel, or its relay does not time arrivals.
+    /// </summary>
+    public async Task<LinkProbeResult?> ProbeAsync(IReadOnlyList<int> stepsKbps, int stepMs = LinkProbe.DefaultStepMs, CancellationToken ct = default)
+    {
+        if (ActivePeer is not { } first || !StampsMessages || stepsKbps.Count == 0) return null;
+        var probe = new LinkProbe();
+        Volatile.Write(ref _probe, probe);
+        var started = _clock();
+        var steps = new List<ProbeStep>();
+        var echo = true;
+        var size = Math.Clamp(first.MaxMessageBytes - TransportSequenceCodec.HeaderSize, PaddingCodec.HeaderSize + 64, ProbeMessageBytes);
+        try
+        {
+            foreach (var rate in stepsKbps)
+            {
+                var step = probe.BeginStep(rate);
+                var flags = echo ? PaddingCodec.Echo : (byte)0;
+                var begin = NowMicroseconds();
+                long sent = 0;
+                uint index = 0;
+                var sentMessages = 0;
+                var backlogLimit = Math.Max(4_096L, rate * ProbeBacklogMs / 8);
+                while (!ct.IsCancellationRequested)
+                {
+                    var elapsedUs = NowMicroseconds() - begin;
+                    if (elapsedUs >= stepMs * 1000L) break;
+                    // Token bucket: whatever the timer's jitter, the step offers its rate over its length.
+                    var owed = rate * elapsedUs / 8_000;
+                    while (sent + size <= owed && ActivePeer is { } peer && peer.BufferedAmount <= backlogLimit)
+                    {
+                        if (!SendPadding(peer, probe, step, index++, flags, size)) break;
+                        sent += size;
+                        sentMessages++;
+                    }
+                    await Task.Delay(5, ct);
+                }
+                // Wait for the relay to report every message of the step (and its echoes), a couple of round trips at most.
+                var rtt = ActivePeer?.Path?.RttMs is double measured && measured > 0 ? measured : 100;
+                var deadline = _clock() + (long)Math.Clamp(rtt * 2 + 120, 150, 900);
+                while (_clock() < deadline && !ct.IsCancellationRequested)
+                {
+                    var (uplink, echoes) = probe.Pending(step, echo);
+                    if (uplink == 0 && echoes == 0) break;
+                    await Task.Delay(10, ct);
+                }
+                var verdict = probe.Judge(step, stamped: true, echo);
+                steps.Add(verdict);
+                if (sentMessages == 0 || !verdict.UplinkPassed) break;
+                if (echo && !verdict.EchoPassed) echo = false;
+            }
+        }
+        catch (OperationCanceledException) { return null; }
+        finally { Volatile.Write(ref _probe, null); }
+        var result = LinkProbe.Conclude(steps, _clock() - started, probe.MinRoundTripMs());
+        _logger.LogInformation("Start probe: {Result}", result);
+        return result;
+    }
+
+    /// <summary>One stamped probe message. False when the channel would not take it.</summary>
+    private bool SendPadding(IRtcPeer peer, LinkProbe probe, int step, uint index, byte flags, int size)
+    {
+        var total = TransportSequenceCodec.HeaderSize + size;
+        var buffer = ArrayPool<byte>.Shared.Rent(total);
+        try
+        {
+            PaddingCodec.Write(buffer.AsSpan(TransportSequenceCodec.HeaderSize, size), flags, (byte)step, index);
+            var sequence = unchecked((ushort)Interlocked.Increment(ref _transportSequence));
+            buffer[0] = (byte)FrameType.TransportSequenced;
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(buffer.AsSpan(1), sequence);
+            if (!peer.TrySend(buffer.AsSpan(0, total))) return false;
+            var now = NowMicroseconds();
+            _feedback.OnSent(sequence, total, now);
+            probe.OnSent(step, index, sequence, total, now);
+            _drain.Sent(total);
+            return true;
+        }
+        finally { ArrayPool<byte>.Shared.Return(buffer); }
+    }
+
     /// <summary>A message from the relay: transport feedback is this client's own, everything else goes to the frame handlers.</summary>
     private void OnPeerMessage(ReadOnlyMemory<byte> data)
     {
         var message = data.Span;
         if (message.IsEmpty) return;
+        if (message[0] == (byte)FrameType.Padding)
+        {
+            // The echo of a start probe message: only the probe reads it.
+            if (PaddingCodec.TryRead(message, out var flags, out var step, out var index) && (flags & PaddingCodec.Echoed) != 0)
+                Volatile.Read(ref _probe)?.OnEcho(step, index, NowMicroseconds());
+            return;
+        }
         if (message[0] != (byte)FrameType.TransportFeedback)
         {
             _client.DispatchDatagram(message);
@@ -327,6 +428,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
         {
             if (!TransportFeedbackCodec.TryRead(message, out var first, _arrivals)) return;
             _feedback.OnFeedback(first, _arrivals, _clock());
+            Volatile.Read(ref _probe)?.OnFeedback(first, _arrivals);
             signal = _feedback.Signal;
             resend = TakeLost(first, _arrivals);
         }

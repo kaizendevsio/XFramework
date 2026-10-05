@@ -129,7 +129,8 @@ public static class DatagramFramePolicy
     /// </summary>
     public static bool AcceptFromParticipant(FrameType type) =>
         type is FrameType.MediaFrame or FrameType.FecFrame or FrameType.MediaFeedback or
-            FrameType.MediaKeyRequest or FrameType.MediaBundle or FrameType.NackRequest or FrameType.TransportSequenced;
+            FrameType.MediaKeyRequest or FrameType.MediaBundle or FrameType.NackRequest or FrameType.TransportSequenced or
+            FrameType.Padding;
 
     /// <summary>Relay to participant: what the relay's media lanes carry (media, feedback, congestion reports, keyframe requests).</summary>
     public static bool AcceptFromRelay(FrameType type) =>

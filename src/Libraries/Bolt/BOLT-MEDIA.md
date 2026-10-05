@@ -64,7 +64,7 @@ The intended SFU path forwards encoded payloads without codec decoding. The curr
 |------|------|-------------|---------|
 | MediaConfig | 0x20 | 52 bytes + extension | Codec/resolution negotiation |
 | MediaFrame | 0x21 | 30 bytes + payload | Encoded audio/video frame |
-| MediaFeedback | 0x22 | 32 bytes, or 40 with a delay report | Receiver reports loss, jitter, RTT; optionally its end-to-end queuing delay and received rate |
+| MediaFeedback | 0x22 | 32 bytes, 40 with a delay report, 44 with a downlink | Receiver reports loss, jitter, RTT; optionally its end-to-end queuing delay and received rate, and its own measured downlink |
 | MediaKeyRequest | 0x23 | 17 bytes (fixed) | Request keyframe from sender |
 | CallSignal | 0x24 | 22 bytes + payload | Call lifecycle signaling |
 | FecFrame | 0x25 | 26 bytes + payload | XOR parity for error correction |
@@ -72,6 +72,7 @@ The intended SFU path forwards encoded payloads without codec decoding. The curr
 | MediaCongestion | 0x27 | 32 bytes (fixed) | Relay-to-sender congestion report; only a relay originates it |
 | MediaTransport | 0x28 | 7 bytes + JSON | Datagram path signalling between one participant and the relay (WebSocket only) |
 | MediaBundle | 0x29 | 2 bytes + frames | Up to four whole MediaFrames in one datagram (audio redundancy; datagram path only) |
+| Padding | 0x2D | 8 bytes + zeros | Start probe filler; the relay drops it or echoes it to its sender (datagram path only) |
 
 ### MediaFrame Header (30 bytes)
 
@@ -107,6 +108,31 @@ A call on TCP never loses media, so congestion shows as delay and as the relay's
 - **Relay.** Each receiver's queue sheds a stream's top temporal layer when it is 20% full, every enhancement layer at 40%, and the base layer (then everything until a keyframe) only when it overflows. A shed layer comes back only at a base-layer picture, so every forwarded picture's references were forwarded too. Every 250 ms (500 ms for audio) the relay tells each sender, per stream, about the worst receiver: its queue delay, the sender-to-relay queuing delay, the stream's share of what that receiver drained while backlogged, drops, base-layer losses and the layer limit (`MediaCongestion`).
 - **Receiver.** Every 250 ms it adds its end-to-end queuing delay (one-way delay above its recent minimum, against the sender's capture clock) and what it received to its `MediaFeedback`.
 - **Sender.** `MediaSendPacer` holds audio and video above the transport, sends audio first, keeps the connection's queue and the browser's WebSocket buffer short, and drops whole pictures (enhancement layers first). `SendRateController` turns the three views into one estimate (fast down, slow probing up, hysteresis), and `VideoRateLadder` into a picture size, frame rate and bitrate.
+
+### Starting a picture at the size the link carries
+
+A picture used to start at 240p15 and climb, which took 30-40 s to reach 1080p on a fast link. It now starts where the
+link is known to carry it (`PictureStart`, `StartRate`):
+
+- **Start probe.** When a participant's data channel first opens (while the call rings or connects), it sends about a
+  second of paced `Padding` at 600, 1500, 3500 and 7500 kbit/s (200 ms each), stamped for transport feedback, and asks
+  the relay to echo it. Feedback times the uplink, the echo the downlink. A step passes when the link delivered its
+  rate without a queue building (25 ms) or loss (6%); the probe stops at the first step the uplink does not carry (that
+  step's delivered rate is the link's) and stops asking for echoes at the first the downlink does not. A step holds
+  back while the channel holds more than 40 ms of its rate, so audio never waits behind it. The relay echoes only to
+  the sender, at most 2 MiB per connection, and only while that channel has under 32 KiB queued.
+- **Receivers' downlinks.** Every `MediaFeedback` a receiver sends carries its probed downlink (or the browser's own
+  ceiling for a slow connection). A sender takes the smallest exact one: the worst receiver.
+- **The start.** Uplink measured (or, without one, the last call's settled rate on the same kind of network, or a
+  540p middle picture), bounded by the worst receiver's downlink and the browser's network hints, under 85% of a
+  measured limit. The ladder starts on the largest rung that rate clears, up to the user's preference; the first
+  keyframe is that rung's.
+- **Revisions.** For 10 s, while the path has shown no congestion, a measurement that arrives later moves the rate:
+  a receiver's downlink down at once, a late probe up. A guess never does.
+- **The ramp.** Until the path first shows congestion the estimate grows 60% a second after 500 ms of calm, and a
+  ladder that has never come down jumps straight to the largest rung its budget held for 750 ms. A measured limit is
+  the congestion point, approached slowly; the first step down returns the ladder to one rung at a time with backoff.
+  Fast down is unchanged.
 
 ### The datagram path (WebRTC data channel through TURN)
 

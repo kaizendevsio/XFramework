@@ -86,6 +86,12 @@ public enum FrameType : byte
     /// delay-gradient and loss estimate. See <see cref="TransportFeedbackCodec"/>.
     /// </summary>
     TransportFeedback = 0x2C,
+    /// <summary>
+    /// Datagram path only, either direction: filler a participant sends to measure its link before media needs it
+    /// (the call's start probe), which the relay drops or, when asked, sends straight back to it. Carries nothing but
+    /// its own numbering: [1:type] [1:flags] [1:step] [1:reserved] [4:index] [padding]. See <see cref="PaddingCodec"/>.
+    /// </summary>
+    Padding = 0x2D,
 }
 
 /// <summary>Media type identifier.</summary>

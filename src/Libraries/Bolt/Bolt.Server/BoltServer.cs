@@ -5359,6 +5359,18 @@ public sealed class BoltHubConnection
 
     internal void RecordDatagramRejected() => Interlocked.Increment(ref _datagramRejected);
 
+    private long _paddingEchoed;
+    /// <summary>Probe bytes this connection got back (see BoltServer.EchoPadding); bounded by its budget.</summary>
+    public long PaddingEchoedBytes => Interlocked.Read(ref _paddingEchoed);
+
+    /// <summary>Take <paramref name="bytes"/> of this connection's probe echo budget; false once it is spent.</summary>
+    internal bool TryTakePaddingEcho(int bytes)
+    {
+        if (Interlocked.Add(ref _paddingEchoed, bytes) <= BoltServer.PaddingEchoBudgetBytes) return true;
+        Interlocked.Add(ref _paddingEchoed, -bytes);
+        return false;
+    }
+
     private readonly VideoSendLedger _videoLedger = new();
 
     /// <summary>When this participant's transport-sequenced datagrams arrived, for its next transport feedback report.</summary>

@@ -9,7 +9,11 @@ using Bolt.Media.Congestion;
 using Bolt.Protocol;
 
 /// <summary>What the encoder model does with a budget: pictures at the rung's rate, keyframes a multiple of a delta, temporal layers.</summary>
-internal sealed record AdaptiveProfile(int StartHeight, int AudioKbps, int KeyframeRatio, int KeyframeIntervalMs, bool TemporalLayers, double Overshoot);
+/// <param name="FastStart">Start the picture the way the browser client does (PictureStart on the hints below, the user's
+/// preference <paramref name="TargetHeight"/> as its ceiling) instead of at <paramref name="StartHeight"/>'s overload offer.</param>
+/// <param name="StartUplinkKbps">What a start probe would have measured (0: none; the client then starts at a middle picture).</param>
+internal sealed record AdaptiveProfile(int StartHeight, int AudioKbps, int KeyframeRatio, int KeyframeIntervalMs, bool TemporalLayers, double Overshoot,
+    bool FastStart = false, int TargetHeight = 1080, int StartUplinkKbps = 0, bool StartUplinkAtLeast = false);
 
 internal sealed class AdaptiveSender(Stopwatch clock) : IAsyncDisposable
 {
@@ -31,6 +35,10 @@ internal sealed class AdaptiveSender(Stopwatch clock) : IAsyncDisposable
     private VideoSetting _setting;
     private readonly object _settingSync = new();
     private readonly List<(double At, string Rung)> _rungTimeline = [];
+    private int _target = 1080, _firstHeight;
+    private string _firstRung = "";
+    private double? _reachedTargetAt;
+    private double _startedAt = -1;
     private readonly List<(double At, int FrameMs)> _audioPacketTimeline = [];
     private readonly List<(double At, int Estimate, int Video, int Delay, bool Suspended)> _estimates = [];
     public long AudioSent, VideoSent, Keyframes, KeyRequests, PacerDroppedPictures, Reports, FeedbackReports;
@@ -48,6 +56,7 @@ internal sealed class AdaptiveSender(Stopwatch clock) : IAsyncDisposable
     public void Start(Guid call, AdaptiveProfile profile)
     {
         TemporalLayers = profile.TemporalLayers;
+        _target = profile.TargetHeight;
         var ladder = new VideoRateLadder(VideoRateLadder.IndexForHeight(profile.StartHeight));
         var start = ladder.Current.Rung;
         // The overload offer: start at the rung's full nominal rate, as a client that ignored the link would.
@@ -59,6 +68,18 @@ internal sealed class AdaptiveSender(Stopwatch clock) : IAsyncDisposable
         var controller = new SendRateController(_setting.BitrateKbps + profile.AudioKbps + 52,
             new SendRateOptions { AudioNormalKbps = profile.AudioKbps, AudioLowKbps = Math.Min(24, profile.AudioKbps) });
         _loop = new SendRateLoop(_pacer, controller, ladder);
+        if (profile.FastStart)
+        {
+            // As the browser client starts a camera: the preference is the ceiling, the start is what the probe measured.
+            ladder.SetCeiling(profile.TargetHeight, allow60: false);
+            var audioWire = profile.AudioKbps + 52;
+            _setting = _loop.BeginPicture(Environment.TickCount64,
+                new StartHints(profile.StartUplinkKbps > 0 ? profile.StartUplinkKbps : null, profile.StartUplinkAtLeast), audioWire);
+            Env.Log($"RATE start {_loop.StartedAt} at {_setting}");
+        }
+        _firstRung = _setting.Rung.ToString();
+        _firstHeight = _setting.Rung.Height;
+        if (_firstHeight >= _target) _reachedTargetAt = 0;
         // AUDIO_MAX_FRAME_MS: 60 (receivers that read long packets, the default) or 20 (a legacy receiver in the call).
         _loop.Audio.MaxFrameMs = Env.Int("AUDIO_MAX_FRAME_MS", 60);
         _audioKbps = profile.AudioKbps;
@@ -209,6 +230,7 @@ internal sealed class AdaptiveSender(Stopwatch clock) : IAsyncDisposable
         try
         {
             var lastLog = 0L;
+            _startedAt = clock.Elapsed.TotalSeconds;
             while (!_stop.IsCancellationRequested)
             {
                 await Task.Delay(SendRateLoop.IntervalMs, _stop.Token);
@@ -226,6 +248,8 @@ internal sealed class AdaptiveSender(Stopwatch clock) : IAsyncDisposable
                     lock (_settingSync)
                     {
                         if (video.Rung != _setting.Rung) _rungTimeline.Add((Math.Round(clock.Elapsed.TotalSeconds, 2), video.Rung.ToString()));
+                        if (video.Rung.Height >= _target && _reachedTargetAt is null && _startedAt >= 0)
+                            _reachedTargetAt = Math.Round(clock.Elapsed.TotalSeconds - _startedAt, 2);
                         _setting = video;
                     }
                 var seconds = Math.Round(clock.Elapsed.TotalSeconds, 2);
@@ -267,6 +291,12 @@ internal sealed class AdaptiveSender(Stopwatch clock) : IAsyncDisposable
             {
                 temporalLayers = TemporalLayers,
                 finalRung = _setting.Rung.ToString(),
+                firstRung = _firstRung,
+                firstHeight = _firstHeight,
+                targetHeight = _target,
+                // Seconds from the picture's start to the preference (null: never).
+                reachedTargetAtS = _reachedTargetAt,
+                start = _loop?.StartedAt?.ToString(),
                 finalVideoKbps = _suspended ? 0 : _setting.BitrateKbps,
                 settledVideoKbpsMedian = median,
                 settledEstimateKbpsMedian = settled.Length == 0 ? 0 : settled.Select(x => x.Estimate).Order().ElementAt(settled.Length / 2),

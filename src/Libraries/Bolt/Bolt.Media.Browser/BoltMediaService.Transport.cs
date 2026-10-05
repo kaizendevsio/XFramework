@@ -1,4 +1,5 @@
 using Bolt.Client;
+using Bolt.Media.Congestion;
 
 namespace Bolt.Media.Browser;
 
@@ -40,7 +41,12 @@ public sealed partial class BoltMediaService
         {
             ReceiveLossPermille = media.SampleAudioReceiveLoss,
         };
-        transport.StatusChanged += status => OnMediaPathChanged?.Invoke(status);
+        transport.StatusChanged += status =>
+        {
+            // The first time this transport's data channel opens, measure the link before media needs it.
+            if (status.Kind == MediaPathKind.Datagram) StartLinkProbe(transport);
+            OnMediaPathChanged?.Invoke(status);
+        };
         // A channel that failed or stopped draining under the sender: what the rate control measured on it was the
         // dead channel, not the link. It starts over on the WebSocket instead of suspending video for a dead pipe.
         transport.PathLost += () => _rateLoop?.PathChanged();
@@ -49,6 +55,78 @@ public sealed partial class BoltMediaService
         // Requests a session once the socket is registered, and keeps the path healthy from then on.
         transport.Start();
         return transport;
+    }
+
+    // ── Start probe ──
+
+    private MediaTransportClient? _probedTransport;
+    private Task<LinkProbeResult?>? _probeTask;
+    /// <summary>What this device's start probe found on the current transport, once it finished.</summary>
+    public LinkProbeResult? LinkProbe { get; private set; }
+
+    /// <summary>Where this call's picture started (or was last revised to while starting), and on what evidence.</summary>
+    public StartEstimate? VideoStart => _rateLoop?.StartedAt;
+
+    private void StartLinkProbe(MediaTransportClient transport)
+    {
+        if (!_options.StartProbe || ReferenceEquals(_probedTransport, transport)) return;
+        _probedTransport = transport;
+        LinkProbe = null;
+        _probeTask = ProbeLinkAsync(transport);
+    }
+
+    private async Task<LinkProbeResult?> ProbeLinkAsync(MediaTransportClient transport)
+    {
+        try
+        {
+            var result = await transport.ProbeAsync(_options.StartProbeStepsKbps);
+            if (result is null || !ReferenceEquals(_transport, transport)) return result;
+            LinkProbe = result;
+            // A picture that started before the probe finished takes the measurement now.
+            _rateLoop?.UplinkMeasured(result);
+            return result;
+        }
+        catch (Exception ex) { _logger.LogDebug(ex, "The start probe failed"); return null; }
+    }
+
+    /// <summary>
+    /// What this device tells remote senders about its downlink (see BoltMediaClient.DownlinkReport): the start probe's
+    /// measurement, else the browser's own ceiling for a slow connection, else nothing.
+    /// </summary>
+    private (uint Kbps, bool AtLeast)? DownlinkForReports()
+    {
+        if (LinkProbe is { DownlinkKbps: > 0 and var down } probe) return ((uint)down, probe.DownlinkAtLeast);
+        if (_networkHint is { CapKbps: > 0 and var cap }) return ((uint)cap, false);
+        return null;
+    }
+
+    private NetworkHint? _networkHint;
+
+    /// <summary>
+    /// Everything known about this path for a new picture: the start probe (waiting up to
+    /// <see cref="MediaServiceOptions.StartProbeWaitMs"/> for a data channel still opening and its probe), and the
+    /// browser's hints. A probe that lands later still revises the start (<see cref="PictureStart"/>).
+    /// </summary>
+    private async Task<StartHints> StartHintsAsync()
+    {
+        if (_options.StartProbe && _options.StartProbeWaitMs > 0 && LinkProbe is null)
+        {
+            var deadline = Environment.TickCount64 + _options.StartProbeWaitMs;
+            // The channel is still opening (a callee turning the camera on as it connects): its probe is worth waiting for.
+            while (_probeTask is null && _transport?.Status is { Kind: MediaPathKind.Negotiating } or { Kind: MediaPathKind.WebSocket, Reason: "starting" } &&
+                   Environment.TickCount64 < deadline)
+                await Task.Delay(50);
+            if (_probeTask is { IsCompleted: false } running && deadline - Environment.TickCount64 is > 0 and var left)
+            {
+                try { await running.WaitAsync(TimeSpan.FromMilliseconds(left)); }
+                catch (TimeoutException) { /* Start on the hints; the probe revises the rate when it lands. */ }
+            }
+        }
+        _networkHint = await _audio.NetworkHintAsync() ?? _networkHint;
+        var probe = LinkProbe;
+        return new StartHints(probe?.UplinkKbps, probe?.UplinkAtLeast == true,
+            CachedKbps: _networkHint is { CachedKbps: > 0 and var cached } ? cached : null,
+            NetworkCapKbps: _networkHint is { CapKbps: > 0 and var cap } ? cap : null);
     }
 
     /// <summary>Send one liveness probe. False when there is no transport or it would not take the frame.</summary>

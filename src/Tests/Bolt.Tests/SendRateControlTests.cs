@@ -143,9 +143,14 @@ public sealed class SendRateControlTests
         long now = 0;
         // A relay reported once, then went silent (a dead link): the estimate must not climb.
         controller.Update(new SendPathSample(now, 300, 60, 10, 0, false, new RelaySignal(now, 10, 0, 0, false)));
+        var whileFresh = 0;
         for (now = 250; now < 30_000; now += 250)
+        {
             controller.Update(new SendPathSample(now, 300, 60, 10, 0, false, new RelaySignal(0, 10, 0, 0, false)));
-        Assert.That(controller.EstimateKbps, Is.LessThanOrEqualTo(330), "at most the one step it took while the report was fresh");
+            if (now == controller.Options.ReportFreshMs) whileFresh = controller.EstimateKbps;
+        }
+        Assert.That(controller.EstimateKbps, Is.EqualTo(whileFresh), "only the steps it took while the report was fresh");
+        Assert.That(controller.EstimateKbps, Is.LessThanOrEqualTo(600), "about a second of start-up ramp at most");
     }
 
     [Test]

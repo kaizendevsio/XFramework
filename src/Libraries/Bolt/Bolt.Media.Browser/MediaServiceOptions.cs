@@ -31,10 +31,24 @@ public sealed class MediaServiceOptions
     /// <summary>Tallest picture this build will ever ask an encoder for. Devices cap themselves below it.</summary>
     public int VideoMaxHeight { get; set; } = 2160;
     /// <summary>
-    /// Ladder rung every call starts on: 240p15, which fits a mobile link. The user's preference is a
-    /// ceiling the ladder climbs towards on measured headroom, never where a call begins.
+    /// The lowest rung a resumed path restarts from (240p15, which fits a mobile link). A new picture starts where the
+    /// start probe and hints put it (see <see cref="StartProbe"/>); the user's preference is its ceiling.
     /// </summary>
     public int VideoStartTier { get; set; } = 0;
+    /// <summary>
+    /// Measure the link when the data channel opens (while the call rings or connects): a second of paced padding through
+    /// the relay at rising rates, timed by its transport feedback and echo (see Bolt.Media.Congestion.LinkProbe). The
+    /// camera then starts at the picture the link and the worst receiver carry, not at the bottom of the ladder.
+    /// </summary>
+    public bool StartProbe { get; set; } = true;
+    /// <summary>Rates the start probe offers, lowest first; it stops at the first the link does not carry.</summary>
+    public int[] StartProbeStepsKbps { get; set; } = [.. Bolt.Media.Congestion.LinkProbe.DefaultStepsKbps];
+    /// <summary>
+    /// How long a camera turned on while the data channel still opens, or its start probe still runs, waits for the
+    /// measurement before starting on hints (a callee turning the camera on as it connects; a caller's probe ran while
+    /// the call rang).
+    /// </summary>
+    public int StartProbeWaitMs { get; set; } = 2_000;
     /// <summary>The most a call sends, audio and video together, however much the path would carry.</summary>
     public int MaxSendKbps { get; set; } = 40_000;
     /// <summary>

@@ -14,7 +14,10 @@
 #                          or above MIN_VIDEO_KBPS (default 1000); "audio-continues" needs the call to last with no
 #                          audio gap longer than MAX_AUDIO_GAP_MS (default 6000); "flap-bounded" (UDP_FLAP_EVERY_S) needs
 #                          the call to last, audio to continue as above, the relay to switch the receiver's media between
-#                          its channel and its socket at most MAX_SWITCHES times (default 8) and video never suspended
+#                          its channel and its socket at most MAX_SWITCHES times (default 8) and video never suspended;
+#                          "reaches-target" (FAST_START=1) needs the picture to reach TARGET_HEIGHT within TARGET_WITHIN_S
+#                          (default 5) of its start; "fits-start" needs it to start at or below FIRST_MAX_HEIGHT (default
+#                          360) and video never suspended
 #   ENV=VALUE              harness settings passed to the relay (SECONDS, VIDEO_KBPS, FPS, AUDIO_PAYLOAD, KF_MS, ...)
 #                          UDP=1 adds a TURN server (coturn) to the run's network and lets the receiver move its
 #                          media onto a WebRTC data channel through it; UDP_BLOCK=1 also drops the receiver's UDP
@@ -28,10 +31,13 @@ shift 7
 envs=()
 seconds=180
 udp=0 udp_block=0
+target_within=5 first_max_height=360
 for setting in "$@"; do
   envs+=(-e "$setting")
   case $setting in
     SECONDS=*) seconds=${setting#SECONDS=} ;;
+    TARGET_WITHIN_S=*) target_within=${setting#TARGET_WITHIN_S=} ;;
+    FIRST_MAX_HEIGHT=*) first_max_height=${setting#FIRST_MAX_HEIGHT=} ;;
     UDP=1) udp=1 ;;
     UDP_BLOCK=1) udp_block=1 ;;
   esac
@@ -112,7 +118,7 @@ docker logs "$receiver" 2>&1 | grep "^SUMMARY" | sed "s/^/$name receiver: /" || 
 relay_summary=$(docker logs "$relay" 2>&1 | grep "^SUMMARY" || true)
 receiver_summary=$(docker logs "$receiver" 2>&1 | grep "^SUMMARY" || true)
 case $expect in
-  survive | resume | resume-retired | video-climbs | audio-continues | flap-bounded)
+  survive | resume | resume-retired | video-climbs | audio-continues | flap-bounded | reaches-target | fits-start)
     if ! grep -q '"outcome":"survived"' <<<"$relay_summary"; then
       echo "$name: the call did not survive" >&2
       exit 1
@@ -144,6 +150,25 @@ if [ "$expect" = video-climbs ]; then
   echo "$name: video suspended ${suspended}s, settled at ${settled} kbps"
   if [ "${suspended%.*}" != 0 ] || [ "${settled:-0}" -lt "${MIN_VIDEO_KBPS:-1000}" ]; then
     echo "$name: video did not stay on and climb on a fast path" >&2
+    exit 1
+  fi
+fi
+if [ "$expect" = reaches-target ]; then
+  reached=$(summary_field "$relay_summary" rate.reachedTargetAtS)
+  target=$(summary_field "$relay_summary" rate.targetHeight)
+  first=$(summary_field "$relay_summary" rate.firstRung)
+  echo "$name: started at $first, reached ${target}p after ${reached:-never} s (limit ${target_within} s)"
+  if [ -z "$reached" ] || ! python3 -c "import sys; sys.exit(0 if float(sys.argv[1]) <= float(sys.argv[2]) else 1)" "$reached" "$target_within"; then
+    echo "$name: the picture did not reach its preference in time" >&2
+    exit 1
+  fi
+fi
+if [ "$expect" = fits-start ]; then
+  first=$(summary_field "$relay_summary" rate.firstHeight)
+  suspended=$(summary_field "$relay_summary" rate.suspendedSeconds)
+  echo "$name: started at ${first}p (limit ${first_max_height}p), video suspended ${suspended}s"
+  if [ "${first:-9999}" -gt "$first_max_height" ] || [ "${suspended%.*}" != 0 ]; then
+    echo "$name: the picture did not start at a size the link carries" >&2
     exit 1
   fi
 fi

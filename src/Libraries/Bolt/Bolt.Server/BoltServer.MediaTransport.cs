@@ -515,6 +515,13 @@ public sealed partial class BoltServer
             connection.RecordDatagramRejected();
             return;
         }
+        if (type == FrameType.Padding)
+        {
+            // A start probe: its arrival is already recorded above. Sent back only when asked, on this participant's own
+            // channel, within its budget and while that channel is not backed up; never to anyone else.
+            EchoPadding(connection, message);
+            return;
+        }
         if (type == FrameType.MediaBundle)
         {
             Span<Range> frames = stackalloc Range[MediaBundleCodec.MaxFrames];
@@ -528,6 +535,30 @@ public sealed partial class BoltServer
             return;
         }
         DispatchDatagramFrame(connection, message);
+    }
+
+    /// <summary>
+    /// Bytes of probe echo one connection may get over its lifetime: a few start probes (each about 0.3 MB at the top of
+    /// its ramp), not a stream. Reflection to the sender alone, same size as what it sent: nothing is amplified.
+    /// </summary>
+    internal const long PaddingEchoBudgetBytes = 2 * 1024 * 1024;
+    /// <summary>The echo stands back while this much already waits on the participant's channel (its media comes first).</summary>
+    internal const long PaddingEchoBacklogBytes = 32 * 1024;
+
+    private static void EchoPadding(BoltHubConnection connection, ReadOnlySpan<byte> message)
+    {
+        if (!PaddingCodec.TryRead(message, out var flags, out _, out _) || (flags & PaddingCodec.Echo) == 0) return;
+        if (connection.Datagram is not { State: RtcChannelState.Open } peer || connection.DatagramSuspended ||
+            peer.BufferedAmount > PaddingEchoBacklogBytes || !connection.TryTakePaddingEcho(message.Length))
+            return;
+        var buffer = ArrayPool<byte>.Shared.Rent(message.Length);
+        try
+        {
+            message.CopyTo(buffer);
+            PaddingCodec.MarkEchoed(buffer.AsSpan(0, message.Length));
+            peer.TrySend(buffer.AsSpan(0, message.Length));
+        }
+        finally { ArrayPool<byte>.Shared.Return(buffer); }
     }
 
     private void DispatchDatagramFrame(BoltHubConnection connection, ReadOnlySpan<byte> frame)

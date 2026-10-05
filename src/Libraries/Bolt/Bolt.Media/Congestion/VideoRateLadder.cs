@@ -22,6 +22,10 @@ public readonly record struct VideoSetting(VideoRung Rung, int BitrateKbps)
 /// skips straight to the rung that fits); a switch up needs the next rung's up-threshold to hold for
 /// <see cref="UpHoldMs"/>, and never happens while the path is congested. Every size change costs a keyframe,
 /// so the gap between the down and up thresholds is what stops the picture flapping.
+///
+/// A fresh picture (<see cref="Start"/>, or one that has never come down) climbs faster: it goes straight to the
+/// largest rung the budget holds for <see cref="FastUpHoldMs"/>, several rungs at once (one keyframe instead of one
+/// per rung). The first step down ends that: from then on every climb is one rung after the full hold, with backoff.
 /// </summary>
 public sealed class VideoRateLadder
 {
@@ -44,6 +48,8 @@ public sealed class VideoRateLadder
     ];
 
     public const int UpHoldMs = 2_500;
+    /// <summary>How long a fresh picture's budget must hold a larger rung before it moves there.</summary>
+    public const int FastUpHoldMs = 750;
     /// <summary>
     /// After a size came down, no size goes up for this long; a size that comes down again soon after going up
     /// doubles it (to <see cref="MaxUpBackoffMs"/>). A link that cannot hold a size stops being offered it.
@@ -65,6 +71,8 @@ public sealed class VideoRateLadder
     private long _lastUpAt = long.MinValue / 2;
     private int _upBackoffMs = UpBackoffMs;
     private int _bitrate;
+    /// <summary>This picture has never come down: it climbs straight to what the budget holds (see <see cref="FastUpHoldMs"/>).</summary>
+    private bool _fresh = true;
 
     /// <param name="startIndex">Rung to start on.</param>
     /// <param name="allow60">The user allows 60 fps; it is still only used when the budget supports it.</param>
@@ -76,6 +84,8 @@ public sealed class VideoRateLadder
     }
 
     public int Index => _index;
+    /// <summary>The picture has not come down since it started: climbs are fast (<see cref="FastUpHoldMs"/>, several rungs at once).</summary>
+    public bool Fresh => _fresh;
     public int Ceiling => Math.Min(_ceiling, _cpuCeiling);
     public bool Allow60 => _allow60;
     public VideoSetting Current => new(Rung(_index, _at60), _bitrate);
@@ -134,7 +144,18 @@ public sealed class VideoRateLadder
             }
             _upSince = null;
         }
-        else if (!congested && nowMs >= _upBlockedUntil)
+        else if (!congested && _fresh && FastUp(index, sixty, ceiling, budgetKbps) is { } target)
+        {
+            // A fresh picture: straight to the largest rung the budget holds, once it has held briefly.
+            _upSince ??= nowMs;
+            if (nowMs - _upSince.Value >= FastUpHoldMs)
+            {
+                (index, sixty) = target;
+                _upSince = null;
+                _lastUpAt = nowMs;
+            }
+        }
+        else if (!congested && !_fresh && nowMs >= _upBlockedUntil)
         {
             // Up one step at a time, and only on a budget that has held.
             var next = NextUp(index, sixty, ceiling);
@@ -157,6 +178,8 @@ public sealed class VideoRateLadder
         var changedRung = index != _index || sixty != _at60;
         if (changedRung && (index < _index || (index == _index && !sixty)))
         {
+            // The first step down ends the fast climb: this link has a limit, and from now on it is approached slowly.
+            _fresh = false;
             _upBackoffMs = nowMs - _lastUpAt <= FailedUpWindowMs ? Math.Min(_upBackoffMs * 2, MaxUpBackoffMs) : UpBackoffMs;
             _upBlockedUntil = nowMs + _upBackoffMs;
         }
@@ -188,6 +211,40 @@ public sealed class VideoRateLadder
         _upBackoffMs = UpBackoffMs;
         _bitrate = Math.Clamp(budgetKbps, Rungs[index].MinKbps, Rungs[index].MaxKbps);
         return Current;
+    }
+
+    /// <summary>
+    /// Start a picture on a budget the start probe or hints vouched for: the largest rung (60 fps on the top one the
+    /// ceiling allows, when that is allowed) whose up-threshold the budget clears, fresh, with no backoff. A link that
+    /// cannot hold it sends the picture down within a second, and the first step down ends the fast climb.
+    /// </summary>
+    public VideoSetting Start(int budgetKbps)
+    {
+        var (index, sixty) = FastUp(0, false, Ceiling, budgetKbps, fromBottom: true) ?? (0, false);
+        _index = index;
+        _at60 = sixty;
+        _fresh = true;
+        _upSince = null;
+        _upBlockedUntil = long.MinValue / 2;
+        _lastUpAt = long.MinValue / 2;
+        _upBackoffMs = UpBackoffMs;
+        var rung = Rung(index, sixty);
+        _bitrate = Math.Clamp(budgetKbps, rung.MinKbps, rung.MaxKbps);
+        return Current;
+    }
+
+    /// <summary>
+    /// The largest rung above the current one whose up-threshold the budget clears (60 fps on top at the ceiling, when
+    /// allowed and afforded), or null when there is none. <paramref name="fromBottom"/>: the same from the bottom rung,
+    /// which it falls back to.
+    /// </summary>
+    private (int Index, bool Sixty)? FastUp(int index, bool sixty, int ceiling, int budgetKbps, bool fromBottom = false)
+    {
+        var top = fromBottom ? 0 : index;
+        for (var rung = top + 1; rung <= ceiling && budgetKbps >= Rungs[rung].UpKbps; rung++) top = rung;
+        var topSixty = top == ceiling && _allow60 && Rungs[top].Height >= 720 && budgetKbps >= Rung(top, true).UpKbps;
+        if (fromBottom || top > index || (top == index && topSixty && !sixty)) return (top, topSixty);
+        return null;
     }
 
     private (int Index, bool Sixty)? NextUp(int index, bool sixty, int ceiling)

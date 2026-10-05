@@ -2,6 +2,9 @@ namespace Bolt.Media.Browser;
 
 public sealed record VoiceCapabilities(bool Supported, string? Reason, bool NativeCodecs = false);
 
+/// <summary>What the browser says about the network: its kind, a ceiling for a slow one, and this device's last settled call rate on it.</summary>
+public sealed record NetworkHint(string Kind, int CapKbps, int CachedKbps);
+
 /// <summary>Opus encoder tuning, applied where the encoder supports it and ignored otherwise.</summary>
 /// <param name="InbandFec">Opus in-band forward error correction.</param>
 /// <param name="PacketLossPercent">Loss the FEC is tuned for, 0-100.</param>
@@ -210,6 +213,24 @@ public sealed class BoltAudioPipeline : IAsyncDisposable
     /// Bytes the page's WebSockets hold that the network has not taken yet. Synchronous and cheap in WebAssembly;
     /// 0 where the browser module is not in process.
     /// </summary>
+    /// <summary>The browser's network hints and this device's last settled call rate on this kind of network (see bolt-media.js networkHint).</summary>
+    public async Task<NetworkHint?> NetworkHintAsync()
+    {
+        try
+        {
+            _module ??= await _js.InvokeAsync<IJSObjectReference>("import", "./_content/Bolt.Media.Browser/bolt-media.js");
+            return await _module.InvokeAsync<NetworkHint>("networkHint");
+        }
+        catch (Exception ex) when (ex is JSException or InvalidOperationException or NotSupportedException) { return null; }
+    }
+
+    /// <summary>Remember where this call settled, for the next call's start on the same kind of network.</summary>
+    public async Task RememberNetworkRateAsync(int kbps)
+    {
+        try { if (_module is not null) await _module.InvokeAsync<bool>("rememberNetworkRate", kbps); }
+        catch (Exception ex) when (ex is JSException or InvalidOperationException or NotSupportedException) { /* Storage unavailable: nothing remembered. */ }
+    }
+
     public long TransportBufferedBytes()
     {
         try { return _module is IJSInProcessObjectReference local ? (long)local.Invoke<double>("socketBufferedAmount") : 0; }
