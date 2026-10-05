@@ -33,7 +33,8 @@ public readonly record struct ProbeStep(int OfferedKbps, int Sent, int UplinkKbp
 /// <summary>
 /// What a start probe found. <see cref="UplinkKbps"/> is what this device can send to the relay; <see cref="DownlinkKbps"/>
 /// what the relay can send to it (null when the relay does not echo). An "at least" value is a lower bound: the link carried
-/// everything the probe offered (or, for the downlink, everything the uplink let through), so its limit lies above.
+/// everything the probe offered (or, for the downlink, everything the uplink let through), so its limit lies above. A
+/// downlink limit needs two failed round trips in a row.
 /// </summary>
 public sealed record LinkProbeResult(int UplinkKbps, bool UplinkAtLeast, int? DownlinkKbps, bool DownlinkAtLeast, int? RttMs,
     IReadOnlyList<ProbeStep> Steps, long DurationMs)
@@ -196,6 +197,7 @@ public sealed class LinkProbe
     {
         int up = 0, down = 0;
         bool upAtLeast = steps.Count > 0, downAtLeast = true, downKnown = false;
+        int? unconfirmed = null;
         foreach (var step in steps)
         {
             // A step the device's own channel held back is the probe's last: higher steps were never sent.
@@ -219,18 +221,32 @@ public sealed class LinkProbe
             if (!step.EchoRequested || !downAtLeast) { if (last) break; continue; }
             if (step.EchoPassed)
             {
+                // A single failed round trip followed by one that passed was the page, not the downlink.
+                unconfirmed = null;
                 down = Math.Max(down, step.TestedKbps);
                 downKnown = true;
                 if (last) break;
                 continue;
             }
             var back = step.EchoKbps > 0 ? Math.Min(step.EchoKbps, step.TestedKbps) : 0;
-            if (step.Echoed > 0 || step.UplinkPassed) downKnown = true;
-            down = Math.Max(down, back);
-            // Only a round trip that failed where the uplink did not is the downlink's own limit; where the uplink failed
-            // too, what came back is all the downlink was offered.
-            if (step.UplinkPassed) downAtLeast = false;
-            else break;
+            if (!step.UplinkPassed)
+            {
+                // Where the uplink failed too, what came back is all the downlink was offered: a lower bound.
+                if (step.Echoed > 0) downKnown = true;
+                down = Math.Max(down, back);
+                break;
+            }
+            // A round trip that failed where the uplink did not is the downlink's own limit, once a second step confirms
+            // it: a page busy for a moment (WebKit's, starting its own picture) fails one step on its own.
+            if (unconfirmed is { } first)
+            {
+                down = Math.Max(first, back);
+                downKnown = true;
+                downAtLeast = false;
+                break;
+            }
+            unconfirmed = back;
+            if (last) break;
         }
         return new LinkProbeResult(up, upAtLeast, downKnown && down > 0 ? down : null, downAtLeast, rttMs, steps, durationMs);
     }

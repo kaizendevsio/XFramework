@@ -349,6 +349,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
         var started = _clock();
         var steps = new List<ProbeStep>();
         var echo = true;
+        var echoFailures = 0;
         var size = Math.Clamp(first.MaxMessageBytes - TransportSequenceCodec.HeaderSize, PaddingCodec.HeaderSize + 64, ProbeMessageBytes);
         try
         {
@@ -396,7 +397,9 @@ public sealed class MediaTransportClient : IAsyncDisposable
                 steps.Add(verdict);
                 // A step the device's own channel held back ends the probe: higher rates would only be held back more.
                 if (sentMessages == 0 || !verdict.UplinkPassed || verdict.HeldBack || verdict.Inconclusive) break;
-                if (echo && !verdict.EchoPassed) echo = false;
+                // Echoes stop after two failed round trips in a row (the downlink's limit, confirmed; see LinkProbe.Conclude).
+                if (echo) echoFailures = verdict.EchoPassed ? 0 : echoFailures + 1;
+                if (echoFailures >= 2) echo = false;
             }
         }
         catch (OperationCanceledException) { return null; }

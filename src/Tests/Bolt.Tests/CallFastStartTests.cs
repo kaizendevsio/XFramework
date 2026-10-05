@@ -53,8 +53,22 @@ public sealed class CallFastStartTests
             Assert.That(result.UplinkAtLeast, Is.True, "the uplink carried every step");
             Assert.That(result.DownlinkAtLeast, Is.False, "the round trip failed on a step the uplink carried: that is the downlink's limit");
             Assert.That(result.DownlinkKbps, Is.InRange(1_200, 1_600));
-            Assert.That(result.Steps.Skip(3).All(x => !x.EchoRequested), "no more echoes once the downlink is found");
+            Assert.That(result.Steps.Count(x => x.EchoRequested && !x.EchoPassed), Is.EqualTo(2), "two failed round trips in a row confirm it");
         });
+    }
+
+    [Test]
+    public void Probe_OneFailedRoundTrip_IsNotALimit_UntilASecondConfirmsIt()
+    {
+        // A busy page (WebKit starting its own picture) failed the first round trip on its own; the next one passed.
+        ProbeStep Step(int kbps, bool echoPassed, int echoKbps) =>
+            new(kbps, 30, kbps, 0, 0, echoKbps, 30, echoPassed ? 0 : 50, UplinkPassed: true, EchoPassed: echoPassed);
+        var noise = LinkProbe.Conclude([Step(600, false, 455), Step(1_500, true, 1_500), Step(3_500, true, 3_500)], 0);
+        Assert.That((noise.DownlinkKbps, noise.DownlinkAtLeast), Is.EqualTo(((int?)3_500, true)));
+        var alone = LinkProbe.Conclude([Step(600, true, 600), Step(1_500, false, 900)], 0);
+        Assert.That(alone.DownlinkAtLeast, Is.True, "an unconfirmed failure at the end is not a limit either");
+        var real = LinkProbe.Conclude([Step(600, true, 600), Step(1_500, false, 1_200), Step(3_500, false, 1_450)], 0);
+        Assert.That((real.DownlinkKbps, real.DownlinkAtLeast), Is.EqualTo(((int?)1_450, false)));
     }
 
     [Test]
@@ -392,6 +406,7 @@ public sealed class CallFastStartTests
         double upFree = 0, downFree = 0;
         ushort sequence = 0;
         var askEcho = echo;
+        var echoFailures = 0;
         const int bytes = 1_103;
         foreach (var rate in LinkProbe.DefaultStepsKbps)
         {
@@ -417,7 +432,8 @@ public sealed class CallFastStartTests
             var verdict = probe.Judge(step, stamped: true, askEcho);
             steps.Add(verdict);
             if (!verdict.UplinkPassed) break;
-            if (askEcho && !verdict.EchoPassed) askEcho = false;
+            if (askEcho) echoFailures = verdict.EchoPassed ? 0 : echoFailures + 1;
+            if (echoFailures >= 2) askEcho = false;
         }
         return LinkProbe.Conclude(steps, 0);
     }
