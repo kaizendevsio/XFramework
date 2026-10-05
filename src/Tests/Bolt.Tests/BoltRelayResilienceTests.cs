@@ -146,6 +146,23 @@ public sealed class BoltRelayResilienceTests
     }
 
     [Test]
+    public void RetransmitCache_AFrameTooLargeForADatagram_IsOnItsWay_NotGone()
+    {
+        // A picture its sender sent over the socket (its channel was not open yet) travels to each receiver over its socket
+        // too. A receiver's NACK for it must not be declined (it would take what follows as a policy gap).
+        var cache = new RelayRetransmitCache();
+        cache.Store(1, new byte[200], 0, out _);
+        cache.Store(2, new byte[4_000], 0, out _);
+        Assert.Multiple(() =>
+        {
+            Assert.That(cache.Lookup(1, 10, out var frame), Is.EqualTo(RelayRetransmitCache.Holding.Held));
+            Assert.That(frame, Has.Length.EqualTo(200));
+            Assert.That(cache.Lookup(2, 10, out _), Is.EqualTo(RelayRetransmitCache.Holding.TooLarge));
+            Assert.That(cache.Lookup(2, RelayRetransmitCache.DefaultMaxAgeMs + 10, out _), Is.EqualTo(RelayRetransmitCache.Holding.Gone));
+        });
+    }
+
+    [Test]
     public void Queue_ALateBasePictureItCannotForward_IsABaseLoss()
     {
         // All of base picture 200 arrived late (the sender's channel stalled and it went over the socket), towards a queue
