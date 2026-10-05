@@ -7,13 +7,29 @@ window.yap = {
         document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#1b1b1b' : '#f7f7f7';
         yap.applyAccent(yap.accentPreference());
     },
+    // [height, fps] the user chose; 0 for a half they never chose (the app's default applies, and follows it when it
+    // changes). The old 'yap-video-quality' pair stored both halves whenever either changed, so a value equal to that
+    // version's default (1440p, 60 fps) cannot be told from one never chosen: it migrates to "default".
     videoPreference() {
-        try { const value = JSON.parse(localStorage.getItem('yap-video-quality'));
-            if (Array.isArray(value) && value.length === 2) return value; } catch {}
-        return [1440, 60];
+        try {
+            const stored = JSON.parse(localStorage.getItem('yap-video-preference'));
+            if (stored && typeof stored === 'object' && !Array.isArray(stored)) return [stored.height | 0, stored.fps | 0];
+            const legacy = JSON.parse(localStorage.getItem('yap-video-quality'));
+            if (Array.isArray(legacy) && legacy.length === 2) {
+                const migrated = { height: legacy[0] === 1440 ? 0 : legacy[0] | 0, fps: legacy[1] === 60 ? 0 : legacy[1] | 0 };
+                localStorage.setItem('yap-video-preference', JSON.stringify(migrated));
+                localStorage.removeItem('yap-video-quality');
+                return [migrated.height, migrated.fps];
+            }
+        } catch {}
+        return [0, 0];
     },
+    // Records only what the user chose: 0 leaves that half as it was.
     setVideoPreference(height, fps) {
-        try { localStorage.setItem('yap-video-quality', JSON.stringify([height, fps])); } catch {}
+        try {
+            const [storedHeight, storedFps] = yap.videoPreference();
+            localStorage.setItem('yap-video-preference', JSON.stringify({ height: height || storedHeight, fps: fps || storedFps }));
+        } catch {}
     },
     accentPreference() { try { const value = localStorage.getItem('yap-accent'); return /^#[0-9a-f]{6}$/i.test(value) ? value : '#d5f879'; } catch { return '#d5f879'; } },
     setAccent(value) {
