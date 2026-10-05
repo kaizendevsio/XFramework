@@ -114,8 +114,6 @@ jobs:
           # Fast start: the picture starts the way the browser client starts it (PictureStart, the preference 1080p as its
           # ceiling) and must reach 1080p within seconds, with a start probe's measurement or with none (a middle picture
           # and the start-up ramp); on 512 kbit/s it must start at a size that fits; a step down mid-call is still followed.
-          # The before row is the base branch's start (240p and the old ramp) on the same link, for the time to 1080p.
-          - { name: before-fast-start-20mbit, target: base, relaynet: "delay 10ms 2ms rate 20mbit", recvnet: "delay 10ms 2ms", at: -1, for: 0, expect: any, steps: "", settings: "ADAPTIVE=1 START_HEIGHT=240" }
           - { name: fast-start-20mbit-nohint, target: head, relaynet: "delay 10ms 2ms rate 20mbit", recvnet: "delay 10ms 2ms", at: -1, for: 0, expect: reaches-target, steps: "", settings: "ADAPTIVE=1 FAST_START=1 TARGET_HEIGHT=1080 TARGET_WITHIN_S=5" }
           - { name: fast-start-20mbit-probed, target: head, relaynet: "delay 10ms 2ms rate 20mbit", recvnet: "delay 10ms 2ms", at: -1, for: 0, expect: reaches-target, steps: "", settings: "ADAPTIVE=1 FAST_START=1 TARGET_HEIGHT=1080 START_UP_KBPS=7500 START_UP_AT_LEAST=1 TARGET_WITHIN_S=3" }
           - { name: fast-start-512k-probed, target: head, relaynet: "delay 50ms 10ms rate 512kbit", recvnet: "delay 50ms 10ms", at: -1, for: 0, expect: fits-start, steps: "", settings: "ADAPTIVE=1 FAST_START=1 TARGET_HEIGHT=1080 START_UP_KBPS=480 FIRST_MAX_HEIGHT=360" }
