@@ -37,7 +37,7 @@ concurrency:
 
 jobs:
   call:
-    name: ${{ matrix.scenario }}${{ matrix.attempt > 1 && format(' #{0}', matrix.attempt) || '' }}
+    name: "${{ matrix.scenario }}${{ matrix.attempt > 1 && format(' ({0})', matrix.attempt) || '' }}"
     runs-on: ubuntu-latest
     env:
       # workflow_dispatch "only": every other scenario's job skips its steps.
