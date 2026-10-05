@@ -296,8 +296,8 @@ public sealed class SendRateController
     /// <summary>
     /// A new picture's first seconds (see <see cref="PictureStart"/>): the first congestion inside them is a start
     /// transient until shown otherwise (both pages starting, channels warming, first keyframes), and once it has passed
-    /// the estimate climbs back fast to 70% of where the start had put it (<see cref="RecoveringToKbps"/>). Congestion
-    /// again during that climb ends it: then the link really is smaller, and the ordinary slow probing applies.
+    /// (the path calm again for the start-up hold) the estimate goes straight back to 70% of where the start had put it
+    /// (<see cref="RecoveringToKbps"/>). If the link really is smaller, the congestion that follows is cut as usual.
     /// </summary>
     public void BeginStartWindow(long nowMs, int windowMs)
     {
@@ -619,7 +619,9 @@ public sealed class SendRateController
         var ceiling = _suspended ? floorForResume : Math.Max(sample.SentKbps * 1.5 + 64, floorForResume);
         if (!_congestionObserved && StartCeilingKbps is { } measured) ceiling = Math.Min(ceiling, Math.Max(measured, floorForResume));
         if (next > ceiling) next = Math.Max(_estimate, ceiling);
-        if (RecoveringToKbps is { } back && _estimate < back && next >= back) { next = back; RecoveringToKbps = null; }
+        // A start transient that has passed (the path calm again): straight back, not a ramp. A link that really is smaller
+        // shows it within a second, and that congestion is cut as any other (there is one recovery per picture start).
+        if (RecoveringToKbps is { } back && _estimate < back) { next = Math.Max(next, back); RecoveringToKbps = null; }
         _estimate = next;
         if (_lastCongestionKbps > 0 && _estimate > _lastCongestionKbps * 1.3) _lastCongestionKbps = 0;
     }
