@@ -176,7 +176,11 @@ public sealed class LinkProbe
             // The relay's reports for the step did not come back in time (they ride this device's downlink, which media
             // may already fill), and those that did show nothing wrong: nothing can be said about the uplink from it. Late
             // reports that already show a queue or a shortfall are the uplink saying no (its queue delayed them too).
-            var looksFine = upGrowth < MaxDelayGrowthMs && (upKbps == 0 || upKbps >= tested * arrivedShare * MinDeliveredShare);
+            // A step the device's own channel held back (it could not even send at the pace) is judged on the queue and the
+            // loss alone: the rate it delivered is the browser's at that moment (WebKit drains a fresh channel slowly),
+            // not the link's, so it is never taken as the link's limit.
+            var heldBack = sentKbps > 0 && sentKbps < log.OfferedKbps * MinDeliveredShare;
+            var looksFine = upGrowth < MaxDelayGrowthMs && (upKbps == 0 || heldBack || upKbps >= tested * arrivedShare * MinDeliveredShare);
             var inconclusive = stamped && reported < log.Sent * 0.9 && looksFine;
             var upPassed = stamped && !inconclusive && reported >= log.Sent * 0.9 && log.Lost <= Math.Max(2, reported * MaxLossShare) &&
                            looksFine;

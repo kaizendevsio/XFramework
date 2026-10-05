@@ -124,6 +124,30 @@ public sealed class CallFastStartTests
     }
 
     [Test]
+    public void Probe_AHeldBackStepThatDeliveredLessThanItSent_IsStillALowerBound()
+    {
+        // WebKit sent 2.7 of a 3.5 Mbit/s step and the relay saw it arrive in bursts (about 2.3 Mbit/s over the span),
+        // with no queue building: the browser's pace, not the link's limit.
+        var probe = new LinkProbe();
+        var step = probe.BeginStep(3_500);
+        var arrivals = new List<long>();
+        for (uint index = 0; index < 54; index++)
+        {
+            probe.OnSent(step, index, (ushort)index, 1_100, index * 3_200L);
+            arrivals.Add(10_000 + index * 3_200L + (index % 4) * 1_500L + (index == 53 ? 40_000 : 0));
+        }
+        probe.OnFeedback(0, arrivals);
+        var verdict = probe.Judge(step, stamped: true, echo: false);
+        var result = LinkProbe.Conclude([verdict], 0);
+        Assert.Multiple(() =>
+        {
+            Assert.That(verdict.HeldBack, Is.True);
+            Assert.That(verdict.UplinkKbps, Is.LessThan(verdict.SentKbps * LinkProbe.MinDeliveredShare), "it did deliver less than it sent");
+            Assert.That(result.UplinkAtLeast, Is.True, "never the link's limit: the start-up ramp, not the probe, finds it");
+        });
+    }
+
+    [Test]
     public void Probe_ReportsThatDoNotComeBack_SayNothing()
     {
         // The relay's feedback rides this device's downlink, which the other side's picture already fills.
