@@ -156,6 +156,7 @@ one never chosen and migrates to the default; any other stored value is kept.
 A call's picture no longer starts at 240p15. The data channel's start probe (Bolt `LinkProbe`, see BOLT-MEDIA.md)
 measures this device's uplink and downlink while the call rings or connects, receivers report their downlink in their
 feedback, and the picture starts at the largest size the worst of those carries, up to the preference; with nothing
-measured it starts at 540p. Until the link first shows congestion it climbs fast (60% a second, several rungs at once).
-On a clean fast link a call reaches 1080p from the first picture, or within about 3 s when nothing could be measured;
-on 512 kbit/s it starts at 360p or less.
+measured it starts at 540p. The first picture is at most 720p and climbs to the measured size about a second in, once
+the receiver reports it keeps up; until the link first shows congestion it climbs fast (60% a second, several rungs at
+once). In the browser e2e on a clean 20 Mbit/s path both sides reach 1080p about 1 s after the camera starts (develop:
+22 s and 41 s); on a 512 kbit/s uplink the picture starts at 240p with a 14 KB keyframe.

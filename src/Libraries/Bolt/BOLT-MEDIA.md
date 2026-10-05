@@ -111,28 +111,32 @@ A call on TCP never loses media, so congestion shows as delay and as the relay's
 
 ### Starting a picture at the size the link carries
 
-A picture used to start at 240p15 and climb, which took 30-40 s to reach 1080p on a fast link. It now starts where the
-link is known to carry it (`PictureStart`, `StartRate`):
+A picture used to start at 240p15 and climb, which took 20-45 s to reach the preference on a fast link. It now starts
+where the link is known to carry it (`LinkProbe`, `StartRate`, `PictureStart`):
 
 - **Start probe.** When a participant's data channel first opens (while the call rings or connects), it sends about a
   second of paced `Padding` at 600, 1500, 3500 and 7500 kbit/s (200 ms each), stamped for transport feedback, and asks
-  the relay to echo it. Feedback times the uplink, the echo the downlink. A step passes when the link delivered its
-  rate without a queue building (25 ms) or loss (6%); the probe stops at the first step the uplink does not carry (that
-  step's delivered rate is the link's) and stops asking for echoes at the first the downlink does not. A step holds
-  back while the channel holds more than 40 ms of its rate, so audio never waits behind it. The relay echoes only to
-  the sender, at most 2 MiB per connection, and only while that channel has under 32 KiB queued.
-- **Receivers' downlinks.** Every `MediaFeedback` a receiver sends carries its probed downlink (or the browser's own
-  ceiling for a slow connection). A sender takes the smallest exact one: the worst receiver.
-- **The start.** Uplink measured (or, without one, the last call's settled rate on the same kind of network, or a
-  540p middle picture), bounded by the worst receiver's downlink and the browser's network hints, under 85% of a
-  measured limit. The ladder starts on the largest rung that rate clears, up to the user's preference; the first
-  keyframe is that rung's.
-- **Revisions.** For 10 s, while the path has shown no congestion, a measurement that arrives later moves the rate:
-  a receiver's downlink down at once, a late probe up. A guess never does.
-- **The ramp.** Until the path first shows congestion the estimate grows 60% a second after 500 ms of calm, and a
-  ladder that has never come down jumps straight to the largest rung its budget held for 750 ms. A measured limit is
-  the congestion point, approached slowly; the first step down returns the ladder to one rung at a time with backoff.
-  Fast down is unchanged.
+  the relay to echo it. Feedback times the uplink; the echo, timed by the page where it lands, the downlink. A step passes
+  when the link delivered what was sent (loss judged on its own, 10%) without a queue building (25 ms). The probe stops at
+  the first step the uplink does not carry (its delivered rate is the link's); a step the device's own channel held back,
+  or whose reports came back late without showing anything wrong, ends it with a lower bound. A downlink limit needs two
+  failed round trips in a row (a busy page fails one on its own), and a step whose timers ran late judges echoes on loss
+  only. Steps hold back while the channel holds 60 ms of their rate, and the rate loop holds still while a probe runs. The
+  relay echoes only to the sender, at most 2 MiB per connection, only while that channel has under 96 KiB queued.
+- **Receivers' downlinks.** Every `MediaFeedback` a receiver sends carries its probed downlink (or the browser's ceiling
+  for a 2G/3G or data-saver connection). A sender takes the smallest exact one: the worst receiver.
+- **The start.** 85% of the measured uplink (95% of a lower bound), else 70% of the last settled call on the same kind of
+  network, else a 540p middle picture; bounded by the worst receiver's exact downlink and the browser's hints. A camera
+  turned on while the channel is still opening waits up to 2 s for the probe. The first picture is at most 720p (a
+  1080p/1440p keyframe into channels that just opened was the start's own congestion); the ladder climbs to the rate's
+  size, up to the preference, once a receiver has reported it keeps up and the budget has held 750 ms (about a second
+  in). For 10 s a later measurement still moves the rate; a guess never does.
+- **The ramp.** Until the path first shows congestion the estimate grows 60% a second after 500 ms of calm, and a fresh
+  ladder jumps straight to the largest rung its budget held. A measured limit caps that during the start window. For 3 s
+  after a picture starts (or climbs), this device's own queues are not congestion; a cut that only this device's queue
+  calls for, while every remote report is calm (a browser's channel stalling), takes at most a quarter. The first cut
+  of a start takes at most half, and once it passes the estimate climbs back fast to 70% of where it was (a start
+  transient: receivers' pages still starting); congestion during that climb ends it. Fast down is otherwise unchanged.
 
 ### The datagram path (WebRTC data channel through TURN)
 
