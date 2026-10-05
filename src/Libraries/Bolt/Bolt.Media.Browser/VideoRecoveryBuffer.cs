@@ -287,6 +287,10 @@ public sealed class VideoRecoveryBuffer
             Declined++;
             // Half a picture the relay will not finish is lost; a whole picture it dropped on purpose is a policy gap.
             if (Owner(sequence) is { Complete: false } owner) Lose(owner);
+            // A whole picture of unknown layer: the relay sheds enhancement layers (it never declines a base picture it
+            // forwards on), but a T1 picture it dropped is still the reference of the T2 pictures after it. Those are
+            // not shown until the next T1 or base picture; a T1 or base picture after the gap decodes as usual.
+            else if (Owner(sequence) is null && _layered) _skipAbove = Math.Min(_skipAbove ?? 1, 1);
         }
         Release(ready);
     }

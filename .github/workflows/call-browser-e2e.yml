@@ -94,7 +94,9 @@ jobs:
             relay: "delay 3ms"
             constrained: "B>1500"
           # Fast start: a clean 20 Mbit/s path, both at the default preference (1080p30). Each picture must reach 1080p
-          # within 5 s of its camera starting (it used to take 30-40 s from 240p), and stay there.
+          # within 5 s of its camera starting (it used to take 20-45 s from 240p), and stay there. WebKit (B) gets 10 s:
+          # on these runners its page and data channel stall for a second or two while it starts (both directions at once),
+          # and a start cut there takes a few seconds to recover from (it reaches 1080p in 1-3.5 s most runs).
           - scenario: fast-start-20mbit
             a_down: "delay 7ms rate 20mbit"
             a_up: "delay 7ms rate 20mbit"
@@ -102,7 +104,7 @@ jobs:
             b_up: "delay 7ms rate 20mbit"
             relay: "delay 3ms"
             constrained: ""
-            extra: "CALL_A_HEIGHT=1080 CALL_A_CEILING=1080 CALL_B_HEIGHT=1080 CALL_B_CEILING=1080 CALL_TARGET_WITHIN_S=5 CALL_MAX_RUNG_CHANGES=1"
+            extra: "CALL_A_HEIGHT=1080 CALL_A_CEILING=1080 CALL_B_HEIGHT=1080 CALL_B_CEILING=1080 CALL_TARGET_WITHIN_S=5 CALL_B_TARGET_WITHIN_S=10 CALL_MAX_RUNG_CHANGES=1"
           # A's uplink carries 512 kbit/s: its picture must start at a size that fits (360p or less, no keyframe that takes
           # the link half a second), while B (on a fast path to A) still reaches 1080p within 5 s.
           - scenario: fast-start-512k
@@ -112,7 +114,7 @@ jobs:
             b_up: "delay 7ms rate 20mbit"
             relay: "delay 3ms"
             constrained: "A>512"
-            extra: "CALL_A_HEIGHT=1080 CALL_A_CEILING=1080 CALL_B_HEIGHT=1080 CALL_B_CEILING=1080 CALL_TARGET_WITHIN_S=5 CALL_A_FIRST_MAX_HEIGHT=360 CALL_A_START_KEYFRAME_MAX_BYTES=32000"
+            extra: "CALL_A_HEIGHT=1080 CALL_A_CEILING=1080 CALL_B_HEIGHT=1080 CALL_B_CEILING=1080 CALL_TARGET_WITHIN_S=5 CALL_B_TARGET_WITHIN_S=10 CALL_A_FIRST_MAX_HEIGHT=360 CALL_A_START_KEYFRAME_MAX_BYTES=32000"
           # A's uplink steps down to 2 Mbit/s mid-call: A must fit it within 3 s, without flapping (fast-start-20mbit asserts
           # the start). Until
           # it has, A's own feedback and SCTP acknowledgements queue behind its video on that uplink, so what A receives

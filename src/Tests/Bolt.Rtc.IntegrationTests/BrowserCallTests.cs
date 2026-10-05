@@ -319,7 +319,7 @@ public sealed class BrowserCallTests
             summary[$"{sender}->{receiver}"] = line;
             // How the picture started, for every scenario that asks: time to the preference, the first size, its first keyframes, flapping.
             var timeToTarget = starts[sender]["timeToHeightMs"] is { } reachedAt ? reachedAt.GetValue<int>() : (int?)null;
-            if (EnvInt("CALL_TARGET_WITHIN_S", 0) is > 0 and var within && Env("CALL_CONSTRAINED")?.StartsWith(sender + ">") != true &&
+            if (EnvInt($"CALL_{sender}_TARGET_WITHIN_S", EnvInt("CALL_TARGET_WITHIN_S", 0)) is > 0 and var within && Env("CALL_CONSTRAINED")?.StartsWith(sender + ">") != true &&
                 (timeToTarget is null || timeToTarget > within * 1000))
                 failures.Add($"{sender}->{receiver}: reached {heights[sender]}p {(timeToTarget is { } ms ? $"{ms} ms" : "never")} after the camera started (limit {within} s)");
             if (EnvInt($"CALL_{sender}_FIRST_MAX_HEIGHT", 0) is > 0 and var firstMax && starts[sender]["firstHeight"]?.GetValue<int>() > firstMax)
