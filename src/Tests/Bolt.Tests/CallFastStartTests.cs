@@ -415,6 +415,19 @@ public sealed class CallFastStartTests
     }
 
     [Test]
+    public void AReceiversDownlinkThatArrivesAfterAStartCut_BoundsTheRecovery()
+    {
+        // The receiver's 1.5 Mbit/s downlink filled before its report arrived: the sender was cut first, then heard of it.
+        var sim = new StartSimulation(capacityKbps: 20_000, oneWayMs: 15, preferredHeight: 1080);
+        sim.Begin(new StartHints(UplinkKbps: 7_500, UplinkAtLeast: true));
+        sim.ExtraDelay = (1_200, 2_200, 1_500);
+        sim.Run(1_800);
+        sim.ReceiversDownlink = (1_500, false);
+        sim.Run(8_000);
+        Assert.That(sim.MaxEstimate(2_500, 9_800), Is.LessThanOrEqualTo(1_500), "the recovery stops under the receiver's limit");
+    }
+
+    [Test]
     public void TwoStartTransients_AreBothRecoveredFrom()
     {
         // WebKit's page stalled twice while both sides started (2.0 s and 6.0 s in): each cut is a transient.
@@ -540,6 +553,7 @@ public sealed class CallFastStartTests
         public long? TimeToHeightMs(int height) => _rungs.FirstOrDefault(x => x.Height >= height) is { Height: > 0 } hit ? hit.At : null;
         public int MaxQueueMs(long from, long to) => _trace.Where(x => x.At >= from && x.At <= to).Select(x => x.QueueMs).DefaultIfEmpty().Max();
         public int EstimateAt(long at) => _trace.Last(x => x.At <= at).Estimate;
+        public int MaxEstimate(long from, long to) => _trace.Where(x => x.At >= from && x.At <= to).Max(x => x.Estimate);
 
         public void Begin(StartHints hints)
         {

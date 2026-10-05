@@ -356,6 +356,7 @@ public sealed class SendRateController
         var next = Math.Clamp(startTotalKbps, _options.MinTotalKbps, _options.MaxTotalKbps);
         if (Math.Abs(next - _estimate) < Math.Max(32, _estimate * 0.1)) return false;
         _estimate = next;
+        _pictureStartKbps = next;
         if (next < _stable) _stable = _lastCalmEstimate = next;
         return true;
     }
@@ -608,7 +609,10 @@ public sealed class SendRateController
             RecoveryGrants++;
             // Back to 70% of the best this start had: its own start rate (the probe's measurement), or more if it climbed.
             _recoveryPeak = Math.Max(Math.Max(beforeCut, _recoveryPeak), _pictureStartKbps);
-            RecoveringToKbps = (int)Math.Round(_recoveryPeak * 0.7);
+            var target = _recoveryPeak * 0.7;
+            // Never past a limit the start measured (the worst receiver's downlink): that cut was the link, not a transient.
+            if (StartCeilingKbps is { } limit) target = Math.Min(target, limit * StartRate.MeasuredHeadroom);
+            RecoveringToKbps = target > _estimate * 1.1 ? (int)Math.Round(target) : null;
             _recoveryClimbing = false;
         }
         else if (_recoveryClimbing) RecoveringToKbps = null; // Congestion again on the way back: the link is smaller.
@@ -637,11 +641,19 @@ public sealed class SendRateController
         // tested. While video is suspended there is nothing to test with, so the ceiling is the resume point.
         var floorForResume = ResumeTotalKbps(sample) + 16;
         var ceiling = _suspended ? floorForResume : Math.Max(sample.SentKbps * 1.5 + 64, floorForResume);
-        if (!_congestionObserved && StartCeilingKbps is { } measured) ceiling = Math.Min(ceiling, Math.Max(measured, floorForResume));
+        // A limit the start measured holds for its window, congestion or not (StartCeilingKbps is null outside it).
+        if (StartCeilingKbps is { } measured) ceiling = Math.Min(ceiling, Math.Max(measured, floorForResume));
         if (next > ceiling) next = Math.Max(_estimate, ceiling);
         // A start transient that has passed (the path calm again): straight back, not a ramp. A link that really is smaller
         // shows it within a second, and that congestion is cut as any other (there is one recovery per picture start).
-        if (RecoveringToKbps is { } back && _estimate < back) { next = Math.Max(next, back); RecoveringToKbps = null; _recoveredAt = sample.NowMs; }
+        if (RecoveringToKbps is { } back && _estimate < back)
+        {
+            // Bounded by a limit the start measured, should it have arrived since the cut.
+            if (StartCeilingKbps is { } limit) back = Math.Min(back, (int)Math.Round(limit * StartRate.MeasuredHeadroom));
+            next = Math.Max(next, back);
+            RecoveringToKbps = null;
+            _recoveredAt = sample.NowMs;
+        }
         _estimate = next;
         if (_lastCongestionKbps > 0 && _estimate > _lastCongestionKbps * 1.3) _lastCongestionKbps = 0;
     }

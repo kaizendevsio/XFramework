@@ -58,7 +58,7 @@ public sealed class PictureStart(SendRateController controller)
     public void Tick(long nowMs, (int Kbps, bool AtLeast)? receivers)
     {
         if (!_active) return;
-        if (nowMs - _startedAt > WindowMs || !controller.StartingUp)
+        if (nowMs - _startedAt > WindowMs)
         {
             _active = false;
             controller.StartCeilingKbps = null;
@@ -67,7 +67,10 @@ public sealed class PictureStart(SendRateController controller)
         var hints = _hints = WithReceivers(_hints, receivers);
         if (hints == _applied) return;
         _applied = hints;
+        // A measured limit (a receiver's downlink that arrived late, say) still bounds a start transient's recovery after
+        // the path has shown congestion; only the estimate itself is no longer revised then.
         controller.StartCeilingKbps = Ceiling(hints);
+        if (!controller.StartingUp) return;
         if (Ceiling(hints) is { } limit) controller.MeasuredLimit(limit);
         var estimate = Choose(hints);
         // Only a measurement moves the rate (a guess never overrides the ramp): down at once, up to what was measured.
