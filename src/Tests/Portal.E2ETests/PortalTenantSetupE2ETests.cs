@@ -12,6 +12,7 @@ public sealed class PortalTenantSetupE2ETests : PageTest
     public override BrowserNewContextOptions ContextOptions() => new()
     {
         BaseURL = Environment.GetEnvironmentVariable("PORTAL_E2E_BASE_URL") ?? "http://127.0.0.1:5000",
+        StorageStatePath = Environment.GetEnvironmentVariable("PORTAL_E2E_STORAGE_STATE"),
         ReducedMotion = ReducedMotion.Reduce
     };
 
@@ -26,16 +27,24 @@ public sealed class PortalTenantSetupE2ETests : PageTest
         var username = Environment.GetEnvironmentVariable("PORTAL_E2E_USERNAME");
         var password = Environment.GetEnvironmentVariable("PORTAL_E2E_PASSWORD");
         var tenantName = Environment.GetEnvironmentVariable("PORTAL_E2E_DEFAULT_TENANT_NAME");
-        Assert.That(username, Is.Not.Null.And.Not.Empty, "Set PORTAL_E2E_USERNAME.");
-        Assert.That(password, Is.Not.Null.And.Not.Empty, "Set PORTAL_E2E_PASSWORD.");
+        var usesSavedSession = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("PORTAL_E2E_STORAGE_STATE"));
+        if (!usesSavedSession)
+        {
+            Assert.That(username, Is.Not.Null.And.Not.Empty, "Set PORTAL_E2E_USERNAME.");
+            Assert.That(password, Is.Not.Null.And.Not.Empty, "Set PORTAL_E2E_PASSWORD.");
+        }
         Assert.That(tenantName, Is.Not.Null.And.Not.Empty,
             "Set PORTAL_E2E_DEFAULT_TENANT_NAME for an isolated tenant with default feature toggles.");
         await Page.SetViewportSizeAsync(width, height);
         await Page.EmulateMediaAsync(new() { ColorScheme = dark ? ColorScheme.Dark : ColorScheme.Light });
-        await Page.GotoAsync("/login");
-        await Page.GetByLabel("Username", new() { Exact = true }).FillAsync(username!);
-        await Page.GetByLabel("Password", new() { Exact = true }).FillAsync(password!);
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Sign in", Exact = true }).ClickAsync();
+        if (usesSavedSession) await Page.GotoAsync("/");
+        else
+        {
+            await Page.GotoAsync("/login");
+            await Page.GetByLabel("Username", new() { Exact = true }).FillAsync(username!);
+            await Page.GetByLabel("Password", new() { Exact = true }).FillAsync(password!);
+            await Page.GetByRole(AriaRole.Button, new() { Name = "Sign in", Exact = true }).ClickAsync();
+        }
         var profile = Page.Locator("button.profile-trigger");
         await Expect(profile).ToBeVisibleAsync(new() { Timeout = 30_000 });
         try
@@ -94,7 +103,7 @@ public sealed class PortalTenantSetupE2ETests : PageTest
         finally
         {
             await Page.GotoAsync("/");
-            if (await profile.IsVisibleAsync())
+            if (!usesSavedSession && await profile.IsVisibleAsync())
             {
                 await profile.ClickAsync();
                 await Page.GetByRole(AriaRole.Button, new() { Name = "Sign Out", Exact = true }).ClickAsync();
