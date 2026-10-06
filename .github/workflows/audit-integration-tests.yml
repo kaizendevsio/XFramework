@@ -21,6 +21,10 @@ jobs:
         with:
           global-json-file: global.json
       - run: dotnet test src/Tests/Audit.IntegrationTests/Audit.IntegrationTests.csproj -m:1 /nr:false
+      - name: Build Portal tests
+        run: dotnet build src/Tests/Portal.E2ETests/Portal.E2ETests.csproj -m:1 /nr:false
+      - name: Install Chromium for isolated layout tests
+        run: pwsh src/Tests/Portal.E2ETests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium
       # Live browser suites require a separately provisioned Portal and authorized fixture data.
-      - name: Run Portal non-browser tests
+      - name: Run Portal contracts and isolated browser layout tests
         run: dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj -m:1 /nr:false --filter 'FullyQualifiedName!~Portal.E2ETests.PortalE2ETests.&TestCategory!=Kind:E2E'
