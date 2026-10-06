@@ -47,6 +47,7 @@ public sealed class PortalTenantSetupE2ETests : PageTest
         }
         var profile = Page.Locator("button.profile-trigger");
         await Expect(profile).ToBeVisibleAsync(new() { Timeout = 30_000 });
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         try
         {
             await profile.ClickAsync();
@@ -56,6 +57,7 @@ public sealed class PortalTenantSetupE2ETests : PageTest
             await Page.Keyboard.PressAsync("Escape");
 
             await Page.GotoAsync("/pos/registers");
+            await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
             await Expect(Page.GetByTestId("pos-list-pager")).ToBeVisibleAsync(new() { Timeout = 30_000 });
             await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Registers could not load", Exact = true })).ToHaveCountAsync(0);
             await Expect(Page.GetByTestId("pos-register-setup-warning")).ToContainTextAsync("Inventario Warehousing");
@@ -64,6 +66,7 @@ public sealed class PortalTenantSetupE2ETests : PageTest
             await Expect(Page.GetByTestId("pos-list-pager")).ToBeVisibleAsync();
 
             await Page.GotoAsync("/inventario/transactions");
+            await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
             var surface = Page.GetByTestId("inventory-transactions-surface");
             var filters = Page.GetByTestId("inventory-transaction-filters");
             await Expect(filters).ToBeVisibleAsync(new() { Timeout = 30_000 });

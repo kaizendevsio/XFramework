@@ -35,12 +35,16 @@ public sealed class PortalModuleDependenciesE2ETests : PageTest
             await Expect(Page.Locator("button.profile-trigger")).ToBeVisibleAsync(new() { Timeout = 30_000 });
         }
         await Page.GotoAsync("/identity/tenants");
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Page.GetByRole(AriaRole.Button, new() { Name = "Create Tenant", Exact = true }).ClickAsync();
         var create = Page.GetByRole(AriaRole.Dialog);
         var name = $"Portal QA dependencies {DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}";
         await create.GetByLabel("Name", new() { Exact = true }).FillAsync(name);
         await create.GetByLabel("Description", new() { Exact = true }).FillAsync("Isolated feature dependency regression; no business records or funds.");
         await create.GetByRole(AriaRole.Button, new() { Name = "Create", Exact = true }).ClickAsync();
+        var tenantRow = Page.GetByRole(AriaRole.Row).Filter(new() { Has = Page.GetByRole(AriaRole.Gridcell, new() { Name = name, Exact = true }) });
+        await Expect(tenantRow).ToBeVisibleAsync(new() { Timeout = 30_000 });
+        await tenantRow.ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = name, Exact = true })).ToBeVisibleAsync(new() { Timeout = 30_000 });
         var modules = Page.GetByRole(AriaRole.Link, new() { Name = "Modules", Exact = true });
         if (!await modules.IsVisibleAsync())
@@ -54,7 +58,7 @@ public sealed class PortalModuleDependenciesE2ETests : PageTest
         await Expect(Page.GetByTestId("module-feature-dependencies")).ToContainTextAsync("Warehousing - Required - Disabled");
 
         await Page.GetByRole(AriaRole.Button, new() { Name = "Enable required features", Exact = true }).ClickAsync();
-        var confirmation = Page.GetByRole(AriaRole.Dialog);
+        var confirmation = Page.GetByRole(AriaRole.Alertdialog, new() { Name = "Enable required features?", Exact = true });
         await Expect(confirmation).ToContainTextAsync("Warehousing");
         await confirmation.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
         await Expect(warehouse.GetByRole(AriaRole.Checkbox)).Not.ToBeCheckedAsync();
@@ -63,18 +67,31 @@ public sealed class PortalModuleDependenciesE2ETests : PageTest
         await confirmation.GetByRole(AriaRole.Button, new() { Name = "Enable features", Exact = true }).ClickAsync();
         await Expect(warehouse.GetByRole(AriaRole.Checkbox)).ToBeCheckedAsync();
         await Page.ReloadAsync();
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Expect(warehouse.GetByRole(AriaRole.Checkbox)).ToBeCheckedAsync(new() { Timeout = 30_000 });
-        await warehouse.GetByRole(AriaRole.Checkbox).ClickAsync();
+        var search = Page.GetByRole(AriaRole.Textbox, new() { Name = "Search modules...", Exact = true });
+        await search.FillAsync("Warehousing");
+        await ToggleFeature("Warehousing");
         await Expect(Page.GetByText("POS Registers requires Warehousing. Disable the dependent feature first.", new() { Exact = false })).ToBeVisibleAsync();
         await Expect(warehouse.GetByRole(AriaRole.Checkbox)).ToBeCheckedAsync();
+        await Expect(search).ToHaveValueAsync("Warehousing");
+        await search.FillAsync("");
 
         // Disable dependents in order, then verify ordinary enabling also confirms prerequisites.
         foreach (var label in new[] { "POS Returns", "POS Sales", "POS Registers", "Warehousing" })
         {
-            await Feature(label).GetByRole(AriaRole.Checkbox).ClickAsync();
+            await ToggleFeature(label);
             await Expect(Feature(label).GetByRole(AriaRole.Checkbox)).Not.ToBeCheckedAsync();
         }
-        await registers.GetByRole(AriaRole.Checkbox).ClickAsync();
+        await ToggleFeature("POS Registers");
+        await Expect(confirmation).ToContainTextAsync("Warehousing");
+        await confirmation.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
+        await Expect(registers.GetByRole(AriaRole.Checkbox)).Not.ToBeCheckedAsync();
+        await Expect(warehouse.GetByRole(AriaRole.Checkbox)).Not.ToBeCheckedAsync();
+        await Page.ReloadAsync();
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await Expect(registers.GetByRole(AriaRole.Checkbox)).Not.ToBeCheckedAsync();
+        await ToggleFeature("POS Registers");
         await Expect(confirmation).ToContainTextAsync("Warehousing");
         await confirmation.GetByRole(AriaRole.Button, new() { Name = "Enable features", Exact = true }).ClickAsync();
         await Expect(registers.GetByRole(AriaRole.Checkbox)).ToBeCheckedAsync();
@@ -89,4 +106,7 @@ public sealed class PortalModuleDependenciesE2ETests : PageTest
     }
 
     private ILocator Feature(string name) => Page.GetByRole(AriaRole.Treeitem, new() { NameRegex = new Regex($"^{Regex.Escape(name)} ") });
+
+    // Blueprint's checkbox is presentation-only; its surrounding span handles pointer clicks.
+    private Task ToggleFeature(string name) => Feature(name).Locator("[data-tree-checkbox]").First.ClickAsync();
 }
