@@ -71,11 +71,16 @@ public sealed class PortalModuleDependenciesE2ETests : PageTest
         await Expect(warehouse.GetByRole(AriaRole.Checkbox)).ToBeCheckedAsync(new() { Timeout = 30_000 });
         var search = Page.GetByRole(AriaRole.Textbox, new() { Name = "Search modules...", Exact = true });
         await search.FillAsync("Warehousing");
+        await search.PressAsync("Tab");
+        await Expect(registers).ToBeHiddenAsync();
+        await Expect(warehouse).ToBeVisibleAsync();
         await ToggleFeature("Warehousing");
         await Expect(Page.GetByText("POS Registers requires Warehousing. Disable the dependent feature first.", new() { Exact = false })).ToBeVisibleAsync();
         await Expect(warehouse.GetByRole(AriaRole.Checkbox)).ToBeCheckedAsync();
         await Expect(search).ToHaveValueAsync("Warehousing");
         await search.FillAsync("");
+        await search.PressAsync("Tab");
+        await Expect(registers).ToBeVisibleAsync();
 
         // Disable dependents in order, then verify ordinary enabling also confirms prerequisites.
         foreach (var label in new[] { "POS Returns", "POS Sales", "POS Registers", "Warehousing" })
@@ -106,6 +111,18 @@ public sealed class PortalModuleDependenciesE2ETests : PageTest
     }
 
     private ILocator Feature(string name) => Page.GetByRole(AriaRole.Treeitem, new() { NameRegex = new Regex($"^{Regex.Escape(name)} ") });
+
+    [TearDown]
+    public async Task CaptureFailure()
+    {
+        if (TestContext.CurrentContext.Result.Outcome.Status != NUnit.Framework.Interfaces.TestStatus.Failed) return;
+        var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, "artifacts", "module-dependencies");
+        Directory.CreateDirectory(directory);
+        var screenshot = Path.Combine(directory, "failure.png");
+        await Page.ScreenshotAsync(new() { Path = screenshot, FullPage = true });
+        TestContext.AddTestAttachment(screenshot);
+        TestContext.Out.WriteLine(await Page.GetByRole(AriaRole.Tree).InnerTextAsync());
+    }
 
     // Blueprint's checkbox is presentation-only; its surrounding span handles pointer clicks.
     private Task ToggleFeature(string name) => Feature(name).Locator("[data-tree-checkbox]").First.ClickAsync();
