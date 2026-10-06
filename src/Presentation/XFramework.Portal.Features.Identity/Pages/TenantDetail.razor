@@ -153,11 +153,13 @@ else
                                 </BbCardHeader>
                                 <BbCardContent>
                                     <BbTreeView TItem="ModuleFeatureTreeNode"
+                                                @key="_moduleFeatureTreeRevision"
                                                 Checkable="true"
                                                 CheckStrictly="true"
                                                 ShowIcons="true"
                                                 ShowLines="true"
                                                 ShowSearch="true"
+                                                @bind-SearchText="_moduleFeatureSearchText"
                                                 SearchPlaceholder="Search modules..."
                                                 ExpandOnClick="true"
                                                 SelectionMode="TreeSelectionMode.Single"
@@ -601,6 +603,8 @@ else
     private bool _moduleFeatureChangeInProgress;
     private List<ModuleFeatureTreeNode> _moduleFeatureTreeNodes = [];
     private HashSet<string> _moduleFeatureCheckedKeys = new(StringComparer.OrdinalIgnoreCase);
+    private int _moduleFeatureTreeRevision;
+    private string _moduleFeatureSearchText = "";
     private HashSet<string> _expandedModuleFeatureKeys = new(StringComparer.OrdinalIgnoreCase);
     private bool _moduleFeaturesLoading;
     private string _selectedModuleFeatureKey = "";
@@ -998,6 +1002,8 @@ else
 
         await ApplyModuleFeatureChanges(enabledKeys, disabledKeys);
         SyncModuleTreeCheckedState();
+        // Blueprint ignores unchanged controlled values; remount when the attempted state was rejected or expanded.
+        if (!desiredKeys.SetEquals(_moduleFeatureCheckedKeys)) _moduleFeatureTreeRevision++;
     }
 
     private async Task ToggleSelectedModuleFeature(ModuleFeatureRow row, bool enabled)

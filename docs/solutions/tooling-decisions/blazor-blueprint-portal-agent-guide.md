@@ -158,6 +158,8 @@ For overlays inside dialogs, verify the nested overlay in both light and dark th
 
 ## Useful Local Checks
 
+For controlled `BbTreeView` checks in Blueprint 3.16.0, rejecting or cancelling an optimistic change can leave the displayed check different from the saved value: the primitive skips syncing values equal to its previously supplied parameter. Tenant Modules remounts the tree only when the attempted checked set differs from the authoritative result. Keep search, expanded groups, and selection controlled so this reconciliation preserves the user's context. Browser regression tests must cover cancel and blocked-disable flows, not just successful saves.
+
 ```powershell
 rg -n "BlazorBlueprint|BbPortalHost|BbToastProvider|BbDialogProvider|AddBlazorBlueprint|@rendermode|Interactive" `
   Directory.Packages.props src/Presentation/XFramework.Portal
