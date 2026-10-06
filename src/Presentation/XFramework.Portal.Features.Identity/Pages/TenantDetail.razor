@@ -152,28 +152,30 @@ else
                                     <BbCardDescription>Use the tree to toggle modules and nested features.</BbCardDescription>
                                 </BbCardHeader>
                                 <BbCardContent>
+                                    <BbInput @bind-Value="_moduleFeatureSearchText"
+                                             Placeholder="Search modules..."
+                                             aria-label="Search modules..."
+                                             Class="mb-2 h-8 text-sm" />
                                     <BbTreeView TItem="ModuleFeatureTreeNode"
                                                 @key="_moduleFeatureTreeRevision"
                                                 Checkable="true"
                                                 CheckStrictly="true"
                                                 ShowIcons="true"
                                                 ShowLines="true"
-                                                ShowSearch="true"
-                                                @bind-SearchText="_moduleFeatureSearchText"
-                                                SearchPlaceholder="Search modules..."
                                                 ExpandOnClick="true"
                                                 SelectionMode="TreeSelectionMode.Single"
                                                 SelectedValue="@_selectedModuleFeatureKey"
                                                 SelectedValueChanged="@OnModuleTreeSelectedValueChanged"
                                                 CheckedValues="@_moduleFeatureCheckedKeys"
                                                 CheckedValuesChanged="@OnModuleTreeCheckedValuesChanged"
-                                                ExpandedValues="@_expandedModuleFeatureKeys"
+                                                ExpandedValues="@ModuleTreeExpandedValues"
                                                 ExpandedValuesChanged="@OnModuleTreeExpandedValuesChanged"
                                                 AriaLabel="Tenant module access tree"
                                                 Class="tenant-module-tree">
-                                        @foreach (var node in _moduleFeatureTreeNodes)
+                                        @foreach (var node in _moduleFeatureTreeNodes.Where(IsModuleTreeNodeVisible))
                                         {
                                             <BbTreeItem Value="@node.Row.Key"
+                                                        @key="node.Row.Key"
                                                         Label="@node.Row.DisplayName"
                                                         Icon="@node.Row.Icon"
                                                         Badge="@GetModuleTreeNodeBadge(node)"
@@ -186,9 +188,10 @@ else
                                                     </div>
                                                 </LabelTemplate>
                                                 <ChildContent>
-                                                    @foreach (var childNode in node.Children)
+                                                    @foreach (var childNode in node.Children.Where(child => MatchesModuleSearch(node.Row) || MatchesModuleSearch(child.Row)))
                                                     {
                                                         <BbTreeItem Value="@childNode.Row.Key"
+                                                                    @key="childNode.Row.Key"
                                                                     Label="@childNode.Row.DisplayName"
                                                                     Icon="@childNode.Row.Icon"
                                                                     Badge="@GetModuleFeatureCoverageText(childNode.Row)"
@@ -982,12 +985,28 @@ else
 
     private Task OnModuleTreeExpandedValuesChanged(HashSet<string> expandedValues)
     {
+        if (!string.IsNullOrWhiteSpace(_moduleFeatureSearchText)) return Task.CompletedTask;
         _expandedModuleFeatureKeys = new HashSet<string>(
             expandedValues ?? [],
             StringComparer.OrdinalIgnoreCase);
 
         return Task.CompletedTask;
     }
+
+    // Blueprint's built-in search indexes Items, not declarative BbTreeItem content.
+    private bool MatchesModuleSearch(ModuleFeatureRow row) =>
+        string.IsNullOrWhiteSpace(_moduleFeatureSearchText) ||
+        row.DisplayName.Contains(_moduleFeatureSearchText, StringComparison.OrdinalIgnoreCase) ||
+        row.Description.Contains(_moduleFeatureSearchText, StringComparison.OrdinalIgnoreCase) ||
+        row.Key.Contains(_moduleFeatureSearchText, StringComparison.OrdinalIgnoreCase);
+
+    private bool IsModuleTreeNodeVisible(ModuleFeatureTreeNode node) =>
+        MatchesModuleSearch(node.Row) || node.Children.Any(child => MatchesModuleSearch(child.Row));
+
+    private HashSet<string> ModuleTreeExpandedValues => string.IsNullOrWhiteSpace(_moduleFeatureSearchText)
+        ? _expandedModuleFeatureKeys
+        : _moduleFeatureTreeNodes.Where(node => node.Children.Count > 0 && IsModuleTreeNodeVisible(node))
+            .Select(node => node.Row.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     private async Task OnModuleTreeCheckedValuesChanged(HashSet<string> checkedValues)
     {
