@@ -22,7 +22,15 @@ public sealed class TenantModuleFeatureDefinitionResolver(
             AddDefinition(
                 definitions,
                 indexes,
-                new ResolvedTenantModuleFeatureDefinition(definition, [], []));
+                new ResolvedTenantModuleFeatureDefinition(definition, [], [])
+                {
+                    Dependencies = definition.RequiredFeatureKeys.Select(key => new BoltDependencyRequirement
+                    {
+                        Kind = BoltDependencyKind.TenantFeature,
+                        Key = key,
+                        DisplayName = localCatalog.Find(key)?.DisplayName ?? key
+                    }).ToList()
+                });
         }
 
         var discoveredModules = await GetDiscoveredModulesAsync(ct);
@@ -98,6 +106,7 @@ public sealed class TenantModuleFeatureDefinitionResolver(
             }
         }
 
+        var unavailableRequired = missingRequired.ToList();
         foreach (var dependency in feature.Dependencies.Where(x => x.Kind == BoltDependencyKind.TenantFeature))
         {
             var dependencyKey = TenantModuleFeatureKeys.Combine(dependency.Key);
@@ -127,7 +136,11 @@ public sealed class TenantModuleFeatureDefinitionResolver(
             string.IsNullOrWhiteSpace(feature.IconName) ? module.IconName : feature.IconName,
             feature.DefaultEnabled && !isBlocked);
 
-        return new ResolvedTenantModuleFeatureDefinition(definition, missingRequired, missingOptional);
+        return new ResolvedTenantModuleFeatureDefinition(definition, missingRequired, missingOptional)
+        {
+            Dependencies = feature.Dependencies,
+            UnavailableRequiredDependencies = unavailableRequired
+        };
     }
 
     private static void AddDependencyMessage(
@@ -185,7 +198,12 @@ public sealed class TenantModuleFeatureDefinitionResolver(
         return existing with
         {
             MissingRequiredDependencies = missingRequired,
-            MissingOptionalDependencies = missingOptional
+            MissingOptionalDependencies = missingOptional,
+            Dependencies = existing.Dependencies.Concat(discovered.Dependencies)
+                .GroupBy(dependency => (dependency.Kind, Key: dependency.Key.ToLowerInvariant()))
+                .Select(group => group.OrderByDescending(dependency => dependency.Required).First()).ToList(),
+            UnavailableRequiredDependencies = existing.UnavailableRequiredDependencies
+                .Concat(discovered.UnavailableRequiredDependencies).Distinct(StringComparer.OrdinalIgnoreCase).ToList()
         };
     }
 

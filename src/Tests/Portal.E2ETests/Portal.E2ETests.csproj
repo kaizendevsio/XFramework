@@ -9,12 +9,18 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="BlazorBlueprint.Components" GeneratePathProperty="true" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.Playwright.NUnit" />
     <PackageReference Include="NUnit" />
     <PackageReference Include="NUnit3TestAdapter" />
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="Moq" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="$(PkgBlazorBlueprint_Components)/staticwebassets/css/themes.css" Link="layout-styles/themes.css" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(PkgBlazorBlueprint_Components)/staticwebassets/blazorblueprint.css" Link="layout-styles/blazorblueprint.css" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

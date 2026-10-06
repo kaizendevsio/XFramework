@@ -738,6 +738,25 @@
     gap: 1rem;
 }
 .inv-report-filters > * { min-width: 0; }
+.inv-transaction-filters {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: end;
+    gap: 1rem;
+    width: min(100%, 54rem);
+    margin-bottom: 1rem;
+}
+.inv-transaction-filters > * { min-width: 0; }
+.inv-transaction-date-trigger { width: 100% !important; min-width: 0; }
+.tenant-module-dependencies { margin: .75rem 0; padding-left: 1.25rem; list-style: disc; overflow-wrap: anywhere; }
+.tenant-module-dependencies li { margin-bottom: .5rem; font-size: .875rem; }
+@media (max-width: 1000px) {
+    .inv-transaction-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .inv-transaction-filters > :first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+    .inv-transaction-filters { grid-template-columns: minmax(0, 1fr); }
+}
 @media (min-width: 1200px) {
     .inv-report-filters { grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, .85fr) auto; }
 }
