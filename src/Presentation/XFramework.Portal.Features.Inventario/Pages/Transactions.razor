@@ -20,27 +20,51 @@ else
 {
     <FadeInContent>
         <div class="space-y-6 inv-page">
-            <div class="flex items-center justify-between">
+            <div class="xf-page-header">
                 <div>
                     <BbTypographyH3>Sales Transactions</BbTypographyH3>
                     <BbTypographyMuted>This view contains Inventario product sales records. POS shipment and return references are recorded separately in the stock movement ledger.</BbTypographyMuted>
                 </div>
-                <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
-                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
-                    Refresh
-                </BbButton>
+                <div class="xf-page-actions">
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Refresh
+                    </BbButton>
+                </div>
             </div>
 
-            <BbCard>
+            <BbCard data-testid="inventory-transactions-surface">
                 <BbCardHeader>
                     <BbCardTitle>Sales Transaction History</BbCardTitle>
                     <BbCardDescription>@_transactions.Count sales transaction(s) loaded</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <a href="/inventario/stock">View stock movements</a><div class="xf-filter-actions"><BbFormFieldInput TValue="string" @bind-Value="_productSearch" Label="Product search" /><BbFormFieldDatePicker @bind-Value="_fromDate" Label="From date" /><BbFormFieldDatePicker @bind-Value="_toDate" Label="Through date" /></div><BbDataGrid Items="@_transactions.Where(x => (_fromDate == null || x.TransactionDate >= _fromDate) && (_toDate == null || x.TransactionDate < _toDate.Value.AddDays(1)) && GetProductName(x.ProductId).Contains(_productSearch, StringComparison.OrdinalIgnoreCase)).ToList()" ShowPagination="true" InitialPageSize="20"
+                    @if (_stockEnabled)
+                    {
+                        <div class="xf-page-actions mb-4">
+                            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo("/inventario/stock"))">
+                                <LucideIcon Name="arrow-right" class="mr-2 h-4 w-4" />View stock movements
+                            </BbButton>
+                        </div>
+                    }
+                    <div class="inv-transaction-filters" data-testid="inventory-transaction-filters">
+                        <div data-testid="transaction-product-filter">
+                            <BbFormFieldInput TValue="string" @bind-Value="_productSearch" Label="Product search" Placeholder="Search products" />
+                        </div>
+                        <div data-testid="transaction-from-filter">
+                            <BbFormFieldDatePicker @bind-Value="_fromDate" Label="From date" InputClass="inv-transaction-date-trigger" />
+                        </div>
+                        <div data-testid="transaction-through-filter">
+                            <BbFormFieldDatePicker @bind-Value="_toDate" Label="Through date" InputClass="inv-transaction-date-trigger" />
+                        </div>
+                    </div>
+                    <BbDataGrid Items="@_transactions.Where(x => (_fromDate == null || x.TransactionDate >= _fromDate) && (_toDate == null || x.TransactionDate < _toDate.Value.AddDays(1)) && GetProductName(x.ProductId).Contains(_productSearch, StringComparison.OrdinalIgnoreCase)).ToList()" ShowPagination="true" InitialPageSize="20"
                                 OnRowClick="@((ProductTransaction item) => Navigation.NavigateTo($"/inventario/transactions/{item.Id}"))"
                                 Class="cursor-pointer">
-                        <EmptyTemplate>No Inventario sales records match this scope. Open Stock movements for inventory changes, including POS shipments and returns.</EmptyTemplate><Columns>
+                        <EmptyTemplate>
+                            <BbEmpty Title="No sales transactions found" Description="No Inventario sales records match the selected filters." />
+                        </EmptyTemplate>
+                        <Columns>
                             <InventoryTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </InventoryTemplateColumn>
@@ -81,6 +105,7 @@ else
     private bool _loading = true;
     private bool _hasTenant;
     private bool _moduleEnabled;
+    private bool _stockEnabled;
 
     protected override void OnInitialized()
     {
@@ -99,7 +124,9 @@ else
         {
             await ModuleNavigation.EnsureLoadedAsync();
             _hasTenant = TenantFilter.SelectedTenantId is Guid;
-            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario);
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.InventarioTransactions);
+            _stockEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.InventarioStockBalances)
+                || ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.InventarioMovements);
             _transactions = [];
             _productNames = [];
             if (!_hasTenant || !_moduleEnabled) return;

@@ -43,6 +43,8 @@ Inventario is not the owner of identities, tenant membership, payments, wallet b
 - Variant-aware inventory must keep product and variant consistency across lots, balances, movements, reservations, purchase order lines, receiving lines, reorder rules, product transactions, and reports.
 - Use absolute variant prices. Preserve legacy `VariationType` and `AdditionalPrice` compatibility only where existing migration/API behavior requires it.
 - `Warehouse` contains `InventoryLocation` records. A stock operation must validate that locations belong to the selected warehouse when both are supplied.
+- POS register lists must not eagerly query warehouse/location lookups when `inventario.warehousing` is disabled. POS being enabled does not implicitly enable Inventario sub-features; show missing register setup prerequisites without hiding the register list or weakening backend gates.
+- Sales transaction filters need their own responsive grid tracks. Do not put product search and two date pickers into the fixed-width `xf-filter-actions` header toolbar; it can overflow left into the sidebar. Hide the stock-movement link when neither stock balances nor movements is enabled.
 - `InventoryLot` is traceability data. Lot numbers may repeat only where the configured uniqueness allows product/variant/warehouse scope. Lot validation must ensure the lot belongs to the same product and variant as the requested stock operation.
 - `StockBalance` is the current snapshot for product plus optional variant plus warehouse/location/lot dimensions.
 - `InventoryMovement` and `ProductTransaction` are operational/audit records. Do not update balances without writing the corresponding movement/transaction path.

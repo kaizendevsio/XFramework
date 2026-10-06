@@ -284,6 +284,26 @@ else
                                                 </div>
                                             }
 
+                                            @if (GetModuleDependencies(selectedRow).Count > 0)
+                                            {
+                                                <div class="tenant-module-preview-children" data-testid="module-feature-dependencies">
+                                                    <div class="tenant-module-preview-section-heading">Dependencies</div>
+                                                    <ul class="tenant-module-dependencies">
+                                                        @foreach (var dependency in GetModuleDependencies(selectedRow))
+                                                        {
+                                                            <li>@dependency</li>
+                                                        }
+                                                    </ul>
+                                                    @if (selectedRow.IsEnabled && HasMissingRequiredFeatures(selectedRow))
+                                                    {
+                                                        <BbButton Variant="ButtonVariant.Outline" Disabled="@_moduleFeatureChangeInProgress"
+                                                                  OnClick="@(() => ToggleSelectedModuleFeature(selectedRow, true))">
+                                                            <LucideIcon Name="link" class="mr-2 h-4 w-4" />Enable required features
+                                                        </BbButton>
+                                                    }
+                                                </div>
+                                            }
+
                                             @if (selectedChildren.Count > 0)
                                             {
                                                 <div class="tenant-module-preview-children">
@@ -541,6 +561,7 @@ else
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleFeatureDefinitionResolver ModuleFeatureDefinitionResolver { get; set; } = default!;
+    [Inject] private DialogService DialogService { get; set; } = default!;
     [Inject] private IIdentityServerServiceWrapper IdentityServer { get; set; } = default!;
     [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthenticationStateTask { get; set; }
 
@@ -576,10 +597,11 @@ else
     private List<TenantModuleFeature> _detailModuleFeatures = [];
     private List<Tenant> _tenantOptions = [];
     private List<ModuleFeatureRow> _moduleFeatureRows = [];
+    private IReadOnlyList<ResolvedTenantModuleFeatureDefinition> _resolvedModuleDefinitions = [];
+    private bool _moduleFeatureChangeInProgress;
     private List<ModuleFeatureTreeNode> _moduleFeatureTreeNodes = [];
     private HashSet<string> _moduleFeatureCheckedKeys = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> _expandedModuleFeatureKeys = new(StringComparer.OrdinalIgnoreCase);
-    private HashSet<Guid> _savingModuleFeatureIds = [];
     private bool _moduleFeaturesLoading;
     private string _selectedModuleFeatureKey = "";
     private string CurrentSection => NormalizeSection(Section);
@@ -832,6 +854,7 @@ else
                 }
             }
 
+            _resolvedModuleDefinitions = resolvedDefinitions;
             _moduleFeatureRows = resolvedDefinitions
                 .Select(resolved =>
                 {
@@ -973,22 +996,7 @@ else
             .Where(key => !desiredKeys.Contains(key))
             .ToList();
 
-        foreach (var key in disabledKeys)
-        {
-            if (FindModuleFeatureRow(key) is { } row)
-            {
-                await ToggleModuleFeature(row, enabled: false);
-            }
-        }
-
-        foreach (var key in enabledKeys)
-        {
-            if (FindModuleFeatureRow(key) is { } row)
-            {
-                await ToggleModuleFeature(row, enabled: true);
-            }
-        }
-
+        await ApplyModuleFeatureChanges(enabledKeys, disabledKeys);
         SyncModuleTreeCheckedState();
     }
 
@@ -1023,65 +1031,73 @@ else
 
     private async Task ToggleModuleFeature(ModuleFeatureRow row, bool enabled)
     {
-        if (enabled && row.IsBlocked)
-        {
-            ToastService.Warning($"Cannot enable {row.DisplayName}: {row.DependencySummary}", "Missing dependency");
-            return;
-        }
+        await ApplyModuleFeatureChanges(enabled ? [row.Key] : [], enabled ? [] : [row.Key]);
+    }
 
-        if (row.Id == Guid.Empty)
-        {
-            ToastService.Warning("Module toggle is still initializing. Refresh the page and try again.", "Toggle unavailable");
-            return;
-        }
-
-        _savingModuleFeatureIds.Add(row.Id);
+    private async Task ApplyModuleFeatureChanges(IReadOnlyList<string> enableKeys, IReadOnlyList<string> disableKeys)
+    {
+        if (_moduleFeatureChangeInProgress || _tenant is null) return;
+        _moduleFeatureChangeInProgress = true;
+        var tenantId = Id;
+        var stamp = _tenant.ConcurrencyStamp;
         try
         {
+            var plan = TenantModuleFeatureEnablementPlanner.Create(_resolvedModuleDefinitions,
+                _moduleFeatureCheckedKeys, enableKeys, disableKeys);
+            if (plan.Errors.Count > 0)
+            {
+                ToastService.Warning(string.Join(" ", plan.Errors), "Feature dependencies");
+                return;
+            }
+            var changes = plan.EnableKeys.Concat(plan.DisableKeys).Select(FindModuleFeatureRow).ToList();
+            if (changes.Any(row => row is null || row.Id == Guid.Empty))
+            {
+                ToastService.Warning("Module toggles are still initializing. Refresh and try again.", "Toggle unavailable");
+                return;
+            }
+            if (changes.Count == 0) return;
+            var additionalKeys = plan.EnableKeys.Except(enableKeys, StringComparer.OrdinalIgnoreCase).ToList();
+            if (additionalKeys.Count > 0)
+            {
+                var names = string.Join(", ", additionalKeys.Select(key => FindModuleFeatureRow(key)!.DisplayName));
+                var confirmation = await DialogService.ConfirmAsync("Enable required features?",
+                    $"Enabling this feature will also enable these required features or modules for this tenant: {names}. Optional dependencies will not be changed.",
+                    new ConfirmDialogOptions { ConfirmText = "Enable features", CancelText = "Cancel" });
+                if (!confirmation.Confirmed) return;
+            }
+            if (Id != tenantId || _tenant?.Id != tenantId || _tenant.ConcurrencyStamp != stamp) return;
             var result = await IdentityServer.SetTenantModuleFeatures(new SetTenantModuleFeaturesRequest
             {
-                TenantId = Id,
-                ExpectedConcurrencyStamp = _tenant!.ConcurrencyStamp,
-                Features =
-                [
-                    new TenantModuleFeatureUpdate
+                TenantId = tenantId,
+                ExpectedConcurrencyStamp = stamp,
+                Features = changes.Select(row => new TenantModuleFeatureUpdate
                     {
-                        ModuleKey = row.ModuleKey,
+                        ModuleKey = row!.ModuleKey,
                         SubFeatureKey = row.SubFeatureKey,
                         DisplayName = row.DisplayName,
                         Description = row.Description,
-                        IsEnabled = enabled
-                    }
-                ]
+                        IsEnabled = plan.EnableKeys.Contains(row.Key, StringComparer.OrdinalIgnoreCase)
+                    }).ToList()
             });
             if (result.IsSuccess)
             {
                 await RefreshTenantConcurrencyStamp();
-                row.IsEnabled = enabled;
-                var cachedFeature = _detailModuleFeatures.FirstOrDefault(item => item.Id == row.Id);
-                if (cachedFeature is not null)
-                {
-                    cachedFeature.IsEnabled = enabled;
-                    cachedFeature.ModifiedAt = DateTime.UtcNow;
-                }
-
-                SyncModuleTreeCheckedState();
-                ToastService.Success($"{row.DisplayName} {(enabled ? "enabled" : "disabled")}.", "Module updated");
+                ToastService.Success("Features updated, including required dependencies.", "Modules updated");
             }
             else
             {
-                ToastService.Error($"{row.DisplayName} could not be updated.", "Save failed");
-                await LoadModuleFeatures();
+                ToastService.Error("Features could not be updated. Settings have been reloaded; try again.", "Save failed");
             }
+            await LoadModuleFeatures();
         }
         catch
         {
-            ToastService.Error($"{row.DisplayName} could not be updated.", "Save failed");
+            ToastService.Error("Features could not be updated.", "Save failed");
             await LoadModuleFeatures();
         }
         finally
         {
-            _savingModuleFeatureIds.Remove(row.Id);
+            _moduleFeatureChangeInProgress = false;
             SyncModuleTreeCheckedState();
         }
     }
@@ -1324,8 +1340,24 @@ else
             : "Feature enabled";
 
     private bool CanToggleModuleFeature(ModuleFeatureRow row) =>
-        !_savingModuleFeatureIds.Contains(row.Id) &&
-        (row.IsEnabled || !row.IsBlocked);
+        !_moduleFeatureChangeInProgress && row.Id != Guid.Empty &&
+        (row.IsEnabled || GetEnablementPlan(row).Errors.Count == 0);
+
+    private TenantModuleFeatureEnablementPlan GetEnablementPlan(ModuleFeatureRow row) =>
+        TenantModuleFeatureEnablementPlanner.Create(_resolvedModuleDefinitions, _moduleFeatureCheckedKeys, [row.Key], []);
+
+    private bool HasMissingRequiredFeatures(ModuleFeatureRow row) => GetEnablementPlan(row).EnableKeys.Count > 0;
+
+    private IReadOnlyList<string> GetModuleDependencies(ModuleFeatureRow row)
+    {
+        var definition = _resolvedModuleDefinitions.FirstOrDefault(x => x.Definition.Key == row.Key);
+        if (definition is null) return [];
+        var required = TenantModuleFeatureEnablementPlanner.RequiredKeys(definition).Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(key => $"{FindModuleFeatureRow(key)?.DisplayName ?? key} - Required - {(_moduleFeatureCheckedKeys.Contains(key) ? "Enabled" : "Disabled")}");
+        var other = definition.Dependencies.Where(x => !x.Required || x.Kind != Bolt.Domain.Shared.Contracts.ServiceDiscovery.BoltDependencyKind.TenantFeature)
+            .Select(x => $"{x.DisplayName ?? x.Key} - {(x.Required ? "Required" : "Optional")} ({x.Kind})");
+        return required.Concat(other).ToList();
+    }
 
     private ModuleFeatureRow? FindModuleFeatureRow(string key) =>
         _moduleFeatureRows.FirstOrDefault(row =>

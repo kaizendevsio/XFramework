@@ -27,6 +27,25 @@ Portal pages must use the most business-aware API available.
 
 The Blazor `IDataContext` migration removed generated per-entity CRUD wrapper properties. It did not make `IDataContext` the default write path for every Portal action.
 
+## Tenant Feature Dependencies
+
+The Modules preview lists required and optional dependencies, including enabled ones.
+Built-in prerequisites live on `TenantModuleFeatureDefinition.RequiredFeatureKeys`;
+Bolt-discovered features contribute their declared dependency requirements. Enabling a child
+also requires its module root. The Portal plans the transitive required-feature closure and
+asks for confirmation before enabling additional features. Optional dependencies are not
+enabled automatically, and unavailable services or unknown required features block the plan.
+Existing enabled features with missing prerequisites expose an explicit repair action.
+
+Submit the entire confirmed change set through one `SetTenantModuleFeatures` wrapper call,
+using the tenant concurrency stamp. Cancel must perform no writes. Do not send sequential
+per-feature updates or replace backend authorization. Disable a dependent first before
+disabling a prerequisite; the Portal does not cascade-disable features.
+
+POS Registers declares Identity Credentials, Wallets, and Inventario Warehousing prerequisites;
+POS Sales also declares catalog/reservation access, and POS Returns declares stock movements.
+These flags permit workflows but do not create credentials, wallets, warehouses, or inventory.
+
 ## Wrapper First For Business Workflows
 
 A Portal action should call a service wrapper when any of these are true:

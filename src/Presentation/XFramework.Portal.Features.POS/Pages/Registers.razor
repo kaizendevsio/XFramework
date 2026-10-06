@@ -26,7 +26,7 @@ else
                     <BbTypographyMuted>Configure cashier registers, default stock location, and cash drawer wallet.</BbTypographyMuted>
                 </div>
                 <div class="xf-page-actions">
-                    <BbButton OnClick="@OpenCreateDialog">
+                    <BbButton OnClick="@OpenCreateDialog" Disabled="@(_missingSetupFeatures.Count > 0)">
                         <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
                         Create Register
                     </BbButton>
@@ -38,6 +38,13 @@ else
             </div>
 
             <section class="pos-list-surface" data-testid="pos-list-surface">
+                @if (_missingSetupFeatures.Count > 0)
+                {
+                    <BbAlert Variant="AlertVariant.Warning" data-testid="pos-register-setup-warning">
+                        <BbAlertTitle>Register setup needs additional features</BbAlertTitle>
+                        <BbAlertDescription>Enable @string.Join(", ", _missingSetupFeatures) in the tenant's Modules settings to create a register. Existing registers can still be listed.</BbAlertDescription>
+                    </BbAlert>
+                }
                 <BbTypographyMuted data-testid="pos-list-result-count">@(string.IsNullOrWhiteSpace(_loadError) ? $"{_registers.Count} register(s) loaded" : "Register data is unavailable")</BbTypographyMuted>
                 <div class="pos-list-content">
                     @if (!string.IsNullOrWhiteSpace(_loadError))
@@ -237,6 +244,7 @@ else
     [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
     [Inject] private IPortalModuleAvailability ModuleNavigation { get; set; } = default!;
     [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
+    [Inject] private Microsoft.Extensions.Logging.ILogger<Registers> Logger { get; set; } = default!;
 
     private readonly RegisterForm _form = new();
     private List<PosRegisterResponse> _registers = [];
@@ -246,6 +254,7 @@ else
     private List<Wallets.Domain.Shared.Contracts.CurrencyType> _currencies = [];
     private List<Warehouse> _warehouses = [];
     private List<InventoryLocation> _locations = [];
+    private readonly List<string> _missingSetupFeatures = [];
     private bool _loading = true;
     private bool _saving;
     private bool _hasTenant;
@@ -291,6 +300,20 @@ else
             _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "registers");
 
             _registers = [];
+            _credentials = [];
+            _wallets = [];
+            _walletTypes = [];
+            _currencies = [];
+            _warehouses = [];
+            _locations = [];
+            _dialogOpen = false;
+            _missingSetupFeatures.Clear();
+            if (!ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.IdentityCredentials))
+                _missingSetupFeatures.Add("Identity Credentials");
+            if (!ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Wallets))
+                _missingSetupFeatures.Add("Wallets");
+            if (!ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.InventarioWarehousing))
+                _missingSetupFeatures.Add("Inventario Warehousing");
             _loadError = null;
             if (!_hasTenant || !_moduleEnabled || TenantFilter.SelectedTenantId is not Guid tenantId)
                 return;
@@ -307,7 +330,8 @@ else
         }
         catch (Exception ex)
         {
-            _loadError = ex.Message;
+            Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(Logger, ex, "Could not load POS registers or setup references.");
+            _loadError = "Register data is temporarily unavailable.";
             _registers = [];
             _hasNextRegisterPage = false;
         }
@@ -320,6 +344,7 @@ else
 
     private void OpenCreateDialog()
     {
+        if (_missingSetupFeatures.Count > 0) return;
         _form.Reset();
         _form.MerchantCredentialId = _credentials.FirstOrDefault()?.Id.ToString() ?? "";
         _form.CashDrawerWalletId = _wallets.FirstOrDefault()?.Id.ToString() ?? "";
@@ -394,6 +419,7 @@ else
 
     private async Task SearchCredentials(string search)
     {
+        if (!ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.IdentityCredentials)) return;
         if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
         var selected = _credentials.FirstOrDefault(item => item.Id.ToString() == _form.MerchantCredentialId);
         var query = DataContext.Query<IdentityCredential>().IgnoreQueryFilters().NoCache()
@@ -409,6 +435,7 @@ else
 
     private async Task SearchWallets(string search)
     {
+        if (!ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Wallets)) return;
         if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
         var selected = _wallets.FirstOrDefault(item => item.Id.ToString() == _form.CashDrawerWalletId);
         var query = DataContext.Query<Wallet>().IgnoreQueryFilters().NoCache()
@@ -424,6 +451,7 @@ else
 
     private async Task SearchWalletTypes(string search)
     {
+        if (!ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Wallets)) return;
         if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
         var selected = _walletTypes.FirstOrDefault(item => item.Id.ToString() == _form.WalletTypeId);
         var query = DataContext.Query<Wallets.Domain.Shared.Contracts.WalletType>().IgnoreQueryFilters().NoCache()
@@ -439,6 +467,7 @@ else
 
     private async Task SearchCurrencies(string search)
     {
+        if (!ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Wallets)) return;
         if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
         var selected = _currencies.FirstOrDefault(item => item.Id.ToString() == _form.CurrencyId);
         var query = DataContext.Query<Wallets.Domain.Shared.Contracts.CurrencyType>().IgnoreQueryFilters().NoCache()
@@ -456,6 +485,7 @@ else
 
     private async Task SearchWarehouses(string search)
     {
+        if (!ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.InventarioWarehousing)) return;
         if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
         var selected = _warehouses.FirstOrDefault(item => item.Id.ToString() == _form.DefaultWarehouseId);
         var query = DataContext.Query<Warehouse>().IgnoreQueryFilters().NoCache()
@@ -471,6 +501,7 @@ else
 
     private async Task SearchLocations(string search)
     {
+        if (!ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.InventarioWarehousing)) return;
         if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
         var selected = _locations.FirstOrDefault(item => item.Id.ToString() == _form.DefaultLocationId);
         var query = DataContext.Query<InventoryLocation>().IgnoreQueryFilters().NoCache()

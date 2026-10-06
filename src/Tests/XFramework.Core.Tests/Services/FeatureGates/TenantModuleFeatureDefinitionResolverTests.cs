@@ -52,6 +52,8 @@ public sealed class TenantModuleFeatureDefinitionResolverTests
         resolved.Definition.DefaultEnabled.Should().BeFalse();
         resolved.MissingRequiredDependencies.Should().ContainSingle()
             .Which.Should().Contain("Residents");
+        resolved.Dependencies.Should().ContainSingle().Which.Key.Should().Be("juan_barangay.residents");
+        resolved.UnavailableRequiredDependencies.Should().BeEmpty("a disabled tenant feature can be enabled after confirmation");
     }
 
     [Test]
@@ -94,6 +96,7 @@ public sealed class TenantModuleFeatureDefinitionResolverTests
         resolved.IsBlocked.Should().BeFalse();
         resolved.Definition.DefaultEnabled.Should().BeTrue();
         resolved.MissingRequiredDependencies.Should().BeEmpty();
+        resolved.Dependencies.Should().ContainSingle("enabled dependencies must remain visible in the preview");
     }
 
     [Test]

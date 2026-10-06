@@ -9,4 +9,5 @@ public sealed record TenantModuleFeatureDefinition(
     bool DefaultEnabled = true)
 {
     public string Key => TenantModuleFeatureKeys.Combine(ModuleKey, SubFeatureKey);
+    public IReadOnlyList<string> RequiredFeatureKeys { get; init; } = [];
 }

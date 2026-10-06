@@ -120,10 +120,13 @@ public static class TenantModuleFeatureKeys
         new(Inventario, InventarioReportingSubFeature, "Reporting", "Inventory analytics, valuation, audit, and operational reports.", "bar-chart-3", false),
         new(Inventario, NegativeStockSubFeature, "Negative Stock", "Controls for allowing or blocking negative stock positions.", "circle-minus", false),
         new(Pos, string.Empty, "POS", "Point of sale checkout, payment capture, returns, and receipts.", "scan-barcode"),
-        new(Pos, RegistersSubFeature, "POS Registers", "Register setup, default warehouse/location, cash drawer wallet, and merchant credentials.", "store"),
-        new(Pos, SalesSubFeature, "POS Sales", "Cashier checkout, receipts, inventory reservation, and sale recovery.", "receipt"),
+        new(Pos, RegistersSubFeature, "POS Registers", "Register setup, default warehouse/location, cash drawer wallet, and merchant credentials.", "store")
+            { RequiredFeatureKeys = [IdentityCredentials, Wallets, InventarioWarehousing] },
+        new(Pos, SalesSubFeature, "POS Sales", "Cashier checkout, receipts, inventory reservation, and sale recovery.", "receipt")
+            { RequiredFeatureKeys = [PosRegisters, InventarioCatalog, InventarioReservations] },
         new(Pos, CartsSubFeature, "POS Carts", "Suspended cashier carts for queue recovery and later checkout.", "shopping-cart"),
-        new(Pos, ReturnsSubFeature, "POS Returns", "Partial and full returns with inventory restock and Wallets refunds.", "undo-2"),
+        new(Pos, ReturnsSubFeature, "POS Returns", "Partial and full returns with inventory restock and Wallets refunds.", "undo-2")
+            { RequiredFeatureKeys = [PosSales, InventarioMovements] },
         new(Pos, PosReportingSubFeature, "POS Reporting", "POS sales, return, and cash drawer reporting views.", "bar-chart-3", false),
         new(Communications, string.Empty, "Communications", "Tenant communications settings, administration, moderation, and chat platform controls.", "messages-square"),
         new(Communications, ChatSubFeature, "Communications Chat", "Threads, direct messages, reactions, and attachments.", "message-circle"),

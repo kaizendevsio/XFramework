@@ -14,6 +14,44 @@ Its explicit save/reload case changes only the selected register description, ve
 value after a fresh wrapper read, and restores the original description in `finally`. Run it only
 against a disposable tenant with the two opt-in guards shown below.
 
+## Default-Tenant Register And Transaction Regression
+
+`PortalModuleDependenciesE2ETests` creates an isolated QA tenant through the Portal and
+verifies dependency preview, repair confirmation/cancellation, persistence, prerequisite
+disable protection, and ordinary checkbox enablement. Set `PORTAL_E2E_BASE_URL` plus either
+`PORTAL_E2E_STORAGE_STATE` (an authorized Playwright state file outside source control) or
+`PORTAL_E2E_USERNAME` / `PORTAL_E2E_PASSWORD`. Explicitly opt in with
+`PORTAL_E2E_ALLOW_TENANT_CREATION=1`. The synthetic tenant is retained for rechecks, with no
+business records or funds. Never run against a production tenant or commit the state file.
+
+```powershell
+dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj --filter "FullyQualifiedName~PortalModuleDependenciesE2ETests"
+```
+
+`PosRegisterFeatureAvailabilityTests` renders the actual Registers component with strict
+read-only query mocks. It checks empty and populated register lists with warehousing,
+wallets, or credentials disabled, plus the fully enabled case. Disabled-feature lookups
+must never run; register creation must explain its missing prerequisites.
+
+`InventarioTransactionLayoutTests` renders the actual Transactions component with shipped
+styles in Chromium at 1920, 768, and 390 pixels in both themes. It asserts filter-control
+containment, no overlapping fields, and no horizontal document overflow. These are isolated
+layout checks, not live authenticated E2E tests.
+
+`PortalTenantSetupE2ETests` is the separate live acceptance suite for the same scenario.
+Set `PORTAL_E2E_BASE_URL`, `PORTAL_E2E_USERNAME`, `PORTAL_E2E_PASSWORD`, and
+`PORTAL_E2E_DEFAULT_TENANT_NAME`. Use a disposable empty tenant with default feature toggles:
+POS registers and Inventario transactions enabled, Inventario warehousing disabled.
+The suite selects the tenant through the real profile menu, refreshes the register list,
+checks its setup warning, and checks transaction search, date-picker opening, and responsive
+filter bounds. It does not create or update business records; login/logout creates normal
+session/audit records. Missing configuration fails an explicitly selected run.
+
+```powershell
+dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj --filter "FullyQualifiedName~PosRegisterFeatureAvailabilityTests|FullyQualifiedName~InventarioTransactionLayoutTests"
+dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj --filter "FullyQualifiedName~PortalTenantSetupE2ETests"
+```
+
 ## Prerequisites
 
 - .NET 10 SDK, the existing restored NuGet packages, and Playwright Chromium.
