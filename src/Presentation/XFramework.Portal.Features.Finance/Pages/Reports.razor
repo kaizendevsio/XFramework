@@ -15,7 +15,7 @@
         <div class="financial-report-filter"><BbLabel>From (UTC)</BbLabel><BbDatePicker @bind-Value="_from" Class="w-full" DateFormat="yyyy-MM-dd" Editable="true" /></div>
         <div class="financial-report-filter"><BbLabel>Through (UTC)</BbLabel><BbDatePicker @bind-Value="_through" Class="w-full" DateFormat="yyyy-MM-dd" Editable="true" /></div>
         <BbButton OnClick="@Apply" Disabled="@_loading">Apply</BbButton>
-        <label class="financial-report-live"><BbSwitch @bind-Value="_live" />Live</label>
+        <label class="financial-report-live"><BbSwitch @bind-Checked="_live" />Live</label>
         @if (_report is not null) { <span class="text-sm text-muted-foreground">Updated @_report.GeneratedAt.ToLocalTime().ToString("HH:mm:ss")</span> }
     </div>
     @if (_error is not null) { <BbAlert Variant="AlertVariant.Danger"><BbAlertTitle>Report unavailable</BbAlertTitle><BbAlertDescription>@_error</BbAlertDescription></BbAlert> }

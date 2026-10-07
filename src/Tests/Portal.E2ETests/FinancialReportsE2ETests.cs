@@ -249,6 +249,34 @@ public sealed class FinancialReportsE2ETests : PageTest
     }
 
     [Test]
+    public async Task LiveSwitch_DisableStopsPolling_AndEnableResumesIt()
+    {
+        var from = new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc);
+        var calls = 0;
+        wrapper.Setup(x => x.WalletFinancialReport(It.Is<WalletFinancialReportRequest>(r => r.From == from), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => {
+                Interlocked.Increment(ref calls);
+                return new CmdResponse<WalletFinancialReportResponse> { HttpStatusCode = HttpStatusCode.OK,
+                    Response = new() { TenantId = tenantId, GeneratedAt = DateTime.UtcNow } };
+            });
+        await Page.GotoAsync(app.Urls.Single() + $"/finance/reports?tenant={tenantId}&from=2026-05-01&through=2026-05-07");
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Current balances" })).ToBeVisibleAsync();
+        var toggle = Page.GetByRole(AriaRole.Switch);
+        await Expect(toggle).ToBeCheckedAsync();
+        await toggle.ClickAsync();
+        await Expect(toggle).Not.ToBeCheckedAsync();
+        var paused = Volatile.Read(ref calls);
+        await Task.Delay(TimeSpan.FromSeconds(32));
+        Volatile.Read(ref calls).Should().Be(paused);
+        await toggle.ClickAsync();
+        await Expect(toggle).ToBeCheckedAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(35));
+        while (Volatile.Read(ref calls) == paused) await Task.Delay(100, timeout.Token);
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "PDF", Exact = true })).ToBeEnabledAsync();
+        errors.Should().BeEmpty();
+    }
+
+    [Test]
     public async Task SharedPdfExporter_PaginatesLongTables_EmbedsUnicodeFont_AndTreatsLabelsAsText()
     {
         await Page.GotoAsync(app.Urls.Single() + "/finance/reports");
