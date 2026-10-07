@@ -4,7 +4,8 @@ namespace POS.Domain.Shared.Contracts.Responses;
 
 [MemoryPackable]
 public partial record PosScannerPairingResponse(
-    Guid PairingId, string DesktopKey, string Challenge, DateTimeOffset ChallengeExpiresAt);
+    Guid PairingId, string DesktopKey, string Challenge, DateTimeOffset ChallengeExpiresAt,
+    string PairingCode = "");
 
 [MemoryPackable]
 public partial record PosScannerPhoneResponse(

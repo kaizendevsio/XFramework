@@ -2,7 +2,6 @@
 .scanner-live { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .scanner-pairing-content { display: grid; justify-items: center; gap: 12px; padding-block: 12px; min-width: 0; }
 .scanner-pairing-content img { width: 240px; max-width: 100%; height: auto; aspect-ratio: 1; background: white; }
-.scanner-pairing-content a { text-decoration: underline; }
+.scanner-short-code { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: 0; min-height: 42px; }
+::deep .scanner-phone-link { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; }
 .scanner-pairing-content p { margin: 0; }
-.scanner-pairing-content details { width: 100%; }
-.scanner-pairing-content code { display: block; overflow-wrap: anywhere; }

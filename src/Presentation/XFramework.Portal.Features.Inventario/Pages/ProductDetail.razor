@@ -903,7 +903,7 @@ else
             _outsideTenantContext = _product is not null && _product.TenantId != TenantFilter.SelectedTenantId;
             if (_product is null || _outsideTenantContext) return;
 
-            _currency = await InventoryDisplay.CurrencyAsync(DataContext, _product.TenantId);
+            _currency = await InventoryDisplay.CurrencyAsync(Inventario, _product.TenantId);
             await LoadProductData(_product.TenantId);
             if (!_editMode)
                 LoadProductForm();

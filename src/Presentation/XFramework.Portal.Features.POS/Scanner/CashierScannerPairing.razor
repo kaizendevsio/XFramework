@@ -4,6 +4,7 @@
 @inject NavigationManager Navigation
 @inject IPortalTenantContext Tenant
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@inject BlazorBlueprint.Primitives.Services.IFocusManager Focus
 
 <link rel="stylesheet" href="/_content/XFramework.Portal.Features.POS/XFramework.Portal.Features.POS.bundle.scp.css" />
 
@@ -14,8 +15,8 @@
     <span class="scanner-live" role="status" aria-live="polite">@_status</span>
 </div>
 
-<BbDialog @bind-Open="_dialogOpen">
-    <BbDialogContent>
+<BbDialog Open="@_dialogOpen" OpenChanged="DialogOpenChanged">
+    <BbDialogContent TrapFocus="true" CloseOnEscape="false" @onkeydown="PairingKeyDown">
         <BbDialogHeader>
             <BbDialogTitle>@(_paired ? "Phone connected" : "Scan with phone")</BbDialogTitle>
             <BbDialogDescription>@_status</BbDialogDescription>
@@ -23,25 +24,50 @@
         <div class="scanner-pairing-content">
             @if (_error is not null) { <BbAlert><BbAlertDescription>@_error</BbAlertDescription></BbAlert> }
             @if (_busy) { <BbSpinner /> }
-            @if (_pairing is not null && !_paired)
+            @if (PairingExpired)
+            {
+                <p role="status" data-testid="pairing-expired">Pairing code expired</p>
+            }
+            else if (_pairing is not null && !_paired)
             {
                 @if (_qrSource is not null) { <img src="@_qrSource" width="240" height="240" alt="One-time phone pairing QR" /> }
-                <p>Expires @_pairing.ChallengeExpiresAt.ToLocalTime().ToString("HH:mm:ss")</p>
-                <a href="@_scannerUrl" target="_blank" rel="noopener noreferrer">Phone scanner</a>
-                <p>Sign in on the phone first, then scan this QR. If login loses the pairing code, scan it again.</p>
-                <details><summary>Pairing code</summary><code>@_pairing.Challenge</code></details>
+                <output class="scanner-short-code" aria-label="Six-digit pairing code" data-testid="pairing-short-code">@_pairing.PairingCode</output>
+                <p role="timer" aria-live="off" data-testid="pairing-countdown">Expires in @Countdown</p>
+            }
+            @if (_scannerUrl.Length > 0)
+            {
+                <BbPopover Open="@_phoneLinkOpen" OpenChanged="PhoneLinkOpenChanged" RestoreFocusOnClose="true">
+                    <BbPopoverTrigger AsChild="false" class="scanner-phone-link" aria-label="Phone scanner">
+                        <LucideIcon Name="smartphone" Size="18" />Phone scanner
+                    </BbPopoverTrigger>
+                    <BbPopoverContent Class="scanner-phone-popover" aria-label="Phone scanner" CloseOnClickOutside="false" CloseOnEscape="true" ZIndex="90"
+                                      OnContentReady="PhoneContentReady"
+                                      style="width: min(280px, calc(100vw - 32px));">
+                        <div @ref="_phoneLinkContent">
+                            @if (_phoneLinkQrSource is not null)
+                            {
+                                <img src="@_phoneLinkQrSource" width="240" height="240" alt="Phone scanner HTTPS landing QR"
+                                     style="max-width: 100%; height: auto; background: white;" />
+                            }
+                            <BbButton OnClick="@(() => PhoneLinkOpenChanged(false))" Variant="ButtonVariant.Outline" aria-label="Close phone scanner QR" title="Close phone scanner QR">
+                                <LucideIcon Name="x" Size="18" />
+                            </BbButton>
+                        </div>
+                    </BbPopoverContent>
+                    @if (_phoneLinkOpen) { <XfPopoverClickOutside /> }
+                </BbPopover>
             }
         </div>
         <BbDialogFooter>
-            @if (_pairing is null)
+            @if (_pairing is null || PairingExpired)
             {
-                <BbButton OnClick="Create" Disabled="@(_busy || Disabled)"><LucideIcon Name="qr-code" Size="18" />Pair phone</BbButton>
+                <BbButton OnClick="NewPairing" Disabled="@(_busy || Disabled)"><LucideIcon Name="qr-code" Size="18" />@(PairingExpired ? "New pairing code" : "Pair phone")</BbButton>
             }
             else
             {
                 <BbButton OnClick="Disconnect" Variant="ButtonVariant.Outline"><LucideIcon Name="unplug" Size="18" />Disconnect</BbButton>
             }
-            <BbButton OnClick="@(() => _dialogOpen = false)" Variant="ButtonVariant.Outline">Done</BbButton>
+            <BbButton OnClick="@(() => DialogOpenChanged(false))" Variant="ButtonVariant.Outline">Done</BbButton>
         </BbDialogFooter>
     </BbDialogContent>
 </BbDialog>
@@ -53,9 +79,17 @@
     [Parameter, EditorRequired] public EventCallback<string> ScanReceived { get; set; }
     private readonly CancellationTokenSource _lifetime = new();
     private Task? _polling;
+    private Task? _countdown;
     private PosScannerPairingResponse? _pairing;
     private IJSObjectReference? _script;
     private string? _qrSource;
+    private string? _phoneLinkQrSource;
+    private bool _phoneLinkOpen;
+    private ElementReference _phoneLinkContent;
+    private IAsyncDisposable? _phoneFocusTrap;
+    private long _phoneFocusVersion;
+    private bool _expired;
+    private DateTimeOffset _now = DateTimeOffset.UtcNow;
     private Guid _registerId;
     private Guid? _tenantId;
     private long _acknowledged;
@@ -67,11 +101,19 @@
     private string? _error;
     private string _scannerUrl = "";
 
-    protected override void OnInitialized() => Tenant.OnChanged += TenantChanged;
+    private int RemainingSeconds => _pairing is null ? 0 : Math.Max(0, (int)Math.Ceiling((_pairing.ChallengeExpiresAt - _now).TotalSeconds));
+    private string Countdown => TimeSpan.FromSeconds(RemainingSeconds).ToString(@"mm\:ss", System.Globalization.CultureInfo.InvariantCulture);
+    private bool PairingExpired => _expired || (_pairing is not null && !_paired && RemainingSeconds == 0);
+
+    protected override void OnInitialized()
+    {
+        Tenant.OnChanged += TenantChanged;
+        _countdown = TickCountdown();
+    }
 
     protected override async Task OnParametersSetAsync()
     {
-        if (Disabled) _dialogOpen = false;
+        if (Disabled) await DialogOpenChanged(false);
         if (_pairing is not null && (RegisterId != _registerId || Tenant.SelectedTenantId != _tenantId))
             await Disconnect();
     }
@@ -81,7 +123,70 @@
     private async Task OpenPairing()
     {
         _dialogOpen = true;
-        if (_pairing is null) await Create();
+        if (_pairing is null && !_expired) await Create();
+    }
+
+    private async Task DialogOpenChanged(bool open)
+    {
+        _dialogOpen = open;
+        if (!open) await PhoneLinkOpenChanged(false);
+    }
+
+    private async Task PhoneLinkOpenChanged(bool open)
+    {
+        _phoneLinkOpen = open;
+        if (open) return;
+        _phoneFocusVersion++;
+        var trap = _phoneFocusTrap;
+        _phoneFocusTrap = null;
+        if (trap is not null) await DisposePhoneFocus(trap);
+    }
+
+    private async Task PhoneContentReady()
+    {
+        // The popover lives outside the dialog DOM, so it needs its own native focus scope.
+        var version = ++_phoneFocusVersion;
+        var trap = await Focus.TrapFocus(_phoneLinkContent);
+        if (_disposed || !_phoneLinkOpen || version != _phoneFocusVersion)
+        { await DisposePhoneFocus(trap); return; }
+        var previous = _phoneFocusTrap;
+        _phoneFocusTrap = trap;
+        if (previous is not null) await DisposePhoneFocus(previous);
+    }
+
+    private static async Task DisposePhoneFocus(IAsyncDisposable trap)
+    {
+        try { await trap.DisposeAsync(); }
+        catch (Exception exception) when (exception is JSDisconnectedException or TaskCanceledException) { }
+    }
+
+    // Scope Escape to this DOM subtree; the portaled popover handles its own Escape.
+    private async Task PairingKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape" && !_phoneLinkOpen) await DialogOpenChanged(false);
+    }
+
+    private async Task NewPairing()
+    {
+        if (_busy || _disposed || Disabled) return;
+        await Disconnect();
+        await Create();
+    }
+
+    private async Task TickCountdown()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_lifetime.Token))
+                await InvokeAsync(() =>
+                {
+                    if (_disposed) return;
+                    _now = DateTimeOffset.UtcNow;
+                    if (_dialogOpen && !_paired) StateHasChanged();
+                });
+        }
+        catch (OperationCanceledException) { }
     }
 
     private async Task Create()
@@ -92,6 +197,9 @@
         _scannerUrl = new Uri(origin!, "/pos/mobile-scanner").AbsoluteUri;
         _busy = true;
         _error = null;
+        _expired = false;
+        _phoneLinkOpen = false;
+        _now = DateTimeOffset.UtcNow;
         _registerId = RegisterId;
         _tenantId = Tenant.SelectedTenantId;
         if (_tenantId.HasValue) _scannerUrl += "?tenant=" + _tenantId.Value;
@@ -103,6 +211,7 @@
             }, _lifetime.Token);
             if (!result.IsSuccess || result.Response is null) { _error = result.Message ?? "Pairing unavailable."; return; }
             _pairing = result.Response;
+            _now = DateTimeOffset.UtcNow;
             if (_disposed || RegisterId != _registerId || Tenant.SelectedTenantId != _tenantId)
             { await Disconnect(); return; }
             _acknowledged = 0;
@@ -117,6 +226,9 @@
                 if (current != _pairing || _disposed) return;
                 var source = await _script.InvokeAsync<string>("qrData", _scannerUrl + "#" + current.Challenge);
                 if (current == _pairing && !_disposed) _qrSource = source;
+                if (current != _pairing || _disposed) return;
+                var landing = await _script.InvokeAsync<string>("qrData", _scannerUrl);
+                if (current == _pairing && !_disposed) _phoneLinkQrSource = landing;
             }
             catch (JSException) { _error = "Pairing QR could not load. Use the pairing code."; }
         }
@@ -157,7 +269,14 @@
                     }
                     if (current != _pairing || _disposed) return;
                     if (!result.IsSuccess || result.Response is null)
-                    { _error = result.Message ?? "Scanner pairing ended."; await Disconnect(); StateHasChanged(); return; }
+                    {
+                        var expired = !_paired && current.ChallengeExpiresAt <= DateTimeOffset.UtcNow;
+                        _error = expired ? null : result.Message ?? "Scanner pairing ended.";
+                        await Disconnect();
+                        if (expired) { _expired = true; _status = "Pairing code expired"; }
+                        StateHasChanged();
+                        return;
+                    }
                     _paired = result.Response.IsPaired;
                     _status = _paired ? (Disabled ? "Phone connected; cashier busy" : "Phone connected") : "Waiting for phone";
                     foreach (var code in result.Response.Codes)
@@ -196,6 +315,9 @@
         var current = _pairing;
         _pairing = null;
         _qrSource = null;
+        _phoneLinkQrSource = null;
+        await PhoneLinkOpenChanged(false);
+        _expired = false;
         _paired = false;
         _status = "Not paired";
         if (current is null) return;
@@ -213,6 +335,7 @@
         _disposed = true;
         Tenant.OnChanged -= TenantChanged;
         await _lifetime.CancelAsync();
+        if (_countdown is not null) await _countdown;
         await Disconnect();
         if (_script is not null)
         {

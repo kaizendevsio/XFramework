@@ -67,6 +67,7 @@ public sealed class PosScannerCreateIntegrationTests
         result.Data.Should().NotBeNull();
         result.Data!.PairingId.Should().NotBeEmpty();
         result.Data.Challenge.Should().HaveLength(64);
+        result.Data.PairingCode.Should().MatchRegex("^[0-9]{6}$");
         result.Data.DesktopKey.Should().HaveLength(64);
         features.VerifyAll();
         var phoneActor = new TrustedActorIdentity(actor.CredentialId, actor.IdentityId, actor.TenantId,

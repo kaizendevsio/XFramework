@@ -2,7 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using POS.Domain.Shared.Contracts;
 using POS.Domain.Shared.Contracts.Requests;
 using POS.Domain.Shared.Contracts.Responses;
+using POS.Api.Features.Scanner.Claim;
 using XFramework.Core.Patterns;
+using XFramework.Core.RateLimiting;
 using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.Contracts.Requests;
@@ -14,8 +16,10 @@ namespace POS.Api.Services;
 public sealed class PosScannerService(
     AppDbContext db, IPosRequestContextResolver resolver,
     ITrustedInvocationContextAccessor invocation, ITenantModuleFeatureService features,
-    PosScannerPairingStore store, TimeProvider clock)
+    PosScannerPairingStore store, TimeProvider clock, IDistributedSecurityRateLimiter? claimLimiter = null)
 {
+    internal static readonly StrictSecurityRateLimitPolicy ActorClaimPolicy = new("pos-scanner-actor", 5, TimeSpan.FromMinutes(2));
+    internal static readonly StrictSecurityRateLimitPolicy GlobalClaimPolicy = new("pos-scanner-global", 500, TimeSpan.FromMinutes(2));
     public async Task<Result<PosScannerPairingResponse>> CreateAsync(CreatePosScannerPairingRequest request, CancellationToken ct)
     {
         var actor = await AuthorizeAsync(request, ct);
@@ -33,8 +37,28 @@ public sealed class PosScannerService(
     public async Task<Result<PosScannerPhoneResponse>> ClaimAsync(ClaimPosScannerPairingRequest request, CancellationToken ct)
     {
         var actor = await AuthorizeAsync(request, ct);
-        return actor.IsSuccess ? store.Claim(actor.Data!, request.Challenge) :
-            Result<PosScannerPhoneResponse>.Failure(actor.Message!, actor.StatusCode);
+        if (!actor.IsSuccess)
+            return Result<PosScannerPhoneResponse>.Failure(actor.Message!, actor.StatusCode);
+        if (!(await new ClaimPosScannerPairingValidator().ValidateAsync(request, ct)).IsValid)
+            return Result<PosScannerPhoneResponse>.Failure("Enter exactly six digits or use a valid pairing QR, not both.", 400);
+        if (!string.IsNullOrEmpty(request.PairingCode))
+        {
+            try
+            {
+                if (claimLimiter is null)
+                    return Result<PosScannerPhoneResponse>.Failure("Manual pairing is temporarily unavailable. Use the pairing QR.", 503);
+                // The actor budget is shared across sessions and delegated tenants, never keyed by client metadata.
+                // Apply the global budget first to bound the number of actor counter keys per window.
+                var globalLimit = await claimLimiter.AcquireAsync(GlobalClaimPolicy, "all", ct);
+                if (!globalLimit.IsAllowed || !(await claimLimiter.AcquireAsync(ActorClaimPolicy, actor.Data!.CredentialId.ToString("N"), ct)).IsAllowed)
+                    return Result<PosScannerPhoneResponse>.Failure("Too many pairing attempts. Try again after two minutes.", 429);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                return Result<PosScannerPhoneResponse>.Failure("Manual pairing is temporarily unavailable. Use the pairing QR.", 503);
+            }
+        }
+        return store.Claim(actor.Data!, string.IsNullOrEmpty(request.PairingCode) ? request.Challenge : request.PairingCode);
     }
 
     public async Task<Result<PosScannerSendResponse>> SendAsync(SendPosScannerCodeRequest request, CancellationToken ct)

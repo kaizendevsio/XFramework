@@ -10,8 +10,12 @@ public static class AllocationStatusReportEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["inventario.reporting:view"],
         RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
-    [MapGet("/api/inventario/reports/reservation-allocations", Tags = ["Inventario Reports"])]
+    [MapGet("/api/inventario/reports/reservation-allocations", Tags = ["Inventario Reports"],
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["inventario.reporting:view"],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     public static async Task<Result<List<ReservationAllocationStatusReportRow>>> Handle(
         GetReservationAllocationStatusReportRequest request,
         InventoryReportingService reportingService,

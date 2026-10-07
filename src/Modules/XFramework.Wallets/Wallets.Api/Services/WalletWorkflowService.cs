@@ -13,7 +13,7 @@ using XFramework.Domain.Shared.Enums;
 
 namespace Wallets.Api.Services;
 
-public sealed class WalletWorkflowService(
+public sealed partial class WalletWorkflowService(
     DbContext dbContext,
     IWalletRequestContextResolver contextResolver,
     IWalletFeatureGateService featureGateService,

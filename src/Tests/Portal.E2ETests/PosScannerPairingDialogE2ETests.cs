@@ -8,6 +8,7 @@ using BlazorBlueprint.Primitives.Services;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Hosting;
@@ -30,6 +31,7 @@ using XFramework.Portal.Features.POS.Scanner;
 using XFramework.Portal.Shared;
 using XFramework.Portal.Shared.Components;
 using XFramework.Portal.Shared.Services;
+using System.Security.Claims;
 
 namespace Portal.E2ETests;
 
@@ -65,6 +67,7 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
         builder.Services.AddScoped<XfPortalService>();
         builder.Services.Replace(ServiceDescriptor.Scoped<IPortalService>(sp => sp.GetRequiredService<XfPortalService>()));
         builder.Services.AddSingleton(state);
+        builder.Services.AddScoped<AuthenticationStateProvider, PosScannerFixtureAuthentication>();
         builder.Services.AddSingleton(Mock.Of<IPortalTenantContext>(t => t.SelectedTenantId == state.TenantId));
         builder.Services.AddSingleton(Mock.Of<IDataContext>());
         builder.Services.AddSingleton(Mock.Of<IPortalModuleAvailability>());
@@ -74,7 +77,9 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
         wrapper.Setup(w => w.CreatePosScannerPairing(It.IsAny<CreatePosScannerPairingRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() =>
             {
-                state.LatestPairing = new(Guid.NewGuid(), new string('B',64), new string('A',64), DateTimeOffset.UtcNow.AddMinutes(2));
+                state.LatestPairing = new(Guid.NewGuid(), new string('B',64), new string('A',64),
+                    DateTimeOffset.UtcNow.AddSeconds(state.ExpirySeconds),
+                    Interlocked.Increment(ref state.NextPairingCode).ToString("D6",System.Globalization.CultureInfo.InvariantCulture));
                 state.ActivePairings.TryAdd(state.LatestPairing.PairingId,0);
                 return new CmdResponse<PosScannerPairingResponse> { HttpStatusCode = HttpStatusCode.OK, Response = state.LatestPairing };
             });
@@ -82,6 +87,9 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
             .ReturnsAsync((PollPosScannerCodesRequest request, CancellationToken _) =>
             {
                 if (!state.ActivePairings.ContainsKey(request.PairingId))
+                    return new QueryResponse<PosScannerPollResponse> { HttpStatusCode = HttpStatusCode.Forbidden };
+                if (!state.Paired && state.LatestPairing is { } pairing && pairing.PairingId == request.PairingId &&
+                    pairing.ChallengeExpiresAt <= DateTimeOffset.UtcNow)
                     return new QueryResponse<PosScannerPollResponse> { HttpStatusCode = HttpStatusCode.Forbidden };
                 Interlocked.Increment(ref state.Polls);
                 if (request.PauseDelivery) Interlocked.Increment(ref state.PausedPolls);
@@ -101,6 +109,15 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
                     Response = new(state.Paired, DateTimeOffset.UtcNow.AddMinutes(30),
                         codes)
                 };
+            });
+        wrapper.Setup(w => w.ClaimPosScannerPairing(It.IsAny<ClaimPosScannerPairingRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ClaimPosScannerPairingRequest request, CancellationToken _) =>
+            {
+                state.Claims.Enqueue(request);
+                if (request.PairingCode != "000007" && request.Challenge != new string('A',64))
+                    return new CmdResponse<PosScannerPhoneResponse> { HttpStatusCode = HttpStatusCode.Forbidden, Message = "Pairing denied." };
+                return new CmdResponse<PosScannerPhoneResponse>
+                { HttpStatusCode = HttpStatusCode.OK, Response = new(Guid.NewGuid(), new string('C',64), "Fixture register", DateTimeOffset.UtcNow.AddMinutes(30)) };
             });
         wrapper.Setup(w => w.RevokePosScannerPairing(It.IsAny<RevokePosScannerPairingRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((RevokePosScannerPairingRequest request,CancellationToken _) =>
@@ -146,6 +163,7 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
         // A disconnected Blazor circuit can retain its component briefly; old fixture pairings fail closed.
         state.ActivePairings.Clear();
         state.Paired = false; state.Pending = false;
+        state.ExpirySeconds = 120; state.NextPairingCode = 6; state.Claims.Clear();
         state.Polls = 0; state.PausedPolls = 0; state.Revokes = 0; state.Acknowledged = 0;
         state.QueuedScan = null; state.LatestPairing = null; state.Cashier = null; state.FinancialCalls = 0;
         state.RevokedPairings.Clear(); state.CatalogRequests.Clear();
@@ -165,8 +183,8 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
         await Page.GetByRole(AriaRole.Button, new() { Name = "Scan with phone", Exact = true }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Dialog)).ToBeVisibleAsync();
         await Expect(Page.GetByAltText("One-time phone pairing QR")).ToBeVisibleAsync();
-        var link = Page.GetByRole(AriaRole.Link, new() { Name = "Phone scanner" });
-        (await link.GetAttributeAsync("href")).Should().Be("https://scanner.fixture.invalid/pos/mobile-scanner?tenant=" + state.TenantId);
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Phone scanner", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByTestId("pairing-short-code")).ToHaveTextAsync("000007");
         (await Page.GetByRole(AriaRole.Dialog).EvaluateAsync<bool>("e=>{const r=e.getBoundingClientRect();return r.left>=0 && r.right<=innerWidth}")).Should().BeTrue();
         var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory,"artifacts","pos-scanner");
         Directory.CreateDirectory(directory);
@@ -195,6 +213,147 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         while (!predicate()) await Task.Delay(50,timeout.Token);
+    }
+
+    [TestCase(390,844)]
+    [TestCase(1366,768)]
+    public async Task ShortPairing_PhoneLandingPopover_KeyboardOutsideFocusAndSeparateQr(int width,int height)
+    {
+        await Page.SetViewportSizeAsync(width,height);
+        var errors = new ConcurrentQueue<string>();
+        Page.PageError += (_, message) => errors.Enqueue(message);
+        await Page.GetByRole(AriaRole.Button,new() {Name="Scan with phone",Exact=true}).ClickAsync();
+        await Expect(Page.GetByAltText("One-time phone pairing QR")).ToBeVisibleAsync();
+        var dialog = Page.GetByRole(AriaRole.Dialog,new() {Name="Scan with phone",Exact=true});
+        var modalButtons = dialog.Locator("button:not([disabled])");
+        await modalButtons.Last.FocusAsync();
+        await Page.Keyboard.PressAsync("Tab");
+        await Expect(modalButtons.First).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Shift+Tab");
+        await Expect(modalButtons.Last).ToBeFocusedAsync();
+        var pairingUrl = new Uri(await DecodeQr("One-time phone pairing QR"));
+        pairingUrl.Fragment.Should().Be("#" + new string('A',64));
+        pairingUrl.Query.Should().Be("?tenant=" + state.TenantId);
+        var trigger = Page.GetByRole(AriaRole.Button,new() {Name="Phone scanner",Exact=true});
+        await trigger.FocusAsync();
+        await Page.Keyboard.PressAsync("Enter");
+        var popover = Page.Locator(".scanner-phone-popover");
+        await Expect(popover).ToBeVisibleAsync();
+        await Expect(popover).ToHaveAttributeAsync("aria-label","Phone scanner");
+        var closePopover = Page.GetByRole(AriaRole.Button,new() {Name="Close phone scanner QR",Exact=true});
+        await Expect(closePopover).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Tab");
+        await Expect(closePopover).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Shift+Tab");
+        await Expect(closePopover).ToBeFocusedAsync();
+        var landingUrl = new Uri(await DecodeQr("Phone scanner HTTPS landing QR"));
+        landingUrl.AbsoluteUri.Should().Be("https://scanner.fixture.invalid/pos/mobile-scanner?tenant=" + state.TenantId);
+        landingUrl.Fragment.Should().BeEmpty("the landing QR is not a pairing credential");
+        (await popover.EvaluateAsync<bool>("e=>{const r=e.getBoundingClientRect();return r.left>=0 && r.right<=innerWidth}")).Should().BeTrue();
+        var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory,"artifacts","pos-scanner");
+        Directory.CreateDirectory(directory);
+        await Page.ScreenshotAsync(new() {Path=Path.Combine(directory,$"pairing-landing-popover-{width}.png"),FullPage=true});
+        await Page.GetByAltText("Phone scanner HTTPS landing QR").ClickAsync();
+        await Expect(popover).ToBeVisibleAsync();
+        await Page.GetByRole(AriaRole.Button,new() {Name="Close phone scanner QR",Exact=true}).FocusAsync();
+        await Page.Keyboard.PressAsync("Escape");
+        await Expect(popover).ToBeHiddenAsync();
+        await Expect(Page.GetByAltText("One-time phone pairing QR")).ToBeVisibleAsync();
+        await Expect(trigger).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Space");
+        await Expect(popover).ToBeVisibleAsync();
+        await Page.GetByRole(AriaRole.Heading,new() {Name="Scan with phone",Exact=true}).ClickAsync();
+        await Expect(popover).ToBeHiddenAsync();
+        await Expect(Page.GetByAltText("One-time phone pairing QR")).ToBeVisibleAsync();
+        for (var i = 0; i < 3; i++)
+        {
+            await trigger.ClickAsync();
+            await Expect(popover).ToBeVisibleAsync();
+            await Page.GetByRole(AriaRole.Button,new() {Name="Close phone scanner QR",Exact=true}).ClickAsync();
+            await Expect(popover).ToBeHiddenAsync();
+            await Expect(trigger).ToBeFocusedAsync();
+        }
+        await trigger.FocusAsync();
+        await Page.Keyboard.PressAsync("Enter");
+        await Expect(popover).ToBeVisibleAsync();
+        await trigger.FocusAsync();
+        await Expect(trigger).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Escape");
+        await Expect(popover).ToBeHiddenAsync();
+        await Expect(Page.GetByAltText("One-time phone pairing QR")).ToBeVisibleAsync();
+        await Expect(trigger).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Escape");
+        await Expect(Page.GetByAltText("One-time phone pairing QR")).ToBeHiddenAsync();
+        state.Revokes.Should().Be(0,"Escape closes pairing content without revoking its lifetime");
+        errors.Should().BeEmpty("the safe outside-click helper must survive repeated disposal");
+    }
+
+    private Task<string> DecodeQr(string alt) => Page.GetByAltText(alt).EvaluateAsync<string>("""
+        async image => {
+            await image.decode();
+            const scanner = await import('/_content/XFramework.Portal.Features.POS/scanner/scanner.js');
+            const canvas = document.createElement('canvas');
+            canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+            const ctx = canvas.getContext('2d'); ctx.drawImage(image,0,0);
+            const pixels = ctx.getImageData(0,0,canvas.width,canvas.height);
+            return (await scanner.decode(pixels))[0].text;
+        }
+        """);
+
+    [Test]
+    public async Task ShortPairing_CountdownTicks_ExpiryHidesCredentials_RefreshCreatesNewPairing()
+    {
+        state.ExpirySeconds = 5;
+        await Page.GetByRole(AriaRole.Button,new() {Name="Scan with phone",Exact=true}).ClickAsync();
+        await Expect(Page.GetByTestId("pairing-short-code")).ToHaveTextAsync("000007");
+        var initial = await Page.GetByTestId("pairing-countdown").TextContentAsync();
+        initial.Should().MatchRegex("^Expires in 00:0[1-5]$");
+        await Expect(Page.GetByTestId("pairing-countdown")).Not.ToHaveTextAsync(initial!,new() {Timeout=3000});
+        var original = state.LatestPairing!.PairingId;
+        await Expect(Page.GetByTestId("pairing-expired")).ToBeVisibleAsync(new() {Timeout=10000});
+        await Expect(Page.GetByTestId("pairing-short-code")).ToBeHiddenAsync();
+        await Expect(Page.GetByAltText("One-time phone pairing QR")).ToBeHiddenAsync();
+        state.ExpirySeconds = 120;
+        await Page.GetByRole(AriaRole.Button,new() {Name="New pairing code",Exact=true}).ClickAsync();
+        await Expect(Page.GetByTestId("pairing-short-code")).ToHaveTextAsync("000008");
+        state.LatestPairing!.PairingId.Should().NotBe(original);
+        await Wait(() => state.RevokedPairings.Contains(original));
+    }
+
+    [Test]
+    public async Task ShortPairing_MobileManualEntry_ExactSixDigitsLeadingZeroAndDenial()
+    {
+        await Page.GotoAsync(app.Urls.Single() + "/pos/mobile-scanner?tenant=" + state.TenantId);
+        var code = Page.GetByLabel("Six-digit pairing code",new() {Exact=true});
+        var pair = Page.GetByRole(AriaRole.Button,new() {Name="Pair desktop",Exact=true});
+        await Expect(code).ToHaveAttributeAsync("inputmode","numeric");
+        await Expect(code).ToHaveAttributeAsync("maxlength","6");
+        foreach (var invalid in new[] {"","12345","abc123"})
+        {
+            await code.FillAsync(invalid);
+            await code.BlurAsync();
+            await Expect(pair).ToBeDisabledAsync();
+        }
+        await code.FillAsync("000008"); await code.BlurAsync();
+        await pair.ClickAsync();
+        await Expect(Page.GetByText("Pairing denied.",new() {Exact=true})).ToBeVisibleAsync();
+        await code.FillAsync("000007"); await code.BlurAsync();
+        await pair.ClickAsync();
+        await Expect(Page.GetByTestId("scanner-status")).ToHaveTextAsync("Paired");
+        state.Claims.Select(c=>c.PairingCode).Should().Equal("000008","000007");
+        state.Claims.Should().OnlyContain(c=>c.Challenge == "" && c.Metadata.RequestedTenantId == state.TenantId);
+    }
+
+    [Test]
+    public async Task ShortPairing_MobileFragment_RetainedInMemoryNotManualInputOrQuery()
+    {
+        await Page.GotoAsync(app.Urls.Single() + "/pos/mobile-scanner?tenant=" + state.TenantId + "#" + new string('A',64));
+        await Expect(Page.GetByRole(AriaRole.Button,new() {Name="Pair desktop",Exact=true})).ToBeEnabledAsync();
+        await Expect(Page.GetByLabel("Six-digit pairing code",new() {Exact=true})).ToHaveValueAsync("");
+        new Uri(Page.Url).Fragment.Should().BeEmpty();
+        await Page.GetByRole(AriaRole.Button,new() {Name="Pair desktop",Exact=true}).ClickAsync();
+        await Expect(Page.GetByTestId("scanner-status")).ToHaveTextAsync("Paired");
+        state.Claims.Should().ContainSingle(c=>c.Challenge == new string('A',64) && c.PairingCode == "" && c.Metadata.RequestedTenantId == state.TenantId);
     }
 
     [TestCase(390,844)]
@@ -293,6 +452,9 @@ public sealed class PairingFixtureState
     public ConcurrentQueue<Guid> RevokedPairings { get; } = new();
     public ConcurrentDictionary<Guid,byte> ActivePairings { get; } = new();
     public ConcurrentQueue<SearchPosCatalogRequest> CatalogRequests { get; } = new();
+    public ConcurrentQueue<ClaimPosScannerPairingRequest> Claims { get; } = new();
+    public int ExpirySeconds = 120;
+    public int NextPairingCode = 6;
     public int FinancialCalls;
     public volatile bool Paired;
     public volatile bool Pending;
@@ -306,17 +468,29 @@ public sealed record PairingFixtureQueuedScan(Guid PairingId,long Sequence,strin
 
 [Route("/scanner-pairing-fixture")]
 [Route("/cashier-scanner-fixture")]
+[Route("/pos/mobile-scanner")]
 public sealed class PosPairingFixtureRoot : ComponentBase
 {
     [Inject] public NavigationManager Navigation { get; set; } = null!;
     protected override void BuildRenderTree(RenderTreeBuilder b)
     {
         b.AddMarkupContent(0,"<!doctype html><html data-base-color='zinc' data-primary-color='green'><head><base href='/'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/css/themes.css'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/blazorblueprint.css'><link rel='stylesheet' href='cashier-css/app.css'><style>body{margin:16px;font-family:Arial}button{gap:8px}.app-main{height:100dvh}</style></head><body>");
-        b.OpenComponent(1,new Uri(Navigation.Uri).AbsolutePath == "/cashier-scanner-fixture" ? typeof(PosScannerFixtureCashierSurface) : typeof(PosPairingFixtureSurface));
+        b.OpenComponent(1,new Uri(Navigation.Uri).AbsolutePath switch
+        {
+            "/cashier-scanner-fixture" => typeof(PosScannerFixtureCashierSurface),
+            "/pos/mobile-scanner" => typeof(MobileScanner),
+            _ => typeof(PosPairingFixtureSurface)
+        });
         b.AddComponentRenderMode(new InteractiveServerRenderMode(prerender:false));
         b.CloseComponent();
         b.AddMarkupContent(2,"<script src='_framework/blazor.web.js'></script></body></html>");
     }
+}
+
+public sealed class PosScannerFixtureAuthentication : AuthenticationStateProvider
+{
+    public override Task<AuthenticationState> GetAuthenticationStateAsync() => Task.FromResult(
+        new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name,"Scanner fixture cashier")],"fixture"))));
 }
 
 public sealed class PosScannerFixtureCashierSurface : ComponentBase

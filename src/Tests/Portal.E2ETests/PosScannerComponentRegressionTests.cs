@@ -1,5 +1,6 @@
 using System.Net;
 using System.Reflection;
+using BlazorBlueprint.Primitives.Services;
 using FluentAssertions;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.RenderTree;
@@ -112,6 +113,44 @@ public sealed class PosScannerComponentRegressionTests
 
     private static CmdResponse<PosScannerSendResponse> Sent(long sequence) => new()
     { HttpStatusCode = HttpStatusCode.OK, Response = new(sequence, false) };
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task Cashier_PopoverClosedDuringFocusRegistration_DisposesLateTrapWithoutClobberingReplacement(bool reopen)
+    {
+        var pending = new TaskCompletionSource<IAsyncDisposable>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var original = new TrackedFocusTrap();
+        var replacement = new TrackedFocusTrap();
+        var focus = new Mock<IFocusManager>();
+        focus.SetupSequence(f => f.TrapFocus(It.IsAny<ElementReference>()))
+            .Returns(pending.Task).ReturnsAsync(replacement);
+        var page = new EmptyPairing();
+        Inject(page,"Focus",focus.Object);
+        Inject(page,"Tenant",Mock.Of<IPortalTenantContext>());
+        Set(page,"_phoneLinkOpen",true);
+        await using var renderer = new EmptyRenderer();
+        renderer.Attach(page);
+        Task Ready() => renderer.Dispatcher.InvokeAsync(() =>
+            (Task)typeof(CashierScannerPairing).GetMethod("PhoneContentReady",Private)!.Invoke(page,null)!);
+        Task Close() => renderer.Dispatcher.InvokeAsync(() =>
+            (Task)typeof(CashierScannerPairing).GetMethod("PhoneLinkOpenChanged",Private)!.Invoke(page,[false])!);
+        var late = Ready();
+        await Close();
+        if (reopen) { Set(page,"_phoneLinkOpen",true); await Ready(); }
+        pending.SetResult(original);
+        await late;
+        original.Disposals.Should().Be(1);
+        if (reopen) Get(page,"_phoneFocusTrap").Should().BeSameAs(replacement);
+        else Get(page,"_phoneFocusTrap").Should().BeNull();
+        await Close();
+        replacement.Disposals.Should().Be(reopen ? 1 : 0);
+    }
+
+    private sealed class TrackedFocusTrap : IAsyncDisposable
+    {
+        public int Disposals { get; private set; }
+        public ValueTask DisposeAsync() { Disposals++; return ValueTask.CompletedTask; }
+    }
 
     [TestCase("stop")]
     [TestCase("dispose")]

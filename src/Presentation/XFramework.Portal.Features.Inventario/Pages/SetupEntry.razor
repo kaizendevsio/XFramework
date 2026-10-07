@@ -1,0 +1,46 @@
+@page "/inventario"
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Setup
+@implements IDisposable
+
+<PageTitle>Inventario - Portal</PageTitle>
+@if (_loading) { <CenteredSpinner /> }
+else if (TenantContext.SelectedTenantId is null) { <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" /> }
+else if (!_moduleEnabled) { <ModuleUnavailable ModuleName="Inventario" /> }
+else
+{ <BbAlert Variant="AlertVariant.Danger"><BbAlertDescription>Inventario setup status could not be loaded.</BbAlertDescription></BbAlert><BbButton OnClick="Load">Reload</BbButton> }
+
+@code {
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
+    [Inject] private IPortalTenantContext TenantContext { get; set; } = default!;
+    [Inject] private IPortalModuleAvailability Availability { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    private bool _loading = true, _moduleEnabled, _disposed;
+    private int _revision;
+    protected override void OnInitialized() { TenantContext.OnChanged += Changed; Availability.OnChanged += Changed; }
+    protected override Task OnInitializedAsync() => Load();
+    private void Changed()
+    {
+        if (_disposed) return;
+        _ = InvokeAsync(async () => { var pending = Load(); StateHasChanged(); await pending; if (!_disposed) StateHasChanged(); });
+    }
+    private bool Current(int revision, Guid? tenant) => !_disposed && revision == _revision && TenantContext.SelectedTenantId == tenant;
+    private async Task Load()
+    {
+        var revision = ++_revision;
+        var tenant = TenantContext.SelectedTenantId;
+        _loading = true;
+        try
+        {
+            await Availability.EnsureLoadedAsync();
+            if (!Current(revision, tenant)) return;
+            _moduleEnabled = Availability.ActiveTenantId == tenant && Availability.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario);
+            if (tenant is not Guid id || !_moduleEnabled) return;
+            var result = await Inventario.GetInventarioSetup(new GetInventarioSetupRequest { Metadata = new() { RequestedTenantId = id } });
+            if (!Current(revision, tenant) || !result.IsSuccess || result.Response?.TenantId != id) return;
+            Navigation.NavigateTo(result.Response.ShouldPrompt ? "/inventario/setup" : "/inventario/products", replace: true);
+        }
+        catch { }
+        finally { if (Current(revision, tenant)) _loading = false; }
+    }
+    public void Dispose() { _disposed = true; ++_revision; TenantContext.OnChanged -= Changed; Availability.OnChanged -= Changed; }
+}

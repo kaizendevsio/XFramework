@@ -10,8 +10,12 @@ public static class NearExpiryReportEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["inventario.reporting:view"],
         RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
-    [MapGet("/api/inventario/reports/near-expiry", Tags = ["Inventario Reports"])]
+    [MapGet("/api/inventario/reports/near-expiry", Tags = ["Inventario Reports"],
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["inventario.reporting:view"],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     public static async Task<Result<List<NearExpiryStockReportRow>>> Handle(
         GetNearExpiryStockReportRequest request,
         InventoryReportingService reportingService,

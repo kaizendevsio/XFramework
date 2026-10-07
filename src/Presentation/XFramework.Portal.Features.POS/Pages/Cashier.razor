@@ -20,7 +20,7 @@ else if (!_moduleEnabled)
 }
     @* Preserve pairing ownership while the unavailable cashier is hidden and paused. *@
     <div class="xf-fade-in pos-cashier-content" hidden="@(!IsCashierVisible)">
-        <div class="pos-cashier-page" data-testid="pos-cashier" data-focus="@(_focusMode ? "true" : "false")">
+        <div @ref="_cashierElement" class="pos-cashier-page" data-testid="pos-cashier" data-focus="false">
             <div class="xf-page-header pos-cashier-header">
                 <BbTypographyH3>Cashier</BbTypographyH3>
                 <div class="pos-register-picker" data-testid="pos-register-picker">
@@ -130,11 +130,12 @@ else if (!_moduleEnabled)
                               Disabled="@(IsInteractionLocked || _searching)" aria-label="Refresh catalog" title="Refresh catalog">
                         <LucideIcon Name="refresh-cw" class="h-4 w-4" />
                     </BbButton>
-                    <BbButton Size="ButtonSize.IconLarge" Variant="ButtonVariant.Ghost" OnClick="@(() => _focusMode = !_focusMode)"
-                              aria-label="@(_focusMode ? "Exit cashier focus" : "Enter cashier focus")"
-                              title="@(_focusMode ? "Exit cashier focus" : "Enter cashier focus")"
-                              aria-pressed="@_focusMode">
-                        <LucideIcon Name="@(_focusMode ? "minimize" : "maximize")" class="h-4 w-4" />
+                    <BbButton Size="ButtonSize.IconLarge" Variant="ButtonVariant.Ghost"
+                              Disabled="@(_focusControllerTask?.IsCompletedSuccessfully != true)"
+                              data-pos-focus-toggle="true" aria-label="Enter cashier focus"
+                              title="Enter cashier focus" aria-pressed="false">
+                        <span data-pos-focus-enter-icon><LucideIcon Name="maximize" class="h-4 w-4" /></span>
+                        <span data-pos-focus-exit-icon hidden><LucideIcon Name="minimize" class="h-4 w-4" /></span>
                     </BbButton>
                 </div>
             </div>
@@ -516,7 +517,6 @@ else if (!_moduleEnabled)
     private bool _heldCartsOpen;
     private bool _saleDetailsOpen;
     private bool _paymentOpen;
-    private bool _focusMode;
     private bool _adjustmentsOpen;
     private bool _reloading;
     private bool _reloadRequested;
@@ -531,6 +531,8 @@ else if (!_moduleEnabled)
     private string? _catalogError;
     private string _lastCatalogSearch = "";
     private Task<IJSObjectReference>? _scriptTask;
+    private ElementReference _cashierElement;
+    private Task<IJSObjectReference>? _focusControllerTask;
     private CartLine? _removedLine;
     private int _removedLineIndex;
     private string _catalogSearch = "";
@@ -656,6 +658,13 @@ else if (!_moduleEnabled)
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender)
+        {
+            _focusControllerTask = InitializeFocusAsync();
+            await _focusControllerTask;
+            if (!_disposed)
+                StateHasChanged();
+        }
         if (_dialogFocusTarget is { } target)
         {
             _dialogFocusTarget = null;
@@ -1600,6 +1609,9 @@ else if (!_moduleEnabled)
     private Task<IJSObjectReference> GetScriptAsync() => _scriptTask ??=
         JSRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/XFramework.Portal.Features.POS/cashier.js").AsTask();
 
+    private async Task<IJSObjectReference> InitializeFocusAsync() =>
+        await (await GetScriptAsync()).InvokeAsync<IJSObjectReference>("initializeFocus", _cashierElement);
+
     private async Task FocusCatalogSearchAsync()
     {
         if (_disposed)
@@ -1688,6 +1700,19 @@ else if (!_moduleEnabled)
         _searchVersion++;
         TenantFilter.OnChanged -= OnTenantChanged;
         ModuleNavigation.OnChanged -= OnTenantChanged;
+        if (_focusControllerTask is not null)
+        {
+            try
+            {
+                var controller = await _focusControllerTask;
+                await controller.InvokeVoidAsync("dispose");
+                await controller.DisposeAsync();
+            }
+            catch (Exception exception) when (exception is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+            {
+                // The browser document may already be gone during navigation or disconnect.
+            }
+        }
         if (_scriptTask is not null)
         {
             try

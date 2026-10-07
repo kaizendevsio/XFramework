@@ -1,0 +1,227 @@
+@page "/finance/reports"
+@implements IAsyncDisposable
+
+<PageTitle>Financial Reports - Portal</PageTitle>
+<div class="financial-report-page">
+    <div class="xf-page-header">
+        <div><BbTypographyH3>Financial Reports</BbTypographyH3><BbTypographyMuted>Wallet balances and posted activity by currency</BbTypographyMuted></div>
+        <div class="xf-page-actions">
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@LoadReport" Disabled="@_loading"><LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />Refresh</BbButton>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@CopyLink" Disabled="@(!CanExport)"><LucideIcon Name="link" class="mr-2 h-4 w-4" />Share link</BbButton>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@Export" Disabled="@(!CanExport || _exporting)"><LucideIcon Name="download" class="mr-2 h-4 w-4" />PDF</BbButton>
+        </div>
+    </div>
+    <div class="financial-report-filters">
+        <div class="financial-report-filter"><BbLabel>From (UTC)</BbLabel><BbDatePicker @bind-Value="_from" Class="w-full" DateFormat="yyyy-MM-dd" Editable="true" /></div>
+        <div class="financial-report-filter"><BbLabel>Through (UTC)</BbLabel><BbDatePicker @bind-Value="_through" Class="w-full" DateFormat="yyyy-MM-dd" Editable="true" /></div>
+        <BbButton OnClick="@Apply" Disabled="@_loading">Apply</BbButton>
+        <label class="financial-report-live"><BbSwitch @bind-Value="_live" />Live</label>
+        @if (_report is not null) { <span class="text-sm text-muted-foreground">Updated @_report.GeneratedAt.ToLocalTime().ToString("HH:mm:ss")</span> }
+    </div>
+    @if (_error is not null) { <BbAlert Variant="AlertVariant.Danger"><BbAlertTitle>Report unavailable</BbAlertTitle><BbAlertDescription>@_error</BbAlertDescription></BbAlert> }
+    @if (!_hasTenant) { <ModuleUnavailable ModuleName="Wallets" RequiresTenant="true" /> }
+    else if (!_enabled) { <ModuleUnavailable ModuleName="Wallets" /> }
+    else if (_report is not null)
+    {
+        <section class="financial-report-section">
+            <BbTypographyH4>Current balances</BbTypographyH4>
+            <BbDataGrid Items="@_report.Currencies" ShowPagination="false">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Currency)" Title="Currency" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.WalletCount)" Title="Wallets" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Balance)" Title="Balance" Format="N2" Sortable="true" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.AvailableBalance)" Title="Available" Format="N2" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.DebitHold)" Title="Debit hold" Format="N2" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.CreditHold)" Title="Credit hold" Format="N2" Filterable="true" />
+                </Columns>
+                <EmptyTemplate><BbEmpty Title="No wallets in this scope" /></EmptyTemplate>
+            </BbDataGrid>
+        </section>
+        <section class="financial-report-section">
+            <BbTypographyH4>Activity: @_appliedFrom.ToString("yyyy-MM-dd") to @_appliedThrough.ToString("yyyy-MM-dd") (UTC)</BbTypographyH4>
+            <BbDataGrid Items="@_report.Currencies" ShowPagination="false">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Currency)" Title="Currency" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Credits)" Title="Credits" Format="N2" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Debits)" Title="Debits (including fees)" Format="N2" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.EntryCount)" Title="Ledger entries" Filterable="true" />
+                </Columns>
+            </BbDataGrid>
+        </section>
+        @foreach (var currency in _report.Currencies)
+        {
+            var series = Daily(currency.CurrencyId);
+            <section class="financial-report-section" @key="@(currency.CurrencyId?.ToString() ?? "unspecified")">
+                <BbTypographyH4>Daily activity - @currency.Currency</BbTypographyH4>
+                <BbBarChart Data="@series" Height="280px">
+                    <BbXAxis DataKey="Date" /><BbYAxis /><BbChartTooltip /><BbChartLegend />
+                    <BbBar DataKey="Credits" Name="Credits" Color="#16a34a" />
+                    <BbBar DataKey="Debits" Name="Debits" Color="#2563eb" />
+                </BbBarChart>
+            </section>
+        }
+    }
+    else if (_loading) { <CenteredSpinner /> }
+</div>
+
+@code {
+    [Inject] private IWalletsServiceWrapper Wallets { get; set; } = default!;
+    [Inject] private IPortalTenantContext Tenant { get; set; } = default!;
+    [Inject] private IPortalModuleAvailability Modules { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+    [Inject] private ToastService Toast { get; set; } = default!;
+    [Inject] private ILogger<Reports> Logger { get; set; } = default!;
+    [SupplyParameterFromQuery(Name = "tenant")] public Guid? SharedTenant { get; set; }
+    [SupplyParameterFromQuery(Name = "from")] public string? SharedFrom { get; set; }
+    [SupplyParameterFromQuery(Name = "through")] public string? SharedThrough { get; set; }
+    private DateTime? _from = DateTime.UtcNow.Date.AddDays(-29);
+    private DateTime? _through = DateTime.UtcNow.Date;
+    private DateTime _appliedFrom = DateTime.UtcNow.Date.AddDays(-29);
+    private DateTime _appliedThrough = DateTime.UtcNow.Date;
+    private WalletFinancialReportResponse? _report;
+    private string? _error;
+    private bool _loading, _hasTenant, _enabled, _exporting, _disposed, _invalidLink;
+    private bool _live = true;
+    private long _version;
+    private readonly CancellationTokenSource _lifetime = new();
+    private CancellationTokenSource? _request;
+    private Task? _timer;
+    private IJSObjectReference? _exportModule;
+    private bool CanExport => !_loading && _error is null && _report is not null && _report.TenantId == Tenant.SelectedTenantId;
+
+    protected override void OnInitialized()
+    {
+        Tenant.OnChanged += ContextChanged;
+        Modules.OnChanged += ContextChanged;
+        _timer = RefreshLoop();
+    }
+    protected override async Task OnParametersSetAsync()
+    {
+        _version++; _request?.Cancel(); _request = null; _loading = false; _report = null;
+        var from = _appliedFrom;
+        var through = _appliedThrough;
+        _invalidLink = SharedFrom is not null && !TryDate(SharedFrom, out from) ||
+            SharedThrough is not null && !TryDate(SharedThrough, out through) || !ValidRange(from, through);
+        if (_invalidLink)
+        { _error = "The report link contains an invalid date."; _report = null; return; }
+        _appliedFrom = from; _appliedThrough = through;
+        _from = _appliedFrom; _through = _appliedThrough;
+        await LoadReport();
+    }
+    private static bool TryDate(string text, out DateTime date) => DateTime.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
+    private static bool ValidRange(DateTime from, DateTime through) => through >= from && through.Date < DateTime.MaxValue.Date && (through.Date - from.Date).TotalDays < 366;
+    private void ContextChanged()
+    {
+        _version++; _request?.Cancel(); _report = null;
+        _ = InvokeAsync(LoadReport);
+    }
+    private async Task Apply()
+    {
+        if (_from is not { } from || _through is not { } through || !ValidRange(from, through))
+        { _error = "Choose a reporting period of up to 366 days."; return; }
+        _invalidLink = false; _report = null;
+        _appliedFrom = from.Date; _appliedThrough = through.Date;
+        await LoadReport();
+    }
+    private async Task LoadReport()
+    {
+        if (_disposed) return;
+        if (_invalidLink) { _error = "The report link contains an invalid date."; return; }
+        var version = ++_version;
+        _request?.Cancel();
+        using var request = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _request = request; _loading = true; _error = null;
+        var tenantId = Tenant.SelectedTenantId;
+        try
+        {
+            await Modules.EnsureLoadedAsync();
+            if (version != _version || _disposed) return;
+            _hasTenant = tenantId.HasValue;
+            _enabled = Modules.IsFeatureEnabled(TenantModuleFeatureKeys.WalletsReporting);
+            if (SharedTenant is { } shared && shared != tenantId)
+            { _report = null; _error = "Select the report's tenant to view this link."; return; }
+            if (!_hasTenant || !_enabled) { _report = null; return; }
+            var result = await Wallets.WalletFinancialReport(new WalletFinancialReportRequest {
+                From = DateTime.SpecifyKind(_appliedFrom, DateTimeKind.Utc),
+                ToExclusive = DateTime.SpecifyKind(_appliedThrough.AddDays(1), DateTimeKind.Utc),
+                Metadata = new RequestMetadata { RequestedTenantId = tenantId, RequestId = Guid.NewGuid(), OperationName = "PortalFinancialReport" }
+            }, request.Token);
+            if (version != _version || _disposed || tenantId != Tenant.SelectedTenantId) return;
+            if (!result.IsSuccess || result.Response is null || result.Response.TenantId != tenantId)
+            { _report = null; _error = "Financial data could not be loaded. Check your report permissions and try again."; return; }
+            _report = result.Response;
+        }
+        catch (OperationCanceledException) when (request.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            if (version == _version && !_disposed) { _report = null; _error = "Financial data could not be loaded. Try Refresh."; Logger.LogWarning(ex, "Financial report failed"); }
+        }
+        finally
+        {
+            if (version == _version && !_disposed) { _request = null; _loading = false; StateHasChanged(); }
+        }
+    }
+    private async Task RefreshLoop()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+        try { while (await timer.WaitForNextTickAsync(_lifetime.Token)) if (_live && !_loading && _hasTenant && _enabled && !_invalidLink) await InvokeAsync(LoadReport); }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+    }
+    private List<DailyPoint> Daily(Guid? currencyId)
+    {
+        var points = _report!.DailyActivity.Where(x => x.CurrencyId == currencyId).ToDictionary(x => x.Date.Date);
+        return Enumerable.Range(0, (int)(_appliedThrough - _appliedFrom).TotalDays + 1).Select(offset => {
+            var date = _appliedFrom.AddDays(offset); points.TryGetValue(date, out var row);
+            return new DailyPoint(date.ToString("yyyy-MM-dd"), row?.Credits ?? 0, row?.Debits ?? 0);
+        }).ToList();
+    }
+    private async Task CopyLink()
+    {
+        if (!CanExport) return;
+        var url = new Uri(new Uri(Navigation.BaseUri), $"finance/reports?tenant={_report!.TenantId}&from={_appliedFrom:yyyy-MM-dd}&through={_appliedThrough:yyyy-MM-dd}").ToString();
+        try {
+            _exportModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/XFramework.Portal.Shared/reports/report-export.js");
+            if (!CanExport) return;
+            await _exportModule.InvokeVoidAsync("copyReportLink", url); Toast.Success("Report link copied.");
+        }
+        catch (JSException) { Toast.Error("Copy is unavailable in this browser."); }
+    }
+    private async Task Export()
+    {
+        if (!CanExport) return;
+        _exporting = true;
+        var snapshot = _report!;
+        var from = _appliedFrom; var through = _appliedThrough;
+        var charts = snapshot.Currencies.Select(currency => new {
+            title = $"Daily net wallet activity - {currency.Currency}",
+            labels = Daily(currency.CurrencyId).Select(x => x.Date).ToArray(),
+            values = Daily(currency.CurrencyId).Select(x => x.Credits - x.Debits).ToArray()
+        }).ToArray();
+        try
+        {
+            _exportModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/XFramework.Portal.Shared/reports/report-export.js");
+            if (_disposed || snapshot.TenantId != Tenant.SelectedTenantId) return;
+            await _exportModule.InvokeVoidAsync("exportPdf", new {
+                title = "Financial Report", tenantLabel = Tenant.SelectedTenantName,
+                generatedAt = snapshot.GeneratedAt.ToString("u"), scope = $"{from:yyyy-MM-dd} to {through:yyyy-MM-dd} UTC. Current balances; activity excludes holds and external counter-entries.", charts,
+                sections = new[] {
+                    new { heading = "Current balances", columns = new[] { "Currency", "Wallets", "Balance", "Available", "Debit hold", "Credit hold" }, rows = snapshot.Currencies.Select(x => new[] { x.Currency, x.WalletCount.ToString(), Money(x.Balance), Money(x.AvailableBalance), Money(x.DebitHold), Money(x.CreditHold) }).ToArray() },
+                    new { heading = "Posted activity", columns = new[] { "Currency", "Credits", "Debits incl. fees", "Entries" }, rows = snapshot.Currencies.Select(x => new[] { x.Currency, Money(x.Credits), Money(x.Debits), x.EntryCount.ToString() }).ToArray() }
+                }
+            });
+        }
+        catch (JSException ex) { Logger.LogWarning(ex, "Financial PDF export failed"); Toast.Error("PDF could not be generated. Try again."); }
+        finally { _exporting = false; }
+    }
+    private static string Money(decimal value) => value.ToString("N2", CultureInfo.InvariantCulture);
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true; _version++; Tenant.OnChanged -= ContextChanged; Modules.OnChanged -= ContextChanged;
+        _lifetime.Cancel(); _request?.Cancel();
+        if (_timer is not null) await _timer;
+        if (_exportModule is not null) try { await _exportModule.DisposeAsync(); } catch (JSDisconnectedException) { }
+        _lifetime.Dispose();
+    }
+    private sealed record DailyPoint(string Date, decimal Credits, decimal Debits);
+}

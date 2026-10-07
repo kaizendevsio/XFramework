@@ -1,0 +1,8 @@
+.financial-report-page { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; }
+.financial-report-filters { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem; }
+.financial-report-filter { width: 12rem; max-width: 100%; }
+.financial-report-filter ::deep input { min-width: 0; width: 100%; }
+.financial-report-filter ::deep > div { max-width: 100%; }
+.financial-report-live { display: flex; align-items: center; gap: .5rem; min-height: 2.5rem; }
+.financial-report-section { display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
+.financial-report-section ::deep h4 { font-size: 1.125rem; letter-spacing: 0; }

@@ -18,6 +18,7 @@
 @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario))
 {
     <SidebarSection GroupId="inventario" Title="Inventario" Icon="package">
+        <SidebarNavItem Href="/inventario" Label="Overview" Icon="layout-dashboard" Match="NavLinkMatch.All" />
         <SidebarNavItem Href="/inventario/products" Label="Products" Icon="package" />
         <SidebarNavItem Href="/inventario/categories" Label="Categories" Icon="folders" />
         @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "warehousing"))
@@ -56,6 +57,7 @@
             <SidebarNavItem Href="/inventario/transactions" Label="Sales Transactions" Icon="receipt-text" />
         }
         <SidebarNavItem Href="/inventario/settings" Label="Settings" Icon="settings" />
+        <SidebarNavItem Href="/inventario/setup" Label="Setup" Icon="list-checks" />
     </SidebarSection>
 }
 
@@ -148,6 +150,7 @@
         {
             <SidebarNavItem Href="/finance/wallet-operations" Label="Operations" Icon="receipt-text" />
             <SidebarNavItem Href="/finance/statements" Label="Statements" Icon="file-text" />
+            <SidebarNavItem Href="/finance/reports" Label="Reports" Icon="chart-column" />
             <SidebarNavItem Href="/finance/wallet-audit" Label="Audit" Icon="list-checks" />
         }
         @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsReconciliation))

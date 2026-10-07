@@ -10,8 +10,12 @@ public static class LowStockReportEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["inventario.reporting:view"],
         RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
-    [MapGet("/api/inventario/reports/low-stock", Tags = ["Inventario Reports"])]
+    [MapGet("/api/inventario/reports/low-stock", Tags = ["Inventario Reports"],
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["inventario.reporting:view"],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     public static async Task<Result<List<LowStockReportRow>>> Handle(
         GetLowStockReportRequest request,
         InventoryReportingService reportingService,

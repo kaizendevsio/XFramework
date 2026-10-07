@@ -1,0 +1,20 @@
+@inject IPortalModuleAvailability Availability
+
+<nav aria-label="Inventario configuration" class="space-y-3 mt-6">
+    <BbTypographyH4>Configuration</BbTypographyH4>
+    <div class="flex flex-wrap gap-4">
+        @foreach (var entry in Entries.Where(x => Availability.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, x.Feature)))
+        { <a href="@entry.Url" class="text-primary underline">@entry.Name</a> }
+    </div>
+</nav>
+
+@code {
+    private static readonly (string Name, string Url, string Feature)[] Entries =
+    [
+        ("Products", "/inventario/products", "catalog"), ("Categories", "/inventario/categories", "catalog"),
+        ("Warehouses and locations", "/inventario/warehouses", "warehousing"), ("Lots", "/inventario/lots", "traceability"),
+        ("Reorder rules", "/inventario/planning", "planning"), ("Suppliers", "/inventario/suppliers", "purchasing"),
+        ("Purchase orders", "/inventario/purchase-orders", "purchasing"), ("Receiving", "/inventario/receiving", "purchasing"),
+        ("Reservations", "/inventario/reservations", "reservations")
+    ];
+}

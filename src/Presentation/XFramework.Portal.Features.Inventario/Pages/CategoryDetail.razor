@@ -157,6 +157,7 @@ else
     [Parameter] public Guid Id { get; set; }
 
     [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
@@ -203,7 +204,7 @@ else
             _products = [];
 
             if (!_hasTenant || !_moduleEnabled) return;
-            _currency = await InventoryDisplay.CurrencyAsync(DataContext, TenantFilter.SelectedTenantId!.Value);
+            _currency = await InventoryDisplay.CurrencyAsync(Inventario, TenantFilter.SelectedTenantId!.Value);
 
             _category = await DataContext.Query<ProductCategory>()
                 .IgnoreQueryFilters()

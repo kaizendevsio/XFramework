@@ -1,0 +1,104 @@
+@implements IDisposable
+
+<div class="setup-wizard" data-testid="inventario-setup-wizard">
+    @if (_error is not null)
+    { <BbAlert Variant="AlertVariant.Danger" role="alert"><BbAlertDescription>@_error</BbAlertDescription></BbAlert> }
+    <fieldset disabled="@_saving">
+        <BbFormWizard OnComplete="ConfirmAsync" CompleteLabel="Confirm setup">
+            <ChildContent>
+                <BbWizardStep Title="Mode" Validator="ValidateMode">
+                    <InventorySelect TValue="string" Value="@_mode" ValueChanged="@(value => _mode = value)" Label="Setup mode" DisplayTextSelector="@(value => value == "advanced" ? "Advanced" : "Basic")">
+                        <BbSelectItem Value="@("basic")" Disabled="@(State.HasExistingConfiguration || !State.WarehousingEnabled)">Basic</BbSelectItem>
+                        <BbSelectItem Value="@("advanced")">Advanced</BbSelectItem>
+                    </InventorySelect>
+                    @if (State.HasExistingConfiguration)
+                    { <p>Existing configuration will be kept. Select existing storage records or explicitly add new ones.</p> }
+                    else
+                    { <p>Basic setup creates one warehouse and one picking location. Advanced setup includes storage details and existing configuration.</p> }
+                </BbWizardStep>
+                <BbWizardStep Title="Warehouse" Validator="ValidateWarehouse">
+                    @if (!State.WarehousingEnabled)
+                    { <BbAlert><BbAlertDescription>Warehousing is disabled. No warehouse or location will be created.</BbAlertDescription></BbAlert> }
+                    else
+                    {
+                        @if (Advanced)
+                        {
+                            <label class="setup-label" for="setup-warehouse">Warehouse</label>
+                            <BbCombobox Id="setup-warehouse" TValue="string" Value="@_warehouseId" ValueChanged="SelectWarehouse" Options="@WarehouseOptions" Placeholder="New warehouse" />
+                        }
+                        @if (_warehouseId == "")
+                        {
+                            <div class="setup-fields">
+                                <BbFormFieldInput TValue="string" @bind-Value="_warehouseCode" UpdateTiming="UpdateTiming.Immediate" Label="Warehouse code" Required="true" />
+                                <BbFormFieldInput TValue="string" @bind-Value="_warehouseName" UpdateTiming="UpdateTiming.Immediate" Label="Warehouse name" Required="true" />
+                                @if (Advanced)
+                                {
+                                    <BbFormFieldInput TValue="string" @bind-Value="_warehouseDescription" UpdateTiming="UpdateTiming.Immediate" Label="Warehouse description" />
+                                    <BbFormFieldInput TValue="string" @bind-Value="_address" UpdateTiming="UpdateTiming.Immediate" Label="Address" />
+                                    <BbFormFieldInput TValue="string" @bind-Value="_city" UpdateTiming="UpdateTiming.Immediate" Label="City" />
+                                    <BbFormFieldInput TValue="string" @bind-Value="_region" UpdateTiming="UpdateTiming.Immediate" Label="Region" />
+                                    <BbFormFieldInput TValue="string" @bind-Value="_postalCode" UpdateTiming="UpdateTiming.Immediate" Label="Postal code" />
+                                    <BbFormFieldInput TValue="string" @bind-Value="_countryCode" UpdateTiming="UpdateTiming.Immediate" Label="Country code" />
+                                    <BbFormFieldSwitch @bind-Checked="_isDefault" Label="Default warehouse (only when none exists)" />
+                                }
+                            </div>
+                        }
+                    }
+                </BbWizardStep>
+                <BbWizardStep Title="Location" Validator="ValidateLocation">
+                    @if (!State.WarehousingEnabled)
+                    { <p>No storage locations will be changed.</p> }
+                    else
+                    {
+                        @if (Advanced && _warehouseId != "")
+                        {
+                            <label class="setup-label" for="setup-location">Location</label>
+                            <BbCombobox Id="setup-location" TValue="string" @bind-Value="_locationId" Options="@LocationOptions" Placeholder="New location" />
+                        }
+                        @if (_locationId == "")
+                        {
+                            <div class="setup-fields">
+                                <BbFormFieldInput TValue="string" @bind-Value="_locationCode" UpdateTiming="UpdateTiming.Immediate" Label="Location code" Required="true" />
+                                <BbFormFieldInput TValue="string" @bind-Value="_locationName" UpdateTiming="UpdateTiming.Immediate" Label="Location name" Required="true" />
+                                @if (Advanced)
+                                {
+                                    <BbFormFieldInput TValue="string" @bind-Value="_locationDescription" UpdateTiming="UpdateTiming.Immediate" Label="Location description" />
+                                    <InventorySelect TValue="string" @bind-Value="_locationType" Label="Location type">
+                                        @foreach (var type in Enum.GetValues<InventoryLocationType>())
+                                        { <BbSelectItem Value="@type.ToString()">@type</BbSelectItem> }
+                                    </InventorySelect>
+                                    @if (_warehouseId != "")
+                                    {
+                                        <label class="setup-label" for="setup-parent-location">Parent location</label>
+                                        <BbCombobox Id="setup-parent-location" TValue="string" @bind-Value="_parentLocationId" Options="@ParentOptions" Placeholder="No parent location" />
+                                    }
+                                    <BbFormFieldSwitch @bind-Checked="_pickable" Label="Pickable location" />
+                                }
+                            </div>
+                        }
+                    }
+                </BbWizardStep>
+                <BbWizardStep Title="Defaults" Validator="ValidateDefaults">
+                    <div class="setup-fields">
+                        <BbFormFieldNumericInput TValue="int" @bind-Value="_threshold" Min="0" AllowNegative="false" DisableDebounce="true" Label="Low stock threshold" />
+                        <BbFormFieldInput TValue="string" @bind-Value="_currency" UpdateTiming="UpdateTiming.Immediate" Label="Default currency" />
+                    </div>
+                    <p>Currency is a display label. Setup does not create products, stock, wallets, or financial balances.</p>
+                </BbWizardStep>
+                <BbWizardStep Title="Review" Validator="ValidateAll">
+                    <dl class="setup-review" data-testid="inventario-setup-review">
+                        <dt>Tenant</dt><dd>@TenantName</dd>
+                        <dt>Mode</dt><dd>@(Advanced ? "Advanced" : "Basic")</dd>
+                        <dt>Warehouse</dt><dd>@WarehouseSummary</dd>
+                        <dt>Location</dt><dd>@LocationSummary</dd>
+                        <dt>Low stock threshold</dt><dd>@_threshold</dd>
+                        <dt>Default currency</dt><dd>@_currency.Trim().ToUpperInvariant()</dd>
+                    </dl>
+                    @if (Advanced) { <InventarioConfigurationLinks /> }
+                </BbWizardStep>
+            </ChildContent>
+        </BbFormWizard>
+    </fieldset>
+    <div class="setup-actions"><BbButton Variant="ButtonVariant.Outline" OnClick="CancelAsync" Disabled="@_saving">Cancel</BbButton></div>
+    @if (_saving) { <BbTypographyMuted>Saving setup...</BbTypographyMuted> }
+</div>

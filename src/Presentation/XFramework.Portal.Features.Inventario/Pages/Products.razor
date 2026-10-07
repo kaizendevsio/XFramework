@@ -179,6 +179,7 @@ else
 
 @code {
     [SupplyParameterFromQuery] public Guid? CategoryId { get; set; }
+    [SupplyParameterFromQuery] public bool SkipSetup { get; set; }
     private string _currency = "PHP";
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
@@ -237,7 +238,7 @@ else
             }
 
             var tenantId = TenantFilter.SelectedTenantId!.Value;
-            _currency = await InventoryDisplay.CurrencyAsync(DataContext, tenantId);
+            if (!await LoadSettings(tenantId)) return;
             _categories = await DataContext.Query<ProductCategory>()
                 .IgnoreQueryFilters()
                 .NoCache()
@@ -254,7 +255,6 @@ else
                 .Take(250)
                 .ToListAsync();
 
-            await LoadSettings();
             ApplySearch();
         }
         catch
@@ -268,19 +268,18 @@ else
         }
     }
 
-    private async Task LoadSettings()
+    private async Task<bool> LoadSettings(Guid tenantId)
     {
-        if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
-        var key = "Settings:Inventario:LowStockThreshold";
-        var config = await DataContext.Query<RegistryConfiguration>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => x.TenantId == tenantId && x.Key == key && !x.IsDeleted)
-            .FirstOrDefaultAsync();
-        if (int.TryParse(config?.Value, out var threshold) && threshold >= 0)
+        var preferences = await InventoryDisplay.PreferencesAsync(Inventario, tenantId);
+        if (TenantFilter.SelectedTenantId != tenantId) return false;
+        if (!SkipSetup && preferences.ShouldPrompt && preferences.CanManage)
         {
-            _lowStockThreshold = threshold;
+            Navigation.NavigateTo("/inventario/setup");
+            return false;
         }
+        _lowStockThreshold = preferences.LowStockThreshold;
+        _currency = preferences.DefaultCurrency;
+        return true;
     }
 
     private void OnSearchChanged(ChangeEventArgs args)

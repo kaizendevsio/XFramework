@@ -1,0 +1,7 @@
+.inventory-reports { display: grid; gap: 1.25rem; min-width: 0; }
+.report-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; padding: 1rem 0; border-block: 1px solid var(--border); }
+.xf-filter-actions { grid-column: 1 / -1; justify-content: flex-end; width: auto; }
+.snapshot-scope { color: var(--muted-foreground); font-size: .875rem; overflow-wrap: anywhere; }
+.protected-share { display: grid; gap: .5rem; }
+@media (max-width: 800px) { .report-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .report-filters { grid-template-columns: minmax(0, 1fr); } }
