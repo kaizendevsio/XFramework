@@ -1,0 +1,224 @@
+@implements IAsyncDisposable
+@inject IPOSServiceWrapper POS
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject IPortalTenantContext Tenant
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+
+<link rel="stylesheet" href="/_content/XFramework.Portal.Features.POS/XFramework.Portal.Features.POS.bundle.scp.css" />
+
+<div class="cashier-scanner" data-testid="cashier-scanner-pairing">
+    <BbButton OnClick="OpenPairing" Disabled="@(Disabled || _busy || RegisterId == Guid.Empty)" Variant="ButtonVariant.Outline">
+        <LucideIcon Name="scan-barcode" Size="18" />@(_paired ? "Phone connected" : "Scan with phone")
+    </BbButton>
+    <span class="scanner-live" role="status" aria-live="polite">@_status</span>
+</div>
+
+<BbDialog @bind-Open="_dialogOpen">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>@(_paired ? "Phone connected" : "Scan with phone")</BbDialogTitle>
+            <BbDialogDescription>@_status</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="scanner-pairing-content">
+            @if (_error is not null) { <BbAlert><BbAlertDescription>@_error</BbAlertDescription></BbAlert> }
+            @if (_busy) { <BbSpinner /> }
+            @if (_pairing is not null && !_paired)
+            {
+                @if (_qrSource is not null) { <img src="@_qrSource" width="240" height="240" alt="One-time phone pairing QR" /> }
+                <p>Expires @_pairing.ChallengeExpiresAt.ToLocalTime().ToString("HH:mm:ss")</p>
+                <a href="@_scannerUrl" target="_blank" rel="noopener noreferrer">Phone scanner</a>
+                <p>Sign in on the phone first, then scan this QR. If login loses the pairing code, scan it again.</p>
+                <details><summary>Pairing code</summary><code>@_pairing.Challenge</code></details>
+            }
+        </div>
+        <BbDialogFooter>
+            @if (_pairing is null)
+            {
+                <BbButton OnClick="Create" Disabled="@(_busy || Disabled)"><LucideIcon Name="qr-code" Size="18" />Pair phone</BbButton>
+            }
+            else
+            {
+                <BbButton OnClick="Disconnect" Variant="ButtonVariant.Outline"><LucideIcon Name="unplug" Size="18" />Disconnect</BbButton>
+            }
+            <BbButton OnClick="@(() => _dialogOpen = false)" Variant="ButtonVariant.Outline">Done</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    [Parameter] public Guid RegisterId { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    // Must complete only after the existing cashier barcode-add path has accepted/rejected the code.
+    [Parameter, EditorRequired] public EventCallback<string> ScanReceived { get; set; }
+    private readonly CancellationTokenSource _lifetime = new();
+    private Task? _polling;
+    private PosScannerPairingResponse? _pairing;
+    private IJSObjectReference? _script;
+    private string? _qrSource;
+    private Guid _registerId;
+    private Guid? _tenantId;
+    private long _acknowledged;
+    private bool _paired;
+    private bool _dialogOpen;
+    private bool _busy;
+    private bool _disposed;
+    private string _status = "Not paired";
+    private string? _error;
+    private string _scannerUrl = "";
+
+    protected override void OnInitialized() => Tenant.OnChanged += TenantChanged;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Disabled) _dialogOpen = false;
+        if (_pairing is not null && (RegisterId != _registerId || Tenant.SelectedTenantId != _tenantId))
+            await Disconnect();
+    }
+
+    private void TenantChanged() => _ = InvokeAsync(async () => { await Disconnect(); StateHasChanged(); });
+
+    private async Task OpenPairing()
+    {
+        _dialogOpen = true;
+        if (_pairing is null) await Create();
+    }
+
+    private async Task Create()
+    {
+        if (_busy || _disposed || Disabled || RegisterId == Guid.Empty || !ScanReceived.HasDelegate) return;
+        if (!ScannerPublicOrigin.TryResolve(Configuration["Portal:ScannerPublicBaseUrl"], Navigation.BaseUri, out var origin))
+        { _error = "Phone pairing requires a valid HTTPS Portal scanner origin. Configure Portal:ScannerPublicBaseUrl."; return; }
+        _scannerUrl = new Uri(origin!, "/pos/mobile-scanner").AbsoluteUri;
+        _busy = true;
+        _error = null;
+        _registerId = RegisterId;
+        _tenantId = Tenant.SelectedTenantId;
+        if (_tenantId.HasValue) _scannerUrl += "?tenant=" + _tenantId.Value;
+        try
+        {
+            var result = await POS.CreatePosScannerPairing(new()
+            {
+                RegisterId = RegisterId, Metadata = Metadata()
+            }, _lifetime.Token);
+            if (!result.IsSuccess || result.Response is null) { _error = result.Message ?? "Pairing unavailable."; return; }
+            _pairing = result.Response;
+            if (_disposed || RegisterId != _registerId || Tenant.SelectedTenantId != _tenantId)
+            { await Disconnect(); return; }
+            _acknowledged = 0;
+            _paired = false;
+            _status = "Waiting for phone";
+            _polling ??= Poll();
+            try
+            {
+                var current = _pairing;
+                if (current is null) return;
+                _script ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/XFramework.Portal.Features.POS/scanner/scanner.js");
+                if (current != _pairing || _disposed) return;
+                var source = await _script.InvokeAsync<string>("qrData", _scannerUrl + "#" + current.Challenge);
+                if (current == _pairing && !_disposed) _qrSource = source;
+            }
+            catch (JSException) { _error = "Pairing QR could not load. Use the pairing code."; }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        { _error = "Scanner connection unavailable."; }
+        finally { _busy = false; }
+    }
+
+    private RequestMetadata Metadata() => new() { RequestedTenantId = _tenantId, OperationName = "Portal.POS.Scanner" };
+
+    private async Task Poll()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_lifetime.Token))
+            {
+                await InvokeAsync(async () =>
+                {
+                    var current = _pairing;
+                    if (current is null || _disposed) return;
+                    QueryResponse<PosScannerPollResponse> result;
+                    try
+                    {
+                        result = await POS.PollPosScannerCodes(new()
+                        {
+                            PairingId = current.PairingId, DesktopKey = current.DesktopKey,
+                            AcknowledgedSequence = _acknowledged, PauseDelivery = Disabled, Metadata = Metadata()
+                        }, _lifetime.Token);
+                    }
+                    catch (Exception)
+                    {
+                        if (current != _pairing || _disposed || _lifetime.IsCancellationRequested) return;
+                        _error = "Scanner connection interrupted. Pair again.";
+                        await Disconnect();
+                        StateHasChanged();
+                        return;
+                    }
+                    if (current != _pairing || _disposed) return;
+                    if (!result.IsSuccess || result.Response is null)
+                    { _error = result.Message ?? "Scanner pairing ended."; await Disconnect(); StateHasChanged(); return; }
+                    _paired = result.Response.IsPaired;
+                    _status = _paired ? (Disabled ? "Phone connected; cashier busy" : "Phone connected") : "Waiting for phone";
+                    foreach (var code in result.Response.Codes)
+                    {
+                        if (current != _pairing || _disposed || Disabled) break;
+                        if (code.Sequence <= _acknowledged) continue;
+                        try
+                        {
+                            await ScanReceived.InvokeAsync(code.Code);
+                            if (current != _pairing || _disposed) break;
+                            _acknowledged = code.Sequence;
+                        }
+                        catch (Exception)
+                        {
+                            if (current != _pairing || _disposed) break;
+                            _error = "Cashier could not accept the scan. Scanner disconnected; check the cart before pairing again.";
+                            await Disconnect();
+                            break;
+                        }
+                    }
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception)
+        {
+            if (!_disposed) await InvokeAsync(async () =>
+            { _error = "Scanner connection interrupted. Pair again."; await Disconnect(); StateHasChanged(); });
+        }
+        finally { _polling = null; }
+    }
+
+    private async Task Disconnect()
+    {
+        var current = _pairing;
+        _pairing = null;
+        _qrSource = null;
+        _paired = false;
+        _status = "Not paired";
+        if (current is null) return;
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            await POS.RevokePosScannerPairing(new()
+            { PairingId = current.PairingId, DesktopKey = current.DesktopKey, Metadata = Metadata() }, timeout.Token);
+        }
+        catch (Exception) { /* A disconnected desktop lease expires within 30 seconds. */ }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        Tenant.OnChanged -= TenantChanged;
+        await _lifetime.CancelAsync();
+        await Disconnect();
+        if (_script is not null)
+        {
+            try { await _script.DisposeAsync(); }
+            catch (Exception exception) when (exception is JSDisconnectedException or TaskCanceledException) { }
+        }
+        _lifetime.Dispose();
+    }
+}

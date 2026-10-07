@@ -1,0 +1,4 @@
+.scanner-shell { max-width: 560px; min-height: 100dvh; margin: auto; padding: 16px; color: var(--foreground); background: var(--background); }
+header { display: flex; align-items: center; gap: 10px; min-height: 40px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+header strong { font-size: 20px; }
+header a { margin-left: auto; text-decoration: underline; }

@@ -1,0 +1,9 @@
+.mobile-scanner { display: grid; gap: 12px; padding-block: 20px; }
+h1 { font-size: 24px; margin: 0; overflow-wrap: anywhere; }
+p { margin: 0; }
+.scanner-account { color: var(--muted-foreground); }
+.camera-surface { position: relative; width: 100%; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 8px; background: #151716; }
+video { width: 100%; height: 100%; object-fit: contain; }
+.camera-idle { position: absolute; inset: 0; display: grid; place-items: center; color: #d4dad7; pointer-events: none; }
+.scanner-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.scanner-last { font-size: 20px; overflow-wrap: anywhere; border-left: 3px solid #218b61; padding-left: 12px; }
