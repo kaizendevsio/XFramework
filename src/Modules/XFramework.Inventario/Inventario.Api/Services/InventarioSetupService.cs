@@ -1,7 +1,9 @@
-using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
 using IdentityServer.Domain.Shared.Contracts;
+using Inventario.Api.Features.Setup;
+using Inventario.Api.Features.Setup.Complete;
+using Inventario.Api.Features.Setup.UpdatePreferences;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.Contracts.Requests;
@@ -30,9 +32,9 @@ public sealed class InventarioSetupService(
     {
         var access = await AccessAsync(request, true, ct);
         if (!access.IsSuccess) return Result<InventarioSetupResponse>.Failure(access.Message!, access.StatusCode);
-        if (request.CompletionRequestId == Guid.Empty || !Enum.IsDefined(request.Mode) ||
-            !ValidPreferences(request.LowStockThreshold, request.DefaultCurrency))
-            return Result<InventarioSetupResponse>.Failure("Choose a setup mode and valid catalog defaults.", 400);
+        var validation = await new CompleteInventarioSetupValidator().ValidateAsync(request, ct);
+        if (!validation.IsValid)
+            return Result<InventarioSetupResponse>.Failure(string.Join(" ", validation.Errors.Select(x => x.ErrorMessage)), 400);
 
         var tenantId = access.Data;
         var hash = CompletionHash(request);
@@ -144,8 +146,9 @@ public sealed class InventarioSetupService(
     {
         var access = await AccessAsync(request, true, ct);
         if (!access.IsSuccess) return Result<InventarioSetupResponse>.Failure(access.Message!, access.StatusCode);
-        if (!ValidPreferences(request.LowStockThreshold, request.DefaultCurrency))
-            return Result<InventarioSetupResponse>.Failure("Enter a non-negative threshold and supported currency code.", 400);
+        var validation = await new UpdateInventarioPreferencesValidator().ValidateAsync(request, ct);
+        if (!validation.IsValid)
+            return Result<InventarioSetupResponse>.Failure(string.Join(" ", validation.Errors.Select(x => x.ErrorMessage)), 400);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         await LockTenantAsync(access.Data, ct);
         var setup = await db.Set<InventarioSetup>().AsTracking().SingleOrDefaultAsync(x => x.TenantId == access.Data, ct);
@@ -185,7 +188,7 @@ public sealed class InventarioSetupService(
             TenantId = tenantId, ConcurrencyStamp = setup?.ConcurrencyStamp, Mode = setup?.Mode, CompletedAt = setup?.CompletedAt,
             HasExistingConfiguration = existing, WarehousingEnabled = warehousing, CanManage = CanManage(),
             LowStockThreshold = setup?.LowStockThreshold ?? threshold,
-            DefaultCurrency = CurrencyCodes.Contains(currency) ? currency : "PHP",
+            DefaultCurrency = SetupCurrency.IsSupported(currency) ? currency : "PHP",
             WarehouseId = setup?.WarehouseId, LocationId = setup?.LocationId, Warehouses = warehouses, Locations = locations
         };
     }
@@ -216,10 +219,6 @@ public sealed class InventarioSetupService(
     private static bool Required(string? value, int max) => !string.IsNullOrWhiteSpace(value) && value.Trim().Length <= max;
     private static bool Optional(string? value, int max) => value?.Trim().Length is null || value.Trim().Length <= max;
     private static string? Trim(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    private static bool ValidPreferences(int threshold, string currency) => threshold >= 0 &&
-        !string.IsNullOrWhiteSpace(currency) && CurrencyCodes.Contains(currency.Trim().ToUpperInvariant());
-    private static readonly HashSet<string> CurrencyCodes = CultureInfo.GetCultures(CultureTypes.SpecificCultures)
-        .Select(x => new RegionInfo(x.Name).ISOCurrencySymbol).ToHashSet(StringComparer.Ordinal);
     private static string CompletionHash(CompleteInventarioSetupRequest request) => Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
     {
         request.Mode, request.ExistingWarehouseId, request.ExistingLocationId, request.LowStockThreshold,
