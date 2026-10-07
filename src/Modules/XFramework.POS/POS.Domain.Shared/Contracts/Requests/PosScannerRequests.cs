@@ -14,6 +14,7 @@ public partial record ClaimPosScannerPairingRequest : RequestBase,
     IBoltRequest<ClaimPosScannerPairingRequest, CmdResponse<PosScannerPhoneResponse>>
 {
     public string Challenge { get; set; } = "";
+    public string PairingCode { get; set; } = "";
 }
 
 [MemoryPackable]

@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Globalization;
+using POS.Api.Features.Scanner.Claim;
 using POS.Domain.Shared.Contracts.Responses;
 using XFramework.Core.Patterns;
 
@@ -10,11 +12,21 @@ public sealed class PosScannerPairingStore(TimeProvider clock)
 {
     internal const int QueueLimit = 32;
     internal const int ScanLimit = 1024;
+    internal const int ShortClaimLimit = 5;
+    internal const int GlobalShortClaimLimit = 500;
     internal static readonly TimeSpan ChallengeTtl = TimeSpan.FromMinutes(2);
     internal static readonly TimeSpan PairingTtl = TimeSpan.FromMinutes(30);
     internal static readonly TimeSpan DesktopLease = TimeSpan.FromSeconds(30);
     private readonly object _gate = new();
     private readonly Dictionary<Guid, Pairing> _pairings = [];
+    private readonly Dictionary<string, DateTimeOffset> _reservedCodes = [];
+    private readonly Dictionary<Guid, ClaimBudget> _claimBudgets = [];
+    private DateTimeOffset _globalClaimWindowEnd;
+    private int _globalClaims;
+    private readonly Func<string> _newCode = static () =>
+        RandomNumberGenerator.GetInt32(1_000_000).ToString("D6", CultureInfo.InvariantCulture);
+
+    internal PosScannerPairingStore(TimeProvider clock, Func<string> newCode) : this(clock) => _newCode = newCode;
 
     internal Result<PosScannerPairingResponse> Create(ScannerActor actor, Guid registerId, string registerName)
     {
@@ -22,21 +34,33 @@ public sealed class PosScannerPairingStore(TimeProvider clock)
         {
             var now = clock.GetUtcNow();
             Prune(now);
-            if (_pairings.Count >= 4096 ||
+            if (_pairings.Count >= 4096 || _reservedCodes.Count >= 4096 ||
                 _pairings.Values.Count(p => p.TenantId == actor.TenantId && p.ActorId == actor.CredentialId) >= 8)
                 return Result<PosScannerPairingResponse>.Failure("Too many active scanner pairings", 429);
+
+            string? code = null;
+            for (var attempt = 0; attempt < 32; attempt++)
+            {
+                var candidate = _newCode();
+                if (ClaimPosScannerPairingValidator.IsPairingCode(candidate) && !_reservedCodes.ContainsKey(candidate))
+                { code = candidate; break; }
+            }
+            if (code is null)
+                return Result<PosScannerPairingResponse>.Failure("Pairing codes are busy. Try again shortly.", 429);
 
             var pairing = new Pairing
             {
                 Id = Guid.NewGuid(), TenantId = actor.TenantId, ActorId = actor.CredentialId,
                 DesktopSessionId = actor.SessionId, RegisterId = registerId, RegisterName = registerName,
-                DesktopKey = NewKey(), Challenge = NewKey(),
+                DesktopKey = NewKey(), Challenge = NewKey(), PairingCode = code,
                 ChallengeExpiresAt = now + ChallengeTtl, ExpiresAt = now + PairingTtl,
                 LeaseExpiresAt = now + DesktopLease
             };
             _pairings.Add(pairing.Id, pairing);
+            // Keep consumed/revoked codes reserved through hard expiry so stale codes cannot claim replacements.
+            _reservedCodes.Add(code, pairing.ExpiresAt);
             return Result<PosScannerPairingResponse>.Success(new(pairing.Id, pairing.DesktopKey,
-                pairing.Challenge, pairing.ChallengeExpiresAt));
+                pairing.Challenge, pairing.ChallengeExpiresAt, code));
         }
     }
 
@@ -46,10 +70,15 @@ public sealed class PosScannerPairingStore(TimeProvider clock)
         {
             var now = clock.GetUtcNow();
             Prune(now);
+            var shortCode = ClaimPosScannerPairingValidator.IsPairingCode(challenge);
+            if (!shortCode && !ClaimPosScannerPairingValidator.IsChallenge(challenge))
+                return Result<PosScannerPhoneResponse>.Failure("Enter exactly six digits or use a valid pairing QR.", 400);
+            if (shortCode && !AllowShortClaim(actor.CredentialId, now))
+                return Result<PosScannerPhoneResponse>.Failure("Too many pairing attempts. Try again after two minutes.", 429);
             var pairing = _pairings.Values.FirstOrDefault(p =>
                 p.TenantId == actor.TenantId && p.ActorId == actor.CredentialId &&
                 !p.PhoneSessionId.HasValue && p.ChallengeExpiresAt > now &&
-                Matches(p.Challenge, challenge));
+                (shortCode ? Matches(p.PairingCode, challenge, 6) : Matches(p.Challenge, challenge)));
             if (pairing is null)
                 return Result<PosScannerPhoneResponse>.Forbidden("Pairing is unavailable; request a new QR on the desktop");
 
@@ -59,6 +88,7 @@ public sealed class PosScannerPairingStore(TimeProvider clock)
             pairing.PhoneSessionId = actor.SessionId;
             pairing.PhoneKey = NewKey();
             pairing.Challenge = "";
+            pairing.PairingCode = "";
             return Result<PosScannerPhoneResponse>.Success(new(pairing.Id, pairing.PhoneKey,
                 pairing.RegisterName, pairing.ExpiresAt));
         }
@@ -150,13 +180,33 @@ public sealed class PosScannerPairingStore(TimeProvider clock)
         foreach (var id in _pairings.Values.Where(p => p.ExpiresAt <= now || p.LeaseExpiresAt <= now ||
                      (!p.PhoneSessionId.HasValue && p.ChallengeExpiresAt <= now)).Select(p => p.Id).ToArray())
             _pairings.Remove(id);
+        foreach (var code in _reservedCodes.Where(p => p.Value <= now).Select(p => p.Key).ToArray())
+            _reservedCodes.Remove(code);
+        foreach (var actor in _claimBudgets.Where(p => p.Value.ExpiresAt <= now).Select(p => p.Key).ToArray())
+            _claimBudgets.Remove(actor);
+    }
+
+    private bool AllowShortClaim(Guid actor, DateTimeOffset now)
+    {
+        if (_globalClaimWindowEnd <= now)
+        { _globalClaimWindowEnd = now + ChallengeTtl; _globalClaims = 0; }
+        if (!_claimBudgets.TryGetValue(actor, out var budget))
+        {
+            if (_claimBudgets.Count >= 4096) return false;
+            budget = new(now + ChallengeTtl);
+            _claimBudgets.Add(actor, budget);
+        }
+        if (budget.Attempts >= ShortClaimLimit || _globalClaims >= GlobalShortClaimLimit) return false;
+        budget.Attempts++;
+        _globalClaims++;
+        return true;
     }
 
     private static bool Owns(Pairing pairing, ScannerActor actor) =>
         pairing.TenantId == actor.TenantId && pairing.ActorId == actor.CredentialId;
     private static string NewKey() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-    private static bool Matches(string expected, string? supplied) =>
-        expected.Length == 64 && supplied?.Length == 64 &&
+    private static bool Matches(string expected, string? supplied, int length = 64) =>
+        expected.Length == length && supplied?.Length == length &&
         CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(expected), Encoding.ASCII.GetBytes(supplied));
 
     private sealed class Pairing
@@ -169,6 +219,7 @@ public sealed class PosScannerPairingStore(TimeProvider clock)
         public required string RegisterName { get; init; }
         public required string DesktopKey { get; init; }
         public required string Challenge { get; set; }
+        public required string PairingCode { get; set; }
         public Guid? PhoneSessionId { get; set; }
         public string PhoneKey { get; set; } = "";
         public DateTimeOffset ChallengeExpiresAt { get; init; }
@@ -180,6 +231,12 @@ public sealed class PosScannerPairingStore(TimeProvider clock)
         public long LastDelivered { get; set; }
         public bool Paused { get; set; }
         public List<PosScannerCodeResponse> Codes { get; } = [];
+    }
+
+    private sealed class ClaimBudget(DateTimeOffset expiresAt)
+    {
+        public DateTimeOffset ExpiresAt { get; } = expiresAt;
+        public int Attempts { get; set; }
     }
 }
 

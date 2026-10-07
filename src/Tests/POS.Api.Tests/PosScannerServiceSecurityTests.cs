@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using XFramework.Core.RateLimiting;
 using POS.Api.Services;
 using POS.Domain.Shared.Contracts;
 using POS.Domain.Shared.Contracts.Requests;
@@ -23,6 +24,7 @@ public sealed class PosScannerServiceSecurityTests
     private PosScannerService service = null!;
     private Guid tenant;
     private TrustedActorIdentity actor = null!;
+    private PosScannerPairingStore store = null!;
 
     [SetUp]
     public void Setup()
@@ -33,8 +35,8 @@ public sealed class PosScannerServiceSecurityTests
         features = new();
         db = new(new DbContextOptionsBuilder<AppDbContext>().Options, new HttpContextAccessor(),
             new ConfigurationBuilder().Build(), new TestEffectiveTenantContextAccessor(tenant));
-        service = new(db, new PosRequestContextResolver(accessor), accessor, features,
-            new PosScannerPairingStore(TimeProvider.System), TimeProvider.System);
+        store = new(TimeProvider.System);
+        service = new(db, new PosRequestContextResolver(accessor), accessor, features, store, TimeProvider.System);
     }
 
     [TearDown]
@@ -110,6 +112,48 @@ public sealed class PosScannerServiceSecurityTests
         new HashSet<string> { "SuperAdmin" },
         new HashSet<string>(capabilities ?? [PosAuthorizationCapabilities.SalesView, PosAuthorizationCapabilities.SalesCreate]),
         "tests", DateTimeOffset.UtcNow.AddMinutes(expired ? -1 : 10));
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task Claim_ManualCode_DistributedGlobalOrActorRejection_DoesNotConsumeCode(bool actorDenied)
+    {
+        var pairing = store.Create(new(tenant, actor.CredentialId, actor.SessionId), Guid.NewGuid(), "Register").Data!;
+        accessor.Current = accessor.Current! with { Actor = PhoneActor() };
+        var limiter = new DenyingLimiter(actorDenied);
+        service = new(db, new PosRequestContextResolver(accessor), accessor, features, store, TimeProvider.System, limiter);
+        var response = await service.ClaimAsync(new() { PairingCode = pairing.PairingCode }, CancellationToken.None);
+        response.StatusCode.Should().Be(429);
+        limiter.Calls.Should().ContainSingle(c => c.Policy == PosScannerService.GlobalClaimPolicy && c.Key == "all");
+        limiter.Calls.Count(c => c.Policy == PosScannerService.ActorClaimPolicy && c.Key == actor.CredentialId.ToString("N"))
+            .Should().Be(actorDenied ? 1 : 0);
+        (await service.ClaimAsync(new() { Challenge = pairing.Challenge }, CancellationToken.None)).IsSuccess.Should().BeTrue();
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task Claim_MissingOrFailedRedis_FailsManualClosedButNotQr(bool unavailable)
+    {
+        var pairing = store.Create(new(tenant, actor.CredentialId, actor.SessionId), Guid.NewGuid(), "Register").Data!;
+        accessor.Current = accessor.Current! with { Actor = PhoneActor() };
+        var limiter = new PosScannerClaimRateLimiter(() => throw new InvalidOperationException("Fixture unavailable"));
+        service = new(db, new PosRequestContextResolver(accessor), accessor, features, store, TimeProvider.System, unavailable ? limiter : null);
+        (await service.ClaimAsync(new() { PairingCode = pairing.PairingCode }, CancellationToken.None)).StatusCode.Should().Be(503);
+        (await service.ClaimAsync(new() { Challenge = pairing.Challenge }, CancellationToken.None)).IsSuccess.Should().BeTrue();
+    }
+
+    private sealed class DenyingLimiter(bool actorDenied) : IDistributedSecurityRateLimiter
+    {
+        public List<(StrictSecurityRateLimitPolicy Policy, string Key)> Calls { get; } = [];
+        public ValueTask<DistributedSecurityRateLimitDecision> AcquireAsync(StrictSecurityRateLimitPolicy policy, string key, CancellationToken ct)
+        {
+            Calls.Add((policy, key));
+            return ValueTask.FromResult(policy == (actorDenied ? PosScannerService.ActorClaimPolicy : PosScannerService.GlobalClaimPolicy)
+                ? DistributedSecurityRateLimitDecision.Rejected(TimeSpan.FromMinutes(2)) : DistributedSecurityRateLimitDecision.Allowed);
+        }
+    }
+
+    private TrustedActorIdentity PhoneActor() => new(actor.CredentialId, actor.IdentityId, actor.TenantId,
+        Guid.NewGuid(), actor.Roles, actor.Capabilities, actor.GenerationId, actor.ExpiresAtUtc);
 
     private sealed class Accessor : ITrustedInvocationContextAccessor
     {

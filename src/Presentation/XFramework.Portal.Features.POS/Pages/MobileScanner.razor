@@ -32,9 +32,9 @@
     {
         <label for="scanner-tenant">Tenant ID</label>
         <BbInput Id="scanner-tenant" @bind-Value="_tenantHint" autocomplete="off" />
-        <label for="scanner-challenge">Pairing code</label>
-        <BbInput Id="scanner-challenge" @bind-Value="_challenge" autocomplete="off" />
-        <BbButton OnClick="PairEntered" Disabled="@(_busy || string.IsNullOrWhiteSpace(_challenge))" Variant="ButtonVariant.Outline">
+        <label for="scanner-challenge">Six-digit pairing code</label>
+        <BbInput Id="scanner-challenge" @bind-Value="_pairingCode" autocomplete="off" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" />
+        <BbButton OnClick="PairEntered" Disabled="@(_busy || (!IsPairingCode(_pairingCode) && string.IsNullOrEmpty(_challenge)))" Variant="ButtonVariant.Outline">
             <LucideIcon Name="link" Size="18" />Pair desktop
         </BbButton>
     }
@@ -66,6 +66,7 @@
     private string _status = "Scan desktop pairing QR";
     private string? _error;
     private string _challenge = "";
+    private string _pairingCode = "";
     private string _manualCode = "";
     private string _tenantHint = "";
     private Guid? _pairedTenantId;
@@ -161,8 +162,18 @@
         return InvokeAsync(StateHasChanged);
     }
 
-    private async Task PairEntered() => await Pair(_challenge);
-    private async Task Pair(string challenge)
+    private static bool IsPairingCode(string value) => value.Length == 6 && value.All(c => c is >= '0' and <= '9');
+
+    private async Task PairEntered()
+    {
+        if (!string.IsNullOrEmpty(_pairingCode))
+        {
+            if (!IsPairingCode(_pairingCode)) { _error = "Enter exactly six digits."; return; }
+            await Pair(_pairingCode, manual: true);
+        }
+        else if (!string.IsNullOrEmpty(_challenge)) await Pair(_challenge);
+    }
+    private async Task Pair(string challenge, bool manual = false)
     {
         if (_busy || _disposed) return;
         if (!string.IsNullOrWhiteSpace(_tenantHint) && !Guid.TryParse(_tenantHint, out _))
@@ -173,12 +184,13 @@
         try
         {
             var result = await POS.ClaimPosScannerPairing(new()
-            { Challenge = challenge, Metadata = new() { RequestedTenantId = tenantId } }, _lifetime.Token);
+            { Challenge = manual ? "" : challenge, PairingCode = manual ? challenge : "", Metadata = new() { RequestedTenantId = tenantId } }, _lifetime.Token);
             if (_disposed) return;
             if (!result.IsSuccess || result.Response is null) { _error = result.Message ?? "Pairing denied."; return; }
             _phone = result.Response;
             _pairedTenantId = tenantId;
             _challenge = "";
+            _pairingCode = "";
             _sequence = 1;
             _status = "Paired";
             _monitor ??= Monitor();

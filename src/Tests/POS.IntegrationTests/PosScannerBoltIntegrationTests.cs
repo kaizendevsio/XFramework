@@ -22,6 +22,7 @@ using POS.Integration.Drivers;
 using XFramework.Core.Extensions;
 using XFramework.Core.Middlewares;
 using XFramework.Core.Patterns;
+using XFramework.Core.RateLimiting;
 using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.BusinessObjects;
@@ -93,6 +94,7 @@ public sealed class PosScannerBoltIntegrationTests
         pos.Services.AddSingleton(authority.CreateTokenProvider(XFrameworkServiceNames.Pos));
         pos.Services.AddSingleton<TimeProvider>(clock);
         pos.Services.AddSingleton(store);
+        pos.Services.AddSingleton<IDistributedSecurityRateLimiter, AllowedScannerClaimLimiter>();
         pos.Services.AddScoped<IPosRequestContextResolver, PosRequestContextResolver>();
         pos.Services.AddScoped<PosScannerService>();
         pos.Services.AddScoped(_ => new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().Options,
@@ -226,6 +228,35 @@ public sealed class PosScannerBoltIntegrationTests
 
     private PosScannerPairingResponse Pairing() =>
         store.Create(new(tenant, cashier, desktopSession), Guid.NewGuid(), "Test register").Data!;
+
+    [Test]
+    public async Task ShortCode_ManualContractValidationAndSingleUse_ThroughGeneratedWrappers()
+    {
+        var pairing = Pairing();
+        pairing.PairingCode.Should().MatchRegex("^[0-9]{6}$");
+        var roundtrip = MemoryPack.MemoryPackSerializer.Deserialize<PosScannerPairingResponse>(
+            MemoryPack.MemoryPackSerializer.Serialize(pairing));
+        roundtrip!.PairingCode.Should().Be(pairing.PairingCode);
+        using var phone = TestInvocationActorTokenScope.Push(Token(phoneSession));
+        foreach (var request in new[]
+        {
+            new ClaimPosScannerPairingRequest { PairingCode = "12345" },
+            new ClaimPosScannerPairingRequest { PairingCode = "ABCDEF" },
+            new ClaimPosScannerPairingRequest { PairingCode = pairing.PairingCode, Challenge = pairing.Challenge }
+        })
+            (await wrapper.ClaimPosScannerPairing(request)).HttpStatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var claim = await wrapper.ClaimPosScannerPairing(new() {PairingCode=pairing.PairingCode});
+        claim.IsSuccess.Should().BeTrue(claim.Message);
+        claim.Response!.PairingId.Should().Be(pairing.PairingId);
+        (await wrapper.ClaimPosScannerPairing(new() {PairingCode=pairing.PairingCode})).HttpStatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await wrapper.ClaimPosScannerPairing(new() {Challenge=pairing.Challenge})).HttpStatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    private sealed class AllowedScannerClaimLimiter : IDistributedSecurityRateLimiter
+    {
+        public ValueTask<DistributedSecurityRateLimitDecision> AcquireAsync(StrictSecurityRateLimitPolicy policy,
+            string clientKey, CancellationToken cancellationToken) => ValueTask.FromResult(DistributedSecurityRateLimitDecision.Allowed);
+    }
 
     [Test]
     public async Task Scanner_TrustedDelegatedTenant_SameCredentialOnly_WithTargetMetadataOnBothDevices()

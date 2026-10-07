@@ -261,7 +261,10 @@ public sealed class PosScannerCameraE2ETests : PageTest
     {
         await Page.SetViewportSizeAsync(width, height);
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Pair scanner" })).ToBeVisibleAsync();
-        await Expect(Page.GetByLabel("Pairing code", new() { Exact = true })).ToBeVisibleAsync();
+        var pairingCode = Page.GetByLabel("Six-digit pairing code", new() { Exact = true });
+        await Expect(pairingCode).ToBeVisibleAsync();
+        await Expect(pairingCode).ToHaveAttributeAsync("inputmode", "numeric");
+        await Expect(pairingCode).ToHaveAttributeAsync("maxlength", "6");
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Start camera" })).ToBeVisibleAsync();
         (await Page.EvaluateAsync<bool>("document.documentElement.scrollWidth<=innerWidth")).Should().BeTrue();
         var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, "artifacts", "pos-scanner");
