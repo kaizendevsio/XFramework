@@ -243,6 +243,30 @@ public sealed class InventoryReportsE2ETests : PageTest
     }
 
     [Test]
+    public async Task Live_RepeatedEnableDisable_LeavesCircuitResponsiveAndDisposesSafely()
+    {
+        var errors = new ConcurrentQueue<string>();
+        Page.PageError += (_, error) => errors.Enqueue(error);
+        Page.Console += (_, message) => { if (message.Type == "error") errors.Enqueue(message.Text); };
+        var toggle = Page.GetByRole(AriaRole.Switch, new() { Name = "Live (30 seconds)" });
+        for (var i = 0; i < 3; i++)
+        {
+            await toggle.ClickAsync();
+            await Expect(toggle).ToBeCheckedAsync();
+            await toggle.ClickAsync();
+            await Expect(toggle).Not.ToBeCheckedAsync();
+            var before = state.Requests.Count;
+            await Page.GetByRole(AriaRole.Button, new() { Name = "Refresh", Exact = true }).ClickAsync();
+            await Wait(() => state.Requests.Count > before);
+            await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Refresh", Exact = true })).ToBeEnabledAsync();
+        }
+        await Page.GotoAsync(app.Urls.Single() + "/inventario/reports");
+        await Expect(Page.GetByText("Fixture Widget", new() { Exact = true }).First).ToBeVisibleAsync();
+        errors.Should().BeEmpty("toggling or disposing the live loop must not terminate the circuit");
+        state.MaxActive.Should().Be(1);
+    }
+
+    [Test]
     public async Task Live_RefreshesAfterThirtySeconds_AndStopsWhenDisabled()
     {
         var initial = state.Requests.Count;

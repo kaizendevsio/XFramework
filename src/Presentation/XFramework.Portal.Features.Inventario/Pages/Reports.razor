@@ -102,7 +102,7 @@
     private string _snapshotScope = "";
     private string _snapshotTenant = "";
     private DateTime? _from, _to;
-    private int _days = 30, _revision;
+    private int _days = 30, _revision, _liveRevision;
     private bool _busy, _live, _exporting, _disposed, _initializing, _denied;
     private List<ReportChoice> _products = [], _warehouses = [], _locations = [];
     private string TenantLabel => _snapshot is not null ? _snapshotTenant :
@@ -308,12 +308,17 @@
     }
     private async Task SetLive(bool value)
     {
+        var revision = ++_liveRevision;
         _live = value;
-        _liveCancellation?.Cancel();
+        var cancellation = _liveCancellation;
+        var task = _liveTask;
+        _liveCancellation = null;
+        _liveTask = null;
+        cancellation?.Cancel();
         if (!value) _request?.Cancel();
-        if (_liveTask is not null) await _liveTask;
-        _liveCancellation?.Dispose();
-        if (value && !_disposed)
+        try { if (task is not null) await task; }
+        finally { cancellation?.Dispose(); }
+        if (value && !_disposed && revision == _liveRevision)
         {
             _liveCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
             _liveTask = LiveLoop(_liveCancellation.Token);
@@ -333,14 +338,13 @@
     }
     public async ValueTask DisposeAsync()
     {
+        if (_disposed) return;
         _disposed = true;
         TenantFilter.OnChanged -= ContextChanged;
         ModuleNavigation.OnChanged -= ContextChanged;
         Invalidate();
         _lifetime.Cancel();
-        _liveCancellation?.Cancel();
-        if (_liveTask is not null) await _liveTask;
-        _liveCancellation?.Dispose();
+        await SetLive(false);
         _lifetime.Dispose();
     }
 }

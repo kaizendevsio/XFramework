@@ -10,7 +10,12 @@ namespace Wallets.Api.Features.Reports.Financial;
 
 public static class GetWalletFinancialReportEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.ReportingView])]
-    [MapPost("/api/wallets/reports/financial", Tags = ["WalletsReporting"], Summary = "Financial activity by currency", RequireAuthorization = true, RequiredActorCapabilities = [WalletAuthorizationCapabilities.ReportingView])]
+    [BoltHandler(TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = [WalletAuthorizationCapabilities.ReportingView],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
+    [MapPost("/api/wallets/reports/financial", Tags = ["WalletsReporting"], Summary = "Financial activity by currency", RequireAuthorization = true,
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = [WalletAuthorizationCapabilities.ReportingView],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     public static Task<Result<WalletFinancialReportResponse>> Handle(WalletFinancialReportRequest request, IWalletReportingService service, CancellationToken ct) => service.GetFinancialReportAsync(request, ct);
 }
