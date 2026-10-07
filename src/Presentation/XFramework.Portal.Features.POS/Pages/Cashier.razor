@@ -107,13 +107,13 @@ else
                                 Sale details
                             </BbButton>
                         </BbDialogTrigger>
-                        <BbDialogContent Class="xf-dialog-wide"
+                        <BbDialogContent
                                          @onkeydown="@(args => HandleDialogKeyDown(args, false))">
                             <BbDialogHeader>
                                 <BbDialogTitle>Sale details</BbDialogTitle>
                                 <BbDialogDescription>Customer reference and notes for this sale.</BbDialogDescription>
                             </BbDialogHeader>
-                            <div class="pos-dialog-fields">
+                            <div class="flex flex-col gap-4">
                                 <BbFormFieldInput @bind-Value="_customerLabel" Label="Customer reference" Placeholder="Name or queue number" Disabled="@IsInteractionLocked" />
                                 <BbFormFieldTextarea @bind-Value="_cartNotes" Label="Sale notes" Placeholder="Optional note" Disabled="@IsInteractionLocked" />
                             </div>
@@ -340,7 +340,14 @@ else
                         }
                     </div>
 
-                    <div class="pos-checkout-panel">
+                    <BbDialog Open="@_paymentOpen" OpenChanged="@PaymentOpenChanged">
+                        <BbDialogContent Class="pos-payment-dialog" ShowClose="@(!_checkingOut)" CloseOnEscape="@(!_checkingOut)" CloseOnOverlayClick="@(!_checkingOut)"
+                                         @onkeydown="@(args => { if (args.Key == "Escape") PaymentOpenChanged(false); })">
+                            <BbDialogHeader>
+                                <BbDialogTitle>Payment</BbDialogTitle>
+                                <BbDialogDescription>@FormatQuantity(CartItemCount) items | @FormatMoney(Total)</BbDialogDescription>
+                            </BbDialogHeader>
+                    <div class="pos-checkout-panel" data-testid="pos-payment-stage">
                         @if (SelectedRegister is null)
                         {
                             <BbEmpty Title="Select a register" Description="Choose an enabled register to set the sale currency and payment options." />
@@ -429,6 +436,17 @@ else
                         }
                         }
                     </div>
+                            <p id="pos-payment-status" class="pos-checkout-status" role="status">@CheckoutStatus</p>
+                            <BbDialogFooter>
+                                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => PaymentOpenChanged(false))" Disabled="@_checkingOut">Back to cart</BbButton>
+                                <BbButton OnClick="@Checkout" Disabled="@(!CanCheckout)" data-testid="pos-confirm-payment">
+                                    @if (_checkingOut) { <BbSpinner /> }
+                                    else { <LucideIcon Name="receipt" class="mr-2 h-4 w-4" /> }
+                                    @(_checkingOut ? "Processing payment" : $"Confirm payment {FormatMoney(Total)}")
+                                </BbButton>
+                            </BbDialogFooter>
+                        </BbDialogContent>
+                    </BbDialog>
 
                     <div class="pos-total-bar">
                         @if (_discountAmount != 0 || _taxAmount != 0)
@@ -443,9 +461,9 @@ else
                             <span>@(RegisterCurrency is { } currency ? $"Total ({currency})" : "Total")</span>
                             <strong data-testid="pos-total">@(RegisterCurrency is null ? "—" : Total.ToString("N2"))</strong>
                         </div>
-                        <p id="pos-checkout-status" class="pos-checkout-status" role="status">@CheckoutStatus</p>
-                        <BbButton Size="ButtonSize.Large" OnClick="@Checkout" Disabled="@(!CanCheckout)" Class="pos-checkout-action"
-                                  data-testid="pos-checkout" aria-describedby="pos-checkout-status">
+                        <p id="pos-checkout-status" class="pos-checkout-status" role="status">@(HasPendingPayment || HasTerminalCheckoutFailure || IsBusy ? CheckoutStatus : SaleRequirement ?? "Ready for payment")</p>
+                        <BbButton Size="ButtonSize.Large" OnClick="@BeginPayment" Disabled="@(!CanBeginPayment)" Class="pos-checkout-action"
+                                  data-testid="pos-checkout" data-pos-dialog-trigger="payment" aria-describedby="pos-checkout-status">
                             @if (_checkingOut)
                             {
                                 <BbSpinner />
@@ -495,6 +513,7 @@ else
     private bool _hasNextHeldCartPage;
     private bool _heldCartsOpen;
     private bool _saleDetailsOpen;
+    private bool _paymentOpen;
     private bool _focusMode;
     private bool _adjustmentsOpen;
     private bool _reloading;
@@ -561,16 +580,17 @@ else
     private IEnumerable<decimal> SuggestedTenderAmounts => new[] { 5m, 10m, 50m }
         .Select(step => Math.Ceiling(Math.Max(Total, 0.01m) / step) * step)
         .Where(amount => amount > Total).Distinct().Take(2);
-    private string? CheckoutRequirement =>
+    private string? SaleRequirement =>
         _loadError is not null ? "Refresh to finish loading the register." :
         SelectedRegister is null ? "Select a register to start a sale." :
         RegisterCurrency is null ? "The register currency could not be loaded. Refresh to retry." :
         ActorContext.CredentialId is null || ActorContext.CredentialId == Guid.Empty ? "Sign in again to identify the cashier." :
         !_cart.Any() ? "Add a product to start a sale." :
-        Total <= 0 || _discountAmount < 0 || _taxAmount < 0 ? "Discount and tax must be valid amounts; the sale total must be greater than zero." :
+        Total <= 0 || _discountAmount < 0 || _taxAmount < 0 ? "Discount and tax must be valid amounts; the sale total must be greater than zero." : null;
+    private string? CheckoutRequirement => SaleRequirement ?? (
         IsCashPayment && _cashTenderedAmount < Total ? $"Enter cash received. {FormatMoney(Total - _cashTenderedAmount)} remaining." :
         IsWalletPayment && !Guid.TryParse(_selectedCustomerCredentialId, out _) ? "Select a customer to pay from their wallet." :
-        IsMerchantCustomer ? "Customer wallet must be different from the register merchant wallet." : null;
+        IsMerchantCustomer ? "Customer wallet must be different from the register merchant wallet." : null);
     private string CheckoutStatus => IsBusy
         ? "Please wait for the current sale action."
         : HasPendingPayment
@@ -579,6 +599,27 @@ else
                 ? "This sale cannot be retried. Start a new sale to use a new payment reference."
             : CheckoutRequirement ?? "Ready for payment";
     private bool CanCheckout => !IsBusy && !HasTerminalCheckoutFailure && (HasPendingPayment || CheckoutRequirement is null);
+    private bool CanBeginPayment => !IsBusy && !HasTerminalCheckoutFailure && (HasPendingPayment || SaleRequirement is null);
+
+    private async Task BeginPayment()
+    {
+        if (!CanBeginPayment)
+            return;
+        if (HasPendingPayment)
+            await Checkout();
+        else
+            _paymentOpen = true;
+    }
+
+    private void PaymentOpenChanged(bool open)
+    {
+        if (!_checkingOut)
+        {
+            _paymentOpen = open;
+            if (!open)
+                _dialogFocusTarget = "payment";
+        }
+    }
 
     protected override void OnInitialized()
     {
@@ -1279,6 +1320,8 @@ else
         finally
         {
             _checkingOut = false;
+            if (_lastReceipt is not null)
+                _paymentOpen = false;
             if (refreshCatalogAfterCheckout)
                 await SearchCatalog(false, false);
         }
@@ -1370,6 +1413,7 @@ else
 
     private void ClearCurrentCart()
     {
+        _paymentOpen = false;
         _cart = [];
         _removedLine = null;
         _adjustmentsOpen = false;

@@ -1,10 +1,12 @@
 using System.Reflection;
+using System.Security.Claims;
 using System.Runtime.CompilerServices;
 using BlazorBlueprint.Components;
 using FluentAssertions;
 using IdentityServer.Domain.Shared.Contracts;
 using MemoryPack;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging.Abstractions;
 using Wallets.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.BusinessObjects;
@@ -12,6 +14,7 @@ using XFramework.Domain.Shared.DataContext;
 using XFramework.Integration.DataContext;
 using XFramework.Integration.Extensions;
 using XFramework.Portal.Features.Administration.Pages.Admin;
+using XFramework.Portal.Shared;
 
 namespace Portal.E2ETests;
 
@@ -49,7 +52,9 @@ public sealed class ReferenceDataSaveTests
         _services = services.BuildServiceProvider();
         _page = new ReferenceData();
         SetProperty("Services", _services);
-        SetProperty("RequestMetadata", _services.GetRequiredService<RequestMetadata>());
+        _page.TenantId = _tenantId;
+        SetProperty("AuthenticationStateTask", Task.FromResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(PortalAuthClaims.IsSuperUser, "true")], "test")))));
         SetProperty("DataContext", _services.GetRequiredService<IDataContext>());
         SetProperty("ToastService", ActivatorUtilities.CreateInstance<ToastService>(_services));
         SetProperty("Logger", NullLogger<ReferenceData>.Instance);
@@ -149,7 +154,7 @@ public sealed class ReferenceDataSaveTests
     [Test]
     public async Task Create_WithoutTenantDoesNotChooseAnArbitraryTenant()
     {
-        SetProperty("RequestMetadata", new RequestMetadata());
+        _page.TenantId = Guid.Empty;
         await Invoke("SaveRecord");
         _wrapper.Batches.Should().BeEmpty();
     }
@@ -165,6 +170,30 @@ public sealed class ReferenceDataSaveTests
             .MakeGenericMethod(typeof(WalletType));
         var result = await (Task<DataContextResult>)remove.Invoke(_page, new object[] { wallet })!;
         result.IsSuccess.Should().BeFalse();
+        _wrapper.Batches.Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task RouteTenant_IgnoresMutableSharedRequestMetadata()
+    {
+        _services.GetRequiredService<RequestMetadata>().RequestedTenantId = Guid.NewGuid();
+        await Invoke("SaveRecord");
+        _wrapper.Batches.Should().ContainSingle().Which.Metadata!.RequestedTenantId.Should().Be(_tenantId);
+        _wrapper.Queries.Should().OnlyContain(query => query.Metadata!.RequestedTenantId == _tenantId);
+    }
+
+    [Test]
+    public async Task CrossTenantRecord_CannotBeEditedOrDeletedEvenBySuperUser()
+    {
+        var wallet = ExistingWallet();
+        wallet.TenantId = Guid.NewGuid();
+        OpenWalletEditor(wallet);
+        await Invoke("SaveRecord");
+        var remove = typeof(ReferenceData).GetMethod("RemoveEntity", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .MakeGenericMethod(typeof(WalletType));
+        var result = await (Task<DataContextResult>)remove.Invoke(_page, new object[] { wallet })!;
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(403);
         _wrapper.Batches.Should().BeEmpty();
     }
 
@@ -194,6 +223,7 @@ public sealed class ReferenceDataSaveTests
     private sealed class RecordingWrapper : IDataContextServiceWrapper
     {
         public List<SaveChangesRequest> Batches { get; } = [];
+        public List<QueryDescriptor> Queries { get; } = [];
         public DataContextResult? NextResult { get; set; }
         public WalletType? Wallet { get; set; }
 
@@ -208,6 +238,7 @@ public sealed class ReferenceDataSaveTests
         public Task<byte[]> ExecuteQueryAsync(byte[] bytes, CancellationToken ct = default)
         {
             var query = MemoryPackSerializer.Deserialize<QueryDescriptor>(bytes)!;
+            Queries.Add(query);
             return Task.FromResult(query.EntityTypeName == nameof(WalletType)
                 ? query.Mode == QueryExecutionMode.FirstOrDefault
                     ? MemoryPackSerializer.Serialize(Wallet)

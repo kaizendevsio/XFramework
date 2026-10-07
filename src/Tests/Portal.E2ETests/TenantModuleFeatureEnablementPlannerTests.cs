@@ -90,6 +90,47 @@ public sealed class TenantModuleFeatureEnablementPlannerTests
     }
 
     private static HashSet<string> Enabled(params string[] keys) => new(keys, StringComparer.OrdinalIgnoreCase);
+
+    [Test]
+    public void FindIssues_OnlyFlagsEnabledFeaturesWithMissingRequiredDependencies()
+    {
+        var issues = TenantModuleFeatureEnablementPlanner.FindIssues(BuiltIns(), Enabled("pos", "pos.registers"));
+        issues.Should().ContainSingle().Which.Feature.Key.Should().Be("pos.registers");
+        issues[0].Plan.EnableKeys.Should().Contain("inventario.warehousing");
+    }
+
+    [Test]
+    public void FindIssues_OptionalAndDisabledFeatures_DoNotCreateWarnings()
+    {
+        var definition = Feature("test", "") with
+        { Dependencies = [new() { Kind = BoltDependencyKind.TenantFeature, Key = "optional", Required = false }] };
+        TenantModuleFeatureEnablementPlanner.FindIssues([definition, Feature("disabled", "", "missing")], Enabled("test"))
+            .Should().BeEmpty();
+    }
+
+    [Test]
+    public void FindIssues_BulkRepair_DeduplicatesTransitiveDependenciesAndClearsWarnings()
+    {
+        var definitions = BuiltIns();
+        var enabled = Enabled("pos", "pos.registers", "pos.sales", "pos.returns");
+        var issues = TenantModuleFeatureEnablementPlanner.FindIssues(definitions, enabled);
+        issues.Should().HaveCount(3);
+        var repair = TenantModuleFeatureEnablementPlanner.Create(definitions, enabled, issues.Select(issue => issue.Feature.Key), []);
+        repair.Errors.Should().BeEmpty();
+        repair.EnableKeys.Should().OnlyHaveUniqueItems();
+        repair.EnableKeys.Should().NotContain("pos.reporting");
+        enabled.UnionWith(repair.EnableKeys);
+        TenantModuleFeatureEnablementPlanner.FindIssues(definitions, enabled).Should().BeEmpty();
+    }
+
+    [Test]
+    public void FindIssues_UnavailableService_IsReportedWithoutOfferingAFlagOnlyRepair()
+    {
+        var unavailable = Feature("test", "") with { UnavailableRequiredDependencies = ["Service is offline."] };
+        var issues = TenantModuleFeatureEnablementPlanner.FindIssues([unavailable], Enabled("test"));
+        issues.Should().ContainSingle().Which.Plan.Errors.Should().Equal("Service is offline.");
+        issues[0].Plan.EnableKeys.Should().BeEmpty();
+    }
     private static List<ResolvedTenantModuleFeatureDefinition> BuiltIns() => TenantModuleFeatureKeys.All.Select(definition =>
         new ResolvedTenantModuleFeatureDefinition(definition, [], [])
         {

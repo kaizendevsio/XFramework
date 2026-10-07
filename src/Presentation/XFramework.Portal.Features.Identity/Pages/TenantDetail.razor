@@ -145,6 +145,52 @@ else
                     }
                     else
                     {
+                        var dependencyIssues = ModuleDependencyIssues;
+                        @if (dependencyIssues.Count > 0)
+                        {
+                            var repairPlan = GetModuleDependencyRepairPlan(dependencyIssues);
+                            <BbAlert Variant="AlertVariant.Warning" data-testid="module-dependency-warning">
+                                <BbAlertTitle>Enabled features have missing required dependencies</BbAlertTitle>
+                                <BbAlertDescription>
+                                    <p>@dependencyIssues.Count enabled features have unmet prerequisites. Some workflows may not work correctly until these are resolved.</p>
+                                    <div class="xf-page-actions mt-3">
+                                        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@(() => _showModuleDependencyIssues = !_showModuleDependencyIssues)"
+                                                  aria-expanded="@_showModuleDependencyIssues" aria-controls="module-dependency-issues">
+                                            <LucideIcon Name="list-filter" class="mr-2 h-4 w-4" />
+                                            @(_showModuleDependencyIssues ? "Hide affected features" : "Show affected features")
+                                        </BbButton>
+                                        <BbButton Size="ButtonSize.Small" OnClick="@RepairAllModuleDependencies"
+                                                  Disabled="@(_moduleFeatureChangeInProgress || repairPlan.EnableKeys.Count == 0 || repairPlan.Errors.Count > 0)"
+                                                  data-testid="module-dependency-fix-all">
+                                            <LucideIcon Name="wand-sparkles" class="mr-2 h-4 w-4" />Fix all
+                                        </BbButton>
+                                    </div>
+                                    @if (repairPlan.Errors.Count > 0)
+                                    {
+                                        <p class="mt-2">Some requirements cannot be enabled here. Show affected features for details.</p>
+                                    }
+                                    @if (_showModuleDependencyIssues)
+                                    {
+                                        <ul id="module-dependency-issues" class="mt-3 space-y-2" data-testid="module-dependency-issues">
+                                            @foreach (var issue in dependencyIssues)
+                                            {
+                                                <li>
+                                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="@(() => InspectModuleDependencyIssue(issue.Feature.Key))">@issue.Feature.DisplayName</BbButton>
+                                                    @if (issue.Plan.EnableKeys.Count > 0)
+                                                    {
+                                                        <span>Requires: @string.Join(", ", issue.Plan.EnableKeys.Select(key => $"{FindModuleFeatureRow(key)?.DisplayName ?? key} (disabled)" )).</span>
+                                                    }
+                                                    @if (issue.Plan.Errors.Count > 0)
+                                                    {
+                                                        <span>@string.Join(" ", issue.Plan.Errors)</span>
+                                                    }
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+                                </BbAlertDescription>
+                            </BbAlert>
+                        }
                         <div class="tenant-modules-grid">
                             <BbCard class="tenant-modules-tree-card">
                                 <BbCardHeader>
@@ -428,44 +474,7 @@ else
             </BbTabsContent>
 
             <BbTabsContent Value="role-types" Class="xf-fade-in">
-                <BbCard>
-                    <BbCardContent>
-                        <BbDataGrid Items="@_detailRoleTypes" ShowPagination="true" InitialPageSize="10">
-                            <Columns>
-                                <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
-                                <BbDataGridTemplateColumn Title="Role Level" Sortable="true" Filterable="true" FilterBy="@(rt => FormatRoleLevel(rt))">
-                                    <ChildContent Context="rt">
-                                        @FormatRoleLevel(rt)
-                                    </ChildContent>
-                                </BbDataGridTemplateColumn>
-                                <BbDataGridTemplateColumn Title="Group" Filterable="true" FilterBy="@(rt => GetRoleTypeGroupLabel(rt))">
-                                    <ChildContent Context="rt">
-                                        @GetRoleTypeGroupLabel(rt)
-                                    </ChildContent>
-                                </BbDataGridTemplateColumn>
-                                <BbDataGridTemplateColumn Title="Enabled" Filterable="true" FilterBy="@(rt => FormatBoolean(rt.IsEnabled))">
-                                    <ChildContent Context="rt">
-                                        <StatusBadge Text="@(rt.IsEnabled ? "Enabled" : "Disabled")"
-                                                     Status="@(rt.IsEnabled ? "active" : "inactive")" />
-                                    </ChildContent>
-                                </BbDataGridTemplateColumn>
-                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
-                                <BbDataGridTemplateColumn Title="Actions">
-                                    <ChildContent Context="rt">
-                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
-                                                  title="Edit role type permissions"
-                                                  OnClick="@(() => Navigation.NavigateTo($"/identity/tenants/{Id}/role-types/{rt.Id}"))">
-                                            <LucideIcon Name="shield-check" class="h-4 w-4" />
-                                        </BbButton>
-                                    </ChildContent>
-                                </BbDataGridTemplateColumn>
-                            </Columns>
-                            <EmptyTemplate>
-                                <BbEmpty Title="No role types" Description="No role types are configured for this tenant." />
-                            </EmptyTemplate>
-                        </BbDataGrid>
-                    </BbCardContent>
-                </BbCard>
+                <XFramework.Portal.Features.Identity.Components.TenantRoleTypes @key="Id" TenantId="@Id" TenantName="@(_tenant?.Name)" />
             </BbTabsContent>
         </BbTabs>
     </div>
@@ -598,7 +607,6 @@ else
     // -- Detail data --
     private List<IdentityInformation> _detailUsers = [];
     private List<RegistryConfiguration> _detailConfigs = [];
-    private List<IdentityRoleType> _detailRoleTypes = [];
     private List<TenantModuleFeature> _detailModuleFeatures = [];
     private List<Tenant> _tenantOptions = [];
     private List<ModuleFeatureRow> _moduleFeatureRows = [];
@@ -608,6 +616,7 @@ else
     private HashSet<string> _moduleFeatureCheckedKeys = new(StringComparer.OrdinalIgnoreCase);
     private int _moduleFeatureTreeRevision;
     private string _moduleFeatureSearchText = "";
+    private bool _showModuleDependencyIssues;
     private HashSet<string> _expandedModuleFeatureKeys = new(StringComparer.OrdinalIgnoreCase);
     private bool _moduleFeaturesLoading;
     private string _selectedModuleFeatureKey = "";
@@ -723,7 +732,6 @@ else
     {
         _detailUsers = [];
         _detailConfigs = [];
-        _detailRoleTypes = [];
         _detailModuleFeatures = [];
         _tenantOptions = [];
         _moduleFeatureRows = [];
@@ -763,16 +771,6 @@ else
                     .Where(x => x.TenantId == Id)
                     .Include(x => x.Group)
                     .OrderBy(x => x.Key)
-                    .Take(100)
-                    .ToListAsync())
-                .ToList();
-
-            _detailRoleTypes = (await DataContext.Query<IdentityRoleType>()
-                    .IgnoreQueryFilters()
-                    .NoCache()
-                    .Where(x => x.TenantId == Id)
-                    .Include(x => x.Group)
-                    .OrderBy(x => x.Name)
                     .Take(100)
                     .ToListAsync())
                 .ToList();
@@ -1057,6 +1055,25 @@ else
     private async Task ToggleModuleFeature(ModuleFeatureRow row, bool enabled)
     {
         await ApplyModuleFeatureChanges(enabled ? [row.Key] : [], enabled ? [] : [row.Key]);
+    }
+
+    private IReadOnlyList<TenantModuleFeatureDependencyIssue> ModuleDependencyIssues =>
+        TenantModuleFeatureEnablementPlanner.FindIssues(_resolvedModuleDefinitions, _moduleFeatureCheckedKeys);
+
+    private TenantModuleFeatureEnablementPlan GetModuleDependencyRepairPlan(IReadOnlyList<TenantModuleFeatureDependencyIssue> issues) =>
+        TenantModuleFeatureEnablementPlanner.Create(_resolvedModuleDefinitions, _moduleFeatureCheckedKeys,
+            issues.Select(issue => issue.Feature.Key), []);
+
+    private Task RepairAllModuleDependencies()
+    {
+        var issues = ModuleDependencyIssues;
+        return ApplyModuleFeatureChanges(issues.Select(issue => issue.Feature.Key).ToList(), []);
+    }
+
+    private void InspectModuleDependencyIssue(string key)
+    {
+        _moduleFeatureSearchText = "";
+        if (FindModuleFeatureRow(key) is { } row) SelectModuleFeature(row);
     }
 
     private async Task ApplyModuleFeatureChanges(IReadOnlyList<string> enableKeys, IReadOnlyList<string> disableKeys)
@@ -1563,10 +1580,6 @@ else
 
     private static string FormatBoolean(bool value) => value ? "Yes" : "No";
     private static string FormatDateTime(DateTime value) => value == default ? "N/A" : value.ToString("g");
-    private static string FormatRoleLevel(IdentityRoleType roleType) => roleType.RoleLevel?.ToString() ?? "N/A";
-    private static string GetRoleTypeGroupLabel(IdentityRoleType roleType) =>
-        roleType.Group?.Name ?? roleType.GroupId.ToString()[..8];
-
     private sealed class ModuleFeatureTreeNode(ModuleFeatureRow row, IReadOnlyList<ModuleFeatureTreeNode> children)
     {
         public ModuleFeatureRow Row { get; } = row;

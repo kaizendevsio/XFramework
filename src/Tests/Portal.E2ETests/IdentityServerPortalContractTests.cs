@@ -224,14 +224,16 @@ public sealed class IdentityServerPortalContractTests
         var roleTypeDetail = File.ReadAllText(Path.Combine(pagesRoot, "RoleTypeDetail.razor"));
         var userDetail = ReadIdentityPage("UserDetail.razor");
 
-        tenantDetail.Should().Contain("/identity/tenants/{Id}/role-types/{rt.Id}");
-        tenantDetail.Should().Contain("title=\"Edit role type permissions\"");
-        tenantDetail.Should().Contain("<BbDataGrid Items=\"@_detailRoleTypes\" ShowPagination=\"true\" InitialPageSize=\"10\">");
-        tenantDetail.Should().Contain("<BbDataGridTemplateColumn Title=\"Role Level\" Sortable=\"true\" Filterable=\"true\" FilterBy=\"@(rt => FormatRoleLevel(rt))\">");
-        tenantDetail.Should().Contain("<BbDataGridTemplateColumn Title=\"Group\" Filterable=\"true\" FilterBy=\"@(rt => GetRoleTypeGroupLabel(rt))\">");
-        tenantDetail.Should().Contain("<BbDataGridTemplateColumn Title=\"Enabled\" Filterable=\"true\" FilterBy=\"@(rt => FormatBoolean(rt.IsEnabled))\">");
-        tenantDetail.Should().Contain("<EmptyTemplate>");
-        tenantDetail.Should().Contain("<BbEmpty Title=\"No role types\"");
+        tenantDetail.Should().Contain("Components.TenantRoleTypes").And.Contain("TenantId=\"@Id\"");
+        var roleTypes = File.ReadAllText(Path.Combine(pagesRoot, "..", "Components", "TenantRoleTypes.razor"));
+        var roleTypesCode = File.ReadAllText(Path.Combine(pagesRoot, "..", "Components", "TenantRoleTypes.razor.cs"));
+        roleTypesCode.Should().Contain("/identity/tenants/{TenantId}/role-types/{roleId}");
+        roleTypes.Should().Contain("title=\"Configure role capabilities\"");
+        roleTypes.Should().Contain("<BbDataGrid Items=\"@_roles\"").And.Contain("ShowPagination=\"true\" InitialPageSize=\"10\"");
+        foreach (var title in new[] { "Role Level", "Group", "Enabled" })
+            roleTypes.Should().MatchRegex($"<BbDataGridTemplateColumn Title=\"{title}\"[^\\r\\n]*Filterable=\"true\"[^\\r\\n]*FilterBy=");
+        roleTypes.Should().Contain("<EmptyTemplate>");
+        roleTypes.Should().Contain("<BbEmpty Title=\"No role types\"");
 
         roleTypeDetail.Should().Contain("@page \"/identity/tenants/{TenantId:guid}/role-types/{RoleTypeId:guid}\"");
         roleTypeDetail.Should().Contain("<BbTreeView TItem=\"PermissionFeatureTreeNode\"");

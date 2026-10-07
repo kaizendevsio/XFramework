@@ -29,6 +29,8 @@ public sealed class PosCashierE2ETests : PageTest
     private ILocator Tiles => Page.Locator(".pos-product-tile");
     private ILocator Lines => Page.Locator(".pos-cart-line");
     private ILocator Pay => Page.GetByTestId("pos-checkout");
+    private ILocator ConfirmPay => Page.GetByTestId("pos-confirm-payment");
+    private ILocator PaymentStatus => Page.Locator("#pos-payment-status");
     private ILocator Status => Page.Locator("#pos-checkout-status");
     private ILocator CashReceived => Page.GetByLabel("Cash received", new() { Exact = true });
 
@@ -321,29 +323,50 @@ public sealed class PosCashierE2ETests : PageTest
     }
 
     [Test]
+    public async Task Payment_OpensOnlyAfterPay_ClosingPreservesDraftAndTender()
+    {
+        await AddProductAsync(_settings.ProductName, _settings.ProductName);
+        var total = await Page.GetByTestId("pos-total").InnerTextAsync();
+        await OpenPaymentAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Exact amount", Exact = true }).ClickAsync();
+        await Expect(ConfirmPay).ToBeEnabledAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Back to cart", Exact = true }).ClickAsync();
+        await Expect(CashReceived).ToBeHiddenAsync();
+        await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync(total);
+        await ExpectQuantityAsync(_settings.ProductName, 1);
+        await OpenPaymentAsync();
+        await Expect(ConfirmPay).ToBeEnabledAsync();
+        await Page.Keyboard.PressAsync("Escape");
+        await Expect(Page.GetByRole(AriaRole.Dialog, new() { Name = "Payment", Exact = true })).ToBeHiddenAsync();
+        await ExpectQuantityAsync(_settings.ProductName, 1);
+        await Expect(Page.GetByTestId("pos-receipt")).ToBeHiddenAsync();
+    }
+
+    [Test]
     public async Task Cash_InsufficientExactAndExcessTender_UpdatesReadinessAndChange()
     {
         await AddProductAsync(_settings.ProductName, _settings.ProductName);
+        await OpenPaymentAsync();
         await Page.GetByRole(AriaRole.Radio, new() { Name = "Cash", Exact = true }).CheckAsync();
         var total = await MoneyAsync(Page.GetByTestId("pos-total"));
         total.Should().BeGreaterThan(0, "cash readiness needs a positively priced fixture product");
 
         await SetMoneyAsync(CashReceived, total - 0.01m);
-        await Expect(Pay).ToBeDisabledAsync();
-        await Expect(Status).ToContainTextAsync(new Regex("cash|tender|received"), new() { IgnoreCase = true });
-        await Expect(Status).ToContainTextAsync(new Regex("enter|insufficient|short|remaining|need"), new() { IgnoreCase = true });
+        await Expect(ConfirmPay).ToBeDisabledAsync();
+        await Expect(PaymentStatus).ToContainTextAsync(new Regex("cash|tender|received"), new() { IgnoreCase = true });
+        await Expect(PaymentStatus).ToContainTextAsync(new Regex("enter|insufficient|short|remaining|need"), new() { IgnoreCase = true });
         await ExpectMoneyAsync(Page.GetByTestId("pos-change"), 0);
-        var insufficientGuidance = await Status.InnerTextAsync();
+        var insufficientGuidance = await PaymentStatus.InnerTextAsync();
 
         await Page.GetByRole(AriaRole.Button, new() { Name = "Exact amount", Exact = true }).ClickAsync();
         await ExpectMoneyInputAsync(CashReceived, total);
-        await Expect(Pay).ToBeEnabledAsync();
-        await Expect(Status).Not.ToHaveTextAsync(insufficientGuidance);
+        await Expect(ConfirmPay).ToBeEnabledAsync();
+        await Expect(PaymentStatus).Not.ToHaveTextAsync(insufficientGuidance);
         await ExpectMoneyAsync(Page.GetByTestId("pos-change"), 0);
-        await Expect(Pay).ToHaveTextAsync(new Regex($@"^\s*Pay\s+{Regex.Escape(_settings.Currency)}\s+{Regex.Escape(FormatMoney(total))}\s*$"));
+        await Expect(ConfirmPay).ToHaveTextAsync(new Regex($@"^\s*Confirm payment\s+{Regex.Escape(_settings.Currency)}\s+{Regex.Escape(FormatMoney(total))}\s*$"));
 
         await SetMoneyAsync(CashReceived, total + 10m);
-        await Expect(Pay).ToBeEnabledAsync();
+        await Expect(ConfirmPay).ToBeEnabledAsync();
         await ExpectMoneyAsync(Page.GetByTestId("pos-change"), 10m);
 
         var preset = Page.GetByTestId("pos-cash-preset").Last;
@@ -352,26 +375,27 @@ public sealed class PosCashierE2ETests : PageTest
         await ExpectMoneyInputAsync(CashReceived, presetAmount);
         await ExpectMoneyAsync(Page.GetByTestId("pos-change"), Math.Max(0, presetAmount - total));
         if (presetAmount >= total)
-            await Expect(Pay).ToBeEnabledAsync();
+            await Expect(ConfirmPay).ToBeEnabledAsync();
         else
-            await Expect(Pay).ToBeDisabledAsync();
+            await Expect(ConfirmPay).ToBeDisabledAsync();
     }
 
     [Test]
     public async Task Wallet_NoCustomer_DisablesPaymentWithCustomerGuidance()
     {
         await AddProductAsync(_settings.ProductName, _settings.ProductName);
+        await OpenPaymentAsync();
         await Page.GetByRole(AriaRole.Radio, new() { Name = "Customer wallet", Exact = true }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Radio, new() { Name = "Customer wallet", Exact = true })).ToBeCheckedAsync();
         await Expect(Page.Locator("button.xf-entity-picker-trigger[aria-label='Customer']")).ToBeVisibleAsync();
-        await Expect(Pay).ToBeDisabledAsync();
-        await Expect(Status).ToContainTextAsync(new Regex("customer"), new() { IgnoreCase = true });
+        await Expect(ConfirmPay).ToBeDisabledAsync();
+        await Expect(PaymentStatus).ToContainTextAsync(new Regex("customer"), new() { IgnoreCase = true });
         await Expect(CashReceived).ToBeHiddenAsync();
 
         await Page.GetByRole(AriaRole.Radio, new() { Name = "Cash", Exact = true }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Radio, new() { Name = "Cash", Exact = true })).ToBeCheckedAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Exact amount", Exact = true }).ClickAsync();
-        await Expect(Pay).ToBeEnabledAsync();
+        await Expect(ConfirmPay).ToBeEnabledAsync();
         await ExpectQuantityAsync(_settings.ProductName, 1);
     }
 
@@ -381,6 +405,7 @@ public sealed class PosCashierE2ETests : PageTest
         await AddProductAsync(_settings.ProductName, _settings.ProductName);
         var subtotal = await MoneyAsync(Page.GetByTestId("pos-total"));
         subtotal.Should().BeGreaterThan(0);
+        await OpenPaymentAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Discount and tax", Exact = true }).ClickAsync();
         var discountInput = Page.GetByLabel($"Discount amount ({_settings.Currency})", new() { Exact = true });
         var taxInput = Page.GetByLabel($"Tax amount ({_settings.Currency})", new() { Exact = true });
@@ -393,12 +418,12 @@ public sealed class PosCashierE2ETests : PageTest
         await ExpectMoneyAsync(Page.GetByTestId("pos-tax"), 0.25m);
         await ExpectMoneyAsync(Page.GetByTestId("pos-total"), subtotal - discount + 0.25m);
         await Page.GetByRole(AriaRole.Button, new() { Name = "Exact amount", Exact = true }).ClickAsync();
-        await Expect(Pay).ToBeEnabledAsync();
+        await Expect(ConfirmPay).ToBeEnabledAsync();
 
         await SetMoneyAsync(discountInput, subtotal + 1m);
         await ExpectMoneyAsync(Page.GetByTestId("pos-total"), -0.75m);
-        await Expect(Pay).ToBeDisabledAsync();
-        await Expect(Status).ToContainTextAsync(new Regex("discount|negative|total"), new() { IgnoreCase = true });
+        await Expect(ConfirmPay).ToBeDisabledAsync();
+        await Expect(PaymentStatus).ToContainTextAsync(new Regex("discount|negative|total"), new() { IgnoreCase = true });
     }
 
     [Test]
@@ -415,6 +440,10 @@ public sealed class PosCashierE2ETests : PageTest
             var details = Page.GetByRole(AriaRole.Dialog, new() { Name = "Sale details", Exact = true });
             await Expect(details).ToBeVisibleAsync();
             var note = details.GetByLabel("Sale notes", new() { Exact = true });
+            var referenceBounds = await details.GetByLabel("Customer reference", new() { Exact = true }).BoundingBoxAsync();
+            var noteBounds = await note.BoundingBoxAsync();
+            noteBounds!.Y.Should().BeGreaterThan(referenceBounds!.Y + referenceBounds.Height);
+            Math.Abs(noteBounds.X - referenceBounds.X).Should().BeLessThan(2);
             if (attempt == 0)
             {
                 await note.FillAsync("POS E2E unsaved draft note");
@@ -478,10 +507,13 @@ public sealed class PosCashierE2ETests : PageTest
             // Browser scroll rounding can clip a fraction of a CSS pixel at the viewport edge.
             await Expect(Pay).ToBeInViewportAsync(new() { Ratio = .99f });
             await Expect(Status).ToBeVisibleAsync();
+            await OpenPaymentAsync();
             await Page.GetByRole(AriaRole.Button, new() { Name = "Exact amount", Exact = true }).ClickAsync();
-            await Expect(Pay).ToBeEnabledAsync();
+            await Expect(ConfirmPay).ToBeEnabledAsync();
             // Trial click checks reachability/overlays without submitting a financial action.
-            await Pay.ClickAsync(new() { Trial = true });
+            await ConfirmPay.ClickAsync(new() { Trial = true });
+            await Page.GetByRole(AriaRole.Button, new() { Name = "Back to cart", Exact = true }).ClickAsync();
+            await Expect(CashReceived).ToBeHiddenAsync();
             if (pass == 0)
             {
                 await Page.GetByRole(AriaRole.Button, new() { Name = "Enter cashier focus", Exact = true }).ClickAsync();
@@ -528,9 +560,10 @@ public sealed class PosCashierE2ETests : PageTest
 
         await AddProductAsync(_settings.ProductName, _settings.ProductName);
         var total = await MoneyAsync(Page.GetByTestId("pos-total"));
+        await OpenPaymentAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Exact amount", Exact = true }).ClickAsync();
-        await Expect(Pay).ToBeEnabledAsync();
-        await Pay.ClickAsync();
+        await Expect(ConfirmPay).ToBeEnabledAsync();
+        await ConfirmPay.ClickAsync();
 
         var receipt = Page.GetByTestId("pos-receipt");
         await Expect(receipt).ToBeVisibleAsync(new() { Timeout = 60_000 });
@@ -540,6 +573,16 @@ public sealed class PosCashierE2ETests : PageTest
         TestContext.Progress.WriteLine($"Completed isolated POS sale: {await receipt.InnerTextAsync()}");
         await Expect(Lines).ToHaveCountAsync(0);
         await Expect(Pay).ToBeDisabledAsync();
+    }
+
+    private async Task OpenPaymentAsync()
+    {
+        await Expect(CashReceived).ToBeHiddenAsync();
+        await Expect(Page.GetByRole(AriaRole.Radio, new() { Name = "Cash", Exact = true })).ToBeHiddenAsync();
+        await Expect(Pay).ToBeEnabledAsync();
+        await Pay.ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Dialog, new() { Name = "Payment", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByTestId("pos-payment-stage")).ToBeVisibleAsync();
     }
 
     private async Task SearchAsync(string query)
