@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -46,11 +47,18 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
     public async Task Start()
     {
         var root = RepoRoot();
+        var assetsManifest = Path.Combine(TestContext.CurrentContext.TestDirectory, "XFramework.Portal.staticwebassets.runtime.json");
+        File.Exists(assetsManifest).Should().BeTrue("the referenced Portal build supplies its runtime asset manifest");
         state = new();
         var builder = WebApplication.CreateBuilder();
         builder.Configuration.Sources.Clear();
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
-        { ["Portal:ScannerPublicBaseUrl"] = "https://scanner.fixture.invalid" });
+        {
+            ["Portal:ScannerPublicBaseUrl"] = "https://scanner.fixture.invalid",
+            [WebHostDefaults.StaticWebAssetsKey] = assetsManifest
+        });
+        // Use the framework and package assets selected by this Portal build, including SDK patch versions.
+        StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Services.AddRazorComponents().AddInteractiveServerComponents(options => options.DetailedErrors = true);
         builder.Services.AddBlazorBlueprintComponents();
@@ -116,14 +124,11 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
             });
         builder.Services.AddSingleton(wrapper.Object);
         app = builder.Build();
+        app.UseStaticFiles();
         Static(root + "/src/Presentation/XFramework.Portal.Features.POS/wwwroot", "/_content/XFramework.Portal.Features.POS");
         var configuration = new DirectoryInfo(TestContext.CurrentContext.TestDirectory).Parent!.Name;
         Static(root + $"/src/Presentation/XFramework.Portal.Features.POS/obj/{configuration}/net10.0/scopedcss/projectbundle", "/_content/XFramework.Portal.Features.POS");
         Static(root + "/src/Presentation/XFramework.Portal/wwwroot/css", "/cashier-css");
-        var packages = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget/packages");
-        Static(Path.Combine(packages,"blazorblueprint.components/3.16.0/staticwebassets"), "/_content/BlazorBlueprint.Components");
-        Static(Path.Combine(packages,"blazorblueprint.primitives/3.16.0/staticwebassets"), "/_content/BlazorBlueprint.Primitives");
-        Static(Path.Combine(packages,"microsoft.aspnetcore.app.internal.assets/10.0.0/_framework"), "/_framework");
         app.UseAntiforgery();
         app.MapRazorComponents<PosPairingFixtureRoot>().AddInteractiveServerRenderMode();
         await app.StartAsync();
@@ -144,6 +149,8 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
         state.Polls = 0; state.PausedPolls = 0; state.Revokes = 0; state.Acknowledged = 0;
         state.QueuedScan = null; state.LatestPairing = null; state.Cashier = null; state.FinancialCalls = 0;
         state.RevokedPairings.Clear(); state.CatalogRequests.Clear();
+        var runtime = await Page.APIRequest.GetAsync(app.Urls.Single() + "/_framework/blazor.web.js");
+        runtime.Status.Should().Be(200, "the framework script must be served from the built Portal's asset manifest");
         Page.PageError += (_, message) => TestContext.Progress.WriteLine(message);
         var response = await Page.GotoAsync(app.Urls.Single() + "/scanner-pairing-fixture");
         response!.Status.Should().Be(200, await Page.ContentAsync());
