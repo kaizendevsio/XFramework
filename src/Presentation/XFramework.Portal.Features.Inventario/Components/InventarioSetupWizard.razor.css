@@ -1,0 +1,9 @@
+.setup-wizard { width: 100%; max-width: 960px; }
+.setup-wizard fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.setup-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.setup-label { display: block; margin: 12px 0 6px; font-size: 14px; font-weight: 500; }
+.setup-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 24px; }
+.setup-review { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 12px; }
+.setup-review dt { font-weight: 500; }
+.setup-review dd { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .setup-fields { grid-template-columns: minmax(0, 1fr); } .setup-review { grid-template-columns: minmax(0, 1fr); gap: 6px; } .setup-review dd { margin-bottom: 12px; } }
