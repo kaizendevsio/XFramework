@@ -1,4 +1,5 @@
 @page "/identity/tenants/{TenantId:guid}/role-types/{RoleTypeId:guid}"
+@implements IDisposable
 
 <PageTitle>Role Type Permissions - Portal</PageTitle>
 
@@ -71,7 +72,8 @@ else
                     <div class="xf-detail-field-grid">
                         <BbFormFieldSelect TValue="string"
                                            Value="@_missingPermissionBehaviorValue"
-                                           ValueChanged="@((string value) => _missingPermissionBehaviorValue = value)"
+                                           ValueChanged="@SetMissingPermissionBehavior"
+                                           Disabled="@(!_permissionsLoaded)"
                                            Label="Missing Permission Behavior">
                             <BbSelectItem Value="@MissingPermissionDeny">Deny</BbSelectItem>
                             <BbSelectItem Value="@MissingPermissionAllow">Allow</BbSelectItem>
@@ -165,6 +167,7 @@ else
                                     <BbFormFieldSelect TValue="string"
                                                        Label="@FormatCapabilityLabel(capability)"
                                                        Value="@GetPermissionValue(SelectedFeature, capability)"
+                                                       Disabled="@(!_permissionsLoaded)"
                                                        ValueChanged="@((string value) => SetPermissionValue(SelectedFeature, capability, value))">
                                         <BbSelectItem Value="@PermissionDefault">Tenant default</BbSelectItem>
                                         <BbSelectItem Value="@PermissionAllow">Allow</BbSelectItem>
@@ -203,6 +206,9 @@ else
     private string _missingPermissionBehaviorValue = MissingPermissionDeny;
     private Guid _policyConcurrencyStamp;
     private Guid _roleTypeConcurrencyStamp;
+    private long _permissionsRevision;
+    private long _draftRevision;
+    private bool _disposed;
 
     private const string PermissionDefault = "default";
     private const string PermissionAllow = "allow";
@@ -216,16 +222,33 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
-        await ResolveAccess();
-        if (!_canManageTenants)
+        var revision = ++_permissionsRevision;
+        var tenantId = TenantId;
+        var roleTypeId = RoleTypeId;
+        _draftRevision++;
+        _saving = false;
+        _loading = true;
+        _permissionsLoaded = false;
+        _roleType = null;
+        _permissionValues = BuildEmptyPermissionValueMap();
+        _policyConcurrencyStamp = Guid.Empty;
+        _roleTypeConcurrencyStamp = Guid.Empty;
+        _accessChecked = false;
+        _canManageTenants = false;
+
+        await ResolveAccess(revision, tenantId, roleTypeId);
+        if (!IsCurrent(revision, tenantId, roleTypeId) || !_canManageTenants)
         {
             return;
         }
 
-        await LoadRoleType();
+        await LoadRoleType(revision, tenantId, roleTypeId);
     }
 
-    private async Task ResolveAccess()
+    private bool IsCurrent(long revision, Guid tenantId, Guid roleTypeId) =>
+        !_disposed && revision == _permissionsRevision && tenantId == TenantId && roleTypeId == RoleTypeId;
+
+    private async Task ResolveAccess(long revision, Guid tenantId, Guid roleTypeId)
     {
         if (AuthenticationStateTask is null)
         {
@@ -234,11 +257,12 @@ else
         }
 
         var authState = await AuthenticationStateTask;
+        if (!IsCurrent(revision, tenantId, roleTypeId)) return;
         _canManageTenants = PortalAccess.CanManageTenants(authState.User);
         _accessChecked = true;
     }
 
-    private async Task LoadRoleType()
+    private async Task LoadRoleType(long revision, Guid tenantId, Guid roleTypeId)
     {
         _loading = true;
         try
@@ -250,52 +274,49 @@ else
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             _selectedFeatureKey = TenantModuleFeatureKeys.Identity;
 
-            _roleType = await DataContext.Query<IdentityRoleType>()
+            var roleType = await DataContext.Query<IdentityRoleType>()
                 .IgnoreQueryFilters()
                 .NoCache()
                 .Include(x => x.Group)
-                .Where(x => x.Id == RoleTypeId && x.TenantId == TenantId)
+                .Where(x => x.Id == roleTypeId && x.TenantId == tenantId)
                 .Where(x => !x.IsDeleted && x.IsEnabled)
                 .FirstOrDefaultAsync();
 
+            if (!IsCurrent(revision, tenantId, roleTypeId)) return;
+            _roleType = roleType;
             if (_roleType is null)
             {
                 _permissionValues = [];
                 return;
             }
 
-            await LoadPermissions();
+            await LoadPermissions(revision, tenantId, roleTypeId);
         }
         catch
         {
+            if (!IsCurrent(revision, tenantId, roleTypeId)) return;
             ToastService.Error("Role type permissions could not be loaded.", "Permissions failed");
             _roleType = null;
         }
         finally
         {
-            _loading = false;
+            if (IsCurrent(revision, tenantId, roleTypeId)) _loading = false;
         }
     }
 
-    private async Task LoadPermissions()
+    private async Task LoadPermissions(long revision, Guid tenantId, Guid roleTypeId)
     {
         _permissionsLoaded = false;
         _permissionValues = BuildEmptyPermissionValueMap();
 
         var policyResult = await IdentityServer.GetTenantAuthorizationPolicy(new GetTenantAuthorizationPolicyRequest
         {
-            TenantId = TenantId,
-            Metadata = CreateMetadata(TenantId)
+            TenantId = tenantId,
+            Metadata = CreateMetadata(tenantId)
         });
 
-        if (policyResult.IsSuccess && policyResult.Response is not null)
-        {
-            _policyConcurrencyStamp = policyResult.Response.ConcurrencyStamp;
-            _missingPermissionBehaviorValue = policyResult.Response.MissingPermissionBehavior == MissingPermissionBehavior.Allow
-                ? MissingPermissionAllow
-                : MissingPermissionDeny;
-        }
-        else
+        if (!IsCurrent(revision, tenantId, roleTypeId)) return;
+        if (!policyResult.IsSuccess || policyResult.Response is null)
         {
             ToastService.Error("Tenant permission default could not be loaded.", "Permissions failed");
             return;
@@ -303,17 +324,23 @@ else
 
         var permissionsResult = await IdentityServer.GetRoleTypePermissions(new GetRoleTypePermissionsRequest
         {
-            RoleTypeId = RoleTypeId,
-            Metadata = CreateMetadata(TenantId)
+            RoleTypeId = roleTypeId,
+            Metadata = CreateMetadata(tenantId)
         });
 
+        if (!IsCurrent(revision, tenantId, roleTypeId)) return;
         if (!permissionsResult.IsSuccess || permissionsResult.Response is null)
         {
             ToastService.Error("Role type permissions could not be loaded.", "Permissions failed");
             return;
         }
 
+        _policyConcurrencyStamp = policyResult.Response.ConcurrencyStamp;
+        _missingPermissionBehaviorValue = policyResult.Response.MissingPermissionBehavior == MissingPermissionBehavior.Allow
+            ? MissingPermissionAllow
+            : MissingPermissionDeny;
         _roleTypeConcurrencyStamp = permissionsResult.Response.ConcurrencyStamp;
+        _draftRevision++;
 
         foreach (var permission in permissionsResult.Response.Permissions)
         {
@@ -326,61 +353,80 @@ else
 
     private async Task ReloadPermissions()
     {
-        if (_roleType is null)
+        if (_roleType is null || _saving || !_canManageTenants)
         {
             return;
         }
 
+        var revision = ++_permissionsRevision;
+        var tenantId = TenantId;
+        var roleTypeId = RoleTypeId;
+        _draftRevision++;
         _loading = true;
         try
         {
-            await LoadPermissions();
+            await LoadPermissions(revision, tenantId, roleTypeId);
         }
         finally
         {
-            _loading = false;
+            if (IsCurrent(revision, tenantId, roleTypeId)) _loading = false;
         }
     }
 
     private async Task SaveRoleTypePermissions()
     {
-        if (_roleType is null)
+        if (_disposed || _saving || _loading || !_permissionsLoaded || !_canManageTenants || _roleType is null
+            || _roleType.Id != RoleTypeId || _roleType.TenantId != TenantId)
         {
             return;
         }
 
+        var revision = _permissionsRevision;
+        var draftRevision = _draftRevision;
+        var tenantId = TenantId;
+        var roleTypeId = RoleTypeId;
+        // Capture the second-stage payload before the policy write yields.
+        var permissionsRequest = new SetRoleTypePermissionsRequest
+        {
+            RoleTypeId = roleTypeId,
+            ExpectedConcurrencyStamp = _roleTypeConcurrencyStamp,
+            Permissions = BuildRoleTypePermissions(),
+            Metadata = CreateMetadata(tenantId)
+        };
         _saving = true;
         try
         {
             var policyResult = await IdentityServer.UpdateTenantAuthorizationPolicy(new UpdateTenantAuthorizationPolicyRequest
             {
-                TenantId = TenantId,
+                TenantId = tenantId,
                 MissingPermissionBehavior = _missingPermissionBehaviorValue == MissingPermissionAllow
                     ? MissingPermissionBehavior.Allow
                     : MissingPermissionBehavior.Deny,
                 ExpectedConcurrencyStamp = _policyConcurrencyStamp,
-                Metadata = CreateMetadata(TenantId)
+                Metadata = CreateMetadata(tenantId)
             });
 
+            if (!IsCurrent(revision, tenantId, roleTypeId)) return;
             if (!policyResult.IsSuccess)
             {
                 ToastService.Error("Tenant permission default could not be saved.", "Permissions failed");
                 return;
             }
             _policyConcurrencyStamp = policyResult.Response?.ConcurrencyStamp ?? _policyConcurrencyStamp;
-
-            var permissionsResult = await IdentityServer.SetRoleTypePermissions(new SetRoleTypePermissionsRequest
+            if (draftRevision != _draftRevision)
             {
-                RoleTypeId = RoleTypeId,
-                ExpectedConcurrencyStamp = _roleTypeConcurrencyStamp,
-                Permissions = BuildRoleTypePermissions(),
-                Metadata = CreateMetadata(TenantId)
-            });
+                ToastService.Error("Permissions changed while saving. Save the current draft again.", "Permissions changed");
+                return;
+            }
 
+            var permissionsResult = await IdentityServer.SetRoleTypePermissions(permissionsRequest);
+
+            if (!IsCurrent(revision, tenantId, roleTypeId)) return;
             if (permissionsResult.IsSuccess)
             {
                 _roleTypeConcurrencyStamp = permissionsResult.Response?.ConcurrencyStamp ?? _roleTypeConcurrencyStamp;
-                ToastService.Success("Role type permissions saved.", "Permissions saved");
+                if (draftRevision == _draftRevision)
+                    ToastService.Success("Role type permissions saved.", "Permissions saved");
             }
             else
             {
@@ -389,11 +435,12 @@ else
         }
         catch
         {
-            ToastService.Error("Role type permissions could not be saved.", "Permissions failed");
+            if (IsCurrent(revision, tenantId, roleTypeId))
+                ToastService.Error("Role type permissions could not be saved.", "Permissions failed");
         }
         finally
         {
-            _saving = false;
+            if (IsCurrent(revision, tenantId, roleTypeId)) _saving = false;
         }
     }
 
@@ -462,8 +509,17 @@ else
 
     private void SetPermissionValue(TenantModuleFeatureDefinition feature, string capability, string value)
     {
+        if (!_permissionsLoaded || _loading) return;
+        _draftRevision++;
         _permissionValues[BuildPermissionKey(feature, capability)] =
             value == PermissionAllow || value == PermissionDeny ? value : PermissionDefault;
+    }
+
+    private void SetMissingPermissionBehavior(string value)
+    {
+        if (!_permissionsLoaded || _loading) return;
+        _draftRevision++;
+        _missingPermissionBehaviorValue = value == MissingPermissionAllow ? MissingPermissionAllow : MissingPermissionDeny;
     }
 
     private string GetPermissionBadge(TenantModuleFeatureDefinition feature)
@@ -498,6 +554,12 @@ else
 
     private void BackToTenantRoles() =>
         Navigation.NavigateTo($"/identity/tenants/{TenantId}/role-types");
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _permissionsRevision++;
+    }
 
     private static string BuildPermissionKey(TenantModuleFeatureDefinition feature, string capability) =>
         BuildPermissionKey(feature.ModuleKey, feature.SubFeatureKey, capability);
