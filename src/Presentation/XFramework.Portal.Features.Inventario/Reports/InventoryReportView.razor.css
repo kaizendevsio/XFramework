@@ -1,0 +1,9 @@
+.inventory-report-view { display: grid; gap: 1.5rem; min-width: 0; }
+.xf-summary-grid > div { border-bottom: 1px solid var(--border); padding: 1rem 0; display: grid; gap: .35rem; }
+.xf-summary-grid strong { font-size: 1.5rem; font-weight: 600; }
+.report-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; }
+.report-charts section { min-width: 0; }
+h4 { font-size: 1rem; font-weight: 600; margin-bottom: .5rem; }
+p { color: var(--muted-foreground); font-size: .875rem; margin: .75rem 0; }
+::deep .report-tabs { min-width: 0; }
+@media (max-width: 700px) { .report-charts { grid-template-columns: minmax(0, 1fr); } }

@@ -127,6 +127,97 @@ public sealed class InventoryPlanningReportingServiceTests
         row.ProductName.Should().Be("Widget");
     }
 
+    [Test]
+    public async Task GetSnapshotAsync_FiltersBeforeAggregatesAndCapsDetailsWithoutCappingTotals()
+    {
+        var tenantId = Guid.NewGuid();
+        var ids = TestIds.Create();
+        var data = SeedPlanningData(tenantId, ids, 3);
+        for (var i = 0; i < 1005; i++)
+            data.Set<StockBalance>().Add(new()
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, ProductId = ids.ProductId,
+                WarehouseId = ids.WarehouseId, LocationId = ids.LocationId,
+                OnHandQuantity = 5, ReservedQuantity = 1, AvailableQuantity = 4
+            });
+        data.Set<StockBalance>().Add(new()
+        {
+            Id = Guid.NewGuid(), TenantId = Guid.NewGuid(), ProductId = ids.ProductId,
+            WarehouseId = ids.WarehouseId, LocationId = ids.LocationId, AvailableQuantity = 999
+        });
+        data.Set<StockBalance>().Add(new()
+        {
+            Id = Guid.NewGuid(), TenantId = tenantId, ProductId = Guid.NewGuid(),
+            WarehouseId = ids.WarehouseId, LocationId = ids.LocationId, AvailableQuantity = 888
+        });
+        var now = DateTime.UtcNow;
+        foreach (var (quantity, date, location) in new[]
+        {
+            (7m, now.AddDays(-2), ids.LocationId), (-2m, now.AddDays(-1), ids.LocationId),
+            (100m, now.AddDays(-50), ids.LocationId), (500m, now.AddDays(-1), Guid.NewGuid())
+        })
+            data.Set<InventoryMovement>().Add(new()
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, ProductId = ids.ProductId,
+                WarehouseId = ids.WarehouseId, LocationId = location, QuantityDelta = quantity, MovementDate = date
+            });
+        var service = CreateReportingService(data, tenantId, CreatePlanningService(data, tenantId));
+        var result = await service.GetSnapshotAsync(new()
+        {
+            Metadata = new() { RequestedTenantId = tenantId }, ProductId = ids.ProductId,
+            WarehouseId = ids.WarehouseId, LocationId = ids.LocationId,
+            FromUtc = now.AddDays(-10), ToUtc = now
+        });
+        result.IsSuccess.Should().BeTrue(result.Message);
+        result.Data!.PositionCount.Should().Be(1006);
+        result.Data.Positions.Should().HaveCount(1000);
+        result.Data.Available.Should().Be(4023);
+        result.Data.OnHand.Should().Be(5028);
+        result.Data.Reserved.Should().Be(1005);
+        result.Data.Inbound.Should().Be(7);
+        result.Data.Outbound.Should().Be(2);
+        result.Data.MovementCount.Should().Be(2);
+        result.Data.GeneratedAtUtc.Should().BeOnOrAfter(now);
+        result.Data.Products.Should().ContainSingle(x => x.Id == ids.ProductId);
+        data.SaveCount.Should().Be(0);
+        data.Added.Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task GetSnapshotAsync_ExpiryScopeIsAppliedBeforeBalanceRowLimit()
+    {
+        var tenantId = Guid.NewGuid();
+        var ids = TestIds.Create();
+        var data = SeedPlanningData(tenantId, ids, 3);
+        var lotId = Guid.NewGuid();
+        data.Set<InventoryLot>().Add(new()
+        {
+            Id = lotId, TenantId = tenantId, ProductId = ids.ProductId,
+            LotNumber = "EXPIRING", ExpiresAt = DateTime.UtcNow.AddDays(5)
+        });
+        for (var i = 0; i < 1001; i++)
+            data.Set<StockBalance>().Add(new()
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, ProductId = ids.ProductId,
+                WarehouseId = Guid.NewGuid(), LocationId = Guid.NewGuid(), LotId = lotId, OnHandQuantity = 10
+            });
+        data.Set<StockBalance>().Add(new()
+        {
+            Id = Guid.NewGuid(), TenantId = tenantId, ProductId = ids.ProductId,
+            WarehouseId = ids.WarehouseId, LocationId = ids.LocationId, LotId = lotId,
+            OnHandQuantity = 4, AvailableQuantity = 3
+        });
+        var service = CreateReportingService(data, tenantId, CreatePlanningService(data, tenantId));
+        var result = await service.GetSnapshotAsync(new()
+        {
+            Metadata = new() { RequestedTenantId = tenantId }, WarehouseId = ids.WarehouseId,
+            LocationId = ids.LocationId, FromUtc = DateTime.UtcNow.AddDays(-10), ToUtc = DateTime.UtcNow
+        });
+        result.IsSuccess.Should().BeTrue(result.Message);
+        result.Data!.NearExpiry.Should().ContainSingle();
+        result.Data.NearExpiry[0].AvailableQuantity.Should().Be(3);
+    }
+
     private static FakeDataContext SeedPlanningData(Guid tenantId, TestIds ids, decimal availableQuantity)
     {
         var dataContext = new FakeDataContext();
@@ -199,7 +290,9 @@ public sealed class InventoryPlanningReportingServiceTests
         FakeDataContext dataContext,
         Guid tenantId,
         InventoryPlanningService planningService) =>
-        new(dataContext, new TestTrustedInvocationContextAccessor(tenantId), planningService, new FakeTenantModuleFeatureService());
+        new(dataContext, new TestTrustedInvocationContextAccessor(tenantId,
+            capabilities: new HashSet<string> { "inventario.reporting:view" }),
+            planningService, new FakeTenantModuleFeatureService());
 
     private sealed class FakeTenantModuleFeatureService : ITenantModuleFeatureService
     {
@@ -256,8 +349,13 @@ public sealed class InventoryPlanningReportingServiceTests
             return (List<T>)set;
         }
 
-        public IRemoteQuery<T> Query<T>() where T : class =>
-            new InMemoryRemoteQuery<T>(Set<T>().AsQueryable());
+        public IRemoteQuery<T> Query<T>() where T : class
+        {
+            if (typeof(T) == typeof(StockBalance))
+                foreach (var balance in Set<StockBalance>())
+                    balance.Lot = Set<InventoryLot>().FirstOrDefault(x => x.Id == balance.LotId);
+            return new InMemoryRemoteQuery<T>(Set<T>().AsQueryable());
+        }
 
         public void Add<T>(T entity) where T : class
         {

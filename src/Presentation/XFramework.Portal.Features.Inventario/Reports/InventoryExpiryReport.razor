@@ -1,0 +1,22 @@
+@using XFramework.Inventario.Domain.Shared.Contracts.Responses.Reports
+
+<section class="expiry-report">
+    <h4>@Heading</h4>
+    <p>@Rows.Count rows, capped at 1,000; positive on-hand stock only.</p>
+    <BbDataGrid Items="@Rows" ShowPagination="true" InitialPageSize="10">
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" Filterable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.WarehouseName)" Title="Warehouse" Filterable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.LocationName)" Title="Location" Filterable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Format="0.####" Sortable="true" Filterable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires (UTC)" Format="yyyy-MM-dd" Sortable="true" Filterable="true" />
+        </Columns>
+        <EmptyTemplate><BbEmpty Title="No expiry risks" Description="No lots match this scope and expiry window." /></EmptyTemplate>
+    </BbDataGrid>
+</section>
+
+@code {
+    [Parameter] public string Heading { get; set; } = "";
+    [Parameter] public List<NearExpiryStockReportRow> Rows { get; set; } = [];
+}

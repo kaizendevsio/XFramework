@@ -46,7 +46,8 @@ public sealed class InventarioIntegrationTestFixture
         TestConstants.TenantId,
         Guid.Parse("00000000-0000-0000-0000-000000000821"),
         Guid.Parse("00000000-0000-0000-0000-000000000822"),
-        Guid.Parse("00000000-0000-0000-0000-000000000823"));
+        Guid.Parse("00000000-0000-0000-0000-000000000823"),
+        ActorCapabilities: ["inventario.reporting:view"]);
 
     public static string ConnectionString { get; private set; } = null!;
     public static string BoltUrl => TestConstants.Ports.InventarioBolt;

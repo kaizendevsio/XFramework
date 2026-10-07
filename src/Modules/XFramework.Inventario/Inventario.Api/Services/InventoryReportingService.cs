@@ -115,6 +115,7 @@ public sealed class InventoryReportingService(
 
         var tenantId = tenantResult.Data;
         var balancesQuery = dataContext.Query<StockBalance>()
+            .NoCache()
             .Where(x => x.TenantId == tenantId);
 
         if (request.ProductId is { } productId)
@@ -132,6 +133,7 @@ public sealed class InventoryReportingService(
             .OrderBy(x => x.ProductId)
             .ThenBy(x => x.WarehouseId)
             .ThenBy(x => x.LocationId)
+            .ThenBy(x => x.Id)
             .Take(1000)
             .ToListAsync(ct);
 
@@ -178,6 +180,7 @@ public sealed class InventoryReportingService(
 
         var tenantId = tenantResult.Data;
         var movementsQuery = dataContext.Query<InventoryMovement>()
+            .NoCache()
             .Where(x => x.TenantId == tenantId);
 
         if (request.ProductId is { } productId)
@@ -201,6 +204,7 @@ public sealed class InventoryReportingService(
 
         var movements = await movementsQuery
             .OrderByDescending(x => x.MovementDate)
+            .ThenBy(x => x.Id)
             .Take(1000)
             .ToListAsync(ct);
 
@@ -293,6 +297,83 @@ public sealed class InventoryReportingService(
         return Result<List<ReservationAllocationStatusReportRow>>.Success(rows);
     }
 
+    public async Task<Result<InventoryReportSnapshot>> GetSnapshotAsync(
+        GetInventoryReportSnapshotRequest request, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        var tenant = GetCurrentTenantId(request);
+        if (!tenant.IsSuccess)
+            return Result<InventoryReportSnapshot>.Failure(tenant.Message!, tenant.StatusCode);
+        if (request.Metadata?.RequestedTenantId != tenant.Data)
+            return Result<InventoryReportSnapshot>.Forbidden("An explicitly authorized report tenant is required.");
+        if (request.FromUtc.Kind != DateTimeKind.Utc || request.ToUtc.Kind != DateTimeKind.Utc ||
+            request.FromUtc > request.ToUtc || request.ToUtc - request.FromUtc > TimeSpan.FromDays(366) ||
+            request.DaysAhead is < 1 or > 365)
+            return Result<InventoryReportSnapshot>.Failure("Choose a valid UTC date range of at most 366 days and expiry window of 1-365 days.", 400);
+        var enabled = await EnsureReportingEnabledAsync(tenant.Data, ct);
+        if (!enabled.IsSuccess)
+            return Result<InventoryReportSnapshot>.Failure(enabled.Message!, enabled.StatusCode);
+
+        var asOf = DateTime.UtcNow;
+        var to = request.ToUtc < asOf ? request.ToUtc : asOf;
+        IRemoteQuery<StockBalance> Balances() => dataContext.Query<StockBalance>().NoCache().Where(x =>
+            x.TenantId == tenant.Data &&
+            (request.ProductId == null || x.ProductId == request.ProductId) &&
+            (request.WarehouseId == null || x.WarehouseId == request.WarehouseId) &&
+            (request.LocationId == null || x.LocationId == request.LocationId));
+        IRemoteQuery<InventoryMovement> Movements() => dataContext.Query<InventoryMovement>().NoCache().Where(x =>
+            x.TenantId == tenant.Data && x.MovementDate >= request.FromUtc && x.MovementDate <= to &&
+            (request.ProductId == null || x.ProductId == request.ProductId) &&
+            (request.WarehouseId == null || x.WarehouseId == request.WarehouseId) &&
+            (request.LocationId == null || x.LocationId == request.LocationId));
+
+        // Scalar aggregates cover the full scope; only detail rows are capped.
+        var positionCount = await Balances().CountAsync(ct);
+        var onHand = await Balances().SumAsync(x => x.OnHandQuantity, ct);
+        var reserved = await Balances().SumAsync(x => x.ReservedQuantity, ct);
+        var available = await Balances().SumAsync(x => x.AvailableQuantity, ct);
+        var movementCount = await Movements().CountAsync(ct);
+        var inbound = await Movements().Where(x => x.QuantityDelta > 0).SumAsync(x => x.QuantityDelta, ct);
+        var outbound = -await Movements().Where(x => x.QuantityDelta < 0).SumAsync(x => x.QuantityDelta, ct);
+        var positions = await GetStockPositionsAsync(new()
+        {
+            Metadata = request.Metadata, ProductId = request.ProductId,
+            WarehouseId = request.WarehouseId, LocationId = request.LocationId
+        }, ct);
+        var movements = await GetMovementLedgerAsync(new()
+        {
+            Metadata = request.Metadata, ProductId = request.ProductId,
+            WarehouseId = request.WarehouseId, LocationId = request.LocationId,
+            From = request.FromUtc, To = to
+        }, ct);
+        if (!positions.IsSuccess || !movements.IsSuccess)
+            return Result<InventoryReportSnapshot>.Failure("Report access changed. Refresh the report.", 403);
+        var traceability = await featureService.IsEnabledAsync(tenant.Data,
+            TenantModuleFeatureKeys.Inventario, TenantModuleFeatureKeys.TraceabilitySubFeature, ct);
+        if (!traceability.IsSuccess)
+            return Result<InventoryReportSnapshot>.Failure("Could not verify expiry report access.", traceability.StatusCode);
+        var near = traceability.Data
+            ? await BuildExpiryRows(tenant.Data, request.ProductId, null, asOf,
+                asOf.AddDays(request.DaysAhead), false, ct, request.WarehouseId, request.LocationId)
+            : [];
+        var expired = traceability.Data
+            ? await BuildExpiryRows(tenant.Data, request.ProductId, null, null,
+                asOf, true, ct, request.WarehouseId, request.LocationId)
+            : [];
+        var products = await dataContext.Query<Product>().NoCache().Where(x => x.TenantId == tenant.Data)
+            .OrderBy(x => x.Name).ThenBy(x => x.Id).Take(500).ToListAsync(ct);
+        var warehouses = await dataContext.Query<Warehouse>().NoCache().Where(x => x.TenantId == tenant.Data)
+            .OrderBy(x => x.Name).ThenBy(x => x.Id).Take(500).ToListAsync(ct);
+        var locations = await dataContext.Query<InventoryLocation>().NoCache().Where(x => x.TenantId == tenant.Data)
+            .OrderBy(x => x.Name).ThenBy(x => x.Id).Take(500).ToListAsync(ct);
+        return Result<InventoryReportSnapshot>.Success(new(tenant.Data, asOf, onHand, reserved, available,
+            inbound, outbound, positionCount, movementCount, traceability.Data,
+            positions.Data!, movements.Data!, near, expired,
+            products.Select(x => new InventoryReportFilterOption(x.Id, x.Name ?? "Unnamed product")).ToList(),
+            warehouses.Select(x => new InventoryReportFilterOption(x.Id, $"{x.Code} - {x.Name}")).ToList(),
+            locations.Select(x => new InventoryReportFilterOption(x.Id, $"{x.Code} - {x.Name}", x.WarehouseId)).ToList()));
+    }
+
     private async Task<List<NearExpiryStockReportRow>> BuildExpiryRows(
         Guid tenantId,
         Guid? productId,
@@ -300,36 +381,32 @@ public sealed class InventoryReportingService(
         DateTime? expiresAfter,
         DateTime expiresOnOrBefore,
         bool includeExpiredStatus,
-        CancellationToken ct)
+        CancellationToken ct,
+        Guid? warehouseId = null,
+        Guid? locationId = null)
     {
-        var lotsQuery = dataContext.Query<InventoryLot>()
-            .Where(x => x.TenantId == tenantId);
+        var balancesQuery = dataContext.Query<StockBalance>().NoCache()
+            .Where(x => x.TenantId == tenantId && x.OnHandQuantity > 0 &&
+                x.Lot != null && x.Lot.TenantId == tenantId);
         if (productId is { } id)
-            lotsQuery = lotsQuery.Where(x => x.ProductId == id);
+            balancesQuery = balancesQuery.Where(x => x.ProductId == id);
         if (productVariationId is { } variantId)
-            lotsQuery = lotsQuery.Where(x => x.ProductVariationId == variantId);
-
-        lotsQuery = includeExpiredStatus
-            ? lotsQuery.Where(x => x.Status == InventoryLotStatus.Expired || x.ExpiresAt != null && x.ExpiresAt <= expiresOnOrBefore)
-            : lotsQuery.Where(x => x.ExpiresAt != null && x.ExpiresAt > expiresAfter && x.ExpiresAt <= expiresOnOrBefore);
-
-        var lots = await lotsQuery
-            .OrderBy(x => x.ExpiresAt)
-            .Take(1000)
+            balancesQuery = balancesQuery.Where(x => x.ProductVariationId == variantId);
+        if (warehouseId is { } warehouse)
+            balancesQuery = balancesQuery.Where(x => x.WarehouseId == warehouse);
+        if (locationId is { } location)
+            balancesQuery = balancesQuery.Where(x => x.LocationId == location);
+        // Apply storage and expiry scope in SQL before the cap, not to a capped list of tenant lots.
+        balancesQuery = includeExpiredStatus
+            ? balancesQuery.Where(x => x.Lot!.Status == InventoryLotStatus.Expired ||
+                x.Lot.ExpiresAt != null && x.Lot.ExpiresAt <= expiresOnOrBefore)
+            : balancesQuery.Where(x => x.Lot!.ExpiresAt != null &&
+                x.Lot.ExpiresAt > expiresAfter && x.Lot.ExpiresAt <= expiresOnOrBefore);
+        var balances = await balancesQuery.OrderBy(x => x.Lot!.ExpiresAt).ThenBy(x => x.Id).Take(1000)
             .ToListAsync(ct);
-        if (lots.Count == 0)
-            return [];
-
-        var lotIds = lots.Select(x => x.Id).ToList();
-        var balances = await dataContext.Query<StockBalance>()
-            .Where(x =>
-                x.TenantId == tenantId &&
-                x.LotId != null &&
-                lotIds.Contains(x.LotId.Value) &&
-                x.OnHandQuantity > 0)
-            .Take(1000)
-            .ToListAsync(ct);
-
+        var lotIds = balances.Select(x => x.LotId!.Value).Distinct().ToList();
+        var lots = await dataContext.Query<InventoryLot>().NoCache()
+            .Where(x => x.TenantId == tenantId && lotIds.Contains(x.Id)).Take(1000).ToListAsync(ct);
         var lotMap = lots.ToDictionary(x => x.Id);
         var lookups = await LoadLookups(tenantId, balances, ct);
 
@@ -451,9 +528,16 @@ public sealed class InventoryReportingService(
 
     private Result<Guid> GetCurrentTenantId(RequestBase? request)
     {
-        var tenantId = trustedInvocationContextAccessor.Current?.EffectiveTenantId;
+        var context = trustedInvocationContextAccessor.Current;
+        var tenantId = context?.EffectiveTenantId;
         if (tenantId is null || tenantId == Guid.Empty)
             return Result<Guid>.Unauthorized("Authentication is required for inventory reporting operations.");
+        if (context?.Actor is not { } actor || actor.ExpiresAtUtc <= DateTimeOffset.UtcNow)
+            return Result<Guid>.Unauthorized("Sign in again to view inventory reports.");
+        if (!actor.Capabilities.Contains("inventario.reporting:view"))
+            return Result<Guid>.Forbidden("Inventory reporting view permission is required.");
+        if (request?.Metadata?.RequestedTenantId is { } target && target != tenantId)
+            return Result<Guid>.Forbidden("The report tenant does not match the authorized tenant.");
         return Result<Guid>.Success(tenantId.Value);
     }
 

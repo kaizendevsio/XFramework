@@ -1,24 +1,22 @@
 using XFramework.Core.Patterns;
 using XFramework.Integration.Attributes;
+using XFramework.Integration.Security;
 using XFramework.Inventario.Api.Services;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Reports;
 using XFramework.Inventario.Domain.Shared.Contracts.Responses.Reports;
 
-namespace Inventario.Api.Features.Reports.NearExpiry;
+namespace Inventario.Api.Features.Reports.Snapshot;
 
-public static class NearExpiryReportEndpoint
+public static class InventoryReportSnapshotEndpoint
 {
-    [BoltHandler(
+    [BoltHandler(TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["inventario.reporting:view"],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
+    [MapPost("/api/inventario/reports/snapshot", Tags = ["Inventario Reports"], Capability = "view",
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
         RequiredActorCapabilities = ["inventario.reporting:view"],
         RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
-    [MapGet("/api/inventario/reports/near-expiry", Tags = ["Inventario Reports"],
-        TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredActorCapabilities = ["inventario.reporting:view"],
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
-    public static async Task<Result<List<NearExpiryStockReportRow>>> Handle(
-        GetNearExpiryStockReportRequest request,
-        InventoryReportingService reportingService,
-        CancellationToken ct) =>
-        await reportingService.GetNearExpiryAsync(request, ct);
+    public static Task<Result<InventoryReportSnapshot>> Handle(
+        GetInventoryReportSnapshotRequest request, InventoryReportingService service, CancellationToken ct) =>
+        service.GetSnapshotAsync(request, ct);
 }
