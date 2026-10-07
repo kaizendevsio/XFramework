@@ -146,6 +146,8 @@ public sealed class EntityPickerClickOutsideE2ETests : PageTest
         await Expect(picker).ToHaveAttributeAsync("aria-expanded", "false");
         if (delayRegistration)
             await Page.EvaluateAsync("window.releaseOutsideRegistration = true");
+        // The trigger closes before Blueprint's exit animation and portal teardown finish.
+        await Expect(option).ToHaveCountAsync(0);
         if (closeAction == "advanced")
         {
             var finder = Page.GetByRole(AriaRole.Dialog, new() { Name = "Find register", Exact = true });
