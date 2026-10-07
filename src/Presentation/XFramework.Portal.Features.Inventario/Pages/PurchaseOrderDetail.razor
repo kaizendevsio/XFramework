@@ -192,7 +192,7 @@ else
             if (!_hasTenant || !_purchasingEnabled) return;
 
             var tenantId = TenantFilter.SelectedTenantId!.Value;
-            _currency = await InventoryDisplay.CurrencyAsync(DataContext, tenantId);
+            _currency = await InventoryDisplay.CurrencyAsync(Inventario, tenantId);
             _variants = await DataContext.Query<ProductVariation>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
             _order = await DataContext.Query<PurchaseOrder>()
                 .IgnoreQueryFilters()

@@ -1,7 +1,8 @@
 using BlazorBlueprint.Components;
-using IdentityServer.Domain.Shared.Contracts;
-using XFramework.Domain.Shared.DataContext;
+using Inventario.Integration.Drivers;
 using XFramework.Inventario.Domain.Shared.Contracts;
+using XFramework.Inventario.Domain.Shared.Contracts.Requests.Setup;
+using XFramework.Inventario.Domain.Shared.Contracts.Responses;
 using XFramework.Inventario.Domain.Shared.Enums;
 
 namespace XFramework.Portal.Features.Inventario;
@@ -31,12 +32,18 @@ internal static class InventoryDisplay
         _ => type
     };
 
-    public static async Task<string> CurrencyAsync(IDataContext data, Guid tenantId)
+    public static async Task<InventarioSetupResponse> PreferencesAsync(IInventarioServiceWrapper inventario, Guid tenantId)
     {
-        var setting = await data.Query<RegistryConfiguration>().NoCache()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.Key == "Settings:Inventario:DefaultCurrency")
-            .FirstOrDefaultAsync();
-        var code = setting?.Value?.Trim().ToUpperInvariant() ?? "PHP";
+        var result = await inventario.GetInventarioSetup(new GetInventarioSetupRequest { Metadata = new() { RequestedTenantId = tenantId } });
+        if (!result.IsSuccess || result.Response is not { } preferences || preferences.TenantId != tenantId)
+            throw new InvalidOperationException("Inventario preferences could not be loaded.");
+        return preferences;
+    }
+
+    public static async Task<string> CurrencyAsync(IInventarioServiceWrapper inventario, Guid tenantId)
+    {
+        var preferences = await PreferencesAsync(inventario, tenantId);
+        var code = preferences.DefaultCurrency.Trim().ToUpperInvariant();
         return CurrencyCatalog.GetAllCurrencyCodes().Contains(code) ? code : "PHP";
     }
 }

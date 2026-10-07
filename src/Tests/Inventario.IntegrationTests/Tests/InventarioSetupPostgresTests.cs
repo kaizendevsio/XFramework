@@ -71,6 +71,18 @@ public sealed class InventarioSetupPostgresTests
     }
 
     [Test]
+    public async Task Get_OrdinaryUser_DoesNotPromptForManagementSetupOrWriteDefaults()
+    {
+        var tenant = Guid.NewGuid();
+        await using var db = Database(tenant);
+        var result = await Service(db, tenant, manager: false).GetAsync(new());
+        result.IsSuccess.Should().BeTrue(result.Message);
+        result.Data!.CanManage.Should().BeFalse();
+        result.Data.ShouldPrompt.Should().BeFalse();
+        (await db.Set<InventarioSetup>().CountAsync()).Should().Be(0);
+    }
+
+    [Test]
     public async Task Complete_BasicAndReplay_PersistsOnlyMinimumStorageAndDefaults()
     {
         var tenant = Guid.NewGuid();

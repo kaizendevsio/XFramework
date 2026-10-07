@@ -37,13 +37,14 @@ public sealed class InventarioSetupPageScopeTests
         _navigation = new();
     }
 
-    [TestCase(false, false, "/inventario/setup")]
-    [TestCase(true, false, "/inventario/products")]
-    [TestCase(false, true, "/inventario/products")]
-    public async Task Entry_FreshOrExistingTenant_RoutesWithoutWrites(bool existing, bool complete, string destination)
+    [TestCase(false, false, true, "/inventario/setup")]
+    [TestCase(true, false, true, "/inventario/products")]
+    [TestCase(false, true, true, "/inventario/products")]
+    [TestCase(false, false, false, "/inventario/products")]
+    public async Task Entry_FreshOrExistingTenant_RoutesWithoutWrites(bool existing, bool complete, bool manager, string destination)
     {
         _wrapper.Setup(x => x.GetInventarioSetup(It.IsAny<GetInventarioSetupRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Response(new() { TenantId = _tenant, HasExistingConfiguration = existing, CompletedAt = complete ? DateTime.UtcNow : null }));
+            .ReturnsAsync(Response(new() { TenantId = _tenant, CanManage = manager, HasExistingConfiguration = existing, CompletedAt = complete ? DateTime.UtcNow : null }));
         await Invoke(Page<SetupEntry>(), "Load");
         _navigation.LastUri.Should().Be(destination);
         _wrapper.Verify(x => x.GetInventarioSetup(It.Is<GetInventarioSetupRequest>(r => r.Metadata.RequestedTenantId == _tenant), It.IsAny<CancellationToken>()), Times.Once);
@@ -102,6 +103,60 @@ public sealed class InventarioSetupPageScopeTests
         Field<string>(page, "_currency").Should().Be("USD");
         Field<InventarioSetupResponse>(page, "_state").Should().BeSameAs(state);
         _wrapper.Verify(x => x.UpdateInventarioPreferences(It.IsAny<UpdateInventarioPreferencesRequest>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Test]
+    public async Task Products_DefaultsRead_UsesOwningWrapperForThresholdAndCurrency()
+    {
+        _wrapper.Setup(x => x.GetInventarioSetup(It.IsAny<GetInventarioSetupRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(new() { TenantId = _tenant, LowStockThreshold = 19, DefaultCurrency = "SGD" }));
+        var page = new Products();
+        typeof(Products).GetProperty("Inventario", Private)!.SetValue(page, _wrapper.Object);
+        typeof(Products).GetProperty("TenantFilter", Private)!.SetValue(page, _context.Object);
+        await (Task)typeof(Products).GetMethod("LoadSettings", Private)!.Invoke(page, [_tenant])!;
+        Field<int>(page, "_lowStockThreshold").Should().Be(19);
+        Field<string>(page, "_currency").Should().Be("SGD");
+        _wrapper.Verify(x => x.GetInventarioSetup(It.Is<GetInventarioSetupRequest>(r => r.Metadata.RequestedTenantId == _tenant), It.IsAny<CancellationToken>()), Times.Once);
+        _wrapper.VerifyNoOtherCalls();
+    }
+
+    [TestCase(true, false, false, false, true)]
+    [TestCase(false, false, false, false, false)]
+    [TestCase(true, true, false, false, false)]
+    [TestCase(true, false, true, false, false)]
+    [TestCase(true, false, false, true, false)]
+    public async Task Products_DirectEntry_OnlyPromptsFreshAdministratorUnlessCancelled(bool manager, bool existing, bool complete, bool skip, bool redirect)
+    {
+        _wrapper.Setup(x => x.GetInventarioSetup(It.IsAny<GetInventarioSetupRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(new() { TenantId = _tenant, CanManage = manager, HasExistingConfiguration = existing, CompletedAt = complete ? DateTime.UtcNow : null }));
+        var page = new Products { SkipSetup = skip };
+        typeof(Products).GetProperty("Inventario", Private)!.SetValue(page, _wrapper.Object);
+        typeof(Products).GetProperty("TenantFilter", Private)!.SetValue(page, _context.Object);
+        typeof(Products).GetProperty("Navigation", Private)!.SetValue(page, _navigation);
+        var proceed = await (Task<bool>)typeof(Products).GetMethod("LoadSettings", Private)!.Invoke(page, [_tenant])!;
+        proceed.Should().Be(!redirect, "a redirect must return before the catalog queries in Reload");
+        _navigation.LastUri.Should().Be(redirect ? "/inventario/setup" : null);
+        _wrapper.Verify(x => x.GetInventarioSetup(It.Is<GetInventarioSetupRequest>(r => r.Metadata.RequestedTenantId == _tenant), It.IsAny<CancellationToken>()), Times.Once);
+        _wrapper.VerifyNoOtherCalls();
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task Products_StaleOrForeignDefaultsResponse_DoesNotApplyToCurrentTenant(bool foreignResponse)
+    {
+        var firstTenant = _tenant;
+        var gate = new TaskCompletionSource<QueryResponse<InventarioSetupResponse>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _wrapper.Setup(x => x.GetInventarioSetup(It.IsAny<GetInventarioSetupRequest>(), It.IsAny<CancellationToken>())).Returns(gate.Task);
+        var page = new Products();
+        typeof(Products).GetProperty("Inventario", Private)!.SetValue(page, _wrapper.Object);
+        typeof(Products).GetProperty("TenantFilter", Private)!.SetValue(page, _context.Object);
+        var pending = (Task)typeof(Products).GetMethod("LoadSettings", Private)!.Invoke(page, [firstTenant])!;
+        if (!foreignResponse) _tenant = Guid.NewGuid();
+        gate.SetResult(Response(new() { TenantId = foreignResponse ? Guid.NewGuid() : firstTenant, LowStockThreshold = 19, DefaultCurrency = "SGD" }));
+        if (foreignResponse) await FluentActions.Awaiting(() => pending).Should().ThrowAsync<InvalidOperationException>();
+        else await pending;
+        Field<int>(page, "_lowStockThreshold").Should().Be(5);
+        Field<string>(page, "_currency").Should().Be("PHP");
     }
 
     private T Page<T>() where T : new()

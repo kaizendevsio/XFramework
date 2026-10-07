@@ -324,7 +324,7 @@ else
             if (!_hasTenant || !_purchasingEnabled) return;
 
             var tenantId = TenantFilter.SelectedTenantId!.Value;
-            _currency = await InventoryDisplay.CurrencyAsync(DataContext, tenantId);
+            _currency = await InventoryDisplay.CurrencyAsync(Inventario, tenantId);
             _documents = await DataContext.Query<ReceivingDocument>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderByDescending(x => x.ReceivedAt).Take(500).ToListAsync();
             _lines = await DataContext.Query<ReceivingLine>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
             _orders = await DataContext.Query<PurchaseOrder>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(500).ToListAsync();

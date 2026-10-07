@@ -19,5 +19,5 @@ public partial record InventarioSetupResponse
     public List<Warehouse> Warehouses { get; init; } = [];
     public List<InventoryLocation> Locations { get; init; } = [];
     [MemoryPackIgnore]
-    public bool ShouldPrompt => CompletedAt is null && !HasExistingConfiguration;
+    public bool ShouldPrompt => CanManage && CompletedAt is null && !HasExistingConfiguration;
 }

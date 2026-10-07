@@ -179,12 +179,13 @@ public sealed class InventarioSetupService(
             await db.Set<ProductCategory>().AnyAsync(x => x.TenantId == tenantId, ct) ||
             await db.Set<Supplier>().AnyAsync(x => x.TenantId == tenantId, ct);
         var threshold = int.TryParse(legacy.FirstOrDefault(x => x.Key == "Settings:Inventario:LowStockThreshold")?.Value, out var value) && value >= 0 ? value : 5;
+        var currency = (setup?.DefaultCurrency ?? legacy.FirstOrDefault(x => x.Key == "Settings:Inventario:DefaultCurrency")?.Value ?? "PHP").Trim().ToUpperInvariant();
         return new InventarioSetupResponse
         {
             TenantId = tenantId, ConcurrencyStamp = setup?.ConcurrencyStamp, Mode = setup?.Mode, CompletedAt = setup?.CompletedAt,
             HasExistingConfiguration = existing, WarehousingEnabled = warehousing, CanManage = CanManage(),
             LowStockThreshold = setup?.LowStockThreshold ?? threshold,
-            DefaultCurrency = setup?.DefaultCurrency ?? legacy.FirstOrDefault(x => x.Key == "Settings:Inventario:DefaultCurrency")?.Value ?? "PHP",
+            DefaultCurrency = CurrencyCodes.Contains(currency) ? currency : "PHP",
             WarehouseId = setup?.WarehouseId, LocationId = setup?.LocationId, Warehouses = warehouses, Locations = locations
         };
     }

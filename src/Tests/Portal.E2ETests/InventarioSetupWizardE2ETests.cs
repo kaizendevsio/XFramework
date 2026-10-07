@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Net;
+using System.Linq.Expressions;
 using System.Text.Json;
 using BlazorBlueprint.Components;
 using BlazorBlueprint.Primitives.Services;
@@ -18,6 +19,8 @@ using Microsoft.Playwright;
 using Microsoft.Playwright.NUnit;
 using Moq;
 using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Domain.Shared.DataContext;
+using XFramework.Inventario.Domain.Shared.Contracts;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Setup;
 using XFramework.Inventario.Domain.Shared.Contracts.Responses;
 using XFramework.Inventario.Domain.Shared.Enums;
@@ -67,11 +70,15 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
         availability.SetupGet(x => x.ActiveTenantId).Returns(() => _state.ActiveTenant);
         availability.Setup(x => x.EnsureLoadedAsync()).Returns(Task.CompletedTask);
         builder.Services.AddSingleton(availability.Object);
+        var data = new Mock<IDataContext>(MockBehavior.Strict);
+        ReadRows<Product>(data, () => [new Product { Id = Guid.NewGuid(), TenantId = _state.ActiveTenant, Name = "Synthetic QA product", Price = 17, StockQuantity = 7 }]);
+        ReadRows<ProductCategory>(data, () => []);
+        builder.Services.AddSingleton(data.Object);
         var wrapper = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
         wrapper.Setup(x => x.GetInventarioSetup(It.IsAny<GetInventarioSetupRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((GetInventarioSetupRequest request, CancellationToken _) => new QueryResponse<InventarioSetupResponse>
             {
-                HttpStatusCode = HttpStatusCode.OK, Response = new() { TenantId = request.Metadata.RequestedTenantId!.Value, CanManage = true, WarehousingEnabled = true,
+                HttpStatusCode = HttpStatusCode.OK, Response = new() { TenantId = request.Metadata.RequestedTenantId!.Value, CanManage = _state.CanManage, HasExistingConfiguration = _state.HasExistingConfiguration, WarehousingEnabled = true, LowStockThreshold = 19,
                     DefaultCurrency = request.Metadata.RequestedTenantId == _state.FirstTenant ? "SGD" : "USD" }
             });
         wrapper.Setup(x => x.CompleteInventarioSetup(It.IsAny<CompleteInventarioSetupRequest>(), It.IsAny<CancellationToken>()))
@@ -179,6 +186,33 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
     }
 
     [Test]
+    public async Task Products_CreateDialogAndWarnings_ConsumeSetupDefaultsWithoutLegacyReads()
+    {
+        _state.HasExistingConfiguration = true;
+        await Page.GotoAsync(_app.Urls.Single() + "/inventario-products-fixture");
+        await Expect(Page.GetByText("SGD 17.00", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.Locator(".bg-card").Filter(new() { Has = Page.GetByRole(AriaRole.Heading, new() { Name = "Low Stock", Exact = true }) }))
+            .ToContainTextAsync("1");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Create Product", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Dialog)).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Dialog).GetByLabel("Amount in Singapore Dollar", new() { Exact = true })).ToBeVisibleAsync();
+        await Screenshot("product-create-defaults");
+        _state.Requests.Should().BeEmpty();
+        _errors.Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task Setup_ExplicitOrdinaryUserAccess_ShowsManagementRestriction()
+    {
+        _state.CanManage = false;
+        await Page.GotoAsync(_app.Urls.Single() + "/inventario-explicit-setup-fixture");
+        await Expect(Page.GetByText("Setup restricted", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByTestId("inventario-setup-wizard")).ToHaveCountAsync(0);
+        _state.Requests.Should().BeEmpty();
+        _errors.Should().BeEmpty();
+    }
+
+    [Test]
     public async Task Settings_TenantContextEvent_ReloadsAndRendersNewTenantDefaults()
     {
         await Page.GotoAsync(_app.Urls.Single() + "/inventario-settings-fixture");
@@ -223,6 +257,17 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
     }
 
     private Task Next() => Page.GetByRole(AriaRole.Button, new() { Name = "Next", Exact = true }).ClickAsync();
+    private static void ReadRows<T>(Mock<IDataContext> data, Func<List<T>> rows) where T : class
+    {
+        var query = new Mock<IRemoteQuery<T>>(MockBehavior.Strict);
+        query.Setup(x => x.IgnoreQueryFilters()).Returns(query.Object);
+        query.Setup(x => x.NoCache()).Returns(query.Object);
+        query.Setup(x => x.Where(It.IsAny<Expression<Func<T, bool>>>())).Returns(query.Object);
+        query.Setup(x => x.Take(It.IsAny<int>())).Returns(query.Object);
+        query.Setup(x => x.OrderBy(It.IsAny<Expression<Func<T, string>>>())).Returns(query.Object);
+        query.Setup(x => x.ToListAsync(It.IsAny<CancellationToken>())).ReturnsAsync(rows);
+        data.Setup(x => x.Query<T>()).Returns(query.Object);
+    }
     private async Task Screenshot(string name)
     {
         var path = Path.Combine(TestContext.CurrentContext.WorkDirectory, "artifacts", "inventario-setup", name + ".png");
@@ -235,6 +280,8 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
 
 [Route("/inventario-setup-fixture")]
 [Route("/inventario-settings-fixture")]
+[Route("/inventario-products-fixture")]
+[Route("/inventario-explicit-setup-fixture")]
 public sealed class SetupBrowserRoot : ComponentBase
 {
     [Inject] public SetupBrowserAssets Styles { get; set; } = null!;
@@ -265,6 +312,10 @@ public sealed class SetupBrowserSurface : ComponentBase, IDisposable
         b.OpenComponent<BbButton>(7); b.AddAttribute(8, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, State.Switch)); b.AddAttribute(9, "ChildContent", (RenderFragment)(x => x.AddContent(0, "Switch QA tenant"))); b.CloseComponent();
         if (new Uri(Navigation.Uri).AbsolutePath == "/inventario-settings-fixture")
         { b.OpenComponent<XFramework.Portal.Features.Inventario.Pages.Settings>(10); b.CloseComponent(); }
+        else if (new Uri(Navigation.Uri).AbsolutePath == "/inventario-products-fixture")
+        { b.OpenComponent<XFramework.Portal.Features.Inventario.Pages.Products>(10); b.CloseComponent(); }
+        else if (new Uri(Navigation.Uri).AbsolutePath == "/inventario-explicit-setup-fixture")
+        { b.OpenComponent<XFramework.Portal.Features.Inventario.Pages.Setup>(10); b.CloseComponent(); }
         else if (_cancelled) { b.OpenElement(10, "p"); b.AddAttribute(11, "data-testid", "setup-cancelled"); b.AddContent(12, "Cancelled"); b.CloseElement(); }
         else if (State.Saved.TryGetValue(State.ActiveTenant, out var saved))
         { b.OpenElement(13, "p"); b.AddAttribute(14, "data-testid", "setup-complete"); b.AddContent(15, saved.Mode + " setup complete"); b.CloseElement(); }
@@ -290,8 +341,10 @@ public sealed class SetupBrowserState
     public ConcurrentDictionary<Guid, InventarioSetupResponse> Saved { get; } = new();
     public TaskCompletionSource? Delay { get; set; }
     public bool FailNextConfirmation { get; set; }
+    public bool CanManage { get; set; } = true;
+    public bool HasExistingConfiguration { get; set; }
     public event Action? Changed;
-    public void Reset() { FirstTenant = Guid.NewGuid(); SecondTenant = Guid.NewGuid(); ActiveTenant = FirstTenant; Requests.Clear(); Saved.Clear(); Delay = null; FailNextConfirmation = false; }
+    public void Reset() { FirstTenant = Guid.NewGuid(); SecondTenant = Guid.NewGuid(); ActiveTenant = FirstTenant; Requests.Clear(); Saved.Clear(); Delay = null; FailNextConfirmation = false; CanManage = true; HasExistingConfiguration = false; }
     public void Switch() { ActiveTenant = SecondTenant; Changed?.Invoke(); }
     public async Task<QueryResponse<InventarioSetupResponse>> Complete(CompleteInventarioSetupRequest request)
     {

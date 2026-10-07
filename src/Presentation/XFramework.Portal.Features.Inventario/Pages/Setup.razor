@@ -64,6 +64,6 @@ else if (_state is not null)
     }
     private bool Current(int revision, Guid? tenantId) => !_disposed && revision == _revision && TenantContext.SelectedTenantId == tenantId;
     private void OnCompleted(InventarioSetupResponse state) { if (!_disposed && TenantContext.SelectedTenantId == state.TenantId) _state = state; }
-    private void Cancel() => Navigation.NavigateTo("/inventario/products");
+    private void Cancel() => Navigation.NavigateTo("/inventario/products?skipSetup=true");
     public void Dispose() { _disposed = true; ++_revision; TenantContext.OnChanged -= Changed; Availability.OnChanged -= Changed; }
 }

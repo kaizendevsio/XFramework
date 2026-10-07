@@ -182,7 +182,7 @@ else
             if (!_hasTenant || !_traceabilityEnabled) return;
 
             var tenantId = TenantFilter.SelectedTenantId!.Value;
-            _currency = await InventoryDisplay.CurrencyAsync(DataContext, tenantId);
+            _currency = await InventoryDisplay.CurrencyAsync(Inventario, tenantId);
             _products = await DataContext.Query<Product>()
                 .IgnoreQueryFilters()
                 .NoCache()

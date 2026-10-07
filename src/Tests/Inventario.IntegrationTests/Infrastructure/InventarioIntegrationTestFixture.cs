@@ -156,6 +156,7 @@ public sealed class InventarioIntegrationTestFixture
         builder.Services.AddTenantResolver();
         builder.Services.AddTenantModuleFeatures();
         builder.Services.AddScoped<ProductService>();
+        builder.Services.AddScoped<InventarioSetupService>();
         builder.Services.AddScoped<StockPostingService>();
         builder.Services.AddScoped<WarehouseService>();
         builder.Services.AddScoped<ReservationService>();
