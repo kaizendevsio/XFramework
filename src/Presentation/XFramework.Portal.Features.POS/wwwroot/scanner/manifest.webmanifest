@@ -1,0 +1,10 @@
+{
+    "name": "XFramework POS Scanner",
+    "short_name": "POS Scanner",
+    "start_url": "/pos/mobile-scanner",
+    "scope": "/pos/mobile-scanner",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#218b61",
+    "icons": [{ "src": "scanner-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

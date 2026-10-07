@@ -1,0 +1,268 @@
+@page "/pos/mobile-scanner"
+@layout XFramework.Portal.Features.POS.Scanner.MobileScannerLayout
+@implements IAsyncDisposable
+@inject IPOSServiceWrapper POS
+@inject IJSRuntime JS
+@inject IPortalActorContext Actor
+@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider Authentication
+
+<PageTitle>POS Scanner</PageTitle>
+<HeadContent>
+    <link rel="manifest" href="_content/XFramework.Portal.Features.POS/scanner/manifest.webmanifest" />
+    <meta name="referrer" content="no-referrer" />
+</HeadContent>
+
+<main class="mobile-scanner" data-testid="mobile-scanner">
+    <h1>@(_phone is null ? "Pair scanner" : _phone.RegisterName)</h1>
+    <p class="scanner-account">@_account</p>
+    <p role="status" aria-live="polite" data-testid="scanner-status">@_status</p>
+    @if (_error is not null)
+    {
+        <BbAlert><BbAlertDescription>@_error</BbAlertDescription></BbAlert>
+    }
+    <div class="camera-surface">
+        <video @ref="_video" muted playsinline aria-label="Barcode camera preview"></video>
+        @if (!_cameraRunning) { <div class="camera-idle"><LucideIcon Name="scan-barcode" Size="48" /></div> }
+    </div>
+    <div class="scanner-actions">
+        <BbButton OnClick="StartCamera" Disabled="@_busy"><LucideIcon Name="camera" Size="18" />Start camera</BbButton>
+        <BbButton OnClick="StopCamera" Variant="ButtonVariant.Outline"><LucideIcon Name="square" Size="18" />Stop</BbButton>
+    </div>
+    @if (_phone is null)
+    {
+        <label for="scanner-tenant">Tenant ID</label>
+        <BbInput Id="scanner-tenant" @bind-Value="_tenantHint" autocomplete="off" />
+        <label for="scanner-challenge">Pairing code</label>
+        <BbInput Id="scanner-challenge" @bind-Value="_challenge" autocomplete="off" />
+        <BbButton OnClick="PairEntered" Disabled="@(_busy || string.IsNullOrWhiteSpace(_challenge))" Variant="ButtonVariant.Outline">
+            <LucideIcon Name="link" Size="18" />Pair desktop
+        </BbButton>
+    }
+    else
+    {
+        <p>Paired until @_phone.ExpiresAt.ToLocalTime().ToString("HH:mm")</p>
+        <label for="scanner-product-code">Product code</label>
+        <BbInput Id="scanner-product-code" @bind-Value="_manualCode" autocomplete="off" />
+        <BbButton OnClick="SendEntered" Disabled="@(_busy || string.IsNullOrWhiteSpace(_manualCode))" Variant="ButtonVariant.Outline">
+            <LucideIcon Name="send" Size="18" />Send code
+        </BbButton>
+        @if (_pendingCode is not null)
+        {
+            <BbButton OnClick="RetrySend" Disabled="@_busy"><LucideIcon Name="rotate-cw" Size="18" />Retry last code</BbButton>
+        }
+        <BbButton OnClick="Disconnect" Variant="ButtonVariant.Outline"><LucideIcon Name="unplug" Size="18" />Leave pairing</BbButton>
+    }
+    @if (_lastCode is not null) { <output class="scanner-last">@_lastCode</output> }
+</main>
+
+@code {
+    private ElementReference _video;
+    private IJSObjectReference? _script;
+    private DotNetObjectReference<MobileScanner>? _receiver;
+    private PosScannerPhoneResponse? _phone;
+    private readonly CancellationTokenSource _lifetime = new();
+    private Task? _monitor;
+    private string _account = "";
+    private string _status = "Scan desktop pairing QR";
+    private string? _error;
+    private string _challenge = "";
+    private string _manualCode = "";
+    private string _tenantHint = "";
+    private Guid? _pairedTenantId;
+    private string? _lastCode;
+    private string? _pendingCode;
+    private long _sequence = 1;
+    private bool _busy;
+    private bool _decoding;
+    private bool _disposed;
+    private bool _cameraRunning;
+    private long _cameraVersion;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _account = (await Authentication.GetAuthenticationStateAsync()).User.Identity?.Name ?? "Cashier";
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            _script = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/XFramework.Portal.Features.POS/scanner/scanner.js");
+            _receiver = DotNetObjectReference.Create(this);
+            _tenantHint = await _script.InvokeAsync<string>("pairingTenant");
+            _challenge = await _script.InvokeAsync<string>("takeChallenge");
+            StateHasChanged();
+        }
+        catch (JSException) { _error = "Scanner assets could not load. Reload this page."; StateHasChanged(); }
+    }
+
+    private async Task StartCamera()
+    {
+        if (_script is null || _disposed || _busy) return;
+        var version = ++_cameraVersion;
+        _busy = true;
+        _error = null;
+        try
+        {
+            var running = await _script.InvokeAsync<bool>("start", _video, _receiver);
+            if (!_disposed && version == _cameraVersion) _cameraRunning = running;
+        }
+        catch (JSException exception)
+        {
+            if (!_disposed && version == _cameraVersion)
+            { _error = exception.Message.Split('\n')[0]; _cameraRunning = false; }
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task StopCamera()
+    {
+        _cameraVersion++;
+        _cameraRunning = false;
+        if (_script is not null) await _script.InvokeVoidAsync("stop", _video);
+    }
+
+    [JSInvokable]
+    public async Task<bool> Decoded(string code)
+    {
+        if (_decoding || _busy || _disposed) return false;
+        _decoding = true;
+        try
+        {
+            if (_phone is null)
+            {
+                var challenge = await _script!.InvokeAsync<string>("pairingChallenge", code);
+                if (challenge.Length == 0) { _error = "This is not a pairing QR from this Portal."; await InvokeAsync(StateHasChanged); return true; }
+                var hint = await _script.InvokeAsync<string>("pairingTenant", code);
+                if (hint.Length > 0) _tenantHint = hint;
+                await Pair(challenge);
+            }
+            else
+            {
+                // Pairing QR must never be sent to catalog search as a product.
+                if (code.StartsWith("https://", StringComparison.OrdinalIgnoreCase) && code.Contains("/pos/mobile-scanner"))
+                    return true;
+                await SendCode(code);
+            }
+            await InvokeAsync(StateHasChanged);
+            if (_error is not null) _cameraRunning = false;
+            return _error is null;
+        }
+        finally { _decoding = false; }
+    }
+
+    [JSInvokable]
+    public Task CameraFailed(string message)
+    {
+        _cameraVersion++;
+        _cameraRunning = false;
+        _error = message;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task PairEntered() => await Pair(_challenge);
+    private async Task Pair(string challenge)
+    {
+        if (_busy || _disposed) return;
+        if (!string.IsNullOrWhiteSpace(_tenantHint) && !Guid.TryParse(_tenantHint, out _))
+        { _error = "Tenant ID must be a valid identifier from the desktop pairing QR."; return; }
+        var tenantId = Guid.TryParse(_tenantHint, out var target) ? target : (Guid?)null;
+        _busy = true;
+        _error = null;
+        try
+        {
+            var result = await POS.ClaimPosScannerPairing(new()
+            { Challenge = challenge, Metadata = new() { RequestedTenantId = tenantId } }, _lifetime.Token);
+            if (_disposed) return;
+            if (!result.IsSuccess || result.Response is null) { _error = result.Message ?? "Pairing denied."; return; }
+            _phone = result.Response;
+            _pairedTenantId = tenantId;
+            _challenge = "";
+            _sequence = 1;
+            _status = "Paired";
+            _monitor ??= Monitor();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        { _error = "Pairing connection failed. Request a new QR on the desktop."; }
+        finally { _busy = false; }
+    }
+
+    private async Task SendEntered() => await SendCode(_manualCode);
+    private async Task RetrySend() { if (_pendingCode is not null) await SendCode(_pendingCode); }
+    private async Task SendCode(string code)
+    {
+        if (_phone is null || _busy || _disposed) return;
+        if (_pendingCode is not null && code != _pendingCode)
+        { _error = "Retry the last code before sending another."; return; }
+        _busy = true;
+        _pendingCode = code;
+        _error = null;
+        var current = _phone;
+        try
+        {
+            var result = await POS.SendPosScannerCode(new()
+            {
+                PairingId = current.PairingId, PhoneKey = current.PhoneKey, Sequence = _sequence, Code = code,
+                Metadata = new() { RequestedTenantId = _pairedTenantId }
+            }, _lifetime.Token);
+            if (_disposed || current != _phone) return;
+            if (!result.IsSuccess)
+            {
+                _error = result.Message ?? "Code was not sent.";
+                if ((int)result.HttpStatusCode is 401 or 403 or 409) await Disconnect();
+                if ((int)result.HttpStatusCode == 400) _pendingCode = null;
+                return;
+            }
+            _sequence++;
+            _pendingCode = null;
+            _manualCode = "";
+            _lastCode = code;
+            _status = result.Response?.Duplicate == true ? "Duplicate ignored" : "Sent to desktop";
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        { _error = "Connection interrupted. Retry last code; it will not be queued twice."; }
+        finally { _busy = false; }
+    }
+
+    private async Task Monitor()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_lifetime.Token))
+            {
+                await InvokeAsync(async () =>
+                {
+                    if (_phone is null || _disposed) return;
+                    var current = _phone;
+                    var result = await POS.GetPosScannerStatus(new()
+                    { PairingId = current.PairingId, PhoneKey = current.PhoneKey, Metadata = new() { RequestedTenantId = _pairedTenantId } }, _lifetime.Token);
+                    if (current != _phone) return;
+                    if (!result.IsSuccess) { _error = result.Message ?? "Pairing ended."; await Disconnect(); StateHasChanged(); }
+                });
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception) { if (!_disposed) await InvokeAsync(async () => { _error = "Scanner connection interrupted. Pair again."; await Disconnect(); StateHasChanged(); }); }
+        finally { _monitor = null; }
+    }
+
+    private async Task Disconnect()
+    {
+        await StopCamera();
+        _phone = null;
+        _pendingCode = null;
+        _status = "Disconnected";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        await _lifetime.CancelAsync();
+        try { await StopCamera(); if (_script is not null) await _script.DisposeAsync(); }
+        catch (Exception exception) when (exception is JSDisconnectedException or TaskCanceledException or ObjectDisposedException) { }
+        _receiver?.Dispose();
+        _lifetime.Dispose();
+    }
+}

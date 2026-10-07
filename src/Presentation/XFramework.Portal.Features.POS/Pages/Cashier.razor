@@ -1,6 +1,7 @@
 @page "/pos/cashier"
 @using XFramework.Domain.Shared.DataContext
 @using Microsoft.Extensions.Logging
+@using XFramework.Portal.Features.POS.Scanner
 @implements IAsyncDisposable
 
 <PageTitle>POS Cashier - Portal</PageTitle>
@@ -17,9 +18,8 @@ else if (!_moduleEnabled)
 {
     <ModuleUnavailable ModuleName="POS" />
 }
-else
-{
-    <FadeInContent Class="pos-cashier-content">
+    @* Preserve pairing ownership while the unavailable cashier is hidden and paused. *@
+    <div class="xf-fade-in pos-cashier-content" hidden="@(!IsCashierVisible)">
         <div class="pos-cashier-page" data-testid="pos-cashier" data-focus="@(_focusMode ? "true" : "false")">
             <div class="xf-page-header pos-cashier-header">
                 <BbTypographyH3>Cashier</BbTypographyH3>
@@ -43,9 +43,13 @@ else
                                     Disabled="@(_cart.Any() || IsInteractionLocked)" />
                 </div>
                 <div class="xf-page-actions pos-cashier-header-actions">
+                    <CashierScannerPairing @key="_scannerSaleGeneration"
+                                           RegisterId="@(TryResolveSelectedRegisterId() ?? Guid.Empty)"
+                                           Disabled="@IsMobileScannerPaused"
+                                           ScanReceived="ReceiveMobileScan" />
                     @if (_cartsEnabled)
                     {
-                        <BbDialog Open="@_heldCartsOpen" OpenChanged="@(value => OnDialogOpenChanged(value, true))">
+                        <BbDialog Open="@(_heldCartsOpen && IsCashierVisible)" OpenChanged="@(value => OnDialogOpenChanged(value, true))">
                             <BbDialogTrigger>
                                 <BbButton Variant="ButtonVariant.Outline" Disabled="@IsInteractionLocked" data-pos-dialog-trigger="held-sales">
                                     <LucideIcon Name="clock" class="mr-2 h-4 w-4" />
@@ -100,7 +104,7 @@ else
                             </BbDialogContent>
                         </BbDialog>
                     }
-                    <BbDialog Open="@_saleDetailsOpen" OpenChanged="@(value => OnDialogOpenChanged(value, false))">
+                    <BbDialog Open="@(_saleDetailsOpen && IsCashierVisible)" OpenChanged="@(value => OnDialogOpenChanged(value, false))">
                         <BbDialogTrigger>
                             <BbButton Variant="ButtonVariant.Ghost" Disabled="@IsInteractionLocked" data-pos-dialog-trigger="sale-details">
                                 <LucideIcon Name="clipboard-list" class="mr-2 h-4 w-4" />
@@ -340,7 +344,7 @@ else
                         }
                     </div>
 
-                    <BbDialog Open="@_paymentOpen" OpenChanged="@PaymentOpenChanged">
+                    <BbDialog Open="@(_paymentOpen && IsCashierVisible)" OpenChanged="@PaymentOpenChanged">
                         <BbDialogContent Class="pos-payment-dialog" ShowClose="@(!_checkingOut)" CloseOnEscape="@(!_checkingOut)" CloseOnOverlayClick="@(!_checkingOut)"
                                          @onkeydown="@(args => { if (args.Key == "Escape") PaymentOpenChanged(false); })">
                             <BbDialogHeader>
@@ -478,9 +482,7 @@ else
                 </aside>
             </div>
         </div>
-    </FadeInContent>
-
-}
+    </div>
 
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
@@ -522,6 +524,7 @@ else
     private bool _focusPending;
     private string? _dialogFocusTarget;
     private int _searchVersion;
+    private long _scannerSaleGeneration;
     private int _heldCartPage = 1;
     private Guid? _loadedTenantId;
     private string? _loadError;
@@ -566,6 +569,10 @@ else
         PosSaleStatus.InventoryReservationFailed or
         PosSaleStatus.Cancelled;
     private bool IsInteractionLocked => IsBusy || HasPendingPayment || HasTerminalCheckoutFailure;
+    private bool IsCashierVisible => !_loading && _hasTenant && _moduleEnabled;
+    private bool IsMobileScannerPaused => _disposed || _paymentOpen || IsInteractionLocked ||
+        _loading || _searching || !_hasTenant || !_moduleEnabled || _loadError is not null ||
+        SelectedRegister is null;
     private PosRegisterResponse? SelectedRegister => _registers.FirstOrDefault(item => item.Id.ToString() == _selectedRegisterId);
     private string? RegisterCurrency
     {
@@ -609,7 +616,10 @@ else
         if (HasPendingPayment)
             await Checkout();
         else
+        {
             _paymentOpen = true;
+            InvalidateCatalogSearch();
+        }
     }
 
     private void PaymentOpenChanged(bool open)
@@ -634,6 +644,8 @@ else
     {
         if (_disposed)
             return;
+        _scannerSaleGeneration++;
+        InvalidateCatalogSearch();
         if (_reloading)
         {
             _reloadRequested = true;
@@ -733,6 +745,7 @@ else
         if (IsInteractionLocked || _cart.Any())
             return;
         _selectedRegisterId = value;
+        _scannerSaleGeneration++;
         _lastReceipt = null;
         _removedLine = null;
         _cashTenderedAmount = 0;
@@ -839,12 +852,39 @@ else
         }
     }
 
-    private async Task SearchCatalog(bool addExactSkuToCart = true, bool readCurrentInput = true)
+    private async Task ReceiveMobileScan(string code)
+    {
+        if (IsMobileScannerPaused || TenantFilter.SelectedTenantId is not Guid tenantId ||
+            TryResolveSelectedRegisterId() is not Guid registerId)
+            throw new InvalidOperationException("Cashier is unavailable for scanning");
+
+        var generation = _scannerSaleGeneration;
+        var expectedVersion = _searchVersion + 1;
+        _catalogSearch = code;
+        _selectedCategoryId = null;
+        var acceptedVersion = await SearchCatalog(addExactSkuToCart: true, readCurrentInput: false, mobileScan: true);
+        if (_catalogError is not null)
+            throw new InvalidOperationException(_catalogError);
+        if (acceptedVersion != expectedVersion || _searchVersion != expectedVersion || IsMobileScannerPaused ||
+            generation != _scannerSaleGeneration || tenantId != TenantFilter.SelectedTenantId ||
+            registerId != TryResolveSelectedRegisterId())
+            throw new InvalidOperationException("Scanner lookup was superseded or the cashier context changed");
+    }
+
+    private void InvalidateCatalogSearch()
+    {
+        _searchVersion++;
+        _searching = false;
+    }
+
+    private async Task<int?> SearchCatalog(bool addExactSkuToCart = true, bool readCurrentInput = true, bool mobileScan = false)
     {
         if (_disposed || IsInteractionLocked || !_moduleEnabled || TenantFilter.SelectedTenantId is not Guid tenantId)
-            return;
+            return null;
 
         var version = ++_searchVersion;
+        var registerId = TryResolveSelectedRegisterId();
+        var generation = _scannerSaleGeneration;
         _searching = true;
         _catalogError = null;
         try
@@ -861,25 +901,28 @@ else
                 Metadata = BuildMetadata(),
                 Search = searchText,
                 CategoryId = _selectedCategoryId,
-                RegisterId = TryResolveSelectedRegisterId(),
+                RegisterId = registerId,
                 Page = 1,
                 PageSize = 50
             });
 
-            if (_disposed || version != _searchVersion || tenantId != TenantFilter.SelectedTenantId)
-                return;
+            if (_disposed || version != _searchVersion || tenantId != TenantFilter.SelectedTenantId ||
+                (mobileScan && (generation != _scannerSaleGeneration || registerId != TryResolveSelectedRegisterId() ||
+                    _paymentOpen || IsInteractionLocked || _loading || !_hasTenant || !_moduleEnabled || _loadError is not null)))
+                return null;
 
             _lastCatalogSearch = searchText;
             if (!response.IsSuccess)
             {
                 _catalogItems = [];
                 _catalogError = "Products could not be loaded. Retry your search.";
-                return;
+                return null;
             }
             _catalogItems = response.Response ?? [];
 
             if (addExactSkuToCart && !string.IsNullOrWhiteSpace(searchText))
                 AddExactSkuMatchToCart(searchText);
+            return version;
         }
         catch (Exception exception)
         {
@@ -899,6 +942,7 @@ else
                     await FocusCatalogSearchAsync();
             }
         }
+        return null;
     }
 
     private async Task SelectCategory(Guid? categoryId)
@@ -1383,6 +1427,8 @@ else
 
     private void ApplyCart(PosCartResponse cart)
     {
+        _scannerSaleGeneration++;
+        InvalidateCatalogSearch();
         _lastReceipt = null;
         _removedLine = null;
         _activeCartId = cart.Id;
@@ -1414,6 +1460,8 @@ else
 
     private void ClearCurrentCart()
     {
+        _scannerSaleGeneration++;
+        InvalidateCatalogSearch();
         _paymentOpen = false;
         _cart = [];
         _removedLine = null;

@@ -32,6 +32,7 @@ using XFramework.Portal.Features.Finance;
 using XFramework.Portal.Features.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddPortalForwardedScheme(builder.Configuration);
 
 // Logging - ZLogger console (lifecycle only) + Seq (everything including Bolt RPC payloads)
 builder.Logging.AddXFrameworkLogging(builder.Configuration);
@@ -168,6 +169,7 @@ builder.Services.AddScoped<PortalBootstrapSeeder>();
 builder.Services.AddHostedService<PortalBootstrapHostedService>();
 
 var app = builder.Build();
+app.UseForwardedHeaders();
 
 if (!app.Environment.IsDevelopment())
 {
