@@ -112,6 +112,28 @@ public sealed class PosScannerComponentRegressionTests
 
     private static CmdResponse<PosScannerSendResponse> Sent(long sequence) => new()
     { HttpStatusCode = HttpStatusCode.OK, Response = new(sequence, false) };
+
+    [TestCase("stop")]
+    [TestCase("dispose")]
+    [TestCase("hidden")]
+    public async Task Mobile_StartCompletionAfterStopOrLifetimeChange_CannotMarkCameraRunning(string cancellation)
+    {
+        var pending = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var script = new Mock<IJSObjectReference>();
+        script.Setup(s => s.InvokeAsync<bool>("start",It.IsAny<object?[]?>())).Returns(new ValueTask<bool>(pending.Task));
+        var page = new EmptyMobile();
+        Set(page,"_script",script.Object);
+        await using var renderer = new EmptyRenderer();
+        renderer.Attach(page);
+        var start = renderer.Dispatcher.InvokeAsync(() => (Task)typeof(MobileScanner).GetMethod("StartCamera",Private)!.Invoke(page,null)!);
+        if(cancellation=="dispose") Set(page,"_disposed",true);
+        if(cancellation=="hidden") await renderer.Dispatcher.InvokeAsync(() => page.CameraFailed("Fixture page hidden"));
+        else await renderer.Dispatcher.InvokeAsync(() => (Task)typeof(MobileScanner).GetMethod("StopCamera",Private)!.Invoke(page,null)!);
+        pending.SetResult(true);
+        await start;
+        Get(page,"_cameraRunning").Should().Be(false);
+        Get(page,"_busy").Should().Be(false);
+    }
     private static PosScannerPairingResponse Pairing() => new(Guid.NewGuid(), new string('B',64), new string('A',64), DateTimeOffset.UtcNow.AddMinutes(2));
     private static Type Base(ComponentBase component) => component is MobileScanner ? typeof(MobileScanner) : typeof(CashierScannerPairing);
     private static void Inject(ComponentBase component, string name, object value) => Base(component).GetProperty(name, Private)!.SetValue(component,value);

@@ -76,6 +76,7 @@
     private bool _decoding;
     private bool _disposed;
     private bool _cameraRunning;
+    private long _cameraVersion;
 
     protected override async Task OnInitializedAsync()
     {
@@ -98,18 +99,28 @@
 
     private async Task StartCamera()
     {
-        if (_script is null || _disposed) return;
+        if (_script is null || _disposed || _busy) return;
+        var version = ++_cameraVersion;
         _busy = true;
         _error = null;
-        try { await _script.InvokeVoidAsync("start", _video, _receiver); _cameraRunning = true; }
-        catch (JSException exception) { _error = exception.Message.Split('\n')[0]; _cameraRunning = false; }
+        try
+        {
+            var running = await _script.InvokeAsync<bool>("start", _video, _receiver);
+            if (!_disposed && version == _cameraVersion) _cameraRunning = running;
+        }
+        catch (JSException exception)
+        {
+            if (!_disposed && version == _cameraVersion)
+            { _error = exception.Message.Split('\n')[0]; _cameraRunning = false; }
+        }
         finally { _busy = false; }
     }
 
     private async Task StopCamera()
     {
-        if (_script is not null) await _script.InvokeVoidAsync("stop", _video);
+        _cameraVersion++;
         _cameraRunning = false;
+        if (_script is not null) await _script.InvokeVoidAsync("stop", _video);
     }
 
     [JSInvokable]
@@ -144,6 +155,7 @@
     [JSInvokable]
     public Task CameraFailed(string message)
     {
+        _cameraVersion++;
         _cameraRunning = false;
         _error = message;
         return InvokeAsync(StateHasChanged);

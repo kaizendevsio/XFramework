@@ -689,6 +689,8 @@ services:
       <<: *common-env
       ASPNETCORE_ENVIRONMENT: ${PORTAL_ASPNETCORE_ENVIRONMENT:-dev}
       Portal__SessionCacheConnection: ${PORTAL_SESSION_REDIS_CONNECTION:-redis:6379}
+      Portal__ScannerPublicBaseUrl: ${PORTAL_SCANNER_PUBLIC_BASE_URL:-https://xeon-dev.tailed40e.ts.net:5443}
+      Portal__TrustedProxyIp: ${PORTAL_TRUSTED_PROXY_IP:-}
       ServiceIdentity__ClientSecret: ${PORTAL_SERVICE_IDENTITY_SECRET:?Set PORTAL_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__DefaultScopes__0: bolt.service
       ServiceIdentity__DefaultScopes__1: identity.admin

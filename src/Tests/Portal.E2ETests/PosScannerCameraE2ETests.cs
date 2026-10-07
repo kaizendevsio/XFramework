@@ -156,6 +156,86 @@ public sealed class PosScannerCameraE2ETests : PageTest
         (await Page.EvaluateAsync<bool>("document.querySelector('video').srcObject===null")).Should().BeTrue();
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task Camera_CancelDuringDecoderLoad_NeverRequestsOrActivatesCamera(bool pageExit)
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await Page.RouteAsync("**/vendor/zxing-wasm-3.1.5.js",async route =>
+        { entered.TrySetResult();await release.Task;await route.ContinueAsync(); });
+        try
+        {
+            await Page.EvaluateAsync("""
+                () => {
+                    window.mediaRequests=0;
+                    navigator.mediaDevices.getUserMedia=async()=>{mediaRequests++;throw new Error('Must not request camera after cancel')};
+                    window.pendingStart=scanner.start(document.querySelector('video'),{invokeMethodAsync:async()=>true});
+                }
+                """);
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await Page.EvaluateAsync(pageExit ? "window.dispatchEvent(new Event('pagehide'))" : "scanner.stop(document.querySelector('video'))");
+            release.TrySetResult();
+            (await Page.EvaluateAsync<bool>("async()=>await pendingStart")).Should().BeFalse();
+            (await Page.EvaluateAsync<int>("mediaRequests")).Should().Be(0);
+            (await Page.EvaluateAsync<bool>("document.querySelector('video').srcObject===null")).Should().BeTrue();
+        }
+        finally { release.TrySetResult(); }
+    }
+
+    [Test]
+    public async Task Camera_StopDuringPermissionAwait_StopsLateTracksWithoutActivatingPreview()
+    {
+        await Page.EvaluateAsync("""
+            () => {
+                const canvas=document.createElement('canvas');canvas.width=640;canvas.height=480;
+                window.fixtureStream=canvas.captureStream(10);
+                window.mediaRequests=0;
+                navigator.mediaDevices.getUserMedia=()=>{mediaRequests++;return new Promise(resolve=>window.resolveMedia=resolve)};
+                window.pendingStart=scanner.start(document.querySelector('video'),{invokeMethodAsync:async()=>true});
+            }
+            """);
+        await Page.WaitForFunctionAsync("mediaRequests===1");
+        await Page.EvaluateAsync("scanner.stop(document.querySelector('video'));resolveMedia(fixtureStream)");
+        (await Page.EvaluateAsync<bool>("async()=>await pendingStart")).Should().BeFalse();
+        (await Page.EvaluateAsync<bool>("fixtureStream.getTracks().every(t=>t.readyState==='ended')")).Should().BeTrue();
+        (await Page.EvaluateAsync<bool>("document.querySelector('video').srcObject===null")).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task Camera_OldCancelledStart_CannotStopReplacementAfterSharedDecoderLoad()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await Page.RouteAsync("**/vendor/zxing-wasm-3.1.5.js",async route =>
+        { entered.TrySetResult();await release.Task;await route.ContinueAsync(); });
+        try
+        {
+            await Page.EvaluateAsync("""
+                () => {
+                    const canvas=document.createElement('canvas');canvas.width=640;canvas.height=480;
+                    const context=canvas.getContext('2d');context.fillStyle='white';context.fillRect(0,0,640,480);
+                    window.fixtureStream=canvas.captureStream(10);window.mediaRequests=0;
+                    window.fixtureFrames=setInterval(()=>context.fillRect(0,0,640,480),100);
+                    navigator.mediaDevices.getUserMedia=async()=>{mediaRequests++;return fixtureStream};
+                    window.receiver={invokeMethodAsync:async()=>true};
+                    window.oldStart=scanner.start(document.querySelector('video'),receiver);
+                }
+                """);
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await Page.EvaluateAsync("()=>{scanner.stop(document.querySelector('video'));window.newStart=scanner.start(document.querySelector('video'),receiver)}");
+            release.TrySetResult();
+            (await Page.EvaluateAsync<bool>("async()=>await oldStart")).Should().BeFalse();
+            (await Page.EvaluateAsync<bool>("async()=>await newStart").WaitAsync(TimeSpan.FromSeconds(10))).Should().BeTrue();
+            (await Page.EvaluateAsync<int>("mediaRequests")).Should().Be(1);
+            (await Page.EvaluateAsync<bool>("fixtureStream.getTracks().every(t=>t.readyState==='live')")).Should().BeTrue();
+            await Page.EvaluateAsync("scanner.stop(document.querySelector('video'))");
+            await Page.EvaluateAsync("clearInterval(fixtureFrames)");
+            (await Page.EvaluateAsync<bool>("fixtureStream.getTracks().every(t=>t.readyState==='ended')")).Should().BeTrue();
+        }
+        finally { release.TrySetResult(); }
+    }
+
     [Test]
     public async Task PairingChallenge_OnlyOwnSecureOriginQr_AndFragmentIsRemoved()
     {

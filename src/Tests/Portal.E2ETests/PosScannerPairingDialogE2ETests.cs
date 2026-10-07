@@ -1,4 +1,7 @@
 using System.Net;
+using System.Collections;
+using System.Collections.Concurrent;
+using System.Reflection;
 using BlazorBlueprint.Components;
 using BlazorBlueprint.Primitives;
 using BlazorBlueprint.Primitives.Services;
@@ -19,6 +22,9 @@ using POS.Domain.Shared.Contracts.Requests;
 using POS.Domain.Shared.Contracts.Responses;
 using POS.Integration.Drivers;
 using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Domain.Shared.DataContext;
+using XFramework.Portal.Features.POS.Pages;
+using Wallets.Domain.Shared.Contracts;
 using XFramework.Portal.Features.POS.Scanner;
 using XFramework.Portal.Shared;
 using XFramework.Portal.Shared.Components;
@@ -52,30 +58,68 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
         builder.Services.Replace(ServiceDescriptor.Scoped<IPortalService>(sp => sp.GetRequiredService<XfPortalService>()));
         builder.Services.AddSingleton(state);
         builder.Services.AddSingleton(Mock.Of<IPortalTenantContext>(t => t.SelectedTenantId == state.TenantId));
+        builder.Services.AddSingleton(Mock.Of<IDataContext>());
+        builder.Services.AddSingleton(Mock.Of<IPortalModuleAvailability>());
+        builder.Services.AddSingleton(Mock.Of<IPortalActorContext>(a => a.CredentialId == state.CashierId));
+        builder.Services.AddScoped(_ => new RequestMetadata());
         var wrapper = new Mock<IPOSServiceWrapper>();
         wrapper.Setup(w => w.CreatePosScannerPairing(It.IsAny<CreatePosScannerPairingRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(() => new CmdResponse<PosScannerPairingResponse>
-            { HttpStatusCode = HttpStatusCode.OK, Response = new(Guid.NewGuid(), new string('B',64), new string('A',64), DateTimeOffset.UtcNow.AddMinutes(2)) });
+            .ReturnsAsync(() =>
+            {
+                state.LatestPairing = new(Guid.NewGuid(), new string('B',64), new string('A',64), DateTimeOffset.UtcNow.AddMinutes(2));
+                state.ActivePairings.TryAdd(state.LatestPairing.PairingId,0);
+                return new CmdResponse<PosScannerPairingResponse> { HttpStatusCode = HttpStatusCode.OK, Response = state.LatestPairing };
+            });
         wrapper.Setup(w => w.PollPosScannerCodes(It.IsAny<PollPosScannerCodesRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((PollPosScannerCodesRequest request, CancellationToken _) =>
             {
+                if (!state.ActivePairings.ContainsKey(request.PairingId))
+                    return new QueryResponse<PosScannerPollResponse> { HttpStatusCode = HttpStatusCode.Forbidden };
                 Interlocked.Increment(ref state.Polls);
                 if (request.PauseDelivery) Interlocked.Increment(ref state.PausedPolls);
                 if (!request.PauseDelivery) Interlocked.Exchange(ref state.Acknowledged, request.AcknowledgedSequence);
+                var queued = state.QueuedScan;
+                var codes = new List<PosScannerCodeResponse>();
+                if (!request.PauseDelivery)
+                {
+                    if (queued is not null && queued.PairingId == request.PairingId && request.AcknowledgedSequence < queued.Sequence)
+                        codes.Add(new(queued.Sequence,queued.Code));
+                    else if (state.Pending && request.AcknowledgedSequence == 0)
+                        codes.Add(new(1,"SKU-1"));
+                }
                 return new QueryResponse<PosScannerPollResponse>
                 {
                     HttpStatusCode = HttpStatusCode.OK,
                     Response = new(state.Paired, DateTimeOffset.UtcNow.AddMinutes(30),
-                        state.Pending && !request.PauseDelivery && request.AcknowledgedSequence == 0 ? [new(1,"SKU-1")] : [])
+                        codes)
                 };
             });
         wrapper.Setup(w => w.RevokePosScannerPairing(It.IsAny<RevokePosScannerPairingRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((RevokePosScannerPairingRequest request,CancellationToken _) =>
+            {
+                if (state.ActivePairings.TryRemove(request.PairingId,out var removed))
+                { state.RevokedPairings.Enqueue(request.PairingId); Interlocked.Increment(ref state.Revokes); }
+                return new CmdResponse<bool> { HttpStatusCode = HttpStatusCode.OK, Response = true };
+            });
+        wrapper.Setup(w => w.SearchPosCatalog(It.IsAny<SearchPosCatalogRequest>(),It.IsAny<CancellationToken>()))
+            .ReturnsAsync((SearchPosCatalogRequest request,CancellationToken _) =>
+            {
+                state.CatalogRequests.Enqueue(request);
+                return new QueryResponse<List<PosCatalogItemResponse>>
+                { HttpStatusCode = HttpStatusCode.OK, Response = [state.Item] };
+            });
+        wrapper.Setup(w => w.CheckoutPosSale(It.IsAny<CheckoutPosSaleRequest>(),It.IsAny<CancellationToken>()))
             .ReturnsAsync(() =>
-            { Interlocked.Increment(ref state.Revokes); return new CmdResponse<bool> { HttpStatusCode = HttpStatusCode.OK, Response = true }; });
+            {
+                Interlocked.Increment(ref state.FinancialCalls);
+                return new CmdResponse<PosSaleReceiptResponse> { HttpStatusCode = HttpStatusCode.Forbidden };
+            });
         builder.Services.AddSingleton(wrapper.Object);
         app = builder.Build();
         Static(root + "/src/Presentation/XFramework.Portal.Features.POS/wwwroot", "/_content/XFramework.Portal.Features.POS");
-        Static(root + "/src/Presentation/XFramework.Portal.Features.POS/obj/Debug/net10.0/scopedcss/projectbundle", "/_content/XFramework.Portal.Features.POS");
+        var configuration = new DirectoryInfo(TestContext.CurrentContext.TestDirectory).Parent!.Name;
+        Static(root + $"/src/Presentation/XFramework.Portal.Features.POS/obj/{configuration}/net10.0/scopedcss/projectbundle", "/_content/XFramework.Portal.Features.POS");
+        Static(root + "/src/Presentation/XFramework.Portal/wwwroot/css", "/cashier-css");
         var packages = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget/packages");
         Static(Path.Combine(packages,"blazorblueprint.components/3.16.0/staticwebassets"), "/_content/BlazorBlueprint.Components");
         Static(Path.Combine(packages,"blazorblueprint.primitives/3.16.0/staticwebassets"), "/_content/BlazorBlueprint.Primitives");
@@ -94,8 +138,12 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
     [SetUp]
     public async Task Load()
     {
+        // A disconnected Blazor circuit can retain its component briefly; old fixture pairings fail closed.
+        state.ActivePairings.Clear();
         state.Paired = false; state.Pending = false;
         state.Polls = 0; state.PausedPolls = 0; state.Revokes = 0; state.Acknowledged = 0;
+        state.QueuedScan = null; state.LatestPairing = null; state.Cashier = null; state.FinancialCalls = 0;
+        state.RevokedPairings.Clear(); state.CatalogRequests.Clear();
         Page.PageError += (_, message) => TestContext.Progress.WriteLine(message);
         var response = await Page.GotoAsync(app.Urls.Single() + "/scanner-pairing-fixture");
         response!.Status.Should().Be(200, await Page.ContentAsync());
@@ -142,6 +190,81 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
         while (!predicate()) await Task.Delay(50,timeout.Token);
     }
 
+    [TestCase(390,844)]
+    [TestCase(1366,768)]
+    public async Task CashierMobileScanner_RealCashierPaymentPause_BackToCartAndClearRotatePairingLifetime(int width,int height)
+    {
+        await Page.SetViewportSizeAsync(width,height);
+        await Page.GotoAsync(app.Urls.Single() + "/cashier-scanner-fixture");
+        await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync("10.00");
+        await Page.GetByRole(AriaRole.Button,new() {Name="Scan with phone",Exact=true}).ClickAsync();
+        await Expect(Page.GetByAltText("One-time phone pairing QR")).ToBeVisibleAsync();
+        await Page.GetByRole(AriaRole.Button,new() {Name="Done",Exact=true}).ClickAsync();
+        state.Paired = true;
+        await Expect(Page.GetByRole(AriaRole.Button,new() {Name="Phone connected",Exact=true})).ToBeVisibleAsync();
+        var original = state.LatestPairing!.PairingId;
+
+        await Page.GetByTestId("pos-checkout").ClickAsync();
+        await Expect(Page.GetByTestId("pos-payment-stage")).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button,new() {Name="Phone connected",Exact=true})).ToBeDisabledAsync();
+        await Wait(() => Volatile.Read(ref state.PausedPolls)>0);
+        state.QueuedScan = new(original,1,"SKU-1");
+        await Page.WaitForTimeoutAsync(1200);
+        await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync("10.00");
+        state.CatalogRequests.Should().BeEmpty();
+        Interlocked.Read(ref state.Acknowledged).Should().Be(0);
+
+        await Page.GetByRole(AriaRole.Button,new() {Name="Back to cart",Exact=true}).ClickAsync();
+        await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync("20.00");
+        await Wait(() => Interlocked.Read(ref state.Acknowledged)==1);
+        Volatile.Read(ref state.Revokes).Should().Be(0,"closing payment must preserve the same sale pairing");
+        state.CatalogRequests.Should().ContainSingle(r => r.Search == "SKU-1" && r.CategoryId == null);
+
+        var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory,"artifacts","pos-scanner");
+        Directory.CreateDirectory(directory);
+        await Page.ScreenshotAsync(new() { Path = Path.Combine(directory,$"cashier-scanner-{width}.png"),FullPage=true });
+        await Page.GetByTestId("pos-checkout").ClickAsync();
+        var paused = Volatile.Read(ref state.PausedPolls);
+        await Wait(() => Volatile.Read(ref state.PausedPolls)>paused);
+        state.QueuedScan = new(original,2,"SKU-1");
+        await state.Cashier!.ClearForFixture();
+        await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync("0.00");
+        await Wait(() => state.RevokedPairings.Contains(original));
+        await Expect(Page.GetByRole(AriaRole.Button,new() {Name="Scan with phone",Exact=true})).ToBeEnabledAsync();
+        await Page.GetByRole(AriaRole.Button,new() {Name="Scan with phone",Exact=true}).ClickAsync();
+        await Page.GetByRole(AriaRole.Button,new() {Name="Done",Exact=true}).ClickAsync();
+        var replacement = state.LatestPairing!.PairingId;
+        replacement.Should().NotBe(original);
+        await Page.WaitForTimeoutAsync(1200);
+        await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync("0.00");
+        state.CatalogRequests.Should().ContainSingle("old queued code must not enter the new sale");
+        state.QueuedScan = new(replacement,1,"SKU-1");
+        await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync("10.00");
+        Volatile.Read(ref state.FinancialCalls).Should().Be(0,"Pay only opened the actual payment stage; no financial submission was used");
+    }
+
+    [TestCase("loading")]
+    [TestCase("tenant-missing")]
+    [TestCase("module-disabled")]
+    public async Task CashierMobileScanner_UnavailableCashier_RemainsMountedButHiddenAndPaused(string unavailable)
+    {
+        await Page.GotoAsync(app.Urls.Single() + "/cashier-scanner-fixture");
+        await Page.GetByRole(AriaRole.Button,new() {Name="Scan with phone",Exact=true}).ClickAsync();
+        await Page.GetByRole(AriaRole.Button,new() {Name="Done",Exact=true}).ClickAsync();
+        var before = Volatile.Read(ref state.Polls);
+        await Page.GetByTestId("pos-checkout").ClickAsync();
+        await Expect(Page.GetByTestId("pos-payment-stage")).ToBeVisibleAsync();
+        await state.Cashier!.UnavailableForFixture(unavailable);
+        await Expect(Page.GetByTestId("cashier-scanner-pairing")).ToHaveCountAsync(1);
+        await Expect(Page.GetByTestId("cashier-scanner-pairing")).ToBeHiddenAsync();
+        await Expect(Page.Locator(".pos-cashier-header-actions")).ToBeHiddenAsync();
+        await Expect(Page.GetByTestId("pos-payment-stage")).ToBeHiddenAsync();
+        (await Page.Locator(".pos-cashier-content").EvaluateAsync<string>("e=>getComputedStyle(e).display")).Should().Be("none");
+        await Wait(() => Volatile.Read(ref state.Polls)>before && Volatile.Read(ref state.PausedPolls)>0);
+        Volatile.Read(ref state.Revokes).Should().Be(0,"hidden loading state must not unmount the pairing owner");
+        state.CatalogRequests.Should().BeEmpty();
+    }
+
     private static string RepoRoot()
     {
         for(var d=new DirectoryInfo(TestContext.CurrentContext.TestDirectory);d is not null;d=d.Parent)
@@ -154,6 +277,16 @@ public sealed class PairingFixtureState
 {
     public Guid TenantId { get; } = Guid.NewGuid();
     public Guid RegisterId { get; } = Guid.NewGuid();
+    public Guid CashierId { get; } = Guid.NewGuid();
+    public Guid CurrencyId { get; } = Guid.NewGuid();
+    public PosCatalogItemResponse Item { get; } = new() { ProductId = Guid.NewGuid(), SKU = "SKU-1", DisplayName = "Scanner fixture item", ProductName = "Scanner fixture item", IsAvailable = true, Price = 10m };
+    public volatile PosScannerPairingResponse? LatestPairing;
+    public volatile PairingFixtureQueuedScan? QueuedScan;
+    public volatile PosScannerFixtureCashier? Cashier;
+    public ConcurrentQueue<Guid> RevokedPairings { get; } = new();
+    public ConcurrentDictionary<Guid,byte> ActivePairings { get; } = new();
+    public ConcurrentQueue<SearchPosCatalogRequest> CatalogRequests { get; } = new();
+    public int FinancialCalls;
     public volatile bool Paired;
     public volatile bool Pending;
     public int Polls;
@@ -162,17 +295,62 @@ public sealed class PairingFixtureState
     public long Acknowledged;
 }
 
+public sealed record PairingFixtureQueuedScan(Guid PairingId,long Sequence,string Code);
+
 [Route("/scanner-pairing-fixture")]
+[Route("/cashier-scanner-fixture")]
 public sealed class PosPairingFixtureRoot : ComponentBase
 {
+    [Inject] public NavigationManager Navigation { get; set; } = null!;
     protected override void BuildRenderTree(RenderTreeBuilder b)
     {
-        b.AddMarkupContent(0,"<!doctype html><html data-base-color='zinc' data-primary-color='green'><head><base href='/'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/css/themes.css'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/blazorblueprint.css'><style>body{margin:16px;font-family:Arial}button{gap:8px}</style></head><body>");
-        b.OpenComponent<PosPairingFixtureSurface>(1);
+        b.AddMarkupContent(0,"<!doctype html><html data-base-color='zinc' data-primary-color='green'><head><base href='/'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/css/themes.css'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/blazorblueprint.css'><link rel='stylesheet' href='cashier-css/app.css'><style>body{margin:16px;font-family:Arial}button{gap:8px}.app-main{height:100dvh}</style></head><body>");
+        b.OpenComponent(1,new Uri(Navigation.Uri).AbsolutePath == "/cashier-scanner-fixture" ? typeof(PosScannerFixtureCashierSurface) : typeof(PosPairingFixtureSurface));
         b.AddComponentRenderMode(new InteractiveServerRenderMode(prerender:false));
         b.CloseComponent();
         b.AddMarkupContent(2,"<script src='_framework/blazor.web.js'></script></body></html>");
     }
+}
+
+public sealed class PosScannerFixtureCashierSurface : ComponentBase
+{
+    protected override void BuildRenderTree(RenderTreeBuilder b)
+    {
+        b.OpenElement(0,"main");b.AddAttribute(1,"class","app-main");
+        b.OpenComponent<PosScannerFixtureCashier>(2);b.CloseComponent();
+        b.OpenComponent<XfContainerPortalHost>(3);b.CloseComponent();
+        b.OpenComponent<BbOverlayPortalHost>(4);b.CloseComponent();
+        b.CloseElement();
+    }
+}
+
+// Render the actual Cashier tree/methods, replacing only initial remote loading with fixture data.
+public sealed class PosScannerFixtureCashier : Cashier
+{
+    [Inject] public PairingFixtureState State { get; set; } = null!;
+    private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
+    protected override void OnInitialized()
+    {
+        State.Cashier = this;
+        Set("_loading",false);Set("_hasTenant",true);Set("_moduleEnabled",true);
+        Set("_registers",new List<PosRegisterResponse> {new() {Id=State.RegisterId,Name="Fixture register",CurrencyId=State.CurrencyId}});
+        Set("_selectedRegisterId",State.RegisterId.ToString());
+        Set("_currencies",new List<CurrencyType> {new() {Id=State.CurrencyId,CurrencyIsoCode3="USD"}});
+        Set("_catalogItems",new List<PosCatalogItemResponse> {State.Item});
+        var type = typeof(Cashier).GetNestedType("CartLine",BindingFlags.NonPublic)!;
+        var line = Activator.CreateInstance(type)!;
+        type.GetProperty("ProductId")!.SetValue(line,State.Item.ProductId);
+        type.GetProperty("DisplayName")!.SetValue(line,State.Item.DisplayName);
+        type.GetProperty("UnitPrice")!.SetValue(line,10m);
+        type.GetProperty("Quantity")!.SetValue(line,1m);
+        ((IList)typeof(Cashier).GetField("_cart",Private)!.GetValue(this)!).Add(line);
+    }
+    protected override Task OnInitializedAsync() => Task.CompletedTask;
+    public Task ClearForFixture() => InvokeAsync(() =>
+    { typeof(Cashier).GetMethod("ClearCurrentCart",Private)!.Invoke(this,null); StateHasChanged(); });
+    public Task UnavailableForFixture(string condition) => InvokeAsync(() =>
+    { Set(condition switch {"loading"=>"_loading","tenant-missing"=>"_hasTenant",_=>"_moduleEnabled"},condition=="loading");StateHasChanged(); });
+    private void Set(string field,object value) => typeof(Cashier).GetField(field,Private)!.SetValue(this,value);
 }
 
 public sealed class PosPairingFixtureSurface : ComponentBase

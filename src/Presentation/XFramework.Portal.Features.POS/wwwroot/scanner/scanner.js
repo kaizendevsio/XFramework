@@ -80,16 +80,30 @@ export async function start(video, receiver) {
         throw new Error("Camera requires HTTPS. Open this Portal on its authorized HTTPS address.");
     if (!navigator.mediaDevices?.getUserMedia)
         throw new Error("Camera scanning is not supported by this browser.");
-    await decoder();
     const state = { stopped: false, stream: null, timer: null, last: "", emptySince: null };
     cameras.set(video, state);
+    const active = () => !state.stopped && cameras.get(video) === state;
+    state.onHidden = () => {
+        if (document.hidden && active()) {
+            stop(video);
+            receiver.invokeMethodAsync("CameraFailed", "Camera paused while this page was hidden. Restart the camera.");
+        }
+    };
+    state.onExit = () => { if (active()) stop(video); };
+    document.addEventListener("visibilitychange", state.onHidden);
+    window.addEventListener("pagehide", state.onExit);
+    let decoderLoaded = false;
     try {
+        await decoder();
+        decoderLoaded = true;
+        if (!active()) return false;
         state.stream = await navigator.mediaDevices.getUserMedia({
             audio: false, video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }
         });
-        if (state.stopped) { state.stream.getTracks().forEach(t => t.stop()); return; }
+        if (!active()) { state.stream.getTracks().forEach(t => t.stop()); return false; }
         video.srcObject = state.stream;
         await video.play();
+        if (!active()) return false;
         const canvas = document.createElement("canvas");
         const context = canvas.getContext("2d", { willReadFrequently: true });
         const frame = async () => {
@@ -110,30 +124,25 @@ export async function start(video, receiver) {
                         state.emptySince = null;
                         if (code !== state.last) {
                             state.last = code;
-                            if (!await receiver.invokeMethodAsync("Decoded", code)) { stop(video); return; }
+                            if (!await receiver.invokeMethodAsync("Decoded", code)) { if (active()) stop(video); return; }
                         }
                     }
                 }
                 if (!state.stopped) state.timer = setTimeout(frame, 180);
             } catch {
+                if (!active()) return;
                 stop(video);
                 await receiver.invokeMethodAsync("CameraFailed", "Scanner connection interrupted. Restart the camera.");
             }
         };
         state.timer = setTimeout(frame, 180);
+        return true;
     } catch (error) {
+        if (!active()) return false;
         stop(video);
+        if (!decoderLoaded) throw error;
         throw new Error(cameraError(error));
     }
-    state.onHidden = () => {
-        if (document.hidden) {
-            stop(video);
-            receiver.invokeMethodAsync("CameraFailed", "Camera paused while this page was hidden. Restart the camera.");
-        }
-    };
-    state.onExit = () => stop(video);
-    document.addEventListener("visibilitychange", state.onHidden);
-    window.addEventListener("pagehide", state.onExit);
 }
 
 export function stop(video) {

@@ -1,0 +1,42 @@
+name: POS Scanner Tests
+
+on:
+  pull_request:
+    paths:
+      - src/Modules/XFramework.POS/**
+      - src/Presentation/XFramework.Portal.Features.POS/**
+      - src/Tests/POS.Api.Tests/**
+      - src/Tests/POS.IntegrationTests/**
+      - src/Tests/Portal.E2ETests/**
+      - .github/workflows/pos-scanner-tests.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pos-scanner-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scanner-tests:
+    name: POS scanner authorization, integration and browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 10.x
+      - name: Test scanner authorization and pairing
+        run: dotnet test src/Tests/POS.Api.Tests/POS.Api.Tests.csproj -m:1 /nr:false --filter FullyQualifiedName~PosScanner
+      - name: Test PostgreSQL register lookup and generated Bolt wrappers
+        run: dotnet test src/Tests/POS.IntegrationTests/POS.IntegrationTests.csproj -m:1 /nr:false --filter FullyQualifiedName~PosScanner
+      - name: Build Portal browser tests
+        run: dotnet build src/Tests/Portal.E2ETests/Portal.E2ETests.csproj -m:1 /nr:false
+      - name: Install Chromium
+        run: pwsh src/Tests/Portal.E2ETests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium
+      - name: Test isolated scanner camera and cashier integration
+        run: dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj --no-build -m:1 /nr:false --filter 'FullyQualifiedName~PosScanner|FullyQualifiedName~CashierMobileScanner|FullyQualifiedName~PortalForwardedSchemeSecurityTests'

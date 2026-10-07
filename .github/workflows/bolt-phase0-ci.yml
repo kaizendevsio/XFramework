@@ -196,6 +196,8 @@ jobs:
           set -euo pipefail
             bash -n scripts/configure-bolt-tailscale-boundary.sh
             bash -n scripts/configure-yap-dev-ingress.sh scripts/provision-yap-dev-secret.sh
+            bash -n scripts/configure-portal-scanner-dev-ingress.sh
+            python3 -B scripts/portal-scanner-ingress-test.py
           python3 -B scripts/verify-bolt-tailscale-boundary-test.py
           python3 -B scripts/verify-bolt-phase0-diagnostic-sinks-test.py
           python3 -B scripts/refresh-bolt-phase0-synthetic-tokens-test.py

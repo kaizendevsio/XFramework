@@ -27,6 +27,9 @@ on:
       - scripts/refresh-bolt-phase0-synthetic-tokens.py
       - scripts/provision-yap-dev-secret.sh
       - scripts/configure-yap-dev-ingress.sh
+      - scripts/configure-portal-scanner-dev-ingress.sh
+      - scripts/portal-scanner-ingress-test.py
+      - scripts/resolve-portal-trusted-proxy.py
       - scripts/deployment-scope.py
       - scripts/deployed-yap-baseline.py
       - scripts/prepare-dotnet-build-context.py
@@ -222,6 +225,8 @@ jobs:
           test -S /var/run/docker.sock
           timeout --foreground --kill-after=10s 30s docker info --format 'Docker daemon: {{.Name}} {{.ServerVersion}}'
           bash -n scripts/configure-bolt-tailscale-boundary.sh
+          bash -n scripts/configure-portal-scanner-dev-ingress.sh
+          python3 -B scripts/portal-scanner-ingress-test.py
           python3 -B -m py_compile scripts/verify-bolt-tailscale-boundary.py
           python3 -B -m py_compile scripts/verify-bolt-phase0-diagnostic-sinks.py
 
@@ -337,6 +342,8 @@ jobs:
           scp scripts/refresh-bolt-phase0-synthetic-tokens.py "$DEPLOY_HOST:$REMOTE_REFRESH_TOKENS"
           scp scripts/provision-yap-dev-secret.sh "$DEPLOY_HOST:$REMOTE_RUN_DIR/provision-yap-dev-secret.sh"
           scp scripts/configure-yap-dev-ingress.sh "$DEPLOY_HOST:$REMOTE_RUN_DIR/configure-yap-dev-ingress.sh"
+          scp scripts/configure-portal-scanner-dev-ingress.sh "$DEPLOY_HOST:$REMOTE_RUN_DIR/configure-portal-scanner-dev-ingress.sh"
+          scp scripts/resolve-portal-trusted-proxy.py "$DEPLOY_HOST:$REMOTE_RUN_DIR/resolve-portal-trusted-proxy.py"
           scp scripts/observe-core-services.sh "$DEPLOY_HOST:$REMOTE_RUN_DIR/observe-core-services.sh"
           ssh "$DEPLOY_HOST" "chmod 700 '$REMOTE_RUN_DIR/provision-yap-dev-secret.sh' && '$REMOTE_RUN_DIR/provision-yap-dev-secret.sh'"
 
@@ -472,6 +479,7 @@ jobs:
           overrides = {
               "BOLT_HUB_EXPOSE_PORT": "7000",
               "IDENTITYSERVER_EXPOSE_PORT": "8261",
+              "PORTAL_SCANNER_PUBLIC_BASE_URL": "https://xeon-dev.tailed40e.ts.net:5443",
               "BOLT_SYNTHETIC_IDENTITYSERVER_BASE_URL": identity_url,
               "BOLT_SYNTHETIC_TARGET": hub_websocket_url,
               "BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_PATH": f"{token_dir}/communications-transport-token",
@@ -1124,6 +1132,21 @@ jobs:
           if [ "$DEPLOY_SCOPE" = yap ]; then clients=(yap); fi
           : > "$REMOTE_RUN_DIR/mutation-started"
           compose=(docker compose --project-name "$COMPOSE_PROJECT_NAME" --env-file "$XFRAMEWORK_ENV_FILE" -f "$REMOTE_CANDIDATE_COMPOSE" -f "$REMOTE_IMAGE_OVERRIDE")
+          if [ "$DEPLOY_SCOPE" != yap ]; then
+            # Core startup has created the bridge even on first deployment.
+            proxy_ip="$(docker network inspect "${COMPOSE_PROJECT_NAME}_default" --format '{{json .}}' | python3 -B "$REMOTE_RUN_DIR/resolve-portal-trusted-proxy.py" "$COMPOSE_PROJECT_NAME")"
+            python3 - "$XFRAMEWORK_ENV_FILE" "$proxy_ip" <<'PY'
+          import ipaddress
+          import pathlib
+          import sys
+
+          path = pathlib.Path(sys.argv[1])
+          proxy_ip = str(ipaddress.IPv4Address(sys.argv[2]))
+          lines = [line for line in path.read_text().splitlines() if not line.startswith("PORTAL_TRUSTED_PROXY_IP=")]
+          lines.append(f"PORTAL_TRUSTED_PROXY_IP={proxy_ip}")
+          path.write_text("\n".join(lines) + "\n")
+          PY
+          fi
           /usr/bin/timeout --foreground --kill-after=30s 600s \
             "${compose[@]}" up -d --no-build --no-deps --force-recreate "${clients[@]}"
 
@@ -1166,6 +1189,13 @@ jobs:
           set -euo pipefail
           curl -fsS --connect-timeout 3 --max-time 15 http://127.0.0.1:5000/_framework/blazor.web.js >/dev/null
           REMOTE_SCRIPT
+
+      - name: Configure and verify Portal scanner HTTPS ingress
+        if: env.DEPLOY_SCOPE != 'yap'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh "$DEPLOY_HOST" "bash '$REMOTE_RUN_DIR/configure-portal-scanner-dev-ingress.sh' configure '$REMOTE_RUN_DIR/portal-scanner-ingress-owned'"
 
       - name: Configure and verify Yap HTTPS ingress
         if: env.DEPLOY_SCOPE != 'yap'
@@ -1271,6 +1301,11 @@ jobs:
               /usr/bin/timeout --foreground --kill-after=10s 30s docker kill "$failed_container" >/dev/null 2>&1 || true
           }
           trap 'stop_hub; exit 1' ERR
+
+          # Remove only a scanner listener created by this candidate. Reused routes stay.
+          if [ -f "$REMOTE_RUN_DIR/portal-scanner-ingress-owned" ]; then
+            bash "$REMOTE_RUN_DIR/configure-portal-scanner-dev-ingress.sh" rollback "$REMOTE_RUN_DIR/portal-scanner-ingress-owned"
+          fi
 
           if [ -f "$REMOTE_RUN_DIR/bootstrap-without-rollback" ]; then
             echo "No previous release exists; removing the failed bootstrap containers." >&2
