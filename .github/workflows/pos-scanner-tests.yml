@@ -5,6 +5,8 @@ on:
     paths:
       - src/Modules/XFramework.POS/**
       - src/Presentation/XFramework.Portal.Features.POS/**
+      - src/Presentation/XFramework.Portal.Shared/Components/XfEntityPicker.razor
+      - src/Presentation/XFramework.Portal.Shared/Components/XfPopoverClickOutside.cs
       - src/Tests/POS.Api.Tests/**
       - src/Tests/POS.IntegrationTests/**
       - src/Tests/Portal.E2ETests/**
@@ -38,5 +40,5 @@ jobs:
         run: dotnet build src/Tests/Portal.E2ETests/Portal.E2ETests.csproj -m:1 /nr:false
       - name: Install Chromium
         run: pwsh src/Tests/Portal.E2ETests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium
-      - name: Test isolated scanner camera and cashier integration
-        run: dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj --no-build -m:1 /nr:false --filter 'FullyQualifiedName~PosScanner|FullyQualifiedName~CashierMobileScanner|FullyQualifiedName~PortalForwardedSchemeSecurityTests'
+      - name: Test isolated scanner camera, cashier and picker integration
+        run: dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj --no-build -m:1 /nr:false --filter 'FullyQualifiedName~PosScanner|FullyQualifiedName~CashierMobileScanner|FullyQualifiedName~PortalForwardedSchemeSecurityTests|FullyQualifiedName~EntityPickerClickOutside|FullyQualifiedName~PopoverClickOutsideLifetime'
