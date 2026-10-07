@@ -3,6 +3,8 @@ using Wallets.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts.Requests;
 using Wallets.Domain.Shared.Enums;
 using XFramework.Domain.Shared.ServiceIdentity;
+using XFramework.Integration.Security;
+using XFramework.TestInfrastructure;
 
 namespace Wallets.IntegrationTests.Tests;
 
@@ -10,6 +12,49 @@ namespace Wallets.IntegrationTests.Tests;
 [NonParallelizable]
 public sealed class FinancialReportTests : WalletsTestBase
 {
+    [TestCase(true, true)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    public async Task Wrapper_Report_DelegatedTenant_RequiresReportingAndTenantManagement(bool canReport, bool canManageTenants)
+    {
+        var owner = await SeedCredential();
+        var wallet = await SeedWallet(owner.Id, 123);
+        await using var db = CreateDbContext();
+        var currency = new CurrencyType { Id = Guid.NewGuid(), TenantId = WalletsTestFixture.TestTenantId, Name = "Delegated report", CurrencyIsoCode3 = "USD", IsEnabled = true };
+        var type = new WalletType { Id = Guid.NewGuid(), TenantId = WalletsTestFixture.TestTenantId, Name = "Delegated report", Code = Guid.NewGuid().ToString("N")[..8], CurrencyTypeId = currency.Id, IsEnabled = true };
+        db.Add(currency);
+        db.Add(type);
+        db.Attach(wallet);
+        wallet.WalletTypeId = type.Id;
+        await db.SaveChangesAsync();
+
+        List<string> capabilities = [];
+        if (canReport) capabilities.Add(WalletAuthorizationCapabilities.ReportingView);
+        if (canManageTenants) capabilities.Add(XFrameworkActorCapabilities.IdentityTenantsManage);
+        var token = TestInvocationIdentityExtensions.CreateTestActorToken(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), [], capabilities);
+        using var scope = TestInvocationActorTokenScope.Push(token);
+        var response = await WalletsTestFixture.ServiceWrapper.WalletFinancialReport(new()
+        {
+            WalletId = wallet.Id,
+            From = DateTime.UtcNow.Date,
+            ToExclusive = DateTime.UtcNow.Date.AddDays(1),
+            Metadata = CreateMetadata()
+        });
+
+        response.IsSuccess.Should().Be(canReport && canManageTenants, response.Message);
+        if (canReport && canManageTenants)
+        {
+            response.Response!.TenantId.Should().Be(WalletsTestFixture.TestTenantId);
+            response.Response.Currencies.Should().ContainSingle().Which.Balance.Should().Be(123);
+            response.Response.Currencies.Single().CurrencyId.Should().Be(currency.Id);
+        }
+        else
+        {
+            response.HttpStatusCode.Should().Be(System.Net.HttpStatusCode.Forbidden);
+        }
+    }
+
     [Test]
     public async Task Wrapper_Report_SeparatesCurrencies_ExcludesHoldsDeletedAndOutOfPeriodEntries()
     {
