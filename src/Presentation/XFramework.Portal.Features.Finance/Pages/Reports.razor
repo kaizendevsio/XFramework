@@ -98,7 +98,7 @@
     }
     protected override async Task OnParametersSetAsync()
     {
-        _version++; _request?.Cancel(); _request = null; _loading = false; _report = null;
+        _version++; CancelRequest(); _loading = false; _report = null;
         var from = _appliedFrom;
         var through = _appliedThrough;
         _invalidLink = SharedFrom is not null && !TryDate(SharedFrom, out from) ||
@@ -113,8 +113,14 @@
     private static bool ValidRange(DateTime from, DateTime through) => through >= from && through.Date < DateTime.MaxValue.Date && (through.Date - from.Date).TotalDays < 366;
     private void ContextChanged()
     {
-        _version++; _request?.Cancel(); _report = null;
+        _version++; CancelRequest(); _report = null;
         _ = InvokeAsync(LoadReport);
+    }
+    private void CancelRequest()
+    {
+        var request = _request;
+        _request = null;
+        request?.Cancel();
     }
     private async Task Apply()
     {
@@ -129,7 +135,7 @@
         if (_disposed) return;
         if (_invalidLink) { _error = "The report link contains an invalid date."; return; }
         var version = ++_version;
-        _request?.Cancel();
+        CancelRequest();
         using var request = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         _request = request; _loading = true; _error = null;
         var tenantId = Tenant.SelectedTenantId;
@@ -159,7 +165,8 @@
         }
         finally
         {
-            if (version == _version && !_disposed) { _request = null; _loading = false; StateHasChanged(); }
+            if (ReferenceEquals(_request, request)) _request = null;
+            if (version == _version && !_disposed) { _loading = false; StateHasChanged(); }
         }
     }
     private async Task RefreshLoop()
@@ -217,8 +224,9 @@
     private static string Money(decimal value) => value.ToString("N2", CultureInfo.InvariantCulture);
     public async ValueTask DisposeAsync()
     {
+        if (_disposed) return;
         _disposed = true; _version++; Tenant.OnChanged -= ContextChanged; Modules.OnChanged -= ContextChanged;
-        _lifetime.Cancel(); _request?.Cancel();
+        CancelRequest(); _lifetime.Cancel();
         if (_timer is not null) await _timer;
         if (_exportModule is not null) try { await _exportModule.DisposeAsync(); } catch (JSDisconnectedException) { }
         _lifetime.Dispose();

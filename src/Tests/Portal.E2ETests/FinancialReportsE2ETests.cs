@@ -38,6 +38,7 @@ public sealed class FinancialReportsE2ETests : PageTest
     private WalletFinancialReportRequest? latest;
     private readonly List<string> errors = [];
     private Mock<IWalletsServiceWrapper> wrapper = null!;
+    private Mock<IPortalModuleAvailability> modules = null!;
 
     [OneTimeSetUp]
     public async Task Start()
@@ -58,7 +59,7 @@ public sealed class FinancialReportsE2ETests : PageTest
         builder.Services.AddScoped<XfPortalService>();
         builder.Services.Replace(ServiceDescriptor.Scoped<IPortalService>(sp => sp.GetRequiredService<XfPortalService>()));
         builder.Services.AddSingleton(Mock.Of<IPortalTenantContext>(x => x.SelectedTenantId == tenantId && x.SelectedTenantName == "Report fixture"));
-        var modules = new Mock<IPortalModuleAvailability>();
+        modules = new Mock<IPortalModuleAvailability>();
         modules.Setup(x => x.EnsureLoadedAsync()).Returns(Task.CompletedTask);
         modules.Setup(x => x.IsFeatureEnabled(TenantModuleFeatureKeys.WalletsReporting)).Returns(true);
         builder.Services.AddSingleton(modules.Object);
@@ -218,6 +219,36 @@ public sealed class FinancialReportsE2ETests : PageTest
     }
 
     [Test]
+    public async Task ModuleRefresh_CancelsPendingReport_RecoversAndDisposesWithoutDisconnect()
+    {
+        var from = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        wrapper.Setup(x => x.WalletFinancialReport(It.Is<WalletFinancialReportRequest>(r => r.From == from), It.IsAny<CancellationToken>()))
+            .Returns(async (WalletFinancialReportRequest _, CancellationToken token) => {
+                if (Interlocked.Increment(ref calls) == 1)
+                {
+                    started.TrySetResult();
+                    await Task.Delay(TimeSpan.FromSeconds(15), token);
+                }
+                return new CmdResponse<WalletFinancialReportResponse> { HttpStatusCode = HttpStatusCode.OK,
+                    Response = new() { TenantId = tenantId, GeneratedAt = DateTime.UtcNow } };
+            });
+        Page.Console += (_, message) => { if (message.Type == "error") errors.Add(message.Text); };
+        await Page.GotoAsync(app.Urls.Single() + $"/finance/reports?tenant={tenantId}&from=2026-06-01&through=2026-06-07");
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await Task.Run(() => modules.Raise(x => x.OnChanged += null));
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Current balances" })).ToBeVisibleAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Refresh", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "PDF", Exact = true })).ToBeEnabledAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Close report", Exact = true }).ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Open report", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Current balances" })).ToBeVisibleAsync();
+        calls.Should().BeGreaterThanOrEqualTo(3);
+        errors.Should().BeEmpty();
+    }
+
+    [Test]
     public async Task SharedPdfExporter_PaginatesLongTables_EmbedsUnicodeFont_AndTreatsLabelsAsText()
     {
         await Page.GotoAsync(app.Urls.Single() + "/finance/reports");
@@ -254,10 +285,18 @@ public sealed class FinancialReportFixtureRoot : ComponentBase
 public sealed class FinancialReportFixtureSurface : ComponentBase
 {
     [Inject] public NavigationManager Navigation { get; set; } = null!;
+    private bool showReport = true;
     protected override void BuildRenderTree(RenderTreeBuilder b)
     {
-        b.OpenComponent<XFramework.Portal.Features.Finance.Pages.Reports>(0);
-        b.CloseComponent();
+        if (showReport)
+        {
+            b.OpenComponent<XFramework.Portal.Features.Finance.Pages.Reports>(0);
+            b.CloseComponent();
+        }
+        b.OpenElement(1, "button");
+        b.AddAttribute(2, "onclick", EventCallback.Factory.Create(this, () => showReport = !showReport));
+        b.AddContent(3, showReport ? "Close report" : "Open report");
+        b.CloseElement();
         b.OpenComponent<XfContainerPortalHost>(4); b.CloseComponent();
         b.OpenComponent<BbOverlayPortalHost>(5); b.CloseComponent();
     }
