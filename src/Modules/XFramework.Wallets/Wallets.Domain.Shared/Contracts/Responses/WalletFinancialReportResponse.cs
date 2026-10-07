@@ -21,7 +21,6 @@ public partial record WalletFinancialCurrencySummary
     public decimal CreditHold { get; init; }
     public decimal Credits { get; init; }
     public decimal Debits { get; init; }
-    public decimal Fees { get; init; }
     public int EntryCount { get; init; }
 }
 

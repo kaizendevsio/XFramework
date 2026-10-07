@@ -333,8 +333,10 @@ public sealed class InventoryReportingService(
         var reserved = await Balances().SumAsync(x => x.ReservedQuantity, ct);
         var available = await Balances().SumAsync(x => x.AvailableQuantity, ct);
         var movementCount = await Movements().CountAsync(ct);
-        var inbound = await Movements().Where(x => x.QuantityDelta > 0).SumAsync(x => x.QuantityDelta, ct);
-        var outbound = -await Movements().Where(x => x.QuantityDelta < 0).SumAsync(x => x.QuantityDelta, ct);
+        var inbound = await Movements().Where(x => x.MovementType != InventoryMovementType.Reservation &&
+            x.MovementType != InventoryMovementType.Release && x.QuantityDelta > 0).SumAsync(x => x.QuantityDelta, ct);
+        var outbound = -await Movements().Where(x => x.MovementType != InventoryMovementType.Reservation &&
+            x.MovementType != InventoryMovementType.Release && x.QuantityDelta < 0).SumAsync(x => x.QuantityDelta, ct);
         var positions = await GetStockPositionsAsync(new()
         {
             Metadata = request.Metadata, ProductId = request.ProductId,

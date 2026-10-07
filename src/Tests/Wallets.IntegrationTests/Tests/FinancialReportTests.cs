@@ -24,12 +24,19 @@ public sealed class FinancialReportTests : WalletsTestBase
         db.Add(currency); db.Add(type);
         eur.WalletTypeId = type.Id;
         db.Add(eur);
-        var dollarCurrency = await db.Set<WalletType>().Where(x => x.Id == usd.WalletTypeId).Select(x => x.CurrencyTypeId).SingleAsync();
+        var dollarCurrency = Guid.NewGuid();
+        var dollarType = new WalletType { Id = Guid.NewGuid(), TenantId = WalletsTestFixture.TestTenantId, Name = "Dollar report test", Code = Guid.NewGuid().ToString("N")[..8], CurrencyTypeId = dollarCurrency, IsEnabled = true };
+        db.Add(new CurrencyType { Id = dollarCurrency, TenantId = WalletsTestFixture.TestTenantId, Name = "Dollar report test", CurrencyIsoCode3 = "USD", IsEnabled = true });
+        db.Add(dollarType);
+        db.Attach(usd);
+        usd.WalletTypeId = dollarType.Id;
         var operation = new WalletOperation { Id = Guid.NewGuid(), TenantId = WalletsTestFixture.TestTenantId, Status = WalletOperationStatus.Completed };
         db.Add(operation);
         var entries = new[] {
             Entry(operation.Id, usd.Id, dollarCurrency, 10, from.AddHours(1)),
             Entry(operation.Id, eur.Id, currency.Id, 20, from.AddHours(1)),
+            Entry(operation.Id, usd.Id, null, 3, from.AddHours(2)),
+            Entry(operation.Id, eur.Id, null, 7, from.AddHours(2)),
             Entry(operation.Id, eur.Id, currency.Id, 500, from.AddHours(1), WalletBalanceBucket.DebitHold),
             Entry(operation.Id, eur.Id, currency.Id, 500, through),
             Entry(operation.Id, eur.Id, currency.Id, 500, from.AddHours(1), deleted: true) };
@@ -40,10 +47,22 @@ public sealed class FinancialReportTests : WalletsTestBase
         var response = await WalletsTestFixture.ServiceWrapper.WalletFinancialReport(new() { From = from, ToExclusive = through, Metadata = CreateMetadata() });
         response.IsSuccess.Should().BeTrue(response.Message);
         response.Response!.TenantId.Should().Be(WalletsTestFixture.TestTenantId);
-        response.Response.Currencies.Single(x => x.CurrencyId == currency.Id).Credits.Should().Be(20);
+        response.Response.Currencies.Single(x => x.CurrencyId == currency.Id).Credits.Should().Be(27);
         response.Response.Currencies.Single(x => x.CurrencyId == currency.Id).Balance.Should().Be(200);
-        response.Response.Currencies.Single(x => x.CurrencyId == dollarCurrency).Credits.Should().Be(10);
+        response.Response.Currencies.Single(x => x.CurrencyId == dollarCurrency).Credits.Should().Be(13);
+        response.Response.Currencies.Should().NotContain(x => x.CurrencyId == null);
         response.Response.DailyActivity.Should().HaveCount(2);
+    }
+
+    [Test]
+    public async Task Wrapper_Report_RejectsUnknownCurrencies_InsteadOfCombiningAmounts()
+    {
+        var actor = await SeedCredential();
+        await SeedWallet(actor.Id);
+        using var scope = WalletsTestFixture.PushActor(actor.Id, [WalletAuthorizationCapabilities.ReportingView]);
+        var response = await WalletsTestFixture.ServiceWrapper.WalletFinancialReport(new() { From = DateTime.UtcNow.Date, ToExclusive = DateTime.UtcNow.Date.AddDays(1), Metadata = CreateMetadata() });
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Contain("currency");
     }
 
     [Test]

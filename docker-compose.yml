@@ -650,6 +650,7 @@ services:
     environment:
       <<: *common-env
       ServiceIdentity__ClientSecret: ${POS_SERVICE_IDENTITY_SECRET:?Set POS_SERVICE_IDENTITY_SECRET in .env}
+      PosScanner__RedisConnectionString: ${POS_SCANNER_REDIS_CONNECTION:-redis:6379}
       ServiceIdentity__DefaultScopes__0: bolt.service
       ServiceIdentity__DefaultScopes__1: identity.session.validate
       ServiceIdentity__DefaultScopes__2: datacontext.query
@@ -661,6 +662,8 @@ services:
     ports:
       - "${POS_EXPOSE_PORT:-8115}:8080"
     depends_on:
+      redis:
+        condition: service_healthy
       bolt-hub:
         condition: service_healthy
       identityserver:

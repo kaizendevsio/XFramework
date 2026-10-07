@@ -44,7 +44,6 @@
                     <BbDataGridPropertyColumn Property="@(x => x.Currency)" Title="Currency" Filterable="true" />
                     <BbDataGridPropertyColumn Property="@(x => x.Credits)" Title="Credits" Format="N2" Filterable="true" />
                     <BbDataGridPropertyColumn Property="@(x => x.Debits)" Title="Debits (including fees)" Format="N2" Filterable="true" />
-                    <BbDataGridPropertyColumn Property="@(x => x.Fees)" Title="Fee entries" Format="N2" Filterable="true" />
                     <BbDataGridPropertyColumn Property="@(x => x.EntryCount)" Title="Ledger entries" Filterable="true" />
                 </Columns>
             </BbDataGrid>
@@ -99,6 +98,7 @@
     }
     protected override async Task OnParametersSetAsync()
     {
+        _version++; _request?.Cancel(); _request = null; _loading = false; _report = null;
         var from = _appliedFrom;
         var through = _appliedThrough;
         _invalidLink = SharedFrom is not null && !TryDate(SharedFrom, out from) ||
@@ -165,7 +165,7 @@
     private async Task RefreshLoop()
     {
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
-        try { while (await timer.WaitForNextTickAsync(_lifetime.Token)) if (_live && !_loading && _report is not null) await InvokeAsync(LoadReport); }
+        try { while (await timer.WaitForNextTickAsync(_lifetime.Token)) if (_live && !_loading && _hasTenant && _enabled && !_invalidLink) await InvokeAsync(LoadReport); }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
     }
     private List<DailyPoint> Daily(Guid? currencyId)
@@ -207,7 +207,7 @@
                 generatedAt = snapshot.GeneratedAt.ToString("u"), scope = $"{from:yyyy-MM-dd} to {through:yyyy-MM-dd} UTC. Current balances; activity excludes holds and external counter-entries.", charts,
                 sections = new[] {
                     new { heading = "Current balances", columns = new[] { "Currency", "Wallets", "Balance", "Available", "Debit hold", "Credit hold" }, rows = snapshot.Currencies.Select(x => new[] { x.Currency, x.WalletCount.ToString(), Money(x.Balance), Money(x.AvailableBalance), Money(x.DebitHold), Money(x.CreditHold) }).ToArray() },
-                    new { heading = "Posted activity", columns = new[] { "Currency", "Credits", "Debits incl. fees", "Fee entries", "Entries" }, rows = snapshot.Currencies.Select(x => new[] { x.Currency, Money(x.Credits), Money(x.Debits), Money(x.Fees), x.EntryCount.ToString() }).ToArray() }
+                    new { heading = "Posted activity", columns = new[] { "Currency", "Credits", "Debits incl. fees", "Entries" }, rows = snapshot.Currencies.Select(x => new[] { x.Currency, Money(x.Credits), Money(x.Debits), x.EntryCount.ToString() }).ToArray() }
                 }
             });
         }

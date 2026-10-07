@@ -35,6 +35,12 @@ public sealed class InventoryReportSnapshotTests : InventarioTestBase
                 QuantityDelta = quantity, MovementDate = date, IsEnabled = true, CreatedAt = now,
                 IdempotencyKey = "synthetic-report-" + Guid.NewGuid()
             });
+        foreach (var (type, quantity) in new[] { (InventoryMovementType.Reservation, 5m), (InventoryMovementType.Release, -5m) })
+            db.Set<InventoryMovement>().Add(new() {
+                Id = Guid.NewGuid(), TenantId = tenant, ProductId = product.Id, WarehouseId = warehouse.Id,
+                LocationId = location.Id, MovementType = type, QuantityDelta = quantity, MovementDate = now.AddHours(-1),
+                IsEnabled = true, CreatedAt = now, IdempotencyKey = "synthetic-report-" + Guid.NewGuid()
+            });
         await db.SaveChangesAsync();
         var countBefore = await db.Set<InventoryMovement>().CountAsync(x => x.ProductId == product.Id);
         var request = new GetInventoryReportSnapshotRequest
@@ -50,7 +56,7 @@ public sealed class InventoryReportSnapshotTests : InventarioTestBase
         result.Response.Available.Should().Be(10);
         result.Response.Inbound.Should().Be(12);
         result.Response.Outbound.Should().Be(2);
-        result.Response.MovementCount.Should().Be(2);
+        result.Response.MovementCount.Should().Be(4);
         result.Response.Positions.Should().ContainSingle();
         result.Response.NearExpiry.Should().ContainSingle(x => x.LotId == lot.Id);
         (await db.Set<InventoryMovement>().CountAsync(x => x.ProductId == product.Id)).Should().Be(countBefore);

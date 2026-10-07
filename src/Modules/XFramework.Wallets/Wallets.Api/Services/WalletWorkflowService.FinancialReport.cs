@@ -35,6 +35,8 @@ public sealed partial class WalletWorkflowService
                 DebitHold = group.Sum(x => x.DebitOnHoldBalance),
                 CreditHold = group.Sum(x => x.CreditOnHoldBalance)
             }).Take(65).ToListAsync(ct);
+        if (balances.Any(x => x.CurrencyId is null))
+            return Result<WalletFinancialReportResponse>.Failure("Configure a currency for each wallet type before generating financial totals.");
 
         // Holds and external counter-entries are not posted wallet activity. Fees remain part of debits.
         var ledger = dbContext.Set<WalletLedgerEntry>().IgnoreQueryFilters().AsNoTracking()
@@ -42,12 +44,17 @@ public sealed partial class WalletWorkflowService
                 wallets.Any(wallet => wallet.Id == x.WalletId) &&
                 (x.BalanceBucket == WalletBalanceBucket.Available || x.BalanceBucket == WalletBalanceBucket.Fee) &&
                 x.EntryKind != WalletLedgerEntryKind.SystemCounterparty &&
-                x.CreatedAt >= request.From && x.CreatedAt < request.ToExclusive);
+                x.CreatedAt >= request.From && x.CreatedAt < request.ToExclusive)
+            .Select(x => new {
+                CurrencyId = x.CurrencyId ?? wallets.Where(wallet => wallet.Id == x.WalletId)
+                    .Select(wallet => wallet.WalletType != null && !wallet.WalletType.IsDeleted && wallet.WalletType.TenantId == tenantId
+                        ? wallet.WalletType.CurrencyTypeId : null).FirstOrDefault(),
+                x.Direction, x.Amount, x.CreatedAt
+            });
         var activity = await ledger.GroupBy(x => x.CurrencyId).Select(group => new {
             CurrencyId = group.Key,
             Credits = group.Sum(x => x.Direction == WalletLedgerDirection.Credit ? x.Amount : 0m),
             Debits = group.Sum(x => x.Direction == WalletLedgerDirection.Debit ? x.Amount : 0m),
-            Fees = group.Sum(x => x.EntryKind == WalletLedgerEntryKind.Fee ? x.Amount : 0m),
             Count = group.Count()
         }).Take(65).ToListAsync(ct);
         var currencyIds = balances.Select(x => x.CurrencyId).Union(activity.Select(x => x.CurrencyId)).ToList();
@@ -71,7 +78,7 @@ public sealed partial class WalletWorkflowService
                 CurrencyId = id, Currency = label, WalletCount = balance?.WalletCount ?? 0,
                 Balance = balance?.Balance ?? 0, AvailableBalance = balance?.Available ?? 0,
                 DebitHold = balance?.DebitHold ?? 0, CreditHold = balance?.CreditHold ?? 0,
-                Credits = flow?.Credits ?? 0, Debits = flow?.Debits ?? 0, Fees = flow?.Fees ?? 0, EntryCount = flow?.Count ?? 0
+                Credits = flow?.Credits ?? 0, Debits = flow?.Debits ?? 0, EntryCount = flow?.Count ?? 0
             };
         }).OrderBy(x => x.Currency).ThenBy(x => x.CurrencyId).ToList();
         return Result<WalletFinancialReportResponse>.Success(new() {

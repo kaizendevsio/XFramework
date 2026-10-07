@@ -51,7 +51,9 @@ public sealed class FinancialReportsE2ETests : PageTest
         });
         StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
         builder.WebHost.UseUrls("http://127.0.0.1:0");
-        builder.Services.AddRazorComponents().AddInteractiveServerComponents(x => x.DetailedErrors = true);
+        builder.Services.AddRazorComponents().AddInteractiveServerComponents(x => {
+            x.DetailedErrors = true; x.DisconnectedCircuitRetentionPeriod = TimeSpan.Zero;
+        });
         builder.Services.AddBlazorBlueprintComponents();
         builder.Services.AddScoped<XfPortalService>();
         builder.Services.Replace(ServiceDescriptor.Scoped<IPortalService>(sp => sp.GetRequiredService<XfPortalService>()));
@@ -153,16 +155,30 @@ public sealed class FinancialReportsE2ETests : PageTest
     }
 
     [Test]
-    public async Task LiveReport_RefreshesAppliedScope()
+    public async Task LiveReport_RecoversFromFailedRefresh_UsingAppliedScope()
     {
-        await Page.GotoAsync(app.Urls.Single() + $"/finance/reports?tenant={tenantId}&from=2026-09-01&through=2026-09-07");
+        var from = new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc);
+        WalletFinancialReportRequest? liveLatest = null;
+        var failNext = false;
+        wrapper.Setup(x => x.WalletFinancialReport(It.Is<WalletFinancialReportRequest>(r => r.From == from), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((WalletFinancialReportRequest request, CancellationToken _) => {
+                liveLatest = request;
+                if (failNext) { failNext = false; return new CmdResponse<WalletFinancialReportResponse> { HttpStatusCode = HttpStatusCode.ServiceUnavailable }; }
+                return new CmdResponse<WalletFinancialReportResponse> { HttpStatusCode = HttpStatusCode.OK, Response = new() { TenantId = tenantId, GeneratedAt = DateTime.UtcNow } };
+            });
+        await Page.GotoAsync(app.Urls.Single() + $"/finance/reports?tenant={tenantId}&from=2026-08-01&through=2026-08-07");
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Current balances" })).ToBeVisibleAsync();
-        var initial = latest;
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(35));
-        while (ReferenceEquals(initial, latest)) await Task.Delay(100, timeout.Token);
-        latest!.Metadata.RequestedTenantId.Should().Be(tenantId);
-        latest.From.Should().Be(initial!.From);
-        latest.ToExclusive.Should().Be(initial.ToExclusive);
+        var initial = liveLatest;
+        failNext = true;
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(65));
+        while (ReferenceEquals(initial, liveLatest)) await Task.Delay(100, timeout.Token);
+        await Expect(Page.GetByText("Financial data could not be loaded. Check your report permissions and try again.")).ToBeVisibleAsync();
+        var failed = liveLatest;
+        while (ReferenceEquals(failed, liveLatest)) await Task.Delay(100, timeout.Token);
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Current balances" })).ToBeVisibleAsync();
+        liveLatest!.Metadata.RequestedTenantId.Should().Be(tenantId);
+        liveLatest.From.Should().Be(initial!.From);
+        liveLatest.ToExclusive.Should().Be(initial.ToExclusive);
         errors.Should().BeEmpty();
     }
 
@@ -175,6 +191,30 @@ public sealed class FinancialReportsE2ETests : PageTest
         await Expect(Page.GetByText("The report link contains an invalid date.")).ToBeVisibleAsync();
         latest.Should().BeNull();
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "PDF", Exact = true })).ToBeDisabledAsync();
+    }
+
+    [Test]
+    public async Task InvalidQuery_DiscardsLateResponseFromPreviousScope()
+    {
+        var from = new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pending = new TaskCompletionSource<CmdResponse<WalletFinancialReportResponse>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        wrapper.Setup(x => x.WalletFinancialReport(It.Is<WalletFinancialReportRequest>(r => r.From == from), It.IsAny<CancellationToken>()))
+            .Returns(() => { started.TrySetResult(); return pending.Task; });
+        try
+        {
+            await Page.GotoAsync(app.Urls.Single() + $"/finance/reports?tenant={tenantId}&from=2026-07-01&through=2026-07-07");
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await Page.EvaluateAsync("Blazor.navigateTo('/finance/reports?from=invalid')");
+            await Expect(Page.GetByText("The report link contains an invalid date.")).ToBeVisibleAsync();
+        }
+        finally
+        {
+            pending.TrySetResult(new() { HttpStatusCode = HttpStatusCode.OK, Response = new() { TenantId = tenantId, GeneratedAt = DateTime.UtcNow } });
+        }
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Current balances" })).ToHaveCountAsync(0);
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "PDF", Exact = true })).ToBeDisabledAsync();
+        errors.Should().BeEmpty();
     }
 
     [Test]

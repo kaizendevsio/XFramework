@@ -33,6 +33,7 @@ public sealed class InventoryReportScopeTests
     [TestCase("?tenant={tenant}&from=2026-10-03&to=2026-10-01")]
     [TestCase("?tenant={tenant}&expiry=0")]
     [TestCase("?tenant={tenant}&from=bad")]
+    [TestCase("?tenant={tenant}&to=9999-12-31")]
     public void Parse_MalformedSharedScope_FailsClosed(string query)
     {
         var tenant = Guid.NewGuid();

@@ -161,6 +161,11 @@ public sealed class InventoryPlanningReportingServiceTests
                 Id = Guid.NewGuid(), TenantId = tenantId, ProductId = ids.ProductId,
                 WarehouseId = ids.WarehouseId, LocationId = location, QuantityDelta = quantity, MovementDate = date
             });
+        foreach (var (type, quantity) in new[] { (InventoryMovementType.Reservation, 5m), (InventoryMovementType.Release, -5m) })
+            data.Set<InventoryMovement>().Add(new() {
+                Id = Guid.NewGuid(), TenantId = tenantId, ProductId = ids.ProductId, WarehouseId = ids.WarehouseId,
+                LocationId = ids.LocationId, MovementType = type, QuantityDelta = quantity, MovementDate = now.AddHours(-1)
+            });
         var service = CreateReportingService(data, tenantId, CreatePlanningService(data, tenantId));
         var result = await service.GetSnapshotAsync(new()
         {
@@ -176,7 +181,7 @@ public sealed class InventoryPlanningReportingServiceTests
         result.Data.Reserved.Should().Be(1005);
         result.Data.Inbound.Should().Be(7);
         result.Data.Outbound.Should().Be(2);
-        result.Data.MovementCount.Should().Be(2);
+        result.Data.MovementCount.Should().Be(4);
         result.Data.GeneratedAtUtc.Should().BeOnOrAfter(now);
         result.Data.Products.Should().ContainSingle(x => x.Id == ids.ProductId);
         data.SaveCount.Should().Be(0);

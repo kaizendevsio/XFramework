@@ -266,7 +266,7 @@
         try
         {
             Guid? Id(string? value) => string.IsNullOrWhiteSpace(value) ? null : Guid.Parse(value);
-            if (_from is null || _to is null) throw new FormatException();
+            if (_from is null || _to is null || _to.Value.Date >= DateTime.MaxValue.Date) throw new FormatException();
             var scope = _scope with { ProductId = Id(_product), WarehouseId = Id(_warehouse), LocationId = Id(_location),
                 FromUtc = DateTime.SpecifyKind(_from.Value.Date, DateTimeKind.Utc),
                 ToUtc = DateTime.SpecifyKind(_to.Value.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc), DaysAhead = _days };

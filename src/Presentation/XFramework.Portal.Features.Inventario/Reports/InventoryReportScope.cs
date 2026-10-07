@@ -37,7 +37,10 @@ public sealed record InventoryReportScope(Guid TenantId, Guid? ProductId, Guid? 
         var days = query.ContainsKey("expiry")
             ? int.TryParse(query["expiry"], out var parsed) ? parsed : 0 : 30;
         var from = Date("from", defaults.FromUtc);
-        var to = Date("to", defaults.ToUtc.Date).AddDays(1).AddTicks(-1);
+        var through = Date("to", defaults.ToUtc.Date);
+        if (through >= DateTime.MaxValue.Date)
+            throw new FormatException("This report link contains an invalid date.");
+        var to = through.AddDays(1).AddTicks(-1);
         if (days is < 1 or > 365 || from > to || to - from > TimeSpan.FromDays(366))
             throw new FormatException("Choose a date range of at most 366 days and an expiry window of 1-365 days.");
         return new(tenant, Id("product"), Id("warehouse"), Id("location"), from, to, days);

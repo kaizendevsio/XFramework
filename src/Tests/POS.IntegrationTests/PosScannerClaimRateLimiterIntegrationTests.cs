@@ -3,6 +3,11 @@ using DotNet.Testcontainers.Containers;
 using POS.Api.Services;
 using StackExchange.Redis;
 using XFramework.Core.RateLimiting;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Moq;
+using POS.Api.Installers;
 
 namespace POS.IntegrationTests;
 
@@ -36,6 +41,21 @@ public sealed class PosScannerClaimRateLimiterIntegrationTests
         if (first is not null) await first.DisposeAsync();
         if (second is not null) await second.DisposeAsync();
         if (redis is not null) await redis.DisposeAsync();
+    }
+
+    [Test]
+    public async Task Installer_ConfiguredConnection_EnforcesSharedRedisBudget()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> {
+            ["PosScanner:RedisConnectionString"] = $"{redis.Hostname}:{redis.GetMappedPublicPort(6379)}"
+        }).Build();
+        var services = new ServiceCollection();
+        new PosScannerInstaller().InstallServices<object>(services, configuration, Mock.Of<IHostEnvironment>());
+        await using var provider = services.BuildServiceProvider();
+        var installed = provider.GetRequiredService<IDistributedSecurityRateLimiter>();
+        var policy = new StrictSecurityRateLimitPolicy("scanner-installed-" + Guid.NewGuid().ToString("N"), 1, TimeSpan.FromMinutes(2));
+        (await installed.AcquireAsync(policy, "actor", CancellationToken.None)).IsAllowed.Should().BeTrue();
+        (await new PosScannerClaimRateLimiter(() => second).AcquireAsync(policy, "actor", CancellationToken.None)).IsAllowed.Should().BeFalse();
     }
 
     [Test]

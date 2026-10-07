@@ -32,7 +32,7 @@ else
                         <BbFormFieldInput TValue="string" @bind-Value="_currency" UpdateTiming="UpdateTiming.Immediate" Label="Default currency" />
                     </div>
                 </fieldset>
-                <p>Currency labels prices and purchasing amounts; it does not convert existing values. SKU validation follows the product API. Negative-stock permission remains controlled by the tenant feature and per-post override.</p>
+                <p>Changing the currency does not convert existing prices.</p>
                 <div class="xf-page-actions">
                     <BbButton OnClick="Save" Disabled="@(_saving || !_state.CanManage || !IsDirty)"><LucideIcon Name="save" class="mr-2 h-4 w-4" />@(_saving ? "Saving..." : "Save Settings")</BbButton>
                 </div>
