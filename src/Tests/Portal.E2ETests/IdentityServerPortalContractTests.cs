@@ -240,7 +240,7 @@ public sealed class IdentityServerPortalContractTests
         roleTypeDetail.Should().Contain("IdentityServer.GetTenantAuthorizationPolicy(new GetTenantAuthorizationPolicyRequest");
         roleTypeDetail.Should().Contain("IdentityServer.UpdateTenantAuthorizationPolicy(new UpdateTenantAuthorizationPolicyRequest");
         roleTypeDetail.Should().Contain("IdentityServer.GetRoleTypePermissions(new GetRoleTypePermissionsRequest");
-        roleTypeDetail.Should().Contain("IdentityServer.SetRoleTypePermissions(new SetRoleTypePermissionsRequest");
+        roleTypeDetail.Should().Contain("IdentityServer.SetRoleTypePermissions(permissionsRequest)");
         roleTypeDetail.Should().Contain("IdentityAuthorizationConstants.CapabilityKeys");
         roleTypeDetail.Should().Contain("MissingPermissionBehavior.Allow");
         roleTypeDetail.Should().Contain("MissingPermissionBehavior.Deny");
