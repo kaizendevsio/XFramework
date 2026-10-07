@@ -82,7 +82,7 @@
     private DateTime _appliedThrough = DateTime.UtcNow.Date;
     private WalletFinancialReportResponse? _report;
     private string? _error;
-    private bool _loading, _hasTenant, _enabled, _exporting, _disposed;
+    private bool _loading, _hasTenant, _enabled, _exporting, _disposed, _invalidLink;
     private bool _live = true;
     private long _version;
     private readonly CancellationTokenSource _lifetime = new();
@@ -99,13 +99,18 @@
     }
     protected override async Task OnParametersSetAsync()
     {
-        if (SharedFrom is not null && !TryDate(SharedFrom, out _appliedFrom) ||
-            SharedThrough is not null && !TryDate(SharedThrough, out _appliedThrough))
+        var from = _appliedFrom;
+        var through = _appliedThrough;
+        _invalidLink = SharedFrom is not null && !TryDate(SharedFrom, out from) ||
+            SharedThrough is not null && !TryDate(SharedThrough, out through) || !ValidRange(from, through);
+        if (_invalidLink)
         { _error = "The report link contains an invalid date."; _report = null; return; }
+        _appliedFrom = from; _appliedThrough = through;
         _from = _appliedFrom; _through = _appliedThrough;
         await LoadReport();
     }
     private static bool TryDate(string text, out DateTime date) => DateTime.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
+    private static bool ValidRange(DateTime from, DateTime through) => through >= from && through.Date < DateTime.MaxValue.Date && (through.Date - from.Date).TotalDays < 366;
     private void ContextChanged()
     {
         _version++; _request?.Cancel(); _report = null;
@@ -113,14 +118,16 @@
     }
     private async Task Apply()
     {
-        if (_from is not { } from || _through is not { } through || through < from || (through.Date - from.Date).TotalDays >= 366)
+        if (_from is not { } from || _through is not { } through || !ValidRange(from, through))
         { _error = "Choose a reporting period of up to 366 days."; return; }
+        _invalidLink = false; _report = null;
         _appliedFrom = from.Date; _appliedThrough = through.Date;
         await LoadReport();
     }
     private async Task LoadReport()
     {
         if (_disposed) return;
+        if (_invalidLink) { _error = "The report link contains an invalid date."; return; }
         var version = ++_version;
         _request?.Cancel();
         using var request = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);

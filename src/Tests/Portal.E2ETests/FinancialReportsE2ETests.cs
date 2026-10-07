@@ -153,6 +153,31 @@ public sealed class FinancialReportsE2ETests : PageTest
     }
 
     [Test]
+    public async Task LiveReport_RefreshesAppliedScope()
+    {
+        await Page.GotoAsync(app.Urls.Single() + $"/finance/reports?tenant={tenantId}&from=2026-09-01&through=2026-09-07");
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Current balances" })).ToBeVisibleAsync();
+        var initial = latest;
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(35));
+        while (ReferenceEquals(initial, latest)) await Task.Delay(100, timeout.Token);
+        latest!.Metadata.RequestedTenantId.Should().Be(tenantId);
+        latest.From.Should().Be(initial!.From);
+        latest.ToExclusive.Should().Be(initial.ToExclusive);
+        errors.Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task InvalidSharedDate_RemainsBlockedAfterRefresh()
+    {
+        await Page.GotoAsync(app.Urls.Single() + $"/finance/reports?tenant={tenantId}&from=invalid&through=2026-09-07");
+        await Expect(Page.GetByText("The report link contains an invalid date.")).ToBeVisibleAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Refresh", Exact = true }).ClickAsync();
+        await Expect(Page.GetByText("The report link contains an invalid date.")).ToBeVisibleAsync();
+        latest.Should().BeNull();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "PDF", Exact = true })).ToBeDisabledAsync();
+    }
+
+    [Test]
     public async Task SharedPdfExporter_PaginatesLongTables_EmbedsUnicodeFont_AndTreatsLabelsAsText()
     {
         await Page.GotoAsync(app.Urls.Single() + "/finance/reports");
