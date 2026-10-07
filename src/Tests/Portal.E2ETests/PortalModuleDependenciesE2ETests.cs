@@ -121,17 +121,22 @@ public sealed class PortalModuleDependenciesE2ETests : PageTest
     private async Task VerifyTenantRoleCreationAsync()
     {
         var tenantUrl = Page.Url[..Page.Url.LastIndexOf("/modules", StringComparison.Ordinal)];
-        await Page.GotoAsync(tenantUrl + "/role-types");
+        // Keep the proven-interactive circuit; a fresh prerender can expose buttons before event handlers attach.
+        await Page.GetByRole(AriaRole.Link, new() { Name = "Role Types", Exact = true }).ClickAsync();
+        await Expect(Page).ToHaveURLAsync(tenantUrl + "/role-types");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Add Role Type", Exact = true }).ClickAsync();
         var roleDialog = Page.GetByRole(AriaRole.Dialog, new() { Name = "Add Role Type", Exact = true });
-        await roleDialog.GetByLabel("Name", new() { Exact = true }).FillAsync("QA Cashier Role");
+        await Expect(roleDialog).ToBeVisibleAsync();
+        var roleName = roleDialog.GetByRole(AriaRole.Textbox, new() { Name = "Name", Exact = true });
+        await roleName.FillAsync("QA Cashier Role");
         await roleDialog.GetByRole(AriaRole.Button, new() { Name = "Add Role Group", Exact = true }).ClickAsync();
         var groupDialog = Page.GetByRole(AriaRole.Dialog, new() { Name = "Add Role Group", Exact = true });
-        await groupDialog.GetByLabel("Name", new() { Exact = true }).FillAsync("QA Cashiers");
+        await Expect(groupDialog).ToBeVisibleAsync();
+        await groupDialog.GetByRole(AriaRole.Textbox, new() { Name = "Name", Exact = true }).FillAsync("QA Cashiers");
         await groupDialog.GetByLabel("Description", new() { Exact = true }).FillAsync("Isolated UI regression; no user assignments.");
         await groupDialog.GetByRole(AriaRole.Button, new() { Name = "Create Role Group", Exact = true }).ClickAsync();
         await Expect(roleDialog).ToBeVisibleAsync();
-        await Expect(roleDialog.GetByLabel("Name", new() { Exact = true })).ToHaveValueAsync("QA Cashier Role");
+        await Expect(roleName).ToHaveValueAsync("QA Cashier Role");
         await Expect(roleDialog.GetByRole(AriaRole.Combobox)).ToContainTextAsync("QA Cashiers");
         await roleDialog.GetByRole(AriaRole.Button, new() { Name = "Create and Configure", Exact = true }).ClickAsync();
         await Expect(Page).ToHaveURLAsync(new Regex($"^{Regex.Escape(tenantUrl)}/role-types/[a-f0-9-]+$"));

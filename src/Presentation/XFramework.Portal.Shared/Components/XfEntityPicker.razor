@@ -15,7 +15,7 @@
         </BbPopoverTrigger>
         <BbPopoverContent Class="xf-entity-picker-popover"
                           MatchTriggerWidth="true"
-                          CloseOnClickOutside="true"
+                          CloseOnClickOutside="false"
                           CloseOnEscape="true"
                           ZIndex="90">
             <BbCommand SearchQuery="@_searchQuery"
@@ -83,6 +83,10 @@
                 </BbCommandList>
             </BbCommand>
         </BbPopoverContent>
+        @if (_open)
+        {
+            <XfPopoverClickOutside />
+        }
     </BbPopover>
 
     @if (!string.IsNullOrWhiteSpace(HelpText))
