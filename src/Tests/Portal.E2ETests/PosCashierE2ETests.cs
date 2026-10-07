@@ -343,6 +343,25 @@ public sealed class PosCashierE2ETests : PageTest
     }
 
     [Test]
+    public async Task Payment_InvalidDiscount_CanReopenAndCorrectWithoutSubmitting()
+    {
+        await AddProductAsync(_settings.ProductName, _settings.ProductName);
+        var total = await MoneyAsync(Page.GetByTestId("pos-total"));
+        await OpenPaymentAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Discount and tax", Exact = true }).ClickAsync();
+        var discount = Page.GetByLabel($"Discount amount ({_settings.Currency})", new() { Exact = true });
+        await SetMoneyAsync(discount, total + 1m);
+        await Expect(ConfirmPay).ToBeDisabledAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Back to cart", Exact = true }).ClickAsync();
+        await Expect(Pay).ToBeEnabledAsync();
+        await OpenPaymentAsync();
+        await SetMoneyAsync(discount, 0m);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Exact amount", Exact = true }).ClickAsync();
+        await Expect(ConfirmPay).ToBeEnabledAsync();
+        await Expect(Page.GetByTestId("pos-receipt")).ToBeHiddenAsync();
+    }
+
+    [Test]
     public async Task Cash_InsufficientExactAndExcessTender_UpdatesReadinessAndChange()
     {
         await AddProductAsync(_settings.ProductName, _settings.ProductName);

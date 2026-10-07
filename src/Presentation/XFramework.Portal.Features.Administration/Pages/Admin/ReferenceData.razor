@@ -1,6 +1,7 @@
 @page "/admin/reference-data"
 @page "/identity/tenants/{TenantId:guid}/reference-data"
 @using IdentityServer.Integration.Drivers
+@using MemoryPack
 @using XFramework.Portal.Features.Administration
 @using XFramework.Domain.Shared.Contracts.Base
 @using XFramework.Domain.Shared.DataContext
@@ -408,7 +409,7 @@ else
 </div>
 
 @* -- Create / Edit Dialog -- *@
-<BbDialog Open="@_dialogOpen" OpenChanged="@(v => _dialogOpen = v)">
+<BbDialog Open="@_dialogOpen" OpenChanged="@OnDialogOpenChanged">
     <BbDialogContent>
         <BbDialogHeader>
             <BbDialogTitle>@(_isEditing ? "Edit" : "Add") @TabDisplayName</BbDialogTitle>
@@ -577,17 +578,25 @@ else
             }
         </div>
         <BbDialogFooter>
-            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _dialogOpen = false)">Cancel</BbButton>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => OnDialogOpenChanged(false))">Cancel</BbButton>
             <BbButton OnClick="@SaveRecord" Disabled="@_saving">@(_isEditing ? "Update" : "Create")</BbButton>
         </BbDialogFooter>
     </BbDialogContent>
 </BbDialog>
 
 @* -- Delete Confirmation Dialog -- *@
-<ConfirmDeleteDialog Open="@_deleteDialogOpen"
-                     OpenChanged="@(v => _deleteDialogOpen = v)"
-                     Message="@($"Delete \"{_deleteName}\"?")"
-                     OnConfirm="@ConfirmDelete" />
+<BbAlertDialog Open="@_deleteDialogOpen" OpenChanged="@OnDeleteDialogOpenChanged">
+    <BbAlertDialogContent>
+        <BbAlertDialogHeader>
+            <BbAlertDialogTitle>Are you sure?</BbAlertDialogTitle>
+            <BbAlertDialogDescription>@($"Delete \"{_deleteName}\"?")</BbAlertDialogDescription>
+        </BbAlertDialogHeader>
+        <BbAlertDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => OnDeleteDialogOpenChanged(false))">Cancel</BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="@ConfirmDelete" Disabled="@_saving">Delete</BbButton>
+        </BbAlertDialogFooter>
+    </BbAlertDialogContent>
+</BbAlertDialog>
 }
 
 @code {
@@ -610,6 +619,8 @@ else
     private bool _deleteDialogOpen;
     private bool _isEditing;
     private bool _saving;
+    private int _draftRevision;
+    private Guid? _parameterTenantId;
     private string _activeTab = "role-types";
     private bool _activeTabLoading;
     private string _categorySearch = "";
@@ -698,6 +709,11 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        if (_parameterTenantId != TenantId)
+        {
+            InvalidateDrafts();
+            _parameterTenantId = TenantId;
+        }
         if (TenantId == Guid.Empty)
         {
             _canManageReferenceData = false;
@@ -713,7 +729,10 @@ else
             return;
         }
 
-        if (!await ResolveAccess(TenantId))
+        var routeTenantId = TenantId;
+        var allowed = await ResolveAccess(routeTenantId);
+        if (TenantId != routeTenantId) return;
+        if (!allowed)
         {
             ClearData();
             return;
@@ -728,7 +747,7 @@ else
         }
         finally
         {
-            _loading = false;
+            if (TenantId == routeTenantId) _loading = false;
         }
     }
 
@@ -740,7 +759,8 @@ else
         {
             var user = AuthenticationStateTask is null ? null : (await AuthenticationStateTask).User;
             var allowed = await TenantReferenceDataAccess.CanManageAsync(user, tenantId, IdentityServer);
-            _canManageReferenceData = TenantId == routeTenantId && allowed;
+            if (TenantId != routeTenantId) return false;
+            _canManageReferenceData = allowed;
         }
         catch (Exception ex)
         {
@@ -779,6 +799,7 @@ else
             return;
         }
 
+        InvalidateDrafts();
         _activeTab = nextTab;
         if (_loadedTabs.Contains(_activeTab))
         {
@@ -814,47 +835,73 @@ else
     private async Task ReloadActiveTab()
     {
         if (!_canManageReferenceData || TenantId == Guid.Empty) return;
+        var revision = _draftRevision;
+        var tenantId = TenantId;
+        var tab = _activeTab;
         try
         {
-            switch (_activeTab)
+            switch (tab)
             {
                 case "role-types":
-                    _roleTypes = await LoadList<IdentityRoleType>();
-                    _roleTypeGroups = await LoadList<IdentityRoleTypeGroup>();
+                    var roles = await LoadList<IdentityRoleType>();
+                    if (!IsCurrentDraft(revision, tenantId, tab)) return;
+                    var roleGroups = await LoadList<IdentityRoleTypeGroup>();
+                    if (!IsCurrentDraft(revision, tenantId, tab)) return;
+                    _roleTypes = roles;
+                    _roleTypeGroups = roleGroups;
                     break;
                 case "role-type-groups":
-                    _roleTypeGroups = await LoadList<IdentityRoleTypeGroup>();
+                    var groups = await LoadList<IdentityRoleTypeGroup>();
+                    if (!IsCurrentDraft(revision, tenantId, tab)) return;
+                    _roleTypeGroups = groups;
                     break;
                 case "contact-types":
-                    _contactTypes = await LoadList<IdentityContactType>();
+                    var contacts = await LoadList<IdentityContactType>();
+                    if (!IsCurrentDraft(revision, tenantId, tab)) return;
+                    _contactTypes = contacts;
                     break;
                 case "contact-groups":
-                    _contactGroups = await LoadList<IdentityContactGroup>();
+                    var contactGroups = await LoadList<IdentityContactGroup>();
+                    if (!IsCurrentDraft(revision, tenantId, tab)) return;
+                    _contactGroups = contactGroups;
                     break;
                 case "address-types":
-                    _addressTypes = await LoadList<IdentityAddressType>();
+                    var addresses = await LoadList<IdentityAddressType>();
+                    if (!IsCurrentDraft(revision, tenantId, tab)) return;
+                    _addressTypes = addresses;
                     break;
                 case "verification-types":
-                    _verificationTypes = await LoadList<IdentityVerificationType>();
+                    var verifications = await LoadList<IdentityVerificationType>();
+                    if (!IsCurrentDraft(revision, tenantId, tab)) return;
+                    _verificationTypes = verifications;
                     break;
                 case "session-types":
-                    _sessionTypes = await LoadList<SessionType>();
+                    var sessions = await LoadList<SessionType>();
+                    if (!IsCurrentDraft(revision, tenantId, tab)) return;
+                    _sessionTypes = sessions;
                     break;
                 case "wallet-types":
-                    _walletTypes = await LoadList<global::Wallets.Domain.Shared.Contracts.WalletType>();
+                    var wallets = await LoadList<global::Wallets.Domain.Shared.Contracts.WalletType>();
+                    if (!IsCurrentDraft(revision, tenantId, tab)) return;
+                    _walletTypes = wallets;
                     break;
                 case "currency-types":
-                    _currencyTypes = await LoadList<global::Wallets.Domain.Shared.Contracts.CurrencyType>();
+                    var currencies = await LoadList<global::Wallets.Domain.Shared.Contracts.CurrencyType>();
+                    if (!IsCurrentDraft(revision, tenantId, tab)) return;
+                    _currencyTypes = currencies;
                     break;
                 case "exchange-rates":
-                    _exchangeRates = await LoadList<ExchangeRate>();
+                    var rates = await LoadList<ExchangeRate>();
+                    if (!IsCurrentDraft(revision, tenantId, tab)) return;
+                    _exchangeRates = rates;
                     break;
             }
 
-            _loadedTabs.Add(_activeTab);
+            _loadedTabs.Add(tab);
         }
         catch (Exception ex)
         {
+            if (!IsCurrentDraft(revision, tenantId, tab)) return;
             Logger.LogWarning(ex, "Could not load reference data category {Category}", _activeTab);
             ToastService.Show("Could not load reference data. Check your tenant and permissions, then try again.");
         }
@@ -876,8 +923,33 @@ else
 
     // -- Add / Edit Helpers --
 
+    private bool IsCurrentDraft(int revision, Guid tenantId, string tab) =>
+        revision == _draftRevision && tenantId == TenantId && tab == _activeTab;
+
+    private void InvalidateDrafts()
+    {
+        _draftRevision++;
+        _dialogOpen = _deleteDialogOpen = false;
+        _deleteTarget = null;
+        _deleteName = "";
+        _saving = false;
+    }
+
+    private void OnDialogOpenChanged(bool open)
+    {
+        if (!open && _dialogOpen) InvalidateDrafts();
+        else _dialogOpen = open;
+    }
+
+    private void OnDeleteDialogOpenChanged(bool open)
+    {
+        if (!open && _deleteDialogOpen) InvalidateDrafts();
+        else _deleteDialogOpen = open;
+    }
+
     private void ResetFormFields()
     {
+        InvalidateDrafts();
         _editingId = Guid.Empty;
         _editingRecord = null;
         _formName = "";
@@ -975,6 +1047,7 @@ else
 
     private void OpenDeleteDialog(object target, string displayName)
     {
+        InvalidateDrafts();
         _deleteTarget = target;
         _deleteName = displayName;
         _deleteDialogOpen = true;
@@ -982,37 +1055,53 @@ else
 
     private async Task ConfirmDelete()
     {
-        if (_deleteTarget is null) return;
+        if (_saving || _deleteTarget is null) return;
+        var revision = _draftRevision;
+        var tenantId = TenantId;
+        var tab = _activeTab;
+        var displayName = TabDisplayName;
 
-        DataContextResult? result = _deleteTarget switch
+        _saving = true;
+        try
         {
-            IdentityRoleType entity => await RemoveEntity(entity),
-            IdentityRoleTypeGroup entity => await RemoveEntity(entity),
-            IdentityContactType entity => await RemoveEntity(entity),
-            IdentityContactGroup entity => await RemoveEntity(entity),
-            IdentityAddressType entity => await RemoveEntity(entity),
-            IdentityVerificationType entity => await RemoveEntity(entity),
-            SessionType entity => await RemoveEntity(entity),
-            global::Wallets.Domain.Shared.Contracts.WalletType entity => await RemoveEntity(entity),
-            global::Wallets.Domain.Shared.Contracts.CurrencyType entity => await RemoveEntity(entity),
-            ExchangeRate entity => await RemoveEntity(entity),
-            _ => null
-        };
-        ToastService.Show(result?.IsSuccess == true ? $"{TabDisplayName} deleted." : $"Error: {result?.Message}");
-        _deleteDialogOpen = false;
-        _deleteTarget = null;
-        _deleteName = "";
-        await ReloadActiveTab();
+            DataContextResult? result = _deleteTarget switch
+            {
+                IdentityRoleType entity => await RemoveEntity(entity),
+                IdentityRoleTypeGroup entity => await RemoveEntity(entity),
+                IdentityContactType entity => await RemoveEntity(entity),
+                IdentityContactGroup entity => await RemoveEntity(entity),
+                IdentityAddressType entity => await RemoveEntity(entity),
+                IdentityVerificationType entity => await RemoveEntity(entity),
+                SessionType entity => await RemoveEntity(entity),
+                global::Wallets.Domain.Shared.Contracts.WalletType entity => await RemoveEntity(entity),
+                global::Wallets.Domain.Shared.Contracts.CurrencyType entity => await RemoveEntity(entity),
+                ExchangeRate entity => await RemoveEntity(entity),
+                _ => null
+            };
+            if (!IsCurrentDraft(revision, tenantId, tab)) return;
+            ToastService.Show(result?.IsSuccess == true ? $"{displayName} deleted." : $"Error: {result?.Message}");
+            _deleteDialogOpen = false;
+            _deleteTarget = null;
+            _deleteName = "";
+            await ReloadActiveTab();
+        }
+        finally
+        {
+            if (IsCurrentDraft(revision, tenantId, tab)) _saving = false;
+        }
     }
 
     private async Task<DataContextResult> RemoveEntity<T>(T entity) where T : BaseModel
     {
         var tenantId = TenantId;
-        if (!await ResolveAccess(tenantId) || TenantId != tenantId || entity.TenantId != tenantId || tenantId == Guid.Empty)
+        var revision = _draftRevision;
+        var tab = _activeTab;
+        var submitted = MemoryPackSerializer.Deserialize<T>(MemoryPackSerializer.Serialize(entity))!;
+        if (!await ResolveAccess(tenantId) || !IsCurrentDraft(revision, tenantId, tab) || submitted.TenantId != tenantId || tenantId == Guid.Empty)
             return DataContextResult.Failure("Reference data cannot be changed outside the authorized tenant.", 403);
 
         var context = CreateMutationContext(tenantId);
-        context.Remove(entity);
+        context.Remove(submitted);
         return await context.SaveChangesAsync();
     }
 
@@ -1021,6 +1110,9 @@ else
     private async Task SaveRecord()
     {
         if (_saving) return;
+        var revision = _draftRevision;
+        var tenantId = TenantId;
+        var tab = _activeTab;
         _saving = true;
         try
         {
@@ -1028,12 +1120,13 @@ else
         }
         catch (Exception ex)
         {
+            if (!IsCurrentDraft(revision, tenantId, tab)) return;
             Logger.LogWarning(ex, "Could not save reference data category {Category}", _activeTab);
             ToastService.Show("Could not save reference data. Please try again.");
         }
         finally
         {
-            _saving = false;
+            if (IsCurrentDraft(revision, tenantId, tab)) _saving = false;
         }
     }
 
@@ -1252,54 +1345,65 @@ else
     private async Task PersistAndClose<T>(Action<T> applyChanges) where T : BaseModel, new()
     {
         var tenantId = TenantId;
-        if (!await ResolveAccess(tenantId) || TenantId != tenantId || tenantId == Guid.Empty || (_isEditing && _editingRecord?.TenantId != tenantId))
+        var revision = _draftRevision;
+        var tab = _activeTab;
+        var displayName = TabDisplayName;
+        var isEditing = _isEditing;
+        var editingId = _editingId;
+        var editingRecord = _editingRecord as T;
+        if (tenantId == Guid.Empty || (isEditing && editingRecord?.TenantId != tenantId))
         {
             ToastService.Show("Reference data cannot be changed outside the authorized tenant.");
             return;
         }
 
-        var context = CreateMutationContext(tenantId);
-        T entity;
-        if (_isEditing)
-        {
-            // Query in the mutation context so Update sends a field patch, not a full replacement.
-            var current = await context.Query<T>().NoCache().Where(x => x.Id == _editingId && x.TenantId == tenantId && !x.IsDeleted).FirstOrDefaultAsync();
-            if (current is null || current.TenantId != tenantId || current.ConcurrencyStamp != _editingRecord?.ConcurrencyStamp)
+        // Freeze submitted fields before authorization or the edit read can yield to another draft.
+        var entity = isEditing
+            ? MemoryPackSerializer.Deserialize<T>(MemoryPackSerializer.Serialize(editingRecord!))!
+            : new T
             {
-                ToastService.Show("This record changed or was removed. Reload it before editing.");
-                return;
-            }
-            entity = current;
-        }
-        else
-        {
-            entity = new T
-            {
-                Id = Guid.NewGuid(),
-                TenantId = tenantId,
-                CreatedAt = DateTime.UtcNow,
-                IsEnabled = true,
-                ConcurrencyStamp = Guid.NewGuid()
+                Id = Guid.NewGuid(), TenantId = tenantId, CreatedAt = DateTime.UtcNow,
+                IsEnabled = true, ConcurrencyStamp = Guid.NewGuid()
             };
-        }
-
+        var expectedStamp = entity.ConcurrencyStamp;
         applyChanges(entity);
         if (entity is IHasSystemReferenceId systemReference && systemReference.SystemReferenceId == Guid.Empty)
             systemReference.SystemReferenceId = Guid.NewGuid();
 
-        if (_isEditing)
+        var allowed = await ResolveAccess(tenantId);
+        if (!IsCurrentDraft(revision, tenantId, tab)) return;
+        if (!allowed)
+        {
+            ToastService.Show("Reference data cannot be changed outside the authorized tenant.");
+            return;
+        }
+        var context = CreateMutationContext(tenantId);
+        if (isEditing)
+        {
+            // Query in the mutation context so Update sends a field patch, not a full replacement.
+            var current = await context.Query<T>().NoCache().Where(x => x.Id == editingId && x.TenantId == tenantId && !x.IsDeleted).FirstOrDefaultAsync();
+            if (!IsCurrentDraft(revision, tenantId, tab)) return;
+            if (current is null || current.TenantId != tenantId || current.ConcurrencyStamp != expectedStamp)
+            {
+                ToastService.Show("This record changed or was removed. Reload it before editing.");
+                return;
+            }
+        }
+
+        if (isEditing)
             context.Update(entity);
         else
             context.Add(entity);
 
         var result = await context.SaveChangesAsync();
+        if (!IsCurrentDraft(revision, tenantId, tab)) return;
         if (!result.IsSuccess)
         {
             ToastService.Show($"Error: {result.Message}");
             return;
         }
 
-        ToastService.Show(_isEditing ? $"{TabDisplayName} updated." : $"{TabDisplayName} created.");
+        ToastService.Show(isEditing ? $"{displayName} updated." : $"{displayName} created.");
         _dialogOpen = false;
         await ReloadActiveTab();
     }

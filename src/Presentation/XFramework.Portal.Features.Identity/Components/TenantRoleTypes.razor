@@ -52,7 +52,7 @@ else
                 <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                 <BbDataGridTemplateColumn Title="Actions">
                     <ChildContent Context="role">
-                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" title="Configure role capabilities" OnClick="@(() => ConfigureRole(role.Id))">
+                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" title="Configure role capabilities" Disabled="@(!role.IsEnabled)" OnClick="@(() => ConfigureRole(role.Id))">
                             <LucideIcon Name="shield-check" class="h-4 w-4" />
                         </BbButton>
                     </ChildContent>
@@ -78,7 +78,6 @@ else
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => OpenGroupDialog(true))" Disabled="@_saving">
                 <LucideIcon Name="folder-plus" class="mr-2 h-4 w-4" /> Add Role Group
             </BbButton>
-            <BbFormFieldSwitch @bind-Checked="_roleEnabled" Label="Enabled" Disabled="@_saving" />
             @if (_roleError is not null)
             {
                 <BbAlert Variant="AlertVariant.Danger" role="alert"><BbAlertDescription>@_roleError</BbAlertDescription></BbAlert>

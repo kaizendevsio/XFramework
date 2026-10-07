@@ -56,6 +56,22 @@ public sealed class PosPaymentStageTests
     }
 
     [Test]
+    public async Task InvalidAdjustments_CanReopenPaymentToCorrectButCannotSubmit()
+    {
+        Set("_discountAmount", 20m);
+        Get<bool>("CanCheckout").Should().BeFalse();
+        Get<bool>("CanBeginPayment").Should().BeTrue();
+        await (Task)typeof(Cashier).GetMethod("BeginPayment", Private)!.Invoke(_page, null)!;
+        Field<bool>("_paymentOpen").Should().BeTrue();
+        typeof(Cashier).GetMethod("PaymentOpenChanged", Private)!.Invoke(_page, [false]);
+        await (Task)typeof(Cashier).GetMethod("BeginPayment", Private)!.Invoke(_page, null)!;
+        Field<bool>("_paymentOpen").Should().BeTrue();
+        Set("_discountAmount", 0m);
+        Set("_cashTenderedAmount", 10m);
+        Get<bool>("CanCheckout").Should().BeTrue();
+    }
+
+    [Test]
     public void BackToCart_PreservesTenderAndCart()
     {
         Set("_paymentOpen", true);

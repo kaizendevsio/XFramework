@@ -42,7 +42,6 @@ public partial class TenantRoleTypes
     private bool _returnToRole;
     private string _roleName = "";
     private short _roleLevel;
-    private bool _roleEnabled = true;
     private string _groupId = "";
     private string _groupName = "";
     private string _groupDescription = "";
@@ -155,7 +154,6 @@ public partial class TenantRoleTypes
         CaptureDraft();
         _roleName = _groupId = "";
         _roleLevel = 0;
-        _roleEnabled = true;
         _roleError = null;
         _roleOpen = true;
     }
@@ -215,7 +213,7 @@ public partial class TenantRoleTypes
         var role = new IdentityRoleType
         {
             Id = Guid.NewGuid(), TenantId = _draftTenantId, Name = name,
-            GroupId = groupId, RoleLevel = _roleLevel, IsEnabled = _roleEnabled,
+            GroupId = groupId, RoleLevel = _roleLevel, IsEnabled = true,
             SystemReferenceId = Guid.NewGuid()
         };
         _saving = true;
