@@ -1053,6 +1053,7 @@ else
     private List<IdentityCredential> _credentials = [];
     private List<IdentityRole> _roles = [];
     private bool _rolesLoadFailed;
+    private bool _credentialsLoadFailed;
     private List<IdentityContact> _contacts = [];
     private List<IdentityAddress> _addresses = [];
     private List<Session> _sessions = [];
@@ -1314,6 +1315,7 @@ else
 
     private async Task LoadCredentials()
     {
+        _credentialsLoadFailed = false;
         try
         {
             _credentials = (await DataContext.Query<IdentityCredential>()
@@ -1325,7 +1327,12 @@ else
                     .ToListAsync())
                 .ToList();
         }
-        catch { _credentials = []; }
+        catch (Exception ex)
+        {
+            _credentials = [];
+            _credentialsLoadFailed = true;
+            Logger.LogWarning(ex, "Could not load credentials for identity {IdentityId}", Id);
+        }
     }
 
     private async Task LoadRoles()
@@ -1333,6 +1340,9 @@ else
         _rolesLoadFailed = false;
         try
         {
+            if (_credentialsLoadFailed)
+                throw new InvalidOperationException("Assigned roles cannot be loaded because the credential read failed.");
+
             var tenantId = _user?.TenantId ?? Guid.Empty;
             var credentialIds = _credentials
                 .Where(credential => credential.TenantId == tenantId)

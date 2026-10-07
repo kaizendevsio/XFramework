@@ -1,0 +1,116 @@
+@implements IDisposable
+
+@if (!_accessChecked)
+{
+    <CenteredSpinner />
+}
+else if (!_canManage)
+{
+    <BbAlert Variant="AlertVariant.Danger">
+        <BbAlertTitle>Tenant Management Restricted</BbAlertTitle>
+        <BbAlertDescription>Tenant administrator access is required to manage role types.</BbAlertDescription>
+    </BbAlert>
+}
+else
+{
+    <div class="space-y-4">
+        <div class="xf-page-header">
+            <BbTypographyH4>Role Types</BbTypographyH4>
+            <div class="xf-page-actions">
+                <BbButton Variant="ButtonVariant.Outline" OnClick="ReloadRolesAsync" Disabled="@(_loading || _saving)">
+                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" /> Reload
+                </BbButton>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => OpenGroupDialog(false))" Disabled="@(_loading || _saving || _loadFailed)">
+                    <LucideIcon Name="folder-plus" class="mr-2 h-4 w-4" /> Add Role Group
+                </BbButton>
+                <BbButton OnClick="OpenRoleDialog" Disabled="@(_loading || _saving || _loadFailed)">
+                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" /> Add Role Type
+                </BbButton>
+            </div>
+        </div>
+        @if (_loadFailed)
+        {
+            <BbAlert Variant="AlertVariant.Danger">
+                <BbAlertTitle>Role Types Not Loaded</BbAlertTitle>
+                <BbAlertDescription>Role types and groups could not be loaded. Reload before creating records.</BbAlertDescription>
+            </BbAlert>
+        }
+        <BbDataGrid Items="@_roles" IsLoading="@_loading" ShowPagination="true" InitialPageSize="10">
+            <Columns>
+                <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
+                <BbDataGridTemplateColumn Title="Role Level" Sortable="true" SortBy="@(x => x.RoleLevel)" Filterable="true" FilterBy="@(x => x.RoleLevel)">
+                    <ChildContent Context="role">@(role.RoleLevel?.ToString() ?? "N/A")</ChildContent>
+                </BbDataGridTemplateColumn>
+                <BbDataGridTemplateColumn Title="Group" SortBy="@(x => GroupLabel(x))" Filterable="true" FilterBy="@(x => GroupLabel(x))">
+                    <ChildContent Context="role">@GroupLabel(role)</ChildContent>
+                </BbDataGridTemplateColumn>
+                <BbDataGridTemplateColumn Title="Enabled" SortBy="@(x => x.IsEnabled ? "Yes" : "No")" Filterable="true" FilterBy="@(x => x.IsEnabled ? "Yes" : "No")">
+                    <ChildContent Context="role">
+                        <StatusBadge Text="@(role.IsEnabled ? "Enabled" : "Disabled")" Status="@(role.IsEnabled ? "active" : "inactive")" />
+                    </ChildContent>
+                </BbDataGridTemplateColumn>
+                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
+                <BbDataGridTemplateColumn Title="Actions">
+                    <ChildContent Context="role">
+                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" title="Configure role capabilities" Disabled="@(!role.IsEnabled)" OnClick="@(() => ConfigureRole(role.Id))">
+                            <LucideIcon Name="shield-check" class="h-4 w-4" />
+                        </BbButton>
+                    </ChildContent>
+                </BbDataGridTemplateColumn>
+            </Columns>
+            <EmptyTemplate>
+                <BbEmpty Title="No role types" Description="No role types are configured for this tenant." />
+            </EmptyTemplate>
+        </BbDataGrid>
+    </div>
+}
+
+<BbDialog Open="@_roleOpen" OpenChanged="SetRoleOpen">
+    <BbDialogContent TrapFocus="false" ShowClose="@(!_saving)" CloseOnEscape="@(!_saving)" CloseOnOverlayClick="@(!_saving)">
+        <BbDialogHeader>
+            <BbDialogTitle>Add Role Type</BbDialogTitle>
+            <BbDialogDescription>@TenantName</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="xf-short-form py-4">
+            <BbFormFieldInput TValue="string" @bind-Value="_roleName" Label="Name" Required="true" Disabled="@_saving" />
+            <BbFormFieldNumericInput TValue="short" @bind-Value="_roleLevel" Label="Role Level" Min="short.MinValue" Max="short.MaxValue" DecimalPlaces="0" AllowNegative="true" Disabled="@_saving" />
+            <BbFormFieldCombobox TValue="string" @bind-Value="_groupId" Label="Role Group" Options="@GroupOptions" Required="true" Disabled="@_saving" />
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => OpenGroupDialog(true))" Disabled="@_saving">
+                <LucideIcon Name="folder-plus" class="mr-2 h-4 w-4" /> Add Role Group
+            </BbButton>
+            @if (_roleError is not null)
+            {
+                <BbAlert Variant="AlertVariant.Danger" role="alert"><BbAlertDescription>@_roleError</BbAlertDescription></BbAlert>
+            }
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => SetRoleOpen(false))" Disabled="@_saving">Cancel</BbButton>
+            <BbButton OnClick="SaveRoleAsync" Disabled="@_saving">
+                <LucideIcon Name="shield-check" class="mr-2 h-4 w-4" /> @(_saving ? "Saving..." : "Create and Configure")
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog Open="@_groupOpen" OpenChanged="SetGroupOpen">
+    <BbDialogContent ShowClose="@(!_saving)" CloseOnEscape="@(!_saving)" CloseOnOverlayClick="@(!_saving)">
+        <BbDialogHeader>
+            <BbDialogTitle>Add Role Group</BbDialogTitle>
+            <BbDialogDescription>@TenantName</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="xf-short-form py-4">
+            <BbFormFieldInput TValue="string" @bind-Value="_groupName" Label="Name" Required="true" Disabled="@_saving" />
+            <BbFormFieldTextarea @bind-Value="_groupDescription" Label="Description" Disabled="@_saving" />
+            @if (_groupError is not null)
+            {
+                <BbAlert Variant="AlertVariant.Danger" role="alert"><BbAlertDescription>@_groupError</BbAlertDescription></BbAlert>
+            }
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => SetGroupOpen(false))" Disabled="@_saving">Cancel</BbButton>
+            <BbButton OnClick="SaveGroupAsync" Disabled="@_saving">
+                <LucideIcon Name="save" class="mr-2 h-4 w-4" /> @(_saving ? "Saving..." : "Create Role Group")
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>

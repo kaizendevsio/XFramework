@@ -152,6 +152,16 @@
 .pos-undo-removal span { overflow-wrap: anywhere; min-width: 0; }
 
 .pos-checkout-panel { display: flex; flex-direction: column; gap: .625rem; flex: 0 1 auto; min-height: 0; overflow-y: auto; padding-block: .75rem; border-top: 1px solid var(--border); }
+.pos-payment-dialog {
+    width: min(32rem, calc(100vw - 2rem));
+    max-width: min(32rem, calc(100vw - 2rem));
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+}
+.pos-payment-dialog .pos-checkout-panel {
+    border-top: 0;
+    overflow-y: visible;
+}
 .pos-payment-options { display: grid !important; grid-template-columns: 1fr 1fr; gap: .5rem !important; }
 .pos-payment-option { display: flex; gap: .5rem; align-items: center; min-height: 2.75rem; min-width: 0; padding: .5rem .75rem; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: .875rem; }
 .pos-payment-option:has([aria-checked="true"]) { background: var(--accent); border-color: var(--primary); }
@@ -693,6 +703,24 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+}
+
+/* Blueprint 3.16 has no search-width parameter or toolbar slot attribute. */
+.w-full:has(> .overflow-auto) > .flex > input.max-w-sm:not(.xf-entity-picker-advanced-dialog *),
+.xf-table-search {
+    width: 100%;
+    max-width: 24rem;
+    min-width: 0;
+}
+
+.xf-short-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+}
+
+.xf-short-form > * {
+    min-width: 0;
 }
 
 .xf-datetime-input {

@@ -17,12 +17,20 @@ against a disposable tenant with the two opt-in guards shown below.
 ## Default-Tenant Register And Transaction Regression
 
 `PortalModuleDependenciesE2ETests` creates an isolated QA tenant through the Portal and
-verifies dependency preview, repair confirmation/cancellation, persistence, prerequisite
+verifies the missing-dependency banner and affected-feature list, bulk repair
+confirmation/cancellation, persistence, prerequisite
 disable protection, and ordinary checkbox enablement. Set `PORTAL_E2E_BASE_URL` plus either
 `PORTAL_E2E_STORAGE_STATE` (an authorized Playwright state file outside source control) or
 `PORTAL_E2E_USERNAME` / `PORTAL_E2E_PASSWORD`. Explicitly opt in with
 `PORTAL_E2E_ALLOW_TENANT_CREATION=1`. The synthetic tenant is retained for rechecks, with no
 business records or funds. Never run against a production tenant or commit the state file.
+
+The same isolated-tenant case creates a role group inline from Add Role Type, preserves the
+role draft, creates the role type, opens its capability editor, and verifies the tenant-bound
+Reference Data settings route. It does not assign roles to users. `ReferenceDataTenantAccessTests`
+covers direct-route denial, revoked permissions, cross-tenant denial, and the guarded legacy
+`/admin/reference-data` redirect. `TenantRoleTypesCreationTests` covers tenant-bound creation
+and rejection of stale drafts.
 
 ```powershell
 dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj --filter "FullyQualifiedName~PortalModuleDependenciesE2ETests"
@@ -74,7 +82,9 @@ dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj --filter "FullyQual
 
 Each test gets a fresh browser context and unsaved draft. Normal cases only search, add/remove
 draft items, edit quantities/payment fields, and open/close dialogs. They never click Hold sale,
-Resume, Cancel, or submit Pay. Login can create normal authentication/session/audit records.
+Resume, Cancel, or submit Confirm payment. Pay only opens the payment dialog; the suite
+checks hidden tender controls before Pay, payment validation, and closing/reopening without
+losing the draft. Login can create normal authentication/session/audit records.
 Tests require real products and endpoints; no catalog or Blazor traffic is mocked.
 
 ## Configuration

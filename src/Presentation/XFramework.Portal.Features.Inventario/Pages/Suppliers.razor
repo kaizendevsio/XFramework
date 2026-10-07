@@ -44,7 +44,8 @@ else
                     <BbCardDescription>@_suppliers.Count supplier(s) loaded</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <BbFormFieldInput TValue="string" @bind-Value="_search" Label="Search suppliers" /><BbDataGrid Items="@_suppliers.Where(x => ($"{x.Name} {x.Code} {x.ContactName}" ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase)).ToList()" OnRowClick="@((Supplier item) => Navigation.NavigateTo($"/inventario/suppliers/{item.Id}"))" ShowPagination="true" InitialPageSize="20">
+                    <BbDataGrid Items="@_suppliers" ShowSearch="true" SearchPlaceholder="Search suppliers..."
+                                OnRowClick="@((Supplier item) => Navigation.NavigateTo($"/inventario/suppliers/{item.Id}"))" ShowPagination="true" InitialPageSize="20">
                         <Columns>
                             <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
@@ -91,7 +92,6 @@ else
 </BbDialog>
 
 @code {
-    private string _search = "";
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;

@@ -5,6 +5,14 @@ namespace XFramework.Portal.Features.Identity.Services;
 
 public static class TenantModuleFeatureEnablementPlanner
 {
+    public static IReadOnlyList<TenantModuleFeatureDependencyIssue> FindIssues(
+        IReadOnlyList<ResolvedTenantModuleFeatureDefinition> definitions, ISet<string> enabledKeys) =>
+        definitions.Where(feature => enabledKeys.Contains(feature.Definition.Key))
+            .Select(feature => new TenantModuleFeatureDependencyIssue(feature.Definition,
+                Create(definitions, enabledKeys, [feature.Definition.Key], [])))
+            .Where(issue => issue.Plan.EnableKeys.Count > 0 || issue.Plan.Errors.Count > 0)
+            .ToList();
+
     public static IEnumerable<string> RequiredKeys(ResolvedTenantModuleFeatureDefinition feature)
     {
         if (!string.IsNullOrEmpty(feature.Definition.SubFeatureKey)) yield return feature.Definition.ModuleKey;

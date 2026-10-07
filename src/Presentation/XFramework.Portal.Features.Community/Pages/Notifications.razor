@@ -71,7 +71,7 @@ else
                             <BbCardDescription>@FilteredItems.Count notification(s)</BbCardDescription>
                         </div>
                         <div class="grid w-full gap-2 md:w-auto md:grid-cols-[18rem_12rem_12rem]">
-                            <BbFormFieldInput TValue="string" @bind-Value="_search" Label="Search" Placeholder="Message or identity" />
+                            <BbFormFieldInput TValue="string" @bind-Value="_search" Label="Search" Placeholder="Message or identity" Class="xf-table-search" />
                             <BbFormFieldSelect TValue="string" @bind-Value="_readFilter" Label="Read State">
                                 <BbSelectItem Value="@("all")">All</BbSelectItem>
                                 <BbSelectItem Value="@("unread")">Unread</BbSelectItem>

@@ -54,18 +54,25 @@ public sealed class PortalModuleDependenciesE2ETests : PageTest
         var warehouse = Feature("Warehousing");
         await Expect(registers.GetByRole(AriaRole.Checkbox)).ToBeCheckedAsync(new() { Timeout = 30_000 });
         await Expect(warehouse.GetByRole(AriaRole.Checkbox)).Not.ToBeCheckedAsync();
+        var warning = Page.GetByTestId("module-dependency-warning");
+        await Expect(warning).ToBeVisibleAsync();
+        await warning.GetByRole(AriaRole.Button, new() { Name = "Show affected features", Exact = true }).ClickAsync();
+        await Expect(Page.GetByTestId("module-dependency-issues")).ToContainTextAsync("POS Registers");
+        await Expect(Page.GetByTestId("module-dependency-issues")).ToContainTextAsync("Warehousing (disabled)");
         await registers.ClickAsync();
         await Expect(Page.GetByTestId("module-feature-dependencies")).ToContainTextAsync("Warehousing - Required - Disabled");
 
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Enable required features", Exact = true }).ClickAsync();
+        await Page.GetByTestId("module-dependency-fix-all").ClickAsync();
         var confirmation = Page.GetByRole(AriaRole.Alertdialog, new() { Name = "Enable required features?", Exact = true });
         await Expect(confirmation).ToContainTextAsync("Warehousing");
         await confirmation.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
         await Expect(warehouse.GetByRole(AriaRole.Checkbox)).Not.ToBeCheckedAsync();
+        await Expect(warning).ToBeVisibleAsync();
 
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Enable required features", Exact = true }).ClickAsync();
+        await Page.GetByTestId("module-dependency-fix-all").ClickAsync();
         await confirmation.GetByRole(AriaRole.Button, new() { Name = "Enable features", Exact = true }).ClickAsync();
         await Expect(warehouse.GetByRole(AriaRole.Checkbox)).ToBeCheckedAsync();
+        await Expect(warning).ToBeHiddenAsync();
         await Page.ReloadAsync();
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Expect(warehouse.GetByRole(AriaRole.Checkbox)).ToBeCheckedAsync(new() { Timeout = 30_000 });
@@ -108,6 +115,35 @@ public sealed class PortalModuleDependenciesE2ETests : PageTest
         await Page.ScreenshotAsync(new() { Path = screenshot, FullPage = true });
         TestContext.AddTestAttachment(screenshot);
         TestContext.Out.WriteLine($"Isolated QA tenant retained for rechecks: {name}");
+        await VerifyTenantRoleCreationAsync();
+    }
+
+    private async Task VerifyTenantRoleCreationAsync()
+    {
+        var tenantUrl = Page.Url[..Page.Url.LastIndexOf("/modules", StringComparison.Ordinal)];
+        await Page.GotoAsync(tenantUrl + "/role-types");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Add Role Type", Exact = true }).ClickAsync();
+        var roleDialog = Page.GetByRole(AriaRole.Dialog, new() { Name = "Add Role Type", Exact = true });
+        await roleDialog.GetByLabel("Name", new() { Exact = true }).FillAsync("QA Cashier Role");
+        await roleDialog.GetByRole(AriaRole.Button, new() { Name = "Add Role Group", Exact = true }).ClickAsync();
+        var groupDialog = Page.GetByRole(AriaRole.Dialog, new() { Name = "Add Role Group", Exact = true });
+        await groupDialog.GetByLabel("Name", new() { Exact = true }).FillAsync("QA Cashiers");
+        await groupDialog.GetByLabel("Description", new() { Exact = true }).FillAsync("Isolated UI regression; no user assignments.");
+        await groupDialog.GetByRole(AriaRole.Button, new() { Name = "Create Role Group", Exact = true }).ClickAsync();
+        await Expect(roleDialog).ToBeVisibleAsync();
+        await Expect(roleDialog.GetByLabel("Name", new() { Exact = true })).ToHaveValueAsync("QA Cashier Role");
+        await Expect(roleDialog.GetByRole(AriaRole.Combobox)).ToContainTextAsync("QA Cashiers");
+        await roleDialog.GetByRole(AriaRole.Button, new() { Name = "Create and Configure", Exact = true }).ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new Regex($"^{Regex.Escape(tenantUrl)}/role-types/[a-f0-9-]+$"));
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "QA Cashier Role", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Tree)).ToBeVisibleAsync();
+        await Page.GotoAsync(tenantUrl + "/role-types");
+        var row = Page.GetByRole(AriaRole.Row).Filter(new() { Has = Page.GetByRole(AriaRole.Gridcell, new() { Name = "QA Cashier Role", Exact = true }) });
+        await Expect(row).ToContainTextAsync("QA Cashiers");
+        await Page.GotoAsync(tenantUrl + "/reference-data");
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Reference Data", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Reference Data", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.Locator("#blazor-error-ui")).ToBeHiddenAsync();
     }
 
     private ILocator Feature(string name) => Page.GetByRole(AriaRole.Treeitem, new() { NameRegex = new Regex($"^{Regex.Escape(name)} ") });
@@ -121,7 +157,8 @@ public sealed class PortalModuleDependenciesE2ETests : PageTest
         var screenshot = Path.Combine(directory, "failure.png");
         await Page.ScreenshotAsync(new() { Path = screenshot, FullPage = true });
         TestContext.AddTestAttachment(screenshot);
-        TestContext.Out.WriteLine(await Page.GetByRole(AriaRole.Tree).InnerTextAsync());
+        if (await Page.GetByRole(AriaRole.Tree).CountAsync() > 0)
+            TestContext.Out.WriteLine(await Page.GetByRole(AriaRole.Tree).First.InnerTextAsync());
     }
 
     // Blueprint's checkbox is presentation-only; its surrounding span handles pointer clicks.

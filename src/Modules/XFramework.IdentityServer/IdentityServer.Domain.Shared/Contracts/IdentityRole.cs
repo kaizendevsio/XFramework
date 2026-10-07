@@ -9,6 +9,7 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/identity-roles",
     RequireAuthorization = true,
+    TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     AuthorizationFeature = "identity.roles"
 )]
 public partial class IdentityRole : BaseModel

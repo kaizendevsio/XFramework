@@ -1,5 +1,7 @@
 @* Tenant detail section navigation *@
 @inject NavigationManager Navigation
+@using XFramework.Portal.Features.Administration
+@inject IdentityServer.Integration.Drivers.IIdentityServerServiceWrapper IdentityServer
 
 <SidebarNavItem Href="/identity/tenants"
                 Label="Tenant List"
@@ -13,10 +15,32 @@
     <SidebarAnchorItem Href="@SectionHref("users")" Label="Users" Icon="users" Active="@(CurrentSection == "users")" />
     <SidebarAnchorItem Href="@SectionHref("configurations")" Label="Configurations" Icon="settings" Active="@(CurrentSection == "configurations")" />
     <SidebarAnchorItem Href="@SectionHref("role-types")" Label="Role Types" Icon="shield" Active="@(CurrentSection == "role-types")" />
+    @if (_canManageReferenceData)
+    {
+        <SidebarAnchorItem Href="@SectionHref("reference-data")" Label="Reference Data" Icon="database" Active="@(CurrentSection == "reference-data")" />
+    }
 </SidebarSection>
 
 @code {
     [Parameter] public Guid TenantId { get; set; }
+    [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthenticationStateTask { get; set; }
+    private bool _canManageReferenceData;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var tenantId = TenantId;
+        _canManageReferenceData = false;
+        try
+        {
+            var user = AuthenticationStateTask is null ? null : (await AuthenticationStateTask).User;
+            var allowed = await TenantReferenceDataAccess.CanManageAsync(user, tenantId, IdentityServer);
+            _canManageReferenceData = TenantId == tenantId && allowed;
+        }
+        catch
+        {
+            // Permission lookup failures must not expose tenant settings navigation.
+        }
+    }
 
     private string CurrentPath => new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/');
     private string BaseHref => $"/identity/tenants/{TenantId}";

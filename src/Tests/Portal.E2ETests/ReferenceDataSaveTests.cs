@@ -1,10 +1,12 @@
 using System.Reflection;
+using System.Security.Claims;
 using System.Runtime.CompilerServices;
 using BlazorBlueprint.Components;
 using FluentAssertions;
 using IdentityServer.Domain.Shared.Contracts;
 using MemoryPack;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging.Abstractions;
 using Wallets.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.BusinessObjects;
@@ -12,6 +14,7 @@ using XFramework.Domain.Shared.DataContext;
 using XFramework.Integration.DataContext;
 using XFramework.Integration.Extensions;
 using XFramework.Portal.Features.Administration.Pages.Admin;
+using XFramework.Portal.Shared;
 
 namespace Portal.E2ETests;
 
@@ -49,7 +52,9 @@ public sealed class ReferenceDataSaveTests
         _services = services.BuildServiceProvider();
         _page = new ReferenceData();
         SetProperty("Services", _services);
-        SetProperty("RequestMetadata", _services.GetRequiredService<RequestMetadata>());
+        _page.TenantId = _tenantId;
+        SetProperty("AuthenticationStateTask", Task.FromResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(PortalAuthClaims.IsSuperUser, "true")], "test")))));
         SetProperty("DataContext", _services.GetRequiredService<IDataContext>());
         SetProperty("ToastService", ActivatorUtilities.CreateInstance<ToastService>(_services));
         SetProperty("Logger", NullLogger<ReferenceData>.Instance);
@@ -149,7 +154,7 @@ public sealed class ReferenceDataSaveTests
     [Test]
     public async Task Create_WithoutTenantDoesNotChooseAnArbitraryTenant()
     {
-        SetProperty("RequestMetadata", new RequestMetadata());
+        _page.TenantId = Guid.Empty;
         await Invoke("SaveRecord");
         _wrapper.Batches.Should().BeEmpty();
     }
@@ -167,6 +172,266 @@ public sealed class ReferenceDataSaveTests
         result.IsSuccess.Should().BeFalse();
         _wrapper.Batches.Should().BeEmpty();
     }
+
+    [Test]
+    public async Task RouteTenant_IgnoresMutableSharedRequestMetadata()
+    {
+        _services.GetRequiredService<RequestMetadata>().RequestedTenantId = Guid.NewGuid();
+        await Invoke("SaveRecord");
+        _wrapper.Batches.Should().ContainSingle().Which.Metadata!.RequestedTenantId.Should().Be(_tenantId);
+        _wrapper.Queries.Should().OnlyContain(query => query.Metadata!.RequestedTenantId == _tenantId);
+    }
+
+    [Test]
+    public async Task CrossTenantRecord_CannotBeEditedOrDeletedEvenBySuperUser()
+    {
+        var wallet = ExistingWallet();
+        wallet.TenantId = Guid.NewGuid();
+        OpenWalletEditor(wallet);
+        await Invoke("SaveRecord");
+        var remove = typeof(ReferenceData).GetMethod("RemoveEntity", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .MakeGenericMethod(typeof(WalletType));
+        var result = await (Task<DataContextResult>)remove.Invoke(_page, new object[] { wallet })!;
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(403);
+        _wrapper.Batches.Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task Create_PendingAuthorization_FreezesSubmittedFields()
+    {
+        var authorization = new TaskCompletionSource<AuthenticationState>(TaskCreationOptions.RunContinuationsAsynchronously);
+        SetProperty("AuthenticationStateTask", authorization.Task);
+        var pending = Invoke("SaveRecord");
+        try
+        {
+            SetField("_formName", "Not submitted");
+        }
+        finally
+        {
+            authorization.SetResult(SuperUserState());
+            await pending;
+        }
+
+        var entity = MemoryPackSerializer.Deserialize<IdentityRoleTypeGroup>(_wrapper.Batches.Single().Changes.Single().SerializedEntity)!;
+        entity.Name.Should().Be("User");
+    }
+
+    [TestCase("cancel")]
+    [TestCase("cancel-reopen")]
+    [TestCase("replace")]
+    [TestCase("route")]
+    [TestCase("tab")]
+    public async Task Edit_PendingRead_InvalidatedDraftDoesNotWrite(string change)
+    {
+        var wallet = ExistingWallet();
+        _wrapper.Wallet = wallet;
+        OpenWalletEditor(wallet);
+        SetField("_formName", "Submitted");
+        var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _wrapper.NextQueryGate = gate.Task;
+        var pending = Invoke("SaveRecord");
+        try
+        {
+            await _wrapper.QueryStarted.Task;
+            switch (change)
+            {
+                case "cancel":
+                    Call("OnDialogOpenChanged", false);
+                    break;
+                case "cancel-reopen":
+                    Call("OnDialogOpenChanged", false);
+                    OpenWalletEditor(ExistingWallet());
+                    SetField("_formName", "Replacement");
+                    break;
+                case "replace":
+                    OpenWalletEditor(ExistingWallet());
+                    SetField("_formName", "Replacement");
+                    break;
+                case "route":
+                    _page.TenantId = Guid.NewGuid();
+                    await Invoke("OnParametersSetAsync");
+                    OpenWalletEditor(ExistingWallet());
+                    break;
+                case "tab":
+                    Field<HashSet<string>>("_loadedTabs").Add("role-type-groups");
+                    await (Task)Call("OnReferenceCategoryChanged", "role-type-groups")!;
+                    Call("OpenAddDialog");
+                    break;
+            }
+        }
+        finally
+        {
+            gate.SetResult(true);
+            await pending;
+        }
+
+        _wrapper.Batches.Should().BeEmpty();
+        if (change != "cancel") Field<bool>("_dialogOpen").Should().BeTrue();
+        if (change is "replace" or "cancel-reopen") Field<string>("_formName").Should().Be("Replacement");
+    }
+
+    [Test]
+    public async Task Edit_PendingRead_FreezesSubmittedFieldsWithoutDraftReplacement()
+    {
+        var wallet = ExistingWallet();
+        _wrapper.Wallet = wallet;
+        OpenWalletEditor(wallet);
+        SetField("_formName", "Submitted");
+        var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _wrapper.NextQueryGate = gate.Task;
+        var pending = Invoke("SaveRecord");
+        try
+        {
+            await _wrapper.QueryStarted.Task;
+            SetField("_formName", "Not submitted");
+        }
+        finally
+        {
+            gate.SetResult(true);
+            await pending;
+        }
+
+        var patch = MemoryPackSerializer.Deserialize<FieldPatch>(_wrapper.Batches.Single().Changes.Single().SerializedEntity)!;
+        MemoryPackSerializer.Deserialize<string>(patch.Changes[nameof(WalletType.Name)]).Should().Be("Submitted");
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task Save_PendingWrite_DoesNotCloseReplacementDialogOrReloadTenant(bool changeTenant)
+    {
+        Call("OpenAddDialog");
+        SetField("_formName", "Submitted");
+        var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _wrapper.NextWriteGate = gate.Task;
+        var pending = Invoke("SaveRecord");
+        try
+        {
+            await _wrapper.WriteStarted.Task;
+            if (changeTenant) _page.TenantId = Guid.NewGuid();
+            Call("OpenAddDialog");
+            SetField("_formName", "Replacement");
+            SetField("_saving", true);
+        }
+        finally
+        {
+            gate.SetResult(true);
+            await pending;
+        }
+
+        _wrapper.Batches.Should().ContainSingle().Which.Metadata!.RequestedTenantId.Should().Be(_tenantId);
+        _wrapper.Queries.Should().BeEmpty("a stale completion must not reload the replacement route or tab");
+        Field<bool>("_dialogOpen").Should().BeTrue();
+        Field<string>("_formName").Should().Be("Replacement");
+        Field<bool>("_saving").Should().BeTrue("the replacement draft owns its own saving state");
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task Delete_PendingWrite_DoesNotCloseReplacementConfirmationOrReloadTenant(bool changeTenant)
+    {
+        Call("OpenDeleteDialog", ExistingWallet(), "Original");
+        var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _wrapper.NextWriteGate = gate.Task;
+        var pending = Invoke("ConfirmDelete");
+        var replacement = ExistingWallet();
+        try
+        {
+            await _wrapper.WriteStarted.Task;
+            if (changeTenant) _page.TenantId = replacement.TenantId = Guid.NewGuid();
+            Call("OpenDeleteDialog", replacement, "Replacement");
+        }
+        finally
+        {
+            gate.SetResult(true);
+            await pending;
+        }
+
+        _wrapper.Batches.Should().ContainSingle().Which.Metadata!.RequestedTenantId.Should().Be(_tenantId);
+        _wrapper.Queries.Should().BeEmpty();
+        Field<bool>("_deleteDialogOpen").Should().BeTrue();
+        Field<object>("_deleteTarget").Should().BeSameAs(replacement);
+        Field<string>("_deleteName").Should().Be("Replacement");
+    }
+
+    [Test]
+    public async Task Delete_PendingAuthorization_CancelledDraftDoesNotWrite()
+    {
+        Call("OpenDeleteDialog", ExistingWallet(), "Original");
+        var authorization = new TaskCompletionSource<AuthenticationState>(TaskCreationOptions.RunContinuationsAsynchronously);
+        SetProperty("AuthenticationStateTask", authorization.Task);
+        var pending = Invoke("ConfirmDelete");
+        try
+        {
+            Call("OnDeleteDialogOpenChanged", false);
+            Call("OpenDeleteDialog", ExistingWallet(), "Replacement");
+        }
+        finally
+        {
+            authorization.SetResult(SuperUserState());
+            await pending;
+        }
+
+        _wrapper.Batches.Should().BeEmpty();
+        Field<bool>("_deleteDialogOpen").Should().BeTrue();
+        Field<string>("_deleteName").Should().Be("Replacement");
+    }
+
+    [Test]
+    public async Task Create_PendingAuthorization_RouteChangeDoesNotWriteOrRevokeReplacementAccess()
+    {
+        Call("OpenAddDialog");
+        SetField("_formName", "Submitted");
+        var authorization = new TaskCompletionSource<AuthenticationState>(TaskCreationOptions.RunContinuationsAsynchronously);
+        SetProperty("AuthenticationStateTask", authorization.Task);
+        var pending = Invoke("SaveRecord");
+        try
+        {
+            _page.TenantId = Guid.NewGuid();
+            SetProperty("AuthenticationStateTask", Task.FromResult(SuperUserState()));
+            await Invoke("OnParametersSetAsync");
+            Call("OpenAddDialog");
+            SetField("_formName", "Replacement");
+        }
+        finally
+        {
+            authorization.SetResult(SuperUserState());
+            await pending;
+        }
+
+        _wrapper.Batches.Should().BeEmpty();
+        Field<bool>("_canManageReferenceData").Should().BeTrue();
+        Field<bool>("_dialogOpen").Should().BeTrue();
+        Field<string>("_formName").Should().Be("Replacement");
+        _wrapper.Queries.Should().ContainSingle().Which.Metadata!.RequestedTenantId.Should().Be(_page.TenantId);
+    }
+
+    [Test]
+    public async Task Reload_PendingRead_RouteChangeDoesNotOverwriteReplacementList()
+    {
+        SetField("_canManageReferenceData", true);
+        var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _wrapper.NextQueryGate = gate.Task;
+        var pending = Invoke("ReloadActiveTab");
+        var replacement = new IdentityRoleTypeGroup { Id = Guid.NewGuid(), TenantId = Guid.NewGuid(), Name = "Replacement" };
+        try
+        {
+            await _wrapper.QueryStarted.Task;
+            _page.TenantId = replacement.TenantId;
+            await Invoke("OnParametersSetAsync");
+            Field<List<IdentityRoleTypeGroup>>("_roleTypeGroups").Add(replacement);
+        }
+        finally
+        {
+            gate.SetResult(true);
+            await pending;
+        }
+
+        Field<List<IdentityRoleTypeGroup>>("_roleTypeGroups").Should().ContainSingle().Which.Should().BeSameAs(replacement);
+    }
+
+    private static AuthenticationState SuperUserState() => new(new ClaimsPrincipal(new ClaimsIdentity(
+        [new Claim(PortalAuthClaims.IsSuperUser, "true")], "test")));
 
     private WalletType ExistingWallet() => new()
     {
@@ -191,28 +456,49 @@ public sealed class ReferenceDataSaveTests
     private Task Invoke(string name) =>
         (Task)typeof(ReferenceData).GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(_page, null)!;
 
+    private object? Call(string name, params object[] args) =>
+        typeof(ReferenceData).GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(_page, args);
+
+    private T Field<T>(string name) =>
+        (T)typeof(ReferenceData).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(_page)!;
+
     private sealed class RecordingWrapper : IDataContextServiceWrapper
     {
         public List<SaveChangesRequest> Batches { get; } = [];
+        public List<QueryDescriptor> Queries { get; } = [];
         public DataContextResult? NextResult { get; set; }
         public WalletType? Wallet { get; set; }
+        public Task? NextWriteGate { get; set; }
+        public Task? NextQueryGate { get; set; }
+        public TaskCompletionSource<bool> WriteStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<bool> QueryStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public Task<byte[]> ExecuteChangesAsync(byte[] bytes, CancellationToken ct = default)
+        public async Task<byte[]> ExecuteChangesAsync(byte[] bytes, CancellationToken ct = default)
         {
             Batches.Add(MemoryPackSerializer.Deserialize<SaveChangesRequest>(bytes)!);
             var result = NextResult ?? DataContextResult.Success();
             NextResult = null;
-            return Task.FromResult(MemoryPackSerializer.Serialize(result));
+            var gate = NextWriteGate;
+            NextWriteGate = null;
+            WriteStarted.TrySetResult(true);
+            if (gate is not null) await gate;
+            return MemoryPackSerializer.Serialize(result);
         }
 
-        public Task<byte[]> ExecuteQueryAsync(byte[] bytes, CancellationToken ct = default)
+        public async Task<byte[]> ExecuteQueryAsync(byte[] bytes, CancellationToken ct = default)
         {
             var query = MemoryPackSerializer.Deserialize<QueryDescriptor>(bytes)!;
-            return Task.FromResult(query.EntityTypeName == nameof(WalletType)
+            Queries.Add(query);
+            var result = query.EntityTypeName == nameof(WalletType)
                 ? query.Mode == QueryExecutionMode.FirstOrDefault
                     ? MemoryPackSerializer.Serialize(Wallet)
                     : MemoryPackSerializer.Serialize(new List<WalletType>())
-                : MemoryPackSerializer.Serialize(new List<IdentityRoleTypeGroup>()));
+                : MemoryPackSerializer.Serialize(new List<IdentityRoleTypeGroup>());
+            var gate = NextQueryGate;
+            NextQueryGate = null;
+            QueryStarted.TrySetResult(true);
+            if (gate is not null) await gate;
+            return result;
         }
 
         public async IAsyncEnumerable<byte[]> ExecuteQueryStreamAsync(byte[] bytes,
