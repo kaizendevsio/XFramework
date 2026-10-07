@@ -4,6 +4,7 @@
 @inject NavigationManager Navigation
 @inject IPortalTenantContext Tenant
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@inject BlazorBlueprint.Primitives.Services.IFocusManager Focus
 
 <link rel="stylesheet" href="/_content/XFramework.Portal.Features.POS/XFramework.Portal.Features.POS.bundle.scp.css" />
 
@@ -15,7 +16,7 @@
 </div>
 
 <BbDialog Open="@_dialogOpen" OpenChanged="DialogOpenChanged">
-    <BbDialogContent TrapFocus="false" CloseOnEscape="false" @onkeydown="PairingKeyDown">
+    <BbDialogContent TrapFocus="true" CloseOnEscape="false" @onkeydown="PairingKeyDown">
         <BbDialogHeader>
             <BbDialogTitle>@(_paired ? "Phone connected" : "Scan with phone")</BbDialogTitle>
             <BbDialogDescription>@_status</BbDialogDescription>
@@ -40,15 +41,18 @@
                         <LucideIcon Name="smartphone" Size="18" />Phone scanner
                     </BbPopoverTrigger>
                     <BbPopoverContent Class="scanner-phone-popover" aria-label="Phone scanner" CloseOnClickOutside="false" CloseOnEscape="true" ZIndex="90"
+                                      OnContentReady="PhoneContentReady"
                                       style="width: min(280px, calc(100vw - 32px));">
-                        @if (_phoneLinkQrSource is not null)
-                        {
-                            <img src="@_phoneLinkQrSource" width="240" height="240" alt="Phone scanner HTTPS landing QR"
-                                 style="max-width: 100%; height: auto; background: white;" />
-                        }
-                        <BbButton OnClick="@(() => _phoneLinkOpen = false)" Variant="ButtonVariant.Outline" aria-label="Close phone scanner QR" title="Close phone scanner QR">
-                            <LucideIcon Name="x" Size="18" />
-                        </BbButton>
+                        <div @ref="_phoneLinkContent">
+                            @if (_phoneLinkQrSource is not null)
+                            {
+                                <img src="@_phoneLinkQrSource" width="240" height="240" alt="Phone scanner HTTPS landing QR"
+                                     style="max-width: 100%; height: auto; background: white;" />
+                            }
+                            <BbButton OnClick="@(() => PhoneLinkOpenChanged(false))" Variant="ButtonVariant.Outline" aria-label="Close phone scanner QR" title="Close phone scanner QR">
+                                <LucideIcon Name="x" Size="18" />
+                            </BbButton>
+                        </div>
                     </BbPopoverContent>
                     @if (_phoneLinkOpen) { <XfPopoverClickOutside /> }
                 </BbPopover>
@@ -81,6 +85,9 @@
     private string? _qrSource;
     private string? _phoneLinkQrSource;
     private bool _phoneLinkOpen;
+    private ElementReference _phoneLinkContent;
+    private IAsyncDisposable? _phoneFocusTrap;
+    private long _phoneFocusVersion;
     private bool _expired;
     private DateTimeOffset _now = DateTimeOffset.UtcNow;
     private Guid _registerId;
@@ -106,7 +113,7 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        if (Disabled) DialogOpenChanged(false);
+        if (Disabled) await DialogOpenChanged(false);
         if (_pairing is not null && (RegisterId != _registerId || Tenant.SelectedTenantId != _tenantId))
             await Disconnect();
     }
@@ -119,18 +126,44 @@
         if (_pairing is null && !_expired) await Create();
     }
 
-    private void DialogOpenChanged(bool open)
+    private async Task DialogOpenChanged(bool open)
     {
         _dialogOpen = open;
-        if (!open) _phoneLinkOpen = false;
+        if (!open) await PhoneLinkOpenChanged(false);
     }
 
-    private void PhoneLinkOpenChanged(bool open) => _phoneLinkOpen = open;
+    private async Task PhoneLinkOpenChanged(bool open)
+    {
+        _phoneLinkOpen = open;
+        if (open) return;
+        _phoneFocusVersion++;
+        var trap = _phoneFocusTrap;
+        _phoneFocusTrap = null;
+        if (trap is not null) await DisposePhoneFocus(trap);
+    }
+
+    private async Task PhoneContentReady()
+    {
+        // The popover lives outside the dialog DOM, so it needs its own native focus scope.
+        var version = ++_phoneFocusVersion;
+        var trap = await Focus.TrapFocus(_phoneLinkContent);
+        if (_disposed || !_phoneLinkOpen || version != _phoneFocusVersion)
+        { await DisposePhoneFocus(trap); return; }
+        var previous = _phoneFocusTrap;
+        _phoneFocusTrap = trap;
+        if (previous is not null) await DisposePhoneFocus(previous);
+    }
+
+    private static async Task DisposePhoneFocus(IAsyncDisposable trap)
+    {
+        try { await trap.DisposeAsync(); }
+        catch (Exception exception) when (exception is JSDisconnectedException or TaskCanceledException) { }
+    }
 
     // Scope Escape to this DOM subtree; the portaled popover handles its own Escape.
-    private void PairingKeyDown(KeyboardEventArgs args)
+    private async Task PairingKeyDown(KeyboardEventArgs args)
     {
-        if (args.Key == "Escape" && !_phoneLinkOpen) DialogOpenChanged(false);
+        if (args.Key == "Escape" && !_phoneLinkOpen) await DialogOpenChanged(false);
     }
 
     private async Task NewPairing()
@@ -283,7 +316,7 @@
         _pairing = null;
         _qrSource = null;
         _phoneLinkQrSource = null;
-        _phoneLinkOpen = false;
+        await PhoneLinkOpenChanged(false);
         _expired = false;
         _paired = false;
         _status = "Not paired";

@@ -224,6 +224,13 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
         Page.PageError += (_, message) => errors.Enqueue(message);
         await Page.GetByRole(AriaRole.Button,new() {Name="Scan with phone",Exact=true}).ClickAsync();
         await Expect(Page.GetByAltText("One-time phone pairing QR")).ToBeVisibleAsync();
+        var dialog = Page.GetByRole(AriaRole.Dialog,new() {Name="Scan with phone",Exact=true});
+        var modalButtons = dialog.Locator("button:not([disabled])");
+        await modalButtons.Last.FocusAsync();
+        await Page.Keyboard.PressAsync("Tab");
+        await Expect(modalButtons.First).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Shift+Tab");
+        await Expect(modalButtons.Last).ToBeFocusedAsync();
         var pairingUrl = new Uri(await DecodeQr("One-time phone pairing QR"));
         pairingUrl.Fragment.Should().Be("#" + new string('A',64));
         pairingUrl.Query.Should().Be("?tenant=" + state.TenantId);
@@ -233,6 +240,12 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
         var popover = Page.Locator(".scanner-phone-popover");
         await Expect(popover).ToBeVisibleAsync();
         await Expect(popover).ToHaveAttributeAsync("aria-label","Phone scanner");
+        var closePopover = Page.GetByRole(AriaRole.Button,new() {Name="Close phone scanner QR",Exact=true});
+        await Expect(closePopover).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Tab");
+        await Expect(closePopover).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Shift+Tab");
+        await Expect(closePopover).ToBeFocusedAsync();
         var landingUrl = new Uri(await DecodeQr("Phone scanner HTTPS landing QR"));
         landingUrl.AbsoluteUri.Should().Be("https://scanner.fixture.invalid/pos/mobile-scanner?tenant=" + state.TenantId);
         landingUrl.Fragment.Should().BeEmpty("the landing QR is not a pairing credential");
@@ -263,6 +276,7 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
         await trigger.FocusAsync();
         await Page.Keyboard.PressAsync("Enter");
         await Expect(popover).ToBeVisibleAsync();
+        await trigger.FocusAsync();
         await Expect(trigger).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Escape");
         await Expect(popover).ToBeHiddenAsync();
