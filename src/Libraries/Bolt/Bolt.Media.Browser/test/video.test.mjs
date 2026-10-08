@@ -115,7 +115,10 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
             this.callbacks.output({ byteLength: 8, type: options?.keyFrame ? 'key' : 'delta', timestamp: frame.timestamp,
                 copyTo(target) { target.fill(1); } }, {});
         }
-        async flush() { if (flushError) throw new Error(flushError); }
+        async flush() {
+            const error = typeof flushError === 'function' ? flushError(this.config) : flushError;
+            if (error) throw new Error(error);
+        }
         close() { this.state = 'closed'; }
     }
     class Decoder {
@@ -1495,4 +1498,24 @@ test('HEVC validates a real first output before publishing despite a positive ca
     assert.equal(working.p.encoder.state, 'configured');
     assert.equal(working.stats.invoked.length, 0, 'synthetic verification frame is never sent');
     assert.equal(working.p.encodeCount, 0, 'verification is not counted as call throughput');
+});
+
+test('HEVC refuses a live 60 fps upgrade before changing the working encoder and retries the same size at 30', async () => {
+    const f = fixture({ flushError: config => config.framerate > 30 ? 'Encoder creation error' : null });
+    await f.p.initEncoder('hevc', 1280, 720, 1500, 30, 10);
+    await f.p.startCapture(f.host, {});
+    const encoder = f.p.encoder, config = f.p.config, before = f.p.tier;
+    await assert.rejects(f.p.applyTier(2560, 1440, 7500, 60), /Encoder creation error/);
+    assert.equal(f.p.encoder, encoder);
+    assert.equal(f.p.config, config);
+    assert.equal(f.p.tier, before);
+    assert.equal(encoder.state, 'configured');
+    assert.equal(f.p.captureRunning, true);
+    assert.equal(f.stats.stopped, 0, 'a refused upgrade does not release the working camera');
+    assert.equal(await f.p.applyTier(2560, 1440, 7500, 30), true);
+    assert.equal(f.p.config.height, 1440);
+    assert.equal(f.p.config.framerate, 30);
+    assert.equal(f.p.encoder, encoder, 'reconfigure the existing encoder after successful preflight');
+    assert.equal(f.p.forceKeyframe, true);
+    f.p.stopCapture();
 });

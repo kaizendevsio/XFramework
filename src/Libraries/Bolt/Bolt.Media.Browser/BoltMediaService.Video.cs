@@ -190,7 +190,7 @@ public sealed partial class BoltMediaService
         if (_adaptation is not { } adaptation) return;
         if (adaptation.SetCeiling(Math.Min(_videoDeviceCeiling, VideoAdaptation.HeightCapForParticipants(senders))) &&
             adaptation.Current is { } tier)
-        { await _video.ApplyTierAsync(tier); OnVideoTierChanged?.Invoke(tier); }
+        { OnVideoTierChanged?.Invoke(await ApplyVideoTierAsync(tier) ?? adaptation.Current); }
     }
 
     // ── Local stream lifecycle ──
@@ -277,7 +277,7 @@ public sealed partial class BoltMediaService
             // Too big to carry at all: the picture is too large, not the link too small. A keyframe is needed, but no
             // congestion is reported (the rate controller would cut tenfold); the picture steps down a rung instead.
             _pacer?.NotePictureTooLarge(layer);
-            if (_adaptation?.Rates.ReduceForCpu() == true && _adaptation.Current is { } smaller) _ = _video.ApplyTierAsync(smaller);
+            if (_adaptation?.Rates.ReduceForCpu() == true && _adaptation.Current is { } smaller) _ = ApplyVideoTierAsync(smaller);
             return;
         }
         var channel = _videoSend;
@@ -509,7 +509,7 @@ public sealed partial class BoltMediaService
         if (tick.ResumeVideo && adaptation.Suspended)
         {
             adaptation.Suspended = false;
-            if (adaptation.Current is { } resumed) await _video.ApplyTierAsync(resumed);
+            if (adaptation.Current is { } resumed) await ApplyVideoTierAsync(resumed);
             _pacer?.ExpectKeyframe();
             await _video.StartCaptureAsync();
             OnVideoTierChanged?.Invoke(adaptation.Current);
@@ -518,12 +518,30 @@ public sealed partial class BoltMediaService
         if (tick.Video is not { } setting || adaptation.Suspended) return;
         var previous = _appliedTier;
         var tier = VideoAdaptation.ToTier(setting);
-        if (await _video.ApplyTierAsync(tier))
+        if (await ApplyVideoTierAsync(tier) is { } applied)
         {
-            _appliedTier = tier;
-            _logger.LogDebug("Video {Tier} (estimate {Estimate} kbps, delay {Delay} ms)", tier, tick.Decision.TotalKbps, tick.Decision.DelayMs);
-            if (previous is not { } before || before.Height != tier.Height || before.Framerate != tier.Framerate)
-                OnVideoTierChanged?.Invoke(tier);
+            _appliedTier = applied;
+            _logger.LogDebug("Video {Tier} (estimate {Estimate} kbps, delay {Delay} ms)", applied, tick.Decision.TotalKbps, tick.Decision.DelayMs);
+            if (previous is not { } before || before.Height != applied.Height || before.Framerate != applied.Framerate)
+                OnVideoTierChanged?.Invoke(applied);
+        }
+    }
+
+    private async Task<VideoTier?> ApplyVideoTierAsync(VideoTier tier)
+    {
+        try
+        {
+            return await _video.ApplyTierAsync(tier) ? tier : null;
+        }
+        catch (JSException) when (_videoCodec == VideoCodec.Hevc && tier.Framerate > 30 && _adaptation is { })
+        {
+            // HEVC may advertise 60 fps yet refuse its first picture. JS preflight leaves the
+            // live encoder intact, so retry this resolution at 30 and prevent another 60 fps climb.
+            _adaptation.LimitTo30Fps();
+            tier = tier with { Framerate = 30 };
+            await _video.ApplyTierAsync(tier);
+            // The retained encoder can already be at this tier; report the accepted fallback anyway.
+            return tier;
         }
     }
 

@@ -1288,6 +1288,14 @@ class VideoPipeline {
     /// far side decodes the new size against the old reference.
     async applyTier(width, height, bitrateKbps, framerate) {
         const before = this.tier;
+        if (this.codec === 'hevc' && this.encoder?.state === 'configured' && this.config) {
+            const fitted = fitTierToSource(width, height, this.sourceWidth, this.sourceHeight);
+            const next = encoderConfig(this.codec, fitted.width, fitted.height, bitrateKbps, framerate,
+                this.config.hardwareAcceleration, temporalModeFor(framerate, this.temporalModes));
+            if (next.width !== this.config.width || next.height !== this.config.height ||
+                next.framerate !== this.config.framerate || next.scalabilityMode !== this.config.scalabilityMode)
+                await verifyHevcEncoder(next);
+        }
         this.tier = { width, height, bitrateKbps, framerate };
         const changed = this._configureForSource();
         const track = this.mediaStream?.getVideoTracks()[0];

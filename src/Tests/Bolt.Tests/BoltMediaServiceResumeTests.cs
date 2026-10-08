@@ -68,6 +68,40 @@ public sealed class BoltMediaServiceResumeTests
         await second.DisposeAsync();
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task HevcRuntimeUpgrade_RefusedAt60_RetriesTheSameResolutionAt30_AndCapsFutureClimbs(bool alreadyAt30)
+    {
+        await using var f = await Fixture.CreateAsync();
+        await f.Media.StartHostedAudioAsync(f.Call);
+        await f.Media.StartVideoAsync(f.Call, VideoCodec.Hevc, 1440, preferredFramerate: 60);
+        typeof(BoltMediaService).GetMethod("StopAdaptationLoop", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(f.Media, null);
+        typeof(BoltMediaService).GetField("_videoLoop", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(f.Media, new CancellationTokenSource());
+        var adaptation = new VideoAdaptation(VideoAdaptation.IndexForHeight(1440), 60);
+        adaptation.SetCeiling(1440);
+        adaptation.Rates.Place(15_000, 0, false);
+        adaptation.Rates.Place(15_000, VideoRateLadder.FastUpHoldMs, false);
+        Assert.That(adaptation.Current!.Value.Framerate, Is.EqualTo(60));
+        typeof(BoltMediaService).GetField("_adaptation", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(f.Media, adaptation);
+        f.Js.RejectVideo60 = true;
+        f.Js.Video30Unchanged = alreadyAt30;
+        var notified = new List<VideoTier?>();
+        f.Media.OnVideoTierChanged += notified.Add;
+        var apply = typeof(BoltMediaService).GetMethod("ApplyVideoAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        await (Task)apply.Invoke(f.Media, [new SendRateTick(default, adaptation.Rates.Current, false, false, null, default)])!;
+        var changed = (VideoTier?)typeof(BoltMediaService).GetField("_appliedTier", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(f.Media);
+        Assert.Multiple(() =>
+        {
+            Assert.That(f.Js.AppliedVideoTiers.Select(x => x.Framerate), Is.EqualTo(new[] { 60, 30 }));
+            Assert.That(changed!.Value.Height, Is.EqualTo(1440));
+            Assert.That(changed.Value.Framerate, Is.EqualTo(30));
+            Assert.That(notified, Is.EqualTo(new[] { changed }), "report the actual accepted tier even when it was already configured");
+            Assert.That(adaptation.Rates.Allow60, Is.False, "subsequent rate windows retain the native encoder limit");
+            Assert.That(f.Media.IsCameraOn, Is.True);
+            Assert.That(f.Js.Calls, Does.Not.Contain("stopCapture"));
+        });
+    }
+
     [Test]
     public async Task Diagnostics_MergeRecoveryByStream_AndExposeTheLatestBudget()
     {
@@ -314,18 +348,29 @@ public sealed class BoltMediaServiceResumeTests
     {
         public ConcurrentQueue<string> Calls { get; } = new();
         public VideoDiagnostics? VideoSnapshot { get; set; }
+        public bool RejectVideo60 { get; set; }
+        public bool Video30Unchanged { get; set; }
+        public List<VideoTier> AppliedVideoTiers { get; } = [];
         public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args) => InvokeAsync<TValue>(identifier, CancellationToken.None, args);
         public ValueTask<TValue> InvokeAsync<TValue>(string identifier, CancellationToken cancellationToken, object?[]? args)
             => ValueTask.FromResult(Invoke<TValue>(identifier, args));
         public TValue Invoke<TValue>(string identifier, params object?[]? args)
         {
             Calls.Enqueue(identifier);
+            if (identifier == "applyTier" && args is { Length: 4 })
+            {
+                var tier = new VideoTier((int)args[0]!, (int)args[1]!, (int)args[3]!, (int)args[2]!);
+                AppliedVideoTiers.Add(tier);
+                if (RejectVideo60 && tier.Framerate > 30) throw new JSException("Encoder creation error");
+                if (Video30Unchanged && tier.Framerate == 30) return (TValue)(object)false;
+            }
             object? value = typeof(TValue).IsAssignableFrom(typeof(RecordingJs)) ? this
                 : typeof(TValue) == typeof(bool) ? true
                 : typeof(TValue) == typeof(byte[]) ? new byte[16]
                 : typeof(TValue) == typeof(VoiceCapabilities) ? new VoiceCapabilities(true, null, true)
                 : typeof(TValue) == typeof(VideoDiagnostics) ? VideoSnapshot
                 : typeof(TValue) == typeof(VideoCaptureState) ? CameraState()
+                : typeof(TValue) == typeof(VideoSendStats) ? new VideoSendStats(30, 5000, 0, 0)
                 : default(TValue);
             return (TValue)value!;
         }
