@@ -445,10 +445,12 @@ public sealed partial class BoltMediaService : IAsyncDisposable
             while (!ct.IsCancellationRequested)
             {
                 await Task.Delay(Math.Max(100, _options.AdaptationIntervalMs), ct);
-                // The start probe's padding fills the channel's buffer and the relay's feedback on purpose: no decision on that.
-                if (_transport?.Probing == true) continue;
+                var now = Environment.TickCount64;
+                // Probe padding can fill the local channel, but media feedback still measures the live call.
+                // Keep adapting its rate and audio while ignoring only that local queue, as at ProbeEnded.
+                if (_transport?.Probing == true) loop.Controller.IgnoreLocalUntil(now + 1_500);
                 loop.AudioRedundancy = _transport is { IsDatagramActive: true, AudioRedundancy: true };
-                var tick = loop.Tick(Environment.TickCount64, _encodeBacklog);
+                var tick = loop.Tick(now, _encodeBacklog);
                 SendRate = tick.Decision;
                 LastSendTick = tick;
                 PacerDroppedPictures += tick.Pacer.DroppedPictures;

@@ -175,6 +175,60 @@ public sealed class CallFastStartTests
         Assert.That(LinkProbe.Conclude([judged], 0).UplinkKbps, Is.InRange(300, 500));
     }
 
+    [TestCase(0, false)]
+    [TestCase(1, false)]
+    [TestCase(2, false)]
+    [TestCase(3, false)]
+    [TestCase(0, true)]
+    [TestCase(1, true)]
+    [TestCase(2, true)]
+    [TestCase(3, true)]
+    public void Probe_AnEmptyOrSparseStep_DoesNotInventCapacity(int sentMessages, bool earlierMeasurement)
+    {
+        var probe = new LinkProbe();
+        var verdicts = new List<ProbeStep>();
+        ushort sequence = 0;
+        if (earlierMeasurement)
+        {
+            var earlier = probe.BeginStep(600);
+            var arrivals = new List<long>();
+            for (uint index = 0; index < 13; index++)
+            {
+                var sent = index * 14_667L;
+                probe.OnSent(earlier, index, sequence++, 1_100, sent);
+                arrivals.Add(sent + 100_000);
+                probe.OnEcho(earlier, index, sent + 200_000);
+            }
+            probe.OnFeedback(0, arrivals);
+            verdicts.Add(probe.Judge(earlier, stamped: true, echo: true));
+            Assert.That(verdicts[0].UplinkPassed, Is.True);
+        }
+        var sparse = probe.BeginStep(1_500);
+        var firstSequence = sequence;
+        var sparseArrivals = new List<long>();
+        for (uint index = 0; index < sentMessages; index++)
+        {
+            var sent = 1_000_000 + index * 60_000L;
+            probe.OnSent(sparse, index, sequence++, 1_100, sent);
+            sparseArrivals.Add(sent + 100_000);
+            probe.OnEcho(sparse, index, sent + 200_000);
+        }
+        probe.OnFeedback(firstSequence, sparseArrivals);
+        var verdict = probe.Judge(sparse, stamped: true, echo: true);
+        verdicts.Add(verdict);
+        var result = LinkProbe.Conclude(verdicts, 1_000);
+        Assert.Multiple(() =>
+        {
+            Assert.That(verdict.SentKbps, Is.Zero, "too few messages to measure the rate actually attempted");
+            Assert.That(verdict.Inconclusive, Is.True);
+            Assert.That(verdict.UplinkPassed, Is.False);
+            Assert.That(verdict.EchoPassed, Is.False);
+            Assert.That(result.UplinkKbps, Is.EqualTo(earlierMeasurement ? verdicts[0].TestedKbps : 0));
+            Assert.That(result.UplinkAtLeast, Is.True, "preserve the earlier lower bound rather than manufacture a limit");
+            Assert.That(result.DownlinkKbps, Is.EqualTo(earlierMeasurement ? (int?)verdicts[0].TestedKbps : null));
+        });
+    }
+
     [Test]
     public void APictureGrowsOnlyWhileTheReceiversKeepUp()
     {

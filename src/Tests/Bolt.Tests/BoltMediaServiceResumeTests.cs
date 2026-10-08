@@ -1,6 +1,8 @@
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Reflection;
 using Bolt.Client;
+using Bolt.Media;
 using Bolt.Media.Browser;
 using Bolt.Media.Congestion;
 using Bolt.Protocol;
@@ -19,6 +21,111 @@ namespace Bolt.Tests;
 /// </summary>
 public sealed class BoltMediaServiceResumeTests
 {
+    [TestCase("relay")]
+    [TestCase("receiver")]
+    [TestCase("transport")]
+    public async Task PendingProbe_StillCutsThePreviousWebSocketRateFromMediaFeedback(string source)
+    {
+        await using var f = await Fixture.CreateAsync();
+        await f.Media.StartHostedAudioAsync(f.Call);
+        await f.Media.StartVideoAsync(f.Call, VideoCodec.H264, 1080);
+        await PauseRateAsync(f.Media);
+        var loop = RateLoop(f.Media)!;
+        loop.Controller.Reset(8_496);
+        loop.Pacer.RateKbps = 8_496;
+        loop.Ladder.Restart(8_496 - 84);
+        await (Task)typeof(BoltMediaService).GetMethod("ApplyVideoAsync", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(f.Media, [new SendRateTick(default, loop.Ladder.Current, false, false, null, default)])!;
+        Assert.That(f.Js.AppliedVideoTiers[^1].Height, Is.EqualTo(1080));
+        Assert.That(f.Js.AppliedVideoTiers[^1].BitrateKbps, Is.EqualTo(5600));
+        var transport = PendingProbe(f.Media);
+        var stream = f.FirstTransport.Configs(MediaType.Video).Single();
+        using var running = new CancellationTokenSource();
+        var task = RunRateAsync(f.Media, loop, running.Token);
+        try
+        {
+            await EncodeAudioAsync(f.Media);
+            Assert.That(() => f.FirstTransport.MediaFrames(), Is.GreaterThan(0).After(1000, 10), "media continues while the probe waits");
+            var frame = new ArrayBufferWriter<byte>();
+            if (source == "relay")
+                BoltCodec.WriteMediaCongestion(frame, new MediaCongestionData
+                {
+                    StreamId = stream, QueueDelayMs = 1_200, AllowedKbps = 512,
+                    Flags = MediaCongestionFlags.Limited | MediaCongestionFlags.BaseLayerLost,
+                });
+            else if (source == "receiver")
+                BoltCodec.WriteMediaFeedback(frame, stream, 1, 0, 0, 0, QualityHint.Maintain, 1_200, 512);
+            else
+                loop.Signals.OnTransportFeedback(new(Environment.TickCount64, 1_200, 0, 0.2, 512));
+            if (frame.WrittenCount > 0) Assert.That(f.First.DispatchDatagram(frame.WrittenSpan), Is.EqualTo(1));
+            Assert.That(() => loop.Pacer.RateKbps, Is.LessThan(8_496).After(1200, 20),
+                "the old path's rate must respond to media congestion before the probe finishes");
+            Assert.That(() => f.Js.AppliedVideoTiers[^1].BitrateKbps, Is.LessThan(5600).After(1000, 20),
+                "the encoder follows the cut while the probe is still pending");
+            Assert.That(transport.Probing, Is.True);
+        }
+        finally
+        {
+            await running.CancelAsync();
+            await task;
+            typeof(MediaTransportClient).GetField("_probe", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(transport, null);
+        }
+    }
+
+    [Test]
+    public async Task PendingProbe_IgnoresPaddingLocalQueue_ButKeepsAudioAdaptationRunning()
+    {
+        await using var f = await Fixture.CreateAsync();
+        await f.Media.StartHostedAudioAsync(f.Call);
+        await PauseRateAsync(f.Media);
+        var previous = RateLoop(f.Media)!;
+        // A probe's padding can leave a large local buffer without queuing any media downstream.
+        await using var pacer = new MediaSendPacer((_, _) => ValueTask.CompletedTask, () => 2_000_000);
+        var loop = new SendRateLoop(pacer, new SendRateController(8_496), previous.Ladder);
+        var transport = PendingProbe(f.Media);
+        using var running = new CancellationTokenSource();
+        var task = RunRateAsync(f.Media, loop, running.Token);
+        try
+        {
+            loop.Signals.OnCongestionReport(new MediaCongestionData(), video: false, Environment.TickCount64);
+            Assert.That(() => loop.LastDecision.HasValue, Is.True.After(1000, 20), "a probe does not pause rate windows");
+            Assert.Multiple(() =>
+            {
+                Assert.That(loop.LastDecision!.Value.Signal, Is.EqualTo(RateSignal.Normal));
+                Assert.That(loop.LastDecision.Value.DelayMs, Is.Zero, "only the padding-contaminated local queue is ignored");
+                Assert.That(loop.Pacer.RateKbps, Is.GreaterThanOrEqualTo(8_496));
+            });
+            loop.Controller.Reset(200);
+            loop.Signals.OnCongestionReport(new MediaCongestionData(), video: false, Environment.TickCount64);
+            Assert.That(() => loop.LastDecision!.Value.AudioKbps, Is.EqualTo(24).After(1000, 20));
+            Assert.That(() => f.Js.Calls, Does.Contain("reconfigureBitrate").After(1000, 20), "audio adaptation applies while the probe is pending");
+            Assert.That(transport.Probing, Is.True);
+        }
+        finally
+        {
+            await running.CancelAsync();
+            await task;
+            typeof(MediaTransportClient).GetField("_probe", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(transport, null);
+        }
+    }
+
+    private static async Task PauseRateAsync(BoltMediaService media)
+    {
+        var cts = (CancellationTokenSource)typeof(BoltMediaService).GetField("_rateCts", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(media)!;
+        await cts.CancelAsync();
+        await (Task)typeof(BoltMediaService).GetField("_rateTask", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(media)!;
+    }
+
+    private static MediaTransportClient PendingProbe(BoltMediaService media)
+    {
+        var transport = (MediaTransportClient)typeof(BoltMediaService).GetField("_transport", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(media)!;
+        typeof(MediaTransportClient).GetField("_probe", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(transport, new LinkProbe());
+        return transport;
+    }
+
+    private static Task RunRateAsync(BoltMediaService media, SendRateLoop loop, CancellationToken ct) =>
+        (Task)typeof(BoltMediaService).GetMethod("RateLoopAsync", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(media, [loop, ct])!;
+
     [Test]
     public async Task LostSocket_DoesNotEndAHostedSFrameCall()
     {

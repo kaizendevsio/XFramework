@@ -46,6 +46,14 @@ tests. JavaScript validation passed 101 video tests, nine branding/accent tests 
 Six recovery parity cases also passed against both the archived baseline and current production source.
 The hosted run completed 81 modeled measurements and 12 full-production calls: three 60-second repeats per profile. Full revisions, raw metrics, failed quality assertions and transport timelines are preserved in the linked report.
 
+The probe/relay follow-up passed 41 focused tests. A broader local Bolt run had 925 passes,
+seven skips and nine failures out of 941 tests: four PostgreSQL fixture failures require Docker
+or `BOLT_TEST_POSTGRES_CONNECTION`; four inbound-request-context fixture cases fail during
+server startup with a disposed service provider, including when run alone. One further failure
+did not recur. Excluding those two fixtures, the recorded rerun passed 926 tests with seven
+skipped and none failed (933 total). The unrelated fixture startup failures remain a validation
+limitation; the full suite is not claimed as passing locally.
+
 A real Chromium live-upgrade smoke check initialized HEVC at 2560x1440/30fps,
 attempted 60fps (native encode refused), and then encoded ten further pictures with
 the untouched 30fps encoder: 10/10 outputs, encoder still configured. This verifies
@@ -76,3 +84,14 @@ Relay retransmissions now enter the drain accounting ledger, so repairs that dra
 samples cannot falsely look stalled when the sampled buffer size stays constant. The existing
 stall timeout remains unchanged. These fixes require a fresh production measurement; neither
 alone proves that the initial severe-link overshoot or later path switching is resolved.
+
+The [probe/drain follow-up](yap-call-media-benchmark-2026-10-08/run-37784214293/README.md)
+retains another 12 production calls and still finds severe audio failures and mixed/fallback
+paths. Its traces exposed two additional defects: rate updates stopped entirely while probing,
+retaining a previous 8.5Mbps budget, and an empty probe step could claim the full requested
+rate. Rate updates now continue while the existing grace excludes padding-contaminated local
+queues; valid relay, receiver and media transport feedback still cut the encoder rate and audio
+adaptation still applies. Probe steps without a measurable send rate remain inconclusive and
+preserve earlier evidence. Four service regressions and eight empty/sparse probe cases failed
+before the fixes; the combined service/probe/rate/audio group passes 95 tests. Final-source
+production measurements are required before attributing any severe quality improvement.
