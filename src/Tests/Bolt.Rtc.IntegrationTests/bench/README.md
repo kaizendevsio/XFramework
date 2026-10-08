@@ -58,7 +58,7 @@ version, input profile, metric version and direct-smoke flag. Production artifac
 Dispatch after pushing the branch:
 
 ```powershell
-gh workflow run call-media-benchmark.yml --ref codex/yap-call-efficiency-white-label -f baseline_ref=8ae24751 -f seconds=60 -f repeats=3 -f production=true
+gh workflow run call-media-benchmark.yml --ref codex/yap-call-efficiency-white-label -f baseline_ref=8ae24751d0975c6dbb8e2a368059aa2338e54df3 -f seconds=60 -f repeats=3 -f production=true
 ```
 
 Each run remains a separate table row; modeled runs alternate path order on even repeats. Netem loss remains

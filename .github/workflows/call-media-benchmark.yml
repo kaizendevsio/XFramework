@@ -13,8 +13,8 @@ on:
         description: Measured seconds per run
         default: "60"
       baseline_ref:
-        description: Baseline production source revision (same metric harness is copied into it)
-        default: "8ae24751"
+        description: Baseline full commit SHA or branch/tag (same metric harness is copied into it)
+        default: "8ae24751d0975c6dbb8e2a368059aa2338e54df3"
       repeats:
         description: Repeats per path/profile (alternate order, report each run)
         default: "1"
@@ -64,7 +64,7 @@ jobs:
       - name: Checkout baseline production snapshot
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          ref: ${{ github.event.inputs.baseline_ref || '8ae24751' }}
+          ref: ${{ github.event.inputs.baseline_ref || '8ae24751d0975c6dbb8e2a368059aa2338e54df3' }}
           path: baseline
           persist-credentials: false
 
@@ -168,7 +168,7 @@ jobs:
       - name: Checkout measured production snapshot
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          ref: ${{ matrix.snapshot == 'baseline' && (github.event.inputs.baseline_ref || '8ae24751') || github.sha }}
+          ref: ${{ matrix.snapshot == 'baseline' && (github.event.inputs.baseline_ref || '8ae24751d0975c6dbb8e2a368059aa2338e54df3') || github.sha }}
           path: measured
           persist-credentials: false
 
