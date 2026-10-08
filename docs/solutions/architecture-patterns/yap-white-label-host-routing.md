@@ -16,7 +16,7 @@ come from the operator's configuration, never from browser request fields.
 
 ```json
 {
-  "AllowedHosts": "chat.alpha.example;chat.beta.example",
+  "AllowedHosts": "chat.alpha.example;chat.beta.example;localhost",
   "Yap": {
     "Hosts": {
       "chat.alpha.example": {
@@ -56,10 +56,14 @@ original `Host` header and accept only the configured public hosts. Yap selects
 It does not install forwarded-header middleware. If another trusted hosting layer
 rewrites `Host`, secure that layer's proxy allowlist and ingress policy first.
 `AllowedHosts` should list the same origins; the Yap mapping provides an additional
-exact allowlist. Hostnames cannot contain wildcard patterns, schemes, ports, or a
-trailing dot. Ports do not distinguish tenants. Unknown mapped hosts return `421`
-before sign-in, protected endpoints, or static assets. `/health/*` remains available
-to container probes independently of public host routing.
+exact allowlist. Include `localhost` for the existing Docker readiness probe (and the
+actual probe hostname if it differs); ASP.NET Core host filtering runs before Yap's
+health exemption. Do not add the probe hostname to `Yap:Hosts`. Hostnames cannot
+contain wildcard patterns, schemes, ports, or a trailing dot. Ports do not distinguish
+tenants. Yap returns `421` for unknown mapped hosts before sign-in, protected endpoints,
+or static assets; ingress or ASP.NET Core host filtering may reject them earlier.
+`/health/*` remains available to permitted container probe hosts independently of
+public tenant routing.
 
 An authenticated cookie with a different tenant than its requested host returns
 `403` before session touch, OPAQUE actor lookup, HTTP business work, or WebSocket

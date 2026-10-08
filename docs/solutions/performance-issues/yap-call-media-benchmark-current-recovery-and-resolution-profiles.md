@@ -76,3 +76,11 @@ two repeats had 12–13 second measured A->B gaps plus two B->A decoder resets e
 but first sampled fallback timing remained 18.9–19.0 seconds. This follow-up precedes the service rate-loop
 probe-gating correction. Its raw measurements and startup/path samples remain separate from the initial run;
 different loss traces and fallback timing prevent causal comparisons of their ranges.
+
+The [final production transport run](yap-call-media-benchmark-2026-10-08/run-37786644195/README.md) measured
+`d043c71a03ba8f1b0967f68a68ef978cc9eaf267` after service feedback during probes and empty/sparse probe guards.
+All twelve calls completed. Clean current passed at 30 FPS and 100% audio. Severe current still switched A to
+WebSocket before the measurement window in every repeat and failed lifetime A->B audio (93.90–95.56%).
+Its settled socket windows had 99–156 ms gaps and no decoder resets, but neither direction represents a valid
+complete shaped-UDP window. No severe audio cure or thermal improvement is established. The final report
+retains startup probe verdicts, path timing and approximate recovery deltas separately from lifetime totals.

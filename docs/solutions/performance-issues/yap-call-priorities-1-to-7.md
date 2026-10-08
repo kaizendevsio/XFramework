@@ -49,7 +49,9 @@ The hosted run completed 81 modeled measurements and 12 full-production calls: t
 The probe/relay follow-up passed 41 focused tests. A broader local Bolt run had 925 passes,
 seven skips and nine failures out of 941 tests: four PostgreSQL fixture failures require Docker
 or `BOLT_TEST_POSTGRES_CONNECTION`; four inbound-request-context fixture cases fail during
-server startup with a disposed service provider, including when run alone. One further failure
+server startup because NoMachine's `nxrunner.bin` already owns their hardcoded port 25001,
+leading to a disposed service provider, including when run alone. The fixture source is
+unchanged from the baseline; the running NoMachine service was left alone. One further failure
 did not recur. Excluding those two fixtures, the recorded rerun passed 926 tests with seven
 skipped and none failed (933 total). The unrelated fixture startup failures remain a validation
 limitation; the full suite is not claimed as passing locally.
@@ -71,8 +73,8 @@ Clean production calls remain at 30fps and 100% lifetime audio delivery. Neither
 wire measurements nor severe-link results establish an overall efficiency or audio-quality
 gain. Severe production calls on both revisions switch from UDP to WebSocket, which bypasses
 the shaped TURN link; their later throughput cannot be presented as constrained-UDP performance.
-All severe repeats still fail lifetime audio delivery, and one current repeat has 25-33 second
-video gaps and three decoder resets during path switching. Real-codec models at constrained
+All severe repeats still fail lifetime audio delivery. In the initial run, one current repeat
+had 25-33 second video gaps and three decoder resets during path switching. Real-codec models at constrained
 720p/1080p also remain poor; those models omit the production pacer and redundancy.
 
 The allocation, repair and keyframe fixes are validated correctness changes. They should not
@@ -88,8 +90,8 @@ delays traffic 500ms in each direction and verifies that both uplink feedback an
 downlink measurements arrive. Silence tests retain a bounded wait and never invent capacity.
 Relay retransmissions now enter the drain accounting ledger, so repairs that drain between
 samples cannot falsely look stalled when the sampled buffer size stays constant. The existing
-stall timeout remains unchanged. These fixes require a fresh production measurement; neither
-alone proves that the initial severe-link overshoot or later path switching is resolved.
+stall timeout remains unchanged. The repeated measurements below do not establish that the
+initial severe-link overshoot or later path switching is resolved.
 
 The [probe/drain follow-up](yap-call-media-benchmark-2026-10-08/run-37784214293/README.md)
 retains another 12 production calls and still finds severe audio failures and mixed/fallback
@@ -99,5 +101,15 @@ rate. Rate updates now continue while the existing grace excludes padding-contam
 queues; valid relay, receiver and media transport feedback still cut the encoder rate and audio
 adaptation still applies. Probe steps without a measurable send rate remain inconclusive and
 preserve earlier evidence. Four service regressions and eight empty/sparse probe cases failed
-before the fixes; the combined service/probe/rate/audio group passes 95 tests. Final-source
-production measurements are required before attributing any severe quality improvement.
+before the fixes; the combined service/probe/rate/audio group passes 95 tests.
+
+The [final-source measurement](yap-call-media-benchmark-2026-10-08/run-37786644195/README.md)
+completed another 12 production calls, three 60-second repeats per revision/profile, against
+the same baseline. Current clean calls pass at 30fps and 100% audio. Severe current calls
+still fall back to WebSocket and fail lifetime A-to-B audio delivery at 93.90-95.56%, compared
+with baseline 94.03-94.52%. Current measured socket windows have 99-156ms video gaps and no
+decoder resets, while baseline repeat 2 has a 7.587-second gap during a UDP retry. The differing
+path histories and random loss prevent attributing that difference to the fixes. All current
+startup probes refuse phantom capacity from sparse feedback but still choose the default
+884kbps; initial high budgets and fallback remain. This is a correctness and diagnostics
+delivery, with severe-link quality and further overhead reduction still outstanding.
