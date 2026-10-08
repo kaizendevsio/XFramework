@@ -75,6 +75,7 @@
 @code {
     [Parameter] public Guid RegisterId { get; set; }
     [Parameter] public bool Disabled { get; set; }
+    [Parameter] public long SaleGeneration { get; set; }
     // Must complete only after the existing cashier barcode-add path has accepted/rejected the code.
     [Parameter, EditorRequired] public EventCallback<string> ScanReceived { get; set; }
     private readonly CancellationTokenSource _lifetime = new();
@@ -94,6 +95,8 @@
     private Guid? _tenantId;
     private long _acknowledged;
     private bool _paired;
+    private long _saleGeneration;
+    private bool _discardPending;
     private bool _dialogOpen;
     private bool _busy;
     private bool _disposed;
@@ -113,6 +116,8 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        if (_pairing is not null && SaleGeneration != _saleGeneration) _discardPending = true;
+        _saleGeneration = SaleGeneration;
         if (Disabled) await DialogOpenChanged(false);
         if (_pairing is not null && (RegisterId != _registerId || Tenant.SelectedTenantId != _tenantId))
             await Disconnect();
@@ -215,6 +220,8 @@
             if (_disposed || RegisterId != _registerId || Tenant.SelectedTenantId != _tenantId)
             { await Disconnect(); return; }
             _acknowledged = 0;
+            _discardPending = false;
+            _saleGeneration = SaleGeneration;
             _paired = false;
             _status = "Waiting for phone";
             _polling ??= Poll();
@@ -250,13 +257,16 @@
                 {
                     var current = _pairing;
                     if (current is null || _disposed) return;
+                    var generation = SaleGeneration;
+                    var discardPending = _discardPending;
                     QueryResponse<PosScannerPollResponse> result;
                     try
                     {
                         result = await POS.PollPosScannerCodes(new()
                         {
                             PairingId = current.PairingId, DesktopKey = current.DesktopKey,
-                            AcknowledgedSequence = _acknowledged, PauseDelivery = Disabled, Metadata = Metadata()
+                            AcknowledgedSequence = _acknowledged, PauseDelivery = Disabled,
+                            DiscardPendingCodes = discardPending, Metadata = Metadata()
                         }, _lifetime.Token);
                     }
                     catch (Exception)
@@ -279,19 +289,25 @@
                     }
                     _paired = result.Response.IsPaired;
                     _status = _paired ? (Disabled ? "Phone connected; cashier busy" : "Phone connected") : "Waiting for phone";
+                    if (discardPending)
+                    {
+                        _acknowledged = result.Response.AcknowledgedSequence;
+                        if (generation == SaleGeneration) _discardPending = false;
+                    }
                     foreach (var code in result.Response.Codes)
                     {
-                        if (current != _pairing || _disposed || Disabled) break;
+                        if (current != _pairing || _disposed || Disabled || generation != SaleGeneration) break;
                         if (code.Sequence <= _acknowledged) continue;
                         try
                         {
                             await ScanReceived.InvokeAsync(code.Code);
-                            if (current != _pairing || _disposed) break;
+                            if (current != _pairing || _disposed || generation != SaleGeneration) break;
                             _acknowledged = code.Sequence;
                         }
                         catch (Exception)
                         {
                             if (current != _pairing || _disposed) break;
+                            if (generation != SaleGeneration) { _discardPending = true; break; }
                             _error = "Cashier could not accept the scan. Scanner disconnected; check the cart before pairing again.";
                             await Disconnect();
                             break;
@@ -319,6 +335,7 @@
         await PhoneLinkOpenChanged(false);
         _expired = false;
         _paired = false;
+        _discardPending = false;
         _status = "Not paired";
         if (current is null) return;
         try

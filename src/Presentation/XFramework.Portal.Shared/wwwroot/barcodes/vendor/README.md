@@ -3,7 +3,7 @@
 Vendored from the maintained [zxing-wasm 3.1.5 release](https://github.com/Sec-ant/zxing-wasm/releases/tag/v3.1.5)
 and its npm package. [Primary API documentation](https://github.com/Sec-ant/zxing-wasm#readme)
 covers the full IIFE build, `prepareZXingModule`, `readBarcodes` and `writeBarcode`.
-The full build is used to decode product symbols and render pairing QR without
+The shared full build is used to decode product symbols and render pairing/product-label QR without
 another QR dependency. JavaScript and WASM are served locally; no CDN or camera
 frames leave the browser. Preserve the adjacent MIT and Apache-2.0 licenses.
 

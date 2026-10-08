@@ -37,6 +37,7 @@ public partial record PollPosScannerCodesRequest : RequestBase,
     public string DesktopKey { get; set; } = "";
     public long AcknowledgedSequence { get; set; }
     public bool PauseDelivery { get; set; }
+    public bool DiscardPendingCodes { get; set; }
 }
 
 [MemoryPackable]

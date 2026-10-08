@@ -6,4 +6,9 @@ p { margin: 0; }
 video { width: 100%; height: 100%; object-fit: contain; }
 .camera-idle { position: absolute; inset: 0; display: grid; place-items: center; color: #d4dad7; pointer-events: none; }
 .scanner-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.scanner-header { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.scanner-header > div { min-width: 0; }
+.scanner-fields { display: grid; gap: 10px; padding-block: 12px; }
+.scanner-manual ::deep .scanner-disclosure { min-height: 44px; display: flex; gap: 8px; align-items: center; color: var(--muted-foreground); }
+.scanner-actions ::deep button { width: 100%; min-height: 44px; }
 .scanner-last { font-size: 20px; overflow-wrap: anywhere; border-left: 3px solid #218b61; padding-left: 12px; }

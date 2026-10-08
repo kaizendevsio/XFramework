@@ -43,7 +43,7 @@ public sealed class PortalAuthService(
 
             var message = response.HttpStatusCode switch
             {
-                HttpStatusCode.NotFound or HttpStatusCode.BadRequest or HttpStatusCode.Forbidden =>
+                HttpStatusCode.Unauthorized or HttpStatusCode.NotFound or HttpStatusCode.BadRequest or HttpStatusCode.Forbidden =>
                     "Invalid username, password, or admin permission.",
                 _ => "Unable to sign in. Check IdentityServer health and try again."
             };

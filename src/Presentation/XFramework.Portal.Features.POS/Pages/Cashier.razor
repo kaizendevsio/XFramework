@@ -43,7 +43,7 @@ else if (!_moduleEnabled)
                                     Disabled="@(_cart.Any() || IsInteractionLocked)" />
                 </div>
                 <div class="xf-page-actions pos-cashier-header-actions">
-                    <CashierScannerPairing @key="_scannerSaleGeneration"
+                    <CashierScannerPairing SaleGeneration="_scannerSaleGeneration"
                                            RegisterId="@(TryResolveSelectedRegisterId() ?? Guid.Empty)"
                                            Disabled="@IsMobileScannerPaused"
                                            ScanReceived="ReceiveMobileScan" />

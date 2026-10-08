@@ -11,7 +11,6 @@ namespace POS.Api.Services;
 public sealed class PosScannerPairingStore(TimeProvider clock)
 {
     internal const int QueueLimit = 32;
-    internal const int ScanLimit = 1024;
     internal const int ShortClaimLimit = 5;
     internal const int GlobalShortClaimLimit = 500;
     internal static readonly TimeSpan ChallengeTtl = TimeSpan.FromMinutes(2);
@@ -52,7 +51,7 @@ public sealed class PosScannerPairingStore(TimeProvider clock)
             {
                 Id = Guid.NewGuid(), TenantId = actor.TenantId, ActorId = actor.CredentialId,
                 DesktopSessionId = actor.SessionId, RegisterId = registerId, RegisterName = registerName,
-                DesktopKey = NewKey(), Challenge = NewKey(), PairingCode = code,
+                DesktopKey = NewKey(), Challenge = NewKey(), PairingCode = code, ReservedCode = code,
                 ChallengeExpiresAt = now + ChallengeTtl, ExpiresAt = now + PairingTtl,
                 LeaseExpiresAt = now + DesktopLease
             };
@@ -109,7 +108,7 @@ public sealed class PosScannerPairingStore(TimeProvider clock)
                 return Result<PosScannerSendResponse>.Failure("Product code must be 1-256 printable characters", 400);
             if (sequence == pairing.LastSequence && code == pairing.LastCode)
                 return Result<PosScannerSendResponse>.Success(new(sequence, true));
-            if (sequence != pairing.LastSequence + 1 || sequence > ScanLimit)
+            if (sequence != pairing.LastSequence + 1)
                 return Result<PosScannerSendResponse>.Conflict("Scan sequence is stale or exhausted; pair again");
             if (pairing.Codes.Count >= QueueLimit)
                 return Result<PosScannerSendResponse>.Failure("Desktop scan queue is full; wait for the cashier", 429);
@@ -121,7 +120,7 @@ public sealed class PosScannerPairingStore(TimeProvider clock)
         }
     }
 
-    internal Result<PosScannerPollResponse> Poll(ScannerActor actor, Guid id, string key, long acknowledged, bool pauseDelivery = false)
+    internal Result<PosScannerPollResponse> Poll(ScannerActor actor, Guid id, string key, long acknowledged, bool pauseDelivery = false, bool discardPending = false)
     {
         lock (_gate)
         {
@@ -132,6 +131,16 @@ public sealed class PosScannerPairingStore(TimeProvider clock)
                 return Result<PosScannerPollResponse>.Forbidden("Scanner pairing ended; create a new pairing");
             pairing.Paused = pauseDelivery;
             pairing.LeaseExpiresAt = now + DesktopLease;
+            // Keep an authorized, connected cashier paired across the entire shift.
+            pairing.ExpiresAt = now + PairingTtl;
+            _reservedCodes[pairing.ReservedCode] = pairing.ExpiresAt;
+            if (discardPending)
+            {
+                pairing.Codes.Clear();
+                pairing.Acknowledged = pairing.LastSequence;
+                pairing.LastDelivered = pairing.LastSequence;
+                return Result<PosScannerPollResponse>.Success(new(pairing.PhoneSessionId.HasValue, pairing.ExpiresAt, [], pairing.Acknowledged));
+            }
             if (pauseDelivery)
                 return Result<PosScannerPollResponse>.Success(new(pairing.PhoneSessionId.HasValue, pairing.ExpiresAt, []));
             if (acknowledged < pairing.Acknowledged || acknowledged > pairing.LastDelivered)
@@ -220,10 +229,11 @@ public sealed class PosScannerPairingStore(TimeProvider clock)
         public required string DesktopKey { get; init; }
         public required string Challenge { get; set; }
         public required string PairingCode { get; set; }
+        public required string ReservedCode { get; init; }
         public Guid? PhoneSessionId { get; set; }
         public string PhoneKey { get; set; } = "";
         public DateTimeOffset ChallengeExpiresAt { get; init; }
-        public DateTimeOffset ExpiresAt { get; init; }
+        public DateTimeOffset ExpiresAt { get; set; }
         public DateTimeOffset LeaseExpiresAt { get; set; }
         public long LastSequence { get; set; }
         public string LastCode { get; set; } = "";

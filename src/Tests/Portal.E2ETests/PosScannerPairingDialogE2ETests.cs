@@ -95,6 +95,14 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
                 if (request.PauseDelivery) Interlocked.Increment(ref state.PausedPolls);
                 if (!request.PauseDelivery) Interlocked.Exchange(ref state.Acknowledged, request.AcknowledgedSequence);
                 var queued = state.QueuedScan;
+                if (request.DiscardPendingCodes)
+                {
+                    var acknowledged = queued?.Sequence ?? request.AcknowledgedSequence;
+                    state.QueuedScan = null;
+                    Interlocked.Exchange(ref state.Acknowledged, acknowledged);
+                    return new QueryResponse<PosScannerPollResponse>
+                    { HttpStatusCode = HttpStatusCode.OK, Response = new(state.Paired, DateTimeOffset.UtcNow.AddMinutes(30), [], acknowledged) };
+                }
                 var codes = new List<PosScannerCodeResponse>();
                 if (!request.PauseDelivery)
                 {
@@ -126,6 +134,11 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
                 { state.RevokedPairings.Enqueue(request.PairingId); Interlocked.Increment(ref state.Revokes); }
                 return new CmdResponse<bool> { HttpStatusCode = HttpStatusCode.OK, Response = true };
             });
+        wrapper.Setup(w => w.GetPosScannerStatus(It.IsAny<GetPosScannerStatusRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((GetPosScannerStatusRequest request, CancellationToken _) => new QueryResponse<PosScannerPhoneResponse>
+            { HttpStatusCode = HttpStatusCode.OK, Response = new(request.PairingId, request.PhoneKey, "Fixture register", DateTimeOffset.UtcNow.AddHours(12)) });
+        wrapper.Setup(w => w.SendPosScannerCode(It.IsAny<SendPosScannerCodeRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((SendPosScannerCodeRequest request, CancellationToken _) => new CmdResponse<PosScannerSendResponse> { HttpStatusCode = HttpStatusCode.OK, Response = new(request.Sequence, false) });
         wrapper.Setup(w => w.SearchPosCatalog(It.IsAny<SearchPosCatalogRequest>(),It.IsAny<CancellationToken>()))
             .ReturnsAsync((SearchPosCatalogRequest request,CancellationToken _) =>
             {
@@ -324,8 +337,9 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
     public async Task ShortPairing_MobileManualEntry_ExactSixDigitsLeadingZeroAndDenial()
     {
         await Page.GotoAsync(app.Urls.Single() + "/pos/mobile-scanner?tenant=" + state.TenantId);
+        await Page.GetByText("Enter pairing code", new() { Exact = true }).ClickAsync();
         var code = Page.GetByLabel("Six-digit pairing code",new() {Exact=true});
-        var pair = Page.GetByRole(AriaRole.Button,new() {Name="Pair desktop",Exact=true});
+        var pair = Page.GetByRole(AriaRole.Button,new() {Name="Pair with code",Exact=true});
         await Expect(code).ToHaveAttributeAsync("inputmode","numeric");
         await Expect(code).ToHaveAttributeAsync("maxlength","6");
         foreach (var invalid in new[] {"","12345","abc123"})
@@ -349,16 +363,64 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
     {
         await Page.GotoAsync(app.Urls.Single() + "/pos/mobile-scanner?tenant=" + state.TenantId + "#" + new string('A',64));
         await Expect(Page.GetByRole(AriaRole.Button,new() {Name="Pair desktop",Exact=true})).ToBeEnabledAsync();
-        await Expect(Page.GetByLabel("Six-digit pairing code",new() {Exact=true})).ToHaveValueAsync("");
+        await Expect(Page.GetByLabel("Six-digit pairing code",new() {Exact=true})).ToBeHiddenAsync();
         new Uri(Page.Url).Fragment.Should().BeEmpty();
         await Page.GetByRole(AriaRole.Button,new() {Name="Pair desktop",Exact=true}).ClickAsync();
         await Expect(Page.GetByTestId("scanner-status")).ToHaveTextAsync("Paired");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Leave pairing", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByText("Paired until", new() { Exact = false })).ToHaveCountAsync(0);
+        await Expect(Page.GetByLabel("Product code", new() { Exact = true })).ToBeHiddenAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Start camera", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Pause camera", Exact = true })).ToHaveCountAsync(0);
         state.Claims.Should().ContainSingle(c=>c.Challenge == new string('A',64) && c.PairingCode == "" && c.Metadata.RequestedTenantId == state.TenantId);
+    }
+
+    [TearDown]
+    public async Task Diagnostics()
+    {
+        if (TestContext.CurrentContext.Result.Outcome.Status == NUnit.Framework.Interfaces.TestStatus.Failed)
+            TestContext.Progress.WriteLine(await Page.Locator("body").InnerTextAsync());
     }
 
     [TestCase(390,844)]
     [TestCase(1366,768)]
-    public async Task CashierMobileScanner_RealCashierPaymentPause_BackToCartAndClearRotatePairingLifetime(int width,int height)
+    public async Task MobileScanner_OneCameraControl_ManualSendAndCompactDisconnect(int width, int height)
+    {
+        await Page.SetViewportSizeAsync(width, height);
+        await Page.GotoAsync(app.Urls.Single() + "/pos/mobile-scanner?tenant=" + state.TenantId + "#" + new string('A',64));
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Pair desktop", Exact = true })).ToBeEnabledAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Pair desktop", Exact = true }).ClickAsync();
+        await Expect(Page.GetByTestId("scanner-status")).ToHaveTextAsync("Paired");
+        await Page.EvaluateAsync("""
+            () => {
+                const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 480;
+                const ctx = canvas.getContext('2d'); ctx.fillStyle = 'white'; ctx.fillRect(0,0,640,480);
+                window.scannerTestStream = canvas.captureStream(10);
+                navigator.mediaDevices.getUserMedia = async () => scannerTestStream;
+            }
+            """);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Start camera", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Pause camera", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Start camera", Exact = true })).ToHaveCountAsync(0);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Pause camera", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Start camera", Exact = true })).ToBeVisibleAsync();
+        (await Page.EvaluateAsync<bool>("scannerTestStream.getTracks().every(t => t.readyState === 'ended')")).Should().BeTrue();
+        await Page.GetByText("Enter product code", new() { Exact = true }).ClickAsync();
+        await Page.GetByLabel("Product code", new() { Exact = true }).FillAsync("SKU-1");
+        await Page.GetByLabel("Product code", new() { Exact = true }).BlurAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Send code", Exact = true }).ClickAsync();
+        await Expect(Page.GetByTestId("scanner-status")).ToHaveTextAsync("Sent to desktop");
+        var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, "artifacts", "pos-scanner");
+        Directory.CreateDirectory(directory);
+        await Page.ScreenshotAsync(new() { Path = Path.Combine(directory, $"mobile-minimal-{width}.png"), FullPage = true });
+        (await Page.EvaluateAsync<bool>("document.documentElement.scrollWidth <= innerWidth")).Should().BeTrue();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Leave pairing", Exact = true }).ClickAsync();
+        await Expect(Page.GetByTestId("scanner-status")).ToHaveTextAsync("Disconnected");
+    }
+
+    [TestCase(390,844)]
+    [TestCase(1366,768)]
+    public async Task CashierMobileScanner_RealCashierPaymentPause_NewCustomerKeepsPairingAndDiscardsOldScans(int width,int height)
     {
         await Page.SetViewportSizeAsync(width,height);
         await Page.GotoAsync(app.Urls.Single() + "/cashier-scanner-fixture");
@@ -395,16 +457,14 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
         state.QueuedScan = new(original,2,"SKU-1");
         await state.Cashier!.ClearForFixture();
         await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync("0.00");
-        await Wait(() => state.RevokedPairings.Contains(original));
-        await Expect(Page.GetByRole(AriaRole.Button,new() {Name="Scan with phone",Exact=true})).ToBeEnabledAsync();
-        await Page.GetByRole(AriaRole.Button,new() {Name="Scan with phone",Exact=true}).ClickAsync();
-        await Page.GetByRole(AriaRole.Button,new() {Name="Done",Exact=true}).ClickAsync();
-        var replacement = state.LatestPairing!.PairingId;
-        replacement.Should().NotBe(original);
+        await Wait(() => Interlocked.Read(ref state.Acknowledged) == 2);
+        await Expect(Page.GetByRole(AriaRole.Button,new() {Name="Phone connected",Exact=true})).ToBeEnabledAsync();
+        state.LatestPairing!.PairingId.Should().Be(original);
+        Volatile.Read(ref state.Revokes).Should().Be(0);
         await Page.WaitForTimeoutAsync(1200);
         await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync("0.00");
         state.CatalogRequests.Should().ContainSingle("old queued code must not enter the new sale");
-        state.QueuedScan = new(replacement,1,"SKU-1");
+        state.QueuedScan = new(original,3,"SKU-1");
         await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync("10.00");
         Volatile.Read(ref state.FinancialCalls).Should().Be(0,"Pay only opened the actual payment stage; no financial submission was used");
     }
@@ -474,7 +534,7 @@ public sealed class PosPairingFixtureRoot : ComponentBase
     [Inject] public NavigationManager Navigation { get; set; } = null!;
     protected override void BuildRenderTree(RenderTreeBuilder b)
     {
-        b.AddMarkupContent(0,"<!doctype html><html data-base-color='zinc' data-primary-color='green'><head><base href='/'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/css/themes.css'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/blazorblueprint.css'><link rel='stylesheet' href='cashier-css/app.css'><style>body{margin:16px;font-family:Arial}button{gap:8px}.app-main{height:100dvh}</style></head><body>");
+        b.AddMarkupContent(0,"<!doctype html><html data-base-color='zinc' data-primary-color='green'><head><base href='/'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/css/themes.css'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/blazorblueprint.css'><link rel='stylesheet' href='_content/XFramework.Portal.Features.POS/XFramework.Portal.Features.POS.bundle.scp.css'><link rel='stylesheet' href='cashier-css/app.css'><style>body{margin:16px;font-family:Arial}button{gap:8px}.app-main{height:100dvh}.mobile-scanner{max-width:528px;margin:auto}</style></head><body>");
         b.OpenComponent(1,new Uri(Navigation.Uri).AbsolutePath switch
         {
             "/cashier-scanner-fixture" => typeof(PosScannerFixtureCashierSurface),

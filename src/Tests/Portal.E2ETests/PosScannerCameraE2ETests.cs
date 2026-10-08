@@ -49,6 +49,11 @@ public sealed class PosScannerCameraE2ETests : PageTest
         app = builder.Build();
         app.UseStaticFiles(new StaticFileOptions
         {
+            FileProvider = new PhysicalFileProvider(Path.Combine(root, "src/Presentation/XFramework.Portal.Shared/wwwroot")),
+            RequestPath = "/_content/XFramework.Portal.Shared"
+        });
+        app.UseStaticFiles(new StaticFileOptions
+        {
             FileProvider = new PhysicalFileProvider(Path.Combine(root, "src/Presentation/XFramework.Portal.Features.POS/wwwroot")),
             RequestPath = "/_content/XFramework.Portal.Features.POS"
         });

@@ -15,6 +15,38 @@ public sealed class PortalLoginStartupE2ETests : PageTest
         ReducedMotion = ReducedMotion.Reduce
     };
 
+    [Test]
+    public async Task Login_PhoneScannerReturnUrl_AuthenticatesAndOpensScanner()
+    {
+        var username = Environment.GetEnvironmentVariable("PORTAL_E2E_USERNAME");
+        var password = Environment.GetEnvironmentVariable("PORTAL_E2E_PASSWORD");
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+            Assert.Ignore("Set PORTAL_E2E_USERNAME and PORTAL_E2E_PASSWORD for the authenticated scanner login test.");
+
+        await Page.SetViewportSizeAsync(390, 844);
+        try
+        {
+            await Page.GotoAsync("/pos/mobile-scanner", new() { WaitUntil = WaitUntilState.DOMContentLoaded });
+            await Expect(Page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex("/login\\?ReturnUrl="));
+            var usernameInput = Page.GetByLabel("Username", new() { Exact = true });
+            await Expect(usernameInput).ToBeEnabledAsync(new() { Timeout = 30_000 });
+            await usernameInput.FillAsync(username!);
+            await Page.GetByLabel("Password", new() { Exact = true }).FillAsync(password!);
+            await Page.GetByRole(AriaRole.Button, new() { Name = "Sign in", Exact = true }).ClickAsync();
+
+            await Expect(Page).ToHaveURLAsync(new Uri(new Uri(ContextOptions().BaseURL!), "/pos/mobile-scanner").ToString());
+            await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Pair scanner", Exact = true }))
+                .ToBeVisibleAsync(new() { Timeout = 30_000 });
+            await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Start camera", Exact = true })).ToBeEnabledAsync();
+            await Expect(Page.Locator("#blazor-error-ui")).ToBeHiddenAsync();
+        }
+        finally
+        {
+            // Revoke only the session created in this isolated browser context.
+            await Page.GotoAsync("/auth/logout");
+        }
+    }
+
     [TestCase(1366, 768)]
     [TestCase(390, 844)]
     public async Task Login_FreshAnonymousSession_LoadsRuntimeAndAcceptsInput(int width, int height)

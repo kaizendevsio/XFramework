@@ -4,13 +4,13 @@
 
 The scanner is independently scoped to this component instance, the selected
 register, trusted tenant, cashier actor, and desktop login session. Cashier mounts
-the pairing component in its header and keys it to the current sale generation.
+the pairing component in its header and keeps it mounted across sale generations.
 
 ```razor
 @using XFramework.Portal.Features.POS.Scanner
 
 <CashierScannerPairing
-    @key="_scannerSaleGeneration"
+    SaleGeneration="_scannerSaleGeneration"
     RegisterId="@(TryResolveSelectedRegisterId() ?? Guid.Empty)"
     Disabled="@IsMobileScannerPaused"
     ScanReceived="ReceiveMobileScan" />
@@ -29,7 +29,8 @@ lease without draining or acknowledging the queue. New phone sends receive 423
 The component also checks `Disabled` immediately before each callback. Codes already
 queued before the modal opened remain pending until it closes. Completed checkout,
 cart clearing/replacement, and register or tenant changes rotate the sale generation
-and dispose/revoke the old pairing. Opening payment invalidates in-flight catalog
+and discard old-sale queued scans. Only register/tenant changes revoke pairing.
+Opening payment invalidates in-flight catalog
 lookups; ordinary product addition and closing payment retain the pairing.
 
 Place the always-mounted component in `cashier-header-actions`. It renders one
@@ -156,13 +157,18 @@ interpretation is performed.
 ## Coordination And Limits
 
 Pairing challenges expire after two minutes and are consumed once. Pairings have
-a thirty-minute hard expiry, and require a desktop heartbeat within thirty seconds.
+a sliding thirty-minute expiry renewed by authorized desktop heartbeats, and require
+a desktop heartbeat within thirty seconds. Connected pairings do not display an
+expiry/countdown and can last an entire shift. The two-minute one-use challenge
+still expires before a phone claims it. Completing, clearing, or replacing a sale
+discards pending old-sale codes without disconnecting the phone; tenant/register
+changes, logout, explicit disconnect, or loss of the desktop lease end pairing.
 Disconnect revokes immediately; failed revocation/logout loses its desktop lease
 within thirty seconds. A component-specific random desktop key isolates tabs even
 when their login session is shared. Phone keys are bound to the independent phone
 login session. None of these keys is persisted in local storage or embedded in QR.
 
-Each pairing queues at most 32 codes and accepts at most 1,024 sequences; at most
+Each pairing queues at most 32 codes, with no per-shift scan-count cutoff; at most
 eight active pairings per tenant/cashier and 4,096 globally are retained. A retry of
 the latest identical sequence/payload is idempotent; stale, conflicting or skipped
 sequences fail. Distinct sequences carrying the same product both count, even
@@ -188,7 +194,7 @@ dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj -m:1 /nr:false --fi
 ```
 
 Coverage includes unauthorized tenant/actor/session/capability, trusted tenant
-delegation, challenge consumption/expiry, revocation, lease/hard expiry, replay,
+delegation, challenge consumption/expiry, revocation, lease expiry, full-shift renewal, replay,
 bounded queues, payment pause, repeated-product sequences, stale callback lifetime,
 concurrent mobile entry, real generated wrappers/handlers through loopback Bolt,
 local WASM decoding and deterministic video, denied camera permission, and compact

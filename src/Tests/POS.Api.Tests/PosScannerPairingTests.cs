@@ -136,16 +136,46 @@ public sealed class PosScannerPairingTests
     }
 
     [Test]
-    public void Status_HardExpiryIsNotExtendedByHeartbeats()
+    public void Status_ConnectedDesktopKeepsPairingForEntireShift()
     {
         var pairing = Create();
         var claimed = store.Claim(phone, pairing.Challenge).Data!;
-        for (var i = 0; i < 120; i++)
+        for (var i = 0; i < 2880; i++)
         {
             clock.Advance(TimeSpan.FromSeconds(15));
             store.Poll(desktop, pairing.PairingId, pairing.DesktopKey, 0);
         }
-        store.Status(phone, pairing.PairingId, claimed.PhoneKey).StatusCode.Should().Be(403);
+        store.Status(phone, pairing.PairingId, claimed.PhoneKey).IsSuccess.Should().BeTrue();
+        store.Send(phone, pairing.PairingId, claimed.PhoneKey, 1, "SKU-1").IsSuccess.Should().BeTrue();
+    }
+
+    [Test]
+    public void Poll_NewSaleDiscardsOldQueueWithoutDisconnectingPhone()
+    {
+        var pairing = Create();
+        var claimed = store.Claim(phone, pairing.Challenge).Data!;
+        store.Send(phone, pairing.PairingId, claimed.PhoneKey, 1, "OLD-SALE");
+        store.Poll(phone, pairing.PairingId, pairing.DesktopKey, 0, discardPending: true).StatusCode.Should().Be(403);
+        store.Poll(desktop with { TenantId = Guid.NewGuid() }, pairing.PairingId, pairing.DesktopKey, 0, discardPending: true).StatusCode.Should().Be(403);
+        var reset = store.Poll(desktop, pairing.PairingId, pairing.DesktopKey, 0, discardPending: true).Data!;
+        reset.Codes.Should().BeEmpty();
+        reset.AcknowledgedSequence.Should().Be(1);
+        store.Status(phone, pairing.PairingId, claimed.PhoneKey).IsSuccess.Should().BeTrue();
+        store.Send(phone, pairing.PairingId, claimed.PhoneKey, 2, "NEW-SALE").IsSuccess.Should().BeTrue();
+        store.Poll(desktop, pairing.PairingId, pairing.DesktopKey, 1).Data!.Codes.Should().ContainSingle(c => c.Code == "NEW-SALE");
+    }
+
+    [Test]
+    public void Send_MoreThan1024AcknowledgedScans_DoesNotRequirePairingAgain()
+    {
+        var pairing = Create();
+        var claimed = store.Claim(phone, pairing.Challenge).Data!;
+        for (var sequence = 1; sequence <= 1100; sequence++)
+        {
+            store.Send(phone, pairing.PairingId, claimed.PhoneKey, sequence, "SKU-1").IsSuccess.Should().BeTrue();
+            store.Poll(desktop, pairing.PairingId, pairing.DesktopKey, sequence - 1).Data!.Codes.Should().ContainSingle();
+            store.Poll(desktop, pairing.PairingId, pairing.DesktopKey, sequence).IsSuccess.Should().BeTrue();
+        }
     }
 
     [Test]

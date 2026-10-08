@@ -19,4 +19,4 @@ public partial record PosScannerSendResponse(long Sequence, bool Duplicate);
 
 [MemoryPackable]
 public partial record PosScannerPollResponse(bool IsPaired, DateTimeOffset ExpiresAt,
-    List<PosScannerCodeResponse> Codes);
+    List<PosScannerCodeResponse> Codes, long AcknowledgedSequence = 0);
