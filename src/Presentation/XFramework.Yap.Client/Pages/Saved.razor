@@ -1,8 +1,9 @@
+@code { [CascadingParameter] public YapBranding TenantBrand { get; set; } = YapBranding.Default; }
 @page "/saved"
 @implements IDisposable
 @inject ChatState State
 @inject BrowserTime Times
-<PageTitle>Saved · Yap</PageTitle>
+<PageTitle>Saved · @TenantBrand.Name</PageTitle>
 @if (State.User is null) { <div class="body"><p class="empty">Sign in to see the messages you saved.</p><a class="btn" href="/login">Sign in</a></div> }
 else
 {

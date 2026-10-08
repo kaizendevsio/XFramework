@@ -1,3 +1,4 @@
+@code { [CascadingParameter] public YapBranding TenantBrand { get; set; } = YapBranding.Default; }
 @page "/chat/{Id:guid}"
 @page "/chat/{Id:guid}/details"
 @page "/thread/{Id:guid}/{ParentId:guid}"
@@ -6,7 +7,7 @@
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject VoiceState Voice
-<PageTitle>@(ParentId.HasValue ? "Thread" : State.Selected?.Name ?? "Conversation") · Yap</PageTitle>
+<PageTitle>@(ParentId.HasValue ? "Thread" : State.Selected?.Name ?? "Conversation") · @TenantBrand.Name</PageTitle>
 @if (State.User is null) { <div class="body"><p>Sign in to open this conversation.</p><a class="btn" href="/login">Sign in</a></div> }
 else
 {

@@ -18,6 +18,10 @@ The sign-in page links to account registration. New accounts receive the configu
 
 ## Connect to XFramework
 
+For multiple branded tenant origins, configure exact `Yap:Hosts` mappings as described
+in [Yap white-label host routing](../../../docs/solutions/architecture-patterns/yap-white-label-host-routing.md).
+Without that mapping the existing `Yap:TenantId` and `Yap:RoleId` setup continues to work.
+
 The xeon-dev deployment hosts Yap at `https://xeon-dev.tailed40e.ts.net:5188` for tailnet users. The normal workflow builds its image, checks Bolt readiness, and configures its own Tailscale Serve listener. Backend HTTP binds only to `127.0.0.1:5188`; other Serve routes are preserved. The protected deployment environment supplies the dedicated service credentials plus `YAP_TENANT_ID` and `YAP_ROLE_ID`. The dev provisioning script initializes missing workspace values to the provisioned Yap test workspace and preserves explicit overrides. Data Protection keys persist in the `yap-keydata` volume. Login sessions are held in the shared cache named by `Yap__SessionCacheConnection` (Redis in compose) as Data Protection ciphertext, so a restart or rollout no longer signs everyone out. Without that setting the host falls back to an in-process store, which is fine for local runs and tests but loses every session on restart.
 
 Use an existing XFramework environment with IdentityServer, Communications, Storage, and Bolt Hub running. The host needs no database connection or new module database; the browser owns a private local SQLite cache. Modules retain their existing single-database, schema-per-module ownership.

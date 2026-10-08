@@ -20,6 +20,22 @@ namespace Yap.Tests;
 [TestFixture]
 public sealed class YapSessionsTests
 {
+    [TestCase(YapAuth.TenantClaim)]
+    [TestCase(ClaimTypes.NameIdentifier)]
+    public async Task SessionClaims_MustMatchStoredTenantAndCredential_BeforeTouchActorOrRevocation(string claim)
+    {
+        using var provider = new ServiceCollection().BuildServiceProvider();
+        var (sessions, _) = Build(provider);
+        var user = await sessions.CreateAsync(Session());
+        var altered = new ClaimsPrincipal(new ClaimsIdentity(user.Claims.Select(value =>
+            value.Type == claim ? new Claim(claim, Guid.NewGuid().ToString()) : value), YapAuth.Scheme));
+        Assert.That(await sessions.ContainsAsync(altered), Is.False);
+        Assert.That(await sessions.TouchAsync(altered), Is.Null);
+        Assert.ThrowsAsync<UnauthorizedAccessException>(async () => await sessions.GetActorAsync(altered, default));
+        await sessions.RevokeAsync(altered, default);
+        Assert.That(await sessions.ContainsAsync(user), Is.True);
+    }
+
     [TestCase(HttpStatusCode.ServiceUnavailable)]
     [TestCase(HttpStatusCode.TooManyRequests)]
     [TestCase(HttpStatusCode.InternalServerError)]

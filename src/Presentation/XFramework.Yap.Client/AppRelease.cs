@@ -2,10 +2,15 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.80";
+    public const string Version = "1.3.82";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
-        (Version, "5 October 2026", [
+        (Version, "8 October 2026", [
+            "Calls protect audio bandwidth more accurately and recover video sooner when a fresh key picture arrives.",
+            "Compatible devices can use power-efficient HEVC video; other calls keep their shared codec.",
+            "Video diagnostics now show congestion budgets and recovery counters.",
+            "Operators can serve multiple tenant brands from one Yap host with isolated sign-ins and manifests."]),
+        ("1.3.80", "5 October 2026", [
             "Video calls now default to 1080p at 30 fps for smoother, lighter calls; your own choice is kept if you set one.",
             "Calls start at the right quality straight away: Yap measures the connection while the call connects and reaches your chosen resolution in about a second instead of half a minute."]),
         ("1.3.79", "5 October 2026", [

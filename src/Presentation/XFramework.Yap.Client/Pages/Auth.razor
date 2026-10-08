@@ -1,3 +1,4 @@
+@code { [CascadingParameter] public YapBranding TenantBrand { get; set; } = YapBranding.Default; }
 @page "/login"
 @page "/register"
 @page "/signup"
@@ -6,10 +7,10 @@
 @inject ChatApi Api
 @inject ChatState State
 @inject NavigationManager Nav
-<PageTitle>@(Register ? "Create an account" : "Sign in") · Yap</PageTitle>
+<PageTitle>@(Register ? "Create an account" : "Sign in") · @TenantBrand.Name</PageTitle>
 <ScrollSurface><Header><div class="appbar plain"><a class="iconbtn" href="/" aria-label="Back to chats"><Icon Name="back" /></a></div></Header>
-<ChildContent><div class="body authbody"><div class="authbrand"><Brand /><span class="muted">A little closer.</span></div>
-<h1>@(Register ? "Join the conversation." : "Welcome back.")</h1><p>@(Register ? "Create your Yap account." : "Sign in to pick up where you left off.")</p>
+<ChildContent><div class="body authbody"><div class="authbrand"><Brand /><span class="muted">@TenantBrand.Tagline</span></div>
+<h1>@(Register ? "Join the conversation." : "Welcome back.")</h1><p>@(Register ? $"Create your {TenantBrand.Name} account." : "Sign in to pick up where you left off.")</p>
 <form @onsubmit="SubmitAsync" @onsubmit:preventDefault>
 @if (Register) { <label class="field"><span class="lab">Display name</span><span class="inp"><Icon Name="user" /><input @bind="name" @bind:event="oninput" autocomplete="name" required maxlength="100" /></span></label> }
 <label class="field"><span class="lab">Username</span><span class="inp"><Icon Name="user" /><input @bind="username" @bind:event="oninput" autocomplete="username" autocapitalize="none" spellcheck="false" required minlength="3" maxlength="100" pattern="[a-zA-Z0-9_.\-]+" /></span></label>

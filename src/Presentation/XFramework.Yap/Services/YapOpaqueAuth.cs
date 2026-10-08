@@ -13,14 +13,15 @@ public static class YapOpaqueAuth
     public static void MapYapOpaqueAuth(this WebApplication app)
     {
         app.MapPost("/api/auth/opaque", async (OpaqueAuthRequest request, HttpContext context,
-            IAntiforgery antiforgery, IConfiguration configuration, IIdentityServerServiceWrapper identity,
+            IAntiforgery antiforgery, YapTenants tenants, IIdentityServerServiceWrapper identity,
             ICommunicationsChatActorProvider actors, IActorAccessTokenScope tokens, YapSessions sessions, CancellationToken ct) =>
         {
             context.Response.Headers.CacheControl = "no-store";
             try { await antiforgery.ValidateRequestAsync(context); }
             catch (AntiforgeryValidationException) { return Results.BadRequest(new { error = "Refresh the page and try again." }); }
-            if (!Guid.TryParse(configuration["Yap:TenantId"], out var tenant) || !Guid.TryParse(configuration["Yap:RoleId"], out var role))
+            if (tenants.Resolve(context) is not { } workspace)
                 return Results.StatusCode(503);
+            var (tenant, role, _) = workspace;
             request.RoleId = role;
             // A device that installed Yap stays signed in like any messenger. Without this the
             // upstream session carries a 24-hour cap that no refresh extends, and the first

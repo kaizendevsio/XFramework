@@ -1,10 +1,11 @@
+@code { [CascadingParameter] public YapBranding TenantBrand { get; set; } = YapBranding.Default; }
 @page "/settings"
 @page "/settings/{Section}"
 @implements IDisposable
 @inject ChatState State
 @inject NavigationManager Nav
 @inject IJSRuntime JS
-<PageTitle>Settings · Yap</PageTitle>
+<PageTitle>Settings · @TenantBrand.Name</PageTitle>
 <ScrollSurface>
 <Header><div class="appbar plain liquid-glass"><GlassLayer />@if (Section is not null) { <a class="iconbtn" href="/settings" aria-label="Back to settings"><Icon Name="back" /></a> }<h1>@SectionTitle</h1><span class="sp"></span></div></Header>
 <ChildContent>
