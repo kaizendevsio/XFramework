@@ -54,6 +54,12 @@ did not recur. Excluding those two fixtures, the recorded rerun passed 926 tests
 skipped and none failed (933 total). The unrelated fixture startup failures remain a validation
 limitation; the full suite is not claimed as passing locally.
 
+On final transport source `d043c71a`, the same broader run excluding those two unavailable
+fixtures passed 938 tests, with seven skipped and none failed (945 total). The narrow final
+branding render/call surface group passed 16 tests, including custom and default product
+names in install, update, reconnect and microphone guidance. Those copy-only UI changes
+do not change the measured transport source.
+
 A real Chromium live-upgrade smoke check initialized HEVC at 2560x1440/30fps,
 attempted 60fps (native encode refused), and then encoded ten further pictures with
 the untouched 30fps encoder: 10/10 outputs, encoder still configured. This verifies

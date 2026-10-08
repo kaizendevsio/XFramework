@@ -1,5 +1,6 @@
 @inject ChatState State
 @inject NavigationManager Nav
+@code { [CascadingParameter] public YapBranding TenantBrand { get; set; } = YapBranding.Default; }
 <div class="conversation-details">
     <section class="details-identity">
         <Avatar Initials="@Conversation.Initials" ImageUrl="@Conversation.AvatarUrl" Color="@Conversation.Color" Size="a80" />
@@ -93,7 +94,7 @@
         <div class="set-note" role="group" aria-label="Confirm conversation deletion">
             @if (deleteEveryone)
             {
-                <p>Delete this conversation for everyone? Members will lose access to its messages in Yap. Their cached chat and unsent messages will be removed when they reconnect. This cannot be undone.</p>
+                <p>Delete this conversation for everyone? Members will lose access to its messages in @TenantBrand.Name. Their cached chat and unsent messages will be removed when they reconnect. This cannot be undone.</p>
             }
             else { <p>Remove this conversation from your chat list? Other members keep their conversation. Starting this conversation again restores its history.</p> }
             @if (deleteError is not null) { <p role="alert">@deleteError</p> }

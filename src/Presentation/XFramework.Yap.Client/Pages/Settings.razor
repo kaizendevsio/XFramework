@@ -89,11 +89,11 @@
         @if (installed)
         {
             <div class="set-row">
-                <span class="set-key"><Icon Name="check" Size="19" /><span class="set-label">Installed<small>Yap is running as an app on this device</small></span></span>
+                <span class="set-key"><Icon Name="check" Size="19" /><span class="set-label">Installed<small>@TenantBrand.Name is running as an app on this device</small></span></span>
             </div>
         }
         <button type="button" class="set-row set-action" @onclick="() => changes = !changes" aria-expanded="@changes.ToString().ToLowerInvariant()">
-            <span class="set-key"><Icon Name="info" Size="19" /><span class="set-label">Version @Yap.Client.AppRelease.Version<small>What's new in Yap</small></span></span>
+            <span class="set-key"><Icon Name="info" Size="19" /><span class="set-label">Version @Yap.Client.AppRelease.Version<small>What's new in @TenantBrand.Name</small></span></span>
             <Icon Name="arrow" Size="17" />
         </button>
         @if (changes)
@@ -109,7 +109,7 @@
         @if (!installed)
         {
             <button type="button" class="set-row set-action" @onclick="InstallAsync">
-                <span class="set-key"><Icon Name="download" Size="19" /><span class="set-label">Install Yap<small>Add Yap to your home screen</small></span></span>
+                <span class="set-key"><Icon Name="download" Size="19" /><span class="set-label">Install @TenantBrand.Name<small>Add @TenantBrand.Name to your home screen</small></span></span>
             </button>
         }
         <button type="button" class="set-row set-action" @onclick="() => gestures = !gestures" aria-expanded="@gestures.ToString().ToLowerInvariant()">
@@ -175,13 +175,13 @@
 @code {
     [Parameter] public string? Section { get; set; }
     private string SectionTitle => Categories.FirstOrDefault(x => x.Route == Section).Title ?? "Settings";
-    private static readonly (string Route, string Title, string Icon, string Description)[] Categories = [
+    private (string Route, string Title, string Icon, string Description)[] Categories => [
         ("appearance", "Appearance", "moon", "Theme, colors, glass and haptics"),
-        ("notifications", "Notifications", "alert", "Alerts while Yap is closed"),
+        ("notifications", "Notifications", "alert", $"Alerts while {TenantBrand.Name} is closed"),
         ("privacy", "Privacy and security", "shield", "Encryption, recovery and devices"),
         ("calls", "Calls", "phone", "Microphone, ringtone and volume"),
         ("storage", "Storage and sync", "wifi", "Offline messages and pending sends"),
-        ("app", "About Yap", "info", "Updates, installation and gestures"),
+        ("app", $"About {TenantBrand.Name}", "info", "Updates, installation and gestures"),
         ("help", "Help and diagnostics", "settings", "Troubleshooting and logs")];
     private bool signOut, gestures, glass, changes, canInstall, installed, diagnostics;
     private bool haptics = true, canVibrate;
