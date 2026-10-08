@@ -4,16 +4,19 @@
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject VoiceState Voice
-<main class="app-shell @(State.User is not null && Tab is not null ? "with-tabs" : "")">
-    <div class="screen">@Body</div>
-    @if (State.User is not null && Tab is { } tab) { <div class="shell-tabs"><TabBar Current="@tab" /></div> }
-    <InstallPrompt />
-    <VoiceCall />
-    <ToastHost><UpdateNotice /></ToastHost>
+<main class="app-shell @((!State.Ready || State.User is not null) && Tab is not null ? "with-tabs" : "")">
+    <div class="screen">@if (!State.Ready) { <Yap.Client.Pages.Inbox /> } else { @Body }</div>
+    @if ((!State.Ready || State.User is not null) && Tab is { } tab) { <div class="shell-tabs" inert="@(!State.Ready ? "" : null)"><TabBar Current="@tab" /></div> }
+    @if (State.Ready)
+    {
+        <InstallPrompt />
+        <VoiceCall />
+        <ToastHost><UpdateNotice /></ToastHost>
+    }
 </main>
 @code {
     private IDisposable? navigation;
-    private string? Tab => Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].TrimEnd('/') switch
+    private string? Tab => !State.Ready ? "inbox" : Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].TrimEnd('/') switch
     { "" => "inbox", "calls" => "calls", "saved" => "saved", "settings" => "settings", _ => null };
     protected override void OnInitialized()
     {
@@ -24,6 +27,6 @@
     private void Changed() => _ = InvokeAsync(StateHasChanged);
     private void LocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args) => Changed();
     protected override async Task OnAfterRenderAsync(bool firstRender)
-    { await JS.InvokeVoidAsync("yap.motion.complete"); await JS.InvokeVoidAsync("yap.device.checkUpdate"); await Voice.InitializeAsync(); }
+    { await JS.InvokeVoidAsync("yap.motion.complete"); if (State.Ready) { await JS.InvokeVoidAsync("yap.device.checkUpdate"); await Voice.InitializeAsync(); } }
     public void Dispose() { State.Changed -= Changed; Nav.LocationChanged -= LocationChanged; navigation?.Dispose(); }
 }

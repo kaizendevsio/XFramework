@@ -6,3 +6,4 @@
     z-index: 1;
 }
 .startup-recovery a { color: inherit; text-underline-offset: 4px; }
+.startup-wait { position:fixed;inset-inline:20px;bottom:100px;padding:16px;border-radius:16px;background:var(--surface2);text-align:center;z-index:2; }

@@ -28,6 +28,7 @@ public sealed class CallUxSurfaceTests
         services.AddSingleton<VoiceState>(); services.AddSingleton<BrowserTime>();
         await using var provider = services.BuildServiceProvider();
         var state = provider.GetRequiredService<ChatState>();
+        typeof(ChatState).GetProperty(nameof(ChatState.Ready))!.SetValue(state, true);
         typeof(ChatState).GetProperty(nameof(ChatState.User))!.SetValue(state, new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Sam"));
         state.Conversations.AddRange([new() { Id = Guid.NewGuid(), Name = "Alex", IsFavorite = true }, new() { Id = Guid.NewGuid(), Name = "Jamie", IsFavorite = true }, new() { Id = Guid.NewGuid(), Name = "Weekend plans", Preview = "See you tomorrow" }]);
         await using var renderer = new HtmlRenderer(provider, provider.GetRequiredService<ILoggerFactory>());
@@ -59,6 +60,38 @@ public sealed class CallUxSurfaceTests
             Assert.That(callHtml, Does.Contain(">Missed video call</span>"));
             Assert.That(callHtml, Does.Contain("class=\"call-event missed\""));
             await SaveArtifactAsync("calls", callHtml);
+        });
+    }
+
+    [Test]
+    public async Task Shell_BeforeStorageIsReady_ShowsInboxWithoutMountingRequestedPage()
+    {
+        var services = new ServiceCollection().AddLogging();
+        var js = new Mock<IJSInProcessRuntime>();
+        services.AddSingleton<IJSRuntime>(js.Object);
+        services.AddSingleton<NavigationManager>(new Navigation());
+        services.AddSingleton(new ChatApi(new HttpClient { BaseAddress = new("https://yap.test/") }));
+        services.AddSingleton(p => new ChatState(null!, p.GetRequiredService<ChatApi>(), js.Object));
+        services.AddSingleton<VoiceState>(); services.AddSingleton<BrowserTime>();
+        await using var provider = services.BuildServiceProvider();
+        await using var renderer = new HtmlRenderer(provider, provider.GetRequiredService<ILoggerFactory>());
+        await renderer.Dispatcher.InvokeAsync(async () =>
+        {
+            var mounted = false;
+            RenderFragment pageRequiringStorage = b => { mounted = true; b.AddContent(0, "Requested conversation"); };
+            var page = await renderer.RenderComponentAsync<MainLayout>(ParameterView.FromDictionary(new Dictionary<string, object?> { ["Body"] = pageRequiringStorage }));
+            var html = page.ToHtmlString();
+            Assert.That(html, Does.Contain("inbox-header").And.Contain("inbox-skeleton").And.Contain("shell-tabs"));
+            Assert.That(html, Does.Contain("aria-busy=\"true\"").And.Contain("inert"));
+            Assert.That(html, Does.Not.Contain("Sign in").And.Not.Contain("Opening device storage").And.Not.Contain("startup-splash"));
+            Assert.That(mounted, Is.False, "Account-dependent pages must wait for storage.");
+            await SaveArtifactAsync("startup-inbox", html);
+            js.VerifyNoOtherCalls();
+            var state = provider.GetRequiredService<ChatState>();
+            typeof(ChatState).GetProperty(nameof(ChatState.Ready))!.SetValue(state, true);
+            state.Notify();
+            Assert.That(page.ToHtmlString(), Does.Contain("Requested conversation").And.Not.Contain("inbox-skeleton"));
+            Assert.That(mounted, Is.True, "The original route must become usable after restoration.");
         });
     }
 
