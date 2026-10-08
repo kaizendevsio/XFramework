@@ -69,6 +69,36 @@ public sealed class BoltMediaServiceResumeTests
     }
 
     [Test]
+    public async Task Diagnostics_MergeRecoveryByStream_AndExposeTheLatestBudget()
+    {
+        await using var f = await Fixture.CreateAsync();
+        await f.Media.StartHostedAudioAsync(f.Call);
+        await f.Media.StartVideoAsync(f.Call, VideoCodec.H264, 720);
+        var incoming = Guid.NewGuid();
+        var untracked = Guid.NewGuid();
+        f.Js.VideoSnapshot = new VideoDiagnostics { Remotes = [new() { StreamId = incoming, RenderedFps = 27 }, new() { StreamId = untracked }] };
+        var buffer = new VideoRecoveryBuffer();
+        buffer.Configure(true, 500);
+        buffer.Push(1, VideoFrameFragments.Split(new byte[10], 1, 0, true)[0], 0, []);
+        var assemblers = (Dictionary<Guid, VideoRecoveryBuffer>)typeof(BoltMediaService)
+            .GetField("_videoAssemblers", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(f.Media)!;
+        assemblers.Add(incoming, buffer);
+        var loop = RateLoop(f.Media)!;
+        loop.Tick(Environment.TickCount64);
+        var snapshot = await f.Media.GetVideoDiagnosticsAsync(true);
+        Assert.Multiple(() =>
+        {
+            Assert.That(snapshot!.Remotes[0].RenderedFps, Is.EqualTo(27), "browser samples remain intact");
+            Assert.That(snapshot.Remotes[0].Recovery!.StreamId, Is.EqualTo(incoming));
+            Assert.That(snapshot.Remotes[0].Recovery!.Fragments, Is.EqualTo(1));
+            Assert.That(snapshot.Remotes[0].Recovery!.RecoveryMs, Is.EqualTo(1050));
+            Assert.That(snapshot.Remotes[1].Recovery, Is.Null, "never attribute another stream's loss");
+            Assert.That(snapshot.TotalBudgetKbps, Is.EqualTo(loop.LastDecision!.Value.TotalKbps));
+            Assert.That(snapshot.Congestion, Is.EqualTo(loop.LastDecision!.Value.Signal.ToString()));
+        });
+    }
+
+    [Test]
     public async Task Resume_RepublishesTheCameraWithoutReopeningIt_AndStartsOnAKeyframe()
     {
         await using var f = await Fixture.CreateAsync();
@@ -283,6 +313,7 @@ public sealed class BoltMediaServiceResumeTests
     public sealed class RecordingJs : IJSInProcessRuntime, IJSObjectReference
     {
         public ConcurrentQueue<string> Calls { get; } = new();
+        public VideoDiagnostics? VideoSnapshot { get; set; }
         public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args) => InvokeAsync<TValue>(identifier, CancellationToken.None, args);
         public ValueTask<TValue> InvokeAsync<TValue>(string identifier, CancellationToken cancellationToken, object?[]? args)
             => ValueTask.FromResult(Invoke<TValue>(identifier, args));
@@ -293,6 +324,7 @@ public sealed class BoltMediaServiceResumeTests
                 : typeof(TValue) == typeof(bool) ? true
                 : typeof(TValue) == typeof(byte[]) ? new byte[16]
                 : typeof(TValue) == typeof(VoiceCapabilities) ? new VoiceCapabilities(true, null, true)
+                : typeof(TValue) == typeof(VideoDiagnostics) ? VideoSnapshot
                 : typeof(TValue) == typeof(VideoCaptureState) ? CameraState()
                 : default(TValue);
             return (TValue)value!;

@@ -2337,11 +2337,11 @@ public sealed partial class BoltServer : IDisposable
             return;
         }
 
-        // Authenticated relays carry exactly two kinds of payload: Opus voice and one of the three
+        // Authenticated relays carry exactly two kinds of payload: Opus voice and one of the negotiated
         // negotiable video codecs. Screen share and everything else stays unrouted.
         if (_authenticatedMediaOnly && !(
                 config.MediaType == MediaType.Audio && config.CodecId == CodecId.Opus ||
-                config.MediaType == MediaType.Video && config.CodecId is CodecId.H264 or CodecId.VP9 or CodecId.AV1))
+                config.MediaType == MediaType.Video && config.CodecId is CodecId.H264 or CodecId.VP9 or CodecId.AV1 or CodecId.H265))
             return;
 
         if (_requireEncryptedMedia)

@@ -112,6 +112,23 @@ public sealed class VideoCallTests
         Assert.That(chosen, Is.EqualTo(VideoCodec.Av1));
     }
 
+    [Test]
+    public void HardwareHevc_RequiresEveryPeerAndPowerEfficientDecoder()
+    {
+        var ladder = Ladder(new(VideoCodec.Hevc, true, true, true, 2160, true), Full(VideoCodec.H264));
+        var software = Ladder(new(VideoCodec.Hevc, true, true, false, 2160), Full(VideoCodec.H264));
+        Assert.Multiple(() =>
+        {
+            Assert.That(ladder.Negotiate([[VideoCodec.Hevc, VideoCodec.H264]], 1440), Is.EqualTo(VideoCodec.Hevc));
+            Assert.That(ladder.Negotiate([[VideoCodec.Hevc, VideoCodec.H264], []], 720), Is.EqualTo(VideoCodec.H264));
+            Assert.That(software.Negotiate([[VideoCodec.Hevc, VideoCodec.H264]], 360), Is.EqualTo(VideoCodec.H264));
+            Assert.That(software.EncodingCeiling(VideoCodec.Hevc), Is.Zero);
+            Assert.That(software.Decodable, Does.Not.Contain(VideoCodec.Hevc));
+            Assert.That(VideoCodecLadder.ReadAdvertisement("hevc,h264,future"), Is.EqualTo(new[] { VideoCodec.Hevc, VideoCodec.H264 }));
+            Assert.That(VideoCodecLadder.FromCodecId(VideoCodecLadder.ToCodecId(VideoCodec.Hevc)), Is.EqualTo(VideoCodec.Hevc));
+        });
+    }
+
     // Software AV1 at 1080p on a phone is a slideshow. The ladder must fall through to a codec
     // this device can actually keep up with rather than promise compression it cannot deliver.
     [Test]

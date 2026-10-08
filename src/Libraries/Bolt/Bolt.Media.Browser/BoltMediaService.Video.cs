@@ -41,9 +41,16 @@ public sealed partial class BoltMediaService
     {
         var snapshot = await _video.DiagnosticsAsync(enabled);
         var path = MediaPath;
+        var decision = _rateLoop?.LastDecision;
+        var receive = GetVideoReceiveStats().ToDictionary(x => x.StreamId);
         return snapshot is null ? null : snapshot with
         {
             SendQueue = _videoSend?.Reader.Count ?? 0,
+            UplinkResent = _transport?.UplinkResent ?? 0,
+            TotalBudgetKbps = decision?.TotalKbps, AudioBitrateKbps = decision?.AudioKbps,
+            VideoBudgetKbps = decision?.VideoKbps, QueueDelayMs = decision?.DelayMs,
+            Congestion = decision?.Signal.ToString(), VideoSuspended = decision?.VideoSuspended ?? false,
+            Remotes = snapshot.Remotes.Select(remote => remote with { Recovery = receive.GetValueOrDefault(remote.StreamId) }).ToArray(),
             // Both legs: "UDP/relay (relay UDP/relay)". A TCP or TLS leg on either side is the first thing to look for.
             Transport = path.RelayLeg is { } relayLeg ? $"{path.Description} (relay {relayLeg})" : path.Description, TransportReason = path.Reason, TransportRttMs = path.RttMs, AudioRedundancy = path.AudioRedundancy,
         };
