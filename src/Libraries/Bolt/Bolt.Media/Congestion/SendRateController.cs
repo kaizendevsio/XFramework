@@ -1,3 +1,5 @@
+using Bolt.Protocol;
+
 namespace Bolt.Media.Congestion;
 
 /// <summary>Tuning for <see cref="SendRateController"/>. Defaults target a WebSocket (TCP) call path.</summary>
@@ -76,6 +78,8 @@ public sealed class SendRateOptions
     public double HoldLossFraction { get; init; } = 0.02;
     /// <summary>Bolt, SFrame and WS/TLS/TCP bytes on every audio packet, and packets per second.</summary>
     public int AudioOverheadBytes { get; init; } = 130;
+    /// <summary>The part inside a media frame (Bolt and compact SFrame); audio bundles share the outer transport framing.</summary>
+    public int AudioMediaOverheadBytes { get; init; } = 50;
     public int AudioPacketsPerSecond { get; init; } = 50;
 }
 
@@ -98,10 +102,12 @@ public readonly record struct ReceiverSignal(long ReceivedAtMs, int QueueDelayMs
 /// <summary>One observation window of the send path.</summary>
 /// <param name="NowMs">Monotonic time.</param>
 /// <param name="SentKbps">Media actually handed to the transport in the window (audio and video).</param>
-/// <param name="AudioKbps">The audio part of <paramref name="SentKbps"/>, including packet overhead.</param>
+/// <param name="AudioKbps">The audio part of <paramref name="SentKbps"/>, including the framing the sample observes; the wire reserve also covers transport framing.</param>
 /// <param name="LocalQueueDelayMs">Age of what waits in the sender's own queues, plus the transport backlog at the delivery rate.</param>
 /// <param name="LocalCapacityKbps">Uplink rate measured while the pacer was blocked on the transport; 0 = not link limited.</param>
 /// <param name="LocalBaseLost">The sender's own queue lost a base-layer picture in the window (and now waits for a keyframe).</param>
+/// <param name="AudioPacketsPerSecond">Current Opus packet rate; 0 uses the configured default.</param>
+/// <param name="AudioRedundancy">The datagram path bundles each audio frame with its predecessor, below the pacer's sample.</param>
 public readonly record struct SendPathSample(
     long NowMs,
     int SentKbps,
@@ -111,7 +117,9 @@ public readonly record struct SendPathSample(
     bool LocalBaseLost,
     RelaySignal? Relay = null,
     ReceiverSignal? Receiver = null,
-    TransportSignal? Transport = null);
+    TransportSignal? Transport = null,
+    int AudioPacketsPerSecond = 0,
+    bool AudioRedundancy = false);
 
 public enum RateSignal { Normal, Overuse, Hold }
 
@@ -658,8 +666,23 @@ public sealed class SendRateController
         if (_lastCongestionKbps > 0 && _estimate > _lastCongestionKbps * 1.3) _lastCongestionKbps = 0;
     }
 
-    private int AudioWireKbps(in SendPathSample sample) =>
-        sample.AudioKbps > 0 ? sample.AudioKbps : _audioKbps + _options.AudioOverheadBytes * 8 * _options.AudioPacketsPerSecond / 1000;
+    private int AudioWireKbps(in SendPathSample sample)
+    {
+        var packets = sample.AudioPacketsPerSecond > 0 ? sample.AudioPacketsPerSecond : _options.AudioPacketsPerSecond;
+        // The pacer counts Bolt frames, before the socket/data channel adds its framing. A live audio sample must
+        // not erase that reserve, nor may a quiet/VBR window lend voice's next packets to the video encoder.
+        var reserved = _audioKbps + _options.AudioOverheadBytes * 8 * packets / 1000;
+        var outer = Math.Max(0, _options.AudioOverheadBytes - _options.AudioMediaOverheadBytes) * 8 * packets / 1000;
+        var wire = Math.Max(sample.AudioKbps + outer, reserved);
+        if (sample.AudioRedundancy)
+        {
+            // A bundle repeats the encrypted media frame, not IP/DTLS/SCTP framing. Observed large/legacy SFrame
+            // headers are retained; a quiet/VBR window still reserves the next voice packet and its predecessor.
+            var copy = Math.Max(sample.AudioKbps, _audioKbps + _options.AudioMediaOverheadBytes * 8 * packets / 1000);
+            wire += copy + (MediaBundleCodec.Size(0, 0) * 8 * packets + 999) / 1000;
+        }
+        return wire;
+    }
 
     private int ResumeTotalKbps(in SendPathSample sample) => _options.ResumeVideoKbps + AudioWireKbps(sample);
 

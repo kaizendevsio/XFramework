@@ -233,8 +233,25 @@ public sealed class VideoRecoveryBuffer
             if (slot.Total > 1 && slot.Parts[^1]!.Length > slot.FragmentSize) Lose(slot);
             else slot.Complete = true;
         }
+        if (slot.Complete && slot.Keyframe) SupersedeBefore(slot);
         while (_bytes > MaxBufferedBytes && _pictures.Count > 0) LoseOldest();
         Release(ready);
+    }
+
+    private void SupersedeBefore(Picture keyframe)
+    {
+        // A complete keyframe has no older references. Waiting for an earlier missing picture only adds latency
+        // and asks for repairs the decoder no longer needs; resume immediately from this authenticated keyframe.
+        foreach (var older in _pictures.Values.Where(x => Newer(keyframe.FirstSequence, x.FirstSequence)).ToArray())
+        {
+            var complete = older.Complete;
+            Lose(older);
+            Remove(older);
+            if (!complete) GiveUp(older);
+            else { Handled(older.FrameId); Note($"supersede{older.FrameId}"); }
+        }
+        foreach (var sequence in _missing.Keys.Where(x => Newer(keyframe.FirstSequence, x)).ToArray())
+            _missing.Remove(sequence);
     }
 
     /// <summary>

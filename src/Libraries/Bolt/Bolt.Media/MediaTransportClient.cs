@@ -44,10 +44,12 @@ public sealed class MediaTransportClientOptions
     public long RedundancyBacklogBytes { get; init; } = 8 * 1024;
     /// <summary>
     /// A video frame the relay's transport feedback reports lost on this device's uplink is sent again at once (and again
-    /// if that copy is lost too), while it is younger than this (0: never). Receivers wait about this long for a lost
-    /// frame (see VideoRecoveryBuffer).
+    /// if that copy is lost too). Allow this much time beyond the measured uplink round trip, bounded by 1.5 s
+    /// from the original send (0: never). A fixed 400 ms lifetime expires before feedback on a long mobile path.
     /// </summary>
     public int ResendLostVideoMs { get; init; } = 400;
+    /// <summary>Without a media pacer, automatic repairs stand back while the data channel holds this many bytes.</summary>
+    public long RepairBacklogBytes { get; init; } = 8 * 1024;
 }
 
 /// <summary>
@@ -103,6 +105,20 @@ public sealed class MediaTransportClient : IAsyncDisposable
 
     /// <summary>Video frames sent again because the relay reported them lost on the uplink.</summary>
     public long UplinkResent => Interlocked.Read(ref _resent);
+    /// <summary>Optional media pacer: enqueue an unchanged video frame, its first send time, and its repair deadline.</summary>
+    public Func<byte[], long, long, bool>? QueueVideoRepair { get; set; }
+
+    private int RepairLifetimeMs => _options.ResendLostVideoMs <= 0 ? 0 :
+        (int)Math.Min(1_500, _options.ResendLostVideoMs + Math.Clamp(ActivePeer?.Path?.RttMs ?? 0, 0, 5_000));
+
+    /// <summary>Send a queued repair on the active datagram path, preserving its original age across repeat losses.</summary>
+    public bool TrySendVideoRepair(ReadOnlySpan<byte> frame, long firstSentAt)
+    {
+        if (ActivePeer is not { } peer || RepairLifetimeMs == 0 || _clock() - firstSentAt > RepairLifetimeMs) return false;
+        if (!SendMessage(peer, frame, StampsMessages, resendable: true, firstSentAt)) return false;
+        Interlocked.Increment(ref _resent);
+        return true;
+    }
 
     private sealed class Session(string id, MediaTransportConfig config, long createdAt)
     {
@@ -467,7 +483,8 @@ public sealed class MediaTransportClient : IAsyncDisposable
         // (its NACK, forwarded by the relay) would take two more trips across both legs, longer than it waits.
         if (resend is not null && ActivePeer is { } peer)
             foreach (var (lost, firstSentAt) in resend)
-                if (SendMessage(peer, lost, StampsMessages, resendable: true, firstSentAt)) Interlocked.Increment(ref _resent);
+                if (QueueVideoRepair is { } queue) queue(lost, firstSentAt, firstSentAt + RepairLifetimeMs);
+                else if (peer.BufferedAmount <= _options.RepairBacklogBytes) TrySendVideoRepair(lost, firstSentAt);
         if (signal is { } value)
         {
             try { TransportFeedback?.Invoke(value); }
@@ -480,6 +497,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
     {
         List<(byte[] Message, long FirstSentAt)>? lost = null;
         var now = _clock();
+        var lifetime = RepairLifetimeMs;
         lock (_resendable)
         {
             for (var index = 0; index < arrivals.Count; index++)
@@ -487,7 +505,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
                 var sequence = unchecked((ushort)(first + index));
                 ref var slot = ref _resendable[sequence % _resendable.Length];
                 if (slot.Message is null || slot.Sequence != sequence) continue;
-                if (arrivals[index] < 0 && now - slot.SentAt <= _options.ResendLostVideoMs) (lost ??= []).Add((slot.Message, slot.SentAt));
+                if (arrivals[index] < 0 && lifetime > 0 && now - slot.SentAt <= lifetime) (lost ??= []).Add((slot.Message, slot.SentAt));
                 slot = default;
             }
         }

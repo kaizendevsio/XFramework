@@ -395,6 +395,13 @@ public sealed partial class BoltMediaService : IAsyncDisposable
                 try { return client.GetPrimaryConnection().PendingBytes + _audio.TransportBufferedBytes() + (datagram?.BufferedAmount ?? 0); }
                 catch (InvalidOperationException) { return 0; }
             });
+        if (datagram is not null)
+            datagram.QueueVideoRepair = (frame, firstSentAt, expiresAt) => pacer.EnqueueVideoRepair(frame, expiresAt,
+                (repair, _) =>
+                {
+                    if (!datagram.TrySendVideoRepair(repair.Span, firstSentAt)) throw new InvalidOperationException("The video repair expired or its datagram path closed.");
+                    return ValueTask.CompletedTask;
+                });
         // The pacer dropped a base picture itself: every receiver is stalled until the next keyframe.
         pacer.KeyframeNeeded += () => _ = _video.RequestKeyframeAsync(force: true);
         pacer.Start();
@@ -440,6 +447,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
                 await Task.Delay(Math.Max(100, _options.AdaptationIntervalMs), ct);
                 // The start probe's padding fills the channel's buffer and the relay's feedback on purpose: no decision on that.
                 if (_transport?.Probing == true) continue;
+                loop.AudioRedundancy = _transport is { IsDatagramActive: true, AudioRedundancy: true };
                 var tick = loop.Tick(Environment.TickCount64, _encodeBacklog);
                 SendRate = tick.Decision;
                 LastSendTick = tick;
