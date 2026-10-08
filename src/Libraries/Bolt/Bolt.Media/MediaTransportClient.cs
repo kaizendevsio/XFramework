@@ -402,7 +402,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
                 }
                 // Wait for the relay to report every message of the step (and its echoes), a couple of round trips at most.
                 var rtt = ActivePeer?.Path?.RttMs is double measured && measured > 0 ? measured : 100;
-                var deadline = _clock() + (long)Math.Clamp(rtt * 2 + 120, 150, 900);
+                var deadline = _clock() + (long)Math.Clamp(rtt * 2 + 120, 150, 3_000);
                 while (_clock() < deadline && !ct.IsCancellationRequested)
                 {
                     var (uplink, echoes) = probe.Pending(step, echo);

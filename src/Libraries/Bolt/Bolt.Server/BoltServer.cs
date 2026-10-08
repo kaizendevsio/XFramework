@@ -5413,6 +5413,7 @@ public sealed class BoltHubConnection
             _retransmitTokens--;
         }
         if (!datagram.TrySend(frame)) return false;
+        _datagramDrain.Sent(frame.Length);
         Interlocked.Increment(ref _retransmitted);
         return true;
     }

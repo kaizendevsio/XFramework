@@ -66,3 +66,13 @@ be described as a cure for the severe-link bottleneck. Further work must isolate
 stalls/path switching, measure production audio in a bounded sender cohort, and attribute
 reverse-wire overhead before selecting another transport change. Actual phone thermal and
 capture-rate validation is still required for the hardware-efficiency claim.
+
+Investigation of the repeated production traces found two further correctness defects. The
+start probe capped its feedback wait at 900ms, shorter than the measured 1000ms round trip;
+it now waits from measured RTC RTT, bounded at 3000ms. A real negotiated client/relay test
+delays traffic 500ms in each direction and verifies that both uplink feedback and echoed
+downlink measurements arrive. Silence tests retain a bounded wait and never invent capacity.
+Relay retransmissions now enter the drain accounting ledger, so repairs that drain between
+samples cannot falsely look stalled when the sampled buffer size stays constant. The existing
+stall timeout remains unchanged. These fixes require a fresh production measurement; neither
+alone proves that the initial severe-link overshoot or later path switching is resolved.
