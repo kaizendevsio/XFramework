@@ -1,12 +1,13 @@
+@code { [CascadingParameter] public YapBranding TenantBrand { get; set; } = YapBranding.Default; }
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 @inject VoiceState Voice
 @if (show && !Voice.IsCalling && !status.Installed)
 {
-    <BottomSheet Title="Install Yap" OnClose="DismissAsync"><div class="picker install-guide">
-        <p>Keep Yap on your home screen for quicker access to your conversations.</p>
-        @if (status.Native) { <button class="btn" @onclick="InstallAsync">Install Yap</button> }
+    <BottomSheet Title="@($"Install {TenantBrand.Name}")" OnClose="DismissAsync"><div class="picker install-guide">
+        <p>Keep @TenantBrand.Name on your home screen for quicker access to your conversations.</p>
+        @if (status.Native) { <button class="btn" @onclick="InstallAsync">Install @TenantBrand.Name</button> }
         else if (status.Platform == "ios") { <p>In Safari, tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>, and tap <strong>Add</strong>. If needed, first open this page in Safari.</p> }
         else { <p>Open your browser menu and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>. Availability depends on your browser.</p> }
         <button class="btn ghost" @onclick="DismissAsync">Not now</button>

@@ -8,7 +8,7 @@
         <div class="toast liquid-glass @notice.Kind" role="status" @key="notice.Id">
             <GlassLayer />
             <Icon Name="@notice.Icon" Size="17" Class="toast-icon" />
-            <span class="toast-text">@notice.Message</span>
+            <span class="toast-text">@(notice is { Group: Connectivity, Kind: "info" } ? $"Can’t reach {TenantBrand.Name}. Reconnecting…" : notice.Message)</span>
             @if (notice is { ActionText: not null, ActionHref: not null })
             {
                 <a class="toast-action" href="@notice.ActionHref">@notice.ActionText</a>
@@ -22,6 +22,7 @@
     }
 </div>
 @code {
+    [CascadingParameter] public YapBranding TenantBrand { get; set; } = YapBranding.Default;
     [Parameter] public RenderFragment? ChildContent { get; set; }
     private const string Connectivity = "connectivity";
     private readonly List<Notice> notices = [];
@@ -51,7 +52,7 @@
                     "Your session ended. Sign in to sync.", "Sign in", "/login"), null);
             else if (!State.Online)
                 Show(new Notice(Guid.NewGuid(), Connectivity, "info", "wifi",
-                    "Can’t reach Yap. Reconnecting…", null, null), null);
+                    "Reconnecting…", null, null), null);
             else if (State.PendingCount > 0)
                 Show(new Notice(Guid.NewGuid(), Connectivity, "ok", "wifi",
                     "Connected. Syncing your messages.", null, null), TimeSpan.FromSeconds(4));

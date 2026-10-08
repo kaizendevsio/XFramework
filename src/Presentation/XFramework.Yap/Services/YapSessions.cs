@@ -47,14 +47,14 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
     public async ValueTask<bool> ContainsAsync(ClaimsPrincipal? user, CancellationToken ct = default) =>
         user?.Identity?.IsAuthenticated == true &&
         user.FindFirstValue(YapAuth.SessionClaim) is { } key &&
-        await ReadAsync(key, ct) is not null;
+        await ReadAsync(key, ct) is { } entry && Matches(user, entry);
 
     /// <summary>Records use and returns the deadline the sign-in now holds, or null once the
     /// idle window lapsed or sign-out revoked it.</summary>
     public async ValueTask<DateTimeOffset?> TouchAsync(ClaimsPrincipal? user, CancellationToken ct = default)
     {
         if (user?.Identity?.IsAuthenticated != true || user.FindFirstValue(YapAuth.SessionClaim) is not { } key ||
-            await ReadAsync(key, ct) is not { } entry) return null;
+            await ReadAsync(key, ct) is not { } entry || !Matches(user, entry)) return null;
         if (Roll(entry)) await WriteAsync(key, entry, ct);
         return entry.ActiveUntil;
     }
@@ -96,6 +96,7 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
         try
         {
             var entry = await ReadAsync(key, ct) ?? throw new UnauthorizedAccessException("Your session ended. Please sign in again.");
+            if (!Matches(user, entry)) throw new UnauthorizedAccessException("Your session ended. Please sign in again.");
             // Chat work is use like any other. A socket that stays open for days never
             // revalidates the cookie, so the actor path has to roll the sign-in itself.
             var rolled = Roll(entry);
@@ -123,7 +124,7 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
         await gate.WaitAsync(ct);
         try
         {
-            if (await ReadAsync(key, ct) is not { } entry) return true;
+            if (await ReadAsync(key, ct) is not { } entry || !Matches(user, entry)) return true;
             // A refusal right after a rotation is a request that raced it with the old token,
             // or proof the new token is refused too. Rotating again fixes neither, and this
             // bounds a misbehaving upstream to one forced rotation per session per interval.
@@ -176,6 +177,7 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
         var key = user.FindFirstValue(YapAuth.SessionClaim);
         if (key is null) return;
         var entry = await ReadAsync(key, ct);
+        if (entry is not null && !Matches(user, entry)) return;
         await cache.RemoveAsync(CacheKey(key), ct);
         gates.TryRemove(key, out _);
         if (entry is null) return;
@@ -192,6 +194,10 @@ public sealed class YapSessions(IDistributedCache cache, IDataProtectionProvider
     }
 
     private static string CacheKey(string key) => $"yap:session:{key}";
+
+    private static bool Matches(ClaimsPrincipal user, Entry entry) =>
+        Guid.TryParse(user.FindFirstValue(YapAuth.TenantClaim), out var tenant) && tenant == entry.TenantId &&
+        Guid.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var credential) && credential == entry.CredentialId;
 
     // Use pushes the idle deadline out. Returns whether the move is worth a write.
     private bool Roll(Entry entry)

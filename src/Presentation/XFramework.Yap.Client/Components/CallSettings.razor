@@ -1,5 +1,6 @@
 @inject IJSRuntime JS
 @inject VoiceState Voice
+@code { [CascadingParameter] public YapBranding TenantBrand { get; set; } = YapBranding.Default; }
 <h3 class="set-group">Video quality</h3>
 <div class="set-list"><VideoQualitySettings /></div>
 <h3 class="set-group">Microphone</h3>
@@ -8,7 +9,7 @@
         <span class="set-key"><Icon Name="mic" Size="19" /><span class="set-label">Enable microphone<small>@microphoneNotice</small></span></span>
     </button>
 </div>
-<p class="set-footnote">Your browser controls microphone permission. On iPhone, Safari's website settings may offer Microphone > Allow. An installed web app may still ask again; installing Yap cannot grant permanent access. This check releases the microphone immediately.</p>
+<p class="set-footnote">Your browser controls microphone permission. On iPhone, Safari's website settings may offer Microphone > Allow. An installed web app may still ask again; installing @TenantBrand.Name cannot grant permanent access. This check releases the microphone immediately.</p>
 <h3 class="set-group">Incoming call ringtone</h3>
 <div class="set-list">
     <div class="set-row">
@@ -86,8 +87,8 @@
     }
 
     private void Describe(RingStatus status) => notice = status.Audible ? "Incoming calls ring like this on this device."
-        : status.Vibrating ? "This browser blocked the sound, so Yap vibrates instead."
+        : status.Vibrating ? $"This browser blocked the sound, so {TenantBrand.Name} vibrates instead."
         : volume == 0 ? "Ring volume is off. Incoming calls still show on screen."
         : selected == "silent" ? "Silent ringing. Incoming calls vibrate where the device supports it."
-        : "This browser blocked the sound. Open Yap and tap once before a call arrives, or check your device’s mute switch.";
+        : $"This browser blocked the sound. Open {TenantBrand.Name} and tap once before a call arrives, or check your device’s mute switch.";
 }

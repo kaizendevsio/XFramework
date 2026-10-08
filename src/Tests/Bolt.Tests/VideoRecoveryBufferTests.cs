@@ -68,6 +68,32 @@ public sealed class VideoRecoveryBufferTests
         });
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ACompleteKeyframe_ReplacesOlderLossImmediately_AndStopsObsoleteRepairs(bool partiallyReceived)
+    {
+        var sender = new Sender();
+        var buffer = Recovering(rttMs: 1_000);
+        Push(buffer, sender.Picture(1, 0, key: true));
+        var missing = sender.Picture(2, 0, fragments: 2);
+        if (partiallyReceived) Push(buffer, [missing[0]]);
+        Push(buffer, sender.Picture(3, 0));
+        Assert.That(Poll(buffer, 20).Nacks, Is.Not.Empty);
+
+        var keyframe = sender.Picture(4, 0, key: true, fragments: 2);
+        Assert.That(Push(buffer, [keyframe[0]], now: 40), Is.Empty, "an incomplete keyframe still needs its fragments");
+        var ready = Push(buffer, [keyframe[1]], now: 60);
+        Assert.Multiple(() =>
+        {
+            Assert.That(ready.Select(x => x.FrameId), Is.EqualTo(new[] { 4u }), "no 1.5 second wait for references this keyframe does not use");
+            Assert.That(ready[0].IsKeyframe, Is.True, "the decoder can restart on the picture already available");
+            Assert.That(Poll(buffer, 80).Nacks, Is.Empty, "the older loss needs no more wire traffic");
+            Assert.That(Push(buffer, missing, now: 100), Is.Empty, "late obsolete repair cannot rebuild a discarded picture");
+            Assert.That(buffer.Incomplete, Is.EqualTo(partiallyReceived ? 1 : 0), "the complete dependent picture was superseded, not incomplete");
+        });
+        Assert.That(Push(buffer, sender.Picture(5, 0), now: 120).Single().Discontinuity, Is.False);
+    }
+
     [TestCase(14)]
     [TestCase(200)]
     public void APictureStillArriving_IsNotAskedFor_NorGivenUp_HoweverLongItTakesToSend(int rttMs)

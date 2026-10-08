@@ -1,8 +1,9 @@
+@code { [CascadingParameter] public YapBranding TenantBrand { get; set; } = YapBranding.Default; }
 @page "/calls"
 @implements IDisposable
 @inject ChatState State
 @inject VoiceState Voice
-<PageTitle>Calls · Yap</PageTitle>
+<PageTitle>Calls · @TenantBrand.Name</PageTitle>
 <ScrollSurface><Header><div class="appbar plain liquid-glass"><GlassLayer /><h1>Calls</h1><span class="sp"></span><a class="iconbtn" href="/new" aria-label="Start a conversation"><Icon Name="edit" /></a></div></Header>
 <ChildContent><div class="body calls-panel">
 @if (State.User is null)

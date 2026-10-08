@@ -395,6 +395,13 @@ public sealed partial class BoltMediaService : IAsyncDisposable
                 try { return client.GetPrimaryConnection().PendingBytes + _audio.TransportBufferedBytes() + (datagram?.BufferedAmount ?? 0); }
                 catch (InvalidOperationException) { return 0; }
             });
+        if (datagram is not null)
+            datagram.QueueVideoRepair = (frame, firstSentAt, expiresAt) => pacer.EnqueueVideoRepair(frame, expiresAt,
+                (repair, _) =>
+                {
+                    if (!datagram.TrySendVideoRepair(repair.Span, firstSentAt)) throw new InvalidOperationException("The video repair expired or its datagram path closed.");
+                    return ValueTask.CompletedTask;
+                });
         // The pacer dropped a base picture itself: every receiver is stalled until the next keyframe.
         pacer.KeyframeNeeded += () => _ = _video.RequestKeyframeAsync(force: true);
         pacer.Start();
@@ -438,9 +445,12 @@ public sealed partial class BoltMediaService : IAsyncDisposable
             while (!ct.IsCancellationRequested)
             {
                 await Task.Delay(Math.Max(100, _options.AdaptationIntervalMs), ct);
-                // The start probe's padding fills the channel's buffer and the relay's feedback on purpose: no decision on that.
-                if (_transport?.Probing == true) continue;
-                var tick = loop.Tick(Environment.TickCount64, _encodeBacklog);
+                var now = Environment.TickCount64;
+                // Probe padding can fill the local channel, but media feedback still measures the live call.
+                // Keep adapting its rate and audio while ignoring only that local queue, as at ProbeEnded.
+                if (_transport?.Probing == true) loop.Controller.IgnoreLocalUntil(now + 1_500);
+                loop.AudioRedundancy = _transport is { IsDatagramActive: true, AudioRedundancy: true };
+                var tick = loop.Tick(now, _encodeBacklog);
                 SendRate = tick.Decision;
                 LastSendTick = tick;
                 PacerDroppedPictures += tick.Pacer.DroppedPictures;

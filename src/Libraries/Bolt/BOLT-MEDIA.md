@@ -164,6 +164,8 @@ message, with DTLS as an extra hop layer.
   audio frame with its predecessor (`MediaBundle`) while its own queue is short, until loss stays below 0.5%
   for 10 s.
 - **Video fragments** are cut to fit one message on this path (4 KB on the socket); receivers take either.
+- **Voice budget.** The sender reserves the codec rate and packet framing at the encoder's accepted packet duration, including a repeated encrypted frame while audio redundancy is active. Bundles share the outer transport headers; their frame lengths and bundle header are additional bytes.
+- **Uplink repairs.** Transport feedback can enqueue a lost video fragment in the same sender pacer, behind audio and under video's token and transport backlog limits. The repair queue is bounded to 64 KiB and 256 fragments. Its deadline includes the measured uplink round trip plus 400 ms, capped at 1.5 s from the original send; repeat losses do not reset that age. A complete received keyframe replaces older incomplete pictures and cancels their obsolete NACKs immediately.
 - **Lifecycle.** A channel that does not open in 15 s or fails falls back to the socket, then retries with
   backoff; a network change restarts ICE in place; credentials are renewed with a fresh session before they
   expire, and a resumed socket negotiates its own.

@@ -15,7 +15,7 @@ const source = readFileSync(new URL('../wwwroot/bolt-media.js', import.meta.url)
 // a browser too old for either.
 function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 8, battery = null, cameras = 1,
     capture = 'processor', frameFromElement = true, clock = () => performance.now(), webgl = null, mediaCapabilities = undefined,
-    orientationInit = true } = {}) {
+    orientationInit = true, flushError = null } = {}) {
     const listeners = new Map();
     const stats = { encoded: [], decoded: [], stopped: 0, opened: [], invoked: [], closedFrames: 0, frames: [] };
 
@@ -115,6 +115,10 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
             this.callbacks.output({ byteLength: 8, type: options?.keyFrame ? 'key' : 'delta', timestamp: frame.timestamp,
                 copyTo(target) { target.fill(1); } }, {});
         }
+        async flush() {
+            const error = typeof flushError === 'function' ? flushError(this.config) : flushError;
+            if (error) throw new Error(error);
+        }
         close() { this.state = 'closed'; }
     }
     class Decoder {
@@ -136,6 +140,7 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
     };
     let track = null;
     const sandbox = {
+        setTimeout, clearTimeout,
         console, URL, Uint8Array, Float32Array, Math, Date, JSON, Promise, Set, Map, Number, performance: { now: clock }, isSecureContext: true,
         AudioEncoder: class { static async isConfigSupported() { return { supported: true }; } },
         AudioDecoder: class { static async isConfigSupported() { return { supported: true }; } },
@@ -192,6 +197,8 @@ this.ceiling = videoDeviceCeiling;
 this.capabilities = checkVideoCapabilities;
 this.strategyOf = typeof videoCaptureStrategy === 'function' ? videoCaptureStrategy : () => 'absent';
 this.codecString = videoCodecString;
+this.hevcBitstreamCodec = hevcBitstreamCodec;
+this.encoderConfig = encoderConfig;
 this.fitTier = fitTierToSource;
 this.GlFramePainter = GlFramePainter;
 this.orientationMatrix = orientationMatrix;
@@ -1444,4 +1451,71 @@ test('diagnostics say which painter an iPhone is using', async () => {
     await f.p.startCapture(f.host, {});
     f.video.emit(0);
     assert.equal(f.p.getDiagnostics().strategy, 'rvfc/webgl');
+});
+
+
+test('HEVC uses Annex B and probes its actual size for power efficiency', async () => {
+    const queries = [];
+    const mc = Object.fromEntries(['encodingInfo', 'decodingInfo'].map(method => [method, async query => {
+        queries.push(query); return { supported: true, powerEfficient: query.video.contentType === 'video/H265' };
+    }]));
+    const f = fixture({ mediaCapabilities: mc });
+    const hevc = (await f.sandbox.probe(1440)).find(x => x.codec === 'hevc');
+    assert.equal(hevc.hardware, true); assert.equal(hevc.decodeHardware, true);
+    assert.equal(hevc.maxHeight, 1440);
+    const config = f.sandbox.encoderConfig('hevc', 2561, 1441, 5000, 60, 'prefer-hardware');
+    assert.equal(config.hevc.format, 'annexb');
+    assert.equal(config.width, 2560); assert.equal(config.height, 1440);
+    assert.equal(config.codec, 'hvc1.1.6.L156.B0'); // An over-1440 short edge requires the next level.
+    assert.ok(queries.filter(q => q.video.contentType === 'video/H265').every(q => q.video.height === 1440));
+});
+
+test('HEVC SPS updates decoder profile and level without enabling software latency fallback', async () => {
+    const f = fixture();
+    const canvas = f.sandbox.document.createElement('canvas');
+    await f.p.addRemote('hevc-peer', canvas, 'hevc');
+    // Main profile, compatibility flags1/2, progressive/nonpacked/frameonly; escaped zero runs.
+    const sps = new Uint8Array([0,0,0,1,66,1,1,1,96,0,0,3,0,176,0,0,3,0,0,3,0,153]);
+    assert.equal(f.sandbox.hevcBitstreamCodec(sps), 'hvc1.1.6.L153.B0');
+    assert.equal(f.p.decodeFrame('hevc-peer', sps, 0, true), true);
+    const remote = f.p.remotes.get('hevc-peer');
+    assert.equal(remote.decoder.config.codec, 'hvc1.1.6.L153.B0');
+    assert.equal(remote.decoder.config.hardwareAcceleration, 'prefer-hardware');
+    for (let i = 0; i < 20; i++) await f.p._considerDecoderLatency(remote, { displayWidth: 1920, displayHeight: 1080 }, 150);
+    assert.equal(remote.software, false);
+    assert.equal(f.sandbox.hevcBitstreamCodec(sps.slice(0, 12)), null);
+    assert.equal(f.sandbox.hevcBitstreamCodec(new Uint8Array([0,0,1,66,1,1,1,0,0,1,66,1])), null);
+});
+
+
+test('HEVC validates a real first output before publishing despite a positive capability probe', async () => {
+    const failing = fixture({ flushError: 'Encoder creation error' });
+    await assert.rejects(failing.p.initEncoder('hevc', 2560, 1440, 5000, 60, 10), /Encoder creation error/);
+    assert.equal(failing.p.encoder, null);
+    assert.equal(failing.stats.opened.length, 0, 'no camera permission or stream before native refusal');
+    const working = fixture();
+    await working.p.initEncoder('hevc', 2560, 1440, 5000, 30, 10);
+    assert.equal(working.p.encoder.state, 'configured');
+    assert.equal(working.stats.invoked.length, 0, 'synthetic verification frame is never sent');
+    assert.equal(working.p.encodeCount, 0, 'verification is not counted as call throughput');
+});
+
+test('HEVC refuses a live 60 fps upgrade before changing the working encoder and retries the same size at 30', async () => {
+    const f = fixture({ flushError: config => config.framerate > 30 ? 'Encoder creation error' : null });
+    await f.p.initEncoder('hevc', 1280, 720, 1500, 30, 10);
+    await f.p.startCapture(f.host, {});
+    const encoder = f.p.encoder, config = f.p.config, before = f.p.tier;
+    await assert.rejects(f.p.applyTier(2560, 1440, 7500, 60), /Encoder creation error/);
+    assert.equal(f.p.encoder, encoder);
+    assert.equal(f.p.config, config);
+    assert.equal(f.p.tier, before);
+    assert.equal(encoder.state, 'configured');
+    assert.equal(f.p.captureRunning, true);
+    assert.equal(f.stats.stopped, 0, 'a refused upgrade does not release the working camera');
+    assert.equal(await f.p.applyTier(2560, 1440, 7500, 30), true);
+    assert.equal(f.p.config.height, 1440);
+    assert.equal(f.p.config.framerate, 30);
+    assert.equal(f.p.encoder, encoder, 'reconfigure the existing encoder after successful preflight');
+    assert.equal(f.p.forceKeyframe, true);
+    f.p.stopCapture();
 });

@@ -1,0 +1,714 @@
+{
+  "sourceJob": 113319740669,
+  "description": "Deduplicated path samples across three consecutive repeats; seconds reset at each repeat.",
+  "samples": [
+    {
+      "seconds": 0.3,
+      "phase": "open",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 0.4,
+      "phase": "open",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 14.0,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 14.0,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 19.0,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 19.1,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 24.1,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 24.1,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 29.1,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 29.1,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 34.1,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 34.1,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 39.2,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 39.2,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 44.2,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 44.2,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 49.2,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 49.2,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 54.3,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 54.3,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 59.3,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 59.3,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 64.3,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 64.4,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 69.4,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 69.4,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 74.4,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 74.4,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 79.5,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 79.5,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 84.5,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 84.5,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 89.5,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 89.5,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 94.5,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 94.6,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 99.6,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 99.6,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 104.6,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 104.6,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 109.6,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 109.7,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 0.3,
+      "phase": "open",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 13.8,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 13.8,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 18.8,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 18.8,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 23.9,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 23.9,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 28.9,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 28.9,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 33.9,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 33.9,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 38.9,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 39.0,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 44.0,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 44.0,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 49.0,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 49.0,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 54.1,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 54.1,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 59.1,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 59.1,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 64.2,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 64.2,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 69.2,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 69.2,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 74.2,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 74.2,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 79.2,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 79.2,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 84.3,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 84.3,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 89.3,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 89.3,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 94.3,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 94.3,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 99.3,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 99.3,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 104.4,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 104.4,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 109.4,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 109.4,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 13.7,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 13.7,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 18.7,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 23.8,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 23.8,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 28.8,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 28.8,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 33.8,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 38.9,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 43.9,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 43.9,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 48.9,
+      "phase": "warmup",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 48.9,
+      "phase": "warmup",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 54.0,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 54.0,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 59.0,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 59.0,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 64.1,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 64.1,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 69.1,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 69.1,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 74.1,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 74.1,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 79.1,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 79.1,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 84.2,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 84.2,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 89.2,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 89.2,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 94.2,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 94.2,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 104.3,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 104.3,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 109.3,
+      "phase": "measure",
+      "peer": "A",
+      "path": "UDP/relay (Datagram)"
+    },
+    {
+      "seconds": 109.3,
+      "phase": "measure",
+      "peer": "B",
+      "path": "UDP/relay (Datagram)"
+    }
+  ]
+}

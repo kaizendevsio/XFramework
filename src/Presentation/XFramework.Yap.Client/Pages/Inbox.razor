@@ -1,11 +1,12 @@
+@code { [CascadingParameter] public YapBranding TenantBrand { get; set; } = YapBranding.Default; }
 @page "/"
 @implements IDisposable
 @inject ChatState State
 @inject BrowserTime Times
 @inject NavigationManager Nav
 @inject IJSRuntime JS
-<PageTitle>Yap · A little closer.</PageTitle>
-@if (State.User is null) { <div class="authbody"><div class="authbrand"><Brand /><p>A little closer.</p></div><h1>Good conversations start here.</h1><p>Your people, one conversation away.</p><a class="btn" href="/login">Sign in</a><a class="btn ghost" href="/register">Create an account</a></div> }
+<PageTitle>@TenantBrand.Name · @TenantBrand.Tagline</PageTitle>
+@if (State.User is null) { <div class="authbody"><div class="authbrand"><Brand /><p>@TenantBrand.Tagline</p></div><h1>Good conversations start here.</h1><p>Your people, one conversation away.</p><a class="btn" href="/login">Sign in</a><a class="btn ghost" href="/register">Create an account</a></div> }
 else
 {
 <ScrollSurface><Header><div class="appbar plain liquid-glass inbox-header"><GlassLayer /><Brand /><span class="sp"></span><button class="iconbtn" aria-label="Search conversations" aria-expanded="@searchVisible.ToString().ToLowerInvariant()" @onclick="ToggleSearch"><Icon Name="search" /></button></div>

@@ -66,6 +66,13 @@ public static class YapApplication
             };
             options.Events.OnValidatePrincipal = async context =>
             {
+                var tenants = context.HttpContext.RequestServices.GetRequiredService<YapTenants>();
+                if (!tenants.Matches(context.HttpContext, context.Principal))
+                {
+                    context.HttpContext.Items["Yap.TenantMismatch"] = true;
+                    context.RejectPrincipal();
+                    return;
+                }
                 var sessions = context.HttpContext.RequestServices.GetRequiredService<YapSessions>();
                 // Every authenticated request is both the liveness check and the activity
                 // signal that rolls the sign-in. Null means idle, capped, or signed out.
@@ -102,7 +109,11 @@ public static class YapApplication
         builder.Services.AddYapCalls();
 
         configure?.Invoke(builder);
+        // Validate the complete host allowlist after test/deployment configuration is applied.
+        var tenants = new YapTenants(builder.Configuration);
+        builder.Services.AddSingleton(tenants);
         var app = builder.Build();
+        tenants.UseRouting(app);
         if (!app.Environment.IsDevelopment())
         {
             app.UseExceptionHandler("/error");
@@ -111,6 +122,16 @@ public static class YapApplication
                 branch => branch.UseHttpsRedirection());
         }
         app.UseAuthentication();
+        app.Use(async (context, next) =>
+        {
+            if (context.Items.ContainsKey("Yap.TenantMismatch"))
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                context.Response.Headers.CacheControl = "no-store";
+                return;
+            }
+            await next(context);
+        });
         app.UseWebSockets();
         app.UseAuthorization();
         app.UseAntiforgery();
@@ -125,6 +146,7 @@ public static class YapApplication
         });
         app.MapYapAuth();
         app.MapYapOpaqueAuth();
+        app.MapYapBranding();
         app.MapYapApi();
         app.MapYapCalls();
         // Older workers already pass /api/ through to the network. This recovery
@@ -136,10 +158,9 @@ public static class YapApplication
             return page.Exists ? Results.Stream(page.CreateReadStream(), "text/html; charset=utf-8") : Results.NotFound();
         });
         app.MapGet("/health/live", () => Results.Ok(new { status = "Healthy" }));
-        app.MapGet("/health/ready", (BoltClient client, IConfiguration configuration) =>
+        app.MapGet("/health/ready", (BoltClient client, YapTenants tenantRouting) =>
         {
-            var configured = Guid.TryParse(configuration["Yap:TenantId"], out var tenant) && tenant != Guid.Empty &&
-                             Guid.TryParse(configuration["Yap:RoleId"], out var role) && role != Guid.Empty;
+            var configured = tenantRouting.Configured;
             return client.IsConnected && configured
                 ? Results.Ok(new { status = "Healthy" })
                 : Results.Json(new { status = "Unhealthy", reason = configured ? "Bolt is disconnected" : "Workspace is not configured" },

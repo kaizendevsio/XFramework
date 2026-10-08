@@ -4,6 +4,8 @@
 @inject ChatState State
 @inject ILogger<App> Logger
 @inject IJSRuntime JS
+@inject Branding Branding
+<CascadingValue Value="@Branding.Current">
 @if (!State.Ready || failure is not null)
 {
     <div class="toast-host"><UpdateNotice /></div>
@@ -29,11 +31,18 @@ else
     <Router AppAssembly="typeof(App).Assembly"><Found Context="route"><RouteView RouteData="route" DefaultLayout="typeof(MainLayout)" /></Found>
     <NotFound><LayoutView Layout="typeof(MainLayout)"><div class="body"><h1>Page not found</h1><a class="btn" href="/">Back to chats</a></div></LayoutView></NotFound></Router>
 }
+</CascadingValue>
 @code {
     private string? failure;
     private bool waitingForDatabase;
     private string startupText = "Opening device storage…";
     protected override Task OnInitializedAsync() { State.Changed += Changed; return StartAsync(); }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await Branding.RefreshAsync();
+        StateHasChanged();
+    }
     private void Changed()
     {
         if (!State.Ready) return;

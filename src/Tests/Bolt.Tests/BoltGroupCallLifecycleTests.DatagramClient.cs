@@ -42,7 +42,7 @@ public sealed partial class BoltGroupCallLifecycleTests
     }
 
     /// <summary>A participant's client whose socket is the fixture's in-memory connection for <paramref name="id"/>.</summary>
-    private static Participant Connect(Fixture f, string id, FakeRtcNetwork network, MediaTransportClientOptions? options = null)
+    private static Participant Connect(Fixture f, string id, FakeRtcNetwork network, MediaTransportClientOptions? options = null, Func<long>? clock = null)
     {
         var client = new BoltClient(new Uri("wss://localhost/bolt"), id, id, new BoltClientOptions(), NullLogger<BoltClient>.Instance);
         var bridge = new BridgeTransport(f.Peers[id]);
@@ -53,7 +53,7 @@ public sealed partial class BoltGroupCallLifecycleTests
         typeof(BoltClient).GetField("_isRegistered", flags)!.SetValue(client, true);
         connection.ReceiveLoop = (Task)typeof(BoltClient).GetMethod("ReceiveLoopAsync", flags)!.Invoke(client, [connection, CancellationToken.None])!;
         var factory = network.Factory(RtcPeerRole.Offer);
-        var transport = new MediaTransportClient(client, (peerOptions, ct) => factory.CreateAsync(RtcPeerRole.Offer, peerOptions, ct), NullLogger.Instance, options ?? FastClient);
+        var transport = new MediaTransportClient(client, (peerOptions, ct) => factory.CreateAsync(RtcPeerRole.Offer, peerOptions, ct), NullLogger.Instance, options ?? FastClient, clock);
         return new Participant { Client = client, Transport = transport, Bridge = bridge };
     }
 
@@ -326,7 +326,8 @@ public sealed partial class BoltGroupCallLifecycleTests
         await using var a = Connect(f, "a", network);
         a.Transport.Start();
         await WaitUntil(() => a.Transport.IsDatagramActive);
-        byte[] Audio(uint sequence) => Frame(w => BoltCodec.WriteMediaFrame(w, stream, sequence, 960 * sequence, MediaFrameFlags.Encrypted, [1, 2, 3]));
+        // 32 kbps Opus at 20 ms (80 bytes), plus a representative compact SFrame header/tag (20 bytes).
+        byte[] Audio(uint sequence) => Frame(w => BoltCodec.WriteMediaFrame(w, stream, sequence, 960 * sequence, MediaFrameFlags.Encrypted, new byte[100]));
         // Every third datagram is lost on the way up; the relay measures that and tells the participant.
         network.DropEvery = 3;
         for (uint sequence = 1; sequence <= 30; sequence++) a.Transport.TrySend(Audio(sequence), audio: true);
@@ -338,6 +339,11 @@ public sealed partial class BoltGroupCallLifecycleTests
         // Stamped for this relay's transport feedback; inside the stamp, the previous frame rides along.
         Assert.That(TransportSequenceCodec.TryRead(participant.Sent.Last(), out _, out var last), Is.True);
         Assert.That(last[0], Is.EqualTo((byte)FrameType.MediaBundle), "the previous frame rides along");
+        Assert.That(last.Length, Is.EqualTo(MediaBundleCodec.Size(Audio(31).Length, Audio(32).Length)));
+        var beforeRedundancyKbps = Audio(32).Length * 8 * 50 / 1000;
+        var decision = new Bolt.Media.Congestion.SendRateController(512).Update(new Bolt.Media.Congestion.SendPathSample(
+            0, 500, beforeRedundancyKbps, 5, 0, false, AudioRedundancy: a.Transport.AudioRedundancy));
+        Assert.That(decision.VideoKbps, Is.EqualTo(373), "the pacer's 52 kbps excludes the repeated frame the negotiated transport just bundled");
         await WaitUntil(() => f.Peers["b"].Media(stream).Any(x => x.Sequence == 32));
         Assert.That(f.Peers["b"].Media(stream).GroupBy(x => x.Sequence).All(x => x.Count() == 1), Is.True, "every frame reaches b once");
         Assert.That(a.Transport.Status.AudioRedundancy, Is.True);
@@ -411,6 +417,73 @@ public sealed partial class BoltGroupCallLifecycleTests
         await WaitUntil(() => heard is { } s && s.LossFraction == 0, 2_000);
         Assert.That(Connection(f, "a").DatagramRejected, Is.Zero, "every stamped message was unwrapped and taken");
     }
+    [TestCase(500, false)]
+    [TestCase(1_000, false)]
+    [TestCase(500, true)]
+    [TestCase(1_000, true)]
+    public async Task Client_RepairsUplinkLoss_WhenFeedbackTakesALongRoundTrip(int rttMs, bool paced)
+    {
+        var network = new FakeRtcNetwork { Path = new("relay", "udp", "udp", "relay", rttMs) };
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource(), x => x.Hysteresis = QuickPath));
+        f.Policy.Accepted.UnionWith(f.Peers.Keys);
+        foreach (var id in f.Peers.Keys) await f.Join(id);
+        var video = await f.VideoConfig("a");
+        var now = Environment.TickCount64;
+        await using var a = Connect(f, "a", network, QuickClient, () => now);
+        a.Transport.Start();
+        await WaitUntil(() => a.Transport.IsDatagramActive && a.Transport.StampsMessages);
+        var sender = network.Created.Single(x => x.Role == RtcPeerRole.Offer);
+        sender.Partner!.LoseSent = message => message[0] == (byte)FrameType.TransportFeedback;
+        var copies = 0;
+        sender.LoseSent = message => TransportSequenceCodec.TryRead(message, out _, out var inner) &&
+            BoltCodec.TryReadMediaFrame(inner, out var media) && media.SequenceNumber == 1 && Interlocked.Increment(ref copies) == 1;
+        // An earlier arrival anchors the relay's transport sequence; the later arrival reveals the lost packet.
+        a.Transport.TrySend(Frame(w => BoltCodec.WriteMediaFrame(w, video, 0, 0,
+            (byte)(MediaFrameFlags.Keyframe | MediaFrameFlags.Encrypted), new byte[800])));
+        var frame = Frame(w => BoltCodec.WriteMediaFrame(w, video, 1, 3000, (byte)(MediaFrameFlags.Keyframe | MediaFrameFlags.Encrypted), new byte[800]));
+        Assert.That(a.Transport.TrySend(frame), Is.True);
+        var sent = sender.Sent.Last();
+        Assert.That(TransportSequenceCodec.TryRead(sent, out var transportSequence, out _), Is.True);
+        a.Transport.TrySend(Frame(w => BoltCodec.WriteMediaFrame(w, video, 2, 6000, MediaFrameFlags.Encrypted, new byte[800])));
+
+        var order = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        await using var pacer = new Bolt.Media.Congestion.MediaSendPacer((_, _) =>
+        {
+            order.Enqueue("audio");
+            return ValueTask.CompletedTask;
+        }, () => sender.BufferedAmount, clock: () => now);
+        if (paced)
+        {
+            sender.BufferedAmount = 100_000;
+            a.Transport.QueueVideoRepair = (repair, firstSentAt, expiresAt) => pacer.EnqueueVideoRepair(repair, expiresAt, (bytes, _) =>
+            {
+                Assert.That(a.Transport.TrySendVideoRepair(bytes.Span, firstSentAt), Is.True);
+                order.Enqueue("repair");
+                return ValueTask.CompletedTask;
+            });
+            pacer.Start();
+        }
+
+        now += rttMs + Bolt.Server.BoltServer.TransportFeedbackIntervalMs;
+        sender.Deliver(TransportFeedbackCodec.Write(transportSequence, [-1L, Bolt.Server.TransportFeedbackRecorder.NowMicroseconds()]));
+        if (paced)
+        {
+            Assert.That(a.Transport.UplinkResent, Is.Zero, "a delayed loss report cannot bypass a full channel");
+            pacer.EnqueueAudio([9]);
+            sender.Drain(0);
+            await WaitUntil(() => order.Count == 2);
+            Assert.That(order, Is.EqualTo(new[] { "audio", "repair" }), "voice overtakes the queued repair");
+        }
+        Assert.That(a.Transport.UplinkResent, Is.EqualTo(1), "the first feedback took one round trip plus the relay's report interval");
+        await WaitUntil(() => f.Peers["b"].Media(video).Any(x => x.Sequence == 1));
+
+        // Losing a repair does not make the original picture young again, even if its RTT would otherwise permit it.
+        Assert.That(TransportSequenceCodec.TryRead(sender.Sent.Last(), out var repairedSequence, out _), Is.True);
+        now += 301;
+        sender.Deliver(TransportFeedbackCodec.Write(repairedSequence, [-1L]));
+        Assert.That(a.Transport.UplinkResent, Is.EqualTo(1), "repeat loss keeps the first send's deadline");
+    }
+
     [Test]
     [CancelAfter(30_000)]
     public async Task Client_ResendsTheVideoItsUplinkLost_AsSoonAsTheRelayReportsIt()

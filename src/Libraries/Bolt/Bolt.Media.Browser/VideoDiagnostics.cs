@@ -32,6 +32,15 @@ public sealed record VideoDiagnostics
     public double? TransportRttMs { get; init; }
     /// <summary>Audio leaves with its previous frame alongside (the datagram path reports loss).</summary>
     public bool AudioRedundancy { get; init; }
+    /// <summary>Video fragments retransmitted on this uplink since the current transport was created.</summary>
+    public long UplinkResent { get; init; }
+    /// <summary>Latest congestion decision, absent until the first rate-control window.</summary>
+    public int? TotalBudgetKbps { get; init; }
+    public int? AudioBitrateKbps { get; init; }
+    public int? VideoBudgetKbps { get; init; }
+    public int? QueueDelayMs { get; init; }
+    public string? Congestion { get; init; }
+    public bool VideoSuspended { get; init; }
     public RemoteVideoDiagnostics[] Remotes { get; init; } = [];
 }
 
@@ -51,4 +60,6 @@ public sealed record RemoteVideoDiagnostics
     public int Resets { get; init; }
     /// <summary>The sender's orientation applied when painting: "90°", "180°, mirrored" or "none".</summary>
     public string Rotation { get; init; } = "";
+    /// <summary>Recovery counters since this stream appeared, not rates.</summary>
+    public VideoReceiveStats? Recovery { get; init; }
 }

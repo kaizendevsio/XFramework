@@ -212,7 +212,7 @@ public sealed partial class BoltMediaService
         {
             var wasSuspended = adaptation.Suspended;
             adaptation.Suspended = false;
-            if (adaptation.Current is { } placed && await _video.ApplyTierAsync(placed)) _appliedTier = placed;
+            if (adaptation.Current is { } placed && await ApplyVideoTierAsync(placed) is { } applied) _appliedTier = applied;
             if (wasSuspended && _videoLoop is not null && !_video.IsCapturing) await _video.StartCaptureAsync();
             OnVideoTierChanged?.Invoke(adaptation.Current);
         }

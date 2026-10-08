@@ -202,6 +202,10 @@ public sealed class SendRateLoop
     public VideoRateLadder Ladder { get; set; }
     public SendPathSignals Signals => _signals;
     public bool VideoSuspended => _suspended;
+    /// <summary>The latest allocation, or null before the first observation window.</summary>
+    public SendRateDecision? LastDecision { get; private set; }
+    /// <summary>The active datagram path repeats audio below the pacer; reserve that frame before allocating video.</summary>
+    public bool AudioRedundancy { get; set; }
     /// <summary>Opus packet length. The host sets <see cref="AudioPacketization.MaxFrameMs"/> from what every receiver plays.</summary>
     public AudioPacketization Audio { get; } = new();
 
@@ -240,7 +244,9 @@ public sealed class SendRateLoop
         var (relay, receiver) = _signals.Take(nowMs, sentVideo, pacer.AudioKbps, Controller.Options.ReportFreshMs);
         var transport = _signals.TakeTransport(nowMs, Controller.Options.ReportFreshMs);
         var decision = Controller.Update(new SendPathSample(nowMs, pacer.SentKbps, pacer.AudioKbps, pacer.QueueDelayMs,
-            pacer.CapacityKbps, pacer.BaseLosses > 0, relay, receiver, transport));
+            pacer.CapacityKbps, pacer.BaseLosses > 0, relay, receiver, transport,
+            AudioPacketsPerSecond: (1_000 + Audio.FrameMs - 1) / Audio.FrameMs, AudioRedundancy: AudioRedundancy));
+        LastDecision = decision;
         Pacer.RateKbps = decision.TotalKbps;
 
         // A phone that cannot encode fast enough is capped on its own, whatever the network says.
