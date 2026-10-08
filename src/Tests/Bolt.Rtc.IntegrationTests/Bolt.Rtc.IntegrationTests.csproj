@@ -17,6 +17,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Compile the current production recovery source for benchmark-model parity without browser interop. -->
+    <Compile Include="..\..\Libraries\Bolt\Bolt.Media.Browser\VideoRecoveryBuffer.cs" Link="BenchmarkReference\VideoRecoveryBuffer.cs" />
+    <Compile Include="..\..\Libraries\Bolt\Bolt.Media.Browser\VideoFrameFragments.cs" Link="BenchmarkReference\VideoFrameFragments.cs" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.Playwright.NUnit" />
     <PackageReference Include="NUnit" />
@@ -36,6 +39,7 @@
     <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\bolt-rtc.js" Link="bolt-rtc.js" CopyToOutputDirectory="PreserveNewest" />
     <!-- The media benchmark (MediaBenchmark.cs): its page, and the production modules it runs (encoder settings, SFrame). -->
     <None Include="bench\bench.js" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="bench\*.mjs" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\bolt-media.js" Link="bench\bolt-media.js" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\bolt-sframe.mjs" Link="bench\bolt-sframe.mjs" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\bolt-rtc.js" Link="bench\bolt-rtc.js" CopyToOutputDirectory="PreserveNewest" />

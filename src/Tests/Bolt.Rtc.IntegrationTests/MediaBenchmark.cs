@@ -36,7 +36,7 @@ public sealed class MediaBenchmark
         if (Env("BENCH_MODE") is not { } mode || Env("BOLT_RTC_TURN_SECRET") is not { } secret)
         {
             // The Bolt runs also need BOLT_RTC_SIDECAR: their relay is the production WebRTC endpoint.
-            Assert.Ignore("Set BENCH_MODE (native, bolt-before, bolt-after) and BOLT_RTC_TURN_SECRET (see call-media-benchmark.yml).");
+            Assert.Ignore("Set BENCH_MODE (native, bolt-baseline, bolt-current) and BOLT_RTC_TURN_SECRET (see call-media-benchmark.yml).");
             return;
         }
 
@@ -133,14 +133,14 @@ public sealed class MediaBenchmark
         if (Env("BENCH_COUNTERS") == "1")
             await page.ExposeFunctionAsync("benchMark", (string phase) => { lock (wire) wire[phase] = ReadCounters(); return true; });
         // The Bolt runs' rate control: the product's SendRateController and AudioPacketization, every 250 ms, fed what the
-        // page measured (what it sent, its channel's backlog, the receiver's delay report). Longer Opus packets only
-        // "after": the previous client never chose them.
+        // page measured (what it sent, its channel's backlog, the receiver's delay report). Each snapshot's
+        // actual packetization policy can lengthen Opus packets.
         var videoTarget = EnvInt("BENCH_VIDEO_KBPS", 300);
         var controller = new SendRateController(videoTarget + 32 + 52, new SendRateOptions
         {
             AudioNormalKbps = 32, AudioLowKbps = 24, AudioHighKbps = 32, MaxTotalKbps = videoTarget + 200, RestartFloorKbps = 180 + 84,
         });
-        var packets = new AudioPacketization { MaxFrameMs = mode == "bolt-after" ? 60 : 20 };
+        var packets = new AudioPacketization { MaxFrameMs = 60 };
         if (mode != "native")
             await page.ExposeFunctionAsync("benchRate", (string json) =>
             {
@@ -154,8 +154,12 @@ public sealed class MediaBenchmark
                 int? frameMs;
                 lock (controller)
                 {
-                    decision = controller.Update(new SendPathSample(now, sample.GetProperty("sentKbps").GetInt32(),
-                        sample.GetProperty("audioKbps").GetInt32(), sample.GetProperty("localQueueMs").GetInt32(), 0, false, null, receiver));
+                    // Optional field on newer snapshots: boxing permits the identical harness to compile against
+                    // the earlier controller, while the current one observes the Opus packet rate as production does.
+                    object sendPath = new SendPathSample(now, sample.GetProperty("sentKbps").GetInt32(),
+                        sample.GetProperty("audioKbps").GetInt32(), sample.GetProperty("localQueueMs").GetInt32(), 0, false, null, receiver);
+                    typeof(SendPathSample).GetProperty("AudioPacketsPerSecond")?.SetValue(sendPath, sample.GetProperty("audioPacketsPerSecond").GetInt32());
+                    decision = controller.Update((SendPathSample)sendPath);
                     frameMs = packets.Update(controller.CongestionKbps, decision.VideoSuspended, now);
                     if (frameMs is { } applied) packets.Applied(applied);
                 }
@@ -179,10 +183,12 @@ public sealed class MediaBenchmark
             fps = EnvInt("BENCH_FPS", 30),
             videoKbps = EnvInt("BENCH_VIDEO_KBPS", 300),
             audioKbps = EnvInt("BENCH_AUDIO_KBPS", 32),
-            // Every run starts at 20 ms; in the Bolt runs the rate control may lengthen packets (bolt-after only).
+            // Every run starts at 20 ms; each production snapshot's controller may lengthen packets.
             audioFrameMs = 20,
-            compact = mode == "bolt-after",
-            nack = mode == "bolt-after",
+            drainMs = EnvInt("BENCH_DRAIN_MS", 5000),
+            compact = true,
+            nack = true,
+            keyframeSupersedes = RecoveryBenchmarkPolicy.KeyframeSupersedes,
             codec = Env("BENCH_CODEC") ?? "h264",
             // BENCH_DIRECT=1: no TURN, the peers meet over loopback directly (a local smoke test of the page, not a measurement).
             turnSender = Env("BENCH_DIRECT") == "1" ? null : Turn("127.0.0.2", secret, "sender"),
@@ -200,6 +206,12 @@ public sealed class MediaBenchmark
             return;
         }
         var text = result.GetRawText();
+        var metadata = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(text)!;
+        metadata["implementationRevision"] = JsonSerializer.SerializeToElement(Env("BENCH_IMPL_REV") ?? "local-uncommitted");
+        metadata["browserVersion"] = JsonSerializer.SerializeToElement(browser.Version);
+        metadata["codecRequested"] = JsonSerializer.SerializeToElement(options.codec);
+        metadata["directSmokeOnly"] = JsonSerializer.SerializeToElement(Env("BENCH_DIRECT") == "1");
+        text = JsonSerializer.Serialize(metadata);
         if (wire.TryGetValue("start", out var start) && wire.TryGetValue("end", out var end))
         {
             var legs = end.ToDictionary(x => x.Key, x => new
@@ -215,6 +227,8 @@ public sealed class MediaBenchmark
         if (Env("BENCH_OUT") is { } output) await File.WriteAllTextAsync(output, text);
         if (console.Count > 0) TestContext.Out.WriteLine(string.Join("\n", console.Take(40)));
         Assert.That(result.GetProperty("picture").GetProperty("fps").GetDouble(), Is.GreaterThan(0), "no picture reached the receiver");
+        Assert.That(result.GetProperty("audio").TryGetProperty("delaySamples", out var audioSamples) && audioSamples.GetInt32() > 0,
+            Is.True, "no matched encoded audio timestamps: audio metrics are unavailable");
     }
 
     /// <summary>

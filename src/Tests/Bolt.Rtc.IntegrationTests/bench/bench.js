@@ -20,6 +20,8 @@
 import { initializeSFrame, SFrameSession } from './bolt-sframe.mjs';
 import { encoderConfig, opusEncoderConfig, probeTemporalModes, temporalModeFor } from './bolt-media.js';
 import { createPeer } from './bolt-rtc.js';
+import { RecoveryBuffer } from './recovery-buffer.mjs';
+import { freezeSummary, delaySummary, AudioMetrics } from './metrics.mjs';
 
 const MESSAGE_BYTES = 1150;           // RtcDefaults.MaxMessageBytes
 const MEDIA_HEADER = 30;              // BoltCodec.MediaFrameHeaderSize
@@ -153,16 +155,10 @@ class PictureMetrics {
         frame.close();
     }
     summary(seconds) {
-        const sorted = [...this.delays].sort((a, b) => a - b);
-        const q = p => sorted.length ? Math.round(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))]) : null;
-        // WebRTC's freeze definition: a gap longer than max(3 x mean interval, mean + 150 ms).
-        let freezes = 0, frozenMs = 0;
-        const gaps = this.frames.slice(1).map((t, i) => t - this.frames[i]);
-        const mean = gaps.length ? gaps.reduce((a, b) => a + b, 0) / gaps.length : 0;
-        for (const gap of gaps) if (gap > Math.max(3 * mean, mean + 150)) { freezes++; frozenMs += gap; }
         const size = [...this.sizes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '-';
-        return { fps: +(this.frames.length / seconds).toFixed(1), resolution: size, delayP50: q(0.5), delayP99: q(0.99),
-            delaySamples: sorted.length, freezes, frozenSeconds: +(frozenMs / 1000).toFixed(1) };
+        return { fps: +(this.frames.length / seconds).toFixed(1), resolution: size, ...delaySummary(this.delays),
+            ...freezeSummary(this.frames, this.started, this.started + seconds * 1000),
+            barcodeSuccessPercent: this.frames.length ? +(100 * this.delays.length / this.frames.length).toFixed(1) : 0 };
     }
 }
 
@@ -214,6 +210,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // ─── (a) Native WebRTC media ───
 
 async function runNative(options, source) {
+    const audioMetrics = new AudioMetrics();
     // A run without TURN (BENCH_DIRECT, local smoke tests only) connects directly over loopback.
     const config = turn => turn ? { iceServers: [turn], iceTransportPolicy: 'relay', encodedInsertableStreams: true } : { encodedInsertableStreams: true };
     const pc1 = new RTCPeerConnection(config(options.turnSender));
@@ -230,13 +227,15 @@ async function runNative(options, source) {
     // trail the frame: Chrome still packetizes H.264 by its NAL units after the transform, so a prefix would break that.
     // Non-zero bytes, so nothing in them reads as a start code.
     const transform = { bytes: 20, available: typeof videoSender.createEncodedStreams === 'function' };
-    const seal = () => new TransformStream({ transform(chunk, controller) {
+    const seal = audio => new TransformStream({ transform(chunk, controller) {
+        if (audio) audioMetrics.onSent(chunk.timestamp, now());
         const data = new Uint8Array(chunk.data);
         const sealed = new Uint8Array(data.length + transform.bytes).fill(0x5a);
         sealed.set(data, 0);
         chunk.data = sealed.buffer; controller.enqueue(chunk);
     } });
-    const open = () => new TransformStream({ transform(chunk, controller) {
+    const open = audio => new TransformStream({ transform(chunk, controller) {
+        if (audio) audioMetrics.onReceived(chunk.timestamp, now());
         const data = new Uint8Array(chunk.data);
         if (data.length > transform.bytes) chunk.data = data.slice(0, data.length - transform.bytes).buffer;
         controller.enqueue(chunk);
@@ -244,7 +243,7 @@ async function runNative(options, source) {
     if (transform.available)
         for (const sender of [videoSender, audioSender]) {
             const { readable, writable } = sender.createEncodedStreams();
-            void readable.pipeThrough(seal()).pipeTo(writable);
+            void readable.pipeThrough(seal(sender === audioSender)).pipeTo(writable);
         }
 
     const metrics = new PictureMetrics(source.width);
@@ -252,7 +251,7 @@ async function runNative(options, source) {
     pc2.ontrack = event => {
         if (transform.available) {
             const { readable, writable } = event.receiver.createEncodedStreams();
-            void readable.pipeThrough(open()).pipeTo(writable);
+            void readable.pipeThrough(open(event.track.kind === 'audio')).pipeTo(writable);
         }
         if (event.track.kind === 'video') stopReading = readTrack(event.track, frame => metrics.onFrame(frame));
         else { const element = new Audio(); element.srcObject = new MediaStream([event.track]); void element.play().catch(() => {}); }
@@ -271,13 +270,18 @@ async function runNative(options, source) {
     await window.benchMark?.('start');
     const before = { sender: await stats(pc1), receiver: await stats(pc2) };
     metrics.measuring = true;
+    audioMetrics.measuring = true;
     const started = now();
+    metrics.started = started;
     await sleep(options.seconds * 1000);
     const elapsed = (now() - started) / 1000;
     metrics.measuring = false;
+    audioMetrics.measuring = false;
     await window.benchMark?.('end');
     const after = { sender: await stats(pc1), receiver: await stats(pc2) };
     const rtt = await roundTripMs(pc2);
+    // Allow the identical measured sender cohort to arrive on high-RTT paths, without extending wire/video windows.
+    await sleep(options.drainMs);
     stopReading?.();
     pc1.close(); pc2.close();
 
@@ -294,7 +298,9 @@ async function runNative(options, source) {
         mediaBytes: Math.max(0, videoPayload + audioPayload - (transform.available ? 20 * (delta('outbound-rtp', 'video', 'framesEncoded') + audioSent) : 0)),
         packetsSent: delta('outbound-rtp', 'video', 'packetsSent') + audioSent,
         audioPacketsSent: audioSent,
-        audioDelivered: audioSent ? +(100 * Math.min(audioReceived, audioSent) / audioSent).toFixed(1) : null,
+        audioDelivered: transform.available ? audioMetrics.summary().deliveredPercent : null,
+        audio: transform.available ? audioMetrics.summary() : { unavailable: 'encoded audio transform not supported' },
+        audioPacketDeliveryInWindow: audioSent ? +(100 * Math.min(audioReceived, audioSent) / audioSent).toFixed(1) : null,
         videoTargetKbps: options.videoKbps,
         videoSentKbps: Math.round(delta('outbound-rtp', 'video', 'bytesSent') * 8 / elapsed / 1000),
         retransmittedKbps: Math.round((delta('outbound-rtp', 'video', 'retransmittedBytesSent') + delta('outbound-rtp', 'audio', 'retransmittedBytesSent')) * 8 / elapsed / 1000),
@@ -345,125 +351,6 @@ function fragments(data, frameId, timestamp, keyframe, layer, payload) {
     return list;
 }
 
-/// VideoRecoveryBuffer (Bolt.Media.Browser) ported line for line: the same reorder wait, NACK pacing, window and
-/// give-up rules. With recovery off it is the plain assembler (emit on completion, drop older partial pictures).
-class RecoveryBuffer {
-    static REORDER = 15; static MAX_TRIES = 3; static MAX_WINDOW = 1500;
-    constructor(recover) { this.recover = recover; this.window = 0; this.rtt = 200; this.pictures = new Map(); this.missing = new Map();
-        this.highest = null; this.lastReleased = null; this.lastHandled = null; this.localLoss = false; this.layered = false;
-        this.topLayer = 0; this.skipAbove = null; this.stats = { nacked: 0, recovered: 0, abandoned: 0, skipped: 0, incomplete: 0 }; }
-    configure(rttMs) { this.rtt = Math.max(1, Math.min(5000, rttMs)); this.window = this.recover ? Math.max(100, Math.min(RecoveryBuffer.MAX_WINDOW, Math.round(this.rtt * 1.5 + 50))) : 0; }
-    static newer(a, b) { const d = (a - b) >>> 0; return d > 0 && d < 0x80000000; }
-    push(sequence, fragment, at, ready) {
-        if (fragment.length <= FRAGMENT_HEADER || (fragment[0] & 0xf0) !== 0x10) return;
-        const view = new DataView(fragment.buffer, fragment.byteOffset, fragment.byteLength);
-        const total = fragment[1] + 1, index = view.getUint16(2, true), frameId = view.getUint32(4, true);
-        if (index >= total) return;
-        const header = { total, index, frameId, timestamp: view.getUint32(8, true), keyframe: (fragment[0] & 1) !== 0, layer: (fragment[0] & 0x0c) >> 2 };
-        const payload = fragment.subarray(FRAGMENT_HEADER);
-        if (!this.recover) return this.#plain(header, payload, ready);
-        const asked = this.missing.get(sequence);
-        if (asked) { this.missing.delete(sequence); if (asked.tries > 0) this.stats.recovered++; }
-        if (this.highest === null) this.highest = sequence;
-        else if (RecoveryBuffer.newer(sequence, this.highest)) {
-            const gap = (sequence - this.highest) >>> 0;
-            if (gap <= 512) for (let o = 1; o < gap; o++) this.#addMissing((this.highest + o) >>> 0, at);
-            else { this.missing.clear(); this.localLoss = true; }
-            this.highest = sequence;
-        }
-        if (this.lastHandled !== null && !RecoveryBuffer.newer(frameId, this.lastHandled)) return;
-        const first = (sequence - index) >>> 0;
-        let slot = this.pictures.get(frameId);
-        if (!slot) { slot = { frameId, first, total, parts: new Array(total), received: 0, bytes: 0, keyframe: false, layer: 0, firstSeen: at, complete: false, lost: false }; this.pictures.set(frameId, slot); }
-        else if (slot.total !== total || slot.first !== first) { this.#lose(slot); return this.#release(ready); }
-        if (slot.lost || slot.complete || slot.parts[index]) return;
-        slot.parts[index] = payload.slice(); slot.received++; slot.bytes += payload.length; slot.timestamp = header.timestamp;
-        if (header.keyframe) slot.keyframe = true;
-        slot.layer = header.layer; if (header.layer > 0) this.layered = true; this.topLayer = Math.max(this.topLayer, header.layer);
-        if (slot.received === slot.total) slot.complete = true;
-        this.#release(ready);
-    }
-    poll(at, ready, nacks) {
-        if (!this.recover) return;
-        for (const picture of this.pictures.values()) {
-            if (picture.complete || picture.lost) continue;
-            for (let i = 0; i < picture.total; i++) {
-                const s = (picture.first + i) >>> 0;
-                if (!picture.parts[i] && this.highest !== null && RecoveryBuffer.newer(s, this.highest)) this.#addMissing(s, picture.firstSeen);
-            }
-        }
-        for (const [sequence, missing] of [...this.missing]) {
-            const age = at - missing.since, owner = this.#owner(sequence);
-            if (owner?.lost) { this.missing.delete(sequence); continue; }
-            if (age >= this.window) {
-                this.missing.delete(sequence); this.stats.abandoned++;
-                if (owner) this.#lose(owner); else this.localLoss = true;
-                continue;
-            }
-            const due = missing.tries === 0 || at - missing.lastAsked >= this.rtt * 1.2 + 10;
-            if (age >= RecoveryBuffer.REORDER && missing.tries < RecoveryBuffer.MAX_TRIES && age + this.rtt <= this.window && due) {
-                nacks.push(sequence); missing.tries++; missing.lastAsked = at; this.stats.nacked++;
-            }
-        }
-        for (const picture of this.pictures.values())
-            if (!picture.complete && !picture.lost && at - picture.firstSeen >= this.window + this.rtt) this.#lose(picture);
-        this.#release(ready);
-    }
-    #addMissing(sequence, since) { if (this.missing.size < 1024 && !this.missing.has(sequence)) this.missing.set(sequence, { since, tries: 0, lastAsked: 0 }); }
-    #owner(sequence) { for (const p of this.pictures.values()) if (((sequence - p.first) >>> 0) < p.total) return p; return null; }
-    #oldest() { let oldest = null; for (const p of this.pictures.values()) if (!oldest || RecoveryBuffer.newer(oldest.first, p.first)) oldest = p; return oldest; }
-    #lose(p) { if (p.lost) return; p.lost = true; p.complete = false; for (let i = 0; i < p.total; i++) this.missing.delete((p.first + i) >>> 0); }
-    #handled(id) { if (this.lastHandled === null || RecoveryBuffer.newer(id, this.lastHandled)) this.lastHandled = id; }
-    #release(ready) {
-        for (let p = this.#oldest(); p; p = this.#oldest()) {
-            if (p.lost) { this.pictures.delete(p.frameId); this.#handled(p.frameId); this.stats.incomplete++;
-                if (p.keyframe || p.layer === 0 || !this.layered) this.localLoss = true; else this.skipAbove = Math.min(this.skipAbove ?? p.layer, p.layer); continue; }
-            if (!p.complete) {
-                if (this.layered && p.layer > 0 && p.layer >= this.topLayer && [...this.pictures.values()].some(x => x.complete && x !== p)) { this.#lose(p); continue; }
-                break;
-            }
-            if ([...this.missing.keys()].some(s => RecoveryBuffer.newer(p.first, s))) break;
-            this.pictures.delete(p.frameId);
-            this.#emit(p, ready);
-        }
-    }
-    #emit(p, ready) {
-        this.#handled(p.frameId);
-        if (this.skipAbove !== null) {
-            if (!p.keyframe && p.layer > this.skipAbove) { this.stats.skipped++; return; }
-            this.skipAbove = null;
-        }
-        const gap = this.lastReleased !== null && ((p.frameId - this.lastReleased) >>> 0) !== 1;
-        const discontinuity = gap && (!this.layered || this.localLoss);
-        if (p.keyframe || discontinuity) this.localLoss = false;
-        const data = new Uint8Array(p.bytes); let offset = 0;
-        for (const part of p.parts) { data.set(part, offset); offset += part.length; }
-        this.lastReleased = p.frameId;
-        ready.push({ data, timestamp: p.timestamp, keyframe: p.keyframe, discontinuity });
-    }
-    // The assembler without recovery (VideoFrameAssembler): emit on completion; older partial pictures are loss.
-    #plain(header, payload, ready) {
-        const { frameId, total, index } = header;
-        if (this.lastReleased !== null && !RecoveryBuffer.newer(frameId, this.lastReleased)) return;
-        let slot = this.pictures.get(frameId);
-        if (!slot) { slot = { frameId, parts: new Array(total), received: 0, bytes: 0, keyframe: false, layer: 0, total }; this.pictures.set(frameId, slot); }
-        if (slot.parts[index]) return;
-        slot.parts[index] = payload.slice(); slot.received++; slot.bytes += payload.length; slot.timestamp = header.timestamp;
-        if (header.keyframe) slot.keyframe = true;
-        slot.layer = header.layer; if (header.layer > 0) this.layered = true;
-        if (slot.received !== slot.total) return;
-        this.pictures.delete(frameId);
-        for (const [id, stale] of [...this.pictures]) if (RecoveryBuffer.newer(frameId, id)) { this.pictures.delete(id); this.stats.incomplete++; if (!slot.keyframe) this.localLoss = true; }
-        const gap = this.lastReleased !== null && ((frameId - this.lastReleased) >>> 0) !== 1;
-        const discontinuity = gap && (!this.layered || this.localLoss);
-        if (slot.keyframe || discontinuity) this.localLoss = false;
-        const data = new Uint8Array(slot.bytes); let offset = 0;
-        for (const part of slot.parts) { data.set(part, offset); offset += part.length; }
-        this.lastReleased = frameId;
-        ready.push({ data, timestamp: slot.timestamp, keyframe: slot.keyframe, discontinuity });
-    }
-}
-
 /// One browser's production data channel (bolt-rtc.js) to the test host's relay, signalled over a WebSocket.
 async function relayChannel(id, turn) {
     const socket = new WebSocket(`ws://${location.host}/relay?id=${id}`);
@@ -488,6 +375,7 @@ async function relayChannel(id, turn) {
 }
 
 async function runBolt(options, source) {
+    const audioMetrics = new AudioMetrics();
     await initializeSFrame();
     const run = crypto.randomUUID().slice(0, 8);
     const [sender, receiver] = await Promise.all([relayChannel(`${run}-sender`, options.turnSender), relayChannel(`${run}-receiver`, options.turnReceiver)]);
@@ -512,7 +400,7 @@ async function runBolt(options, source) {
         audioSent: 0, audioReceived: 0, videoFrames: 0, overhead: 0 };
     let measuring = false;
     const rate = { sent: 0, audio: 0, received: 0, transitFloor: Infinity, previousFloor: Infinity, floorSince: now(), latest: null,
-        videoKbps: options.videoKbps, audioKbps: options.audioKbps, frameMs: 20,
+        videoKbps: options.videoKbps, audioKbps: options.audioKbps, frameMs: 20, suspended: false,
         audioSentAt: new Map(), trace: [] };
     const send = (bytes, mediaBytes = 0) => {
         if (sendChannel.bufferedAmount > 256 * 1024 || !sendChannel.send(bytes)) { counters.dropped++; return false; }
@@ -558,7 +446,7 @@ async function runBolt(options, source) {
     let nextDue = 0;
     const stopVideo = readTrack(source.video, frame => {
         try {
-            if (encoder.encodeQueueSize > 2) return;
+            if (rate.suspended || encoder.encodeQueueSize > 2) return;
             const at = now();
             const fps = Math.max(5, Math.min(options.fps, Math.round(options.fps * rate.videoKbps / options.videoKbps)));
             if (fps < options.fps) {
@@ -582,6 +470,7 @@ async function runBolt(options, source) {
         output: chunk => {
             const data = new Uint8Array(chunk.byteLength); chunk.copyTo(data);
             const seq = (audioSequence = (audioSequence + 1) >>> 0);
+            audioMetrics.onSent(seq, now());
             const timestamp = Math.round(chunk.timestamp * 48 / 1000) >>> 0;
             const sealed = tx.encrypt(data, audioStreamId, seq, timestamp);
             if (measuring) { counters.audioSent++; counters.overhead = Math.max(counters.overhead, sealed.length - data.length); }
@@ -609,13 +498,16 @@ async function runBolt(options, source) {
         rate.received = 0;
         setTimeout(() => { rate.latest = report; }, Math.max(0, rtt / 2));
         const sample = { sentKbps: Math.round(rate.sent * 8 / 250), audioKbps: Math.round(rate.audio * 8 / 250),
+            audioPacketsPerSecond: Math.ceil(1000 / rate.frameMs),
             localQueueMs: Math.round(sendChannel.bufferedAmount * 8 / Math.max(1, rate.sent * 8 / 250)),
             receiver: rate.latest && at - rate.latest.at < 1500 ? rate.latest : null };
         rate.sent = rate.audio = 0;
         let decision;
         try { decision = JSON.parse(await window.benchRate(JSON.stringify(sample))); } catch { return; }
         const video = Math.max(60, Math.min(options.videoKbps, decision.videoKbps));
-        if (Math.abs(video - rate.videoKbps) / rate.videoKbps > 0.05 && encoder.state === 'configured') {
+        if (rate.suspended && !decision.suspended) keyframeWanted = true;
+        rate.suspended = decision.suspended;
+        if (!rate.suspended && Math.abs(video - rate.videoKbps) / rate.videoKbps > 0.05 && encoder.state === 'configured') {
             rate.videoKbps = video;
             const fps = Math.max(5, Math.min(options.fps, Math.round(options.fps * video / options.videoKbps)));
             encoder.configure({ ...videoConfig, bitrate: video * 1000, framerate: fps, scalabilityMode: temporalModeFor(fps, modes) });
@@ -645,7 +537,7 @@ async function runBolt(options, source) {
 
     // Receiver: decrypt, recover (or plain reassembly), decode in order; a break restarts the decoder on a keyframe.
     const metrics = new PictureMetrics(source.width);
-    const recovery = new RecoveryBuffer(options.nack);
+    const recovery = new RecoveryBuffer(options.nack, options.keyframeSupersedes);
     let rtt = 300, lastKeyRequest = -Infinity, decoderNeedsKey = true;
     const decoder = new VideoDecoder({ output: frame => metrics.onFrame(frame), error: error => console.error('bench video decoder', error) });
     const decoderConfig = { codec: videoConfig.codec, optimizeForLatency: true };
@@ -683,6 +575,7 @@ async function runBolt(options, source) {
         try { plain = rx.decrypt(alice, frame.subarray(MEDIA_HEADER), isVideo ? videoStreamId : audioStreamId, seq, timestamp); }
         catch { return; } // A duplicate (a retransmission that raced its original) or garbage.
         if (!isVideo) {
+            audioMetrics.onReceived(seq, now());
             const sentAt = rate.audioSentAt.get(seq);
             if (sentAt !== undefined) {
                 const transit = now() - sentAt, at = now();
@@ -715,12 +608,16 @@ async function runBolt(options, source) {
 
     measuring = true;
     metrics.measuring = true;
+    audioMetrics.measuring = true;
     const started = now();
+    metrics.started = started;
     await sleep(options.seconds * 1000);
     measuring = false;
     metrics.measuring = false;
+    audioMetrics.measuring = false;
     const elapsed = (now() - started) / 1000;
     await window.benchMark?.('end');
+    await sleep(options.drainMs);
 
     clearInterval(poller); clearInterval(rttTimer); clearInterval(rateTimer);
     stopVideo(); stopAudio();
@@ -729,18 +626,22 @@ async function runBolt(options, source) {
     for (const side of [sender, receiver]) { side.peer.close(); side.socket.close(); }
     return {
         seconds: elapsed, rttMs: rtt, compact: options.compact, nack: options.nack,
-        audioPacketMs: rate.frameMs, videoKbpsAtEnd: rate.videoKbps, rateTrace: rate.trace.filter((_, i) => i % 4 === 0),
+        audioPacketMs: rate.frameMs, videoKbpsAtEnd: rate.suspended ? 0 : rate.videoKbps, videoSuspendedAtEnd: rate.suspended,
+        rateTrace: rate.trace.filter((_, i) => i % 4 === 0),
         sframeBytesPerFrame: counters.overhead,
         mediaBytes: counters.mediaBytes,
         packetsSent: counters.messages,
         channelBytesSent: counters.messageBytes, relayed: true,
         audioPacketsSent: counters.audioSent,
-        audioDelivered: counters.audioSent ? +(100 * Math.min(counters.audioReceived, counters.audioSent) / counters.audioSent).toFixed(1) : null,
+        audioDelivered: audioMetrics.summary().deliveredPercent,
+        audio: audioMetrics.summary(),
+        audioPacketDeliveryInWindow: counters.audioSent ? +(100 * Math.min(counters.audioReceived, counters.audioSent) / counters.audioSent).toFixed(1) : null,
         videoTargetKbps: options.videoKbps,
         videoSentKbps: null,
         retransmitted: counters.retransmitted, nackRequests: counters.nackRequests, keyframeRequests: counters.keyRequests,
         droppedAtChannel: counters.dropped, keyframes: counters.keyframes, temporalMode: videoConfig.scalabilityMode,
         codec: videoConfig.codec, recovery: recovery.stats,
+        keyframeSupersedes: options.keyframeSupersedes,
         picture: metrics.summary(elapsed),
     };
 }
@@ -749,7 +650,10 @@ window.runBenchmark = async options => {
     const source = createSource(options);
     try {
         if (source.audioContext.state !== 'running') await source.audioContext.resume();
-        return options.mode === 'native' ? await runNative(options, source) : await runBolt(options, source);
+        const result = options.mode === 'native' ? await runNative(options, source) : await runBolt(options, source);
+        return { ...result, metricVersion: 2, source: { width: options.width, height: options.height, fps: options.fps },
+            audioDrainMs: options.drainMs, implementation: options.mode,
+            scope: 'modeled datagram browser path; excludes production pacer, relay lanes and audio redundancy' };
     } finally { source.stop(); }
 };
 window.benchReady = true;
