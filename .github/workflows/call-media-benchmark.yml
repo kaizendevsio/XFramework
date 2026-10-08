@@ -18,6 +18,10 @@ on:
       repeats:
         description: Repeats per path/profile (alternate order, report each run)
         default: "1"
+      modeled:
+        description: Run real-codec modeled and native WebRTC comparisons
+        type: boolean
+        default: true
       production:
         description: Also run production WASM/pacer/relay with synthetic codecs
         type: boolean
@@ -41,6 +45,7 @@ concurrency:
 jobs:
   run:
     name: Modeled ${{ matrix.scenario }} ${{ matrix.profile }}
+    if: github.event_name == 'pull_request' || inputs.modeled
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:

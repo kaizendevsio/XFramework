@@ -22,6 +22,10 @@ against baseline `8ae24751` and the updated production snapshot. Three picture p
 1080p30) run through clean 20 Mbit/s, 512 kbit/s / 500 ms / 1% loss and 512 kbit/s / 1000 ms / 3% loss
 receiver links. A separate production WASM/pacer/relay experiment uses the existing synthetic-codec browser
 call test; its results are explicitly separate from the native/real-codec model.
+The severe production experiment shapes A's downlink to 512 kbit/s, 1000 ms round trip and 3% loss, with delay
+but no injected loss on A's uplink. It measures constrained-downlink receiver recovery, redundancy and pacing.
+It cannot alone validate repairs for sender-uplink loss; the real `MediaTransportClient`/relay transport-feedback
+regression tests are the direct evidence for the RTT-aware uplink repair change.
 
 Recovery parity compares actual C# source decisions and reassembled bytes against the JavaScript model on
 every deterministic trace step. It includes the current independent-keyframe supersession rule. Metric tests
@@ -50,5 +54,17 @@ All smoke runs reported zero freezes at the fixed 250 ms threshold. Raw results 
 barcodes, delivery cohorts and codec setup function at 1080p30. They do not prove bandwidth superiority,
 severe-link audio recovery, real-device heating improvements or production pacing effectiveness.
 
-The baseline/current GitHub TURN/netem and production-path runs must be appended after execution, with their
-workflow URL, full source revisions and repeat counts. Do not replace this pending evidence with estimates.
+The [October 8 GitHub run and raw results](yap-call-media-benchmark-2026-10-08/run-37779802662/README.md)
+retain three 60-second repeats per profile against full baseline/current revisions. All 81 modeled runs completed.
+Clean 1080p30 delivered 30 FPS and 100% audio on every path, but current modeled severe 1080p30 remained at
+1.3–1.8 FPS with audio p99 above 10 seconds. Severe 720p30 rendered fewer frames than baseline. The model
+does not establish that production audio/pacing changes cure these regressions.
+
+Production baseline severe calls opened UDP, then fell back to WebSocket during warmup and stayed there
+through measurement. WebSocket bypasses the shaped TURN path; those later throughput/delay numbers are
+invalid constrained-path performance evidence. All three still failed the existing lifetime audio delivery assertion
+(93.63–95.62% A->B). Production video window metrics must be distinguished from lifetime audio/recovery counters,
+which include startup and warmup. Current severe production also fell back in every repeat and failed lifetime
+audio delivery (91.47–95.66% A->B). One repeat retried UDP during measurement, with 25–33 second frame gaps
+and three B->A decoder resets. Both snapshots passed clean production. The run establishes unresolved severe
+quality/fallback problems; it does not establish a production audio cure or thermal improvement.

@@ -34,7 +34,7 @@ legacy peers, software HEVC refusal and wire-codec mapping.
 
 Actual phone capture, battery/thermal behavior and sustainable 60fps remain device tests. A desktop
 roundtrip proves codec interoperability at that configuration, not sustained real-camera FPS.
-Benchmark runs and final validation results are appended after completion.
+Benchmark runs and final validation results are recorded below and in the linked evidence report.
 
 On a 512kbps link, the default 20ms Opus allocation reserves 84kbps without redundancy and 139kbps with it (one repeated encrypted media frame, shared outer framing, bundle length fields). That leaves 373kbps for video with redundancy. The actual negotiated-bundle test validates its wire length and allocation. These figures describe budgeting; production netem measurements determine the observed result.
 
@@ -44,9 +44,25 @@ The current implementation passed 316 Yap server/UI tests, 319 Yap client tests,
 114 focused transport/congestion/recovery regressions and 24 browser-service/authenticated-media
 tests. JavaScript validation passed 101 video tests, nine branding/accent tests and three metric tests.
 Six recovery parity cases also passed against both the archived baseline and current production source.
-The hosted benchmark repeats are recorded in the linked methodology document after completion.
+The hosted run completed 81 modeled measurements and 12 full-production calls: three 60-second repeats per profile. Full revisions, raw metrics, failed quality assertions and transport timelines are preserved in the linked report.
 
 A real Chromium live-upgrade smoke check initialized HEVC at 2560x1440/30fps,
 attempted 60fps (native encode refused), and then encoded ten further pictures with
 the untouched 30fps encoder: 10/10 outputs, encoder still configured. This verifies
 failure preservation, not a sustained-camera performance claim.
+
+## Measured limits and remaining performance work
+
+Clean production calls remain at 30fps and 100% lifetime audio delivery. Neither clean
+wire measurements nor severe-link results establish an overall efficiency or audio-quality
+gain. Severe production calls on both revisions switch from UDP to WebSocket, which bypasses
+the shaped TURN link; their later throughput cannot be presented as constrained-UDP performance.
+All severe repeats still fail lifetime audio delivery, and one current repeat has 25-33 second
+video gaps and three decoder resets during path switching. Real-codec models at constrained
+720p/1080p also remain poor; those models omit the production pacer and redundancy.
+
+The allocation, repair and keyframe fixes are validated correctness changes. They should not
+be described as a cure for the severe-link bottleneck. Further work must isolate datagram
+stalls/path switching, measure production audio in a bounded sender cohort, and attribute
+reverse-wire overhead before selecting another transport change. Actual phone thermal and
+capture-rate validation is still required for the hardware-efficiency claim.

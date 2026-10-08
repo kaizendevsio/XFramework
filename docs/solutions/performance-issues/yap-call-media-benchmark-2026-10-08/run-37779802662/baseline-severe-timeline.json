@@ -1,0 +1,6690 @@
+{
+  "sourceJob": 113319740608,
+  "description": "Deduplicated open/warmup/measure samples from job logs, recent-picture text omitted; last warmup sample precedes actual measure reset by a small interval.",
+  "repeats": [
+    [
+      {
+        "seconds": 5.8,
+        "phase": "open",
+        "peer": "A",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5509
+        },
+        "rate": {
+          "totalKbps": 9199,
+          "videoKbps": 9148,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 26
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 6063,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 1017,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 26,
+          "receiverKbps": 5024
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 3701,
+            "localDrops": 0,
+            "nacked": 0,
+            "recovered": 0,
+            "abandoned": 0,
+            "declined": 0,
+            "incomplete": 0,
+            "skipped": 0,
+            "pictures": 185,
+            "recoveryMs": 1500
+          }
+        ]
+      },
+      {
+        "seconds": 5.8,
+        "phase": "open",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 11226,
+          "videoKbps": 11173,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 22
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 10942,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 3,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 7181,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 22,
+          "receiverKbps": 5804
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 653,
+            "localDrops": 0,
+            "nacked": 0,
+            "recovered": 0,
+            "abandoned": 0,
+            "declined": 0,
+            "incomplete": 0,
+            "skipped": 0,
+            "pictures": 150,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 19.0,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (WebSocket stalled)",
+        "tier": {
+          "width": 1280,
+          "height": 720,
+          "framerate": 30,
+          "bitrateKbps": 1902
+        },
+        "rate": {
+          "totalKbps": 2013,
+          "videoKbps": 1960,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 15
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 1700,
+          "backlog": 129,
+          "capacityKbps": 0,
+          "droppedPictures": 13,
+          "baseLosses": 5,
+          "onSocket": 2432,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 15,
+          "receiverKbps": 2066
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 7534,
+            "localDrops": 0,
+            "nacked": 937,
+            "recovered": 0,
+            "abandoned": 109,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 1,
+            "pictures": 510,
+            "recoveryMs": 750
+          }
+        ]
+      },
+      {
+        "seconds": 19.0,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1280,
+          "height": 720,
+          "framerate": 30,
+          "bitrateKbps": 2600
+        },
+        "rate": {
+          "totalKbps": 5089,
+          "videoKbps": 5040,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 18
+        },
+        "send": {
+          "pacerDelayMs": 1,
+          "pacerSentKbps": 2612,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 3391,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 18,
+          "receiverKbps": 2824
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 1481,
+            "localDrops": 0,
+            "nacked": 178,
+            "recovered": 7,
+            "abandoned": 1,
+            "declined": 0,
+            "incomplete": 3,
+            "skipped": 0,
+            "pictures": 492,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 24.0,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (WebSocket stalled)",
+        "tier": {
+          "width": 960,
+          "height": 540,
+          "framerate": 25,
+          "bitrateKbps": 1400
+        },
+        "rate": {
+          "totalKbps": 1734,
+          "videoKbps": 1681,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 7
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 1563,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 28,
+          "baseLosses": 10,
+          "onSocket": 2773,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 1333
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 9138,
+            "localDrops": 0,
+            "nacked": 937,
+            "recovered": 0,
+            "abandoned": 109,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 1,
+            "pictures": 661,
+            "recoveryMs": 750
+          }
+        ]
+      },
+      {
+        "seconds": 24.0,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1280,
+          "height": 720,
+          "framerate": 30,
+          "bitrateKbps": 2600
+        },
+        "rate": {
+          "totalKbps": 5089,
+          "videoKbps": 5041,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 1,
+          "pacerSentKbps": 3000,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 2889,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 2676
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 1677,
+            "localDrops": 0,
+            "nacked": 868,
+            "recovered": 11,
+            "abandoned": 217,
+            "declined": 0,
+            "incomplete": 6,
+            "skipped": 0,
+            "pictures": 562,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 29.1,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (WebSocket stalled)",
+        "tier": {
+          "width": 960,
+          "height": 540,
+          "framerate": 25,
+          "bitrateKbps": 1007
+        },
+        "rate": {
+          "totalKbps": 1104,
+          "videoKbps": 1052,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 15
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 968,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 28,
+          "baseLosses": 10,
+          "onSocket": 3204,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 15,
+          "receiverKbps": 922
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 11499,
+            "localDrops": 0,
+            "nacked": 937,
+            "recovered": 0,
+            "abandoned": 109,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 1,
+            "pictures": 811,
+            "recoveryMs": 750
+          }
+        ]
+      },
+      {
+        "seconds": 29.1,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 6108,
+          "videoKbps": 6056,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 18
+        },
+        "send": {
+          "pacerDelayMs": 1,
+          "pacerSentKbps": 6443,
+          "backlog": 1583,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 6326,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 18,
+          "receiverKbps": 3729
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 1857,
+            "localDrops": 0,
+            "nacked": 868,
+            "recovered": 11,
+            "abandoned": 217,
+            "declined": 0,
+            "incomplete": 6,
+            "skipped": 0,
+            "pictures": 687,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 34.1,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (WebSocket stalled)",
+        "tier": {
+          "width": 960,
+          "height": 540,
+          "framerate": 25,
+          "bitrateKbps": 1366
+        },
+        "rate": {
+          "totalKbps": 1414,
+          "videoKbps": 1366,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 14
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 1223,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 28,
+          "baseLosses": 10,
+          "onSocket": 3716,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 14,
+          "receiverKbps": 1362
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 14826,
+            "localDrops": 0,
+            "nacked": 937,
+            "recovered": 0,
+            "abandoned": 109,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 1,
+            "pictures": 962,
+            "recoveryMs": 750
+          }
+        ]
+      },
+      {
+        "seconds": 34.1,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 8631,
+          "videoKbps": 8575,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 7
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5453,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 5828,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 5853
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 2118,
+            "localDrops": 0,
+            "nacked": 868,
+            "recovered": 11,
+            "abandoned": 217,
+            "declined": 0,
+            "incomplete": 6,
+            "skipped": 0,
+            "pictures": 812,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 39.1,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (WebSocket stalled)",
+        "tier": {
+          "width": 960,
+          "height": 540,
+          "framerate": 25,
+          "bitrateKbps": 1366
+        },
+        "rate": {
+          "totalKbps": 1603,
+          "videoKbps": 1550,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 14
+        },
+        "send": {
+          "pacerDelayMs": 4,
+          "pacerSentKbps": 1529,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 28,
+          "baseLosses": 10,
+          "onSocket": 4253,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 14,
+          "receiverKbps": 1376
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 18342,
+            "localDrops": 0,
+            "nacked": 937,
+            "recovered": 0,
+            "abandoned": 109,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 1,
+            "pictures": 1113,
+            "recoveryMs": 750
+          }
+        ]
+      },
+      {
+        "seconds": 39.1,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 10004,
+          "videoKbps": 9943,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5218,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 7249,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 5735
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 2405,
+            "localDrops": 0,
+            "nacked": 868,
+            "recovered": 11,
+            "abandoned": 217,
+            "declined": 0,
+            "incomplete": 6,
+            "skipped": 0,
+            "pictures": 939,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 44.1,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 499
+        },
+        "rate": {
+          "totalKbps": 583,
+          "videoKbps": 499,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Hold",
+          "delayMs": 2273
+        },
+        "send": {
+          "pacerDelayMs": 2273,
+          "pacerSentKbps": 0,
+          "backlog": 27582,
+          "capacityKbps": 0,
+          "droppedPictures": 42,
+          "baseLosses": 14,
+          "onSocket": 4555,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 1397,
+          "receiverKbps": 730
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 21720,
+            "localDrops": 0,
+            "nacked": 937,
+            "recovered": 0,
+            "abandoned": 109,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 1,
+            "pictures": 1263,
+            "recoveryMs": 1500
+          }
+        ]
+      },
+      {
+        "seconds": 44.1,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 10004,
+          "videoKbps": 9943,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 7
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 6190,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 6266,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 5851
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 2577,
+            "localDrops": 0,
+            "nacked": 884,
+            "recovered": 12,
+            "abandoned": 218,
+            "declined": 0,
+            "incomplete": 7,
+            "skipped": 0,
+            "pictures": 1010,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 49.2,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 750
+        },
+        "rate": {
+          "totalKbps": 1490,
+          "videoKbps": 1438,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 15
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 747,
+          "backlog": 129,
+          "capacityKbps": 0,
+          "droppedPictures": 43,
+          "baseLosses": 15,
+          "onSocket": 5003,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 15,
+          "receiverKbps": 809
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 25261,
+            "localDrops": 0,
+            "nacked": 937,
+            "recovered": 0,
+            "abandoned": 109,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 1,
+            "pictures": 1413,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 49.2,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 10214,
+          "videoKbps": 10157,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 7
+        },
+        "send": {
+          "pacerDelayMs": 3,
+          "pacerSentKbps": 6483,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 6014,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 5769
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 2753,
+            "localDrops": 0,
+            "nacked": 1436,
+            "recovered": 12,
+            "abandoned": 396,
+            "declined": 0,
+            "incomplete": 8,
+            "skipped": 0,
+            "pictures": 1104,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 54.2,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 960,
+          "height": 540,
+          "framerate": 25,
+          "bitrateKbps": 1400
+        },
+        "rate": {
+          "totalKbps": 1582,
+          "videoKbps": 1533,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 1564,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 43,
+          "baseLosses": 15,
+          "onSocket": 5433,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 803
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 28674,
+            "localDrops": 0,
+            "nacked": 937,
+            "recovered": 0,
+            "abandoned": 109,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 1,
+            "pictures": 1564,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 54.2,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 10338,
+          "videoKbps": 10277,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 9
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 6849,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 6083,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 9,
+          "receiverKbps": 5691
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 2930,
+            "localDrops": 0,
+            "nacked": 1436,
+            "recovered": 12,
+            "abandoned": 396,
+            "declined": 0,
+            "incomplete": 9,
+            "skipped": 0,
+            "pictures": 1206,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 59.2,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1280,
+          "height": 720,
+          "framerate": 30,
+          "bitrateKbps": 2256
+        },
+        "rate": {
+          "totalKbps": 2355,
+          "videoKbps": 2306,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 5
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 2170,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 43,
+          "baseLosses": 15,
+          "onSocket": 6044,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 5,
+          "receiverKbps": 2055
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 32157,
+            "localDrops": 0,
+            "nacked": 937,
+            "recovered": 0,
+            "abandoned": 109,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 1,
+            "pictures": 1715,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 59.2,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 10544,
+          "videoKbps": 10483,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 7
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5681,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 5870,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 5778
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 3288,
+            "localDrops": 0,
+            "nacked": 1436,
+            "recovered": 12,
+            "abandoned": 396,
+            "declined": 0,
+            "incomplete": 9,
+            "skipped": 0,
+            "pictures": 1346,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 64.2,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1600,
+          "height": 900,
+          "framerate": 30,
+          "bitrateKbps": 3383
+        },
+        "rate": {
+          "totalKbps": 3504,
+          "videoKbps": 3455,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 6
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 4019,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 43,
+          "baseLosses": 15,
+          "onSocket": 6807,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 6,
+          "receiverKbps": 3015
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 35517,
+            "localDrops": 0,
+            "nacked": 937,
+            "recovered": 0,
+            "abandoned": 109,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 1,
+            "pictures": 1866,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 64.2,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 10544,
+          "videoKbps": 10483,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 9
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5832,
+          "backlog": 152,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 6110,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 9,
+          "receiverKbps": 5804
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 3805,
+            "localDrops": 0,
+            "nacked": 1436,
+            "recovered": 12,
+            "abandoned": 396,
+            "declined": 0,
+            "incomplete": 9,
+            "skipped": 0,
+            "pictures": 1497,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 69.3,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 4966
+        },
+        "rate": {
+          "totalKbps": 5227,
+          "videoKbps": 5171,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 5
+        },
+        "send": {
+          "pacerDelayMs": 4,
+          "pacerSentKbps": 5009,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 43,
+          "baseLosses": 15,
+          "onSocket": 7790,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 5,
+          "receiverKbps": 4474
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 39046,
+            "localDrops": 0,
+            "nacked": 937,
+            "recovered": 0,
+            "abandoned": 109,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 1,
+            "pictures": 2017,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 69.3,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 10755,
+          "videoKbps": 10694,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 7
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 6129,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 6264,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 5876
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 4534,
+            "localDrops": 0,
+            "nacked": 1436,
+            "recovered": 12,
+            "abandoned": 396,
+            "declined": 0,
+            "incomplete": 9,
+            "skipped": 0,
+            "pictures": 1649,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 74.3,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5492
+        },
+        "rate": {
+          "totalKbps": 7779,
+          "videoKbps": 7718,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 10
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5747,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 43,
+          "baseLosses": 15,
+          "onSocket": 8963,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 10,
+          "receiverKbps": 5681
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 42437,
+            "localDrops": 0,
+            "nacked": 937,
+            "recovered": 0,
+            "abandoned": 109,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 1,
+            "pictures": 2166,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 74.3,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 10755,
+          "videoKbps": 10694,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 6
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5020,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 5980,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 6,
+          "receiverKbps": 5822
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 5456,
+            "localDrops": 0,
+            "nacked": 1436,
+            "recovered": 12,
+            "abandoned": 396,
+            "declined": 0,
+            "incomplete": 9,
+            "skipped": 0,
+            "pictures": 1799,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 79.3,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5492
+        },
+        "rate": {
+          "totalKbps": 9303,
+          "videoKbps": 9242,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 5
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5499,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 43,
+          "baseLosses": 15,
+          "onSocket": 10168,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 5,
+          "receiverKbps": 5597
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 46035,
+            "localDrops": 0,
+            "nacked": 937,
+            "recovered": 0,
+            "abandoned": 109,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 1,
+            "pictures": 2319,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 79.3,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 10970,
+          "videoKbps": 10909,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 9
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5649,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 6155,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 9,
+          "receiverKbps": 6027
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 6409,
+            "localDrops": 0,
+            "nacked": 1436,
+            "recovered": 12,
+            "abandoned": 396,
+            "declined": 0,
+            "incomplete": 9,
+            "skipped": 0,
+            "pictures": 1951,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 84.4,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5492
+        },
+        "rate": {
+          "totalKbps": 9444,
+          "videoKbps": 9383,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 5
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 6061,
+          "backlog": 44,
+          "capacityKbps": 0,
+          "droppedPictures": 43,
+          "baseLosses": 15,
+          "onSocket": 11338,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 5,
+          "receiverKbps": 5598
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 49528,
+            "localDrops": 0,
+            "nacked": 937,
+            "recovered": 0,
+            "abandoned": 109,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 1,
+            "pictures": 2469,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 84.4,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 11191,
+          "videoKbps": 11135,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 57
+        },
+        "send": {
+          "pacerDelayMs": 57,
+          "pacerSentKbps": 10056,
+          "backlog": 14638,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 6116,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 9,
+          "receiverKbps": 5736
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 7328,
+            "localDrops": 0,
+            "nacked": 1436,
+            "recovered": 12,
+            "abandoned": 396,
+            "declined": 0,
+            "incomplete": 9,
+            "skipped": 0,
+            "pictures": 2101,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 89.4,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5492
+        },
+        "rate": {
+          "totalKbps": 9634,
+          "videoKbps": 9578,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 5
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5307,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 43,
+          "baseLosses": 15,
+          "onSocket": 12558,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 5,
+          "receiverKbps": 5613
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 52933,
+            "localDrops": 0,
+            "nacked": 937,
+            "recovered": 0,
+            "abandoned": 109,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 1,
+            "pictures": 2621,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 89.4,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 11191,
+          "videoKbps": 11135,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 6016,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 6037,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 5903
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 8296,
+            "localDrops": 0,
+            "nacked": 1436,
+            "recovered": 12,
+            "abandoned": 396,
+            "declined": 0,
+            "incomplete": 9,
+            "skipped": 0,
+            "pictures": 2252,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 94.4,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5492
+        },
+        "rate": {
+          "totalKbps": 9634,
+          "videoKbps": 9574,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 15
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5661,
+          "backlog": 193,
+          "capacityKbps": 0,
+          "droppedPictures": 43,
+          "baseLosses": 15,
+          "onSocket": 13747,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 14,
+          "receiverKbps": 5676
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 56524,
+            "localDrops": 0,
+            "nacked": 937,
+            "recovered": 0,
+            "abandoned": 109,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 1,
+            "pictures": 2771,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 94.4,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 11424,
+          "videoKbps": 11365,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 35
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 11762,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 2,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 7380,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 35,
+          "receiverKbps": 5818
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 9233,
+            "localDrops": 0,
+            "nacked": 1436,
+            "recovered": 12,
+            "abandoned": 396,
+            "declined": 0,
+            "incomplete": 9,
+            "skipped": 0,
+            "pictures": 2403,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 99.5,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5492
+        },
+        "rate": {
+          "totalKbps": 9827,
+          "videoKbps": 9766,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 6
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5586,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 43,
+          "baseLosses": 15,
+          "onSocket": 14950,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 6,
+          "receiverKbps": 5504
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 59840,
+            "localDrops": 0,
+            "nacked": 937,
+            "recovered": 0,
+            "abandoned": 109,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 1,
+            "pictures": 2922,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 99.5,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 11424,
+          "videoKbps": 11368,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 11
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 6120,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 6048,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 11,
+          "receiverKbps": 5888
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 10185,
+            "localDrops": 0,
+            "nacked": 1436,
+            "recovered": 12,
+            "abandoned": 396,
+            "declined": 0,
+            "incomplete": 9,
+            "skipped": 0,
+            "pictures": 2554,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 104.5,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5492
+        },
+        "rate": {
+          "totalKbps": 9827,
+          "videoKbps": 9766,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 15
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5772,
+          "backlog": 149,
+          "capacityKbps": 0,
+          "droppedPictures": 43,
+          "baseLosses": 15,
+          "onSocket": 16123,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 15,
+          "receiverKbps": 5476
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 63390,
+            "localDrops": 0,
+            "nacked": 937,
+            "recovered": 0,
+            "abandoned": 109,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 1,
+            "pictures": 3073,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 104.5,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 11656,
+          "videoKbps": 11595,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 18
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 10744,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 7346,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 18,
+          "receiverKbps": 5835
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 11106,
+            "localDrops": 0,
+            "nacked": 1436,
+            "recovered": 12,
+            "abandoned": 396,
+            "declined": 0,
+            "incomplete": 9,
+            "skipped": 0,
+            "pictures": 2705,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 109.5,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5492
+        },
+        "rate": {
+          "totalKbps": 10024,
+          "videoKbps": 9963,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 5
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5978,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 43,
+          "baseLosses": 15,
+          "onSocket": 17333,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 5,
+          "receiverKbps": 5653
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 66779,
+            "localDrops": 0,
+            "nacked": 937,
+            "recovered": 0,
+            "abandoned": 109,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 1,
+            "pictures": 3224,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 109.5,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 11656,
+          "videoKbps": 11595,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5556,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 6054,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 5877
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 12065,
+            "localDrops": 0,
+            "nacked": 1436,
+            "recovered": 12,
+            "abandoned": 396,
+            "declined": 0,
+            "incomplete": 9,
+            "skipped": 0,
+            "pictures": 2856,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 114.5,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5492
+        },
+        "rate": {
+          "totalKbps": 10024,
+          "videoKbps": 9963,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 6028,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 43,
+          "baseLosses": 15,
+          "onSocket": 18497,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 5488
+        },
+        "receive": [
+          {
+            "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+            "fragments": 70294,
+            "localDrops": 0,
+            "nacked": 937,
+            "recovered": 0,
+            "abandoned": 109,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 1,
+            "pictures": 3374,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 114.5,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 11656,
+          "videoKbps": 11605,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 12
+        },
+        "send": {
+          "pacerDelayMs": 12,
+          "pacerSentKbps": 6820,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 6034,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 5855
+        },
+        "receive": [
+          {
+            "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+            "fragments": 12978,
+            "localDrops": 0,
+            "nacked": 1436,
+            "recovered": 12,
+            "abandoned": 396,
+            "declined": 0,
+            "incomplete": 9,
+            "skipped": 0,
+            "pictures": 3006,
+            "recoveryMs": 350
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "seconds": 5.8,
+        "phase": "open",
+        "peer": "A",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5573
+        },
+        "rate": {
+          "totalKbps": 8802,
+          "videoKbps": 8749,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 19
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5781,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 1014,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 19,
+          "receiverKbps": 5251
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 4237,
+            "localDrops": 0,
+            "nacked": 0,
+            "recovered": 0,
+            "abandoned": 0,
+            "declined": 0,
+            "incomplete": 0,
+            "skipped": 0,
+            "pictures": 183,
+            "recoveryMs": 1500
+          }
+        ]
+      },
+      {
+        "seconds": 5.8,
+        "phase": "open",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 11496,
+          "videoKbps": 11456,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 29
+        },
+        "send": {
+          "pacerDelayMs": 1,
+          "pacerSentKbps": 4736,
+          "backlog": 1817,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 7390,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 29,
+          "receiverKbps": 6084
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 649,
+            "localDrops": 0,
+            "nacked": 0,
+            "recovered": 0,
+            "abandoned": 0,
+            "declined": 0,
+            "incomplete": 0,
+            "skipped": 0,
+            "pictures": 150,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 19.0,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (WebSocket stalled)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5573
+        },
+        "rate": {
+          "totalKbps": 11121,
+          "videoKbps": 11069,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 12
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5883,
+          "backlog": 129,
+          "capacityKbps": 0,
+          "droppedPictures": 12,
+          "baseLosses": 4,
+          "onSocket": 3843,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 12,
+          "receiverKbps": 6156
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 8388,
+            "localDrops": 0,
+            "nacked": 703,
+            "recovered": 27,
+            "abandoned": 64,
+            "declined": 0,
+            "incomplete": 3,
+            "skipped": 0,
+            "pictures": 530,
+            "recoveryMs": 750
+          }
+        ]
+      },
+      {
+        "seconds": 19.0,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1280,
+          "height": 720,
+          "framerate": 30,
+          "bitrateKbps": 2600
+        },
+        "rate": {
+          "totalKbps": 8047,
+          "videoKbps": 7998,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 12
+        },
+        "send": {
+          "pacerDelayMs": 3,
+          "pacerSentKbps": 5299,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 3428,
+          "relayQueueMs": 1,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 12,
+          "receiverKbps": 2730
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 2878,
+            "localDrops": 0,
+            "nacked": 106,
+            "recovered": 0,
+            "abandoned": 0,
+            "declined": 0,
+            "incomplete": 2,
+            "skipped": 0,
+            "pictures": 493,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 24.0,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (WebSocket stalled)",
+        "tier": {
+          "width": 1600,
+          "height": 900,
+          "framerate": 30,
+          "bitrateKbps": 3600
+        },
+        "rate": {
+          "totalKbps": 7934,
+          "videoKbps": 7881,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 16
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 3023,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 25,
+          "baseLosses": 9,
+          "onSocket": 4443,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 16,
+          "receiverKbps": 3184
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 9982,
+            "localDrops": 0,
+            "nacked": 703,
+            "recovered": 27,
+            "abandoned": 64,
+            "declined": 0,
+            "incomplete": 3,
+            "skipped": 0,
+            "pictures": 680,
+            "recoveryMs": 750
+          }
+        ]
+      },
+      {
+        "seconds": 24.0,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1280,
+          "height": 720,
+          "framerate": 30,
+          "bitrateKbps": 2600
+        },
+        "rate": {
+          "totalKbps": 8047,
+          "videoKbps": 7998,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 2591,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 2785,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 2717
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 3333,
+            "localDrops": 0,
+            "nacked": 147,
+            "recovered": 2,
+            "abandoned": 1,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 0,
+            "pictures": 574,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 29.0,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (WebSocket stalled)",
+        "tier": {
+          "width": 960,
+          "height": 540,
+          "framerate": 25,
+          "bitrateKbps": 678
+        },
+        "rate": {
+          "totalKbps": 727,
+          "videoKbps": 674,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 11
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 1259,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 25,
+          "baseLosses": 9,
+          "onSocket": 4998,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": true,
+          "relayBaseLost": false,
+          "receiverDelayMs": 11,
+          "receiverKbps": 977
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 12217,
+            "localDrops": 0,
+            "nacked": 703,
+            "recovered": 27,
+            "abandoned": 64,
+            "declined": 0,
+            "incomplete": 3,
+            "skipped": 0,
+            "pictures": 830,
+            "recoveryMs": 750
+          }
+        ]
+      },
+      {
+        "seconds": 29.0,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 8209,
+          "videoKbps": 8160,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 7
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 3942,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 3986,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 3781
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 3598,
+            "localDrops": 0,
+            "nacked": 184,
+            "recovered": 2,
+            "abandoned": 2,
+            "declined": 34,
+            "incomplete": 4,
+            "skipped": 0,
+            "pictures": 681,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 34.1,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (WebSocket stalled)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 674
+        },
+        "rate": {
+          "totalKbps": 750,
+          "videoKbps": 697,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 6
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 710,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 25,
+          "baseLosses": 9,
+          "onSocket": 5395,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 6,
+          "receiverKbps": 710
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 15678,
+            "localDrops": 0,
+            "nacked": 703,
+            "recovered": 27,
+            "abandoned": 64,
+            "declined": 0,
+            "incomplete": 3,
+            "skipped": 0,
+            "pictures": 981,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 34.1,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 9828,
+          "videoKbps": 9771,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5107,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 5922,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 5776
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 3702,
+            "localDrops": 0,
+            "nacked": 231,
+            "recovered": 2,
+            "abandoned": 2,
+            "declined": 81,
+            "incomplete": 4,
+            "skipped": 0,
+            "pictures": 749,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 39.1,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (Negotiating negotiating)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 746
+        },
+        "rate": {
+          "totalKbps": 963,
+          "videoKbps": 914,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 7
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 713,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 25,
+          "baseLosses": 9,
+          "onSocket": 5796,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 795
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 19098,
+            "localDrops": 0,
+            "nacked": 703,
+            "recovered": 27,
+            "abandoned": 64,
+            "declined": 0,
+            "incomplete": 3,
+            "skipped": 0,
+            "pictures": 1132,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 39.1,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 10105,
+          "videoKbps": 10048,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 12
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 6474,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 6056,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 12,
+          "receiverKbps": 5992
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 3852,
+            "localDrops": 0,
+            "nacked": 231,
+            "recovered": 2,
+            "abandoned": 2,
+            "declined": 81,
+            "incomplete": 4,
+            "skipped": 0,
+            "pictures": 849,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 44.1,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (WebSocket)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 746
+        },
+        "rate": {
+          "totalKbps": 1324,
+          "videoKbps": 1275,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 6
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 761,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 25,
+          "baseLosses": 9,
+          "onSocket": 6203,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 6,
+          "receiverKbps": 825
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 22770,
+            "localDrops": 0,
+            "nacked": 703,
+            "recovered": 27,
+            "abandoned": 64,
+            "declined": 0,
+            "incomplete": 3,
+            "skipped": 0,
+            "pictures": 1250,
+            "recoveryMs": 750
+          }
+        ]
+      },
+      {
+        "seconds": 44.1,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 10520,
+          "videoKbps": 10459,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 21
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5761,
+          "backlog": 152,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 7646,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 21,
+          "receiverKbps": 6652
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 4008,
+            "localDrops": 0,
+            "nacked": 231,
+            "recovered": 2,
+            "abandoned": 2,
+            "declined": 81,
+            "incomplete": 4,
+            "skipped": 0,
+            "pictures": 949,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 49.1,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 746
+        },
+        "rate": {
+          "totalKbps": 1041,
+          "videoKbps": 957,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Overuse",
+          "delayMs": 786
+        },
+        "send": {
+          "pacerDelayMs": 786,
+          "pacerSentKbps": 0,
+          "backlog": 10703,
+          "capacityKbps": 0,
+          "droppedPictures": 36,
+          "baseLosses": 10,
+          "onSocket": 6531,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 1,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 6,
+          "receiverKbps": 731
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 26117,
+            "localDrops": 0,
+            "nacked": 703,
+            "recovered": 27,
+            "abandoned": 64,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 1,
+            "pictures": 1413,
+            "recoveryMs": 1500
+          }
+        ]
+      },
+      {
+        "seconds": 49.1,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 11177,
+          "videoKbps": 11121,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Hold",
+          "delayMs": 246
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5439,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 5771,
+          "relayQueueMs": 246,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 6,
+          "receiverKbps": 5219
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 4131,
+            "localDrops": 0,
+            "nacked": 231,
+            "recovered": 2,
+            "abandoned": 2,
+            "declined": 81,
+            "incomplete": 4,
+            "skipped": 0,
+            "pictures": 1031,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 54.1,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 426,
+          "height": 240,
+          "framerate": 15,
+          "bitrateKbps": 148
+        },
+        "rate": {
+          "totalKbps": 195,
+          "videoKbps": 159,
+          "audioKbps": 24,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 17
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 176,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 39,
+          "baseLosses": 13,
+          "onSocket": 6736,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 17,
+          "receiverKbps": 192
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 26377,
+            "localDrops": 0,
+            "nacked": 706,
+            "recovered": 27,
+            "abandoned": 64,
+            "declined": 0,
+            "incomplete": 6,
+            "skipped": 1,
+            "pictures": 1480,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 54.1,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 432
+        },
+        "rate": {
+          "totalKbps": 481,
+          "videoKbps": 432,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 4
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 505,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 490,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 4,
+          "receiverKbps": 465
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 4201,
+            "localDrops": 0,
+            "nacked": 627,
+            "recovered": 2,
+            "abandoned": 127,
+            "declined": 81,
+            "incomplete": 6,
+            "skipped": 0,
+            "pictures": 1087,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 59.2,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 426,
+          "height": 240,
+          "framerate": 15,
+          "bitrateKbps": 247
+        },
+        "rate": {
+          "totalKbps": 278,
+          "videoKbps": 249,
+          "audioKbps": 24,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 7
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 214,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 39,
+          "baseLosses": 13,
+          "onSocket": 6895,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 250
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 26731,
+            "localDrops": 0,
+            "nacked": 706,
+            "recovered": 27,
+            "abandoned": 64,
+            "declined": 0,
+            "incomplete": 6,
+            "skipped": 1,
+            "pictures": 1581,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 59.2,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 599
+        },
+        "rate": {
+          "totalKbps": 706,
+          "videoKbps": 657,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 727,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 699,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 638
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 4276,
+            "localDrops": 0,
+            "nacked": 627,
+            "recovered": 2,
+            "abandoned": 127,
+            "declined": 81,
+            "incomplete": 6,
+            "skipped": 0,
+            "pictures": 1162,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 64.2,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 426,
+          "height": 240,
+          "framerate": 15,
+          "bitrateKbps": 273
+        },
+        "rate": {
+          "totalKbps": 315,
+          "videoKbps": 279,
+          "audioKbps": 24,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 5
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 329,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 39,
+          "baseLosses": 13,
+          "onSocket": 7058,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 5,
+          "receiverKbps": 303
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 27199,
+            "localDrops": 0,
+            "nacked": 706,
+            "recovered": 27,
+            "abandoned": 64,
+            "declined": 0,
+            "incomplete": 6,
+            "skipped": 1,
+            "pictures": 1681,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 64.2,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 733
+        },
+        "rate": {
+          "totalKbps": 801,
+          "videoKbps": 752,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 791,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 873,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 760
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 4355,
+            "localDrops": 0,
+            "nacked": 627,
+            "recovered": 2,
+            "abandoned": 127,
+            "declined": 81,
+            "incomplete": 6,
+            "skipped": 0,
+            "pictures": 1238,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 69.2,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 426,
+          "height": 240,
+          "framerate": 15,
+          "bitrateKbps": 304
+        },
+        "rate": {
+          "totalKbps": 357,
+          "videoKbps": 321,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 5
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 385,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 39,
+          "baseLosses": 13,
+          "onSocket": 7216,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 5,
+          "receiverKbps": 325
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 27678,
+            "localDrops": 0,
+            "nacked": 706,
+            "recovered": 27,
+            "abandoned": 64,
+            "declined": 0,
+            "incomplete": 6,
+            "skipped": 1,
+            "pictures": 1782,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 69.2,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 733
+        },
+        "rate": {
+          "totalKbps": 907,
+          "videoKbps": 858,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 4
+        },
+        "send": {
+          "pacerDelayMs": 2,
+          "pacerSentKbps": 756,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 841,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 4,
+          "receiverKbps": 789
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 4430,
+            "localDrops": 0,
+            "nacked": 627,
+            "recovered": 2,
+            "abandoned": 127,
+            "declined": 81,
+            "incomplete": 6,
+            "skipped": 0,
+            "pictures": 1313,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 74.2,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 442
+        },
+        "rate": {
+          "totalKbps": 518,
+          "videoKbps": 482,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 4
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 468,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 39,
+          "baseLosses": 13,
+          "onSocket": 7395,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 4,
+          "receiverKbps": 463
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 28187,
+            "localDrops": 0,
+            "nacked": 706,
+            "recovered": 27,
+            "abandoned": 64,
+            "declined": 0,
+            "incomplete": 6,
+            "skipped": 1,
+            "pictures": 1882,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 74.2,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 733
+        },
+        "rate": {
+          "totalKbps": 1253,
+          "videoKbps": 1204,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 3,
+          "pacerSentKbps": 744,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 859,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 822
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 4525,
+            "localDrops": 0,
+            "nacked": 627,
+            "recovered": 2,
+            "abandoned": 127,
+            "declined": 81,
+            "incomplete": 6,
+            "skipped": 0,
+            "pictures": 1405,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 79.2,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 676
+        },
+        "rate": {
+          "totalKbps": 771,
+          "videoKbps": 735,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 5
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 642,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 39,
+          "baseLosses": 13,
+          "onSocket": 7621,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 5,
+          "receiverKbps": 662
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 28678,
+            "localDrops": 0,
+            "nacked": 706,
+            "recovered": 27,
+            "abandoned": 64,
+            "declined": 0,
+            "incomplete": 6,
+            "skipped": 1,
+            "pictures": 1982,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 79.2,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 733
+        },
+        "rate": {
+          "totalKbps": 1453,
+          "videoKbps": 1400,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 756,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 873,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 838
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 4668,
+            "localDrops": 0,
+            "nacked": 627,
+            "recovered": 2,
+            "abandoned": 127,
+            "declined": 81,
+            "incomplete": 6,
+            "skipped": 0,
+            "pictures": 1505,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 84.2,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 960,
+          "height": 540,
+          "framerate": 25,
+          "bitrateKbps": 1046
+        },
+        "rate": {
+          "totalKbps": 1148,
+          "videoKbps": 1102,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 6
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 1160,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 39,
+          "baseLosses": 13,
+          "onSocket": 7891,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 6,
+          "receiverKbps": 1002
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 29173,
+            "localDrops": 0,
+            "nacked": 706,
+            "recovered": 27,
+            "abandoned": 64,
+            "declined": 0,
+            "incomplete": 6,
+            "skipped": 1,
+            "pictures": 2082,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 84.2,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 733
+        },
+        "rate": {
+          "totalKbps": 1512,
+          "videoKbps": 1463,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 5
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 867,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 809,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 5,
+          "receiverKbps": 802
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 4854,
+            "localDrops": 0,
+            "nacked": 627,
+            "recovered": 2,
+            "abandoned": 127,
+            "declined": 81,
+            "incomplete": 6,
+            "skipped": 0,
+            "pictures": 1622,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 89.3,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1280,
+          "height": 720,
+          "framerate": 30,
+          "bitrateKbps": 1531
+        },
+        "rate": {
+          "totalKbps": 1708,
+          "videoKbps": 1672,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 7
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 1729,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 39,
+          "baseLosses": 13,
+          "onSocket": 8253,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 1586
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 29659,
+            "localDrops": 0,
+            "nacked": 706,
+            "recovered": 27,
+            "abandoned": 64,
+            "declined": 0,
+            "incomplete": 6,
+            "skipped": 1,
+            "pictures": 2183,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 89.3,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 733
+        },
+        "rate": {
+          "totalKbps": 1512,
+          "videoKbps": 1459,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 7
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 937,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 857,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 817
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 5133,
+            "localDrops": 0,
+            "nacked": 627,
+            "recovered": 2,
+            "abandoned": 127,
+            "declined": 81,
+            "incomplete": 6,
+            "skipped": 0,
+            "pictures": 1753,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 94.3,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1280,
+          "height": 720,
+          "framerate": 30,
+          "bitrateKbps": 2312
+        },
+        "rate": {
+          "totalKbps": 2542,
+          "videoKbps": 2506,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 7
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 2409,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 39,
+          "baseLosses": 13,
+          "onSocket": 8723,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 2198
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 30161,
+            "localDrops": 0,
+            "nacked": 706,
+            "recovered": 27,
+            "abandoned": 64,
+            "declined": 0,
+            "incomplete": 6,
+            "skipped": 1,
+            "pictures": 2283,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 94.3,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 733
+        },
+        "rate": {
+          "totalKbps": 1550,
+          "videoKbps": 1501,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 6
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 840,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 857,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 6,
+          "receiverKbps": 811
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 5518,
+            "localDrops": 0,
+            "nacked": 627,
+            "recovered": 2,
+            "abandoned": 127,
+            "declined": 81,
+            "incomplete": 6,
+            "skipped": 0,
+            "pictures": 1903,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 99.3,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1600,
+          "height": 900,
+          "framerate": 30,
+          "bitrateKbps": 3368
+        },
+        "rate": {
+          "totalKbps": 3780,
+          "videoKbps": 3736,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 2,
+          "pacerSentKbps": 3538,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 39,
+          "baseLosses": 13,
+          "onSocket": 9358,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 3269
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 30650,
+            "localDrops": 0,
+            "nacked": 706,
+            "recovered": 27,
+            "abandoned": 64,
+            "declined": 0,
+            "incomplete": 6,
+            "skipped": 1,
+            "pictures": 2384,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 99.3,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 733
+        },
+        "rate": {
+          "totalKbps": 1550,
+          "videoKbps": 1501,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 6
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 867,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 832,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 6,
+          "receiverKbps": 830
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 6069,
+            "localDrops": 0,
+            "nacked": 627,
+            "recovered": 2,
+            "abandoned": 127,
+            "declined": 81,
+            "incomplete": 7,
+            "skipped": 0,
+            "pictures": 2053,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 104.3,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5467
+        },
+        "rate": {
+          "totalKbps": 5622,
+          "videoKbps": 5578,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5743,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 39,
+          "baseLosses": 13,
+          "onSocket": 10196,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 4715
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 31149,
+            "localDrops": 0,
+            "nacked": 706,
+            "recovered": 27,
+            "abandoned": 64,
+            "declined": 0,
+            "incomplete": 6,
+            "skipped": 1,
+            "pictures": 2484,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 104.3,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 733
+        },
+        "rate": {
+          "totalKbps": 1610,
+          "videoKbps": 1561,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 6
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 783,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 836,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 6,
+          "receiverKbps": 816
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 6825,
+            "localDrops": 0,
+            "nacked": 627,
+            "recovered": 2,
+            "abandoned": 127,
+            "declined": 81,
+            "incomplete": 7,
+            "skipped": 0,
+            "pictures": 2204,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 109.3,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5467
+        },
+        "rate": {
+          "totalKbps": 8044,
+          "videoKbps": 7983,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 7
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5459,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 39,
+          "baseLosses": 13,
+          "onSocket": 11331,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 5502
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 31639,
+            "localDrops": 0,
+            "nacked": 706,
+            "recovered": 27,
+            "abandoned": 64,
+            "declined": 0,
+            "incomplete": 6,
+            "skipped": 1,
+            "pictures": 2584,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 109.3,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 733
+        },
+        "rate": {
+          "totalKbps": 1610,
+          "videoKbps": 1561,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 7
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 778,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 834,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 831
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 7746,
+            "localDrops": 0,
+            "nacked": 627,
+            "recovered": 2,
+            "abandoned": 127,
+            "declined": 81,
+            "incomplete": 7,
+            "skipped": 0,
+            "pictures": 2354,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 114.3,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5467
+        },
+        "rate": {
+          "totalKbps": 9544,
+          "videoKbps": 9488,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 7
+        },
+        "send": {
+          "pacerDelayMs": 1,
+          "pacerSentKbps": 6320,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 39,
+          "baseLosses": 13,
+          "onSocket": 12530,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 5584
+        },
+        "receive": [
+          {
+            "streamId": "4613e13c-01be-4224-a0fd-e4a6e0446184",
+            "fragments": 32141,
+            "localDrops": 0,
+            "nacked": 706,
+            "recovered": 27,
+            "abandoned": 64,
+            "declined": 0,
+            "incomplete": 6,
+            "skipped": 1,
+            "pictures": 2684,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 114.3,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 733
+        },
+        "rate": {
+          "totalKbps": 1660,
+          "videoKbps": 1607,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 7
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 868,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 21,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 855,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 821
+        },
+        "receive": [
+          {
+            "streamId": "cca224df-e3ba-496f-ae79-7e2f8aafe8c7",
+            "fragments": 8695,
+            "localDrops": 0,
+            "nacked": 627,
+            "recovered": 2,
+            "abandoned": 127,
+            "declined": 81,
+            "incomplete": 7,
+            "skipped": 0,
+            "pictures": 2505,
+            "recoveryMs": 350
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "seconds": 5.8,
+        "phase": "open",
+        "peer": "A",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5100
+        },
+        "rate": {
+          "totalKbps": 8624,
+          "videoKbps": 8571,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 17
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5617,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 988,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 17,
+          "receiverKbps": 4798
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 4131,
+            "localDrops": 0,
+            "nacked": 0,
+            "recovered": 0,
+            "abandoned": 0,
+            "declined": 0,
+            "incomplete": 0,
+            "skipped": 0,
+            "pictures": 184,
+            "recoveryMs": 1500
+          }
+        ]
+      },
+      {
+        "seconds": 5.8,
+        "phase": "open",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 11483,
+          "videoKbps": 11439,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 34
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5405,
+          "backlog": 132,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 1,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 7199,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 34,
+          "receiverKbps": 5732
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 618,
+            "localDrops": 0,
+            "nacked": 0,
+            "recovered": 0,
+            "abandoned": 0,
+            "declined": 0,
+            "incomplete": 0,
+            "skipped": 0,
+            "pictures": 153,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 18.9,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (WebSocket stalled)",
+        "tier": {
+          "width": 1600,
+          "height": 900,
+          "framerate": 30,
+          "bitrateKbps": 3600
+        },
+        "rate": {
+          "totalKbps": 6510,
+          "videoKbps": 6457,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 11
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 3991,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 13,
+          "baseLosses": 4,
+          "onSocket": 3029,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 11,
+          "receiverKbps": 3628
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 6692,
+            "localDrops": 0,
+            "nacked": 819,
+            "recovered": 34,
+            "abandoned": 38,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 0,
+            "pictures": 463,
+            "recoveryMs": 750
+          }
+        ]
+      },
+      {
+        "seconds": 19.0,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 960,
+          "height": 540,
+          "framerate": 25,
+          "bitrateKbps": 1400
+        },
+        "rate": {
+          "totalKbps": 8038,
+          "videoKbps": 7989,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 19
+        },
+        "send": {
+          "pacerDelayMs": 1,
+          "pacerSentKbps": 1367,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 1786,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 19,
+          "receiverKbps": 1549
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 2062,
+            "localDrops": 0,
+            "nacked": 219,
+            "recovered": 0,
+            "abandoned": 1,
+            "declined": 0,
+            "incomplete": 2,
+            "skipped": 0,
+            "pictures": 492,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 24.0,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (WebSocket stalled)",
+        "tier": {
+          "width": 1280,
+          "height": 720,
+          "framerate": 30,
+          "bitrateKbps": 2600
+        },
+        "rate": {
+          "totalKbps": 4998,
+          "videoKbps": 4949,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 9
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 3020,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 27,
+          "baseLosses": 9,
+          "onSocket": 3498,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 9,
+          "receiverKbps": 1707
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 7590,
+            "localDrops": 0,
+            "nacked": 819,
+            "recovered": 34,
+            "abandoned": 38,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 0,
+            "pictures": 589,
+            "recoveryMs": 750
+          }
+        ]
+      },
+      {
+        "seconds": 24.0,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 960,
+          "height": 540,
+          "framerate": 25,
+          "bitrateKbps": 1400
+        },
+        "rate": {
+          "totalKbps": 8038,
+          "videoKbps": 7989,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 7
+        },
+        "send": {
+          "pacerDelayMs": 1,
+          "pacerSentKbps": 1542,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 1643,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 1482
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 2383,
+            "localDrops": 0,
+            "nacked": 1515,
+            "recovered": 5,
+            "abandoned": 410,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 0,
+            "pictures": 574,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 29.0,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (WebSocket stalled)",
+        "tier": {
+          "width": 1280,
+          "height": 720,
+          "framerate": 30,
+          "bitrateKbps": 2600
+        },
+        "rate": {
+          "totalKbps": 4998,
+          "videoKbps": 4945,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 6
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 2702,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 27,
+          "baseLosses": 9,
+          "onSocket": 4206,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 6,
+          "receiverKbps": 2625
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 8513,
+            "localDrops": 0,
+            "nacked": 819,
+            "recovered": 34,
+            "abandoned": 38,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 0,
+            "pictures": 714,
+            "recoveryMs": 750
+          }
+        ]
+      },
+      {
+        "seconds": 29.0,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 960,
+          "height": 540,
+          "framerate": 25,
+          "bitrateKbps": 1400
+        },
+        "rate": {
+          "totalKbps": 8038,
+          "videoKbps": 7985,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 7
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 1875,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 1899,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 1508
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 2853,
+            "localDrops": 0,
+            "nacked": 1515,
+            "recovered": 5,
+            "abandoned": 410,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 0,
+            "pictures": 724,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 34.0,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (WebSocket stalled)",
+        "tier": {
+          "width": 1280,
+          "height": 720,
+          "framerate": 30,
+          "bitrateKbps": 2600
+        },
+        "rate": {
+          "totalKbps": 5099,
+          "videoKbps": 5046,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 6
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 2824,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 27,
+          "baseLosses": 9,
+          "onSocket": 4926,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 6,
+          "receiverKbps": 2715
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 9442,
+            "localDrops": 0,
+            "nacked": 819,
+            "recovered": 34,
+            "abandoned": 38,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 0,
+            "pictures": 840,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 34.0,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 960,
+          "height": 540,
+          "framerate": 25,
+          "bitrateKbps": 1400
+        },
+        "rate": {
+          "totalKbps": 8038,
+          "videoKbps": 7981,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 9
+        },
+        "send": {
+          "pacerDelayMs": 1,
+          "pacerSentKbps": 1432,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 1582,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 9,
+          "receiverKbps": 1540
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 3324,
+            "localDrops": 0,
+            "nacked": 1515,
+            "recovered": 5,
+            "abandoned": 410,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 0,
+            "pictures": 875,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 39.0,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (Negotiating negotiating)",
+        "tier": {
+          "width": 1280,
+          "height": 720,
+          "framerate": 30,
+          "bitrateKbps": 2600
+        },
+        "rate": {
+          "totalKbps": 5099,
+          "videoKbps": 5050,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 6
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 2452,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 27,
+          "baseLosses": 9,
+          "onSocket": 5640,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 6,
+          "receiverKbps": 2578
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 10327,
+            "localDrops": 0,
+            "nacked": 819,
+            "recovered": 34,
+            "abandoned": 38,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 0,
+            "pictures": 965,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 39.0,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 960,
+          "height": 540,
+          "framerate": 25,
+          "bitrateKbps": 1400
+        },
+        "rate": {
+          "totalKbps": 8038,
+          "videoKbps": 7981,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 1665,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 1512,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 1522
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 3782,
+            "localDrops": 0,
+            "nacked": 1515,
+            "recovered": 5,
+            "abandoned": 410,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 0,
+            "pictures": 1025,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 44.0,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (WebSocket)",
+        "tier": {
+          "width": 1280,
+          "height": 720,
+          "framerate": 30,
+          "bitrateKbps": 2600
+        },
+        "rate": {
+          "totalKbps": 5203,
+          "videoKbps": 5154,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 4,
+          "pacerSentKbps": 2968,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 27,
+          "baseLosses": 9,
+          "onSocket": 6355,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 2624
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 11654,
+            "localDrops": 0,
+            "nacked": 819,
+            "recovered": 34,
+            "abandoned": 38,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 0,
+            "pictures": 1099,
+            "recoveryMs": 750
+          }
+        ]
+      },
+      {
+        "seconds": 44.0,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1280,
+          "height": 720,
+          "framerate": 30,
+          "bitrateKbps": 2600
+        },
+        "rate": {
+          "totalKbps": 8038,
+          "videoKbps": 7977,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 2897,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 3435,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 2588
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 4252,
+            "localDrops": 0,
+            "nacked": 1515,
+            "recovered": 5,
+            "abandoned": 410,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 0,
+            "pictures": 1176,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 49.1,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1280,
+          "height": 720,
+          "framerate": 30,
+          "bitrateKbps": 2600
+        },
+        "rate": {
+          "totalKbps": 5203,
+          "videoKbps": 5119,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Hold",
+          "delayMs": 553
+        },
+        "send": {
+          "pacerDelayMs": 553,
+          "pacerSentKbps": 0,
+          "backlog": 39061,
+          "capacityKbps": 0,
+          "droppedPictures": 27,
+          "baseLosses": 9,
+          "onSocket": 6953,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 1980
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 13943,
+            "localDrops": 0,
+            "nacked": 819,
+            "recovered": 34,
+            "abandoned": 38,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 0,
+            "pictures": 1235,
+            "recoveryMs": 1500
+          }
+        ]
+      },
+      {
+        "seconds": 49.1,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5600
+        },
+        "rate": {
+          "totalKbps": 8706,
+          "videoKbps": 8650,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 88
+        },
+        "send": {
+          "pacerDelayMs": 3,
+          "pacerSentKbps": 5434,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 5987,
+          "relayQueueMs": 88,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 4421
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 4638,
+            "localDrops": 0,
+            "nacked": 1515,
+            "recovered": 5,
+            "abandoned": 410,
+            "declined": 0,
+            "incomplete": 4,
+            "skipped": 0,
+            "pictures": 1303,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 54.1,
+        "phase": "warmup",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1280,
+          "height": 720,
+          "framerate": 30,
+          "bitrateKbps": 2600
+        },
+        "rate": {
+          "totalKbps": 4178,
+          "videoKbps": 4126,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 19
+        },
+        "send": {
+          "pacerDelayMs": 19,
+          "pacerSentKbps": 2623,
+          "backlog": 10283,
+          "capacityKbps": 0,
+          "droppedPictures": 58,
+          "baseLosses": 12,
+          "onSocket": 7584,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 2701
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 14183,
+            "localDrops": 0,
+            "nacked": 822,
+            "recovered": 34,
+            "abandoned": 38,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 1296,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 54.1,
+        "phase": "warmup",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 346
+        },
+        "rate": {
+          "totalKbps": 424,
+          "videoKbps": 375,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 417,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 428,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 414
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 5070,
+            "localDrops": 0,
+            "nacked": 1584,
+            "recovered": 5,
+            "abandoned": 419,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 1399,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 59.1,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5265
+        },
+        "rate": {
+          "totalKbps": 5424,
+          "videoKbps": 5375,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 12
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 9664,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 58,
+          "baseLosses": 12,
+          "onSocket": 8475,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 9,
+          "receiverKbps": 3591
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 14490,
+            "localDrops": 0,
+            "nacked": 822,
+            "recovered": 34,
+            "abandoned": 38,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 1397,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 59.1,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 541
+        },
+        "rate": {
+          "totalKbps": 614,
+          "videoKbps": 561,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 9
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 664,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 627,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 9,
+          "receiverKbps": 542
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 5709,
+            "localDrops": 0,
+            "nacked": 1584,
+            "recovered": 5,
+            "abandoned": 419,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 1550,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 64.1,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5265
+        },
+        "rate": {
+          "totalKbps": 7753,
+          "videoKbps": 7700,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5640,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 58,
+          "baseLosses": 12,
+          "onSocket": 9608,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 5391
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 14888,
+            "localDrops": 0,
+            "nacked": 822,
+            "recovered": 34,
+            "abandoned": 38,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 1497,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 64.1,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 600
+        },
+        "rate": {
+          "totalKbps": 696,
+          "videoKbps": 644,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 1,
+          "pacerSentKbps": 735,
+          "backlog": 132,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 689,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 678
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 6592,
+            "localDrops": 0,
+            "nacked": 1584,
+            "recovered": 5,
+            "abandoned": 419,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 1700,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 69.1,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5265
+        },
+        "rate": {
+          "totalKbps": 9259,
+          "videoKbps": 9203,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 27
+        },
+        "send": {
+          "pacerDelayMs": 27,
+          "pacerSentKbps": 10546,
+          "backlog": 35911,
+          "capacityKbps": 0,
+          "droppedPictures": 58,
+          "baseLosses": 12,
+          "onSocket": 10793,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 9,
+          "receiverKbps": 5241
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 15329,
+            "localDrops": 0,
+            "nacked": 822,
+            "recovered": 34,
+            "abandoned": 38,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 1597,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 69.1,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 734
+        },
+        "rate": {
+          "totalKbps": 788,
+          "videoKbps": 735,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 9
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 785,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 821,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 9,
+          "receiverKbps": 754
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 7526,
+            "localDrops": 0,
+            "nacked": 1584,
+            "recovered": 5,
+            "abandoned": 419,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 1851,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 74.2,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5265
+        },
+        "rate": {
+          "totalKbps": 9259,
+          "videoKbps": 9202,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 10
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5304,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 58,
+          "baseLosses": 12,
+          "onSocket": 11937,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 10,
+          "receiverKbps": 5520
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 15844,
+            "localDrops": 0,
+            "nacked": 822,
+            "recovered": 34,
+            "abandoned": 38,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 1698,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 74.2,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 734
+        },
+        "rate": {
+          "totalKbps": 1142,
+          "videoKbps": 1089,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 768,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 834,
+          "relayQueueMs": 1,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 820
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 8412,
+            "localDrops": 0,
+            "nacked": 1584,
+            "recovered": 5,
+            "abandoned": 419,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 2001,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 79.2,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5265
+        },
+        "rate": {
+          "totalKbps": 9445,
+          "videoKbps": 9384,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 13
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5560,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 58,
+          "baseLosses": 12,
+          "onSocket": 13092,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 9,
+          "receiverKbps": 5089
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 16327,
+            "localDrops": 0,
+            "nacked": 822,
+            "recovered": 34,
+            "abandoned": 38,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 1798,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 79.2,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 734
+        },
+        "rate": {
+          "totalKbps": 1376,
+          "videoKbps": 1323,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 875,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 830,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 825
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 9323,
+            "localDrops": 0,
+            "nacked": 1584,
+            "recovered": 5,
+            "abandoned": 419,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 2152,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 84.2,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5265
+        },
+        "rate": {
+          "totalKbps": 9445,
+          "videoKbps": 9384,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 11
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5729,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 58,
+          "baseLosses": 12,
+          "onSocket": 14220,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 11,
+          "receiverKbps": 5406
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 16844,
+            "localDrops": 0,
+            "nacked": 822,
+            "recovered": 34,
+            "abandoned": 38,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 1899,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 84.2,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 734
+        },
+        "rate": {
+          "totalKbps": 1451,
+          "videoKbps": 1402,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 9
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 866,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 857,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 9,
+          "receiverKbps": 842
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 10200,
+            "localDrops": 0,
+            "nacked": 1584,
+            "recovered": 5,
+            "abandoned": 419,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 2303,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 89.2,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5265
+        },
+        "rate": {
+          "totalKbps": 9638,
+          "videoKbps": 9578,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 9
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 9857,
+          "backlog": 149,
+          "capacityKbps": 0,
+          "droppedPictures": 58,
+          "baseLosses": 12,
+          "onSocket": 15384,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 9,
+          "receiverKbps": 5177
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 17329,
+            "localDrops": 0,
+            "nacked": 822,
+            "recovered": 34,
+            "abandoned": 38,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 1999,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 89.2,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 734
+        },
+        "rate": {
+          "totalKbps": 1478,
+          "videoKbps": 1425,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 837,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 861,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 816
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 11112,
+            "localDrops": 0,
+            "nacked": 1584,
+            "recovered": 5,
+            "abandoned": 419,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 2452,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 94.2,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5265
+        },
+        "rate": {
+          "totalKbps": 9638,
+          "videoKbps": 9577,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 10
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5820,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 58,
+          "baseLosses": 12,
+          "onSocket": 16516,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 10,
+          "receiverKbps": 5291
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 17838,
+            "localDrops": 0,
+            "nacked": 822,
+            "recovered": 34,
+            "abandoned": 38,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 2099,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 94.2,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 734
+        },
+        "rate": {
+          "totalKbps": 1508,
+          "videoKbps": 1455,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 740,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 824,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 819
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 11993,
+            "localDrops": 0,
+            "nacked": 1584,
+            "recovered": 5,
+            "abandoned": 419,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 2603,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 99.3,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5265
+        },
+        "rate": {
+          "totalKbps": 9831,
+          "videoKbps": 9774,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 9
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 9477,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 58,
+          "baseLosses": 12,
+          "onSocket": 17701,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 9,
+          "receiverKbps": 5513
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 18325,
+            "localDrops": 0,
+            "nacked": 822,
+            "recovered": 34,
+            "abandoned": 38,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 2200,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 99.3,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 734
+        },
+        "rate": {
+          "totalKbps": 1538,
+          "videoKbps": 1489,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 848,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 820,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 819
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 12928,
+            "localDrops": 0,
+            "nacked": 1584,
+            "recovered": 5,
+            "abandoned": 419,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 2754,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 104.3,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5265
+        },
+        "rate": {
+          "totalKbps": 9831,
+          "videoKbps": 9770,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 9
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 5627,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 58,
+          "baseLosses": 12,
+          "onSocket": 18824,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 9,
+          "receiverKbps": 5288
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 18832,
+            "localDrops": 0,
+            "nacked": 822,
+            "recovered": 34,
+            "abandoned": 38,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 2300,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 104.3,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 734
+        },
+        "rate": {
+          "totalKbps": 1569,
+          "videoKbps": 1516,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 892,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 838,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 834
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 13799,
+            "localDrops": 0,
+            "nacked": 1584,
+            "recovered": 5,
+            "abandoned": 419,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 2904,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 109.3,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5265
+        },
+        "rate": {
+          "totalKbps": 10237,
+          "videoKbps": 10176,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 10
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 8509,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 58,
+          "baseLosses": 12,
+          "onSocket": 19991,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 10,
+          "receiverKbps": 5349
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 19314,
+            "localDrops": 0,
+            "nacked": 822,
+            "recovered": 34,
+            "abandoned": 38,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 2401,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 109.3,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 734
+        },
+        "rate": {
+          "totalKbps": 1569,
+          "videoKbps": 1516,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 8
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 893,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 835,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 8,
+          "receiverKbps": 794
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 14716,
+            "localDrops": 0,
+            "nacked": 1584,
+            "recovered": 5,
+            "abandoned": 419,
+            "declined": 0,
+            "incomplete": 6,
+            "skipped": 0,
+            "pictures": 3055,
+            "recoveryMs": 350
+          }
+        ]
+      },
+      {
+        "seconds": 114.3,
+        "phase": "measure",
+        "peer": "A",
+        "path": "WebSocket (WebSocket flapping)",
+        "tier": {
+          "width": 1920,
+          "height": 1080,
+          "framerate": 30,
+          "bitrateKbps": 5265
+        },
+        "rate": {
+          "totalKbps": 10237,
+          "videoKbps": 10180,
+          "audioKbps": 40,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 7
+        },
+        "send": {
+          "pacerDelayMs": 4,
+          "pacerSentKbps": 5590,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 58,
+          "baseLosses": 12,
+          "onSocket": 21124,
+          "uplinkDelayMs": null,
+          "uplinkLoss": null,
+          "uplinkDeliveredKbps": null,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 5243
+        },
+        "receive": [
+          {
+            "streamId": "07eefe39-65c3-43fa-951e-439520c162d9",
+            "fragments": 19817,
+            "localDrops": 0,
+            "nacked": 822,
+            "recovered": 34,
+            "abandoned": 38,
+            "declined": 0,
+            "incomplete": 5,
+            "skipped": 0,
+            "pictures": 2501,
+            "recoveryMs": 0
+          }
+        ]
+      },
+      {
+        "seconds": 114.3,
+        "phase": "measure",
+        "peer": "B",
+        "path": "UDP/relay (Datagram)",
+        "tier": {
+          "width": 640,
+          "height": 360,
+          "framerate": 20,
+          "bitrateKbps": 734
+        },
+        "rate": {
+          "totalKbps": 1633,
+          "videoKbps": 1580,
+          "audioKbps": 32,
+          "videoSuspended": false,
+          "signal": "Normal",
+          "delayMs": 7
+        },
+        "send": {
+          "pacerDelayMs": 0,
+          "pacerSentKbps": 829,
+          "backlog": 0,
+          "capacityKbps": 0,
+          "droppedPictures": 0,
+          "baseLosses": 0,
+          "onSocket": 23,
+          "uplinkDelayMs": 0,
+          "uplinkLoss": 0,
+          "uplinkDeliveredKbps": 842,
+          "relayQueueMs": 0,
+          "relayCapacityKbps": 0,
+          "relayDropping": false,
+          "relayBaseLost": false,
+          "receiverDelayMs": 7,
+          "receiverKbps": 811
+        },
+        "receive": [
+          {
+            "streamId": "e38ab606-2bbd-4fb2-a6b9-4914c2a1ea6a",
+            "fragments": 15598,
+            "localDrops": 0,
+            "nacked": 1584,
+            "recovered": 5,
+            "abandoned": 419,
+            "declined": 0,
+            "incomplete": 6,
+            "skipped": 0,
+            "pictures": 3205,
+            "recoveryMs": 350
+          }
+        ]
+      }
+    ]
+  ]
+}

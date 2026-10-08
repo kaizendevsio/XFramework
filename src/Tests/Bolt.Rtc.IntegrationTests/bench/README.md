@@ -27,6 +27,9 @@ The clean and 512 kbps / 1000 ms RTT / 3% loss profiles shape participant A's re
 baseline/current. The test's existing quality assertions and failures stay visible in JSON. A quality failure
 with a completed measurement is reported; a setup failure fails the job. These results test transport behavior,
 not real codec quality, decoder CPU, phone temperature or battery life. There is no native comparator for this table.
+The severe profile injects loss on A's downlink; its uplink has delay without injected loss. It exercises receiver
+recovery, redundancy and audio/video pacing under a constrained downlink. It does not directly verify a sender-uplink
+loss repair fix; production `MediaTransportClient`/relay feedback regression tests provide that separate evidence.
 
 ## Comparable metrics
 
@@ -60,6 +63,11 @@ Dispatch after pushing the branch:
 ```powershell
 gh workflow run call-media-benchmark.yml --ref codex/yap-call-efficiency-white-label -f baseline_ref=8ae24751d0975c6dbb8e2a368059aa2338e54df3 -f seconds=60 -f repeats=3 -f production=true
 ```
+
+For a focused rerun of production transport changes, add `-f modeled=false`; keep `-f production=true`.
+This runs the clean/severe baseline/current production matrix without repeating the modeled comparisons.
+Pull requests always run both matrices, regardless of the manual dispatch flags. Preserve earlier raw results
+and label each measured source revision when comparing a follow-up run.
 
 Each run remains a separate table row; modeled runs alternate path order on even repeats. Netem loss remains
 random and the hosted runner's scheduling and Chrome software codec can vary. Use repeated results to assess
