@@ -68,3 +68,11 @@ which include startup and warmup. Current severe production also fell back in ev
 audio delivery (91.47–95.66% A->B). One repeat retried UDP during measurement, with 25–33 second frame gaps
 and three B->A decoder resets. Both snapshots passed clean production. The run establishes unresolved severe
 quality/fallback problems; it does not establish a production audio cure or thermal improvement.
+
+The [production-only probe/drain follow-up](yap-call-media-benchmark-2026-10-08/run-37784214293/README.md)
+measured `d258a01a1368093d93a454d713d475359b9b8375` in another twelve 60-second calls. Clean production
+again passed. Severe current still fell back in every repeat, failed lifetime A->B audio (94.55–94.85%), and
+two repeats had 12–13 second measured A->B gaps plus two B->A decoder resets each. Probe waits became longer
+but first sampled fallback timing remained 18.9–19.0 seconds. This follow-up precedes the service rate-loop
+probe-gating correction. Its raw measurements and startup/path samples remain separate from the initial run;
+different loss traces and fallback timing prevent causal comparisons of their ranges.
