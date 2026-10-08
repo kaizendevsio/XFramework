@@ -1,26 +1,6 @@
-let decoderPromise;
+import { decoder, decode } from '/_content/XFramework.Portal.Shared/barcodes/barcodes.js';
+export { decoder, decode, qrData } from '/_content/XFramework.Portal.Shared/barcodes/barcodes.js';
 const cameras = new WeakMap();
-
-export function decoder() {
-    return decoderPromise ??= new Promise((resolve, reject) => {
-        const script = document.createElement("script");
-        script.src = new URL("./vendor/zxing-wasm-3.1.5.js", import.meta.url).href;
-        script.onload = async () => {
-            try {
-                const library = globalThis.ZXingWASM;
-                await library.prepareZXingModule({
-                    overrides: {
-                        locateFile: () => new URL("./vendor/zxing_full.wasm", import.meta.url).href
-                    },
-                    fireImmediately: true
-                });
-                resolve(library);
-            } catch { reject(new Error("Scanner decoder could not load. Reload this page.")); }
-        };
-        script.onerror = () => reject(new Error("Scanner decoder could not load. Reload this page."));
-        document.head.append(script);
-    });
-}
 
 export function cameraError(error) {
     switch (error?.name) {
@@ -53,25 +33,6 @@ export function pairingTenant(value = location.href) {
         return url.origin === location.origin && url.pathname === "/pos/mobile-scanner" &&
             /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenant) ? tenant : "";
     } catch { return ""; }
-}
-
-export async function qrData(url) {
-    const library = await decoder();
-    const result = await library.writeBarcode(url, { format: "QRCode", scale: 5 });
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error("Pairing QR could not load."));
-        reader.readAsDataURL(result.image);
-    });
-}
-
-export async function decode(imageData) {
-    const library = await decoder();
-    return library.readBarcodes(imageData, {
-        formats: ["QRCode", "EAN13", "EAN8", "UPCA", "UPCE", "Code128", "Code39", "ITF", "DataMatrix"],
-        tryHarder: true, maxNumberOfSymbols: 1
-    });
 }
 
 export async function start(video, receiver) {

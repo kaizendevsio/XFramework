@@ -42,12 +42,17 @@ export async function copyReportLink(url) {
 }
 
 // Render the already-authorized report snapshot; exporting never performs another data query.
-export async function exportPdf(model) {
+export async function createPdf(options = { unit: 'mm', format: 'a4' }) {
     await loadLibraries();
-    const doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+    const doc = new window.jspdf.jsPDF(options);
     doc.addFileToVFS('NotoSans-Regular.ttf', font);
     doc.addFont('NotoSans-Regular.ttf', 'NotoSans', 'normal');
     doc.setFont('NotoSans', 'normal');
+    return doc;
+}
+
+export async function exportPdf(model) {
+    const doc = await createPdf();
     const margin = 16;
     const width = 178;
     let y = margin;

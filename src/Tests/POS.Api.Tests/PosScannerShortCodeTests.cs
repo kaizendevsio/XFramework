@@ -105,6 +105,21 @@ public sealed class PosScannerShortCodeTests
     }
 
     [Test]
+    public void Create_ConnectedPairingReservesItsConsumedCodeBeyondOriginalExpiry()
+    {
+        store = new(clock, () => "000007");
+        var pairing = Create();
+        store.Claim(phone, pairing.PairingCode).IsSuccess.Should().BeTrue();
+        for (var i = 0; i < 160; i++)
+        {
+            clock.Advance(TimeSpan.FromSeconds(15));
+            store.Poll(desktop, pairing.PairingId, pairing.DesktopKey, 0).IsSuccess.Should().BeTrue();
+        }
+        store.Create(desktop, Guid.NewGuid(), "Another register").StatusCode.Should().Be(429);
+        store.Claim(phone, pairing.PairingCode).StatusCode.Should().Be(403);
+    }
+
+    [Test]
     public void Claim_GlobalBudgetBoundsDistributedActors()
     {
         for (var i = 0; i < PosScannerPairingStore.GlobalShortClaimLimit; i++)

@@ -71,7 +71,7 @@ public sealed class PosScannerService(
     public async Task<Result<PosScannerPollResponse>> PollAsync(PollPosScannerCodesRequest request, CancellationToken ct)
     {
         var actor = await AuthorizeAsync(request, ct);
-        return actor.IsSuccess ? store.Poll(actor.Data!, request.PairingId, request.DesktopKey, request.AcknowledgedSequence, request.PauseDelivery) :
+        return actor.IsSuccess ? store.Poll(actor.Data!, request.PairingId, request.DesktopKey, request.AcknowledgedSequence, request.PauseDelivery, request.DiscardPendingCodes) :
             Result<PosScannerPollResponse>.Failure(actor.Message!, actor.StatusCode);
     }
 

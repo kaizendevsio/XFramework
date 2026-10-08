@@ -13,8 +13,13 @@
 </HeadContent>
 
 <main class="mobile-scanner" data-testid="mobile-scanner">
-    <h1>@(_phone is null ? "Pair scanner" : _phone.RegisterName)</h1>
-    <p class="scanner-account">@_account</p>
+    <header class="scanner-header">
+        <div><h1>@(_phone is null ? "Pair scanner" : _phone.RegisterName)</h1><p class="scanner-account">@_account</p></div>
+        @if (_phone is not null)
+        {
+            <BbButton OnClick="Disconnect" Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Leave pairing" title="Leave pairing"><LucideIcon Name="unplug" Size="20" /></BbButton>
+        }
+    </header>
     <p role="status" aria-live="polite" data-testid="scanner-status">@_status</p>
     @if (_error is not null)
     {
@@ -25,32 +30,48 @@
         @if (!_cameraRunning) { <div class="camera-idle"><LucideIcon Name="scan-barcode" Size="48" /></div> }
     </div>
     <div class="scanner-actions">
-        <BbButton OnClick="StartCamera" Disabled="@_busy"><LucideIcon Name="camera" Size="18" />Start camera</BbButton>
-        <BbButton OnClick="StopCamera" Variant="ButtonVariant.Outline"><LucideIcon Name="square" Size="18" />Stop</BbButton>
+        @if (_cameraRunning || _cameraStarting)
+        {
+            <BbButton OnClick="StopCamera" Variant="ButtonVariant.Outline"><LucideIcon Name="pause" Size="18" />Pause camera</BbButton>
+        }
+        else
+        {
+            <BbButton OnClick="StartCamera" Disabled="@_busy"><LucideIcon Name="camera" Size="18" />Start camera</BbButton>
+        }
     </div>
     @if (_phone is null)
     {
+        @if (_challenge.Length > 0)
+        {
+            <BbButton OnClick="PairEntered" Disabled="@_busy"><LucideIcon Name="link" Size="18" />Pair desktop</BbButton>
+        }
+        <BbCollapsible @bind-Open="_manualPairOpen" Class="scanner-manual">
+        <BbCollapsibleTrigger AsChild="false" class="scanner-disclosure">Enter pairing code</BbCollapsibleTrigger>
+        <BbCollapsibleContent>@if (_manualPairOpen) { <div class="scanner-fields">
         <label for="scanner-tenant">Tenant ID</label>
         <BbInput Id="scanner-tenant" @bind-Value="_tenantHint" autocomplete="off" />
         <label for="scanner-challenge">Six-digit pairing code</label>
         <BbInput Id="scanner-challenge" @bind-Value="_pairingCode" autocomplete="off" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" />
-        <BbButton OnClick="PairEntered" Disabled="@(_busy || (!IsPairingCode(_pairingCode) && string.IsNullOrEmpty(_challenge)))" Variant="ButtonVariant.Outline">
-            <LucideIcon Name="link" Size="18" />Pair desktop
+        <BbButton OnClick="PairEntered" Disabled="@(_busy || !IsPairingCode(_pairingCode))" Variant="ButtonVariant.Outline">
+            <LucideIcon Name="link" Size="18" />Pair with code
         </BbButton>
+        </div> }</BbCollapsibleContent></BbCollapsible>
     }
     else
     {
-        <p>Paired until @_phone.ExpiresAt.ToLocalTime().ToString("HH:mm")</p>
+        <BbCollapsible @bind-Open="_manualProductOpen" Class="scanner-manual">
+        <BbCollapsibleTrigger AsChild="false" class="scanner-disclosure">Enter product code</BbCollapsibleTrigger>
+        <BbCollapsibleContent>@if (_manualProductOpen) { <div class="scanner-fields">
         <label for="scanner-product-code">Product code</label>
         <BbInput Id="scanner-product-code" @bind-Value="_manualCode" autocomplete="off" />
         <BbButton OnClick="SendEntered" Disabled="@(_busy || string.IsNullOrWhiteSpace(_manualCode))" Variant="ButtonVariant.Outline">
             <LucideIcon Name="send" Size="18" />Send code
         </BbButton>
+        </div> }</BbCollapsibleContent></BbCollapsible>
         @if (_pendingCode is not null)
         {
             <BbButton OnClick="RetrySend" Disabled="@_busy"><LucideIcon Name="rotate-cw" Size="18" />Retry last code</BbButton>
         }
-        <BbButton OnClick="Disconnect" Variant="ButtonVariant.Outline"><LucideIcon Name="unplug" Size="18" />Leave pairing</BbButton>
     }
     @if (_lastCode is not null) { <output class="scanner-last">@_lastCode</output> }
 </main>
@@ -77,6 +98,9 @@
     private bool _decoding;
     private bool _disposed;
     private bool _cameraRunning;
+    private bool _cameraStarting;
+    private bool _manualPairOpen;
+    private bool _manualProductOpen;
     private long _cameraVersion;
 
     protected override async Task OnInitializedAsync()
@@ -102,6 +126,7 @@
     {
         if (_script is null || _disposed || _busy) return;
         var version = ++_cameraVersion;
+        _cameraStarting = true;
         _busy = true;
         _error = null;
         try
@@ -114,12 +139,13 @@
             if (!_disposed && version == _cameraVersion)
             { _error = exception.Message.Split('\n')[0]; _cameraRunning = false; }
         }
-        finally { _busy = false; }
+        finally { if (version == _cameraVersion) _cameraStarting = false; _busy = false; }
     }
 
     private async Task StopCamera()
     {
         _cameraVersion++;
+        _cameraStarting = false;
         _cameraRunning = false;
         if (_script is not null) await _script.InvokeVoidAsync("stop", _video);
     }
@@ -188,6 +214,8 @@
             if (_disposed) return;
             if (!result.IsSuccess || result.Response is null) { _error = result.Message ?? "Pairing denied."; return; }
             _phone = result.Response;
+            _manualPairOpen = false;
+            _manualProductOpen = false;
             _pairedTenantId = tenantId;
             _challenge = "";
             _pairingCode = "";

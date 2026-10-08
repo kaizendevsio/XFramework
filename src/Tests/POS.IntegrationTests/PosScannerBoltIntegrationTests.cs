@@ -200,6 +200,27 @@ public sealed class PosScannerBoltIntegrationTests
     }
 
     [Test]
+    public async Task Poll_NewSaleFlush_RoundTripsAcknowledgementWithoutReplacingPairing()
+    {
+        var pairing = Pairing();
+        PosScannerPhoneResponse phone;
+        using (TestInvocationActorTokenScope.Push(Token(phoneSession)))
+        {
+            phone = (await wrapper.ClaimPosScannerPairing(new() { Challenge = pairing.Challenge })).Response!;
+            (await wrapper.SendPosScannerCode(new() { PairingId = phone.PairingId, PhoneKey = phone.PhoneKey, Sequence = 1, Code = "OLD-SALE" })).IsSuccess.Should().BeTrue();
+        }
+        var poll = new PollPosScannerCodesRequest { PairingId = pairing.PairingId, DesktopKey = pairing.DesktopKey, DiscardPendingCodes = true };
+        var reset = await wrapper.PollPosScannerCodes(poll);
+        reset.IsSuccess.Should().BeTrue(reset.Message);
+        reset.Response!.AcknowledgedSequence.Should().Be(1);
+        reset.Response.Codes.Should().BeEmpty();
+        reset.Response.IsPaired.Should().BeTrue();
+        using (TestInvocationActorTokenScope.Push(Token(phoneSession)))
+            (await wrapper.SendPosScannerCode(new() { PairingId = phone.PairingId, PhoneKey = phone.PhoneKey, Sequence = 2, Code = "NEW-SALE" })).IsSuccess.Should().BeTrue();
+        (await wrapper.PollPosScannerCodes(poll with { DiscardPendingCodes = false, AcknowledgedSequence = 1 })).Response!.Codes.Should().ContainSingle(c => c.Code == "NEW-SALE");
+    }
+
+    [Test]
     public async Task Claim_ExpiredOrFeatureDisabled_ThroughGeneratedWrappers()
     {
         var pairing = Pairing();

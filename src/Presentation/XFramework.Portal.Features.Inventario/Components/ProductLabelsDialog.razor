@@ -1,0 +1,108 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<BbDialog Open="@Open" OpenChanged="OpenChanged">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide inv-dialog product-labels-dialog">
+        <BbDialogHeader><BbDialogTitle>Product QR labels</BbDialogTitle><BbDialogDescription>@Products.Count loaded products</BbDialogDescription></BbDialogHeader>
+        <div class="labels-body inv-dialog-body">
+            @if (_error is not null) { <BbAlert><BbAlertDescription>@_error</BbAlertDescription></BbAlert> }
+            @if (Products.Any(p => !ValidSku(p.SKU)))
+            {
+                <BbAlert><BbAlertDescription>Products without a valid SKU cannot be printed. Add a SKU in the product details first.</BbAlertDescription></BbAlert>
+            }
+            <div class="labels-grid"><BbDataGrid @key="_gridVersion" TItem="Product" Items="@_eligible" SelectionMode="DataTableSelectionMode.Multiple" SelectedItemsChanged="@((IReadOnlyCollection<Product> items) => SelectionChanged(items))" ShowPagination="true" InitialPageSize="5">
+                <Columns>
+                    <BbDataGridSelectColumn />
+                    <BbDataGridPropertyColumn Property="@(p => p.Name)" Title="Product" Sortable="true" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(p => p.SKU)" Title="SKU" Sortable="true" Filterable="true" />
+                </Columns>
+            </BbDataGrid></div>
+            <div class="labels-options">
+                <BbFormFieldNumericInput TValue="int" @bind-Value="_copies" Label="Copies per product" Min="1" Max="100" />
+                <BbFormFieldNumericInput TValue="int" @bind-Value="_width" Label="Width (mm)" Min="40" Max="100" />
+                <BbFormFieldNumericInput TValue="int" @bind-Value="_height" Label="Height (mm)" Min="30" Max="80" />
+                <div><label>Paper</label><BbSelect TValue="string" @bind-Value="_sheet">
+                    <BbSelectTrigger AriaLabel="Paper"><BbSelectValue>@(_sheet == "a4" ? "A4 sheet" : "Single-label roll")</BbSelectValue></BbSelectTrigger>
+                    <BbSelectContent><BbSelectItem TValue="string" Value="@("a4")">A4 sheet</BbSelectItem><BbSelectItem TValue="string" Value="@("label")">Single-label roll</BbSelectItem></BbSelectContent>
+                </BbSelect></div>
+            </div>
+            @if (_preview is not null && _selected.Count > 0)
+            {
+                <figure class="label-preview"><img src="@_preview" width="132" height="132" alt="Product QR preview" /><figcaption><strong>@_selected[0].Name</strong><span>@_selected[0].SKU</span></figcaption></figure>
+            }
+            <output aria-live="polite">@(_selected.Count * _copies) labels selected (maximum 500)</output>
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => OpenChanged.InvokeAsync(false))">Close</BbButton>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Export(true))" Disabled="@(!CanExport)"><LucideIcon Name="printer" Size="18" />Print</BbButton>
+            <BbButton OnClick="@(() => Export(false))" Disabled="@(!CanExport)"><LucideIcon Name="download" Size="18" />Download PDF</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<Product> Products { get; set; } = [];
+    [Parameter] public Guid? TenantId { get; set; }
+    private IReadOnlyList<Product>? _source;
+    private Guid? _tenant;
+    private List<Product> _eligible = [], _selected = [];
+    private IJSObjectReference? _script;
+    private string? _preview, _error;
+    private int _copies = 1, _width = 60, _height = 40;
+    private string _sheet = "a4";
+    private bool _busy;
+    private long _version;
+    private long _gridVersion;
+    private bool CanExport => Open && !_busy && _preview is not null && _selected.Count > 0 && _copies is >= 1 and <= 100 &&
+        _width is >= 40 and <= 100 && _height is >= 30 and <= 80 && _selected.Count * _copies <= 500;
+
+    protected override void OnParametersSet()
+    {
+        if (_source != Products || _tenant != TenantId || !Open)
+        {
+            _version++;
+            _gridVersion++;
+            _source = Products; _tenant = TenantId;
+            _eligible = Products.Where(p => ValidSku(p.SKU) && p.TenantId == TenantId).ToList();
+            _selected = []; _preview = null; _error = null;
+        }
+    }
+    private static bool ValidSku(string? sku) => !string.IsNullOrWhiteSpace(sku) && sku.Length <= 256 && !sku.Any(char.IsControl);
+    private async Task SelectionChanged(IReadOnlyCollection<Product> products)
+    {
+        var version = ++_version;
+        _selected = products.Where(_eligible.Contains).ToList();
+        _preview = null; _error = null;
+        if (_selected.Count == 0) return;
+        var sku = _selected[0].SKU;
+        try
+        {
+            _script ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/XFramework.Portal.Features.Inventario/labels/product-labels.js");
+            if (version != _version || !Open) return;
+            var preview = await _script.InvokeAsync<string>("qrData", sku);
+            if (version == _version && Open) _preview = preview;
+        }
+        catch (JSException) { if (version == _version) _error = "QR preview could not load. Try selecting the product again."; }
+    }
+    private async Task Export(bool print)
+    {
+        if (!CanExport || _script is null) return;
+        _busy = true; _error = null;
+        try
+        {
+            await _script.InvokeVoidAsync(print ? "printPdf" : "downloadPdf", new
+            { products = _selected.Select(p => new { name = p.Name, sku = p.SKU }).ToArray(), copies = _copies, width = _width, height = _height, sheet = _sheet });
+        }
+        catch (JSException) { _error = "Labels could not be exported. For printing, allow pop-ups or download the PDF."; }
+        finally { _busy = false; }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        _version++;
+        if (_script is null) return;
+        try { await _script.DisposeAsync(); }
+        catch (Exception exception) when (exception is JSDisconnectedException or TaskCanceledException) { }
+    }
+}
