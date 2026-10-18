@@ -98,8 +98,16 @@ encrypted and authenticated with the picture; a relay can neither read nor chang
 transformed `drawImage` into a canvas of the displayed size. Turning the phone then changes only that byte: the sensor
 raster, the encoder and the reference pictures stay, so it costs no keyframe. With any older member, or a browser that
 cannot strip orientation, the sender redraws the frame upright first (as before), and a change in what the pixels have
-baked in forces a keyframe. Upright pictures always use header version 1. Safari's frame-callback path paints the camera
-element, which is upright already, and is unchanged.
+baked in forces a keyframe. Upright pictures always use header version 1.
+
+Browsers with a worker-only `MediaStreamTrackProcessor` are probed in a dedicated capture worker.
+The worker owns a cloned camera track and transfers at most one `VideoFrame` at a time to the existing
+encoder/orientation path, avoiding the element/canvas redraw. Extra frames are closed while credit is
+outstanding, and camera constraints follow adaptation on both tracks. Missing orientation metadata,
+unsupported track transfer, worker failure or a 2.5-second delivery stall restores element capture without
+reopening the camera. Camera off, backgrounding and switching release the worker's track; late frames
+cannot enter a later capture generation. Older Safari keeps its upright WebGL capture path (2D fallback).
+That path checks GPU errors only at startup or resize, with context-loss checks retained.
 
 ### Congestion control on the WebSocket path
 
@@ -164,6 +172,8 @@ message, with DTLS as an extra hop layer.
   audio frame with its predecessor (`MediaBundle`) while its own queue is short, until loss stays below 0.5%
   for 10 s.
 - **Video fragments** are cut to fit one message on this path (4 KB on the socket); receivers take either.
+- **Voice budget.** The sender reserves the codec rate and packet framing at the encoder's accepted packet duration, including a repeated encrypted frame while audio redundancy is active. Bundles share the outer transport headers; their frame lengths and bundle header are additional bytes.
+- **Uplink repairs.** Transport feedback can enqueue a lost video fragment in the same sender pacer, behind audio and under video's token and transport backlog limits. The repair queue is bounded to 64 KiB and 256 fragments. Its deadline includes the measured uplink round trip plus 400 ms, capped at 1.5 s from the original send; repeat losses do not reset that age. A complete received keyframe replaces older incomplete pictures and cancels their obsolete NACKs immediately.
 - **Lifecycle.** A channel that does not open in 15 s or fails falls back to the socket, then retries with
   backoff; a network change restarts ICE in place; credentials are renewed with a fresh session before they
   expire, and a resumed socket negotiates its own.

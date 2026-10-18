@@ -28,7 +28,8 @@ namespace Yap.Tests;
 internal static partial class UiFixture
 {
     public static WebApplication Create(int port = 5189, Action<Mock<IIdentityServerServiceWrapper>>? configureIdentity = null, bool? enableCalls = null, X509Certificate2? certificate = null,
-        Action<ChatFixture>? configureChat = null, Action<IServiceCollection>? configureServices = null, bool? enableEncryption = null)
+        Action<ChatFixture>? configureChat = null, Action<IServiceCollection>? configureServices = null, bool? enableEncryption = null,
+        Action<WebApplicationBuilder>? configureApplication = null)
     {
         var fixture = new ChatFixture();
         var registrationRole = Guid.NewGuid();
@@ -420,6 +421,7 @@ internal static partial class UiFixture
             encryption?.ConfigureServices(builder.Services);
             configureChat?.Invoke(fixture);
             configureServices?.Invoke(builder.Services);
+            configureApplication?.Invoke(builder);
         });
         // Upstream reads are proxied one-for-one, so this count is exactly how many browser
         // requests reached the server - the number a caching claim has to be measured against.

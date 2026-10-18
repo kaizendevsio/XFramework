@@ -6,8 +6,17 @@
         <div class="debug-stream">
             <strong>Transport: @(string.IsNullOrEmpty(info.Transport) ? "—" : info.Transport)</strong>
             @if (info.TransportReason is { Length: > 0 } reason) { <div>On the WebSocket: @reason</div> }
+            <div>Uplink repairs: @info.UplinkResent fragments since transport start</div>
             @if (info.TransportRttMs is { } rtt) { <div>Round trip: @Number(rtt) ms@(info.AudioRedundancy ? " · audio sent twice" : "")</div> }
         </div>
+        @if (info.TotalBudgetKbps is { } budget)
+        {
+            <div class="debug-stream">
+                <strong>Congestion: @info.Congestion@(info.VideoSuspended ? " ? video suspended" : "")</strong>
+                <div>Budget: @budget kbps total / @info.VideoBudgetKbps video / @info.AudioBitrateKbps Opus</div>
+                <div>Queue delay: @info.QueueDelayMs ms</div>
+            </div>
+        }
         <div class="debug-stream">
             <strong>Outgoing · @(info.Capturing ? "camera on" : "camera off")</strong>
             <div>Requested: @(RequestedHeight)p / @RequestedFps fps</div>
@@ -30,6 +39,13 @@
                 <div>Received → rendered: @Number(remote.ReceivedFps) → @Number(remote.RenderedFps) fps</div>
                 <div>Received: @Number(remote.ReceivedKbps) kbps · last decode: @Number(remote.DecoderDelayMs) ms</div>
                 <div>Queue: decoder @remote.DecoderQueue / pending @remote.PendingFrames · resets: @remote.Resets</div>
+                @if (remote.Recovery is { } recovery)
+                {
+                    <div>Recovery window: @recovery.RecoveryMs ms ? counters since stream start</div>
+                    <div>NACKs: @recovery.Nacked ? recovered: @recovery.Recovered ? abandoned: @recovery.Abandoned ? declined: @recovery.Declined</div>
+                    <div>Pictures: @recovery.Pictures released / @recovery.Incomplete incomplete / @recovery.Skipped skipped</div>
+                    <div>Fragments: @recovery.Fragments received ? local backlog drops: @recovery.LocalDrops</div>
+                }
                 <div>Decoder preference: @remote.Acceleration</div>
                 <div>Rotation applied: @(string.IsNullOrEmpty(remote.Rotation) ? "—" : remote.Rotation)</div>
             </div>

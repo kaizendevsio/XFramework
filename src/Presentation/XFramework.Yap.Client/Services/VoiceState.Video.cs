@@ -239,8 +239,8 @@ public sealed partial class VoiceState
 
     /// <summary>
     /// Decide the wire codec for this epoch from what every accepted peer said it can decode.
-    /// AV1 first, then VP9, then H.264: the same picture costs roughly a third less on AV1 than on
-    /// H.264, but only a device with a hardware encoder is allowed to choose it at the larger sizes.
+    /// AV1, HEVC, VP9, then H.264, restricted to what every peer advertises.
+    /// HEVC requires power-efficient encoder and decoder probes; older peers retain their shared codec.
     /// </summary>
     private void NegotiateVideo(Attempt attempt, GroupEpoch epoch)
     {

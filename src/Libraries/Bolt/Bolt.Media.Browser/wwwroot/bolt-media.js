@@ -478,8 +478,14 @@ function av1Codec(height, fps = 30) { if (height > 1080) return fps > 30 ? 'av01
 function vp9Codec(height, fps = 30) { return height > 1080 ? (fps > 30 ? 'vp09.00.51.08' : 'vp09.00.50.08') : height > 720 ? (fps > 30 ? 'vp09.00.41.08' : 'vp09.00.40.08') : height > 480 ? (fps > 30 ? 'vp09.00.40.08' : 'vp09.00.31.08') : 'vp09.00.21.08'; }
 function h264Codec(height, fps = 30) { return height > 1080 ? (fps > 30 ? 'avc1.640034' : 'avc1.640033') : height > 720 ? (fps > 30 ? 'avc1.4d002a' : 'avc1.4d0028') : height > 480 ? (fps > 30 ? 'avc1.420020' : 'avc1.42001f') : 'avc1.42001e'; }
 
+function hevcCodec(height, fps = 30) {
+    const level = height > 1440 ? (fps > 30 ? 156 : 153) : height > 1080 ? (fps > 30 ? 153 : 150)
+        : height > 720 ? (fps > 30 ? 123 : 120) : height > 480 ? (fps > 30 ? 120 : 93) : (fps > 30 ? 93 : 90);
+    return `hvc1.1.6.L${level}.B0`;
+}
+
 export function videoCodecString(codec, height, fps = 30) {
-    return codec === 'av1' ? av1Codec(height, fps) : codec === 'vp9' ? vp9Codec(height, fps) : h264Codec(height, fps);
+    return codec === 'av1' ? av1Codec(height, fps) : codec === 'vp9' ? vp9Codec(height, fps) : codec === 'hevc' ? hevcCodec(height, fps) : h264Codec(height, fps);
 }
 
 export function h264BitstreamCodec(data) {
@@ -489,6 +495,37 @@ export function h264BitstreamCodec(data) {
         const nal = data[i + 2] === 1 ? i + 3 : data[i + 2] === 0 && data[i + 3] === 1 ? i + 4 : -1;
         if (nal < 0 || (data[nal] & 31) !== 7) continue;
         return 'avc1.' + [...data.slice(nal + 1, nal + 4)].map(x => x.toString(16).padStart(2, '0')).join('');
+    }
+    return null;
+}
+
+/// Read only the SPS profile-tier-level prefix; no picture data or full SPS parsing is needed.
+export function hevcBitstreamCodec(data) {
+    const limit = Math.min(data.length, 65536);
+    for (let i = 0; i + 5 < limit; i++) {
+        if (data[i] !== 0 || data[i + 1] !== 0) continue;
+        const nal = data[i + 2] === 1 ? i + 3 : data[i + 2] === 0 && data[i + 3] === 1 ? i + 4 : -1;
+        if (nal < 0 || (data[nal] & 0x80) || ((data[nal] >> 1) & 63) !== 33 || !(data[nal + 1] & 7)) continue;
+        const prefix = [];
+        let zeros = 0;
+        for (let j = nal + 2; j < limit && prefix.length < 13; j++) {
+            const byte = data[j];
+            if (zeros >= 2 && byte === 3) { zeros = 0; continue; }
+            if (zeros >= 2 && byte <= 1) break; // Next Annex B NAL or a truncated SPS.
+            prefix.push(byte);
+            zeros = byte === 0 ? zeros + 1 : 0;
+        }
+        if (prefix.length !== 13) return null;
+        const profile = prefix[1];
+        // Codec strings reverse the compatibility flags' bit order (ISO/IEC 14496-15).
+        let compatibility = 0;
+        for (let bit = 0; bit < 32; bit++) {
+            if (prefix[2 + (bit >> 3)] & (128 >> (bit & 7))) compatibility += 2 ** bit;
+        }
+        const constraints = prefix.slice(6, 12);
+        while (constraints.length && constraints.at(-1) === 0) constraints.pop();
+        const suffix = constraints.map(x => x.toString(16).toUpperCase().padStart(2, '0')).join('.');
+        return `hvc1.${['', 'A', 'B', 'C'][profile >> 6]}${profile & 31}.${compatibility.toString(16).toUpperCase()}.${profile & 32 ? 'H' : 'L'}${prefix[12]}${suffix ? '.' + suffix : ''}`;
     }
     return null;
 }
@@ -521,8 +558,34 @@ export function encoderConfig(codec, width, height, bitrateKbps, framerate, hard
     // Without a decoder description an H.264/H.265 bitstream has to be Annex B, and the
     // decoder here is fed raw chunks. Asking for the wrong container plays as green mush.
     // WebKit rejects odd H.264 dimensions outright, so both sides are rounded to even.
+    if (codec === 'hevc') { config.hevc = { format: 'annexb' }; config.width &= ~1; config.height &= ~1; }
     if (codec === 'h264') { config.avc = { format: 'annexb' }; config.width &= ~1; config.height &= ~1; }
     return config;
+}
+
+// Some native HEVC encoders accept isConfigSupported but fail asynchronously on their first
+// picture at 60fps. Verify that configuration before publishing a stream; C# already retries
+// real refusals at30fps, preserving the requested resolution. Cache successes, never camera frames.
+const verifiedHevcEncoders = new Set();
+async function verifyHevcEncoder(config) {
+    const key = JSON.stringify([config.codec, config.width, config.height, config.framerate, config.hardwareAcceleration, config.scalabilityMode]);
+    if (verifiedHevcEncoders.has(key)) return;
+    let reject, encoder, frame, timer;
+    const failed = new Promise((_, fail) => { reject = fail; timer = setTimeout(() => fail(new Error('HEVC encoder did not initialize.')), 1500); });
+    failed.catch(() => {}); // A synchronous configure/encode refusal can precede the awaited race.
+    try {
+        encoder = new VideoEncoder({ output() {}, error: error => reject(error) });
+        encoder.configure(config);
+        const canvas = document.createElement('canvas'); canvas.width = config.width; canvas.height = config.height;
+        frame = new VideoFrame(canvas, { timestamp: 0 });
+        encoder.encode(frame, { keyFrame: true });
+        await Promise.race([encoder.flush(), failed]);
+        if (verifiedHevcEncoders.size >= 32) verifiedHevcEncoders.clear();
+        verifiedHevcEncoders.add(key);
+    } finally {
+        clearTimeout(timer); frame?.close();
+        if (encoder && encoder.state !== 'closed') encoder.close();
+    }
 }
 
 /// Temporal layers let the relay drop enhancement pictures for one slow receiver instead of every picture until
@@ -664,11 +727,13 @@ export class GlFramePainter {
     paint(video, width, height) {
         const { gl, canvas } = this;
         if (gl.isContextLost?.()) throw new Error('context lost');
-        if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+        const resized = canvas.width !== width || canvas.height !== height;
+        if (resized) { canvas.width = width; canvas.height = height; }
         gl.viewport(0, 0, width, height);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-        if (gl.getError() !== gl.NO_ERROR) throw new Error('webgl');
+        // getError synchronizes with the GPU process. Validate startup and resizing, not every frame.
+        if ((!this.checked || resized) && gl.getError() !== gl.NO_ERROR) throw new Error('webgl');
         if (!this.checked) {
             // Once per capture: an all-zero centre after a successful draw means nothing was uploaded.
             this.checked = true;
@@ -709,13 +774,13 @@ export async function probeVideoCodecs(maxHeight = 2160) {
     if (typeof VideoEncoder === 'undefined' || typeof VideoDecoder === 'undefined') return results;
     const heights = [2160, 1440, 1080, 720, 540, 360].filter(h => h <= maxHeight);
     if (heights.length === 0) heights.push(Math.max(180, maxHeight));
-    for (const codec of ['av1', 'vp9', 'h264']) {
+    for (const codec of ['av1', 'hevc', 'vp9', 'h264']) {
         let best = 0, hardware = false, decode = false, decodeMaxHeight = 0;
         for (const height of heights) {
             const width = Math.round(height * 16 / 9 / 2) * 2;
             try {
                 const supported = await VideoEncoder.isConfigSupported(encoderConfig(codec, width, height, 2000, 30));
-                if (!supported?.supported) continue;
+                if (!supported?.supported || (codec === 'hevc' && supported.config?.hevc?.format !== 'annexb')) continue;
                 if (best === 0) best = height;
                 // isConfigSupported cannot prove acceleration (WebKit ignores the hint for encoders);
                 // powerEfficient below is the hardware signal.
@@ -728,14 +793,14 @@ export async function probeVideoCodecs(maxHeight = 2160) {
                 if (supported?.supported) { decode = true; decodeMaxHeight = height; break; }
             } catch { /* Same: treat a throw as unsupported. */ }
         }
-        if (best > 0) hardware = await powerEfficient('encodingInfo', codec);
-        const decodeHardware = decode && await powerEfficient('decodingInfo', codec);
+        if (best > 0) hardware = await powerEfficient('encodingInfo', codec, best);
+        const decodeHardware = decode && await powerEfficient('decodingInfo', codec, decodeMaxHeight);
         results.push({ codec, encode: best > 0, decode, hardware, maxHeight: best, decodeMaxHeight, decodeHardware });
     }
     return results;
 }
 
-const RTP_VIDEO_TYPES = { av1: 'video/AV1', vp9: 'video/VP9', h264: 'video/H264' };
+const RTP_VIDEO_TYPES = { av1: 'video/AV1', vp9: 'video/VP9', h264: 'video/H264', hevc: 'video/H265' };
 
 /// Whether this device encodes (or decodes) `codec` on dedicated hardware, as far as the browser will say.
 ///
@@ -745,10 +810,10 @@ const RTP_VIDEO_TYPES = { av1: 'video/AV1', vp9: 'video/VP9', h264: 'video/H264'
 /// (LibWebRTCProvider::videoEncodingCapabilitiesOverride), decode follows the hardware decoder it found, and
 /// Chromium reports power efficient only where a hardware encoder profile matches. Anything else is "not known",
 /// which the codec ladder treats as software.
-async function powerEfficient(method, codec) {
+async function powerEfficient(method, codec, height) {
     try {
         const info = await globalThis.navigator?.mediaCapabilities?.[method]?.({ type: 'webrtc',
-            video: { contentType: RTP_VIDEO_TYPES[codec], width: 1280, height: 720, bitrate: 1_500_000, framerate: 30 } });
+            video: { contentType: RTP_VIDEO_TYPES[codec], width: Math.round(height * 16 / 9 / 2) * 2, height, bitrate: 2_000_000, framerate: 30 } });
         return info?.supported === true && info.powerEfficient === true;
     } catch { return false; }
 }
@@ -778,6 +843,8 @@ class VideoPipeline {
         this.captureVideo = null;
         this.captureCallbackId = 0;
         this.captureStrategy = null;
+        this.activeCaptureStrategy = null;
+        this.captureWorker = null;
         this.captureCanvas = null;
         this.captureContext = null;
         this.preview = null;
@@ -850,6 +917,7 @@ class VideoPipeline {
         this.temporalModes = temporalLayers ? await probeTemporalModes(config) : new Set();
         const mode = temporalModeFor(framerate, this.temporalModes);
         if (mode !== 'L1T1') config = { ...config, scalabilityMode: mode };
+        if (this.codec === 'hevc') await verifyHevcEncoder(config);
         this._closeEncoder();
         this.config = config;
         // The published stream survives camera off/on; its frame IDs must too.
@@ -947,16 +1015,74 @@ class VideoPipeline {
         track.addEventListener('ended', () => { if (generation === this.captureGeneration) this.stopCapture('ended'); });
         // Everything downstream of here - encode, fragmentation, SFrame, adaptation, transport - is
         // identical on both strategies; only the way a VideoFrame is obtained differs.
+        this.activeCaptureStrategy = null;
         if (this.strategy() === 'processor') {
             this.captureReader = new MediaStreamTrackProcessor({ track }).readable.getReader();
             void this._readLoop(generation);
+        } else if (!this.captureStrategy && this._startWorkerCapture(track, stream, generation)) {
+            // Worker-only processors (Safari) are probed in their own execution context.
         } else {
             this._startFrameCallbacks(stream, generation);
         }
         return this.describe();
     }
 
-    strategy() { return this.captureStrategy ?? videoCaptureStrategy(); }
+    strategy() { return this.activeCaptureStrategy ?? this.captureStrategy ?? videoCaptureStrategy(); }
+
+    _startWorkerCapture(track, stream, generation) {
+        if (typeof Worker === 'undefined' || typeof track.clone !== 'function') return false;
+        let worker;
+        try { worker = new Worker(new URL('./bolt-video-capture-worker.js', import.meta.url), { type: 'module' }); }
+        catch { return false; }
+        this.captureWorker = worker;
+        this.activeCaptureStrategy = 'worker-pending';
+        let clone, lastFrame = performance.now();
+        const current = () => this.captureRunning && generation === this.captureGeneration && this.captureWorker === worker;
+        const fallback = () => {
+            if (!current()) return;
+            this._stopWorkerCapture();
+            this.activeCaptureStrategy = 'rvfc';
+            this.lastCaptureTimestamp = this.nextCaptureTimestamp = null;
+            this.forceKeyframe = true;
+            this._startFrameCallbacks(stream, generation);
+        };
+        // Covers unsupported transfer, CSP/load failures and processors that stop delivering frames.
+        this.captureWorkerWatch = setInterval(() => {
+            if (current() && performance.now() - lastFrame > 2500) fallback();
+        }, 1000);
+        worker.onerror = event => { event.preventDefault?.(); fallback(); };
+        worker.onmessage = ({ data }) => {
+            if (!current()) { data.frame?.close(); return; }
+            if (data.type === 'ready') {
+                if (!data.supported) { fallback(); return; }
+                try {
+                    // Keep the original camera track for preview and applyConstraints.
+                    clone = track.clone();
+                    worker.postMessage({ type: 'start', track: clone, framerate: this.config.framerate }, [clone]);
+                } catch { try { clone?.stop(); } catch { } fallback(); }
+            } else if (data.type === 'frame') {
+                lastFrame = performance.now();
+                this.activeCaptureStrategy = 'worker-processor';
+                try { this._encodeProcessorFrame(data.frame); }
+                catch { fallback(); }
+                finally {
+                    if (current()) worker.postMessage({ type: 'credit', framerate: this.config.framerate });
+                }
+            } else if (data.type === 'failed') fallback();
+        };
+        return true;
+    }
+
+    _stopWorkerCapture() {
+        clearInterval(this.captureWorkerWatch);
+        this.captureWorkerWatch = null;
+        const worker = this.captureWorker;
+        this.captureWorker = null;
+        if (!worker) return;
+        // Give the worker a turn to stop its transferred camera clone before terminating it.
+        try { worker.postMessage({ type: 'stop' }); } catch { }
+        setTimeout(() => worker.terminate(), 250);
+    }
 
     /// Force a capture strategy. Only the tests and the cost measurement use this; a real page
     /// picks by feature detection, because a browser that has both should use the cheaper one.
@@ -1088,21 +1214,24 @@ class VideoPipeline {
                 const { value, done } = await this.captureReader.read();
                 if (done) break;
                 frame = value;
-                this.captureCount++;
             } catch { break; }
-            try {
-                if (!this.encoder || this.encoder.state !== 'configured') continue;
-                // Dropping the newest frame beats queueing it: a backlog is latency the call never recovers.
-                if (this.encoder.encodeQueueSize >= 2) { this.stats.dropped++; continue; }
-                if (!this._acceptCaptureTime(frame.timestamp)) continue;
-                const oriented = this._orient(frame);
-                frame = oriented.frame;
-                // The encoder is fitted to the pixels it is given: the sensor's shape when the orientation travels
-                // as metadata, the upright shape when it was redrawn.
-                this._noteSource(frame.displayWidth, frame.displayHeight);
-                this._encode(frame, this._takeKeyframe(Date.now()), oriented.code);
-            } finally { frame.close(); }
+            if (!this.captureRunning || generation !== this.captureGeneration) { frame.close(); break; }
+            this._encodeProcessorFrame(frame);
         }
+    }
+
+    _encodeProcessorFrame(frame) {
+        this.captureCount++;
+        try {
+            if (!this.encoder || this.encoder.state !== 'configured') return;
+            // Dropping the newest frame beats queueing latency.
+            if (this.encoder.encodeQueueSize >= 2) { this.stats.dropped++; return; }
+            if (!this._acceptCaptureTime(frame.timestamp)) return;
+            const oriented = this._orient(frame);
+            frame = oriented.frame;
+            this._noteSource(frame.displayWidth, frame.displayHeight);
+            this._encode(frame, this._takeKeyframe(Date.now()), oriented.code);
+        } finally { frame.close(); }
     }
 
     /// Keyframes are sent when the encoder needs one, when someone asked for one, and otherwise only
@@ -1224,14 +1353,24 @@ class VideoPipeline {
     /// far side decodes the new size against the old reference.
     async applyTier(width, height, bitrateKbps, framerate) {
         const before = this.tier;
+        if (this.codec === 'hevc' && this.encoder?.state === 'configured' && this.config) {
+            const fitted = fitTierToSource(width, height, this.sourceWidth, this.sourceHeight);
+            const next = encoderConfig(this.codec, fitted.width, fitted.height, bitrateKbps, framerate,
+                this.config.hardwareAcceleration, temporalModeFor(framerate, this.temporalModes));
+            if (next.width !== this.config.width || next.height !== this.config.height ||
+                next.framerate !== this.config.framerate || next.scalabilityMode !== this.config.scalabilityMode)
+                await verifyHevcEncoder(next);
+        }
         this.tier = { width, height, bitrateKbps, framerate };
         const changed = this._configureForSource();
         const track = this.mediaStream?.getVideoTracks()[0];
         // A bitrate change is the encoder's business alone; only a new size or rate asks the camera.
         const reshaped = !before || before.width !== width || before.height !== height || before.framerate !== framerate;
         if (changed && reshaped && track?.applyConstraints) {
-            try { await track.applyConstraints({ width: { ideal: width }, height: { ideal: height },
-                frameRate: { ideal: framerate, max: framerate } }); }
+            const constraints = { width: { ideal: width }, height: { ideal: height },
+                frameRate: { ideal: framerate, max: framerate } };
+            this.captureWorker?.postMessage({ type: 'constraints', constraints, framerate });
+            try { await track.applyConstraints(constraints); }
             catch { /* Keep the working track; encoder pacing still enforces the limit. */ }
         }
         return changed;
@@ -1425,8 +1564,8 @@ class VideoPipeline {
         const remote = this.remotes.get(streamId);
         if (!remote || remote.decoder?.state !== 'configured') return false;
         remote.received++; remote.bytes += data.byteLength;
-        if (isKeyframe && remote.codec === 'h264') {
-            const codec = h264BitstreamCodec(data);
+        if (isKeyframe && (remote.codec === 'h264' || remote.codec === 'hevc')) {
+            const codec = remote.codec === 'hevc' ? hevcBitstreamCodec(data) : h264BitstreamCodec(data);
             if (codec && codec !== remote.bitstreamCodec) {
                 remote.bitstreamCodec = codec;
                 remote.decoder.close();
@@ -1520,6 +1659,8 @@ class VideoPipeline {
         const wasRunning = this.captureRunning;
         this.captureGeneration++;
         this.captureRunning = false;
+        this._stopWorkerCapture();
+        this.activeCaptureStrategy = null;
         if (this.captureReader) { try { this.captureReader.cancel(); } catch { } this.captureReader = null; }
         this._stopFrameCallbacks();
         // The next camera has its own shape; leaving these set would fit it to the old one's aspect.

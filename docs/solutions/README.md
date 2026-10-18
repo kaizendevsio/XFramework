@@ -64,6 +64,7 @@ status: current
 - [Yap call history and app shell](developer-experience/yap-call-history-and-app-shell.md) - voice/video call cards, installation guidance, stationary tabs and background inbox restoration.
 - [Yap-scoped deployment pipeline](developer-experience/yap-scoped-deployment-pipeline.md) - conservative app-only deployment, image reuse, verification gates, rollback, and focused CI inside the normal release workflow.
 - [Yap browser Bolt messaging](architecture-patterns/yap-browser-bolt-messaging.md) - authenticated direct ciphertext delivery, explicit receipts, bounded queues and reconciliation.
+- [Yap white-label host routing](architecture-patterns/yap-white-label-host-routing.md) - exact tenant host mappings, server-owned authentication context, public branding and origin-specific PWA manifests.
 - [Yap voice trusted-server relay](architecture-patterns/yap-voice-trusted-server-relay.md) - authenticated browser voice, transport security, codec fallback, verification evidence and remaining device limitations.
 - [UI guidelines](../../rules/UiGuidelines.md) - primary Portal and Blazor UI rules, with links to BlazorBlueprint component details.
 - [Bolt protocol, Hub, and Media audit](workflow-issues/bolt-protocol-hub-media-audit-2026-07-12.md) - active correctness, security, performance, scalability, and Media finding inventory.
@@ -129,3 +130,6 @@ tags: [vsa, standards, conventions]
 ## Maintaining This Index
 
 This index maps the existing solution categories and metadata contract. Add links to newly created solution docs only after those docs exist.
+
+- [Yap call priorities1?7](performance-issues/yap-call-priorities-1-to-7.md) ? current benchmark, recovery, diagnostics, codecs and tenant routing.
+- [Yap call benchmark methodology and evidence](performance-issues/yap-call-media-benchmark-current-recovery-and-resolution-profiles.md).

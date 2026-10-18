@@ -1,0 +1,635 @@
+{
+    "finished":  true,
+    "results":  [
+                    {
+                        "captureCostMs":  {
+                                              "p50":  2.5999999046325684,
+                                              "p95":  3.1000001430511475,
+                                              "samples":  180,
+                                              "total":  454.6000008583069
+                                          },
+                        "config":  {
+                                       "avc":  {
+                                                   "format":  "annexb"
+                                               },
+                                       "bitrate":  6000000,
+                                       "bitrateMode":  "variable",
+                                       "codec":  "avc1.4d0028",
+                                       "framerate":  30,
+                                       "hardwareAcceleration":  "prefer-hardware",
+                                       "height":  1080,
+                                       "latencyMode":  "realtime",
+                                       "scalabilityMode":  "L1T1",
+                                       "width":  1920
+                                   },
+                        "encoded":  173,
+                        "encodedFps":  28.816043707566813,
+                        "errors":  [
+
+                                   ],
+                        "height":  1080,
+                        "measuredSeconds":  6.003599999904632,
+                        "mode":  "baseline-webgl",
+                        "painter":  "webgl",
+                        "renderer":  "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x00002484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+                        "repeat":  1,
+                        "seconds":  6,
+                        "strategy":  "rvfc"
+                    },
+                    {
+                        "captureCostMs":  {
+                                              "p50":  1.2999999523162842,
+                                              "p95":  1.6999998092651367,
+                                              "samples":  180,
+                                              "total":  224.40000009536743
+                                          },
+                        "config":  {
+                                       "avc":  {
+                                                   "format":  "annexb"
+                                               },
+                                       "bitrate":  6000000,
+                                       "bitrateMode":  "variable",
+                                       "codec":  "avc1.4d0028",
+                                       "framerate":  30,
+                                       "hardwareAcceleration":  "prefer-hardware",
+                                       "height":  1080,
+                                       "latencyMode":  "realtime",
+                                       "scalabilityMode":  "L1T1",
+                                       "width":  1920
+                                   },
+                        "encoded":  175,
+                        "encodedFps":  29.16083449953501,
+                        "errors":  [
+
+                                   ],
+                        "height":  1080,
+                        "measuredSeconds":  6.0012000000476835,
+                        "mode":  "current-webgl",
+                        "painter":  "webgl",
+                        "renderer":  "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x00002484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+                        "repeat":  1,
+                        "seconds":  6,
+                        "strategy":  "rvfc"
+                    },
+                    {
+                        "captureCostMs":  {
+                                              "p50":  0,
+                                              "p95":  0.10000014305114746,
+                                              "samples":  181,
+                                              "total":  6.099998474121094
+                                          },
+                        "config":  {
+                                       "avc":  {
+                                                   "format":  "annexb"
+                                               },
+                                       "bitrate":  6000000,
+                                       "bitrateMode":  "variable",
+                                       "codec":  "avc1.4d0028",
+                                       "framerate":  30,
+                                       "hardwareAcceleration":  "prefer-hardware",
+                                       "height":  1080,
+                                       "latencyMode":  "realtime",
+                                       "scalabilityMode":  "L1T1",
+                                       "width":  1920
+                                   },
+                        "encoded":  173,
+                        "encodedFps":  28.789669001328253,
+                        "errors":  [
+
+                                   ],
+                        "height":  1080,
+                        "measuredSeconds":  6.009100000143051,
+                        "mode":  "processor",
+                        "painter":  null,
+                        "renderer":  null,
+                        "repeat":  1,
+                        "seconds":  6,
+                        "strategy":  "processor"
+                    },
+                    {
+                        "captureCostMs":  {
+                                              "p50":  0,
+                                              "p95":  0.10000014305114746,
+                                              "samples":  180,
+                                              "total":  6.100000619888306
+                                          },
+                        "config":  {
+                                       "avc":  {
+                                                   "format":  "annexb"
+                                               },
+                                       "bitrate":  6000000,
+                                       "bitrateMode":  "variable",
+                                       "codec":  "avc1.4d0028",
+                                       "framerate":  30,
+                                       "hardwareAcceleration":  "prefer-hardware",
+                                       "height":  1080,
+                                       "latencyMode":  "realtime",
+                                       "scalabilityMode":  "L1T1",
+                                       "width":  1920
+                                   },
+                        "encoded":  173,
+                        "encodedFps":  28.785357737104825,
+                        "errors":  [
+
+                                   ],
+                        "height":  1080,
+                        "measuredSeconds":  6.01,
+                        "mode":  "processor",
+                        "painter":  null,
+                        "renderer":  null,
+                        "repeat":  2,
+                        "seconds":  6,
+                        "strategy":  "processor"
+                    },
+                    {
+                        "captureCostMs":  {
+                                              "p50":  1.2000000476837158,
+                                              "p95":  1.7000000476837158,
+                                              "samples":  180,
+                                              "total":  218.3999993801117
+                                          },
+                        "config":  {
+                                       "avc":  {
+                                                   "format":  "annexb"
+                                               },
+                                       "bitrate":  6000000,
+                                       "bitrateMode":  "variable",
+                                       "codec":  "avc1.4d0028",
+                                       "framerate":  30,
+                                       "hardwareAcceleration":  "prefer-hardware",
+                                       "height":  1080,
+                                       "latencyMode":  "realtime",
+                                       "scalabilityMode":  "L1T1",
+                                       "width":  1920
+                                   },
+                        "encoded":  173,
+                        "encodedFps":  28.831411239938063,
+                        "errors":  [
+
+                                   ],
+                        "height":  1080,
+                        "measuredSeconds":  6.000399999856949,
+                        "mode":  "current-webgl",
+                        "painter":  "webgl",
+                        "renderer":  "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x00002484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+                        "repeat":  2,
+                        "seconds":  6,
+                        "strategy":  "rvfc"
+                    },
+                    {
+                        "captureCostMs":  {
+                                              "p50":  2.299999952316284,
+                                              "p95":  2.700000047683716,
+                                              "samples":  182,
+                                              "total":  405.4999990463257
+                                          },
+                        "config":  {
+                                       "avc":  {
+                                                   "format":  "annexb"
+                                               },
+                                       "bitrate":  6000000,
+                                       "bitrateMode":  "variable",
+                                       "codec":  "avc1.4d0028",
+                                       "framerate":  30,
+                                       "hardwareAcceleration":  "prefer-hardware",
+                                       "height":  1080,
+                                       "latencyMode":  "realtime",
+                                       "scalabilityMode":  "L1T1",
+                                       "width":  1920
+                                   },
+                        "encoded":  173,
+                        "encodedFps":  28.82948940164223,
+                        "errors":  [
+
+                                   ],
+                        "height":  1080,
+                        "measuredSeconds":  6.000799999952316,
+                        "mode":  "baseline-webgl",
+                        "painter":  "webgl",
+                        "renderer":  "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x00002484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+                        "repeat":  2,
+                        "seconds":  6,
+                        "strategy":  "rvfc"
+                    },
+                    {
+                        "captureCostMs":  {
+                                              "p50":  2.3000001907348633,
+                                              "p95":  2.9000000953674316,
+                                              "samples":  181,
+                                              "total":  423.5000011920929
+                                          },
+                        "config":  {
+                                       "avc":  {
+                                                   "format":  "annexb"
+                                               },
+                                       "bitrate":  6000000,
+                                       "bitrateMode":  "variable",
+                                       "codec":  "avc1.4d0028",
+                                       "framerate":  30,
+                                       "hardwareAcceleration":  "prefer-hardware",
+                                       "height":  1080,
+                                       "latencyMode":  "realtime",
+                                       "scalabilityMode":  "L1T1",
+                                       "width":  1920
+                                   },
+                        "encoded":  173,
+                        "encodedFps":  28.817003698591183,
+                        "errors":  [
+
+                                   ],
+                        "height":  1080,
+                        "measuredSeconds":  6.003399999856949,
+                        "mode":  "baseline-webgl",
+                        "painter":  "webgl",
+                        "renderer":  "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x00002484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+                        "repeat":  3,
+                        "seconds":  6,
+                        "strategy":  "rvfc"
+                    },
+                    {
+                        "captureCostMs":  {
+                                              "p50":  1.2999999523162842,
+                                              "p95":  1.7999999523162842,
+                                              "samples":  179,
+                                              "total":  226.09999871253967
+                                          },
+                        "config":  {
+                                       "avc":  {
+                                                   "format":  "annexb"
+                                               },
+                                       "bitrate":  6000000,
+                                       "bitrateMode":  "variable",
+                                       "codec":  "avc1.4d0028",
+                                       "framerate":  30,
+                                       "hardwareAcceleration":  "prefer-hardware",
+                                       "height":  1080,
+                                       "latencyMode":  "realtime",
+                                       "scalabilityMode":  "L1T1",
+                                       "width":  1920
+                                   },
+                        "encoded":  174,
+                        "encodedFps":  28.99468430718573,
+                        "errors":  [
+
+                                   ],
+                        "height":  1080,
+                        "measuredSeconds":  6.001100000143051,
+                        "mode":  "current-webgl",
+                        "painter":  "webgl",
+                        "renderer":  "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x00002484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+                        "repeat":  3,
+                        "seconds":  6,
+                        "strategy":  "rvfc"
+                    },
+                    {
+                        "captureCostMs":  {
+                                              "p50":  0,
+                                              "p95":  0.10000014305114746,
+                                              "samples":  180,
+                                              "total":  5.100001335144043
+                                          },
+                        "config":  {
+                                       "avc":  {
+                                                   "format":  "annexb"
+                                               },
+                                       "bitrate":  6000000,
+                                       "bitrateMode":  "variable",
+                                       "codec":  "avc1.4d0028",
+                                       "framerate":  30,
+                                       "hardwareAcceleration":  "prefer-hardware",
+                                       "height":  1080,
+                                       "latencyMode":  "realtime",
+                                       "scalabilityMode":  "L1T1",
+                                       "width":  1920
+                                   },
+                        "encoded":  173,
+                        "encodedFps":  28.825646494726243,
+                        "errors":  [
+
+                                   ],
+                        "height":  1080,
+                        "measuredSeconds":  6.0015999999046326,
+                        "mode":  "processor",
+                        "painter":  null,
+                        "renderer":  null,
+                        "repeat":  3,
+                        "seconds":  6,
+                        "strategy":  "processor"
+                    },
+                    {
+                        "captureCostMs":  {
+                                              "p50":  3.6000001430511475,
+                                              "p95":  5,
+                                              "samples":  181,
+                                              "total":  699.7999999523163
+                                          },
+                        "config":  {
+                                       "avc":  {
+                                                   "format":  "annexb"
+                                               },
+                                       "bitrate":  6000000,
+                                       "bitrateMode":  "variable",
+                                       "codec":  "avc1.640033",
+                                       "framerate":  30,
+                                       "hardwareAcceleration":  "prefer-hardware",
+                                       "height":  1440,
+                                       "latencyMode":  "realtime",
+                                       "scalabilityMode":  "L1T1",
+                                       "width":  2560
+                                   },
+                        "encoded":  175,
+                        "encodedFps":  29.15063381829827,
+                        "errors":  [
+
+                                   ],
+                        "height":  1440,
+                        "measuredSeconds":  6.003299999952317,
+                        "mode":  "baseline-webgl",
+                        "painter":  "webgl",
+                        "renderer":  "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x00002484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+                        "repeat":  1,
+                        "seconds":  6,
+                        "strategy":  "rvfc"
+                    },
+                    {
+                        "captureCostMs":  {
+                                              "p50":  2.0999999046325684,
+                                              "p95":  2.8000001907348633,
+                                              "samples":  180,
+                                              "total":  369.5000014305115
+                                          },
+                        "config":  {
+                                       "avc":  {
+                                                   "format":  "annexb"
+                                               },
+                                       "bitrate":  6000000,
+                                       "bitrateMode":  "variable",
+                                       "codec":  "avc1.640033",
+                                       "framerate":  30,
+                                       "hardwareAcceleration":  "prefer-hardware",
+                                       "height":  1440,
+                                       "latencyMode":  "realtime",
+                                       "scalabilityMode":  "L1T1",
+                                       "width":  2560
+                                   },
+                        "encoded":  171,
+                        "encodedFps":  28.49240202657912,
+                        "errors":  [
+
+                                   ],
+                        "height":  1440,
+                        "measuredSeconds":  6.0015999999046326,
+                        "mode":  "current-webgl",
+                        "painter":  "webgl",
+                        "renderer":  "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x00002484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+                        "repeat":  1,
+                        "seconds":  6,
+                        "strategy":  "rvfc"
+                    },
+                    {
+                        "captureCostMs":  {
+                                              "p50":  0,
+                                              "p95":  0.10000014305114746,
+                                              "samples":  172,
+                                              "total":  4.700000286102295
+                                          },
+                        "config":  {
+                                       "avc":  {
+                                                   "format":  "annexb"
+                                               },
+                                       "bitrate":  6000000,
+                                       "bitrateMode":  "variable",
+                                       "codec":  "avc1.640033",
+                                       "framerate":  30,
+                                       "hardwareAcceleration":  "prefer-hardware",
+                                       "height":  1440,
+                                       "latencyMode":  "realtime",
+                                       "scalabilityMode":  "L1T1",
+                                       "width":  2560
+                                   },
+                        "encoded":  163,
+                        "encodedFps":  27.127783509656048,
+                        "errors":  [
+
+                                   ],
+                        "height":  1440,
+                        "measuredSeconds":  6.008600000143051,
+                        "mode":  "processor",
+                        "painter":  null,
+                        "renderer":  null,
+                        "repeat":  1,
+                        "seconds":  6,
+                        "strategy":  "processor"
+                    },
+                    {
+                        "captureCostMs":  {
+                                              "p50":  0,
+                                              "p95":  0.10000014305114746,
+                                              "samples":  181,
+                                              "total":  9.400002241134644
+                                          },
+                        "config":  {
+                                       "avc":  {
+                                                   "format":  "annexb"
+                                               },
+                                       "bitrate":  6000000,
+                                       "bitrateMode":  "variable",
+                                       "codec":  "avc1.640033",
+                                       "framerate":  30,
+                                       "hardwareAcceleration":  "prefer-hardware",
+                                       "height":  1440,
+                                       "latencyMode":  "realtime",
+                                       "scalabilityMode":  "L1T1",
+                                       "width":  2560
+                                   },
+                        "encoded":  174,
+                        "encodedFps":  28.985507246376812,
+                        "errors":  [
+
+                                   ],
+                        "height":  1440,
+                        "measuredSeconds":  6.003,
+                        "mode":  "processor",
+                        "painter":  null,
+                        "renderer":  null,
+                        "repeat":  2,
+                        "seconds":  6,
+                        "strategy":  "processor"
+                    },
+                    {
+                        "captureCostMs":  {
+                                              "p50":  2,
+                                              "p95":  2.6000001430511475,
+                                              "samples":  181,
+                                              "total":  364.0999987125397
+                                          },
+                        "config":  {
+                                       "avc":  {
+                                                   "format":  "annexb"
+                                               },
+                                       "bitrate":  6000000,
+                                       "bitrateMode":  "variable",
+                                       "codec":  "avc1.640033",
+                                       "framerate":  30,
+                                       "hardwareAcceleration":  "prefer-hardware",
+                                       "height":  1440,
+                                       "latencyMode":  "realtime",
+                                       "scalabilityMode":  "L1T1",
+                                       "width":  2560
+                                   },
+                        "encoded":  175,
+                        "encodedFps":  29.162778296458903,
+                        "errors":  [
+
+                                   ],
+                        "height":  1440,
+                        "measuredSeconds":  6.000799999952316,
+                        "mode":  "current-webgl",
+                        "painter":  "webgl",
+                        "renderer":  "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x00002484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+                        "repeat":  2,
+                        "seconds":  6,
+                        "strategy":  "rvfc"
+                    },
+                    {
+                        "captureCostMs":  {
+                                              "p50":  3.5999999046325684,
+                                              "p95":  4.200000047683716,
+                                              "samples":  180,
+                                              "total":  653.300000667572
+                                          },
+                        "config":  {
+                                       "avc":  {
+                                                   "format":  "annexb"
+                                               },
+                                       "bitrate":  6000000,
+                                       "bitrateMode":  "variable",
+                                       "codec":  "avc1.640033",
+                                       "framerate":  30,
+                                       "hardwareAcceleration":  "prefer-hardware",
+                                       "height":  1440,
+                                       "latencyMode":  "realtime",
+                                       "scalabilityMode":  "L1T1",
+                                       "width":  2560
+                                   },
+                        "encoded":  174,
+                        "encodedFps":  28.993234911393177,
+                        "errors":  [
+
+                                   ],
+                        "height":  1440,
+                        "measuredSeconds":  6.001400000095368,
+                        "mode":  "baseline-webgl",
+                        "painter":  "webgl",
+                        "renderer":  "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x00002484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+                        "repeat":  2,
+                        "seconds":  6,
+                        "strategy":  "rvfc"
+                    },
+                    {
+                        "captureCostMs":  {
+                                              "p50":  3.6999998092651367,
+                                              "p95":  4.3999998569488525,
+                                              "samples":  179,
+                                              "total":  649.0999999046326
+                                          },
+                        "config":  {
+                                       "avc":  {
+                                                   "format":  "annexb"
+                                               },
+                                       "bitrate":  6000000,
+                                       "bitrateMode":  "variable",
+                                       "codec":  "avc1.640033",
+                                       "framerate":  30,
+                                       "hardwareAcceleration":  "prefer-hardware",
+                                       "height":  1440,
+                                       "latencyMode":  "realtime",
+                                       "scalabilityMode":  "L1T1",
+                                       "width":  2560
+                                   },
+                        "encoded":  173,
+                        "encodedFps":  28.828528578570236,
+                        "errors":  [
+
+                                   ],
+                        "height":  1440,
+                        "measuredSeconds":  6.001,
+                        "mode":  "baseline-webgl",
+                        "painter":  "webgl",
+                        "renderer":  "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x00002484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+                        "repeat":  3,
+                        "seconds":  6,
+                        "strategy":  "rvfc"
+                    },
+                    {
+                        "captureCostMs":  {
+                                              "p50":  2.0999999046325684,
+                                              "p95":  2.6000001430511475,
+                                              "samples":  180,
+                                              "total":  365.90000104904175
+                                          },
+                        "config":  {
+                                       "avc":  {
+                                                   "format":  "annexb"
+                                               },
+                                       "bitrate":  6000000,
+                                       "bitrateMode":  "variable",
+                                       "codec":  "avc1.640033",
+                                       "framerate":  30,
+                                       "hardwareAcceleration":  "prefer-hardware",
+                                       "height":  1440,
+                                       "latencyMode":  "realtime",
+                                       "scalabilityMode":  "L1T1",
+                                       "width":  2560
+                                   },
+                        "encoded":  173,
+                        "encodedFps":  28.802610548290684,
+                        "errors":  [
+
+                                   ],
+                        "height":  1440,
+                        "measuredSeconds":  6.0064000000953675,
+                        "mode":  "current-webgl",
+                        "painter":  "webgl",
+                        "renderer":  "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x00002484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+                        "repeat":  3,
+                        "seconds":  6,
+                        "strategy":  "rvfc"
+                    },
+                    {
+                        "captureCostMs":  {
+                                              "p50":  0,
+                                              "p95":  0.10000014305114746,
+                                              "samples":  174,
+                                              "total":  5.6999993324279785
+                                          },
+                        "config":  {
+                                       "avc":  {
+                                                   "format":  "annexb"
+                                               },
+                                       "bitrate":  6000000,
+                                       "bitrateMode":  "variable",
+                                       "codec":  "avc1.640033",
+                                       "framerate":  30,
+                                       "hardwareAcceleration":  "prefer-hardware",
+                                       "height":  1440,
+                                       "latencyMode":  "realtime",
+                                       "scalabilityMode":  "L1T1",
+                                       "width":  2560
+                                   },
+                        "encoded":  165,
+                        "encodedFps":  27.493584830861632,
+                        "errors":  [
+
+                                   ],
+                        "height":  1440,
+                        "measuredSeconds":  6.0013999998569485,
+                        "mode":  "processor",
+                        "painter":  null,
+                        "renderer":  null,
+                        "repeat":  3,
+                        "seconds":  6,
+                        "strategy":  "processor"
+                    }
+                ]
+}

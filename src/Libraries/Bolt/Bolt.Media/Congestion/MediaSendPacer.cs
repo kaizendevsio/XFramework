@@ -12,6 +12,8 @@ public sealed class MediaSendPacerOptions
     /// <summary>Video budget. Beyond it the queue drops whole pictures: enhancement layers first, then until a keyframe.</summary>
     public int VideoMaxDelayMs { get; init; } = 500;
     public int VideoMaxQueuedBytes { get; init; } = 256 * 1024;
+    /// <summary>Bound for individual video fragments queued for repair; they share video's pacing and transport limit.</summary>
+    public int RepairMaxQueuedBytes { get; init; } = 64 * 1024;
     /// <summary>Fraction of the video budget at which the top temporal layer is shed; twice it sheds every enhancement layer.</summary>
     public double LayerShedFraction { get; init; } = 0.3;
     /// <summary>
@@ -80,6 +82,8 @@ public sealed class MediaSendPacer : IAsyncDisposable
     private readonly object _sync = new();
     private readonly Queue<(byte[] Frame, long At)> _audio = new();
     private readonly LinkedList<(PacedPicture Picture, long At, int Bytes)> _video = new();
+    private readonly Queue<(byte[] Frame, long At, long ExpiresAt, Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> Send)> _repairs = new();
+    private int _repairBytes;
     private readonly SemaphoreSlim _work = new(0);
     private readonly CancellationTokenSource _stop = new();
     private Task _pump = Task.CompletedTask;
@@ -189,6 +193,28 @@ public sealed class MediaSendPacer : IAsyncDisposable
         if (requestKeyframe) KeyframeNeeded?.Invoke();
         if (accepted) Signal();
         return accepted;
+    }
+
+    /// <summary>Queue one unchanged repair fragment: after audio, before newer video, under the same pacing budget.</summary>
+    public bool EnqueueVideoRepair(byte[] frame, long expiresAt, Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> send)
+    {
+        lock (_sync)
+        {
+            var now = _clock();
+            DropExpiredRepairs(now);
+            if (_stop.IsCancellationRequested || frame.Length == 0 || expiresAt <= now ||
+                _repairs.Count >= 256 || _repairBytes + frame.Length > _options.RepairMaxQueuedBytes) return false;
+            _repairs.Enqueue((frame, now, expiresAt, send));
+            _repairBytes += frame.Length;
+        }
+        Signal();
+        return true;
+    }
+
+    private void DropExpiredRepairs(long now)
+    {
+        while (_repairs.TryPeek(out var repair) && now >= repair.ExpiresAt)
+            _repairBytes -= _repairs.Dequeue().Frame.Length;
     }
 
     private bool Admit(PacedPicture picture, long now, ref bool requestKeyframe)
@@ -339,6 +365,8 @@ public sealed class MediaSendPacer : IAsyncDisposable
         {
             _video.Clear();
             _videoBytes = 0;
+            _repairs.Clear();
+            _repairBytes = 0;
             _awaitingKeyframe = false;
             _layerLimit = MaxLayer;
         }
@@ -346,9 +374,13 @@ public sealed class MediaSendPacer : IAsyncDisposable
 
     /// <summary>Next frame to send: audio first, then the rest of the picture on the wire, then the next picture.</summary>
     internal bool TryTake(out byte[] frame, out bool audio)
+        => TryTake(out frame, out audio, out _);
+
+    private bool TryTake(out byte[] frame, out bool audio, out Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask>? repairSend)
     {
         lock (_sync)
         {
+            repairSend = null;
             var now = _clock();
             while (_audio.TryDequeue(out var queued))
             {
@@ -358,6 +390,14 @@ public sealed class MediaSendPacer : IAsyncDisposable
                 return true;
             }
             audio = false;
+            DropExpiredRepairs(now);
+            if (_repairs.TryDequeue(out var repair))
+            {
+                _repairBytes -= repair.Frame.Length;
+                frame = repair.Frame;
+                repairSend = repair.Send;
+                return true;
+            }
             if (_current is null || _currentIndex >= _current.Frames.Count)
             {
                 _current = null;
@@ -378,7 +418,7 @@ public sealed class MediaSendPacer : IAsyncDisposable
         get
         {
             lock (_sync)
-                return _audio.Count > 0 || _video.Count > 0 || (_current is not null && _currentIndex < _current.Frames.Count);
+                return _audio.Count > 0 || _repairs.Count > 0 || _video.Count > 0 || (_current is not null && _currentIndex < _current.Frames.Count);
         }
     }
 
@@ -414,9 +454,13 @@ public sealed class MediaSendPacer : IAsyncDisposable
                     await Task.Delay(_options.PollMs, ct);
                     continue;
                 }
-                if (!TryTake(out var frame, out var audio)) continue;
+                if (!TryTake(out var frame, out var audio, out var repairSend)) continue;
                 if (!audio) lock (_sync) _videoTokens -= frame.Length;
-                try { await _send(frame, audio, ct); }
+                try
+                {
+                    if (repairSend is not null) await repairSend(frame, ct);
+                    else await _send(frame, audio, ct);
+                }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
                 catch { lock (_sync) { if (audio) _droppedAudio++; } continue; }
                 lock (_sync)
@@ -437,11 +481,13 @@ public sealed class MediaSendPacer : IAsyncDisposable
         lock (_sync)
         {
             if (_audio.Count > 0) return false;
+            var now = _clock();
+            DropExpiredRepairs(now);
             int next;
-            if (_current is not null && _currentIndex < _current.Frames.Count) next = _current.Frames[_currentIndex].Length;
+            if (_repairs.TryPeek(out var repair)) next = repair.Frame.Length;
+            else if (_current is not null && _currentIndex < _current.Frames.Count) next = _current.Frames[_currentIndex].Length;
             else if (_video.First is { } picture && picture.Value.Picture.Frames.Count > 0) next = picture.Value.Picture.Frames[0].Length;
             else return false;
-            var now = _clock();
             var bytesPerMs = RateKbps * _options.PacingFactor / 8.0;
             var burst = Math.Max(8 * 1024, bytesPerMs * _options.PacingBurstMs);
             _videoTokens = double.IsNaN(_videoTokens) ? burst : Math.Min(burst, _videoTokens + bytesPerMs * Math.Max(0, now - _tokensAt));
@@ -470,6 +516,7 @@ public sealed class MediaSendPacer : IAsyncDisposable
             var rate = Math.Max(64, capacity > 0 ? capacity : Math.Max(sentKbps, RateKbps));
             var oldest = long.MaxValue;
             if (_audio.Count > 0) oldest = _audio.Peek().At;
+            if (_repairs.Count > 0) oldest = Math.Min(oldest, _repairs.Peek().At);
             if (_current is not null && _currentIndex < _current.Frames.Count) oldest = Math.Min(oldest, _currentAt);
             if (_video.First is { } first) oldest = Math.Min(oldest, first.Value.At);
             var waiting = oldest == long.MaxValue ? 0 : now - oldest;

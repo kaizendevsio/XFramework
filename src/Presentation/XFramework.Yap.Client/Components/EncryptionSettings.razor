@@ -2,6 +2,7 @@
 @inject IJSRuntime JS
 @inject VoiceState Voice
 @implements IDisposable
+@code { [CascadingParameter] public YapBranding TenantBrand { get; set; } = YapBranding.Default; }
 @if (State.User is not null && State.EncryptionEnabled)
 {
     <h3 class="set-group">Privacy</h3>
@@ -112,7 +113,7 @@
             <details><summary>Can't use your password?</summary>
                 <label>Recovery key<textarea @bind="recoveryKey" autocomplete="off" spellcheck="false" placeholder="Paste your saved recovery key"></textarea></label>
                 <button class="btn" disabled="@(busy || string.IsNullOrWhiteSpace(recoveryKey))" @onclick="RestoreAsync">Restore encrypted messages</button>
-                <p>Or open Yap on a trusted device, then paste this device request in Settings → Privacy → Approve another device.</p>
+                <p>Or open @TenantBrand.Name on a trusted device, then paste this device request in Settings → Privacy → Approve another device.</p>
                 <button class="btn" disabled="@busy" @onclick="ProposeAsync">Create device request</button>
                 @if (proposal is not null) { <textarea readonly aria-label="Device request" value="@proposal"></textarea><button class="btn" @onclick="() => CopyAsync(proposal)">Copy device request</button> }
                 <label>Approval code<textarea @bind="approvalCode" autocomplete="off" spellcheck="false" placeholder="Paste the approval from your trusted device"></textarea></label>

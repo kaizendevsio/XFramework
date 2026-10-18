@@ -3,7 +3,7 @@ name: Call media benchmark
 # Bandwidth efficiency against native WebRTC: the same synthetic camera and microphone, at the same target bitrates,
 # in headless Chrome, through (a) native WebRTC media (RTCPeerConnection tracks with an SFrame-sized encoded transform)
 # and (b) Bolt's datagram path (the production WebCodecs settings, SFrame adapter, framing and fragmentation on the
-# unordered, unretransmitted data channel), before and after this branch's efficiency changes. Both peers reach each
+# unordered, unretransmitted data channel), against baseline/current source snapshots. Both peers reach each
 # other only through coturn; netem shapes the receiver's TURN leg and iptables counts every byte on each leg.
 # See src/Tests/Bolt.Rtc.IntegrationTests/bench/bench.js for what (b) does and does not include.
 on:
@@ -12,9 +12,25 @@ on:
       seconds:
         description: Measured seconds per run
         default: "60"
+      baseline_ref:
+        description: Baseline full commit SHA or branch/tag (same metric harness is copied into it)
+        default: "8ae24751d0975c6dbb8e2a368059aa2338e54df3"
+      repeats:
+        description: Repeats per path/profile (alternate order, report each run)
+        default: "1"
+      modeled:
+        description: Run real-codec modeled and native WebRTC comparisons
+        type: boolean
+        default: true
+      production:
+        description: Also run production WASM/pacer/relay with synthetic codecs
+        type: boolean
+        default: true
   pull_request:
     paths:
       - src/Libraries/Bolt/Bolt.Media.Browser/**
+      - src/Libraries/Bolt/Bolt.Media/**
+      - src/Libraries/Bolt/Bolt.Server/**
       - src/Libraries/Bolt/Bolt.Rtc/**
       - src/Tests/Bolt.Rtc.IntegrationTests/**
       - .github/workflows/call-media-benchmark.yml
@@ -28,22 +44,38 @@ concurrency:
 
 jobs:
   run:
-    name: ${{ matrix.scenario }}
+    name: Modeled ${{ matrix.scenario }} ${{ matrix.profile }}
+    if: github.event_name == 'pull_request' || inputs.modeled
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
+        profile: [360p30, 720p30, 1080p30]
         include:
-          # One way each: the receiver's round trip to TURN is twice the delay. Video targets fit each link with audio.
-          - { scenario: clean-20mbit, downlink: "delay 10ms rate 20mbit", uplink: "delay 10ms", video: 1500, audio: 20 }
-          - { scenario: 512k-500ms-1pct, downlink: "delay 250ms 10ms rate 512kbit loss 1%", uplink: "delay 250ms 10ms", video: 300, audio: 60 }
-          - { scenario: 512k-1000ms-3pct, downlink: "delay 500ms 20ms rate 512kbit loss 3%", uplink: "delay 500ms 20ms", video: 300, audio: 60 }
+          - { profile: 360p30, width: 640, height: 360, clean_video: 1500 }
+          - { profile: 720p30, width: 1280, height: 720, clean_video: 2500 }
+          - { profile: 1080p30, width: 1920, height: 1080, clean_video: 4000 }
+        scenario: [clean-20mbit, 512k-500ms-1pct, 512k-1000ms-3pct]
+        # include entries enrich each scenario across every picture profile.
+        # One way each: the receiver's RTT to TURN is twice the delay. Constrained video targets fit with audio.
+        # Scenario details are selected by run-bench-profile.sh so the profile/scenario cross product stays explicit.
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
+
+      - name: Checkout baseline production snapshot
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.inputs.baseline_ref || '8ae24751d0975c6dbb8e2a368059aa2338e54df3' }}
+          path: baseline
+          persist-credentials: false
+
+      - name: Use identical benchmark harness for both snapshots
+        shell: bash
+        run: bash src/Tests/Bolt.Rtc.IntegrationTests/bench/prepare-baseline.sh baseline
 
       - name: Set up .NET 10
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
@@ -56,10 +88,12 @@ jobs:
           go-version-file: src/Libraries/Bolt/Bolt.Rtc/sidecar/go.mod
           cache-dependency-path: src/Libraries/Bolt/Bolt.Rtc/sidecar/go.sum
 
-      - name: Build the relay's WebRTC sidecar
+      - name: Build both relay sidecars
         shell: bash
-        working-directory: src/Libraries/Bolt/Bolt.Rtc/sidecar
-        run: CGO_ENABLED=0 go build -trimpath -o "$RUNNER_TEMP/bolt-rtc" .
+        run: |
+          set -euo pipefail
+          (cd src/Libraries/Bolt/Bolt.Rtc/sidecar && CGO_ENABLED=0 go build -trimpath -o "$RUNNER_TEMP/bolt-rtc" .)
+          (cd baseline/src/Libraries/Bolt/Bolt.Rtc/sidecar && CGO_ENABLED=0 go build -trimpath -o "$RUNNER_TEMP/bolt-rtc-baseline" .)
 
       - name: Enable netem
         shell: bash
@@ -71,46 +105,40 @@ jobs:
             sudo modprobe sch_netem
           fi
 
-      - name: Start coturn on three loopback addresses
+      - name: Start coturn
         shell: bash
-        run: |
-          set -euo pipefail
-          # One TURN address per side (sender .2, receiver .3, the Bolt relay .4), so each leg can be shaped and counted on
-          # its own. UDP only, as Yap configures it.
-          docker run --detach --name coturn --network host \
-            coturn/coturn:4.18.0-debian@sha256:bbefd3e1fdfdc0d58770fe01b581fd8b00d9f3a5580d00acb77cf719a6bc78e3 \
-            -n --log-file=stdout --listening-ip=127.0.0.2 --listening-ip=127.0.0.3 --listening-ip=127.0.0.4 --relay-ip=127.0.0.1 --listening-port=3478 \
-            --use-auth-secret --static-auth-secret=ci-turn-secret --realm=bolt.test --fingerprint \
-            --no-tls --no-tcp-relay --allow-loopback-peers --min-port=49160 --max-port=49400
-          for attempt in $(seq 1 30); do
-            if ss -lnu | grep -q '127.0.0.3:3478 '; then exit 0; fi
-            sleep 1
-          done
-          docker logs coturn
-          exit 1
+        run: bash src/Tests/Bolt.Rtc.IntegrationTests/bench/start-turn.sh
 
-      - name: Build and install the browser
+      - name: Build snapshots and validate model parity
         shell: bash
         run: |
           set -euo pipefail
-          dotnet build src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj --configuration Release
-          # Google Chrome (preinstalled on the runner) has the H.264 codecs; Chromium is the fallback.
+          node --test src/Tests/Bolt.Rtc.IntegrationTests/bench/metrics.test.mjs
+          for snapshot in . baseline; do
+            dotnet test "$snapshot/src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj" --configuration Release \
+              --filter 'FullyQualifiedName~RecoveryBufferBenchmarkTests'
+          done
           pwsh src/Tests/Bolt.Rtc.IntegrationTests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
           google-chrome --version || true
 
-      - name: Benchmark
+      - name: Benchmark real codecs and native WebRTC
         shell: bash
         env:
           BENCH_SECONDS: ${{ github.event.inputs.seconds || '60' }}
+          BENCH_REPEATS: ${{ github.event.inputs.repeats || '1' }}
           BOLT_RTC_SIDECAR: ${{ runner.temp }}/bolt-rtc
+          BENCH_BASELINE_SIDECAR: ${{ runner.temp }}/bolt-rtc-baseline
+          BENCH_BASELINE_PROJECT: baseline/src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj
+          BENCH_WIDTH: ${{ matrix.width }}
+          BENCH_HEIGHT: ${{ matrix.height }}
+          BENCH_FPS: "30"
           SCENARIO: ${{ matrix.scenario }}
-          DOWNLINK: ${{ matrix.downlink }}
-          UPLINK: ${{ matrix.uplink }}
-          VIDEO: ${{ matrix.video }}
-          AUDIO: ${{ matrix.audio }}
+          PROFILE: ${{ matrix.profile }}
+          CLEAN_VIDEO: ${{ matrix.clean_video }}
         run: |
           set -euo pipefail
-          bash src/Tests/Bolt.Rtc.IntegrationTests/bench/run-bench.sh "$SCENARIO" "$DOWNLINK" "$UPLINK" "$VIDEO" "$AUDIO" "$RUNNER_TEMP/bench"
+          export BENCH_CURRENT_REV=$(git rev-parse HEAD) BENCH_BASELINE_REV=$(git -C baseline rev-parse HEAD)
+          bash src/Tests/Bolt.Rtc.IntegrationTests/bench/run-bench-profile.sh "$SCENARIO" "$PROFILE" "$CLEAN_VIDEO" "$RUNNER_TEMP/bench"
           python3 src/Tests/Bolt.Rtc.IntegrationTests/bench/summarize-bench.py "$RUNNER_TEMP/bench" | tee -a "$GITHUB_STEP_SUMMARY"
           if [ -f "$RUNNER_TEMP/bench/failures.txt" ]; then cat "$RUNNER_TEMP/bench/failures.txt"; exit 1; fi
 
@@ -118,7 +146,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: call-media-benchmark-${{ matrix.scenario }}
+          name: call-media-benchmark-${{ matrix.scenario }}-${{ matrix.profile }}
           path: ${{ runner.temp }}/bench
           if-no-files-found: warn
 
@@ -126,9 +154,94 @@ jobs:
         if: failure()
         run: docker logs coturn 2>&1 | tail -100
 
+  production:
+    name: Production ${{ matrix.scenario }} ${{ matrix.snapshot }}
+    if: github.event_name == 'pull_request' || inputs.production
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        snapshot: [baseline, current]
+        scenario: [clean-1080p30, 512k-1000ms-3pct]
+    steps:
+      - name: Checkout measurement harness
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout measured production snapshot
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ matrix.snapshot == 'baseline' && (github.event.inputs.baseline_ref || '8ae24751d0975c6dbb8e2a368059aa2338e54df3') || github.sha }}
+          path: measured
+          persist-credentials: false
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 10.x
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: measured/src/Libraries/Bolt/Bolt.Rtc/sidecar/go.mod
+          cache-dependency-path: measured/src/Libraries/Bolt/Bolt.Rtc/sidecar/go.sum
+
+      - name: Build production participant and relay
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd measured/src/Libraries/Bolt/Bolt.Rtc/sidecar && CGO_ENABLED=0 go build -trimpath -o "$RUNNER_TEMP/bolt-rtc" .)
+          dotnet workload install wasm-tools --skip-manifest-update
+          dotnet publish measured/src/Tests/Bolt.Rtc.CallClient/Bolt.Rtc.CallClient.csproj --configuration Release \
+            -p:CALL_CLIENT_AOT=1 -o "$RUNNER_TEMP/call-client"
+          dotnet build measured/src/Tests/Bolt.Rtc.IntegrationTests/Bolt.Rtc.IntegrationTests.csproj --configuration Release
+          pwsh measured/src/Tests/Bolt.Rtc.IntegrationTests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: Enable netem and TURN
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! sudo modprobe sch_netem 2>/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq "linux-modules-extra-$(uname -r)"
+            sudo modprobe sch_netem
+          fi
+          bash src/Tests/Bolt.Rtc.IntegrationTests/bench/start-turn.sh
+
+      - name: Measure production WASM pacer and relay
+        shell: bash
+        env:
+          CALL_CLIENT_DIR: ${{ runner.temp }}/call-client/wwwroot
+          BOLT_RTC_SIDECAR: ${{ runner.temp }}/bolt-rtc
+          BOLT_RTC_TURN_SECRET: ci-turn-secret
+          CALL_SCENARIO: ${{ matrix.scenario }}
+          CALL_A_ENGINE: chromium
+          CALL_B_ENGINE: chromium
+          CALL_A_HEIGHT: "1080"
+          CALL_B_HEIGHT: "1080"
+          CALL_A_CEILING: "1080"
+          CALL_B_CEILING: "1080"
+          CALL_A_FPS: "30"
+          CALL_B_FPS: "30"
+          CALL_WARMUP_SECONDS: "40"
+          CALL_SECONDS: ${{ github.event.inputs.seconds || '60' }}
+          CALL_OUT: ${{ runner.temp }}/production/${{ matrix.scenario }}.${{ matrix.snapshot }}.json
+          BENCH_REPEATS: ${{ github.event.inputs.repeats || '1' }}
+        run: bash src/Tests/Bolt.Rtc.IntegrationTests/bench/run-production-profile.sh "${{ matrix.snapshot }}" "$RUNNER_TEMP/production"
+
+      - name: Upload production results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: call-media-production-${{ matrix.scenario }}-${{ matrix.snapshot }}
+          path: ${{ runner.temp }}/production
+          if-no-files-found: warn
+
   report:
     name: Report
-    needs: run
+    needs: [run, production]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -140,7 +253,7 @@ jobs:
       - name: Download results
         uses: actions/download-artifact@v4
         with:
-          pattern: call-media-benchmark-*
+          pattern: call-media-*
           path: bench-results
 
       - name: Summarize
@@ -148,4 +261,5 @@ jobs:
         run: |
           set -euo pipefail
           python3 src/Tests/Bolt.Rtc.IntegrationTests/bench/summarize-bench.py bench-results | tee summary.md
+          python3 src/Tests/Bolt.Rtc.IntegrationTests/bench/summarize-production.py bench-results | tee -a summary.md
           cat summary.md >>"$GITHUB_STEP_SUMMARY"

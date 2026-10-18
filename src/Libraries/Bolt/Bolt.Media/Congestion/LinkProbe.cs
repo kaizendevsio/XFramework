@@ -14,7 +14,7 @@ namespace Bolt.Media.Congestion;
 /// <param name="EchoRequested">The step asked the relay for its echo (only while every earlier round trip passed).</param>
 /// <param name="SentKbps">What the device actually handed to its channel over the step (a browser holding back its own
 /// buffer sends less than the pace); 0 when too few messages to tell.</param>
-/// <param name="Inconclusive">The relay's reports on the step did not come back in time: it says nothing either way.</param>
+/// <param name="Inconclusive">The step lacked a measurable send rate, or its relay reports did not come back in time: it says nothing either way.</param>
 public readonly record struct ProbeStep(int OfferedKbps, int Sent, int UplinkKbps, int UplinkLost, int UplinkDelayGrowthMs,
     int EchoKbps, int Echoed, int EchoDelayGrowthMs, bool UplinkPassed, bool EchoPassed, bool EchoRequested = true, int SentKbps = 0,
     bool Inconclusive = false)
@@ -181,11 +181,13 @@ public sealed class LinkProbe
             // not the link's, so it is never taken as the link's limit.
             var heldBack = sentKbps > 0 && sentKbps < log.OfferedKbps * MinDeliveredShare;
             var looksFine = upGrowth < MaxDelayGrowthMs && (upKbps == 0 || heldBack || upKbps >= tested * arrivedShare * MinDeliveredShare);
-            var inconclusive = stamped && reported < log.Sent * 0.9 && looksFine;
+            // Empty or sparse steps never tested their advertised pace. Keep earlier evidence;
+            // neither complete reports nor echoes can turn an unmeasured send rate into capacity.
+            var inconclusive = sentKbps == 0 || (stamped && reported < log.Sent * 0.9 && looksFine);
             var upPassed = stamped && !inconclusive && reported >= log.Sent * 0.9 && log.Lost <= Math.Max(2, reported * MaxLossShare) &&
                            looksFine;
             // The echo crosses both legs: its loss is up to twice the uplink's, and it can only bring back what got there.
-            var echoPassed = echo && log.Sent > 0 && log.Echoes.Count >= Math.Max(1, log.Sent * (1 - 2 * MaxLossShare) - 2) &&
+            var echoPassed = echo && !inconclusive && log.Sent > 0 && log.Echoes.Count >= Math.Max(1, log.Sent * (1 - 2 * MaxLossShare) - 2) &&
                              (pageBusy || ((echoKbps == 0 || echoKbps >= Math.Min(tested, upKbps > 0 ? upKbps : tested) * echoShare * MinDeliveredShare) &&
                                            echoGrowth < MaxEchoGrowthMs));
             return new ProbeStep(log.OfferedKbps, log.Sent, upKbps, log.Lost, upGrowth, echoKbps, log.Echoes.Count, echoGrowth, upPassed, echoPassed, echo,

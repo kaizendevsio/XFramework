@@ -386,6 +386,46 @@ public sealed class BoltCallCongestionTests
         Assert.That(pacer.Sample().DroppedAudio, Is.EqualTo(1));
     }
 
+    [Test]
+    public async Task Pacer_RepairsAreBoundedAndExpireAboveTheTransport()
+    {
+        var now = 0L;
+        await using var pacer = new MediaSendPacer((_, _) => ValueTask.CompletedTask,
+            options: new MediaSendPacerOptions { RepairMaxQueuedBytes = 4 }, clock: () => now);
+        static ValueTask Send(ReadOnlyMemory<byte> _, CancellationToken __) => throw new AssertionException("an expired repair was sent");
+        Assert.That(pacer.EnqueueVideoRepair([1, 2, 3], 100, Send), Is.True);
+        Assert.That(pacer.EnqueueVideoRepair([4, 5, 6], 100, Send), Is.False, "repair traffic has its own byte bound");
+        now = 100;
+        Assert.That(pacer.TryTake(out _, out _), Is.False, "waiting above a full channel does not extend a repair's deadline");
+        Assert.That(pacer.EnqueueVideoRepair([7], 100, Send), Is.False);
+    }
+
+    [Test]
+    public async Task Pacer_RepairsShareVideoPacing_AndVoiceOvertakesWhileTokensRefill()
+    {
+        var now = 0L;
+        var repaired = 0;
+        var audio = 0;
+        await using var pacer = new MediaSendPacer((_, _) => { Interlocked.Increment(ref audio); return ValueTask.CompletedTask; }, clock: () => now);
+        pacer.RateKbps = 16;
+        for (var i = 0; i < 12; i++)
+            Assert.That(pacer.EnqueueVideoRepair(new byte[1024], 5_000, (_, _) =>
+            {
+                Interlocked.Increment(ref repaired);
+                return ValueTask.CompletedTask;
+            }), Is.True);
+        pacer.Start();
+        for (var i = 0; i < 100 && Volatile.Read(ref repaired) < 8; i++) await Task.Delay(5);
+        Assert.That(repaired, Is.EqualTo(8), "the existing 8 KiB video burst also bounds a feedback repair burst");
+        pacer.EnqueueAudio([9]);
+        for (var i = 0; i < 100 && Volatile.Read(ref audio) == 0; i++) await Task.Delay(5);
+        Assert.That(audio, Is.EqualTo(1));
+        Assert.That(repaired, Is.EqualTo(8), "voice needs no video tokens");
+        Volatile.Write(ref now, 2_000);
+        for (var i = 0; i < 100 && Volatile.Read(ref repaired) < 12; i++) await Task.Delay(5);
+        Assert.That(repaired, Is.EqualTo(12));
+    }
+
     // ── Sender signals ──
 
     [Test]

@@ -3,14 +3,14 @@ using Bolt.Protocol;
 namespace Bolt.Media.Browser;
 
 /// <summary>One negotiable video codec, ordered best-compression-first.</summary>
-public enum VideoCodec { None = 0, Av1 = 1, Vp9 = 2, H264 = 3 }
+public enum VideoCodec { None = 0, Av1 = 1, Vp9 = 2, H264 = 3, Hevc = 4 }
 
 /// <summary>What one device reported for one codec after probing WebCodecs.</summary>
 /// <param name="Codec">The codec family.</param>
 /// <param name="Encode">The encoder accepted a configuration at <paramref name="MaxHeight"/>.</param>
 /// <param name="Decode">The decoder accepted a configuration at <paramref name="MaxHeight"/>.</param>
 /// <param name="Hardware">
-/// Hardware encoding is known: Media Capabilities ('webrtc') reported the encoder power efficient. A WebCodecs
+/// Power-efficient encoding was reported: Media Capabilities ('webrtc') reported the encoder power efficient at the probed size. This is not proof of GPU use. A WebCodecs
 /// preference hint cannot establish this; WebKit ignores it for encoders.
 /// </param>
 /// <param name="MaxHeight">Tallest probed frame the encoder accepted, 0 when it accepted none.</param>
@@ -20,7 +20,7 @@ public sealed record VideoCodecSupport(VideoCodec Codec, bool Encode, bool Decod
 /// <summary>
 /// Per-device codec probing results plus the peer intersection that picks the wire codec.
 ///
-/// The compression order is AV1 &gt; VP9 &gt; H.264, but AV1 and VP9 software encoders cannot hold
+/// The compression order is AV1 &gt; HEVC &gt; VP9 &gt; H.264, but AV1 and VP9 software encoders cannot hold
 /// 1080p30 on a phone, so a codec is only preferred over the next one when this device reported
 /// hardware encoding for it. Software AV1 is accepted only for the small tiers, where its
 /// bitrate advantage is worth more than the CPU it costs.
@@ -28,11 +28,13 @@ public sealed record VideoCodecSupport(VideoCodec Codec, bool Encode, bool Decod
 public sealed class VideoCodecLadder
 {
     /// <summary>Compression order. Earlier entries need fewer bits for the same picture.</summary>
-    public static readonly VideoCodec[] Preference = [VideoCodec.Av1, VideoCodec.Vp9, VideoCodec.H264];
+    // HEVC requires power-efficient encode and decode probes; unadvertised peers stay on H.264.
+    public static readonly VideoCodec[] Preference = [VideoCodec.Av1, VideoCodec.Hevc, VideoCodec.Vp9, VideoCodec.H264];
 
     /// <summary>Tallest frame a software encoder of this codec may be asked to produce.</summary>
     internal static int SoftwareCeiling(VideoCodec codec) => codec switch
     {
+        VideoCodec.Hevc => 0, // HEVC is offered only with a positive power-efficient hardware signal.
         VideoCodec.Av1 => 360,
         VideoCodec.Vp9 => 540,
         _ => 2160 // H.264 prefers the native hardware encoder; measured pressure lowers the tier.
@@ -54,6 +56,7 @@ public sealed class VideoCodecLadder
     /// runs libvpx in the web process). A device with no hardware H.264 decoder keeps every decoder it has.
     /// </summary>
     public VideoCodec[] Decodable => Preference.Where(codec => support.GetValueOrDefault(codec) is { Decode: true } local &&
+        (codec != VideoCodec.Hevc || local.DecodeHardware) &&
         (local.DecodeHardware || codec == VideoCodec.H264 || support.GetValueOrDefault(VideoCodec.H264)?.DecodeHardware != true)).ToArray();
 
     /// <summary>Maximum safe height for the selected encoder, including software limits.</summary>
@@ -83,12 +86,12 @@ public sealed class VideoCodecLadder
     /// <summary>Wire-format name understood by <c>bolt-media.js</c>.</summary>
     public static string Name(VideoCodec codec) => codec switch
     {
-        VideoCodec.Av1 => "av1", VideoCodec.Vp9 => "vp9", VideoCodec.H264 => "h264", _ => ""
+        VideoCodec.Av1 => "av1", VideoCodec.Vp9 => "vp9", VideoCodec.H264 => "h264", VideoCodec.Hevc => "hevc", _ => ""
     };
 
     public static VideoCodec Parse(string? name) => name switch
     {
-        "av1" => VideoCodec.Av1, "vp9" => VideoCodec.Vp9, "h264" => VideoCodec.H264, _ => VideoCodec.None
+        "av1" => VideoCodec.Av1, "vp9" => VideoCodec.Vp9, "h264" => VideoCodec.H264, "hevc" => VideoCodec.Hevc, _ => VideoCodec.None
     };
 
     /// <summary>Compact advertisement carried inside the end-to-end encrypted epoch control envelope.</summary>
@@ -102,11 +105,11 @@ public sealed class VideoCodecLadder
 
     public static CodecId ToCodecId(VideoCodec codec) => codec switch
     {
-        VideoCodec.Av1 => CodecId.AV1, VideoCodec.Vp9 => CodecId.VP9, _ => CodecId.H264
+        VideoCodec.Av1 => CodecId.AV1, VideoCodec.Vp9 => CodecId.VP9, VideoCodec.Hevc => CodecId.H265, _ => CodecId.H264
     };
 
     public static VideoCodec FromCodecId(CodecId codec) => codec switch
     {
-        CodecId.AV1 => VideoCodec.Av1, CodecId.VP9 => VideoCodec.Vp9, CodecId.H264 => VideoCodec.H264, _ => VideoCodec.None
+        CodecId.AV1 => VideoCodec.Av1, CodecId.VP9 => VideoCodec.Vp9, CodecId.H264 => VideoCodec.H264, CodecId.H265 => VideoCodec.Hevc, _ => VideoCodec.None
     };
 }

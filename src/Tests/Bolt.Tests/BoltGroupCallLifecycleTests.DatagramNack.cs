@@ -1,4 +1,6 @@
+using System.Reflection;
 using Bolt.Protocol;
+using Bolt.Protocol.Transport;
 using NUnit.Framework;
 
 namespace Bolt.Tests;
@@ -23,6 +25,34 @@ public sealed partial class BoltGroupCallLifecycleTests
     private static List<uint[]> SequenceLists(IEnumerable<byte[]> frames, FrameType type) => frames
         .Where(x => x[0] == (byte)type && BoltCodec.TryReadNackRequest(x, out _))
         .Select(x => { BoltCodec.TryReadNackRequest(x, out var h); return h.GetMissingSequences(x); }).ToList();
+
+    [Test]
+    public async Task Datagram_RepairProgress_IsCountedEvenWhenTheBufferStaysAtTheSameSize()
+    {
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        var (relay, _, _) = await OpenDatagramAsync(f, network, "a");
+        var connection = Connection(f, "a");
+        var drain = (DatagramDrainWatch)connection.GetType()
+            .GetField("_datagramDrain", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(connection)!;
+        relay.Stuck = true;
+        relay.Drain(1000);
+        drain.Reset();
+        var now = Environment.TickCount64;
+        drain.Observe(relay.BufferedAmount, now);
+        var frame = VideoFrame(Guid.NewGuid(), 1, true);
+        for (var elapsed = 500; elapsed <= DatagramDrainWatch.DefaultTimeoutMs + 500; elapsed += 500)
+        {
+            Assert.That(connection.TrySendRetransmission(frame), Is.True);
+            Assert.That(relay.BufferedAmount, Is.EqualTo(1000 + frame.Length));
+            // Acknowledgment releases the repair while other bytes remain in flight. A constant
+            // sampled amount still means progress: accepted repair bytes must enter the drain ledger.
+            relay.Drain(1000);
+            drain.Observe(relay.BufferedAmount, now + elapsed);
+            Assert.That(drain.Stalled, Is.False, "a repair drained during every window");
+        }
+        Assert.That(connection.RetransmittedFrames, Is.EqualTo(5));
+    }
 
     [Test]
     public async Task Datagram_TheRelayAnnouncesNack()

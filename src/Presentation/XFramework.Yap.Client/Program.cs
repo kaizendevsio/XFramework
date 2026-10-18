@@ -25,6 +25,7 @@ builder.Services.AddDbContextFactory<OfflineDatabase>(options => options
 builder.Services.AddSqliteWasm();
 builder.Services.AddScoped<OfflineStore>();
 builder.Services.AddScoped<ChatApi>();
+builder.Services.AddScoped<Branding>();
 // Scoped, not singleton, so its memo of formatted timestamps dies with the account's session.
 builder.Services.AddScoped<BrowserTime>();
 builder.Services.AddScoped<ChatState>();
@@ -32,5 +33,6 @@ builder.Services.AddScoped<VoiceState>();
 builder.Services.AddBoltMediaBrowser(options => options.SecurityMode = Bolt.Media.Browser.MediaSecurityMode.AuthenticatedSFrame);
 builder.Services.AddScoped<DatabaseStartup>();
 var host = builder.Build();
+await host.Services.GetRequiredService<Branding>().InitializeAsync();
 await host.Services.GetRequiredService<IJSRuntime>().InvokeVoidAsync("yap.diagnostics.version", AppRelease.Version);
 await host.RunAsync();

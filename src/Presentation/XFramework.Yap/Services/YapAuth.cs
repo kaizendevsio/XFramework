@@ -27,7 +27,7 @@ public static class YapAuth
         ? Results.Ok(new { redirect = location }) : Results.Redirect(location);
 
     private static async Task<IResult> RegisterAsync(HttpContext context, IAntiforgery antiforgery,
-        IConfiguration configuration, IIdentityServerServiceWrapper identity, ILogger<YapSessions> logger,
+        YapTenants tenants, IIdentityServerServiceWrapper identity, ILogger<YapSessions> logger,
         CancellationToken ct)
     {
         try { await antiforgery.ValidateRequestAsync(context); }
@@ -42,9 +42,9 @@ public static class YapAuth
             return Redirect(context, "/register?error=validation");
         if (password != form["confirmPassword"].ToString())
             return Redirect(context, "/register?error=mismatch");
-        if (!Guid.TryParse(configuration["Yap:TenantId"], out var tenant) || tenant == Guid.Empty ||
-            !Guid.TryParse(configuration["Yap:RoleId"], out var role) || role == Guid.Empty)
+        if (tenants.Resolve(context) is not { } workspace)
             return Redirect(context, "/register?error=disabled");
+        var (tenant, role, _) = workspace;
         try
         {
             var response = await identity.RegisterIdentity(new RegisterIdentityRequest
@@ -73,7 +73,7 @@ public static class YapAuth
     }
 
     private static async Task<IResult> LoginAsync(HttpContext context, IAntiforgery antiforgery,
-        IConfiguration configuration, IIdentityServerServiceWrapper identity, YapSessions sessions,
+        YapTenants tenants, IIdentityServerServiceWrapper identity, YapSessions sessions,
         ILogger<YapSessions> logger, CancellationToken ct)
     {
         try { await antiforgery.ValidateRequestAsync(context); }
@@ -83,9 +83,9 @@ public static class YapAuth
         var password = form["password"].ToString();
         if (username.Length is 0 or > 150 || password.Length is 0 or > 256)
             return Redirect(context, "/login?error=credentials");
-        if (!Guid.TryParse(configuration["Yap:TenantId"], out var tenant) || tenant == Guid.Empty ||
-            !Guid.TryParse(configuration["Yap:RoleId"], out var role) || role == Guid.Empty)
+        if (tenants.Resolve(context) is not { } workspace)
             return Redirect(context, "/login?error=setup");
+        var (tenant, role, _) = workspace;
         try
         {
             var response = await identity.AuthenticateIdentity(new AuthenticateIdentityRequest

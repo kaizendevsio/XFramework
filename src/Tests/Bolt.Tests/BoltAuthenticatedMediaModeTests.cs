@@ -68,11 +68,12 @@ public sealed class BoltAuthenticatedMediaModeTests
     }
 
     // Video rides the same authenticated, per-frame-encrypted relay as the voice. The relay must
-    // carry the three negotiable video codecs and nothing else: screen share and unknown codecs
+    // carry the negotiable video codecs and nothing else: screen share and unknown codecs
     // have no key exchange behind them, so they never reach a recipient.
     [TestCase(MediaType.Video, CodecId.AV1, true)]
     [TestCase(MediaType.Video, CodecId.VP9, true)]
     [TestCase(MediaType.Video, CodecId.H264, true)]
+    [TestCase(MediaType.Video, CodecId.H265, true)]
     [TestCase(MediaType.Video, CodecId.Opus, false)]
     [TestCase(MediaType.ScreenShare, CodecId.H264, false)]
     public async Task EncryptedPayloadMode_RoutesNegotiatedVideoCodecsOnly(MediaType mediaType, CodecId codec, bool routed)

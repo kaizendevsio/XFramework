@@ -1,1 +1,2 @@
-<span class="yap-brand"><span class="brand-mark"><Icon Name="chat" Size="24" /></span><span class="wordmark">yap<b>.</b></span></span>
+@code { [CascadingParameter] public YapBranding TenantBrand { get; set; } = YapBranding.Default; }
+<span class="yap-brand"><span class="brand-mark">@if (TenantBrand.LogoUrl.Length != 0) { <img src="@TenantBrand.LogoUrl" alt="" width="43" height="43" /> } else { <Icon Name="chat" Size="24" /> }</span><span class="wordmark">@if (TenantBrand.Name == "Yap") { <text>yap</text><b>.</b> } else { @TenantBrand.Name }</span></span>

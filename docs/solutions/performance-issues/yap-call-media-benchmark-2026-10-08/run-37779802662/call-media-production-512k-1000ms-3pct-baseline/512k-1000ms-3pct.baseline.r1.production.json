@@ -1,0 +1,213 @@
+{
+  "scenario": "512k-1000ms-3pct",
+  "a": "chromium 1080p30",
+  "b": "chromium 1080p30",
+  "A-\u003EB": {
+    "sentFps": 29.8,
+    "sentKbps": 4939,
+    "renderedFps": 29.8,
+    "longestFreezeMs": 139,
+    "frozenMs": 0,
+    "decoderResets": 0,
+    "corrupt": 0,
+    "largestKeyframe": 203302,
+    "audioDelivered": 0.9562081401339516,
+    "audioP50": 19,
+    "audioP99": 224,
+    "damagedBeforeWindow": 0,
+    "decoderEvents": [],
+    "receive": [
+      {
+        "streamId": "7fcc8e3d-52b9-4583-bca0-f0656c181382",
+        "fragments": 12989,
+        "localDrops": 0,
+        "nacked": 1436,
+        "recovered": 12,
+        "abandoned": 396,
+        "declined": 0,
+        "incomplete": 9,
+        "skipped": 0,
+        "pictures": 3007,
+        "recoveryMs": 350,
+        "recent": "recovery-on K1L0 2L2 3L1 4L2 5L0 6L2 7L1 8L2 9L0 10L2 11L1 12L2 13L0 14L2 15L1 16L2 17L0 18L2 19L1 20L2 21L0 22L2 23L1 24L2 K25L0 26L2 27L1 28L2 29L0 30L2 31L1 32L2 33L0 34L2 35L1 36L2 37L0 38L2 39L1 40L2 41L0 42L2 43L1 44L2 K45L0 46L2 47L1 48L2 49L0 50L2 51L1 52L2 53L0 54L2 55L1 56L2 57L0 58L2 59L1 60L2 61L0 62L2 63L1 64L2 65L0 66L2 67L1 68L2 69L0 70L2 71L1 72L2 73L0 74L2 K75L0 76L2 77L1 78L2 79L0 80L2 81L1 82L2 83L0 84L2 85L1 86L2 87L0 88L2 89L1 90L2 91L0 92L2 93L1 94L2 95L0 96L2 97L1 98L2 99L0 100L2 101L1 102L2 103L0 104L2 105L1 106L2 107L0 108L2 109L1 110L2 111L0 112L2 113L1 114L2 115L0 116L2 117L1 118L2 119L0 120L2 121L1 122L2 123L0 124L2 125L1 126L2 127L0 128L2 129L1 130L2 131L0 132L2 133L1 134L2 135L0 136L2 137L1 138L2 139L0 140L2 141L1 142L2 143L0 144L2 145L1 146L2 147L0 148L2 149L1 150L2 abandon665 giveup151L0 jump667 giveup153L1 K219L0!g 220L2 221L1 222L2 223L0 | 3148L2 3149L1 3150L2 3151L0 3152L2 3153L1 3154L2 3155L0 3156L2 3157L1 3158L2 3159L0 3160L2 3161L1 3162L2 3163L0 3164L2 3165L1 3166L2 3167L0 3168L2 3169L1 3170L2 3171L0 3172L2 3173L1 3174L2 3175L0 3176L2 3177L1 3178L2 3179L0 3180L2 3181L1 3182L2 3183L0 3184L2 3185L1 3186L2 3187L0 3188L2 3189L1 3190L2 3191L0 3192L2 3193L1 3194L2 3195L0"
+      }
+    ],
+    "senderTier": {
+      "width": 1920,
+      "height": 1080,
+      "framerate": 30,
+      "bitrateKbps": 5492
+    },
+    "senderRate": {
+      "totalKbps": 10024,
+      "videoKbps": 9963,
+      "audioKbps": 40,
+      "videoSuspended": false,
+      "signal": "Normal",
+      "delayMs": 8
+    },
+    "senderPath": "WebSocket",
+    "receiverPath": "UDP/relay",
+    "targetHeight": 1080,
+    "timeToTargetMs": 2818,
+    "firstHeight": 540,
+    "firstKbps": 800,
+    "largestStartKeyframe": 132554,
+    "rungChangesInWindow": 3,
+    "startRungs": [
+      {
+        "atMs": 0,
+        "height": 540,
+        "framerate": 25,
+        "kbps": 800
+      },
+      {
+        "atMs": 1806,
+        "height": 720,
+        "framerate": 30,
+        "kbps": 2006
+      },
+      {
+        "atMs": 2818,
+        "height": 1080,
+        "framerate": 30,
+        "kbps": 3575
+      },
+      {
+        "atMs": 6656,
+        "height": 720,
+        "framerate": 30,
+        "kbps": 1415
+      },
+      {
+        "atMs": 20539,
+        "height": 540,
+        "framerate": 25,
+        "kbps": 622
+      },
+      {
+        "atMs": 42940,
+        "height": 360,
+        "framerate": 20,
+        "kbps": 499
+      },
+      {
+        "atMs": 53562,
+        "height": 540,
+        "framerate": 25,
+        "kbps": 1400
+      },
+      {
+        "atMs": 56331,
+        "height": 720,
+        "framerate": 30,
+        "kbps": 1840
+      },
+      {
+        "atMs": 61347,
+        "height": 900,
+        "framerate": 30,
+        "kbps": 2767
+      },
+      {
+        "atMs": 66117,
+        "height": 1080,
+        "framerate": 30,
+        "kbps": 4049
+      }
+    ],
+    "senderStart": "1425k (uplink probe)",
+    "senderProbe": "up \u003E=1500k down \u003E=600k rtt 1020ms in 1254ms [600k: up 0k (lost 0/1, \u002B0ms) echo 0k (1/1, \u002B0ms); 1500k: up 0k (lost 0/0, \u002B0ms) echo 0k! (0/0, \u002B0ms)]"
+  },
+  "B-\u003EA": {
+    "sentFps": 30,
+    "sentKbps": 5731,
+    "renderedFps": 30,
+    "longestFreezeMs": 138,
+    "frozenMs": 0,
+    "decoderResets": 0,
+    "corrupt": 0,
+    "largestKeyframe": 213733,
+    "audioDelivered": 0.9941630901287554,
+    "audioP50": 21,
+    "audioP99": 103,
+    "damagedBeforeWindow": 0,
+    "decoderEvents": [],
+    "receive": [
+      {
+        "streamId": "05508005-192a-4f56-b5f4-6f794c5e193e",
+        "fragments": 70312,
+        "localDrops": 0,
+        "nacked": 937,
+        "recovered": 0,
+        "abandoned": 109,
+        "declined": 0,
+        "incomplete": 4,
+        "skipped": 1,
+        "pictures": 3375,
+        "recoveryMs": 0,
+        "recent": "recovery-on 173L2! 174L1! K175L0 176L2 177L1 178L2 179L0 180L2 181L1 182L2 183L0 184L2 185L1 abandon3707 giveup186L2 abandon3725 giveup187L0 giveup188L2 abandon3769? abandon3770? abandon3771? abandon3772? abandon3773? abandon3774? abandon3775? abandon3776? abandon3777? abandon3778? abandon3779? abandon3780? abandon3781? abandon3782? abandon3783? abandon3784? abandon3785? abandon3786? abandon3787? abandon3788? abandon3789? abandon3790? abandon3791? abandon3792? abandon3793? abandon3794? abandon3795? abandon3796? abandon3797? abandon3798? abandon3799? abandon3800? abandon3801? abandon3802? abandon3803? abandon3804? abandon3805? abandon3806? abandon3807? abandon3808? abandon3809? abandon3810? abandon3811? abandon3812? abandon3813? abandon3814? abandon3815? abandon3816? abandon3817? abandon3818? abandon3819? abandon3820? abandon3821? abandon3822? abandon3823? abandon3824? abandon3825? abandon3826? abandon3827? abandon3828? abandon3829? abandon3830? abandon3831? abandon3832? abandon3833? abandon3834? abandon3835? abandon3836? abandon3837? abandon3838? abandon3839? abandon3840? abandon3841? abandon3842? abandon3843? abandon3844? abandon3845? abandon3846? abandon3847? abandon3848? abandon3849? abandon3850? abandon3851? abandon3852? abandon3853? abandon3854? abandon3855? abandon3856? abandon3857? abandon3858? abandon3859 abandon3981? abandon3980? abandon3982? abandon3983? abandon3984? abandon3985? abandon3986? abandon3987? abandon3988? abandon3989? abandon3990? abandon3991? abandon3992? abandon3993? abandon3994? abandon3995? giveup193L1 skip194 195L0!g 196L2 197L1 199L0g 262L2! 263L0 K264L0 265L2 266L1 267L2 268L0 269L2 270L1 271L2 272L0 273L2 274L1 275L2 276L0 277L2 278L1 279L2 280L0 281L2 282L1 283L2 284L0 285L2 286L1 287L2 288L0 289L2 | 1291L2 1292L0 1293L2 1294L1 1295L2 1296L0 1297L2 1298L1 1299L2 1300L0 1301L2 1302L1 1303L2 1304L0 1305L2 1306L1 1307L2 1308L0 1309L2 1310L1 1311L2 1312L0 1313L2 1314L1 1315L2 1316L0 1317L2 1318L1 1319L2 1320L0 1321L2 1322L1 1323L2 1324L0 1325L2 1326L1 1327L2 1328L0 1329L2 1330L1 1331L2 1332L0 1333L2 1334L1 1335L2 1336L0 1337L2 recovery-off"
+      }
+    ],
+    "senderTier": {
+      "width": 1920,
+      "height": 1080,
+      "framerate": 30,
+      "bitrateKbps": 5600
+    },
+    "senderRate": {
+      "totalKbps": 11656,
+      "videoKbps": 11605,
+      "audioKbps": 40,
+      "videoSuspended": false,
+      "signal": "Normal",
+      "delayMs": 12
+    },
+    "senderPath": "UDP/relay",
+    "receiverPath": "WebSocket",
+    "targetHeight": 1080,
+    "timeToTargetMs": 2481,
+    "firstHeight": 720,
+    "firstKbps": 2600,
+    "largestStartKeyframe": 164695,
+    "rungChangesInWindow": 0,
+    "startRungs": [
+      {
+        "atMs": 0,
+        "height": 720,
+        "framerate": 30,
+        "kbps": 2600
+      },
+      {
+        "atMs": 2481,
+        "height": 1080,
+        "framerate": 30,
+        "kbps": 5600
+      },
+      {
+        "atMs": 7559,
+        "height": 720,
+        "framerate": 30,
+        "kbps": 1422
+      },
+      {
+        "atMs": 26135,
+        "height": 900,
+        "framerate": 30,
+        "kbps": 3600
+      },
+      {
+        "atMs": 28900,
+        "height": 1080,
+        "framerate": 30,
+        "kbps": 5600
+      }
+    ],
+    "senderStart": "7125k (uplink probe)",
+    "senderProbe": "up \u003E=7500k down \u003E=7500k rtt 27ms in 1194ms [600k: up 610k (lost 0/13, \u002B0ms) echo 612k (13/13, \u002B0ms); 1500k: up 1510k (lost 0/33, \u002B0ms) echo 1510k (33/33, \u002B0ms); 3500k: up 3525k (lost 0/78, \u002B0ms) echo 3519k (78/78, \u002B0ms); 7500k: up 7580k (lost 0/167, \u002B0ms) echo 7477k (167/167, \u002B0ms)]"
+  },
+  "relay": "5aef: sent=242 socket=0 rexmit=0 videoDrops=415 stale=0 purges=0 keyReq=0 layerDrops=30 lateForwarded=59 sidecarDropped= buffered= cwnd= | 6e24: sent=9237 socket=12050 rexmit=22 videoDrops=0 stale=2 purges=0 keyReq=0 layerDrops=0 lateForwarded=13 sidecarDropped=0 buffered=298 cwnd=139131 | route 0550: late=54 | route 7fcc: late=13",
+  "failures": [
+    "A-\u003EB: audio delivered 0.9562081401339516"
+  ]
+}

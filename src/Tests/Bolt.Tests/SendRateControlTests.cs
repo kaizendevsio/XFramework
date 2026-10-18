@@ -168,6 +168,47 @@ public sealed class SendRateControlTests
         Assert.That(new SendRateController(800).Update(new SendPathSample(0, 800, 80, 5, 0, false)).AudioKbps, Is.EqualTo(32));
     }
 
+    [TestCase(0, 428)]
+    [TestCase(45, 428)]
+    [TestCase(100, 380)]
+    public void LiveAudio_ReservesPacketFramingAndVoiceRate_BeforeAllocatingVideo(int sampledAudio, int expectedVideo)
+    {
+        var controller = new SendRateController(512);
+        var decision = controller.Update(new SendPathSample(0, 500, sampledAudio, 5, 0, false));
+        Assert.That(decision.VideoKbps, Is.EqualTo(expectedVideo),
+            "20 ms Opus reserves 32 kbps voice plus 52 kbps framing even in a quiet window; higher observed audio is retained");
+    }
+
+    [Test]
+    public void LongerAudioPackets_ReleaseTheirSavedFramingBudgetToVideo()
+    {
+        var controller = new SendRateController(512);
+        var decision = controller.Update(new SendPathSample(0, 500, 39, 5, 0, false, AudioPacketsPerSecond: 17));
+        Assert.That(decision.VideoKbps, Is.EqualTo(463), "60 ms packets reserve 32 + 17 kbps, instead of the 20 ms packet rate");
+    }
+
+    [TestCase(50, 45, 373)]
+    [TestCase(17, 39, 423)]
+    [TestCase(50, 100, 277)]
+    public void RedundantAudio_ReservesTheRepeatedFrame_AndSharesTransportFraming(int packets, int observedAudio, int video)
+    {
+        var decision = new SendRateController(512).Update(new SendPathSample(0, 500, observedAudio, 5, 0, false,
+            AudioPacketsPerSecond: packets, AudioRedundancy: true));
+        Assert.That(decision.VideoKbps, Is.EqualTo(video), "only the encrypted media frame is repeated; the datagram's outer headers are paid once");
+    }
+
+    [Test]
+    public async Task RateLoop_AllocatesUsingTheAudioDurationTheEncoderAccepted()
+    {
+        await using var pacer = new MediaSendPacer((_, _) => ValueTask.CompletedTask);
+        var loop = new SendRateLoop(pacer, new SendRateController(512), new VideoRateLadder());
+        loop.Audio.MaxFrameMs = 60;
+        loop.Audio.Applied(60);
+        Assert.That(loop.Tick(0).Decision.VideoKbps, Is.EqualTo(463));
+        loop.Audio.Applied(20);
+        Assert.That(loop.Tick(250).Decision.VideoKbps, Is.EqualTo(428), "a browser refusing long packets still pays 50 packets per second");
+    }
+
     [Test]
     public void ADrainingQueue_IsNotCutAgain()
     {

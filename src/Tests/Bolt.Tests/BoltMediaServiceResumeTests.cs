@@ -1,6 +1,8 @@
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Reflection;
 using Bolt.Client;
+using Bolt.Media;
 using Bolt.Media.Browser;
 using Bolt.Media.Congestion;
 using Bolt.Protocol;
@@ -19,6 +21,111 @@ namespace Bolt.Tests;
 /// </summary>
 public sealed class BoltMediaServiceResumeTests
 {
+    [TestCase("relay")]
+    [TestCase("receiver")]
+    [TestCase("transport")]
+    public async Task PendingProbe_StillCutsThePreviousWebSocketRateFromMediaFeedback(string source)
+    {
+        await using var f = await Fixture.CreateAsync();
+        await f.Media.StartHostedAudioAsync(f.Call);
+        await f.Media.StartVideoAsync(f.Call, VideoCodec.H264, 1080);
+        await PauseRateAsync(f.Media);
+        var loop = RateLoop(f.Media)!;
+        loop.Controller.Reset(8_496);
+        loop.Pacer.RateKbps = 8_496;
+        loop.Ladder.Restart(8_496 - 84);
+        await (Task)typeof(BoltMediaService).GetMethod("ApplyVideoAsync", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(f.Media, [new SendRateTick(default, loop.Ladder.Current, false, false, null, default)])!;
+        Assert.That(f.Js.AppliedVideoTiers[^1].Height, Is.EqualTo(1080));
+        Assert.That(f.Js.AppliedVideoTiers[^1].BitrateKbps, Is.EqualTo(5600));
+        var transport = PendingProbe(f.Media);
+        var stream = f.FirstTransport.Configs(MediaType.Video).Single();
+        using var running = new CancellationTokenSource();
+        var task = RunRateAsync(f.Media, loop, running.Token);
+        try
+        {
+            await EncodeAudioAsync(f.Media);
+            Assert.That(() => f.FirstTransport.MediaFrames(), Is.GreaterThan(0).After(1000, 10), "media continues while the probe waits");
+            var frame = new ArrayBufferWriter<byte>();
+            if (source == "relay")
+                BoltCodec.WriteMediaCongestion(frame, new MediaCongestionData
+                {
+                    StreamId = stream, QueueDelayMs = 1_200, AllowedKbps = 512,
+                    Flags = MediaCongestionFlags.Limited | MediaCongestionFlags.BaseLayerLost,
+                });
+            else if (source == "receiver")
+                BoltCodec.WriteMediaFeedback(frame, stream, 1, 0, 0, 0, QualityHint.Maintain, 1_200, 512);
+            else
+                loop.Signals.OnTransportFeedback(new(Environment.TickCount64, 1_200, 0, 0.2, 512));
+            if (frame.WrittenCount > 0) Assert.That(f.First.DispatchDatagram(frame.WrittenSpan), Is.EqualTo(1));
+            Assert.That(() => loop.Pacer.RateKbps, Is.LessThan(8_496).After(1200, 20),
+                "the old path's rate must respond to media congestion before the probe finishes");
+            Assert.That(() => f.Js.AppliedVideoTiers[^1].BitrateKbps, Is.LessThan(5600).After(1000, 20),
+                "the encoder follows the cut while the probe is still pending");
+            Assert.That(transport.Probing, Is.True);
+        }
+        finally
+        {
+            await running.CancelAsync();
+            await task;
+            typeof(MediaTransportClient).GetField("_probe", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(transport, null);
+        }
+    }
+
+    [Test]
+    public async Task PendingProbe_IgnoresPaddingLocalQueue_ButKeepsAudioAdaptationRunning()
+    {
+        await using var f = await Fixture.CreateAsync();
+        await f.Media.StartHostedAudioAsync(f.Call);
+        await PauseRateAsync(f.Media);
+        var previous = RateLoop(f.Media)!;
+        // A probe's padding can leave a large local buffer without queuing any media downstream.
+        await using var pacer = new MediaSendPacer((_, _) => ValueTask.CompletedTask, () => 2_000_000);
+        var loop = new SendRateLoop(pacer, new SendRateController(8_496), previous.Ladder);
+        var transport = PendingProbe(f.Media);
+        using var running = new CancellationTokenSource();
+        var task = RunRateAsync(f.Media, loop, running.Token);
+        try
+        {
+            loop.Signals.OnCongestionReport(new MediaCongestionData(), video: false, Environment.TickCount64);
+            Assert.That(() => loop.LastDecision.HasValue, Is.True.After(1000, 20), "a probe does not pause rate windows");
+            Assert.Multiple(() =>
+            {
+                Assert.That(loop.LastDecision!.Value.Signal, Is.EqualTo(RateSignal.Normal));
+                Assert.That(loop.LastDecision.Value.DelayMs, Is.Zero, "only the padding-contaminated local queue is ignored");
+                Assert.That(loop.Pacer.RateKbps, Is.GreaterThanOrEqualTo(8_496));
+            });
+            loop.Controller.Reset(200);
+            loop.Signals.OnCongestionReport(new MediaCongestionData(), video: false, Environment.TickCount64);
+            Assert.That(() => loop.LastDecision!.Value.AudioKbps, Is.EqualTo(24).After(1000, 20));
+            Assert.That(() => f.Js.Calls, Does.Contain("reconfigureBitrate").After(1000, 20), "audio adaptation applies while the probe is pending");
+            Assert.That(transport.Probing, Is.True);
+        }
+        finally
+        {
+            await running.CancelAsync();
+            await task;
+            typeof(MediaTransportClient).GetField("_probe", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(transport, null);
+        }
+    }
+
+    private static async Task PauseRateAsync(BoltMediaService media)
+    {
+        var cts = (CancellationTokenSource)typeof(BoltMediaService).GetField("_rateCts", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(media)!;
+        await cts.CancelAsync();
+        await (Task)typeof(BoltMediaService).GetField("_rateTask", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(media)!;
+    }
+
+    private static MediaTransportClient PendingProbe(BoltMediaService media)
+    {
+        var transport = (MediaTransportClient)typeof(BoltMediaService).GetField("_transport", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(media)!;
+        typeof(MediaTransportClient).GetField("_probe", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(transport, new LinkProbe());
+        return transport;
+    }
+
+    private static Task RunRateAsync(BoltMediaService media, SendRateLoop loop, CancellationToken ct) =>
+        (Task)typeof(BoltMediaService).GetMethod("RateLoopAsync", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(media, [loop, ct])!;
+
     [Test]
     public async Task LostSocket_DoesNotEndAHostedSFrameCall()
     {
@@ -66,6 +173,70 @@ public sealed class BoltMediaServiceResumeTests
         });
         Assert.That(await f.Media.SendHeartbeatAsync(f.Call, 2), Is.True);
         await second.DisposeAsync();
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task HevcRuntimeUpgrade_RefusedAt60_RetriesTheSameResolutionAt30_AndCapsFutureClimbs(bool alreadyAt30)
+    {
+        await using var f = await Fixture.CreateAsync();
+        await f.Media.StartHostedAudioAsync(f.Call);
+        await f.Media.StartVideoAsync(f.Call, VideoCodec.Hevc, 1440, preferredFramerate: 60);
+        typeof(BoltMediaService).GetMethod("StopAdaptationLoop", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(f.Media, null);
+        typeof(BoltMediaService).GetField("_videoLoop", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(f.Media, new CancellationTokenSource());
+        var adaptation = new VideoAdaptation(VideoAdaptation.IndexForHeight(1440), 60);
+        adaptation.SetCeiling(1440);
+        adaptation.Rates.Place(15_000, 0, false);
+        adaptation.Rates.Place(15_000, VideoRateLadder.FastUpHoldMs, false);
+        Assert.That(adaptation.Current!.Value.Framerate, Is.EqualTo(60));
+        typeof(BoltMediaService).GetField("_adaptation", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(f.Media, adaptation);
+        f.Js.RejectVideo60 = true;
+        f.Js.Video30Unchanged = alreadyAt30;
+        var notified = new List<VideoTier?>();
+        f.Media.OnVideoTierChanged += notified.Add;
+        var apply = typeof(BoltMediaService).GetMethod("ApplyVideoAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        await (Task)apply.Invoke(f.Media, [new SendRateTick(default, adaptation.Rates.Current, false, false, null, default)])!;
+        var changed = (VideoTier?)typeof(BoltMediaService).GetField("_appliedTier", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(f.Media);
+        Assert.Multiple(() =>
+        {
+            Assert.That(f.Js.AppliedVideoTiers.Select(x => x.Framerate), Is.EqualTo(new[] { 60, 30 }));
+            Assert.That(changed!.Value.Height, Is.EqualTo(1440));
+            Assert.That(changed.Value.Framerate, Is.EqualTo(30));
+            Assert.That(notified, Is.EqualTo(new[] { changed }), "report the actual accepted tier even when it was already configured");
+            Assert.That(adaptation.Rates.Allow60, Is.False, "subsequent rate windows retain the native encoder limit");
+            Assert.That(f.Media.IsCameraOn, Is.True);
+            Assert.That(f.Js.Calls, Does.Not.Contain("stopCapture"));
+        });
+    }
+
+    [Test]
+    public async Task Diagnostics_MergeRecoveryByStream_AndExposeTheLatestBudget()
+    {
+        await using var f = await Fixture.CreateAsync();
+        await f.Media.StartHostedAudioAsync(f.Call);
+        await f.Media.StartVideoAsync(f.Call, VideoCodec.H264, 720);
+        var incoming = Guid.NewGuid();
+        var untracked = Guid.NewGuid();
+        f.Js.VideoSnapshot = new VideoDiagnostics { Remotes = [new() { StreamId = incoming, RenderedFps = 27 }, new() { StreamId = untracked }] };
+        var buffer = new VideoRecoveryBuffer();
+        buffer.Configure(true, 500);
+        buffer.Push(1, VideoFrameFragments.Split(new byte[10], 1, 0, true)[0], 0, []);
+        var assemblers = (Dictionary<Guid, VideoRecoveryBuffer>)typeof(BoltMediaService)
+            .GetField("_videoAssemblers", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(f.Media)!;
+        assemblers.Add(incoming, buffer);
+        var loop = RateLoop(f.Media)!;
+        loop.Tick(Environment.TickCount64);
+        var snapshot = await f.Media.GetVideoDiagnosticsAsync(true);
+        Assert.Multiple(() =>
+        {
+            Assert.That(snapshot!.Remotes[0].RenderedFps, Is.EqualTo(27), "browser samples remain intact");
+            Assert.That(snapshot.Remotes[0].Recovery!.StreamId, Is.EqualTo(incoming));
+            Assert.That(snapshot.Remotes[0].Recovery!.Fragments, Is.EqualTo(1));
+            Assert.That(snapshot.Remotes[0].Recovery!.RecoveryMs, Is.EqualTo(1050));
+            Assert.That(snapshot.Remotes[1].Recovery, Is.Null, "never attribute another stream's loss");
+            Assert.That(snapshot.TotalBudgetKbps, Is.EqualTo(loop.LastDecision!.Value.TotalKbps));
+            Assert.That(snapshot.Congestion, Is.EqualTo(loop.LastDecision!.Value.Signal.ToString()));
+        });
     }
 
     [Test]
@@ -283,17 +454,30 @@ public sealed class BoltMediaServiceResumeTests
     public sealed class RecordingJs : IJSInProcessRuntime, IJSObjectReference
     {
         public ConcurrentQueue<string> Calls { get; } = new();
+        public VideoDiagnostics? VideoSnapshot { get; set; }
+        public bool RejectVideo60 { get; set; }
+        public bool Video30Unchanged { get; set; }
+        public List<VideoTier> AppliedVideoTiers { get; } = [];
         public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args) => InvokeAsync<TValue>(identifier, CancellationToken.None, args);
         public ValueTask<TValue> InvokeAsync<TValue>(string identifier, CancellationToken cancellationToken, object?[]? args)
             => ValueTask.FromResult(Invoke<TValue>(identifier, args));
         public TValue Invoke<TValue>(string identifier, params object?[]? args)
         {
             Calls.Enqueue(identifier);
+            if (identifier == "applyTier" && args is { Length: 4 })
+            {
+                var tier = new VideoTier((int)args[0]!, (int)args[1]!, (int)args[3]!, (int)args[2]!);
+                AppliedVideoTiers.Add(tier);
+                if (RejectVideo60 && tier.Framerate > 30) throw new JSException("Encoder creation error");
+                if (Video30Unchanged && tier.Framerate == 30) return (TValue)(object)false;
+            }
             object? value = typeof(TValue).IsAssignableFrom(typeof(RecordingJs)) ? this
                 : typeof(TValue) == typeof(bool) ? true
                 : typeof(TValue) == typeof(byte[]) ? new byte[16]
                 : typeof(TValue) == typeof(VoiceCapabilities) ? new VoiceCapabilities(true, null, true)
+                : typeof(TValue) == typeof(VideoDiagnostics) ? VideoSnapshot
                 : typeof(TValue) == typeof(VideoCaptureState) ? CameraState()
+                : typeof(TValue) == typeof(VideoSendStats) ? new VideoSendStats(30, 5000, 0, 0)
                 : default(TValue);
             return (TValue)value!;
         }

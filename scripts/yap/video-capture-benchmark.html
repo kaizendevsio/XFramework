@@ -1,0 +1,57 @@
+<!doctype html><meta charset="utf-8"><title>Bolt capture benchmark</title>
+<p>Local synthetic-camera capture benchmark. Does not measure iPhone temperature or network performance.</p>
+<pre id="result">Ready</pre>
+<script type="module">
+const current = '/src/Libraries/Bolt/Bolt.Media.Browser/wwwroot/bolt-media.js';
+const baseline = '/artifacts/bolt-media-capture-baseline.js';
+window.results = [];
+window.finished = false;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const percentile = (xs, p) => xs.sort((a,b) => a-b)[Math.min(xs.length-1, Math.floor(xs.length*p))] ?? null;
+window.runCapture = async (mode, height = 1080, seconds = 8) => {
+    const mod = await import(mode === 'baseline-webgl' ? baseline : current);
+    const p = mod.createVideoPipeline();
+    const width = Math.round(height * 16 / 9);
+    const source = document.createElement('canvas'); source.width=width; source.height=height;
+    const ctx=source.getContext('2d');
+    let tick=0;
+    const paint=()=>{ctx.fillStyle='#123';ctx.fillRect(0,0,width,height);ctx.fillStyle='#ac5';ctx.fillRect((tick++*15)%width,100,300,300);};
+    paint();
+    const original=navigator.mediaDevices.getUserMedia;
+    navigator.mediaDevices.getUserMedia=async()=>source.captureStream(30);
+    const preview=document.createElement('video'); preview.muted=true; preview.autoplay=true; preview.playsInline=true;
+    preview.style.width='240px';document.body.append(preview);p.attachPreview(preview);
+    Object.defineProperty(navigator,'vendor',{configurable:true,value:'Apple Computer, Inc.'});
+    p.useCaptureStrategy(mode === 'processor' ? 'processor' : 'rvfc');
+    p.setOrientationMetadata(true);
+    let encoded=0, errors=[], costs=[], started=performance.now();
+    const host={invokeMethodAsync:async(name,...args)=>{if(name==='OnVideoEncoded' && performance.now()-started>=2000)encoded++;if(name==='OnVideoCaptureStopped')errors.push(args);}};
+    const method=mode==='processor'?'_encodeProcessorFrame':'_encodeElementFrame';
+    const originalMethod=p[method].bind(p);
+    p[method]=(...args)=>{const t=performance.now();try{return originalMethod(...args);}finally{if(t-started>=2000)costs.push(performance.now()-t);}};
+    let timer;
+    try {
+        await p.initEncoder('h264',width,height,6000,30,10);
+        timer=setInterval(paint,1000/30);started=performance.now();await p.startCapture(host,{});
+        await sleep((seconds+2)*1000);
+        const measuredSeconds=(performance.now()-started-2000)/1000;
+        const value={mode,height,seconds,measuredSeconds,encoded,encodedFps:encoded/measuredSeconds,captureCostMs:{samples:costs.length,p50:percentile(costs,.5),p95:percentile(costs,.95),total:costs.reduce((a,b)=>a+b,0)},config:p.config,errors,strategy:p.strategy(),painter:p.glPainter?'webgl':null};
+        const gl=p.glPainter?.gl,info=gl?.getExtension('WEBGL_debug_renderer_info');
+        value.renderer=info?gl.getParameter(info.UNMASKED_RENDERER_WEBGL):null;
+        return value;
+    } finally {clearInterval(timer);await p.dispose();preview.remove();navigator.mediaDevices.getUserMedia=original;delete navigator.vendor;}
+};
+window.runAll = async () => {
+    try {
+        for(const height of [1080,1440]) for(let repeat=0;repeat<3;repeat++) {
+            const modes=repeat%2?['processor','current-webgl','baseline-webgl']:['baseline-webgl','current-webgl','processor'];
+            for(const mode of modes) {
+                const row=await window.runCapture(mode,height,6);row.repeat=repeat+1;window.results.push(row);
+                document.querySelector('#result').textContent=JSON.stringify(window.results,null,2);
+                await sleep(300);
+            }
+        }
+    } catch(error) {window.failure=String(error);}
+    finally {window.finished=true;}
+};
+</script>
