@@ -176,6 +176,71 @@ public sealed class BoltMediaEnablementSafetyTests
         connection.CompleteSendChannel();
     }
 
+    [TestCase(CodecId.H264)]
+    [TestCase(CodecId.VP9)]
+    [TestCase(CodecId.AV1)]
+    [TestCase(CodecId.H265)]
+    public async Task BoltMediaClient_AuthenticatedVideoConfig_RegistersAndReceivesEncryptedFrames(CodecId codec)
+    {
+        await using var client = CreateClientWithConnection(out var connection);
+        await using var media = new BoltMediaClient(client, NullLogger<BoltMediaClient>.Instance);
+        var callId = await media.StartCallAsync("peer", encrypted: false);
+        media.AuthenticatedStreamEncryptionFactory = (id, owner) =>
+        {
+            id.Should().Be(callId);
+            owner.Should().Be("peer");
+            return new StubEncryption(isReady: true);
+        };
+        var configuredCount = 0;
+        media.OnMediaStreamConfigured += _ => configuredCount++;
+        var streamId = Guid.NewGuid();
+        var writer = new ArrayBufferWriter<byte>();
+        BoltCodec.WriteMediaConfig(writer, streamId, callId, MediaType.Video, codec,
+            1080, 1920, 5000, 0x10, "SFR1:peer"u8);
+        var config = writer.WrittenMemory.ToArray();
+
+        InvokeMediaConfigHandler(media, connection, config);
+        InvokeMediaConfigHandler(media, connection, config);
+
+        var stream = media.GetMediaStream(streamId);
+        stream.Should().NotBeNull();
+        stream!.Codec.Should().Be(codec);
+        stream.SenderId.Should().Be("peer");
+        configuredCount.Should().Be(1);
+        await stream.EnqueueFrameAsync(1, 3000, new byte[] { 1, 2, 3 }, flags: 0);
+        GetInboundChannel(stream).Reader.TryRead(out _).Should().BeFalse("plaintext is still refused");
+        await stream.EnqueueFrameAsync(2, 6000, new byte[] { 4, 5, 6 }, flags: 0x10);
+        GetInboundChannel(stream).Reader.TryRead(out var frame).Should().BeTrue();
+        frame.Data.ToArray().Should().Equal(4, 5, 6);
+        await media.EndCallAsync(callId);
+        media.GetMediaStream(streamId).Should().BeNull();
+        connection.CompleteSendChannel();
+    }
+
+    [TestCase(CodecId.H265, MediaType.Video, 0, "SFR1:peer")]
+    [TestCase(CodecId.H265, MediaType.Video, 0x10, "wrong:peer")]
+    [TestCase(CodecId.H265, MediaType.Audio, 0x10, "SFR1:peer")]
+    [TestCase((CodecId)255, MediaType.Video, 0x10, "SFR1:peer")]
+    public async Task BoltMediaClient_InvalidAuthenticatedVideoConfig_IsRejected(
+        CodecId codec, MediaType type, byte flags, string owner)
+    {
+        await using var client = CreateClientWithConnection(out var connection);
+        await using var media = new BoltMediaClient(client, NullLogger<BoltMediaClient>.Instance);
+        var callId = await media.StartCallAsync("peer", encrypted: false);
+        var factoryCalls = 0;
+        media.AuthenticatedStreamEncryptionFactory = (_, _) => { factoryCalls++; return new StubEncryption(true); };
+        var streamId = Guid.NewGuid();
+        var writer = new ArrayBufferWriter<byte>();
+        BoltCodec.WriteMediaConfig(writer, streamId, callId, type, codec,
+            1080, 1920, 5000, flags, System.Text.Encoding.UTF8.GetBytes(owner));
+
+        InvokeMediaConfigHandler(media, connection, writer.WrittenMemory.ToArray());
+
+        media.GetMediaStream(streamId).Should().BeNull();
+        factoryCalls.Should().Be(0);
+        connection.CompleteSendChannel();
+    }
+
     [Test]
     public async Task NackTracker_GapDetection_IsWrapSafeAndBounded()
     {

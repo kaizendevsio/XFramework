@@ -2,10 +2,12 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.83";
+    public const string Version = "1.3.84";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "19 October 2026", [
+            "Fixed one-way video when another participant sends HEVC, including Android cameras viewed on iOS."]),
+        ("1.3.83", "19 October 2026", [
             "Compatible browsers capture camera frames directly in a worker, avoiding the extra canvas redraw.",
             "Other browsers retain the proven video capture fallback with less per-frame GPU synchronization."]),
         ("1.3.82", "8 October 2026", [

@@ -341,7 +341,7 @@ public sealed class BoltMediaClient : IAsyncDisposable
         {
             // Eight participants may each publish voice and camera, so sixteen routes is the ceiling.
             var codecAllowed = isAudio ? config.CodecId == CodecId.Opus
-                : config.MediaType == MediaType.Video && config.CodecId is CodecId.H264 or CodecId.VP9 or CodecId.AV1;
+                : config.MediaType == MediaType.Video && config.CodecId is CodecId.H264 or CodecId.VP9 or CodecId.AV1 or CodecId.H265;
             if (_mediaStreams.Count >= 16 || !codecAllowed || (config.Flags & 0x10) == 0 ||
                 config.ExtensionLength is < 6 or > 133) return;
             var owner = System.Text.Encoding.UTF8.GetString(buffer, config.ExtensionOffset, config.ExtensionLength);
