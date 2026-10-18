@@ -727,11 +727,13 @@ export class GlFramePainter {
     paint(video, width, height) {
         const { gl, canvas } = this;
         if (gl.isContextLost?.()) throw new Error('context lost');
-        if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+        const resized = canvas.width !== width || canvas.height !== height;
+        if (resized) { canvas.width = width; canvas.height = height; }
         gl.viewport(0, 0, width, height);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-        if (gl.getError() !== gl.NO_ERROR) throw new Error('webgl');
+        // getError synchronizes with the GPU process. Validate startup and resizing, not every frame.
+        if ((!this.checked || resized) && gl.getError() !== gl.NO_ERROR) throw new Error('webgl');
         if (!this.checked) {
             // Once per capture: an all-zero centre after a successful draw means nothing was uploaded.
             this.checked = true;
@@ -841,6 +843,8 @@ class VideoPipeline {
         this.captureVideo = null;
         this.captureCallbackId = 0;
         this.captureStrategy = null;
+        this.activeCaptureStrategy = null;
+        this.captureWorker = null;
         this.captureCanvas = null;
         this.captureContext = null;
         this.preview = null;
@@ -1011,16 +1015,74 @@ class VideoPipeline {
         track.addEventListener('ended', () => { if (generation === this.captureGeneration) this.stopCapture('ended'); });
         // Everything downstream of here - encode, fragmentation, SFrame, adaptation, transport - is
         // identical on both strategies; only the way a VideoFrame is obtained differs.
+        this.activeCaptureStrategy = null;
         if (this.strategy() === 'processor') {
             this.captureReader = new MediaStreamTrackProcessor({ track }).readable.getReader();
             void this._readLoop(generation);
+        } else if (!this.captureStrategy && this._startWorkerCapture(track, stream, generation)) {
+            // Worker-only processors (Safari) are probed in their own execution context.
         } else {
             this._startFrameCallbacks(stream, generation);
         }
         return this.describe();
     }
 
-    strategy() { return this.captureStrategy ?? videoCaptureStrategy(); }
+    strategy() { return this.activeCaptureStrategy ?? this.captureStrategy ?? videoCaptureStrategy(); }
+
+    _startWorkerCapture(track, stream, generation) {
+        if (typeof Worker === 'undefined' || typeof track.clone !== 'function') return false;
+        let worker;
+        try { worker = new Worker(new URL('./bolt-video-capture-worker.js', import.meta.url), { type: 'module' }); }
+        catch { return false; }
+        this.captureWorker = worker;
+        this.activeCaptureStrategy = 'worker-pending';
+        let clone, lastFrame = performance.now();
+        const current = () => this.captureRunning && generation === this.captureGeneration && this.captureWorker === worker;
+        const fallback = () => {
+            if (!current()) return;
+            this._stopWorkerCapture();
+            this.activeCaptureStrategy = 'rvfc';
+            this.lastCaptureTimestamp = this.nextCaptureTimestamp = null;
+            this.forceKeyframe = true;
+            this._startFrameCallbacks(stream, generation);
+        };
+        // Covers unsupported transfer, CSP/load failures and processors that stop delivering frames.
+        this.captureWorkerWatch = setInterval(() => {
+            if (current() && performance.now() - lastFrame > 2500) fallback();
+        }, 1000);
+        worker.onerror = event => { event.preventDefault?.(); fallback(); };
+        worker.onmessage = ({ data }) => {
+            if (!current()) { data.frame?.close(); return; }
+            if (data.type === 'ready') {
+                if (!data.supported) { fallback(); return; }
+                try {
+                    // Keep the original camera track for preview and applyConstraints.
+                    clone = track.clone();
+                    worker.postMessage({ type: 'start', track: clone, framerate: this.config.framerate }, [clone]);
+                } catch { try { clone?.stop(); } catch { } fallback(); }
+            } else if (data.type === 'frame') {
+                lastFrame = performance.now();
+                this.activeCaptureStrategy = 'worker-processor';
+                try { this._encodeProcessorFrame(data.frame); }
+                catch { fallback(); }
+                finally {
+                    if (current()) worker.postMessage({ type: 'credit', framerate: this.config.framerate });
+                }
+            } else if (data.type === 'failed') fallback();
+        };
+        return true;
+    }
+
+    _stopWorkerCapture() {
+        clearInterval(this.captureWorkerWatch);
+        this.captureWorkerWatch = null;
+        const worker = this.captureWorker;
+        this.captureWorker = null;
+        if (!worker) return;
+        // Give the worker a turn to stop its transferred camera clone before terminating it.
+        try { worker.postMessage({ type: 'stop' }); } catch { }
+        setTimeout(() => worker.terminate(), 250);
+    }
 
     /// Force a capture strategy. Only the tests and the cost measurement use this; a real page
     /// picks by feature detection, because a browser that has both should use the cheaper one.
@@ -1152,21 +1214,24 @@ class VideoPipeline {
                 const { value, done } = await this.captureReader.read();
                 if (done) break;
                 frame = value;
-                this.captureCount++;
             } catch { break; }
-            try {
-                if (!this.encoder || this.encoder.state !== 'configured') continue;
-                // Dropping the newest frame beats queueing it: a backlog is latency the call never recovers.
-                if (this.encoder.encodeQueueSize >= 2) { this.stats.dropped++; continue; }
-                if (!this._acceptCaptureTime(frame.timestamp)) continue;
-                const oriented = this._orient(frame);
-                frame = oriented.frame;
-                // The encoder is fitted to the pixels it is given: the sensor's shape when the orientation travels
-                // as metadata, the upright shape when it was redrawn.
-                this._noteSource(frame.displayWidth, frame.displayHeight);
-                this._encode(frame, this._takeKeyframe(Date.now()), oriented.code);
-            } finally { frame.close(); }
+            if (!this.captureRunning || generation !== this.captureGeneration) { frame.close(); break; }
+            this._encodeProcessorFrame(frame);
         }
+    }
+
+    _encodeProcessorFrame(frame) {
+        this.captureCount++;
+        try {
+            if (!this.encoder || this.encoder.state !== 'configured') return;
+            // Dropping the newest frame beats queueing latency.
+            if (this.encoder.encodeQueueSize >= 2) { this.stats.dropped++; return; }
+            if (!this._acceptCaptureTime(frame.timestamp)) return;
+            const oriented = this._orient(frame);
+            frame = oriented.frame;
+            this._noteSource(frame.displayWidth, frame.displayHeight);
+            this._encode(frame, this._takeKeyframe(Date.now()), oriented.code);
+        } finally { frame.close(); }
     }
 
     /// Keyframes are sent when the encoder needs one, when someone asked for one, and otherwise only
@@ -1302,8 +1367,10 @@ class VideoPipeline {
         // A bitrate change is the encoder's business alone; only a new size or rate asks the camera.
         const reshaped = !before || before.width !== width || before.height !== height || before.framerate !== framerate;
         if (changed && reshaped && track?.applyConstraints) {
-            try { await track.applyConstraints({ width: { ideal: width }, height: { ideal: height },
-                frameRate: { ideal: framerate, max: framerate } }); }
+            const constraints = { width: { ideal: width }, height: { ideal: height },
+                frameRate: { ideal: framerate, max: framerate } };
+            this.captureWorker?.postMessage({ type: 'constraints', constraints, framerate });
+            try { await track.applyConstraints(constraints); }
             catch { /* Keep the working track; encoder pacing still enforces the limit. */ }
         }
         return changed;
@@ -1592,6 +1659,8 @@ class VideoPipeline {
         const wasRunning = this.captureRunning;
         this.captureGeneration++;
         this.captureRunning = false;
+        this._stopWorkerCapture();
+        this.activeCaptureStrategy = null;
         if (this.captureReader) { try { this.captureReader.cancel(); } catch { } this.captureReader = null; }
         this._stopFrameCallbacks();
         // The next camera has its own shape; leaving these set would fit it to the old one's aspect.

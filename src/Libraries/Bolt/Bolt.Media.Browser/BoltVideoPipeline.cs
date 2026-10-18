@@ -8,7 +8,7 @@ public sealed record VideoCapabilities(bool Supported, string? Reason, int Ceili
 /// <param name="DecodeHardware">The same for the decoder.</param>
 public sealed record VideoCodecProbe(string Codec, bool Encode, bool Decode, bool Hardware, int MaxHeight, int DecodeMaxHeight = 1080, bool DecodeHardware = false);
 /// <summary>The camera actually acquired, which may differ from what was asked for.
-/// <paramref name="Strategy"/> is how frames are read: "processor" or the "rvfc" fallback.</summary>
+/// <paramref name="Strategy"/> is how frames are read: "processor", "worker-processor", or the "rvfc" fallback.</summary>
 public sealed record VideoCaptureState(bool Capturing, string DeviceId, string FacingMode, int Width, int Height,
     string Codec, string Strategy = "");
 public sealed record VideoSendStats(double Fps, double Kbps, int Dropped, int Backlog);

@@ -140,7 +140,7 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
     };
     let track = null;
     const sandbox = {
-        setTimeout, clearTimeout,
+        setTimeout, clearTimeout, setInterval, clearInterval,
         console, URL, Uint8Array, Float32Array, Math, Date, JSON, Promise, Set, Map, Number, performance: { now: clock }, isSecureContext: true,
         AudioEncoder: class { static async isConfigSupported() { return { supported: true }; } },
         AudioDecoder: class { static async isConfigSupported() { return { supported: true }; } },
@@ -1338,7 +1338,7 @@ function fakeGl({ pixels = 7, fail = false, lost = false } = {}) {
             viewport(x, y, w, h) { gl.calls.push(['viewport', w, h]); },
             texImage2D(...args) { gl.uploads.push(args); },
             drawArrays() { gl.draws++; },
-            getError: () => fail ? 1282 : 0,
+            getError: () => { gl.calls.push(['getError']); return fail ? 1282 : 0; },
             readPixels(x, y, w, h, format, type, target) { target.fill(pixels); },
             isContextLost: () => gl.lost,
             getExtension: name => name === 'WEBGL_lose_context' ? { loseContext() { gl.released = true; } } : null };
@@ -1356,6 +1356,7 @@ test('on the frame-callback path the camera is painted on the GPU, upright, at t
     assert.equal(f.stats.encoded.length, 4);
     assert.ok(f.stats.frames.every(x => x.source === gl.canvas && x.closed), 'frames come from the WebGL canvas and are closed');
     assert.equal(gl.uploads.length, 4, 'one texture upload a picture');
+    assert.equal(gl.calls.filter(x => x[0] === 'getError').length, 1, 'only startup synchronizes for error validation');
     assert.ok(gl.uploads.every(args => args.length === 6 && args[1] === 0 && args[2] === gl.RGBA && args[4] === gl.UNSIGNED_BYTE && args[5] === f.video),
         "only the level-0 RGBA/UNSIGNED_BYTE upload of the element itself takes WebKit's GPU-to-GPU path");
     assert.deepEqual(plain(gl.calls.find(x => x[0] === 'viewport')), ['viewport', 1280, 720]);
@@ -1517,5 +1518,87 @@ test('HEVC refuses a live 60 fps upgrade before changing the working encoder and
     assert.equal(f.p.config.framerate, 30);
     assert.equal(f.p.encoder, encoder, 'reconfigure the existing encoder after successful preflight');
     assert.equal(f.p.forceKeyframe, true);
+    f.p.stopCapture();
+});
+
+function workerFixture() {
+    const f = fixture({ capture: 'rvfc' });
+    const workers = [];
+    f.sandbox.Worker = class {
+        constructor() { this.messages = []; workers.push(this); }
+        postMessage(data, transfer) { this.messages.push({ data, transfer }); }
+        emit(data) { this.onmessage({ data }); }
+        terminate() { this.terminated = true; }
+    };
+    const open = f.sandbox.navigator.mediaDevices.getUserMedia;
+    f.sandbox.navigator.mediaDevices.getUserMedia = async constraints => {
+        const stream = await open(constraints);
+        f.track.clone = () => ({ stop() {}, clone: true });
+        f.track.applyConstraints = async () => {};
+        return stream;
+    };
+    return Object.assign(f, { workers });
+}
+
+test('worker-only processor transfers a clone, encodes without canvas and preserves orientation', async () => {
+    const f = workerFixture(); await init(f);
+    f.p.setOrientationMetadata(true);
+    await f.p.startCapture(f.host, {});
+    const w = f.workers[0]; w.emit({ type: 'ready', supported: true });
+    assert.equal(w.messages[0].transfer[0].clone, true);
+    const frame = new f.sandbox.VideoFrame({ camera: true, displayWidth: 720, displayHeight: 1280, rotation: 90, flip: false, timestamp: 0 });
+    w.emit({ type: 'frame', frame });
+    assert.equal(f.p.strategy(), 'worker-processor');
+    assert.equal(f.stats.encoded.length, 1);
+    assert.equal(f.p.orientationState.how, 'metadata');
+    assert.equal(f.canvases.length, 0);
+    assert.ok(frame.closed);
+    assert.equal(w.messages.at(-1).data.type, 'credit');
+    await f.p.applyTier(640, 360, 600, 20);
+    assert.equal(w.messages.at(-1).data.type, 'constraints');
+    assert.equal(w.messages.at(-1).data.framerate, 20);
+    f.p.stopCapture();
+    assert.equal(w.messages.at(-1).data.type, 'stop');
+    const late = new f.sandbox.VideoFrame({ width: 640, height: 360 }, { timestamp: 100000 });
+    w.emit({ type: 'frame', frame: late });
+    assert.ok(late.closed);
+    assert.equal(f.stats.encoded.length, 1);
+});
+
+test('unsupported or failed worker falls back to working element capture without reopening the camera', async () => {
+    for (const failure of ['unsupported', 'transfer', 'failed', 'error', 'timeout']) {
+        let time = 0, watchdog;
+        const f = workerFixture();
+        f.sandbox.performance.now = () => time;
+        f.sandbox.setInterval = callback => { watchdog = callback; return 1; };
+        f.sandbox.clearInterval = () => {};
+        await init(f); await f.p.startCapture(f.host, {});
+        const w = f.workers[0];
+        if (failure === 'transfer') {
+            w.postMessage = data => { if (data.type === 'start') throw new Error('DataCloneError'); };
+            w.emit({ type: 'ready', supported: true });
+        } else if (failure === 'unsupported') w.emit({ type: 'ready', supported: false });
+        else if (failure === 'error') w.onerror({ preventDefault() {} });
+        else if (failure === 'timeout') { time = 3000; watchdog(); }
+        else w.emit({ type: 'failed' });
+        assert.equal(f.p.strategy(), 'rvfc', failure);
+        f.video.emit(0);
+        assert.equal(f.stats.encoded.length, 1, failure);
+        assert.equal(f.stats.opened.length, 1);
+        f.p.stopCapture();
+    }
+});
+
+test('backgrounding a worker capture stops it and late frames cannot enter a restarted call', async () => {
+    const f = workerFixture(); await init(f); await f.p.startCapture(f.host, {});
+    const old = f.workers[0];
+    f.sandbox.document.hidden = true; f.listeners.get('visibilitychange')();
+    assert.equal(old.messages.at(-1).data.type, 'stop');
+    f.sandbox.document.hidden = false; await f.p.startCapture(f.host, {});
+    const late = new f.sandbox.VideoFrame({ width: 640, height: 360 }, { timestamp: 0 });
+    old.emit({ type: 'frame', frame: late });
+    assert.ok(late.closed);
+    assert.equal(f.stats.encoded.length, 0);
+    assert.notEqual(f.p.captureWorker, old);
     f.p.stopCapture();
 });

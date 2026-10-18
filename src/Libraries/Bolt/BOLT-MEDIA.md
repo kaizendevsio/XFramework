@@ -98,8 +98,16 @@ encrypted and authenticated with the picture; a relay can neither read nor chang
 transformed `drawImage` into a canvas of the displayed size. Turning the phone then changes only that byte: the sensor
 raster, the encoder and the reference pictures stay, so it costs no keyframe. With any older member, or a browser that
 cannot strip orientation, the sender redraws the frame upright first (as before), and a change in what the pixels have
-baked in forces a keyframe. Upright pictures always use header version 1. Safari's frame-callback path paints the camera
-element, which is upright already, and is unchanged.
+baked in forces a keyframe. Upright pictures always use header version 1.
+
+Browsers with a worker-only `MediaStreamTrackProcessor` are probed in a dedicated capture worker.
+The worker owns a cloned camera track and transfers at most one `VideoFrame` at a time to the existing
+encoder/orientation path, avoiding the element/canvas redraw. Extra frames are closed while credit is
+outstanding, and camera constraints follow adaptation on both tracks. Missing orientation metadata,
+unsupported track transfer, worker failure or a 2.5-second delivery stall restores element capture without
+reopening the camera. Camera off, backgrounding and switching release the worker's track; late frames
+cannot enter a later capture generation. Older Safari keeps its upright WebGL capture path (2D fallback).
+That path checks GPU errors only at startup or resize, with context-loss checks retained.
 
 ### Congestion control on the WebSocket path
 
