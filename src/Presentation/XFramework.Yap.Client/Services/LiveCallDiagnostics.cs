@@ -62,6 +62,15 @@ public sealed class LiveCallDiagnostics(ChatApi api, IJSRuntime js) : IAsyncDisp
         finally { if (ReferenceEquals(upload, timeout)) upload = null; busy = false; }
     }
 
+    public void OfferExperiment(Guid run, FrameExperimentSample sample)
+    {
+        if (!Enabled || busy || sample.Mode is not (1 or 2) || Environment.TickCount64 - lastSent < 2000) return;
+        lastSent = Environment.TickCount64;
+        _ = SendAsync(session!.Id, new(run, ++sequence, device, AppRelease.Version,
+            sample.Mode == 1 ? CallCapturePath.WorkerProcessor : CallCapturePath.WorkerWebgpu,
+            CallTransportPath.Unknown, CallTransportPath.Unknown, sample.Codec, sample.Metrics(), []));
+    }
+
     public static CallDiagnosticSample Project(VideoDiagnostics s, Guid call, int sequence, CallDevice device,
         bool visible, long elapsed, int height, int fps)
     {

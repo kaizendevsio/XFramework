@@ -1,0 +1,47 @@
+<!doctype html><meta charset="utf-8"><title>Direct frame experiment checks</title>
+<p>Synthetic camera source; real worker, WebGPU, encoder and decoder. This does not test Safari camera orientation or phone temperature.</p>
+<video id="camera" autoplay muted playsinline style="width:240px"></video><canvas id="decoded" style="width:240px"></canvas><pre id="result">Running</pre>
+<script type="module">
+// Only the camera/track transfer are substituted because desktop Chrome exposes its
+// track processor on the page, while Safari exposes it inside the worker.
+const base = '/src/Presentation/XFramework.Yap.Client/wwwroot/';
+const workerSource = (await (await fetch(base + 'frame-experiment-worker.js')).text())
+    .replace("'/_content/Bolt.Media.Browser/bolt-video-gpu.js'", JSON.stringify(location.origin + '/src/Libraries/Bolt/Bolt.Media.Browser/wwwroot/bolt-video-gpu.js'));
+const originalWorker = Worker;
+const bootstrap = `
+let clock;
+globalThis.MediaStreamTrackProcessor = class {
+ constructor() { this.readable = new ReadableStream({start(c) {
+   const canvas = new OffscreenCanvas(640,360), ctx=canvas.getContext('2d');let n=0;
+   clock=setInterval(()=>{ctx.fillStyle='green';ctx.fillRect(0,0,640,360);ctx.fillStyle='white';ctx.fillText('TOP '+n,20,30);
+    c.enqueue(new VideoFrame(canvas,{timestamp:++n*33333}));},33);
+ },cancel(){clearInterval(clock);}}); }
+};
+${workerSource}
+const realMessage=self.onmessage;
+self.onmessage=({data})=>{if(data.type==='start') data.track={stop(){clearInterval(clock);},getSettings(){return {width:640,height:360,frameRate:30};}};realMessage({data});};
+`;
+const workerUrl=URL.createObjectURL(new Blob([bootstrap],{type:'text/javascript'}));
+globalThis.Worker=class extends originalWorker {
+ constructor(){super(workerUrl,{type:'module'});}
+ postMessage(data,transfer){ if(data.type==='start'){data.track.stop();super.postMessage({...data,track:null});}else super.postMessage(data,transfer); }
+};
+const fixture=document.createElement('canvas');fixture.width=640;fixture.height=360;
+const paintClock=setInterval(()=>{const c=fixture.getContext('2d');c.fillStyle='green';c.fillRect(0,0,640,360);},33);
+Object.defineProperty(navigator.mediaDevices,'getUserMedia',{value:async()=>fixture.captureStream(30)});
+const {create}=await import(base+'frame-experiment.js');
+window.results=[];let samples=[],finished;
+const api=await create(document.querySelector('#camera'),document.querySelector('#decoded'),{async invokeMethodAsync(name,value){if(name==='Sample')samples.push(value);else if(name==='Finished')finished=value;}});
+try {
+ for(const mode of ['direct','webgpu']) {
+  samples=[];finished=null;
+  await api.start({mode,height:1080,fps:30,rear:false});
+  const began=performance.now();
+  while(samples.length<3 && !finished && performance.now()-began<10000) await new Promise(r=>setTimeout(r,100));
+  await api.stop();
+  const valid=samples.filter(s=>s.renderedFps>10);
+  results.push({mode,finished,samples,ok:valid.length>=2 && valid.every(s=>s.decodedWidth===640 && s.decodedHeight===360 && (mode!=='direct'||s.snapshotMs===0))});
+  if(!results.at(-1).ok)throw Error(mode+' did not render');
+ }
+}catch(e){results.push({error:String(e)});}finally{clearInterval(paintClock);await api.dispose();URL.revokeObjectURL(workerUrl);window.finished=true;document.querySelector('#result').textContent=JSON.stringify(results,null,2);}
+</script>

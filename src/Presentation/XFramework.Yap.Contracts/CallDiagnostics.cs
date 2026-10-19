@@ -12,7 +12,9 @@ public enum CallMetric
     CryptoOperations, CryptoProcessingMs, CryptoWaitingMs, ReceivedFps, RenderedFps, ReceivedKbps,
     DecoderQueue, PendingFrames, RenderMs, DecoderDelayMs, Resets, Fragments, LocalDrops,
     Nacked, Recovered, Abandoned, Declined, Incomplete, Skipped, Pictures, RecoveryMs,
-    CapturePaintMs, CaptureFrameMs
+    CapturePaintMs, CaptureFrameMs,
+    FrameExperiment, RawWidth, RawHeight, DisplayWidth, DisplayHeight, FrameRotation, FrameFlip,
+    DecodedWidth, DecodedHeight, PrepareP95Ms, ScreenAngle, RearCamera
 }
 public enum CallDevice { Other, Android, Ios, Desktop }
 public enum CallCapturePath { Unknown, Processor, WorkerProcessor, WorkerWebgl, Rvfc, RvfcWebgl, WorkerWebgpu }

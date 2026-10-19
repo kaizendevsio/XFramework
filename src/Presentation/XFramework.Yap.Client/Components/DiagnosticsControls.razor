@@ -8,6 +8,7 @@
         <button class="btn ghost" @onclick="ToggleLiveAsync">@(Live.Enabled ? "Stop sharing call diagnostics" : "Share call diagnostics for 15 minutes")</button>
         <p role="status">@Live.Status @(Live.Enabled ? $"· Test {Live.TestId}" : "")</p>
     </div>
+    <p><a href="/diagnostics/frames">Camera frame experiment</a> ? Compare direct capture with WebGPU locally.</p>
     <label class="setting-toggle"><span>Enable diagnostic logging</span><input type="checkbox" role="switch" checked="@enabled" @onchange="ToggleAsync" /><span class="switch-track" aria-hidden="true"></span></label>
     <p>Logs stay on this device and survive a reload. They include app errors, connection status, image sizes and memory use, without messages, passwords or photo contents.</p>
     <div class="row"><button class="btn ghost" @onclick="CopyAsync">Copy logs</button><button class="btn ghost" @onclick="ClearAsync">Clear logs</button></div>
