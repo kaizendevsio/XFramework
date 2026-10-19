@@ -2,10 +2,13 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.86";
+    public const string Version = "1.3.87";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "19 October 2026", [
+            "Video can recover on a UDP call after poor connectivity suspends the camera, even when your microphone is muted.",
+            "Improved call connection setup and quality recovery when switching to UDP."]),
+        ("1.3.86", "19 October 2026", [
             "Opt in to a temporary live call diagnostic session so support can inspect performance while you test, without recording media."]),
         ("1.3.85", "19 October 2026", [
             "Safari can normalize camera orientation in a worker, keeping capture work off the page when supported.",

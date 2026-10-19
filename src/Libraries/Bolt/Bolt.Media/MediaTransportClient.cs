@@ -167,6 +167,9 @@ public sealed class MediaTransportClient : IAsyncDisposable
     /// </summary>
     public event Action? PathLost;
 
+    /// <summary>Media moved from the socket to a usable data channel; old socket congestion no longer applies.</summary>
+    public event Action? PathAvailable;
+
     /// <summary>
     /// Supplies the loss (thousandths) of audio that reached this participant since the last call; the relay
     /// uses it to decide whether to send this participant's audio with redundancy.
@@ -307,6 +310,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
         if (!stamp)
         {
             if (!peer.TrySend(message)) return false;
+            _lastMessageAt = _clock();
             _drain.Sent(message.Length);
             return true;
         }
@@ -322,6 +326,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
             // the uplink read a standing 400 ms queue that was not there for the next 10-20 s.
             var sentAt = NowMicroseconds();
             if (!peer.TrySend(buffer.AsSpan(0, size))) return false;
+            _lastMessageAt = _clock();
             _feedback.OnSent(sequence, size, sentAt);
             _drain.Sent(size);
             if (resendable && _options.ResendLostVideoMs > 0)
@@ -349,6 +354,23 @@ public sealed class MediaTransportClient : IAsyncDisposable
     /// <summary>A start probe is running: its padding sits in the channel's buffer and the relay's feedback, so the rate loop holds still.</summary>
     public bool Probing => Volatile.Read(ref _probe) is not null;
     private const int ProbeMessageBytes = 1_100;
+
+    /// <summary>Keep measured uplink feedback alive while video is suspended and audio may be muted.</summary>
+    public bool IdleFeedbackEnabled { get; set; }
+    private long _lastMessageAt = long.MinValue / 2;
+    private long _lastIdleFeedbackAt = long.MinValue / 2;
+
+    private void SendIdleFeedback(long now)
+    {
+        // Padding contains no microphone data. Never queue it behind media or compete with a start probe.
+        if (!IdleFeedbackEnabled || Probing || !StampsMessages || now - _lastMessageAt < 500 ||
+            now - _lastIdleFeedbackAt < 500 || ActivePeer is not { BufferedAmount: 0 } peer) return;
+        _lastIdleFeedbackAt = now;
+        Span<byte> padding = stackalloc byte[64];
+        padding.Clear();
+        PaddingCodec.Write(padding, 0, 0, 0);
+        SendMessage(peer, padding, stamp: true);
+    }
 
     /// <summary>
     /// Measure the link before media needs it (WebRTC-style initial probing, see <see cref="LinkProbe"/>): short bursts of
@@ -574,6 +596,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
                 if (request)
                     await SendAsync(MediaTransportKind.Request, new MediaTransportRequest(1, RtcDefaults.MaxMessageBytes));
                 await EvaluatePathAsync(now);
+                SendIdleFeedback(now);
                 if (now >= nextReport)
                 {
                     nextReport = now + (long)_options.ReportInterval.TotalMilliseconds;
@@ -622,6 +645,8 @@ public sealed class MediaTransportClient : IAsyncDisposable
             {
                 lock (_sync) _reason = null;
                 _logger.LogInformation("Call media is back on the datagram path ({Switches} switches so far)", path.Switches);
+                try { PathAvailable?.Invoke(); }
+                catch (Exception ex) { _logger.LogDebug(ex, "A media path listener failed"); }
             }
             else
             {
@@ -790,8 +815,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
     /// <summary>The offer is out: candidates gathered while it was made follow it, in order.</summary>
     private async Task SendHeldCandidatesAsync(Session session)
     {
-        foreach (var candidate in session.Candidates.Release())
-            await SendCandidateAsync(session, candidate);
+        await session.Candidates.ReleaseAsync(candidate => SendCandidateAsync(session, candidate));
     }
 
     private async Task OnPeerStateAsync(Session session, RtcChannelState state)
