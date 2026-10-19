@@ -56,3 +56,20 @@ UDP recovery and perceived warming. Stable 1080p60 and lower phone temperatures 
 The external-texture mechanism is described in the [WebGPU explainer](https://gpuweb.github.io/gpuweb/explainer/#gpuexternaltexture).
 WebKit also documents historical [OffscreenCanvas frame-construction costs](https://bugs.webkit.org/show_bug.cgi?id=300579);
 that report alone does not establish which implementation a particular iPhone runs.
+
+## 1.3.89: explicit Safari capture policy
+
+The 1.3.88 compatibility behavior described above is superseded: hidden-orientation worker
+frames now require WebGPU. The WebGL capture painter and its texture upload have been removed.
+Safari never switches to page-based or 2D capture. Adapter, validation, device-loss, worker and
+transfer failures stop video with a visible notice; audio continues. Startup waits for the first
+successfully submitted worker frame before announcing camera-on. Android's direct-frame path remains.
+Older iOS browsers without WebGPU can still use voice calls but cannot send video through this path.
+WebGPU does not eliminate the canvas-to-VideoFrame snapshot or guarantee hardware codec selection.
+The harness now uses `?nogpu` for the explicit-failure check instead of the removed `?webgl` fallback.
+
+Validation for 1.3.89: 173 browser unit tests and 319 Yap client tests passed. Desktop Chromium
+passed all eight orientation/flip cases and ten H.264 encode/decode round trips; synthetic
+1080x1920 preparation sustained 30.12/60.18 fps with mean preparation 0.45/0.44 ms.
+Disabling WebGPU in the real worker returned `webgpu-unavailable`, without a compatibility frame.
+These measurements are not a Safari or device thermal benchmark.

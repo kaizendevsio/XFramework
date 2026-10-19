@@ -1,18 +1,16 @@
-import { GlFramePainter } from './bolt-media.js';
 import { GpuFramePainter } from './bolt-video-gpu.js';
 
 // Capture only: the existing encoder, authenticated orientation and transport stay unchanged.
 // Transfer VideoFrames, never pixel arrays. One outstanding frame bounds ownership and latency
 // even when the page is busy; keep draining and closing newer frames until it returns credit.
 let reader, track, stopped = false, credit = true, lastTimestamp = null, nextTimestamp = null, framerate = 30;
-let painter, gpuPainter, gpuProbed = false, diagnostics = false, width = 0, height = 0;
+let gpuPainter, gpuProbed = false, diagnostics = false, width = 0, height = 0;
 
 async function stop() {
     if (stopped) return;
     stopped = true;
     track?.stop();
     try { await reader?.cancel(); } catch { }
-    painter?.release();
     gpuPainter?.release();
     self.close();
 }
@@ -43,54 +41,32 @@ async function capture(value) {
                 let paintMs = null, frameMs = null;
                 let output = frame, path = 'worker-processor';
                 if (typeof frame.rotation !== 'number' || typeof frame.flip !== 'boolean') {
-                    // WebKit's texture upload applies the internal camera orientation even when
-                    // VideoFrame does not expose rotation/flip to JS. Normalize on the worker's
-                    // GPU canvas, not through an element callback on the page. No pixel readback
-                    // or guessed portrait angle; known orientation retains the direct frame path.
+                    // Normalize hidden orientation through an external GPU texture. Never silently
+                    // switch to a texture-upload path if WebGPU is unavailable or fails.
+                    if (!gpuPainter) throw new Error('webgpu-unavailable');
+                    const init = { timestamp, duration: frame.duration ?? Math.round(1e6 / framerate) };
+                    const settings = track.getSettings?.() ?? {};
+                    const w = settings.width || width || frame.displayWidth;
+                    const h = settings.height || height || frame.displayHeight;
+                    const probe = !gpuPainter.checked;
+                    let scopeOpen = probe;
                     try {
-                        const init = { timestamp, duration: frame.duration ?? Math.round(1e6 / framerate) };
-                        // Track dimensions describe the displayed camera, even on WebKit versions
-                        // whose VideoFrame dimensions still describe the hidden sensor orientation.
-                        const settings = track.getSettings?.() ?? {};
-                        const w = settings.width || width || frame.displayWidth;
-                        const h = settings.height || height || frame.displayHeight;
-                        if (gpuPainter) {
-                            const probe = !gpuPainter.checked;
-                            let scopeOpen = probe;
-                            if (probe) gpuPainter.device.pushErrorScope('validation');
-                            try {
-                                const canvas = gpuPainter.paint(frame, w, h);
-                                const paintedAt = diagnostics ? performance.now() : null;
-                                normalized = new VideoFrame(canvas, init);
-                                if (diagnostics) { paintMs = paintedAt - started; frameMs = performance.now() - paintedAt; }
-                                if (probe) {
-                                    scopeOpen = false;
-                                    if (await gpuPainter.device.popErrorScope()) throw Error('webgpu-validation');
-                                }
-                                gpuPainter.checked = true;
-                                path = 'worker-webgpu';
-                            } catch {
-                                normalized?.close(); normalized = null;
-                                // A failed canvas snapshot or device must not send black frames or
-                                // repeat expensive capability probes on every subsequent picture.
-                                if (scopeOpen) {
-                                    try { await gpuPainter.device.popErrorScope(); } catch { }
-                                }
-                                gpuPainter.release(); gpuPainter = null;
-                            }
+                        if (probe) gpuPainter.device.pushErrorScope('validation');
+                        const canvas = gpuPainter.paint(frame, w, h);
+                        const paintedAt = diagnostics ? performance.now() : null;
+                        normalized = new VideoFrame(canvas, init);
+                        if (diagnostics) { paintMs = paintedAt - started; frameMs = performance.now() - paintedAt; }
+                        if (probe) {
+                            scopeOpen = false;
+                            if (await gpuPainter.device.popErrorScope()) throw Error('webgpu-validation');
                         }
-                        if (!normalized) {
-                            painter ??= GlFramePainter.create({ createElement: () => new OffscreenCanvas(1, 1) });
-                            if (!painter) throw new Error();
-                            const paintStarted = diagnostics ? performance.now() : null;
-                            const canvas = painter.paint(frame, w, h);
-                            const paintedAt = diagnostics ? performance.now() : null;
-                            normalized = new VideoFrame(canvas, init);
-                            if (diagnostics) { paintMs = paintedAt - paintStarted; frameMs = performance.now() - paintedAt; }
-                            path = 'worker-webgl';
-                        }
+                        gpuPainter.checked = true;
+                        path = 'worker-webgpu';
                         output = normalized;
-                    } catch { throw new Error('orientation-normalization-unavailable'); }
+                    } catch {
+                        if (scopeOpen) { try { await gpuPainter.device.popErrorScope(); } catch { } }
+                        throw new Error('webgpu-failed');
+                    }
                 }
                 if (stopped) break;
                 credit = false;
@@ -100,7 +76,7 @@ async function capture(value) {
         }
         if (!stopped) self.postMessage({ type: 'failed', reason: 'track-ended' });
     } catch (error) {
-        if (!stopped) self.postMessage({ type: 'failed', reason: error.message === 'orientation-normalization-unavailable'
+        if (!stopped) self.postMessage({ type: 'failed', reason: ['webgpu-unavailable', 'webgpu-failed'].includes(error.message)
             ? error.message : 'worker-capture-failed' });
     } finally { await stop(); }
 }
