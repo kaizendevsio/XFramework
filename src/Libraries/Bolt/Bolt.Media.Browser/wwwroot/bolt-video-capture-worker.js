@@ -1,10 +1,11 @@
 import { GlFramePainter } from './bolt-media.js';
+import { GpuFramePainter } from './bolt-video-gpu.js';
 
 // Capture only: the existing encoder, authenticated orientation and transport stay unchanged.
 // Transfer VideoFrames, never pixel arrays. One outstanding frame bounds ownership and latency
 // even when the page is busy; keep draining and closing newer frames until it returns credit.
 let reader, track, stopped = false, credit = true, lastTimestamp = null, nextTimestamp = null, framerate = 30;
-let painter, diagnostics = false;
+let painter, gpuPainter, gpuProbed = false, diagnostics = false, width = 0, height = 0;
 
 async function stop() {
     if (stopped) return;
@@ -12,6 +13,7 @@ async function stop() {
     track?.stop();
     try { await reader?.cancel(); } catch { }
     painter?.release();
+    gpuPainter?.release();
     self.close();
 }
 
@@ -32,7 +34,13 @@ async function capture(value) {
                 nextTimestamp = nextTimestamp === null || timestamp > nextTimestamp + interval
                     ? timestamp + interval : nextTimestamp + interval;
                 lastTimestamp = timestamp;
+                if ((typeof frame.rotation !== 'number' || typeof frame.flip !== 'boolean') && !gpuProbed) {
+                    gpuProbed = true;
+                    gpuPainter = await GpuFramePainter.create();
+                    if (stopped) { gpuPainter?.release(); break; }
+                }
                 const started = diagnostics ? performance.now() : null;
+                let paintMs = null, frameMs = null;
                 let output = frame, path = 'worker-processor';
                 if (typeof frame.rotation !== 'number' || typeof frame.flip !== 'boolean') {
                     // WebKit's texture upload applies the internal camera orientation even when
@@ -40,16 +48,54 @@ async function capture(value) {
                     // GPU canvas, not through an element callback on the page. No pixel readback
                     // or guessed portrait angle; known orientation retains the direct frame path.
                     try {
-                        painter ??= GlFramePainter.create({ createElement: () => new OffscreenCanvas(1, 1) });
-                        if (!painter) throw new Error();
-                        const canvas = painter.paint(frame, frame.displayWidth, frame.displayHeight);
-                        output = normalized = new VideoFrame(canvas, { timestamp, duration: frame.duration ?? Math.round(1e6 / framerate) });
-                        path = 'worker-webgl';
+                        const init = { timestamp, duration: frame.duration ?? Math.round(1e6 / framerate) };
+                        // Track dimensions describe the displayed camera, even on WebKit versions
+                        // whose VideoFrame dimensions still describe the hidden sensor orientation.
+                        const settings = track.getSettings?.() ?? {};
+                        const w = settings.width || width || frame.displayWidth;
+                        const h = settings.height || height || frame.displayHeight;
+                        if (gpuPainter) {
+                            const probe = !gpuPainter.checked;
+                            let scopeOpen = probe;
+                            if (probe) gpuPainter.device.pushErrorScope('validation');
+                            try {
+                                const canvas = gpuPainter.paint(frame, w, h);
+                                const paintedAt = diagnostics ? performance.now() : null;
+                                normalized = new VideoFrame(canvas, init);
+                                if (diagnostics) { paintMs = paintedAt - started; frameMs = performance.now() - paintedAt; }
+                                if (probe) {
+                                    scopeOpen = false;
+                                    if (await gpuPainter.device.popErrorScope()) throw Error('webgpu-validation');
+                                }
+                                gpuPainter.checked = true;
+                                path = 'worker-webgpu';
+                            } catch {
+                                normalized?.close(); normalized = null;
+                                // A failed canvas snapshot or device must not send black frames or
+                                // repeat expensive capability probes on every subsequent picture.
+                                if (scopeOpen) {
+                                    try { await gpuPainter.device.popErrorScope(); } catch { }
+                                }
+                                gpuPainter.release(); gpuPainter = null;
+                            }
+                        }
+                        if (!normalized) {
+                            painter ??= GlFramePainter.create({ createElement: () => new OffscreenCanvas(1, 1) });
+                            if (!painter) throw new Error();
+                            const paintStarted = diagnostics ? performance.now() : null;
+                            const canvas = painter.paint(frame, w, h);
+                            const paintedAt = diagnostics ? performance.now() : null;
+                            normalized = new VideoFrame(canvas, init);
+                            if (diagnostics) { paintMs = paintedAt - paintStarted; frameMs = performance.now() - paintedAt; }
+                            path = 'worker-webgl';
+                        }
+                        output = normalized;
                     } catch { throw new Error('orientation-normalization-unavailable'); }
                 }
+                if (stopped) break;
                 credit = false;
                 self.postMessage({ type: 'frame', frame: output, path,
-                    prepareMs: started === null ? null : performance.now() - started }, [output]);
+                    prepareMs: started === null ? null : performance.now() - started, paintMs, frameMs }, [output]);
             } finally { normalized?.close(); frame.close(); }
         }
         if (!stopped) self.postMessage({ type: 'failed', reason: 'track-ended' });
@@ -64,6 +110,7 @@ self.onmessage = ({ data }) => {
     if (data.type === 'diagnostics') { diagnostics = data.enabled === true; return; }
     if (data.type === 'credit') {
         framerate = Math.max(1, Math.min(60, data.framerate || 30));
+        width = data.width || width; height = data.height || height;
         credit = true;
     }
     if (data.type === 'constraints') {
@@ -74,6 +121,7 @@ self.onmessage = ({ data }) => {
     }
     if (data.type === 'start' && !track && !stopped) {
         framerate = Math.max(1, Math.min(60, data.framerate || 30));
+        width = data.width || 0; height = data.height || 0;
         void capture(data.track);
     }
 };

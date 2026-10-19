@@ -66,7 +66,8 @@ public readonly record struct MediaSendPacerSample(
 /// always sent first, and the transport below is only fed while its backlog is short, so a burst of video
 /// fragments can never put hundreds of milliseconds between a voice packet and the wire.
 ///
-/// Video is queued and dropped as whole pictures: a picture that has started goes out completely. When the queue
+/// Video is queued and dropped as whole pictures. An unfinished picture expires at the latency deadline; its
+/// remaining fragments and dependent pictures are discarded and a new keyframe requested. When the queue
 /// is over budget it sheds enhancement-layer pictures first (nothing at the base layer refers to them), and
 /// only then drops base pictures, after which it takes nothing but a keyframe and asks the encoder for one.
 /// After shedding a layer-L picture no picture of layer L or above is taken until the next base picture.
@@ -283,8 +284,8 @@ public sealed class MediaSendPacer : IAsyncDisposable
     private double Pressure(long now, int incoming)
     {
         var bytes = (double)(_videoBytes + incoming) / Math.Max(1, _options.VideoMaxQueuedBytes);
-        var oldest = _video.First is { } first ? first.Value.At
-            : _current is not null && _currentIndex < _current.Frames.Count ? _currentAt : now;
+        var oldest = _current is not null && _currentIndex < _current.Frames.Count ? _currentAt : now;
+        if (_video.First is { } first) oldest = Math.Min(oldest, first.Value.At);
         var age = (double)(now - oldest) / Math.Max(1, _options.VideoMaxDelayMs);
         return Math.Max(bytes, age);
     }
@@ -372,12 +373,65 @@ public sealed class MediaSendPacer : IAsyncDisposable
         }
     }
 
+    // Enforcing age only on admission left an unfinished keyframe on the wire for seconds after
+    // a rate cut (or when capture stopped). Expire it even while transport backpressure blocks sends.
+    internal void ExpireVideo()
+    {
+        bool request;
+        lock (_sync)
+        {
+            var now = _clock();
+            DropExpiredRepairs(now);
+            var expired = (_current is not null && _currentIndex < _current.Frames.Count && now - _currentAt > _options.VideoMaxDelayMs)
+                || (_video.First is { } first && now - first.Value.At > _options.VideoMaxDelayMs);
+            if (!expired) return;
+            DropVideoLocked();
+            if (!_awaitingKeyframe) _baseLosses++;
+            _awaitingKeyframe = true;
+            request = RequestKeyframe(now);
+        }
+        if (request) KeyframeNeeded?.Invoke();
+    }
+
+    private void DropVideoLocked()
+    {
+        _droppedPictures += _video.Count + (_current is not null && _currentIndex < _current.Frames.Count ? 1 : 0);
+        _current = null;
+        _currentIndex = 0;
+        _video.Clear();
+        _videoBytes = 0;
+        _repairs.Clear();
+        _repairBytes = 0;
+        _layerLimit = MaxLayer;
+    }
+
+    /// <summary>Discard old-path media and observations. Start the new path with a fresh keyframe.</summary>
+    public void ResetForPathChange()
+    {
+        bool request;
+        lock (_sync)
+        {
+            DropVideoLocked();
+            _audio.Clear();
+            _awaitingKeyframe = true;
+            _videoTokens = double.NaN;
+            _tokensAt = _sampleAt = _clock();
+            _sentBytes = _sentAudioBytes = _blockedMs = 0;
+            _totalSent = _deliveredAtSample = 0;
+            _capacityKbps = _baseLosses = _droppedPictures = _droppedAudio = 0;
+            request = RequestKeyframe(_clock());
+        }
+        if (request) KeyframeNeeded?.Invoke();
+        Signal();
+    }
+
     /// <summary>Next frame to send: audio first, then the rest of the picture on the wire, then the next picture.</summary>
     internal bool TryTake(out byte[] frame, out bool audio)
         => TryTake(out frame, out audio, out _);
 
     private bool TryTake(out byte[] frame, out bool audio, out Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask>? repairSend)
     {
+        ExpireVideo();
         lock (_sync)
         {
             repairSend = null;
@@ -434,6 +488,7 @@ public sealed class MediaSendPacer : IAsyncDisposable
         {
             while (!ct.IsCancellationRequested)
             {
+                ExpireVideo();
                 if (!HasWork)
                 {
                     Volatile.Write(ref _signalled, 0);
@@ -489,7 +544,9 @@ public sealed class MediaSendPacer : IAsyncDisposable
             else if (_video.First is { } picture && picture.Value.Picture.Frames.Count > 0) next = picture.Value.Picture.Frames[0].Length;
             else return false;
             var bytesPerMs = RateKbps * _options.PacingFactor / 8.0;
-            var burst = Math.Max(8 * 1024, bytesPerMs * _options.PacingBurstMs);
+            // A WebSocket fragment can exceed the usual burst at a low rate. A bucket smaller
+            // than its next fragment can never fill enough, permanently stalling that picture.
+            var burst = Math.Max(next, Math.Max(8 * 1024, bytesPerMs * _options.PacingBurstMs));
             _videoTokens = double.IsNaN(_videoTokens) ? burst : Math.Min(burst, _videoTokens + bytesPerMs * Math.Max(0, now - _tokensAt));
             _tokensAt = now;
             return _videoTokens < next;

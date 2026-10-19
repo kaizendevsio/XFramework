@@ -74,6 +74,7 @@ public sealed class LiveCallDiagnostics(ChatApi api, IJSRuntime js) : IAsyncDisp
             [M.CaptureFps] = s.CaptureFps, [M.EncodedFps] = s.EncodedFps, [M.EncodedKbps] = s.EncodedKbps,
             [M.EncoderQueue] = s.EncoderQueue, [M.SendQueue] = s.SendQueue, [M.EncoderDelayMs] = s.EncoderDelayMs,
             [M.CaptureDrops] = s.Dropped, [M.CapturePrepareMs] = s.CapturePrepareMs, [M.EncodedCopyMs] = s.EncodedCopyMs,
+            [M.CapturePaintMs] = s.CapturePaintMs, [M.CaptureFrameMs] = s.CaptureFrameMs,
             [M.EventLoopLagMs] = s.EventLoopLagMs, [M.RttMs] = s.TransportRttMs, [M.UplinkResent] = s.UplinkResent,
             [M.TotalBudgetKbps] = s.TotalBudgetKbps, [M.VideoBudgetKbps] = s.VideoBudgetKbps,
             [M.AudioBitrateKbps] = s.AudioBitrateKbps, [M.QueueDelayMs] = s.QueueDelayMs, [M.VideoSuspended] = s.VideoSuspended ? 1 : 0,
@@ -87,6 +88,7 @@ public sealed class LiveCallDiagnostics(ChatApi api, IJSRuntime js) : IAsyncDisp
         };
         var path = s.Strategy switch
         { "processor" => CallCapturePath.Processor, "worker-processor" => CallCapturePath.WorkerProcessor,
+            "worker-webgpu" => CallCapturePath.WorkerWebgpu,
             "worker-webgl" => CallCapturePath.WorkerWebgl, "rvfc" => CallCapturePath.Rvfc, "rvfc/webgl" => CallCapturePath.RvfcWebgl, _ => CallCapturePath.Unknown };
         var relay = s.Transport.IndexOf("(relay ", StringComparison.Ordinal);
         return new(call, sequence, device, AppRelease.Version, path, Transport(s.Transport),

@@ -164,6 +164,36 @@ public sealed partial class BoltGroupCallLifecycleTests
     }
 
     [Test]
+    public async Task Client_PersistentIceDisconnect_RestartsBeforeBrowserFailure()
+    {
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        await using var a = Connect(f, "a", network, new MediaTransportClientOptions { IceDisconnectRestartMs = 100 });
+        a.Transport.Start();
+        await WaitUntil(() => a.Transport.IsDatagramActive);
+        var participant = network.Created.Single(x => x.Role == RtcPeerRole.Offer);
+        participant.Stall();
+        await WaitUntil(() => participant.IceRestarts == 1);
+        await AwaitTransport<MediaTransportDescription>(f.Peers["a"], MediaTransportKind.Answer, x => x.IceRestart);
+        Assert.That(f.Tasks["a"].IsCompleted, Is.False, "the authenticated socket stays available during recovery");
+        Assert.That(network.Created.Count(x => x.Role == RtcPeerRole.Offer), Is.EqualTo(1), "reuse the existing session");
+    }
+
+    [Test]
+    public async Task Client_BriefIceDisconnect_DoesNotRestartRecoveredChannel()
+    {
+        var network = new FakeRtcNetwork();
+        await using var f = await Fixture.CreateAsync(configure: o => o.MediaTransport = Transport(network, new FakeIceSource()));
+        await using var a = Connect(f, "a", network, new MediaTransportClientOptions { IceDisconnectRestartMs = 200 });
+        a.Transport.Start();
+        await WaitUntil(() => a.Transport.IsDatagramActive);
+        var participant = network.Created.Single(x => x.Role == RtcPeerRole.Offer);
+        participant.Stall(); participant.Recover();
+        await Task.Delay(300);
+        Assert.That(participant.IceRestarts, Is.Zero);
+    }
+
+    [Test]
     public async Task Client_NetworkChange_RestartsIceOnTheOpenChannel()
     {
         var network = new FakeRtcNetwork();

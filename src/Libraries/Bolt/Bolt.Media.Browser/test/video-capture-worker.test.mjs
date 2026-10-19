@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
-const source = readFileSync(new URL('../wwwroot/bolt-video-capture-worker.js', import.meta.url), 'utf8').replace(/^import .*;$/m, '');
+const source = readFileSync(new URL('../wwwroot/bolt-video-capture-worker.js', import.meta.url), 'utf8').replace(/^import .*;$/gm, '');
 const tick = () => new Promise(resolve => setImmediate(resolve));
-function fixture(supported = true, normalizer = true) {
+function fixture(supported = true, normalizer = true, gpu = null) {
     let pending;
     const messages = [], track = { stopped: false, constraints: [], stop() { this.stopped = true; },
         async applyConstraints(value) { this.constraints.push(value); } };
@@ -16,6 +16,7 @@ function fixture(supported = true, normalizer = true) {
         release() { painter.released = true; } };
     const sandbox = { self, Math, Error, performance,
         GlFramePainter: { create: () => normalizer ? painter : null },
+        GpuFramePainter: { create: async () => gpu },
         OffscreenCanvas: class {},
         VideoFrame: class { constructor(canvas, init) { Object.assign(this, init); this.rotation = 0; this.flip = false;
             this.displayWidth = canvas.width; this.displayHeight = canvas.height; normalized.push(this); }
@@ -37,6 +38,34 @@ test('worker probes its own context without opening any camera', () => {
         assert.equal(f.messages[0].data.supported, supported);
         assert.equal(f.track.stopped, false);
     }
+});
+
+test('worker prefers external GPU textures and reports separate preparation costs', async () => {
+    const gpu = { checked: false, device: { pushErrorScope() {}, async popErrorScope() { return null; } },
+        paint(frame, width, height) { gpu.size = [width, height]; return { width, height }; }, release() { gpu.released = true; } };
+    const f = fixture(true, true, gpu);
+    f.send({ type: 'start', track: f.track, width: 720, height: 1280 });
+    f.send({ type: 'diagnostics', enabled: true });
+    const frame = f.frame(); delete frame.rotation; await tick();
+    const sent = f.messages.at(-1).data;
+    assert.equal(sent.path, 'worker-webgpu');
+    assert.deepEqual(gpu.size, [720, 1280]);
+    assert.ok(Number.isFinite(sent.paintMs) && Number.isFinite(sent.frameMs));
+    assert.equal(f.painted.length, 0);
+    f.send({ type: 'stop' }); await tick(); assert.ok(gpu.released);
+});
+
+test('GPU validation failure falls back once without losing the current frame', async () => {
+    let draws = 0;
+    const gpu = { checked: false, device: { pushErrorScope() {}, async popErrorScope() { return Error('unsupported'); } },
+        paint(frame, width, height) { draws++; return { width, height }; }, release() { gpu.released = true; } };
+    const f = fixture(true, true, gpu); f.send({ type: 'start', track: f.track });
+    for (let i = 0; i < 2; i++) {
+        f.send({ type: 'credit' }); const frame = f.frame(i * 40000); delete frame.rotation; await tick();
+        assert.equal(f.messages.at(-1).data.path, 'worker-webgl'); assert.ok(frame.closed);
+    }
+    assert.equal(draws, 1); assert.ok(gpu.released);
+    f.send({ type: 'stop' }); await tick();
 });
 
 test('worker bounds in-flight ownership, drops excess and paces before transferring', async () => {
