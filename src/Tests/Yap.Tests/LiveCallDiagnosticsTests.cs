@@ -80,6 +80,21 @@ public sealed class LiveCallDiagnosticsTests
         Assert.That(sample.Metrics[CallMetric.CaptureFrameMs], Is.EqualTo(7.5));
     }
 
+    [Test] public void Schema_PreservesDirectFrameExperimentAndHiddenOrientation()
+    {
+        var experiment = new FrameExperimentSample { Mode = 1, Width = 1920, Height = 1080,
+            CameraWidth = 1080, CameraHeight = 1920, DecodedWidth = 1920, DecodedHeight = 1080,
+            Rotation = null, Flip = null, PrepareMs = 0.1, PrepareP95Ms = 0.3, SnapshotMs = 0 };
+        var sample = Sample() with { Metrics = experiment.Metrics(), Remotes = [] };
+        Assert.That(YapCallDiagnostics.Valid(sample), Is.True);
+        Assert.That(sample.Metrics[CallMetric.FrameExperiment], Is.EqualTo(1));
+        Assert.That(sample.Metrics[CallMetric.FrameRotation], Is.Null, "Hidden orientation must not be reported as zero.");
+        Assert.That(sample.Metrics[CallMetric.CameraWidth], Is.EqualTo(1080));
+        Assert.That(sample.Metrics[CallMetric.RawWidth], Is.EqualTo(1920));
+        Assert.That(sample.Metrics[CallMetric.DecodedWidth], Is.EqualTo(1920));
+        Assert.That(sample.Metrics[CallMetric.CaptureFrameMs], Is.Zero);
+    }
+
     [Test] public async Task Endpoint_RequiresSessionAccountCsrfAndBoundedBody_StoresReadableTrace()
     {
         File.WriteAllText(enable, "");

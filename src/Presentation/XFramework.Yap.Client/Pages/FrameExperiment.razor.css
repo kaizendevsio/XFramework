@@ -1,0 +1,12 @@
+.frame-test { padding: 20px 20px 110px; max-width: 850px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+.frame-test p { line-height: 1.5; }
+.frame-options, .frame-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-block: 16px; }
+.frame-options label { display: grid; gap: 6px; }
+.frame-options select { padding: 10px; color: inherit; background: var(--surface, #222); border: 1px solid #777; border-radius: 8px; }
+.frame-previews { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.frame-previews figure { margin: 0; min-width: 0; }
+.frame-previews video, .frame-previews canvas { width: 100%; height: 260px; object-fit: contain; background: #000; transform: none; }
+.frame-test pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.6; }
+
+.appbar { background: var(--page, #1b1b1b); }
+.frame-options .frame-rear { display: flex; align-items: center; }

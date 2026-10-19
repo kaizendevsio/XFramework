@@ -1,0 +1,88 @@
+@page "/diagnostics/frames"
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject VoiceState Voice
+@inject LiveCallDiagnostics Diagnostics
+<PageTitle>Camera frame experiment · Yap</PageTitle>
+<ScrollSurface><Header><div class="appbar plain"><a class="iconbtn" href="/settings/help" aria-label="Back"><Icon Name="back" /></a><h1>Camera experiment</h1></div></Header>
+<ChildContent><div class="body frame-test">
+    <p>Compare direct camera frames with the current WebGPU preparation. Each test lasts 30 seconds. Camera video stays on this device; only numeric results are shared if you enable sharing.</p>
+    <p>Use the same settings for both modes. Hold up text, test front and rear cameras, and rotate the phone during each test. Both previews are unmirrored. A fast result is only useful if the decoded picture stays upright and uncropped.</p>
+    <div class="frame-options">
+        <label>Mode<select @bind="mode" disabled="@running"><option value="direct">Direct frame (experimental)</option><option value="webgpu">WebGPU (reference)</option></select></label>
+        <label>Resolution<select @bind="height" disabled="@running"><option value="1080">1080p</option><option value="720">720p</option></select></label>
+        <label>Frame rate<select @bind="fps" disabled="@running"><option value="30">30 fps</option><option value="60">60 fps</option></select></label>
+        <label class="frame-rear"><input type="checkbox" @bind="rear" disabled="@running" /> Rear camera</label>
+    </div>
+    <div class="frame-actions"><button class="btn" disabled="@(running || Voice.IsCalling || handle is null)" @onclick="StartAsync">Start test</button><button class="btn ghost" disabled="@(!running)" @onclick="StopAsync">Stop</button></div>
+    @if (Voice.IsCalling) { <p>End the call before running this local camera test.</p> }
+    <p role="status">@status</p>
+    <div class="frame-previews"><figure><figcaption>Camera</figcaption><video @ref="camera" autoplay muted playsinline></video></figure><figure><figcaption>After encode / decode</figcaption><canvas @ref="decoded"></canvas></figure></div>
+    @if (sample is not null)
+    {
+        <pre>Camera: @sample.CameraWidth × @sample.CameraHeight / @F(sample.CameraFps) fps
+Raw: @sample.Width × @sample.Height; display @sample.DisplayWidth × @sample.DisplayHeight
+Rotation metadata: @(sample.Rotation?.ToString() ?? "hidden"); flip: @(sample.Flip?.ToString() ?? "hidden")
+Encoder: @sample.EncoderWidth × @sample.EncoderHeight · @sample.Codec
+Decoded: @sample.DecodedWidth × @sample.DecodedHeight
+Capture → encoded → rendered: @F(sample.CaptureFps) → @F(sample.EncodedFps) → @F(sample.RenderedFps) fps
+Preparation avg / p95: @F(sample.PrepareMs) / @F(sample.PrepareP95Ms) ms
+GPU submission / snapshot: @F(sample.PaintMs) / @F(sample.SnapshotMs) ms
+Encode / decode / render: @F(sample.EncodeMs) / @F(sample.DecodeMs) / @F(sample.RenderMs) ms
+Queues: @sample.EncoderQueue / @sample.DecoderQueue; drops: @sample.Drops</pre>
+        <p>Timings include scheduling and GPU waits. Hardware preference does not confirm hardware use. This local loop excludes transport, encryption and remote playback.</p>
+        <button class="btn ghost" disabled="@running" @onclick="DownloadAsync">Download numeric results</button>
+    }
+    <p>@Diagnostics.Status</p>
+    <button class="btn ghost" @onclick="ShareAsync">@(Diagnostics.Enabled ? "Stop sharing" : "Share numeric diagnostics for 15 minutes")</button>
+</div></ChildContent></ScrollSurface>
+@code {
+    private ElementReference camera, decoded;
+    private IJSObjectReference? module, handle;
+    private DotNetObjectReference<FrameExperiment>? reference;
+    private bool running, rear, disposed;
+    private string mode = "direct", status = "Ready. Start with 1080p / 30 fps.";
+    private int height = 1080, fps = 30;
+    private Guid run;
+    private FrameExperimentSample? sample;
+    protected override void OnInitialized() => Voice.Changed += CallChanged;
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (!first) return;
+        try
+        {
+            module = await JS.InvokeAsync<IJSObjectReference>("import", "./frame-experiment.js");
+            if (disposed) { await module.DisposeAsync(); return; }
+            reference = DotNetObjectReference.Create(this);
+            handle = await module.InvokeAsync<IJSObjectReference>("create", camera, decoded, reference);
+            StateHasChanged();
+        }
+        catch (JSException) { status = "Camera experiment could not load. Refresh and try again."; StateHasChanged(); }
+    }
+    private async Task StartAsync()
+    {
+        if (handle is null || Voice.IsCalling || running) return;
+        running = true; sample = null; run = Guid.NewGuid(); status = "Running — compare both pictures and rotate the phone.";
+        try { await handle.InvokeVoidAsync("start", new { mode, height, fps, rear }); }
+        catch (JSException) { running = false; status = "Camera test failed to start."; }
+    }
+    private async Task StopAsync() { if (handle is not null) await handle.InvokeVoidAsync("stop"); running = false; }
+    private async Task DownloadAsync() { if (handle is not null) await handle.InvokeVoidAsync("download"); }
+    private async Task ShareAsync()
+    {
+        try { if (Diagnostics.Enabled) await Diagnostics.StopAsync(); else await Diagnostics.StartAsync(); }
+        catch { status = "Sharing is unavailable. The local experiment and download still work."; }
+    }
+    [JSInvokable] public Task Sample(FrameExperimentSample value) => InvokeAsync(() =>
+    { if (disposed) return; sample = value; Diagnostics.OfferExperiment(run, value); StateHasChanged(); });
+    [JSInvokable] public Task Finished(string message) => InvokeAsync(() =>
+    { if (disposed) return; running = false; status = message; StateHasChanged(); });
+    private void CallChanged() { if (Voice.IsCalling) _ = InvokeAsync(async () => { await StopAsync(); StateHasChanged(); }); }
+    private static string F(double? value) => value?.ToString("F1") ?? "—";
+    public async ValueTask DisposeAsync()
+    {
+        disposed = true; Voice.Changed -= CallChanged;
+        if (handle is not null) { try { await handle.InvokeVoidAsync("dispose"); } catch (JSException) { } await handle.DisposeAsync(); }
+        reference?.Dispose(); if (module is not null) await module.DisposeAsync();
+    }
+}
