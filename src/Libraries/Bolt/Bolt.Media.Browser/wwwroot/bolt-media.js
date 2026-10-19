@@ -1066,16 +1066,24 @@ class VideoPipeline {
                     // Keep the original camera track for preview and applyConstraints.
                     worker.postMessage({ type: 'diagnostics', enabled: !!this.debugSample });
                     clone = track.clone();
-                    worker.postMessage({ type: 'start', track: clone, framerate: this.config.framerate }, [clone]);
+                    const settings = track.getSettings?.() ?? {};
+                    worker.postMessage({ type: 'start', track: clone, framerate: this.config.framerate,
+                        width: settings.width, height: settings.height }, [clone]);
                 } catch { try { clone?.stop(); } catch { } fallback('track-transfer-failed'); }
             } else if (data.type === 'frame') {
                 lastFrame = performance.now();
-                this.activeCaptureStrategy = data.path === 'worker-webgl' ? 'worker-webgl' : 'worker-processor';
+                this.activeCaptureStrategy = ['worker-webgl', 'worker-webgpu'].includes(data.path) ? data.path : 'worker-processor';
                 this._recordCost('capture', data.prepareMs);
+                this._recordCost('capturePaint', data.paintMs);
+                this._recordCost('captureFrame', data.frameMs);
                 try { this._encodeProcessorFrame(data.frame); }
                 catch { fallback('worker-frame-encode-failed'); }
                 finally {
-                    if (current()) worker.postMessage({ type: 'credit', framerate: this.config.framerate });
+                    if (current()) {
+                        const settings = track.getSettings?.() ?? {};
+                        worker.postMessage({ type: 'credit', framerate: this.config.framerate,
+                            width: settings.width, height: settings.height });
+                    }
                 }
             } else if (data.type === 'failed') fallback(data.reason || 'worker-capture-failed');
         };
@@ -1324,6 +1332,7 @@ class VideoPipeline {
         const strategy = this.strategy() === 'rvfc' && this.captureRunning ? `rvfc/${this.glPainter ? 'webgl' : '2d'}` : this.strategy();
         const result = { capturing: this.captureRunning, strategy,
             captureFallback: this.captureFallback, capturePrepareMs: average('capture'), encodedCopyMs: average('copy'),
+            capturePaintMs: average('capturePaint'), captureFrameMs: average('captureFrame'),
             eventLoopLagMs: previous ? this.eventLoopLagMs : null, codec: this.config?.codec || this.codec,
             width: this.captureRunning ? this.config?.width ?? 0 : 0, height: this.captureRunning ? this.config?.height ?? 0 : 0,
             targetFps: this.captureRunning ? this.config?.framerate ?? 0 : 0,
@@ -1496,6 +1505,7 @@ class VideoPipeline {
 
     /// The sender's orientation handling, for diagnostics.
     _orientationLabel() {
+        if (this.strategy() === 'worker-webgpu') return 'normalized upright in worker (webgpu)';
         if (this.strategy() === 'worker-webgl') return 'normalized upright in worker (webgl)';
         if (!this.captureRunning) return '';
         // The frame-callback path paints the element, which shows the camera upright already.

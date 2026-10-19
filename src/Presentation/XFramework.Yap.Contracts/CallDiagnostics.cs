@@ -11,10 +11,11 @@ public enum CallMetric
     RateCause, LastCutCause, LastCutFromKbps, LastCutToKbps, LastCutAgeMs,
     CryptoOperations, CryptoProcessingMs, CryptoWaitingMs, ReceivedFps, RenderedFps, ReceivedKbps,
     DecoderQueue, PendingFrames, RenderMs, DecoderDelayMs, Resets, Fragments, LocalDrops,
-    Nacked, Recovered, Abandoned, Declined, Incomplete, Skipped, Pictures, RecoveryMs
+    Nacked, Recovered, Abandoned, Declined, Incomplete, Skipped, Pictures, RecoveryMs,
+    CapturePaintMs, CaptureFrameMs
 }
 public enum CallDevice { Other, Android, Ios, Desktop }
-public enum CallCapturePath { Unknown, Processor, WorkerProcessor, WorkerWebgl, Rvfc, RvfcWebgl }
+public enum CallCapturePath { Unknown, Processor, WorkerProcessor, WorkerWebgl, Rvfc, RvfcWebgl, WorkerWebgpu }
 public enum CallTransportPath { Unknown, Udp, Tcp, Tls, WebSocket }
 public sealed record CallDiagnosticRemote(Guid StreamId, string Codec, Dictionary<CallMetric, double?> Metrics);
 public sealed record CallDiagnosticSample(Guid CallId, int Sequence, CallDevice Device, string Version,

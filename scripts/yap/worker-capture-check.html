@@ -1,13 +1,14 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>Bolt worker capture checks</title>
-<p>Synthetic frames through the production worker. Tests hidden orientation, WebGL pixels and transfers; does not emulate Safari's camera or measure phone temperature.</p>
+<p>Synthetic frames through the production worker. Tests hidden orientation, GPU pixels and transfers; does not emulate Safari's camera or measure phone temperature. Add ?webgl for the compatibility path.</p>
 <pre id="result">Running</pre>
 <script type="module">
 const moduleUrl = new URL('/src/Libraries/Bolt/Bolt.Media.Browser/wwwroot/bolt-video-capture-worker.js', location.href).href;
 // Only the camera source is simulated. All painting, normalization, pacing, frame ownership,
 // transfers and cleanup run through the production worker, using actual browser VideoFrames.
 const bootstrap = `
+${location.search.includes('webgl') ? "Object.defineProperty(navigator,'gpu',{value:undefined});" : ''}
 let controller;
 globalThis.MediaStreamTrackProcessor = class {
     constructor() { this.readable = new ReadableStream({start(value) {controller = value;}}); }
@@ -63,14 +64,29 @@ try {
         const output=await send(frame);
         try {
             const actual=pixels(output.frame);
-            const ok=output.path==='worker-webgl' && JSON.stringify(size)===JSON.stringify([output.frame.displayWidth,output.frame.displayHeight]) &&
+            const ok=['worker-webgl','worker-webgpu'].includes(output.path) && JSON.stringify(size)===JSON.stringify([output.frame.displayWidth,output.frame.displayHeight]) &&
                 expected.every((v,i)=>Math.abs(v-actual[i])<=2);
-            results.push({rotation,flip,ok});
+            results.push({rotation,flip,ok,path:output.path});
             if (!ok) throw Error(`orientation mismatch ${rotation}/${flip}: ${actual} versus ${expected}`);
         } finally {output.frame.close();}
     }
     worker.postMessage({type:'diagnostics',enabled:true});
     const large=pattern(1080,1920);
+    let encoded=0, decoded=0, codecErrors=[];
+    const decoder=new VideoDecoder({output:frame=>{decoded++;frame.close();},error:e=>codecErrors.push(String(e))});
+    const encoder=new VideoEncoder({output:(chunk,metadata)=>{
+        encoded++; if(metadata.decoderConfig) decoder.configure(metadata.decoderConfig); decoder.decode(chunk);
+    },error:e=>codecErrors.push(String(e))});
+    try {
+        encoder.configure({codec:'avc1.420028',width:1080,height:1920,bitrate:4000000,framerate:30,latencyMode:'realtime'});
+        for(let i=0;i<10;i++) {
+            const output=await send(new VideoFrame(large,{timestamp:timestamp+=40000}));
+            try {encoder.encode(output.frame,{keyFrame:i===0});} finally {output.frame.close();}
+        }
+        await encoder.flush(); await decoder.flush();
+        results.push({encoded,decoded,codecErrors});
+        if(encoded!==10 || decoded!==10 || codecErrors.length) throw Error('normalized frame codec roundtrip failed');
+    } finally {encoder.close();decoder.close();}
     for (const fps of [30,60]) {
         const costs=[], started=performance.now();let frames=0;
         while(performance.now()-started<5000) {

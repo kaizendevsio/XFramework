@@ -38,6 +38,8 @@ public sealed class MediaTransportClientOptions
     /// <see cref="DatagramDrainWatch"/>): media takes the WebSocket until it drains again.
     /// </summary>
     public int DrainStallMs { get; init; } = DatagramDrainWatch.DefaultTimeoutMs;
+    /// <summary>Allow a short ICE disconnect to recover before restarting its credentials in place.</summary>
+    public int IceDisconnectRestartMs { get; init; } = 3_000;
     /// <summary>How media moves between the data channel and the socket (see <see cref="DatagramPathHysteresis"/>).</summary>
     public DatagramHysteresisOptions PathHysteresis { get; init; } = new();
     /// <summary>Redundancy is added only while the channel's own buffer is this short.</summary>
@@ -862,10 +864,29 @@ public sealed class MediaTransportClient : IAsyncDisposable
             // The path under an open channel went quiet (or is being rebuilt by an ICE restart). ActivePeer is null
             // until it is back and the hysteresis lets media return; the session is kept, ICE may recover by itself.
             await EvaluatePathAsync(_clock());
+            _ = RecoverDisconnectedIceAsync(session);
             return;
         }
         if (state is RtcChannelState.Failed or RtcChannelState.Closed)
             await FailAsync(session, state == RtcChannelState.Failed ? "ice-failed" : "closed", notifyRelay: true);
+    }
+
+    private async Task RecoverDisconnectedIceAsync(Session session)
+    {
+        try
+        {
+            // Keep using the socket while ICE reconnects. Do not wait for the browser's much
+            // longer failed-state timeout, or restart on a brief disconnect / our own ICE check.
+            await Task.Delay(Math.Max(1, _options.IceDisconnectRestartMs), _lifetime.Token);
+            lock (_sync)
+            {
+                if (_disposed || _restarting || session.Closed || !ReferenceEquals(_active, session)
+                    || session.Peer?.State != RtcChannelState.Stalled) return;
+                _restarting = true;
+            }
+            await RestartIceLoopAsync(session);
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
     }
 
     /// <summary>One ICE restart, until its answer is applied. False when the session is gone or the restart failed.</summary>

@@ -7,6 +7,8 @@ public sealed record VideoDiagnostics
     public bool Capturing { get; init; }
     public string? CaptureFallback { get; init; }
     public double? CapturePrepareMs { get; init; }
+    public double? CapturePaintMs { get; init; }
+    public double? CaptureFrameMs { get; init; }
     public double? EncodedCopyMs { get; init; }
     public double? EventLoopLagMs { get; init; }
     public Congestion.SendRateDecision? RateDetails { get; init; }

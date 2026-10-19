@@ -45,6 +45,7 @@
                 <div>Path: @info.Strategy · @info.Acceleration</div>
                 @if (info.CaptureFallback is { } fallback) { <div>Worker unavailable: @fallback</div> }
                 <div>Average capture preparation: @Number(info.CapturePrepareMs) ms · encoded copy: @Number(info.EncodedCopyMs) ms</div>
+                <div>Preparation draw / frame snapshot: @Number(info.CapturePaintMs) / @Number(info.CaptureFrameMs) ms</div>
                 <div>Orientation: @(string.IsNullOrEmpty(info.Orientation) ? "—" : info.Orientation)</div>
             }
         </div>
