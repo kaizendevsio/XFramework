@@ -676,79 +676,8 @@ export function paintOriented(context, frame, width, height, code) {
     finally { context.setTransform(1, 0, 0, 1, 0, 0); }
 }
 
-/// WebKit (Safari, and every iOS browser) turns a 2D canvas into a VideoFrame with a CPU readback. Its vendor
-/// string is the engine's own; there is no feature that reveals how a canvas becomes a frame.
-function webKitCanvasReadsBack() { return /^Apple/.test(globalThis.navigator?.vendor ?? ''); }
-
-/// Paints a <video> element's current picture, upright, into a WebGL canvas of a given size, entirely on the GPU.
-///
-/// Only the default-rect, level-0 RGBA/UNSIGNED_BYTE texImage2D of a video takes WebKit's GPU-to-GPU path
-/// (WebGLRenderingContextBase::texImageSource), so that is the only upload used. The first picture is checked
-/// once with a 2x2 readPixels: a texture that came back empty means this engine took a path that does not work,
-/// and the caller falls back to the 2D canvas rather than send black.
-export class GlFramePainter {
-    static create(doc) {
-        const canvas = doc?.createElement?.('canvas');
-        const gl = canvas?.getContext?.('webgl', { alpha: false, antialias: false, depth: false, stencil: false,
-            premultipliedAlpha: false, preserveDrawingBuffer: false, powerPreference: 'low-power' });
-        if (!gl || typeof gl.createShader !== 'function') return null;
-        const shader = (type, source) => {
-            const compiled = gl.createShader(type);
-            gl.shaderSource(compiled, source);
-            gl.compileShader(compiled);
-            if (!gl.getShaderParameter(compiled, gl.COMPILE_STATUS)) throw new Error('shader');
-            return compiled;
-        };
-        const program = gl.createProgram();
-        gl.attachShader(program, shader(gl.VERTEX_SHADER,
-            'attribute vec2 p;varying vec2 t;void main(){t=vec2(p.x*.5+.5,.5-p.y*.5);gl_Position=vec4(p,0.,1.);}'));
-        gl.attachShader(program, shader(gl.FRAGMENT_SHADER,
-            'precision mediump float;varying vec2 t;uniform sampler2D s;void main(){gl_FragColor=vec4(texture2D(s,t).rgb,1.);}'));
-        gl.linkProgram(program);
-        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error('program');
-        gl.useProgram(program);
-        gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-        // A strip over the whole viewport; the vertex shader maps clip top to the texture's first row.
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-        const position = gl.getAttribLocation(program, 'p');
-        gl.enableVertexAttribArray(position);
-        gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
-        gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
-        for (const [name, value] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR],
-            [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, name, value);
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-        return new GlFramePainter(canvas, gl);
-    }
-
-    constructor(canvas, gl) { this.canvas = canvas; this.gl = gl; this.checked = false; }
-
-    /// The canvas holding `video` at width x height. Throws when this engine cannot paint it on the GPU.
-    paint(video, width, height) {
-        const { gl, canvas } = this;
-        if (gl.isContextLost?.()) throw new Error('context lost');
-        const resized = canvas.width !== width || canvas.height !== height;
-        if (resized) { canvas.width = width; canvas.height = height; }
-        gl.viewport(0, 0, width, height);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-        // getError synchronizes with the GPU process. Validate startup and resizing, not every frame.
-        if ((!this.checked || resized) && gl.getError() !== gl.NO_ERROR) throw new Error('webgl');
-        if (!this.checked) {
-            // Once per capture: an all-zero centre after a successful draw means nothing was uploaded.
-            this.checked = true;
-            const pixels = new Uint8Array(16);
-            gl.readPixels(Math.max(0, (width >> 1) - 1), Math.max(0, (height >> 1) - 1), 2, 2, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-            if (pixels.every(x => x === 0)) throw new Error('empty texture');
-        }
-        return canvas;
-    }
-
-    release() {
-        try { this.gl.getExtension?.('WEBGL_lose_context')?.loseContext(); } catch { }
-        this.canvas.width = this.canvas.height = 0;
-    }
-}
+// WebKit capture requires the worker path: do not silently switch to page canvas preparation.
+function isWebKit() { return /^Apple/.test(globalThis.navigator?.vendor ?? ''); }
 
 /// How this browser can get camera frames out of a MediaStreamTrack.
 ///
@@ -1025,8 +954,16 @@ class VideoPipeline {
             this.captureReader = new MediaStreamTrackProcessor({ track }).readable.getReader();
             void this._readLoop(generation);
         } else if (!this.captureStrategy && this._startWorkerCapture(track, stream, generation)) {
-            // Worker-only processors (Safari) are probed in their own execution context.
+            // Safari must prove its worker path before the UI declares the camera on.
+            if (isWebKit()) {
+                const failure = await this.captureWorkerReady;
+                if (failure) throw new Error(failure);
+            }
         } else {
+            if (isWebKit()) {
+                this.stopCapture();
+                throw new Error('webgpu-capture-unavailable');
+            }
             this._startFrameCallbacks(stream, generation);
         }
         return this.describe();
@@ -1041,12 +978,19 @@ class VideoPipeline {
         try { worker = new Worker(new URL('./bolt-video-capture-worker.js', import.meta.url), { type: 'module' }); }
         catch { this.captureFallback = 'worker-start-failed'; return false; }
         this.captureWorker = worker;
+        this.captureWorkerReady = new Promise(resolve => { this.captureWorkerResolve = resolve; });
         this.activeCaptureStrategy = 'worker-pending';
         let clone, lastFrame = performance.now();
         const current = () => this.captureRunning && generation === this.captureGeneration && this.captureWorker === worker;
         const fallback = (reason) => {
             if (!current()) return;
             this.captureFallback = reason;
+            if (isWebKit() || reason.startsWith('webgpu-')) {
+                const failure = reason.startsWith('webgpu-') ? reason : 'webgpu-capture-failed';
+                this.captureWorkerResolve?.(failure);
+                this.stopCapture(failure);
+                return;
+            }
             this._stopWorkerCapture();
             this.activeCaptureStrategy = 'rvfc';
             this.lastCaptureTimestamp = this.nextCaptureTimestamp = null;
@@ -1072,11 +1016,15 @@ class VideoPipeline {
                 } catch { try { clone?.stop(); } catch { } fallback('track-transfer-failed'); }
             } else if (data.type === 'frame') {
                 lastFrame = performance.now();
-                this.activeCaptureStrategy = ['worker-webgl', 'worker-webgpu'].includes(data.path) ? data.path : 'worker-processor';
+                this.activeCaptureStrategy = data.path === 'worker-webgpu' ? data.path : 'worker-processor';
                 this._recordCost('capture', data.prepareMs);
                 this._recordCost('capturePaint', data.paintMs);
                 this._recordCost('captureFrame', data.frameMs);
-                try { this._encodeProcessorFrame(data.frame); }
+                try {
+                    this._encodeProcessorFrame(data.frame);
+                    this.captureWorkerResolve?.(null);
+                    this.captureWorkerResolve = null;
+                }
                 catch { fallback('worker-frame-encode-failed'); }
                 finally {
                     if (current()) {
@@ -1091,6 +1039,8 @@ class VideoPipeline {
     }
 
     _stopWorkerCapture() {
+        this.captureWorkerResolve?.('webgpu-capture-stopped');
+        this.captureWorkerResolve = null;
         clearInterval(this.captureWorkerWatch);
         this.captureWorkerWatch = null;
         const worker = this.captureWorker;
@@ -1105,9 +1055,9 @@ class VideoPipeline {
     /// picks by feature detection, because a browser that has both should use the cheaper one.
     useCaptureStrategy(strategy) { this.captureStrategy = strategy || null; }
 
-    /// The Safari path: the visible preview (or a temporary element until it mounts), one callback per decoded
-    /// frame, painted at the encoder size so sensor rotation cannot leak into the bitstream.
+    /// Compatibility path for other engines without a frame processor.
     _startFrameCallbacks(stream, generation) {
+        if (isWebKit()) throw new Error('webgpu-capture-unavailable');
         const video = this.captureVideo = this.preview || globalThis.document.createElement('video');
         this.ownsCaptureVideo = video !== this.preview;
         video.srcObject = stream;
@@ -1172,29 +1122,12 @@ class VideoPipeline {
     /// A video-element VideoFrame can retain sensor rotation, including on Safari (WebKit exposes no
     /// rotation attribute to tell), so the displayed image is painted upright, at the encoder size.
     ///
-    /// WebGL first. On WebKit a 2D canvas becomes a VideoFrame by reading every pixel back to the CPU,
-    /// unpremultiplying it and copying it again to the GPU process for the encoder
-    /// (HTMLCanvasElement::toVideoFrame -> getPixelBuffer, then SharedVideoFrameWriter): about 30 MB of
-    /// copies per 1440p picture. A WebGL canvas uploads the camera's IOSurface as a texture on the GPU,
-    /// with its orientation undone (GraphicsContextGLCVCocoa::copyVideoSampleToTexture), and becomes a
-    /// VideoFrame as a GPU copy into another IOSurface (surfaceBufferToVideoFrame) that reaches
-    /// VideoToolbox as a mach port: no pixel touches the CPU. The 2D canvas stays as the fallback, and is
-    /// the only path elsewhere: Chromium's 2D canvas is GPU-backed already, and measured there the WebGL
-    /// round trip cost more main thread (1.5 vs 0.75 ms a 720p picture, 4 vs 2.2 ms at 1440p).
+    // Compatibility capture for non-WebKit engines only. Safari requires the worker.
     _elementFrame(video, timestamp) {
         // WebKit throws InvalidStateError for an element below HAVE_CURRENT_DATA or with no decoded
         // frame in hand. rVFC should never hand us one, but a throw per frame would be expensive.
         if (!video.videoWidth || !video.videoHeight || (video.readyState ?? 2) < 2) return null;
         const duration = Math.round(1e6 / this.config.framerate);
-        if (this.glPainter !== false && webKitCanvasReadsBack()) {
-            try {
-                this.glPainter ??= GlFramePainter.create(globalThis.document) ?? false;
-                const canvas = this.glPainter && this.glPainter.paint(video, this.config.width, this.config.height);
-                if (canvas) return new VideoFrame(canvas, { timestamp, duration });
-            } catch { /* Fall through to the 2D canvas for the rest of this capture. */ }
-            this.glPainter?.release?.();
-            this.glPainter = false;
-        }
         try {
             const canvas = this.captureCanvas ??= typeof OffscreenCanvas !== 'undefined'
                 ? new OffscreenCanvas(this.config.width, this.config.height)
@@ -1213,10 +1146,6 @@ class VideoPipeline {
         const video = this.captureVideo;
         this.captureVideo = null;
         this.captureCanvas = this.captureContext = null;
-        // The WebGL painter is retried on the next capture: a lost context or a camera that only stalled is
-        // not a reason to read pixels back on the CPU for the rest of the call.
-        this.glPainter?.release?.();
-        this.glPainter = null;
         if (!video) return;
         if (this.captureCallbackId) { try { video.cancelVideoFrameCallback(this.captureCallbackId); } catch { } }
         this.captureCallbackId = 0;
@@ -1328,8 +1257,8 @@ class VideoPipeline {
                 rotation: describeOrientation(remote.orientation) || 'none' };
         });
         const encodedFps = rate(this.encodeCount, previous?.encode);
-        // On the frame-callback path, which painter turns the camera into frames: "webgl" on the GPU, "2d" otherwise.
-        const strategy = this.strategy() === 'rvfc' && this.captureRunning ? `rvfc/${this.glPainter ? 'webgl' : '2d'}` : this.strategy();
+        // Non-WebKit compatibility capture uses a 2D canvas.
+        const strategy = this.strategy() === 'rvfc' && this.captureRunning ? 'rvfc/2d' : this.strategy();
         const result = { capturing: this.captureRunning, strategy,
             captureFallback: this.captureFallback, capturePrepareMs: average('capture'), encodedCopyMs: average('copy'),
             capturePaintMs: average('capturePaint'), captureFrameMs: average('captureFrame'),
@@ -1506,10 +1435,9 @@ class VideoPipeline {
     /// The sender's orientation handling, for diagnostics.
     _orientationLabel() {
         if (this.strategy() === 'worker-webgpu') return 'normalized upright in worker (webgpu)';
-        if (this.strategy() === 'worker-webgl') return 'normalized upright in worker (webgl)';
         if (!this.captureRunning) return '';
         // The frame-callback path paints the element, which shows the camera upright already.
-        if (this.strategy() === 'rvfc') return `painted upright by the element (${this.glPainter ? 'webgl' : '2d canvas'})`;
+        if (this.strategy() === 'rvfc') return 'painted upright by the element (2d canvas)';
         const { code, how } = this.orientationState;
         if (!code) return 'none';
         const angle = describeOrientation(code);

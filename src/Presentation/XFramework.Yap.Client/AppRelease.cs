@@ -2,10 +2,12 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.88";
+    public const string Version = "1.3.89";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "19 October 2026", [
+            "Safari video uses WebGPU camera preparation and shows a clear notice if it cannot run; voice calls can continue."]),
+        ("1.3.88", "19 October 2026", [
             "Compatible Safari devices use direct GPU camera textures for video preparation, with more detailed performance diagnostics.",
             "Calls discard stale video after a connection stall and recover with a fresh picture, avoiding stuck low-bitrate queues."]),
         ("1.3.87", "19 October 2026", [

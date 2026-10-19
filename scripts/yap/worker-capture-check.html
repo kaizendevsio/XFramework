@@ -1,14 +1,14 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>Bolt worker capture checks</title>
-<p>Synthetic frames through the production worker. Tests hidden orientation, GPU pixels and transfers; does not emulate Safari's camera or measure phone temperature. Add ?webgl for the compatibility path.</p>
+<p>Synthetic frames through the production worker. Tests hidden orientation, GPU pixels and transfers; does not emulate Safari's camera or measure phone temperature. Add ?nogpu to verify an explicit failure when WebGPU is unavailable.</p>
 <pre id="result">Running</pre>
 <script type="module">
 const moduleUrl = new URL('/src/Libraries/Bolt/Bolt.Media.Browser/wwwroot/bolt-video-capture-worker.js', location.href).href;
 // Only the camera source is simulated. All painting, normalization, pacing, frame ownership,
 // transfers and cleanup run through the production worker, using actual browser VideoFrames.
 const bootstrap = `
-${location.search.includes('webgl') ? "Object.defineProperty(navigator,'gpu',{value:undefined});" : ''}
+${location.search.includes('nogpu') ? "Object.defineProperty(navigator,'gpu',{value:undefined});" : ''}
 let controller;
 globalThis.MediaStreamTrackProcessor = class {
     constructor() { this.readable = new ReadableStream({start(value) {controller = value;}}); }
@@ -27,6 +27,7 @@ self.postMessage({type:'fixture-ready'});
 const url = URL.createObjectURL(new Blob([bootstrap], {type:'text/javascript'}));
 const worker = new Worker(url, {type:'module'});
 let waiter, timestamp = 0;
+worker.onerror = event => { if (waiter) { const done=waiter; waiter=null; done({type:'failed',reason:event.message}); } };
 worker.onmessage = ({data}) => {
     if (data.type === 'fixture-ready' || data.type === 'frame' || data.type === 'failed') {
         if (waiter) { const done = waiter; waiter = null; done(data); }
@@ -64,7 +65,7 @@ try {
         const output=await send(frame);
         try {
             const actual=pixels(output.frame);
-            const ok=['worker-webgl','worker-webgpu'].includes(output.path) && JSON.stringify(size)===JSON.stringify([output.frame.displayWidth,output.frame.displayHeight]) &&
+            const ok=output.path==='worker-webgpu' && JSON.stringify(size)===JSON.stringify([output.frame.displayWidth,output.frame.displayHeight]) &&
                 expected.every((v,i)=>Math.abs(v-actual[i])<=2);
             results.push({rotation,flip,ok,path:output.path});
             if (!ok) throw Error(`orientation mismatch ${rotation}/${flip}: ${actual} versus ${expected}`);

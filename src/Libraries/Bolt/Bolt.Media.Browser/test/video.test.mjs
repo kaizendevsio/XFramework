@@ -200,7 +200,6 @@ this.codecString = videoCodecString;
 this.hevcBitstreamCodec = hevcBitstreamCodec;
 this.encoderConfig = encoderConfig;
 this.fitTier = fitTierToSource;
-this.GlFramePainter = GlFramePainter;
 this.orientationMatrix = orientationMatrix;
 this.orientedSize = orientedSize;
 this.orientationCode = orientationCode;`, sandbox);
@@ -1318,96 +1317,6 @@ test('the transport meter sums what open sockets still buffer and forgets closed
 
 // ── Safari capture without a CPU readback ──
 
-/// A WebKit page: the only engine whose 2D canvas reads back to the CPU to become a VideoFrame.
-const apple = options => { const f = fixture(options); f.sandbox.navigator.vendor = 'Apple Computer, Inc.'; return f; };
-
-/// A WebGL context that records what was asked of it. `pixels` is what the 2x2 centre check reads back; `fail`
-/// makes getError report an error after a draw.
-function fakeGl({ pixels = 7, fail = false, lost = false } = {}) {
-    return canvas => {
-        const gl = { calls: [], uploads: [], draws: 0, lost, released: false,
-            VERTEX_SHADER: 1, FRAGMENT_SHADER: 2, COMPILE_STATUS: 3, LINK_STATUS: 4, ARRAY_BUFFER: 5, STATIC_DRAW: 6, FLOAT: 7,
-            TEXTURE_2D: 8, TEXTURE_MIN_FILTER: 9, TEXTURE_MAG_FILTER: 10, TEXTURE_WRAP_S: 11, TEXTURE_WRAP_T: 12, LINEAR: 13,
-            CLAMP_TO_EDGE: 14, UNPACK_FLIP_Y_WEBGL: 15, UNPACK_PREMULTIPLY_ALPHA_WEBGL: 16, RGBA: 17, UNSIGNED_BYTE: 18,
-            TRIANGLE_STRIP: 19, NO_ERROR: 0,
-            createShader: () => ({}), shaderSource() {}, compileShader() {}, getShaderParameter: () => true,
-            createProgram: () => ({}), attachShader() {}, linkProgram() {}, getProgramParameter: () => true, useProgram() {},
-            createBuffer: () => ({}), bindBuffer() {}, bufferData() {}, getAttribLocation: () => 0, enableVertexAttribArray() {},
-            vertexAttribPointer() {}, createTexture: () => ({}), bindTexture() {}, texParameteri() {},
-            pixelStorei(name, value) { gl.calls.push(['pixelStorei', name, value]); },
-            viewport(x, y, w, h) { gl.calls.push(['viewport', w, h]); },
-            texImage2D(...args) { gl.uploads.push(args); },
-            drawArrays() { gl.draws++; },
-            getError: () => { gl.calls.push(['getError']); return fail ? 1282 : 0; },
-            readPixels(x, y, w, h, format, type, target) { target.fill(pixels); },
-            isContextLost: () => gl.lost,
-            getExtension: name => name === 'WEBGL_lose_context' ? { loseContext() { gl.released = true; } } : null };
-        gl.canvas = canvas;
-        return gl;
-    };
-}
-
-test('on the frame-callback path the camera is painted on the GPU, upright, at the encoder size', async () => {
-    const f = apple({ capture: 'rvfc', webgl: fakeGl() });
-    await init(f);
-    await f.p.startCapture(f.host, {});
-    for (let i = 0; i < 4; i++) f.video.emit(i / 30);
-    const gl = f.p.glPainter.gl;
-    assert.equal(f.stats.encoded.length, 4);
-    assert.ok(f.stats.frames.every(x => x.source === gl.canvas && x.closed), 'frames come from the WebGL canvas and are closed');
-    assert.equal(gl.uploads.length, 4, 'one texture upload a picture');
-    assert.equal(gl.calls.filter(x => x[0] === 'getError').length, 1, 'only startup synchronizes for error validation');
-    assert.ok(gl.uploads.every(args => args.length === 6 && args[1] === 0 && args[2] === gl.RGBA && args[4] === gl.UNSIGNED_BYTE && args[5] === f.video),
-        "only the level-0 RGBA/UNSIGNED_BYTE upload of the element itself takes WebKit's GPU-to-GPU path");
-    assert.deepEqual(plain(gl.calls.find(x => x[0] === 'viewport')), ['viewport', 1280, 720]);
-    assert.deepEqual([gl.canvas.width, gl.canvas.height], [1280, 720]);
-    assert.ok(gl.calls.some(x => x[0] === 'pixelStorei' && x[1] === gl.UNPACK_FLIP_Y_WEBGL && x[2] === false),
-        'WebKit undoes the camera orientation in the upload; flipping again would turn the picture over');
-    assert.equal(f.canvases.filter(x => x.ops.length).length, 0, 'the 2D canvas, and its CPU readback, is never used');
-});
-
-test('an engine whose WebGL upload comes back empty falls back to the 2D canvas instead of sending black', async () => {
-    const f = apple({ capture: 'rvfc', webgl: fakeGl({ pixels: 0 }) });
-    await init(f);
-    await f.p.startCapture(f.host, {});
-    f.video.emit(0); f.video.emit(1 / 30);
-    assert.equal(f.p.glPainter, false);
-    assert.equal(f.stats.encoded.length, 2, 'no picture is lost to the switch');
-    assert.ok(f.stats.frames.every(x => x.source === f.p.captureCanvas));
-    assert.equal(f.canvases.find(x => x.gl)?.gl.released, true, 'the abandoned context is released');
-});
-
-test('a WebGL error or a lost context also falls back, and the next capture tries WebGL again', async () => {
-    for (const options of [{ fail: true }, { lost: true }]) {
-        const f = apple({ capture: 'rvfc', webgl: fakeGl(options) });
-        await init(f);
-        await f.p.startCapture(f.host, {});
-        f.video.emit(0);
-        assert.equal(f.p.glPainter, false);
-        assert.equal(f.stats.encoded.length, 1);
-        f.p.stopCapture();
-        assert.equal(f.p.glPainter, null, 'a lost context is not a verdict on this device');
-    }
-});
-
-test('the painter checks its first picture once, not every picture', () => {
-    const gl = fakeGl()({ width: 0, height: 0 });
-    let reads = 0;
-    gl.readPixels = (x, y, w, h, format, type, target) => { reads++; target.fill(9); };
-    const canvas = { width: 0, height: 0, getContext: () => gl };
-    const sandbox = fixture().sandbox;
-    const painter = sandbox.GlFramePainter.create({ createElement: () => canvas });
-    for (let i = 0; i < 30; i++) painter.paint({}, 720, 1280);
-    assert.equal(reads, 1);
-    assert.deepEqual([canvas.width, canvas.height], [720, 1280]);
-    painter.release();
-    assert.equal(gl.released, true);
-});
-
-// ── Which encoders are hardware: Media Capabilities, since WebCodecs cannot say ──
-
-/// Safari's answers (LibWebRTCProvider::videoEncodingCapabilitiesOverride): H.264 power efficient, VP8/VP9/AV1
-/// encode not; decode as the device found hardware.
 const safariCapabilities = (vp9HardwareDecode = true) => ({
     queries: [],
     async encodingInfo(query) { this.queries.push(['encode', query]); return { supported: true, smooth: query.video.contentType === 'video/H264', powerEfficient: query.video.contentType === 'video/H264' }; },
@@ -1436,7 +1345,7 @@ test('no Media Capabilities, a refusal or a throw all mean "not known to be hard
 });
 
 test('other engines keep the 2D canvas, which is GPU-backed there and cheaper than a WebGL round trip', async () => {
-    const f = fixture({ capture: 'rvfc', webgl: fakeGl() });
+    const f = fixture({ capture: 'rvfc' });
     f.sandbox.navigator.vendor = 'Google Inc.';
     await init(f);
     await f.p.startCapture(f.host, {});
@@ -1445,15 +1354,6 @@ test('other engines keep the 2D canvas, which is GPU-backed there and cheaper th
     assert.ok(f.stats.frames.every(x => x.source === f.p.captureCanvas));
     assert.equal(f.p.getDiagnostics().strategy, 'rvfc/2d');
 });
-
-test('diagnostics say which painter an iPhone is using', async () => {
-    const f = apple({ capture: 'rvfc', webgl: fakeGl() });
-    await init(f);
-    await f.p.startCapture(f.host, {});
-    f.video.emit(0);
-    assert.equal(f.p.getDiagnostics().strategy, 'rvfc/webgl');
-});
-
 
 test('HEVC uses Annex B and probes its actual size for power efficiency', async () => {
     const queries = [];
@@ -1609,11 +1509,11 @@ test('Safari worker diagnostics report its painter and window costs; disabling c
     const w = f.workers[0]; w.emit({ type: 'ready', supported: true });
     assert.equal(f.p.getDiagnostics().capturePrepareMs, null);
     const frame = new f.sandbox.VideoFrame({ width: 720, height: 1280 }, { timestamp: 0 });
-    w.emit({ type: 'frame', path: 'worker-webgl', frame, prepareMs: 2.5 });
+    w.emit({ type: 'frame', path: 'worker-webgpu', frame, prepareMs: 2.5 });
     const info = f.p.getDiagnostics();
-    assert.equal(info.strategy, 'worker-webgl');
+    assert.equal(info.strategy, 'worker-webgpu');
     assert.equal(info.capturePrepareMs, 2.5);
-    assert.equal(info.orientation, 'normalized upright in worker (webgl)');
+    assert.equal(info.orientation, 'normalized upright in worker (webgpu)');
     assert.equal(f.p.getDiagnostics().capturePrepareMs, null, 'no stale cost in an empty window');
     f.p.getDiagnostics(false);
     assert.equal(f.p.debugLoopTimer, null);
@@ -1628,5 +1528,45 @@ test('worker normalization failure is visible in diagnostics while element captu
     assert.equal(info.captureFallback, 'orientation-normalization-unavailable');
     assert.equal(info.strategy, 'rvfc/2d');
     f.video.emit(0); assert.equal(f.stats.encoded.length, 1);
+    await f.p.dispose();
+});
+
+test('Safari waits for its first worker frame and does not use page capture', async () => {
+    const f = workerFixture(); f.sandbox.navigator.vendor = 'Apple Computer, Inc.';
+    await init(f);
+    const starting = f.p.startCapture(f.host, {});
+    await new Promise(resolve => setImmediate(resolve));
+    f.workers[0].emit({ type: 'frame', path: 'worker-webgpu',
+        frame: new f.sandbox.VideoFrame({ width: 720, height: 1280 }, { timestamp: 0 }) });
+    assert.equal((await starting).capturing, true);
+    assert.equal(f.p.strategy(), 'worker-webgpu');
+    assert.equal(f.canvases.length, 0);
+    f.workers[0].emit({ type: 'failed', reason: 'webgpu-failed' });
+    assert.equal(f.p.captureRunning, false);
+    assert.ok(f.stats.invoked.some(x => x[0] === 'OnVideoCaptureStopped' && x[1] === 'webgpu-failed'));
+    await f.p.dispose();
+});
+
+test('Safari worker failure rejects startup and releases the camera without fallback', async () => {
+    for (const failure of ['webgpu-unavailable', 'webgpu-failed', 'worker-processor-unavailable']) {
+        const f = workerFixture(); f.sandbox.navigator.vendor = 'Apple Computer, Inc.';
+        await init(f);
+        const starting = f.p.startCapture(f.host, {});
+        await new Promise(resolve => setImmediate(resolve));
+        f.workers[0].emit({ type: 'failed', reason: failure });
+        await assert.rejects(starting, /webgpu-/);
+        assert.equal(f.p.captureRunning, false);
+        assert.equal(f.canvases.length, 0);
+        assert.equal(f.stats.encoded.length, 0);
+        await f.p.dispose();
+    }
+});
+
+test('Safari without a worker refuses camera capture explicitly', async () => {
+    const f = fixture({ capture: 'rvfc' }); f.sandbox.navigator.vendor = 'Apple Computer, Inc.';
+    await init(f);
+    await assert.rejects(f.p.startCapture(f.host, {}), /webgpu-capture-unavailable/);
+    assert.equal(f.p.captureRunning, false);
+    assert.equal(f.canvases.length, 0);
     await f.p.dispose();
 });

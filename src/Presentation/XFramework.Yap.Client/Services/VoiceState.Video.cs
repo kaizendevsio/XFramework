@@ -220,6 +220,8 @@ public sealed partial class VoiceState
             "hidden" => "Camera turned off while Yap was in the background.",
             "denied" => "Yap could not use the camera. Check its permission for this site.",
             "ended" => "The camera was disconnected.",
+            "webgpu-unavailable" => WebGpuUnavailableNotice,
+            var failure when failure.StartsWith("webgpu-", StringComparison.Ordinal) => WebGpuFailedNotice,
             _ => "The camera stopped unexpectedly."
         });
     }
@@ -230,8 +232,14 @@ public sealed partial class VoiceState
         if (Current(attempt)) Notify();
     }
 
+    private const string WebGpuUnavailableNotice = "Video requires WebGPU on this browser. On iPhone, update to iOS 26 or later. Your voice call can continue.";
+    private const string WebGpuFailedNotice = "Video processing could not start or stopped. Try turning the camera on again. Your voice call can continue.";
+
     private static string CameraMessage(Exception error) => error switch
     {
+        _ when error.Message.Contains("webgpu-unavailable", StringComparison.Ordinal)
+            || error.Message.Contains("webgpu-capture-unavailable", StringComparison.Ordinal) => WebGpuUnavailableNotice,
+        _ when error.Message.Contains("webgpu-", StringComparison.Ordinal) => WebGpuFailedNotice,
         ChatApiException { Status: 409 } => "This call already has as many cameras as it can carry.",
         ChatApiException { Status: 503 } => "Video calls are not available yet.",
         _ => "The camera could not start. Check camera access for this site."

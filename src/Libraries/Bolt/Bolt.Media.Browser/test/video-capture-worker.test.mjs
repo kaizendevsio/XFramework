@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 const source = readFileSync(new URL('../wwwroot/bolt-video-capture-worker.js', import.meta.url), 'utf8').replace(/^import .*;$/gm, '');
 const tick = () => new Promise(resolve => setImmediate(resolve));
-function fixture(supported = true, normalizer = true, gpu = null) {
+function fixture(supported = true, normalizer = true, gpu = undefined) {
     let pending;
     const messages = [], track = { stopped: false, constraints: [], stop() { this.stopped = true; },
         async applyConstraints(value) { this.constraints.push(value); } };
@@ -12,11 +12,11 @@ function fixture(supported = true, normalizer = true, gpu = null) {
         async cancel() { pending?.({ done: true }); } };
     const self = { postMessage: (data, transfer) => messages.push({ data, transfer }), close() { self.closed = true; } };
     const painted = [], normalized = [];
-    const painter = { paint(frame, width, height) { painted.push({ frame, width, height }); return { width, height }; },
+    const painter = { checked: false, device: { pushErrorScope() {}, async popErrorScope() { return null; } }, paint(frame, width, height) { painted.push({ frame, width, height }); return { width, height }; },
         release() { painter.released = true; } };
     const sandbox = { self, Math, Error, performance,
         GlFramePainter: { create: () => normalizer ? painter : null },
-        GpuFramePainter: { create: async () => gpu },
+        GpuFramePainter: { create: async () => gpu === undefined ? (normalizer ? painter : null) : gpu },
         OffscreenCanvas: class {},
         VideoFrame: class { constructor(canvas, init) { Object.assign(this, init); this.rotation = 0; this.flip = false;
             this.displayWidth = canvas.width; this.displayHeight = canvas.height; normalized.push(this); }
@@ -55,17 +55,15 @@ test('worker prefers external GPU textures and reports separate preparation cost
     f.send({ type: 'stop' }); await tick(); assert.ok(gpu.released);
 });
 
-test('GPU validation failure falls back once without losing the current frame', async () => {
-    let draws = 0;
+test('GPU validation failure stops capture, closes frames and never uses WebGL', async () => {
     const gpu = { checked: false, device: { pushErrorScope() {}, async popErrorScope() { return Error('unsupported'); } },
-        paint(frame, width, height) { draws++; return { width, height }; }, release() { gpu.released = true; } };
+        paint(frame, width, height) { return { width, height }; }, release() { gpu.released = true; } };
     const f = fixture(true, true, gpu); f.send({ type: 'start', track: f.track });
-    for (let i = 0; i < 2; i++) {
-        f.send({ type: 'credit' }); const frame = f.frame(i * 40000); delete frame.rotation; await tick();
-        assert.equal(f.messages.at(-1).data.path, 'worker-webgl'); assert.ok(frame.closed);
-    }
-    assert.equal(draws, 1); assert.ok(gpu.released);
-    f.send({ type: 'stop' }); await tick();
+    const frame = f.frame(); delete frame.rotation; await tick();
+    assert.equal(f.messages.at(-1).data.reason, 'webgpu-failed');
+    assert.equal(f.messages.filter(x => x.data.type === 'frame').length, 0);
+    assert.equal(f.painted.length, 0);
+    assert.ok(frame.closed && f.normalized[0].closed && gpu.released && f.track.stopped);
 });
 
 test('worker bounds in-flight ownership, drops excess and paces before transferring', async () => {
@@ -88,7 +86,7 @@ test('worker reports unavailable normalization and releases its camera clone', a
     const f = fixture(true, false); f.send({ type: 'start', track: f.track });
     const a = f.frame(); delete a.rotation; await tick();
     assert.equal(f.messages.at(-1).data.type, 'failed');
-    assert.equal(f.messages.at(-1).data.reason, 'orientation-normalization-unavailable');
+    assert.equal(f.messages.at(-1).data.reason, 'webgpu-unavailable');
     assert.ok(a.closed); assert.ok(f.track.stopped); assert.ok(f.self.closed);
 });
 
@@ -129,7 +127,7 @@ test('worker normalizes hidden orientation without rejecting Safari frames or gu
     const f = fixture(); f.send({ type: 'start', track: f.track });
     const frame = f.frame(); delete frame.rotation; delete frame.flip; await tick();
     const sent = f.messages.at(-1);
-    assert.equal(sent.data.path, 'worker-webgl');
+    assert.equal(sent.data.path, 'worker-webgpu');
     assert.equal(sent.data.prepareMs, null, 'timing is opt-in');
     assert.equal(sent.transfer[0], f.normalized[0]);
     assert.deepEqual([sent.data.frame.displayWidth, sent.data.frame.displayHeight], [1080, 1920]);
@@ -147,4 +145,14 @@ test('normalization failure after allocation releases both frames and the GPU co
     f.self.postMessage = data => { if (data.type === 'frame') throw Error('transfer'); };
     const frame = f.frame(); delete frame.rotation; await tick();
     assert.ok(frame.closed && f.normalized[0].closed && f.painter.released && f.track.stopped);
+});
+
+test('device loss after a successful frame stops instead of switching painters', async () => {
+    const f = fixture(); f.send({ type: 'start', track: f.track });
+    const first = f.frame(); delete first.rotation; await tick();
+    f.painter.paint = () => { throw Error('device lost'); };
+    f.send({ type: 'credit' }); const next = f.frame(40000); delete next.rotation; await tick();
+    assert.equal(f.messages.at(-1).data.reason, 'webgpu-failed');
+    assert.equal(f.messages.filter(x => x.data.type === 'frame').length, 1);
+    assert.ok(next.closed && f.track.stopped && f.painter.released);
 });
