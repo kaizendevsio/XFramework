@@ -517,7 +517,25 @@ public sealed class MediaSendPacer : IAsyncDisposable
                     else await _send(frame, audio, ct);
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
-                catch { lock (_sync) { if (audio) _droppedAudio++; } continue; }
+                catch
+                {
+                    bool request = false;
+                    lock (_sync)
+                    {
+                        if (audio) _droppedAudio++;
+                        else if (repairSend is null)
+                        {
+                            // A failed fragment breaks the picture's references, even when the
+                            // channel closes before it can report a path change.
+                            DropVideoLocked();
+                            if (!_awaitingKeyframe) _baseLosses++;
+                            _awaitingKeyframe = true;
+                            request = RequestKeyframe(_clock());
+                        }
+                    }
+                    if (request) KeyframeNeeded?.Invoke();
+                    continue;
+                }
                 lock (_sync)
                 {
                     _sentBytes += frame.Length;

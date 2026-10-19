@@ -38,12 +38,13 @@ WebSocket fallback and reconnection. No sample entered automatic video suspensio
 # Validation
 
 - Browser media unit suite: 174 passed, including worker fallback, ownership and diagnostics.
-- Congestion, rate and client transport tests: 88 passed; additional ICE recovery and media resume
-  checks: 16 passed. Regressions cover partial-picture expiry, blocked transport expiry, large
+- Congestion, rate, ICE recovery and media resume tests: 105 passed. Regressions cover
+  partial-picture expiry, blocked transport expiry, failed sends, large
   socket fragments at 16 kbps and clearing media on a path change.
 - Yap regression suite: 321 passed.
 - `scripts/yap/worker-capture-check.html` checks all eight rotation/flip combinations with real
   VideoFrames in the production worker. `?webgl` exercises the compatibility path.
+  Ten WebGPU-normalized frames also completed an H.264 encode/decode round trip without errors.
 - Desktop Chromium synthetic 1080x1920 preparation: WebGPU sustained 30.19/60.18 fps at requested
   30/60, with mean preparation 0.53/0.43 ms; WebGL sustained 30.16/60.18 fps with 0.31/0.33 ms.
   Both paths preserved pixels. These are desktop pipeline checks, **not an iPhone speedup**.

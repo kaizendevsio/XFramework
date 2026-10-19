@@ -55,6 +55,26 @@ public class MediaPacerRecoveryTests
     }
 
     [Test]
+    public async Task FailedFragment_DiscardsDependentVideoAndRequestsRecovery()
+    {
+        var requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var attempts = 0;
+        await using var pacer = new MediaSendPacer((_, _) =>
+        {
+            Interlocked.Increment(ref attempts);
+            throw new IOException("transport disconnected");
+        });
+        pacer.KeyframeNeeded += () => requested.TrySetResult();
+        pacer.EnqueueVideo(new([[1], [2]], true));
+        pacer.EnqueueVideo(new([[3]], false));
+        pacer.Start();
+        await requested.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        Assert.That(pacer.IsAwaitingKeyframe, Is.True);
+        Assert.That(attempts, Is.EqualTo(1));
+        Assert.That(pacer.Sample().BaseLosses, Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task PathChange_ClearsOldFragmentsRepairsAndSamples_AndRequestsKeyframe()
     {
         long now = 0;

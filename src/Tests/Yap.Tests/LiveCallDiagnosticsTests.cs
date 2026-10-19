@@ -67,6 +67,19 @@ public sealed class LiveCallDiagnosticsTests
         Assert.That(YapCallDiagnostics.Valid(sample with { Metrics = null! }), Is.False);
     }
 
+    [Test] public void Schema_PreservesWebGpuPreparationBreakdown()
+    {
+        var sample = LiveCallDiagnostics.Project(new VideoDiagnostics
+        {
+            Strategy = "worker-webgpu", CapturePaintMs = 2.5, CaptureFrameMs = 7.5,
+            CapturePrepareMs = 10, Codec = "avc1.420028"
+        }, Guid.NewGuid(), 1, CallDevice.Ios, true, 2000, 1080, 30);
+        Assert.That(YapCallDiagnostics.Valid(sample), Is.True);
+        Assert.That(sample.CapturePath, Is.EqualTo(CallCapturePath.WorkerWebgpu));
+        Assert.That(sample.Metrics[CallMetric.CapturePaintMs], Is.EqualTo(2.5));
+        Assert.That(sample.Metrics[CallMetric.CaptureFrameMs], Is.EqualTo(7.5));
+    }
+
     [Test] public async Task Endpoint_RequiresSessionAccountCsrfAndBoundedBody_StoresReadableTrace()
     {
         File.WriteAllText(enable, "");
