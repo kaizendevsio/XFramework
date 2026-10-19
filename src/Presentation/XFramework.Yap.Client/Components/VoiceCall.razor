@@ -1,6 +1,7 @@
 @implements IAsyncDisposable
 @inject VoiceState Voice
 @inject IJSRuntime JS
+@inject LiveCallDiagnostics Live
 @if(Voice.IsCalling || Voice.Ended is not null)
 {
     @if(Voice.Minimized && Voice.IsCalling)
@@ -102,6 +103,8 @@
             @if (outputOpen)
             {
                 <section class="call-panel video-call-settings" aria-label="Audio and video options" data-call-hold>
+                    @if (Live.Enabled)
+                    { <div class="call-audio-output"><p role="status">Test @Live.TestId · @Live.Status</p><button type="button" class="btn ghost" @onclick="Live.StopAsync">Stop sharing diagnostics</button></div> }
                     @AudioOutputPicker @CameraPicker
                     <div class="call-audio-output"><VideoQualitySettings />@if (QualityLabel is { Length: > 0 } quality) { <p class="call-quality">Sending @quality</p> }</div>
                     <div class="call-audio-output"><label class="setting-toggle"><span>Show video diagnostics</span><input type="checkbox" role="switch" checked="@debugVideo" @onchange="ToggleDiagnosticsAsync" /><span class="switch-track" aria-hidden="true"></span></label></div>
@@ -198,18 +201,22 @@
         debugVideo = !debugVideo;
         videoDiagnostics = null;
         if (debugVideo) outputOpen = false;
-        else { try { await Voice.GetVideoDiagnosticsAsync(false); } catch { } }
+        else if (!Live.Enabled) { try { await Voice.GetVideoDiagnosticsAsync(false); } catch { } }
     }
-    private async Task RefreshDiagnosticsAsync()
+    private bool samplingDiagnostics;
+    private async Task RefreshDiagnosticsAsync(bool visible = true)
     {
-        if (!debugVideo || Voice.Minimized || !Video)
+        if (!Voice.IsCalling || (!Live.Enabled && (!debugVideo || Voice.Minimized || !Video || !visible)))
         {
-            if (videoDiagnostics is not null) { videoDiagnostics = null; try { await Voice.GetVideoDiagnosticsAsync(false); } catch { } }
+            if (samplingDiagnostics) { samplingDiagnostics = false; videoDiagnostics = null; try { await Voice.GetVideoDiagnosticsAsync(false); } catch { } }
             return;
         }
         try
         {
+            samplingDiagnostics = true;
             var snapshot = await Voice.GetVideoDiagnosticsAsync(true);
+            if (snapshot is not null && Voice.Invite is { } invite)
+                Live.Offer(invite.Id, snapshot, visible, Voice.PreferredVideoHeight, Voice.PreferredVideoFramerate);
             if (debugVideo && Voice.IsCalling && !Voice.Minimized) videoDiagnostics = snapshot;
         }
         catch { videoDiagnostics = null; }
@@ -271,8 +278,28 @@
     private void Changed() => _ = InvokeAsync(() => { if (!Voice.IsCalling) { outputOpen = false; outputs = null; outputError = null; playbackSuspended = false; debugVideo = false; videoDiagnostics = null; if (!Surface) { backdropFailed = null; Release(); } } StateHasChanged(); });
     private void Release(){ canvases.Clear(); attached.Clear(); previewAttached = null; opened = null; }
     // Ringing counts: the output picker is usable before the call connects, so it must refresh then too.
-    // Nothing to tick in the background: no clock is visible, and diagnostics must not keep sampling the pipeline.
-    private async Task Tick(){ try { while(!lifetime.IsCancellationRequested){await Task.Delay(1000,lifetime.Token);if((Voice.IsCalling || Voice.Ended is not null) && !await PageHiddenAsync())await InvokeAsync(async () => { if (outputOpen && !outputBusy) await RefreshOutputsAsync(); await CheckPlaybackAsync(); await RefreshDiagnosticsAsync(); StateHasChanged(); });} }catch(OperationCanceledException){} }
+    // One sampler serves both the panel and live capture, so reading the counters cannot reset another reader's window.
+    // A hidden page may be suspended by the OS; the server's timestamps expose those gaps without replaying stale samples.
+    private async Task Tick()
+    {
+        try
+        {
+            while (!lifetime.IsCancellationRequested)
+            {
+                await Task.Delay(1000, lifetime.Token);
+                if (!Voice.IsCalling && Voice.Ended is null) continue;
+                var visible = !await PageHiddenAsync();
+                await InvokeAsync(async () =>
+                {
+                    await RefreshDiagnosticsAsync(visible);
+                    if (!visible) return;
+                    if (outputOpen && !outputBusy) await RefreshOutputsAsync();
+                    await CheckPlaybackAsync(); StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
     private async Task<bool> PageHiddenAsync() { try { return await JS.InvokeAsync<bool>("yap.pageHidden"); } catch (JSException) { return false; } }
     private async Task ToggleOutputAsync() { outputOpen = !outputOpen; if (outputOpen) { outputError = null; await RefreshOutputsAsync(); await RefreshCamerasAsync(); } }
     private async Task RefreshOutputsAsync()

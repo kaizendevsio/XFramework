@@ -71,7 +71,7 @@
         @if (info.Remotes.Length == 0) { <div>No incoming video stream.</div> }
     }
     else { <div>Collecting video measurements…</div> }
-    <p>Updates every second. — means no sample. Hardware preference does not confirm GPU use. Rates exclude transport overhead; codec delays include queueing, not CPU usage or call latency. Preparation/copy/render are submission costs, not GPU completion times. Timings run only while this panel is open.</p>
+    <p>Updates every second. — means no sample. Hardware preference does not confirm GPU use. Rates exclude transport overhead; codec delays include queueing, not CPU usage or call latency. Preparation/copy/render are submission costs, not GPU completion times. Timings run while this panel is open or live sharing is enabled in Settings.</p>
 </aside>
 @code {
     [Parameter] public VideoDiagnostics? Snapshot { get; set; }

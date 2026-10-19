@@ -173,3 +173,50 @@ The optional panel adds per-window average capture preparation, encoded copy and
 Validation: the production worker passed all eight rotation/mirror pixel comparisons in real Chromium with hidden JS orientation metadata and synthetic frames. At portrait 1080x1920 it delivered 30.1 and 60.0 frames/second in five-second synthetic runs; worker preparation averaged 0.29 and 0.26ms respectively (p95 0.40ms). These exclude encoding, transport, phone cameras and thermal effects. Reproduce with `scripts/yap/worker-capture-check.html` served from the repository root; results are in `../performance-issues/yap-worker-normalization-2026-10-19.json`. Physical Safari camera and sustained-temperature validation remain necessary; this is not a claim that a real iPhone now sustains 1080p60 or stays cool.
 
 Startup uses one centered logo. A document-level timer reveals the spinner only after two seconds across the static-to-Blazor handoff. Progress text is removed; actionable storage-lock and error recovery remain visible.
+
+## 1.3.86 - Temporary live device traces
+
+Live call diagnostics are off by default. The operator opens a two-hour upload window with
+`ssh xeon@xeon-dev 'docker exec xframework-yap touch /tmp/yap-call-diagnostics.enabled'`.
+On each test phone, open Settings > Help and diagnostics > Diagnostics and choose
+**Share call diagnostics for 15 minutes**, then start the call. Keep Yap in the foreground;
+the stats panel can be closed. Call settings show the short test ID and last acknowledged
+sample, and provide Stop sharing. Closing/reloading the app disarms sharing.
+
+The existing one-second sampler serves both the panel and uploads (no competing reads of
+reset-on-read counters). Every two seconds it offers a sample over the same-origin authenticated
+Yap API. Only one request can be in flight, with a three-second timeout and no retry queue.
+Hidden/suspended pages may stop delivering samples; inspect server timestamps and sequence gaps.
+Per-window timings describe the selected one-second window, not the entire two-second interval.
+
+The allowlisted numeric schema contains capture/encode/decode/render timing, dimensions and FPS,
+queue and recovery counters, congestion causes and last bitrate cut, crypto/interop elapsed time,
+main-thread scheduling delay, coarse device family, app version and codec. Call/stream/test IDs
+correlate both devices; it contains no names, messages, media, keys, credentials, SDP, ICE addresses
+or user-agent strings. The API checks session, tenant/account, antiforgery, owner, sample order,
+1.5-second minimum interval, 16 KiB body limit, finite numbers and bounded codec labels.
+
+Traces are NDJSON in `/tmp/yap-call-diagnostics/` inside the Yap container, outside the web root
+and normal logs/Seq. There is no HTTP reader. A one-minute sweeper removes traces after an hour
+without writes. Each test lasts at most 15 minutes/450 samples; at most 32 retained sessions
+bound disk usage. Server restart invalidates upload sessions. The marker expires after two hours;
+remove it to stop accepting new uploads immediately (existing clients stop on their next upload).
+No database, persistent volumes, TURN settings, Funnel routes or call adaptation rules change.
+
+Read live device traces and server container CPU/memory over SSH:
+
+```powershell
+python scripts/yap/watch-call-diagnostics.py --seconds 60 --output artifacts/call-live.ndjson
+```
+
+The script prints device/test/call IDs, sample age, FPS, bitrate and cuts. It records container
+resource observations every ten seconds. Use short runs during a conversation so the agent can
+respond while observing. For complete retained history, read the specific session file over SSH;
+the live watcher only samples the latest line, so slower SSH polls can skip intermediate lines.
+The current checked-in topology is Tailscale Funnel for HTTP and Cloudflare Realtime TURN for
+call media; this scaffold adds no Cloudflare Worker or public management endpoint.
+
+Validate with `dotnet test src/Tests/Yap.Tests/Yap.Tests.csproj --filter FullyQualifiedName~LiveCallDiagnosticsTests`.
+It checks opt-in, expiry/retention, ownership, caps, schema restrictions, authenticated/CSRF API
+boundaries, duplicate handling and payload limits. Physical iOS/Android captures are the next
+step; these tests do not establish the cause of the video quality collapse.

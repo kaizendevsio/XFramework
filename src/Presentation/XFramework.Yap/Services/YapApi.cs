@@ -40,6 +40,7 @@ public static class YapApi
         });
 
         var api = app.MapGroup("/api/chat").RequireAuthorization().AddEndpointFilter<YapApiFilter>();
+        YapCallDiagnostics.Map(api);
         api.MapPost("/socket/session", (HttpContext context, YapChatGateway gateway, CancellationToken ct) =>
             gateway.CreateTicketAsync(context.User, ct));
         api.MapGet("/socket", (HttpContext context, YapChatGateway gateway) => gateway.AcceptSocketAsync(context))
