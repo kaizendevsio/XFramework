@@ -39,4 +39,20 @@ public sealed class CandidateGate
             return held;
         }
     }
+
+    /// <summary>Drain candidates without letting a newly gathered candidate overtake an awaited send.</summary>
+    public async Task ReleaseAsync(Func<RtcCandidate, Task> send)
+    {
+        while (true)
+        {
+            RtcCandidate[] batch;
+            lock (_sync)
+            {
+                if (_held is not { Count: > 0 }) { _held = null; return; }
+                batch = _held.ToArray();
+                _held.Clear();
+            }
+            foreach (var candidate in batch) await send(candidate);
+        }
+    }
 }

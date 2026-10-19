@@ -453,6 +453,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
                 var tick = loop.Tick(now, _encodeBacklog);
                 SendRate = tick.Decision;
                 LastSendTick = tick;
+                if (_transport is { } transport) transport.IdleFeedbackEnabled = _videoLoop is not null && tick.Decision.VideoSuspended;
                 PacerDroppedPictures += tick.Pacer.DroppedPictures;
                 PacerBaseLosses += tick.Pacer.BaseLosses;
                 if (tick.AudioKbps is { } audio && _options.AdaptiveAudioBitrate)
@@ -482,6 +483,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
 
     private async Task StopSendPathAsync()
     {
+        if (_transport is { } transport) transport.IdleFeedbackEnabled = false;
         var cts = _rateCts;
         _rateCts = null;
         if (cts is not null)

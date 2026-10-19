@@ -134,6 +134,7 @@ public sealed partial class BoltGroupCallLifecycleTests
         var loop = new SendRateLoop(pacer, new SendRateController(setting.BitrateKbps + 32 + 52), ladder);
         // As BoltMediaService does: a channel that died under the sender restarts the rate control on the socket.
         datagram.PathLost += loop.PathChanged;
+        datagram.PathAvailable += loop.PathChanged;
         senderClient.RegisterFrameHandler(FrameType.MediaCongestion, (_, buffer, length) =>
         {
             if (BoltCodec.TryReadMediaCongestion(buffer.AsSpan(0, length), out var report))

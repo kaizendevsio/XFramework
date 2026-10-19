@@ -113,6 +113,7 @@ public sealed class CallHistorySurfaceTests
         services.AddSingleton<NavigationManager>(new Navigation(path));
         services.AddSingleton(new ChatApi(new HttpClient { BaseAddress = new("https://yap.test/") }));
         services.AddSingleton(p => new ChatState(null!, p.GetRequiredService<ChatApi>(), js.Object));
+        services.AddSingleton<LiveCallDiagnostics>();
         services.AddSingleton<VoiceState>(); services.AddSingleton<BrowserTime>();
         var provider = services.BuildServiceProvider();
         var state = provider.GetRequiredService<ChatState>();

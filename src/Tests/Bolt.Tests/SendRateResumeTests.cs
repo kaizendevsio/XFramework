@@ -14,6 +14,31 @@ public sealed class SendRateResumeTests
 {
     private const int Audio = 84;
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void MutedSuspendedSender_RecoversOnlyWhenIdlePacketsReceiveFeedback(bool acknowledged)
+    {
+        var controller = new SendRateController(65);
+        for (long now = 0; now <= 4_000; now += 250)
+            controller.Update(new SendPathSample(now, 0, 0, 0, 0, false,
+                Transport: now == 0 ? new(now, 0, 0, 0, 0) : null));
+        Assert.That(controller.VideoSuspended, Is.True);
+
+        SendRateDecision last = default;
+        for (long now = 4_250; now <= 100_000; now += 250)
+            last = controller.Update(new SendPathSample(now, 1, 0, 0, 0, false,
+                Transport: acknowledged ? new(now - now % 500, 0, 0, 0, 1) : null));
+        Assert.Multiple(() =>
+        {
+            Assert.That(last.VideoSuspended, Is.EqualTo(!acknowledged));
+            if (acknowledged)
+                Assert.That(last.VideoKbps, Is.GreaterThanOrEqualTo(controller.Options.ResumeVideoKbps));
+            else
+                Assert.That(last.Cause.HasFlag(RateCause.FeedbackMissing), Is.True,
+                    "sending filler alone is not proof that the path recovered");
+        });
+    }
+
     [Test]
     public void StableRate_IsTheCalmOperatingPoint_NotAProbePeak_NorTheCutAnOutageCaused()
     {

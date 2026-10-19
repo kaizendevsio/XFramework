@@ -220,3 +220,40 @@ Validate with `dotnet test src/Tests/Yap.Tests/Yap.Tests.csproj --filter FullyQu
 It checks opt-in, expiry/retention, ownership, caps, schema restrictions, authenticated/CSRF API
 boundaries, duplicate handling and payload limits. Physical iOS/Android captures are the next
 step; these tests do not establish the cause of the video quality collapse.
+
+## 1.3.87 - Recovery after the live device trace
+
+The 19 October device traces confirmed Safari was using `WorkerWebgl` while capturing.
+Both senders eventually stopped capture with `VideoSuspended=1`, followed by
+`FeedbackMissing` and budgets stuck around 84-86 kbps. Android continued encoding during
+an earlier iOS receive gap; the iOS fragment counter stopped, then advanced in a burst,
+with an empty decoder queue. The sender's receiver-delay report reached 4,479 ms.
+These observations locate that stall before decoding; they do not identify its network
+hop or establish the cause of full-resolution heating.
+
+While video is automatically suspended, an idle, open UDP channel now sends a 64-byte
+padding frame at most every 500 ms (67 bytes including the transport sequence stamp,
+about 1.1 kbps before network framing). This is existing protocol padding, with no media
+or microphone content. The relay returns actual arrival feedback, which permits the
+existing controller to recover only when the measured path is calm. No responses means
+no inferred recovery. Padding stops for active outgoing media, a backed-up channel,
+start probes, camera-off, or hangup. This mechanism requires the UDP transport-feedback
+capability; it does not add a synthetic capacity estimate to WebSocket-only calls.
+
+Moving from WebSocket to a usable data channel now resets the old path's congestion
+signals, just as falling back to WebSocket already did. Repeated status updates do not
+trigger another reset. The two ICE candidate senders also keep holding newly gathered
+candidates while earlier candidates are being sent; an end-of-gathering notification
+can no longer overtake that queue. This fixes a reproducible signaling race, but a real
+device rerun is still needed to determine whether it explains the observed setup timeouts.
+
+Regression coverage exercises idle traffic with acknowledged and black-holed packets,
+backpressure/disable behavior, recovery with and without feedback, the path-upgrade reset,
+and candidate ordering when gathering finishes during an awaited send. Congestion limits
+and microphone mute semantics are unchanged. Retest with both microphones muted and
+the live diagnostics enabled; verify suspension recovers, then inspect sustained 1080p
+timings separately rather than treating a low-resolution recovery as a thermal benchmark.
+
+Local validation: all 86 `BoltGroupCallLifecycleTests` passed, as did the 50-test targeted
+candidate/feedback/congestion/probe regression selection (the selections overlap).
+The Yap client Debug build passed with existing SQLite WebAssembly interop warnings.

@@ -25,6 +25,7 @@ public sealed class CallUxSurfaceTests
         services.AddSingleton<NavigationManager>(new Navigation());
         services.AddSingleton(new ChatApi(new HttpClient { BaseAddress = new("https://yap.test/") }));
         services.AddSingleton(p => new ChatState(null!, p.GetRequiredService<ChatApi>(), js.Object));
+        services.AddSingleton<LiveCallDiagnostics>();
         services.AddSingleton<VoiceState>(); services.AddSingleton<BrowserTime>();
         await using var provider = services.BuildServiceProvider();
         var state = provider.GetRequiredService<ChatState>();

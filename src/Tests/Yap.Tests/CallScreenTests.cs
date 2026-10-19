@@ -213,6 +213,7 @@ public sealed partial class CallScreenTests
 
             var services = new ServiceCollection().AddLogging();
             services.AddSingleton(js);
+            services.AddSingleton(new LiveCallDiagnostics(new ChatApi(http), js));
             services.AddSingleton(voice);
             provider = services.BuildServiceProvider();
         }

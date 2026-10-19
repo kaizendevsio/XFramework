@@ -177,8 +177,7 @@ public sealed partial class BoltServer
                     }
                     var answer = await session.Peer!.AnswerAsync(offer.Sdp, ct);
                     await SendTransportAsync(connection, MediaTransportKind.Answer, new MediaTransportDescription(session.Id, answer, offer.IceRestart));
-                    foreach (var held in session.LocalCandidates.Release())
-                        await SendCandidateAsync(connection, session, held);
+                    await session.LocalCandidates.ReleaseAsync(held => SendCandidateAsync(connection, session, held));
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
                 {
