@@ -1,13 +1,17 @@
+import { GlFramePainter } from './bolt-media.js';
+
 // Capture only: the existing encoder, authenticated orientation and transport stay unchanged.
 // Transfer VideoFrames, never pixel arrays. One outstanding frame bounds ownership and latency
 // even when the page is busy; keep draining and closing newer frames until it returns credit.
-let reader, track, stopped = false, credit = true, lastTimestamp = null, framerate = 30;
+let reader, track, stopped = false, credit = true, lastTimestamp = null, nextTimestamp = null, framerate = 30;
+let painter, diagnostics = false;
 
 async function stop() {
     if (stopped) return;
     stopped = true;
     track?.stop();
     try { await reader?.cancel(); } catch { }
+    painter?.release();
     self.close();
 }
 
@@ -18,28 +22,46 @@ async function capture(value) {
         while (!stopped) {
             const { value: frame, done } = await reader.read();
             if (done) break;
+            let normalized;
             try {
                 if (stopped || !credit) continue;
-                // Older WebKit can hide sensor orientation. Do not reintroduce sideways video:
-                // use the proven upright WebGL path when orientation cannot be inspected.
-                if (typeof frame.rotation !== 'number' || typeof frame.flip !== 'boolean')
-                    throw new Error('orientation-unavailable');
                 const timestamp = frame.timestamp;
-                if (lastTimestamp !== null && timestamp >= lastTimestamp &&
-                    timestamp - lastTimestamp < 1e6 / framerate - 500) continue;
+                const interval = 1e6 / framerate;
+                if (lastTimestamp !== null && timestamp <= lastTimestamp) continue;
+                if (nextTimestamp !== null && timestamp < nextTimestamp - interval * 0.1) continue;
+                nextTimestamp = nextTimestamp === null || timestamp > nextTimestamp + interval
+                    ? timestamp + interval : nextTimestamp + interval;
                 lastTimestamp = timestamp;
+                const started = diagnostics ? performance.now() : null;
+                let output = frame, path = 'worker-processor';
+                if (typeof frame.rotation !== 'number' || typeof frame.flip !== 'boolean') {
+                    // WebKit's texture upload applies the internal camera orientation even when
+                    // VideoFrame does not expose rotation/flip to JS. Normalize on the worker's
+                    // GPU canvas, not through an element callback on the page. No pixel readback
+                    // or guessed portrait angle; known orientation retains the direct frame path.
+                    try {
+                        painter ??= GlFramePainter.create({ createElement: () => new OffscreenCanvas(1, 1) });
+                        if (!painter) throw new Error();
+                        const canvas = painter.paint(frame, frame.displayWidth, frame.displayHeight);
+                        output = normalized = new VideoFrame(canvas, { timestamp, duration: frame.duration ?? Math.round(1e6 / framerate) });
+                        path = 'worker-webgl';
+                    } catch { throw new Error('orientation-normalization-unavailable'); }
+                }
                 credit = false;
-                self.postMessage({ type: 'frame', frame }, [frame]);
-            } finally { frame.close(); }
+                self.postMessage({ type: 'frame', frame: output, path,
+                    prepareMs: started === null ? null : performance.now() - started }, [output]);
+            } finally { normalized?.close(); frame.close(); }
         }
-        if (!stopped) self.postMessage({ type: 'failed' });
-    } catch {
-        if (!stopped) self.postMessage({ type: 'failed' });
+        if (!stopped) self.postMessage({ type: 'failed', reason: 'track-ended' });
+    } catch (error) {
+        if (!stopped) self.postMessage({ type: 'failed', reason: error.message === 'orientation-normalization-unavailable'
+            ? error.message : 'worker-capture-failed' });
     } finally { await stop(); }
 }
 
 self.onmessage = ({ data }) => {
     if (data.type === 'stop') { void stop(); return; }
+    if (data.type === 'diagnostics') { diagnostics = data.enabled === true; return; }
     if (data.type === 'credit') {
         framerate = Math.max(1, Math.min(60, data.framerate || 30));
         credit = true;

@@ -140,7 +140,7 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
     };
     let track = null;
     const sandbox = {
-        setTimeout, clearTimeout, setInterval, clearInterval,
+        setTimeout, clearTimeout, setInterval: (...args) => setInterval(...args).unref(), clearInterval,
         console, URL, Uint8Array, Float32Array, Math, Date, JSON, Promise, Set, Map, Number, performance: { now: clock }, isSecureContext: true,
         AudioEncoder: class { static async isConfigSupported() { return { supported: true }; } },
         AudioDecoder: class { static async isConfigSupported() { return { supported: true }; } },
@@ -1545,7 +1545,7 @@ test('worker-only processor transfers a clone, encodes without canvas and preser
     f.p.setOrientationMetadata(true);
     await f.p.startCapture(f.host, {});
     const w = f.workers[0]; w.emit({ type: 'ready', supported: true });
-    assert.equal(w.messages[0].transfer[0].clone, true);
+    assert.equal(w.messages.find(x => x.data.type === 'start').transfer[0].clone, true);
     const frame = new f.sandbox.VideoFrame({ camera: true, displayWidth: 720, displayHeight: 1280, rotation: 90, flip: false, timestamp: 0 });
     w.emit({ type: 'frame', frame });
     assert.equal(f.p.strategy(), 'worker-processor');
@@ -1601,4 +1601,32 @@ test('backgrounding a worker capture stops it and late frames cannot enter a res
     assert.equal(f.stats.encoded.length, 0);
     assert.notEqual(f.p.captureWorker, old);
     f.p.stopCapture();
+});
+
+
+test('Safari worker diagnostics report its painter and window costs; disabling clears timing', async () => {
+    const f = workerFixture(); await init(f); await f.p.startCapture(f.host, {});
+    const w = f.workers[0]; w.emit({ type: 'ready', supported: true });
+    assert.equal(f.p.getDiagnostics().capturePrepareMs, null);
+    const frame = new f.sandbox.VideoFrame({ width: 720, height: 1280 }, { timestamp: 0 });
+    w.emit({ type: 'frame', path: 'worker-webgl', frame, prepareMs: 2.5 });
+    const info = f.p.getDiagnostics();
+    assert.equal(info.strategy, 'worker-webgl');
+    assert.equal(info.capturePrepareMs, 2.5);
+    assert.equal(info.orientation, 'normalized upright in worker (webgl)');
+    assert.equal(f.p.getDiagnostics().capturePrepareMs, null, 'no stale cost in an empty window');
+    f.p.getDiagnostics(false);
+    assert.equal(f.p.debugLoopTimer, null);
+    assert.equal(w.messages.at(-1).data.enabled, false);
+    await f.p.dispose();
+});
+
+test('worker normalization failure is visible in diagnostics while element capture continues', async () => {
+    const f = workerFixture(); await init(f); await f.p.startCapture(f.host, {});
+    f.workers[0].emit({ type: 'failed', reason: 'orientation-normalization-unavailable' });
+    const info = f.p.getDiagnostics();
+    assert.equal(info.captureFallback, 'orientation-normalization-unavailable');
+    assert.equal(info.strategy, 'rvfc/2d');
+    f.video.emit(0); assert.equal(f.stats.encoded.length, 1);
+    await f.p.dispose();
 });

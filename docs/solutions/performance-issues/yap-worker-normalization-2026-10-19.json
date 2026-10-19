@@ -1,0 +1,59 @@
+{
+  "description": "Synthetic Chromium worker normalization with hidden orientation metadata; not an iPhone or full call benchmark",
+  "results": [
+    {
+      "rotation": 0,
+      "flip": false,
+      "ok": true
+    },
+    {
+      "rotation": 0,
+      "flip": true,
+      "ok": true
+    },
+    {
+      "rotation": 90,
+      "flip": false,
+      "ok": true
+    },
+    {
+      "rotation": 90,
+      "flip": true,
+      "ok": true
+    },
+    {
+      "rotation": 180,
+      "flip": false,
+      "ok": true
+    },
+    {
+      "rotation": 180,
+      "flip": true,
+      "ok": true
+    },
+    {
+      "rotation": 270,
+      "flip": false,
+      "ok": true
+    },
+    {
+      "rotation": 270,
+      "flip": true,
+      "ok": true
+    },
+    {
+      "requestedFps": 30,
+      "frames": 151,
+      "deliveredFps": 30.106669325092213,
+      "prepareMeanMs": 0.28940397856251293,
+      "prepareP95Ms": 0.40000009536743164
+    },
+    {
+      "requestedFps": 60,
+      "frames": 301,
+      "deliveredFps": 60.045083682952715,
+      "prepareMeanMs": 0.25880398227526896,
+      "prepareP95Ms": 0.39999985694885254
+    }
+  ]
+}

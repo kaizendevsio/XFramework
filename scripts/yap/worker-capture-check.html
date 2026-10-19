@@ -1,0 +1,91 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Bolt worker capture checks</title>
+<p>Synthetic frames through the production worker. Tests hidden orientation, WebGL pixels and transfers; does not emulate Safari's camera or measure phone temperature.</p>
+<pre id="result">Running</pre>
+<script type="module">
+const moduleUrl = new URL('/src/Libraries/Bolt/Bolt.Media.Browser/wwwroot/bolt-video-capture-worker.js', location.href).href;
+// Only the camera source is simulated. All painting, normalization, pacing, frame ownership,
+// transfers and cleanup run through the production worker, using actual browser VideoFrames.
+const bootstrap = `
+let controller;
+globalThis.MediaStreamTrackProcessor = class {
+    constructor() { this.readable = new ReadableStream({start(value) {controller = value;}}); }
+};
+Object.defineProperty(VideoFrame.prototype, 'rotation', {get() {return undefined;}});
+Object.defineProperty(VideoFrame.prototype, 'flip', {get() {return undefined;}});
+await import(${JSON.stringify(moduleUrl)});
+const captureMessage = self.onmessage;
+self.onmessage = event => {
+    if (event.data.type === 'fixture-start') captureMessage({data:{type:'start', framerate:60, track:{stop(){}}}});
+    else if (event.data.type === 'fixture-frame') controller.enqueue(event.data.frame);
+    else captureMessage(event);
+};
+self.postMessage({type:'fixture-ready'});
+`;
+const url = URL.createObjectURL(new Blob([bootstrap], {type:'text/javascript'}));
+const worker = new Worker(url, {type:'module'});
+let waiter, timestamp = 0;
+worker.onmessage = ({data}) => {
+    if (data.type === 'fixture-ready' || data.type === 'frame' || data.type === 'failed') {
+        if (waiter) { const done = waiter; waiter = null; done(data); }
+        else data.frame?.close();
+    }
+};
+const next = () => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {waiter=null; reject(Error('worker timeout'));}, 5000);
+    waiter = data => {clearTimeout(timer); data.type === 'failed' ? reject(Error(data.reason)) : resolve(data);};
+});
+function pattern(width, height) {
+    const c = new OffscreenCanvas(width, height), ctx=c.getContext('2d');
+    for (const [x,y,color] of [[0,0,'red'],[1,0,'lime'],[0,1,'blue'],[1,1,'yellow']]) {
+        ctx.fillStyle=color;ctx.fillRect(x*width/2,y*height/2,width/2,height/2);
+    }
+    return c;
+}
+function pixels(frame) {
+    const c=new OffscreenCanvas(frame.displayWidth,frame.displayHeight), ctx=c.getContext('2d');
+    ctx.drawImage(frame,0,0);
+    return [[.25,.25],[.75,.25],[.25,.75],[.75,.75]].flatMap(([x,y]) =>
+        [...ctx.getImageData(Math.floor(c.width*x),Math.floor(c.height*y),1,1).data]);
+}
+async function send(frame) {
+    const promise=next();worker.postMessage({type:'credit',framerate:60});
+    worker.postMessage({type:'fixture-frame',frame},[frame]);return promise;
+}
+window.results = [];
+try {
+    await next();worker.postMessage({type:'fixture-start'});
+    const source=pattern(96,64);
+    for (const rotation of [0,90,180,270]) for (const flip of [false,true]) {
+        const frame=new VideoFrame(source,{timestamp:timestamp+=40000,rotation,flip});
+        const expected=pixels(frame), size=[frame.displayWidth,frame.displayHeight];
+        const output=await send(frame);
+        try {
+            const actual=pixels(output.frame);
+            const ok=output.path==='worker-webgl' && JSON.stringify(size)===JSON.stringify([output.frame.displayWidth,output.frame.displayHeight]) &&
+                expected.every((v,i)=>Math.abs(v-actual[i])<=2);
+            results.push({rotation,flip,ok});
+            if (!ok) throw Error(`orientation mismatch ${rotation}/${flip}: ${actual} versus ${expected}`);
+        } finally {output.frame.close();}
+    }
+    worker.postMessage({type:'diagnostics',enabled:true});
+    const large=pattern(1080,1920);
+    for (const fps of [30,60]) {
+        const costs=[], started=performance.now();let frames=0;
+        while(performance.now()-started<5000) {
+            const deadline=started+frames*1000/fps;
+            if(deadline>performance.now()) await new Promise(r=>setTimeout(r,deadline-performance.now()));
+            const output=await send(new VideoFrame(large,{timestamp:timestamp+=Math.round(1e6/fps)}));
+            costs.push(output.prepareMs);output.frame.close();frames++;
+        }
+        costs.sort((a,b)=>a-b);
+        results.push({requestedFps:fps,frames,deliveredFps:frames*1000/(performance.now()-started),
+            prepareMeanMs:costs.reduce((a,b)=>a+b,0)/costs.length, prepareP95Ms:costs[Math.floor(costs.length*.95)]});
+    }
+} catch(error) {results.push({error:String(error)});}
+finally {
+    worker.postMessage({type:'stop'});setTimeout(()=>worker.terminate(),250);URL.revokeObjectURL(url);
+    document.querySelector('#result').textContent=JSON.stringify(results,null,2);window.finished=true;
+}
+</script>

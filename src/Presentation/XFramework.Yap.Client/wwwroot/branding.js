@@ -22,7 +22,6 @@
         yap.accentPreference = () => { try { const own = localStorage.getItem('yap-accent'); if (/^#[0-9a-f]{6}$/i.test(own)) return own; } catch {} return brand.accentColor; };
         yap.applyAccent(yap.accentPreference());
         if (brand.name !== 'Yap') document.querySelector('[data-startup-brand-name]')?.replaceChildren(brand.name);
-        const text = document.querySelector('[data-startup-brand-text]'); if (text) text.textContent = `Starting ${brand.name}…`;
         if (brand.logoUrl) {
             const mark = document.querySelector('[data-startup-brand-mark]');
             if (mark) { const logo = document.createElement('img'); logo.src = brand.logoUrl; logo.alt = ''; logo.width = 43; logo.height = 43; mark.replaceChildren(logo); }

@@ -6,7 +6,7 @@
 @inject IJSRuntime JS
 @inject Branding Branding
 <CascadingValue Value="@Branding.Current">
-@if (!State.Ready || failure is not null)
+@if (failure is not null || waitingForDatabase)
 {
     <div class="toast-host"><UpdateNotice /></div>
     <div class="startup-recovery"><a href="/api/app-recovery" data-enhance-nav="false">Taking a while? Open recovery</a></div>
@@ -19,11 +19,11 @@ else if (!State.Ready)
 {
     @if (waitingForDatabase)
     {
-        <StartupSplash Text="Waiting for the other Yap tab…"><p class="startup-help">Close the other tab to continue. Your saved conversations are safe.</p></StartupSplash>
+        <StartupSplash><p class="startup-help">Close the other Yap tab to continue. Your saved conversations are safe.</p></StartupSplash>
     }
     else
     {
-        <StartupSplash Text="@startupText" />
+        <StartupSplash />
     }
 }
 else
@@ -35,7 +35,6 @@ else
 @code {
     private string? failure;
     private bool waitingForDatabase;
-    private string startupText = "Opening device storage…";
     protected override Task OnInitializedAsync() { State.Changed += Changed; return StartAsync(); }
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -61,7 +60,6 @@ else
                 StateHasChanged();
             }
             waitingForDatabase = false;
-            startupText = "Loading saved conversations…";
             StateHasChanged();
             await State.InitializeAsync();
             await JS.InvokeVoidAsync("yap.diagnostics.record", "startup.complete");

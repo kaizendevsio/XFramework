@@ -15,8 +15,23 @@
                 <strong>Congestion: @info.Congestion@(info.VideoSuspended ? " ? video suspended" : "")</strong>
                 <div>Budget: @budget kbps total / @info.VideoBudgetKbps video / @info.AudioBitrateKbps Opus</div>
                 <div>Queue delay: @info.QueueDelayMs ms</div>
+                @if (info.RateDetails is { } rate)
+                {
+                    <div>Reason: @rate.Cause</div>
+                    <div>Delays local / uplink / relay / receiver: @rate.LocalDelayMs / @Number(rate.TransportDelayMs) / @Number(rate.RelayDelayMs) / @Number(rate.ReceiverDelayMs) ms</div>
+                    <div>Uplink loss: @Number(rate.UplinkLossPercent)% · measured capacity: @(rate.CapacityKbps > 0 ? $"{rate.CapacityKbps} kbps" : "—")</div>
+                    @if (rate.LastCutAgeMs is { } age)
+                    {
+                        <div>Last cut: @rate.LastCutFromKbps → @rate.LastCutToKbps kbps (@rate.LastCutCause), @Number(age / 1000.0)s ago</div>
+                    }
+                }
             </div>
         }
+        @if (info.EncryptionCosts is { } costs)
+        {
+            <div>Crypto + interop this window: @costs.Operations packets / @Number(costs.ProcessingMs) ms processing / @Number(costs.WaitingMs) ms waiting (both directions)</div>
+        }
+        <div>Main thread: max scheduling delay @Number(info.EventLoopLagMs) ms</div>
         <div class="debug-stream">
             <strong>Outgoing · @(info.Capturing ? "camera on" : "camera off")</strong>
             <div>Requested: @(RequestedHeight)p / @RequestedFps fps</div>
@@ -28,6 +43,8 @@
                 <div>Encoded: @Number(info.EncodedKbps) kbps · last encode: @Number(info.EncoderDelayMs) ms</div>
                 <div>Queue: encoder @info.EncoderQueue / send @info.SendQueue · capture pressure drops: @info.Dropped</div>
                 <div>Path: @info.Strategy · @info.Acceleration</div>
+                @if (info.CaptureFallback is { } fallback) { <div>Worker unavailable: @fallback</div> }
+                <div>Average capture preparation: @Number(info.CapturePrepareMs) ms · encoded copy: @Number(info.EncodedCopyMs) ms</div>
                 <div>Orientation: @(string.IsNullOrEmpty(info.Orientation) ? "—" : info.Orientation)</div>
             }
         </div>
@@ -46,6 +63,7 @@
                     <div>Pictures: @recovery.Pictures released / @recovery.Incomplete incomplete / @recovery.Skipped skipped</div>
                     <div>Fragments: @recovery.Fragments received ? local backlog drops: @recovery.LocalDrops</div>
                 }
+                <div>Average render submission: @Number(remote.RenderMs) ms</div>
                 <div>Decoder preference: @remote.Acceleration</div>
                 <div>Rotation applied: @(string.IsNullOrEmpty(remote.Rotation) ? "—" : remote.Rotation)</div>
             </div>
@@ -53,7 +71,7 @@
         @if (info.Remotes.Length == 0) { <div>No incoming video stream.</div> }
     }
     else { <div>Collecting video measurements…</div> }
-    <p>Updates every second. — means no sample. Hardware preference does not confirm GPU use. Rates exclude transport overhead; delays are local codec timings, not call latency.</p>
+    <p>Updates every second. — means no sample. Hardware preference does not confirm GPU use. Rates exclude transport overhead; codec delays include queueing, not CPU usage or call latency. Preparation/copy/render are submission costs, not GPU completion times. Timings run only while this panel is open.</p>
 </aside>
 @code {
     [Parameter] public VideoDiagnostics? Snapshot { get; set; }

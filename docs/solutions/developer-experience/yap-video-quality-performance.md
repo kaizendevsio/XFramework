@@ -160,3 +160,16 @@ measured it starts at 540p. The first picture is at most 720p and climbs to the 
 the receiver reports it keeps up; until the link first shows congestion it climbs fast (60% a second, several rungs at
 once). In the browser e2e on a clean 20 Mbit/s path both sides reach 1080p about 1 s after the camera starts (develop:
 22 s and 41 s); on a 512 kbit/s uplink the picture starts at 240p with a 14 KB keyframe.
+
+
+## 1.3.85 - Safari worker normalization and bottleneck measurements
+
+Safari's worker processor was probed, but frames without JavaScript `rotation`/`flip` properties were rejected. The worker now paints those frames through an OffscreenCanvas WebGL texture before transferring an upright VideoFrame to the existing page encoder. Browsers exposing orientation retain direct frame transfer. The reusable painter checks initialization/resizing, not every frame; no per-frame pixel-array transfer or guessed portrait rotation is introduced. The worker keeps one outstanding frame, closes both original and normalized frames, and releases the GPU context and camera clone on stop/failure. Deadline pacing tolerates 60fps camera jitter.
+
+The mechanism follows WebKit's internal orientation-aware texture upload (`GraphicsContextGLCVCocoa::copyVideoSampleToTexture`). Unsupported worker processors, track transfer, OffscreenCanvas/WebGL, context loss and stalls still recover through the element capture path. Diagnostics now name the actual failure, instead of silently reporting only `rvfc/webgl`. Removing recovery would turn unsupported browser capabilities into a broken camera. The new worker path reports `worker-webgl`; metadata-preserving transfer reports `worker-processor`. Encoding and sending remain on their existing paths.
+
+The optional panel adds per-window average capture preparation, encoded copy and render submission cost, maximum main-thread timer delay, and aggregate encryption/decryption interop wall time and gate wait. These are elapsed/submission timings, not CPU utilization, GPU completion, or proof of hardware use. Extra timing runs only while diagnostics are enabled; no frame contents or keys are retained. Congestion snapshots show local/uplink/relay/receiver delays, fresh uplink loss and estimated capacity. The most recent actual bitrate cut retains its reasons, before/after budgets and age. No congestion thresholds were relaxed without evidence.
+
+Validation: the production worker passed all eight rotation/mirror pixel comparisons in real Chromium with hidden JS orientation metadata and synthetic frames. At portrait 1080x1920 it delivered 30.1 and 60.0 frames/second in five-second synthetic runs; worker preparation averaged 0.29 and 0.26ms respectively (p95 0.40ms). These exclude encoding, transport, phone cameras and thermal effects. Reproduce with `scripts/yap/worker-capture-check.html` served from the repository root; results are in `../performance-issues/yap-worker-normalization-2026-10-19.json`. Physical Safari camera and sustained-temperature validation remain necessary; this is not a claim that a real iPhone now sustains 1080p60 or stays cool.
+
+Startup uses one centered logo. A document-level timer reveals the spinner only after two seconds across the static-to-Blazor handoff. Progress text is removed; actionable storage-lock and error recovery remain visible.

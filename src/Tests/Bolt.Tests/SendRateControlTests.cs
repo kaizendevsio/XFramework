@@ -12,6 +12,34 @@ namespace Bolt.Tests;
 [CancelAfter(20_000)]
 public sealed class SendRateControlTests
 {
+    [Test]
+    public void Diagnostics_UplinkLoss_ExplainsCutAndKeepsItAfterRecovery()
+    {
+        var controller = new SendRateController(6000);
+        var cut = controller.Update(new SendPathSample(1000, 6000, 40, 7, 0, false,
+            Relay: new(1000, 8, 9, 0, false), Receiver: new(1000, 10, 5000),
+            Transport: new(1000, 11, 0, 0.25, 4000)));
+        Assert.Multiple(() =>
+        {
+            Assert.That(cut.Cause.HasFlag(RateCause.UplinkLoss), Is.True);
+            Assert.That(cut.LocalDelayMs, Is.EqualTo(7));
+            Assert.That(cut.TransportDelayMs, Is.EqualTo(11));
+            Assert.That(cut.RelayDelayMs, Is.EqualTo(8));
+            Assert.That(cut.ReceiverDelayMs, Is.EqualTo(10));
+            Assert.That(cut.UplinkLossPercent, Is.EqualTo(25));
+            Assert.That(cut.LastCutFromKbps, Is.EqualTo(6000));
+            Assert.That(cut.LastCutToKbps, Is.LessThan(6000));
+        });
+        var recovered = controller.Update(new SendPathSample(2000, 3000, 40, 0, 0, false,
+            Receiver: new(2000, 0, 3000), Transport: new(2000, 0, 0, 0, 4000)));
+        Assert.That(recovered.LastCutCause, Is.EqualTo(cut.LastCutCause));
+        Assert.That(recovered.LastCutAgeMs, Is.EqualTo(1000));
+        var stale = controller.Update(new SendPathSample(60000, 3000, 40, 0, 0, false,
+            Receiver: new(2000, 10, 3000), Transport: new(2000, 11, 0, 0.25, 4000)));
+        Assert.That(stale.ReceiverDelayMs, Is.Null);
+        Assert.That(stale.UplinkLossPercent, Is.Null, "stale feedback must not look current");
+    }
+
     // ── Step responses ──
 
     [Test]
