@@ -116,6 +116,7 @@ public sealed class PresenceSurfaceTests
         services.AddSingleton<NavigationManager>(new Navigation(path));
         services.AddSingleton(new ChatApi(new HttpClient(new Api(detail)) { BaseAddress = new("https://yap.test/") }));
         services.AddSingleton(p => new ChatState(new OfflineStore(factory), p.GetRequiredService<ChatApi>(), js.Object));
+        services.AddSingleton<LiveCallDiagnostics>();
         services.AddSingleton<VoiceState>(); services.AddSingleton<BrowserTime>();
         var provider = services.BuildServiceProvider();
         typeof(ChatState).GetProperty(nameof(ChatState.User))!.SetValue(provider.GetRequiredService<ChatState>(), new UserSession(Me, Guid.NewGuid(), "You"));

@@ -216,6 +216,7 @@ public sealed partial class CallSurfaceTests
 
             var container = new ServiceCollection();
             container.AddSingleton<IJSRuntime>(js);
+            container.AddSingleton(new LiveCallDiagnostics(new ChatApi(http), js));
             container.AddSingleton(voice);
             renderer = new SurfaceRenderer(container.BuildServiceProvider());
         }

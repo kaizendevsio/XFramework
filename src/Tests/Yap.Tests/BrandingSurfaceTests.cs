@@ -27,6 +27,7 @@ public sealed class BrandingSurfaceTests
         services.AddSingleton<NavigationManager>(new Navigation());
         services.AddSingleton(new ChatApi(new HttpClient { BaseAddress = new("https://yap.test/") }));
         services.AddSingleton(p => new ChatState(null!, p.GetRequiredService<ChatApi>(), js.Object));
+        services.AddSingleton<LiveCallDiagnostics>();
         services.AddSingleton<VoiceState>();
         await using var provider = services.BuildServiceProvider();
         await using var renderer = new HtmlRenderer(provider, provider.GetRequiredService<ILoggerFactory>());
