@@ -30,6 +30,7 @@ builder.Services.AddScoped<Branding>();
 builder.Services.AddScoped<BrowserTime>();
 builder.Services.AddScoped<ChatState>();
 builder.Services.AddScoped<VoiceState>();
+builder.Services.AddScoped<LiveCallDiagnostics>();
 builder.Services.AddBoltMediaBrowser(options => options.SecurityMode = Bolt.Media.Browser.MediaSecurityMode.AuthenticatedSFrame);
 builder.Services.AddScoped<DatabaseStartup>();
 var host = builder.Build();

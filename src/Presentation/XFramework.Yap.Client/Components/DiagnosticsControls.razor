@@ -1,6 +1,13 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
+@inject LiveCallDiagnostics Live
 <div class="set-stack diagnostics">
+    <div class="memory-readout">
+        <strong>Live call diagnostics · temporary test</strong>
+        <p>Share call performance numbers with the operator for 15 minutes. No audio, video, messages or credentials are shared. Temporary server traces expire after one hour.</p>
+        <button class="btn ghost" @onclick="ToggleLiveAsync">@(Live.Enabled ? "Stop sharing call diagnostics" : "Share call diagnostics for 15 minutes")</button>
+        <p role="status">@Live.Status @(Live.Enabled ? $"· Test {Live.TestId}" : "")</p>
+    </div>
     <label class="setting-toggle"><span>Enable diagnostic logging</span><input type="checkbox" role="switch" checked="@enabled" @onchange="ToggleAsync" /><span class="switch-track" aria-hidden="true"></span></label>
     <p>Logs stay on this device and survive a reload. They include app errors, connection status, image sizes and memory use, without messages, passwords or photo contents.</p>
     <div class="row"><button class="btn ghost" @onclick="CopyAsync">Copy logs</button><button class="btn ghost" @onclick="ClearAsync">Clear logs</button></div>
@@ -35,6 +42,15 @@
 </div>
 @code {
     private bool enabled;
+    private async Task ToggleLiveAsync()
+    {
+        if (Live.Enabled) await Live.StopAsync();
+        else
+        {
+            try { await Live.StartAsync(); notice = "Start the call on both devices. You can close Settings and the stats panel."; }
+            catch { notice = "Live collection is unavailable. Ask the operator to open the test window, then try again."; }
+        }
+    }
     private string? notice, report;
     private SessionHealth? health, previous;
     private double? managed;
@@ -53,7 +69,7 @@
     private async Task PollAsync()
     {
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
-        try { while (await timer.WaitForNextTickAsync(lifetime.Token)) if (enabled) await InvokeAsync(async () => { await RefreshAsync(); StateHasChanged(); }); }
+        try { while (await timer.WaitForNextTickAsync(lifetime.Token)) await InvokeAsync(async () => { if (enabled) await RefreshAsync(); StateHasChanged(); }); }
         catch (OperationCanceledException) { }
         catch (JSDisconnectedException) { }
     }

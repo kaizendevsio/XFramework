@@ -29,7 +29,8 @@ public sealed class VideoDiagnosticsSurfaceTests
             Assert.That(html, Does.Contain("counters since stream start"));
             Assert.That(html, Does.Contain("8 fragments since transport start"));
             Assert.That(html, Does.Contain("20 released / 3 incomplete / 5 skipped"));
-            Assert.That(html, Does.Contain("delays are local codec timings"));
+            Assert.That(html, Does.Contain("codec delays include queueing, not CPU usage or call latency"));
+            Assert.That(html, Does.Contain("live sharing is enabled in Settings"));
         });
     }
 }

@@ -101,6 +101,8 @@ public static class YapApplication
         builder.Services.AddNotificationsWrapperServices();
         builder.Services.AddSingleton<YapSessions>();
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<YapCallDiagnostics>();
+        builder.Services.AddHostedService(services => services.GetRequiredService<YapCallDiagnostics>());
         builder.Services.AddSingleton<YapPresence>();
         builder.Services.AddSingleton<YapChatGateway>();
         builder.Services.AddScoped<ICommunicationsChatActorProvider, YapActorProvider>();
