@@ -2,23 +2,31 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
-const source = readFileSync(new URL('../wwwroot/bolt-video-capture-worker.js', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../wwwroot/bolt-video-capture-worker.js', import.meta.url), 'utf8').replace(/^import .*;$/m, '');
 const tick = () => new Promise(resolve => setImmediate(resolve));
-function fixture(supported = true) {
+function fixture(supported = true, normalizer = true) {
     let pending;
     const messages = [], track = { stopped: false, constraints: [], stop() { this.stopped = true; },
         async applyConstraints(value) { this.constraints.push(value); } };
     const reader = { read: () => new Promise(resolve => { pending = resolve; }),
         async cancel() { pending?.({ done: true }); } };
     const self = { postMessage: (data, transfer) => messages.push({ data, transfer }), close() { self.closed = true; } };
-    const sandbox = { self, Math, Error };
+    const painted = [], normalized = [];
+    const painter = { paint(frame, width, height) { painted.push({ frame, width, height }); return { width, height }; },
+        release() { painter.released = true; } };
+    const sandbox = { self, Math, Error, performance,
+        GlFramePainter: { create: () => normalizer ? painter : null },
+        OffscreenCanvas: class {},
+        VideoFrame: class { constructor(canvas, init) { Object.assign(this, init); this.rotation = 0; this.flip = false;
+            this.displayWidth = canvas.width; this.displayHeight = canvas.height; normalized.push(this); }
+            close() { this.closed = true; } } };
     if (supported) sandbox.MediaStreamTrackProcessor = class {
         constructor(options) { assert.equal(options.maxBufferSize, 1); this.readable = { getReader: () => reader }; }
     };
     vm.runInNewContext(source, sandbox);
-    return { self, track, messages, send: data => self.onmessage({ data }),
+    return { self, track, messages, painter, painted, normalized, send: data => self.onmessage({ data }),
         frame(timestamp = 0, rotation = 0) {
-            const value = { timestamp, rotation, flip: false, closed: false, close() { this.closed = true; } };
+            const value = { displayWidth: 1080, displayHeight: 1920, timestamp, rotation, flip: false, closed: false, close() { this.closed = true; } };
             pending({ value, done: false }); return value;
         }, end() { pending({ done: true }); } };
 }
@@ -47,10 +55,11 @@ test('worker bounds in-flight ownership, drops excess and paces before transferr
     assert.ok(f.track.stopped); assert.ok(f.self.closed);
 });
 
-test('worker refuses uninspectable orientation and releases its camera clone', async () => {
-    const f = fixture(); f.send({ type: 'start', track: f.track });
+test('worker reports unavailable normalization and releases its camera clone', async () => {
+    const f = fixture(true, false); f.send({ type: 'start', track: f.track });
     const a = f.frame(); delete a.rotation; await tick();
     assert.equal(f.messages.at(-1).data.type, 'failed');
+    assert.equal(f.messages.at(-1).data.reason, 'orientation-normalization-unavailable');
     assert.ok(a.closed); assert.ok(f.track.stopped); assert.ok(f.self.closed);
 });
 
@@ -73,4 +82,40 @@ test('worker applies adaptation to the transferred clone', async () => {
     f.send({ type: 'constraints', framerate: 20, constraints });
     await tick(); assert.equal(f.track.constraints[0], constraints);
     f.send({ type: 'stop' }); await tick();
+});
+
+test('worker deadline pacing retains 60fps with alternating camera jitter', async () => {
+    const f = fixture(); f.send({ type: 'start', track: f.track, framerate: 60 });
+    for (let i = 0; i < 120; i++) {
+        f.send({ type: 'credit', framerate: 60 });
+        f.frame(Math.round(i * 1e6 / 60 + (i % 2 ? 1200 : 0)));
+        await tick();
+    }
+    assert.ok(f.messages.filter(x => x.data.type === 'frame').length >= 118);
+    f.send({ type: 'stop' }); await tick();
+});
+
+
+test('worker normalizes hidden orientation without rejecting Safari frames or guessing a rotation', async () => {
+    const f = fixture(); f.send({ type: 'start', track: f.track });
+    const frame = f.frame(); delete frame.rotation; delete frame.flip; await tick();
+    const sent = f.messages.at(-1);
+    assert.equal(sent.data.path, 'worker-webgl');
+    assert.equal(sent.data.prepareMs, null, 'timing is opt-in');
+    assert.equal(sent.transfer[0], f.normalized[0]);
+    assert.deepEqual([sent.data.frame.displayWidth, sent.data.frame.displayHeight], [1080, 1920]);
+    assert.ok(frame.closed && f.normalized[0].closed);
+    assert.equal(f.painted[0].frame, frame);
+    assert.equal(f.track.stopped, false);
+    f.send({ type: 'diagnostics', enabled: true }); f.send({ type: 'credit' });
+    const next = f.frame(40000); delete next.rotation; await tick();
+    assert.ok(Number.isFinite(f.messages.at(-1).data.prepareMs));
+    f.send({ type: 'stop' }); await tick(); assert.ok(f.painter.released);
+});
+
+test('normalization failure after allocation releases both frames and the GPU context', async () => {
+    const f = fixture(); f.send({ type: 'start', track: f.track });
+    f.self.postMessage = data => { if (data.type === 'frame') throw Error('transfer'); };
+    const frame = f.frame(); delete frame.rotation; await tick();
+    assert.ok(frame.closed && f.normalized[0].closed && f.painter.released && f.track.stopped);
 });

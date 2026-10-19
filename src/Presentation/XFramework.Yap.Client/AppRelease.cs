@@ -2,10 +2,14 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.84";
+    public const string Version = "1.3.85";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "19 October 2026", [
+            "Safari can normalize camera orientation in a worker, keeping capture work off the page when supported.",
+            "Video diagnostics show processing costs, main-thread stalls, worker fallback reasons and the last bitrate cut.",
+            "Startup shows only the logo, with a spinner appearing after two seconds if loading continues."]),
+        ("1.3.84", "19 October 2026", [
             "Fixed one-way video when another participant sends HEVC, including Android cameras viewed on iOS."]),
         ("1.3.83", "19 October 2026", [
             "Compatible browsers capture camera frames directly in a worker, avoiding the extra canvas redraw.",

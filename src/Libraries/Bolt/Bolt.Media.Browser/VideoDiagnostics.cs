@@ -3,7 +3,13 @@ namespace Bolt.Media.Browser;
 /// <summary>Local measurements only. Acceleration is a browser preference, not proof of hardware use.</summary>
 public sealed record VideoDiagnostics
 {
+    public SFrameCosts? EncryptionCosts { get; init; }
     public bool Capturing { get; init; }
+    public string? CaptureFallback { get; init; }
+    public double? CapturePrepareMs { get; init; }
+    public double? EncodedCopyMs { get; init; }
+    public double? EventLoopLagMs { get; init; }
+    public Congestion.SendRateDecision? RateDetails { get; init; }
     public string Strategy { get; init; } = "";
     public string Codec { get; init; } = "";
     public string Acceleration { get; init; } = "";
@@ -56,6 +62,7 @@ public sealed record RemoteVideoDiagnostics
     public double? ReceivedKbps { get; init; }
     public int DecoderQueue { get; init; }
     public int PendingFrames { get; init; }
+    public double? RenderMs { get; init; }
     public double? DecoderDelayMs { get; init; }
     public int Resets { get; init; }
     /// <summary>The sender's orientation applied when painting: "90°", "180°, mirrored" or "none".</summary>

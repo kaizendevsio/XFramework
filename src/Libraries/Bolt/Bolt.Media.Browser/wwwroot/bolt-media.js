@@ -874,6 +874,9 @@ class VideoPipeline {
         this.lastOutputAt = 0;
         this.encodedBytes = 0;
         this.debugSample = null;
+        this.captureFallback = null;
+        this.costs = {};
+        this.eventLoopLagMs = 0;
         this.encodePending = new Map();
         this.encodeDelayMs = null;
         this.diagnosticWindow = { since: 0, capture: 0, encode: 0, render: 0 };
@@ -934,8 +937,10 @@ class VideoPipeline {
     }
 
     _onEncoded(chunk, metadata) {
+        const copyStarted = this.debugSample ? performance.now() : null;
         const data = new Uint8Array(chunk.byteLength);
         chunk.copyTo(data);
+        if (copyStarted !== null) this._recordCost('copy', performance.now() - copyStarted);
         const now = Date.now();
         this.lastOutputAt = now;
         this.encodeCount++;
@@ -1030,16 +1035,18 @@ class VideoPipeline {
     strategy() { return this.activeCaptureStrategy ?? this.captureStrategy ?? videoCaptureStrategy(); }
 
     _startWorkerCapture(track, stream, generation) {
-        if (typeof Worker === 'undefined' || typeof track.clone !== 'function') return false;
+        this.captureFallback = null;
+        if (typeof Worker === 'undefined' || typeof track.clone !== 'function') { this.captureFallback = 'worker-or-clone-unavailable'; return false; }
         let worker;
         try { worker = new Worker(new URL('./bolt-video-capture-worker.js', import.meta.url), { type: 'module' }); }
-        catch { return false; }
+        catch { this.captureFallback = 'worker-start-failed'; return false; }
         this.captureWorker = worker;
         this.activeCaptureStrategy = 'worker-pending';
         let clone, lastFrame = performance.now();
         const current = () => this.captureRunning && generation === this.captureGeneration && this.captureWorker === worker;
-        const fallback = () => {
+        const fallback = (reason) => {
             if (!current()) return;
+            this.captureFallback = reason;
             this._stopWorkerCapture();
             this.activeCaptureStrategy = 'rvfc';
             this.lastCaptureTimestamp = this.nextCaptureTimestamp = null;
@@ -1048,27 +1055,29 @@ class VideoPipeline {
         };
         // Covers unsupported transfer, CSP/load failures and processors that stop delivering frames.
         this.captureWorkerWatch = setInterval(() => {
-            if (current() && performance.now() - lastFrame > 2500) fallback();
+            if (current() && performance.now() - lastFrame > 2500) fallback('worker-stalled');
         }, 1000);
-        worker.onerror = event => { event.preventDefault?.(); fallback(); };
+        worker.onerror = event => { event.preventDefault?.(); fallback('worker-error'); };
         worker.onmessage = ({ data }) => {
             if (!current()) { data.frame?.close(); return; }
             if (data.type === 'ready') {
-                if (!data.supported) { fallback(); return; }
+                if (!data.supported) { fallback('worker-processor-unavailable'); return; }
                 try {
                     // Keep the original camera track for preview and applyConstraints.
+                    worker.postMessage({ type: 'diagnostics', enabled: !!this.debugSample });
                     clone = track.clone();
                     worker.postMessage({ type: 'start', track: clone, framerate: this.config.framerate }, [clone]);
-                } catch { try { clone?.stop(); } catch { } fallback(); }
+                } catch { try { clone?.stop(); } catch { } fallback('track-transfer-failed'); }
             } else if (data.type === 'frame') {
                 lastFrame = performance.now();
-                this.activeCaptureStrategy = 'worker-processor';
+                this.activeCaptureStrategy = data.path === 'worker-webgl' ? 'worker-webgl' : 'worker-processor';
+                this._recordCost('capture', data.prepareMs);
                 try { this._encodeProcessorFrame(data.frame); }
-                catch { fallback(); }
+                catch { fallback('worker-frame-encode-failed'); }
                 finally {
                     if (current()) worker.postMessage({ type: 'credit', framerate: this.config.framerate });
                 }
-            } else if (data.type === 'failed') fallback();
+            } else if (data.type === 'failed') fallback(data.reason || 'worker-capture-failed');
         };
         return true;
     }
@@ -1143,7 +1152,9 @@ class VideoPipeline {
         this.lastElementTime = timestamp;
         this.lastElementClock = callbackTime;
         if (!this._acceptCaptureTime(timestamp)) return;
+        const started = this.debugSample ? performance.now() : null;
         const frame = this._elementFrame(video, timestamp);
+        if (started !== null) this._recordCost('capture', performance.now() - started);
         if (!frame) return;
         try {
             this._encode(frame, this._takeKeyframe(Date.now()));
@@ -1227,7 +1238,9 @@ class VideoPipeline {
             // Dropping the newest frame beats queueing latency.
             if (this.encoder.encodeQueueSize >= 2) { this.stats.dropped++; return; }
             if (!this._acceptCaptureTime(frame.timestamp)) return;
+            const preparedAt = this.debugSample && this.strategy() === 'processor' ? performance.now() : null;
             const oriented = this._orient(frame);
+            if (preparedAt !== null) this._recordCost('capture', performance.now() - preparedAt);
             frame = oriented.frame;
             this._noteSource(frame.displayWidth, frame.displayHeight);
             this._encode(frame, this._takeKeyframe(Date.now()), oriented.code);
@@ -1260,15 +1273,36 @@ class VideoPipeline {
         this.encoder.encode(frame, { keyFrame });
     }
 
+    _recordCost(stage, ms) {
+        if (!this.debugSample || !Number.isFinite(ms)) return;
+        const cost = this.costs[stage] ??= { ms: 0, count: 0 };
+        cost.ms += ms; cost.count++;
+    }
+
     // Independent of adaptation's getStats window: opening diagnostics must not alter adaptation.
     getDiagnostics(enabled = true) {
         if (!enabled) {
+            clearInterval(this.debugLoopTimer);
+            this.debugLoopTimer = null;
+            this.costs = {};
+            this.eventLoopLagMs = 0;
+            this.captureWorker?.postMessage({ type: 'diagnostics', enabled: false });
             this.debugSample = null;
             this.encodePending.clear();
             this.encodeDelayMs = null;
             return null;
         }
         const now = performance.now(), previous = this.debugSample;
+        if (!this.debugLoopTimer) {
+            let expected = now + 100;
+            this.debugLoopTimer = setInterval(() => {
+                const at = performance.now();
+                this.eventLoopLagMs = Math.max(this.eventLoopLagMs, at - expected, 0);
+                expected = at + 100;
+            }, 100);
+            this.captureWorker?.postMessage({ type: 'diagnostics', enabled: true });
+        }
+        const average = stage => this.costs[stage]?.count ? this.costs[stage].ms / this.costs[stage].count : null;
         const elapsed = previous ? now - previous.at : 0;
         const rate = (count, before) => elapsed > 0 && before !== undefined ? Math.max(0, count - before) * 1000 / elapsed : null;
         const camera = this.mediaStream?.getVideoTracks()[0]?.getSettings?.() ?? {};
@@ -1281,13 +1315,16 @@ class VideoPipeline {
                 receivedKbps: before && elapsed > 0 ? rate(remote.bytes, before.bytes) * 8 / 1000 : null,
                 decoderQueue: remote.decoder?.decodeQueueSize ?? 0, pendingFrames: remote.pending.size,
                 decoderDelayMs: renderedFps > 0 ? remote.decodeDelayMs : null,
+                renderMs: average(`render:${remote.streamId}`),
                 acceleration: remote.acceleration || 'no-preference', resets: remote.resets,
                 rotation: describeOrientation(remote.orientation) || 'none' };
         });
         const encodedFps = rate(this.encodeCount, previous?.encode);
         // On the frame-callback path, which painter turns the camera into frames: "webgl" on the GPU, "2d" otherwise.
         const strategy = this.strategy() === 'rvfc' && this.captureRunning ? `rvfc/${this.glPainter ? 'webgl' : '2d'}` : this.strategy();
-        const result = { capturing: this.captureRunning, strategy, codec: this.config?.codec || this.codec,
+        const result = { capturing: this.captureRunning, strategy,
+            captureFallback: this.captureFallback, capturePrepareMs: average('capture'), encodedCopyMs: average('copy'),
+            eventLoopLagMs: previous ? this.eventLoopLagMs : null, codec: this.config?.codec || this.codec,
             width: this.captureRunning ? this.config?.width ?? 0 : 0, height: this.captureRunning ? this.config?.height ?? 0 : 0,
             targetFps: this.captureRunning ? this.config?.framerate ?? 0 : 0,
             cameraWidth: camera.width ?? 0, cameraHeight: camera.height ?? 0, cameraFps: camera.frameRate ?? null,
@@ -1299,6 +1336,8 @@ class VideoPipeline {
             orientation: this._orientationLabel(), remotes };
         this.debugSample = { at: now, capture: this.captureCount, encode: this.encodeCount, bytes: this.encodedBytes,
             remotes: new Map([...this.remotes.values()].map(r => [r.streamId, { received: r.received, rendered: r.rendered, bytes: r.bytes }])) };
+        this.costs = {};
+        this.eventLoopLagMs = 0;
         return result;
     }
 
@@ -1457,6 +1496,7 @@ class VideoPipeline {
 
     /// The sender's orientation handling, for diagnostics.
     _orientationLabel() {
+        if (this.strategy() === 'worker-webgl') return 'normalized upright in worker (webgl)';
         if (!this.captureRunning) return '';
         // The frame-callback path paints the element, which shows the camera upright already.
         if (this.strategy() === 'rvfc') return `painted upright by the element (${this.glPainter ? 'webgl' : '2d canvas'})`;
@@ -1620,7 +1660,9 @@ class VideoPipeline {
                 remote.height = remote.canvas.height = shown.height;
             }
             remote.orientation = code;
+            const paintStarted = this.debugSample ? performance.now() : null;
             paintOriented(remote.context, frame, frame.displayWidth, frame.displayHeight, code);
+            if (paintStarted !== null) this._recordCost(`render:${remote.streamId}`, performance.now() - paintStarted);
             remote.rendered++;
         } catch { /* A detached canvas is a closed tile, not a call failure. */ }
         finally { frame.close(); }

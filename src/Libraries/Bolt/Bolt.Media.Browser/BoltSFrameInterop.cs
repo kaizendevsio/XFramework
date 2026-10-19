@@ -1,7 +1,12 @@
+using System.Diagnostics;
+
 namespace Bolt.Media.Browser;
 
 /// <summary>Only authenticated envelope plaintext belongs here. Never persist these sender keys.</summary>
 public sealed record SFrameSenderKey(string SenderId, string Kid, byte[] Key);
+
+/// <summary>Aggregate wall time for media crypto and interop, including both directions.</summary>
+public sealed record SFrameCosts(long Operations, double ProcessingMs, double WaitingMs);
 
 /// <summary>Owns one bounded RFC9605 session. Does not authenticate directories or negotiate keys.</summary>
 public sealed class BoltSFrameInterop(IJSRuntime js) : IAsyncDisposable
@@ -15,6 +20,20 @@ public sealed class BoltSFrameInterop(IJSRuntime js) : IAsyncDisposable
     private HashSet<string> _remoteSenders = new(StringComparer.Ordinal);
     private bool _ready;
     private long _generation;
+
+    private bool _measureCosts;
+    private long _costOperations, _costProcessing, _costWaiting;
+
+    /// <summary>Bounded aggregate of encrypt/decrypt interop and crypto wall time since the previous snapshot. No payloads.</summary>
+    public SFrameCosts? ReadCosts(bool enabled)
+    {
+        var wasEnabled = _measureCosts;
+        _measureCosts = enabled;
+        var count = Interlocked.Exchange(ref _costOperations, 0);
+        var processing = Interlocked.Exchange(ref _costProcessing, 0);
+        var waiting = Interlocked.Exchange(ref _costWaiting, 0);
+        return enabled && wasEnabled ? new(count, processing * 1000.0 / Stopwatch.Frequency, waiting * 1000.0 / Stopwatch.Frequency) : null;
+    }
 
     public bool IsReady => _ready;
 
@@ -88,9 +107,12 @@ public sealed class BoltSFrameInterop(IJSRuntime js) : IAsyncDisposable
         if (!_ready || callId != _callId) throw new InvalidOperationException("SFrame epoch is paused.");
         if (data.Length is < 1 or > 5155 || !_pendingFrames.Wait(0))
             throw new InvalidOperationException("SFrame frame processing capacity exceeded.");
+        var measure = _measureCosts;
+        var queuedAt = measure ? Stopwatch.GetTimestamp() : 0;
         try
         {
             await _gate.WaitAsync();
+            var enteredAt = measure ? Stopwatch.GetTimestamp() : 0;
             try
             {
                 if (!_ready || _session is null || callId != _callId || generation != Interlocked.Read(ref _generation))
@@ -117,13 +139,23 @@ public sealed class BoltSFrameInterop(IJSRuntime js) : IAsyncDisposable
                 }
                 return result;
             }
-            finally { _gate.Release(); }
+            finally
+            {
+                if (measure && _measureCosts)
+                {
+                    Interlocked.Increment(ref _costOperations);
+                    Interlocked.Add(ref _costProcessing, Stopwatch.GetTimestamp() - enteredAt);
+                    Interlocked.Add(ref _costWaiting, enteredAt - queuedAt);
+                }
+                _gate.Release();
+            }
         }
         finally { _pendingFrames.Release(); }
     }
 
     public async Task EndCallAsync()
     {
+        ReadCosts(false);
         _ready = false; Interlocked.Increment(ref _generation);
         await _gate.WaitAsync();
         try

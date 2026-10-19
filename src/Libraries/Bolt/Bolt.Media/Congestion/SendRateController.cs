@@ -123,6 +123,9 @@ public readonly record struct SendPathSample(
 
 public enum RateSignal { Normal, Overuse, Hold }
 
+[Flags]
+public enum RateCause { None = 0, BaseLost = 1, StandingQueue = 2, RelayShedding = 4, Overload = 8, UplinkLoss = 16, RisingQueue = 32, FeedbackMissing = 64, Draining = 128 }
+
 /// <summary>What the call may send now.</summary>
 /// <param name="TotalKbps">The estimate: everything this sender may put on the wire.</param>
 /// <param name="AudioKbps">Opus encoder rate.</param>
@@ -133,7 +136,20 @@ public enum RateSignal { Normal, Overuse, Hold }
 /// <param name="ReceiversCalm">Every receiver that reports says its queue is short (or none has ever reported): a
 /// picture may grow. A receiver still busy starting (its page handling a new call) is not yet ready for a larger picture.</param>
 public readonly record struct SendRateDecision(int TotalKbps, int AudioKbps, int VideoKbps, bool VideoSuspended, RateSignal Signal, int DelayMs,
-    bool ReceiversCalm = true);
+    bool ReceiversCalm = true)
+{
+    public RateCause Cause { get; init; }
+    public int LocalDelayMs { get; init; }
+    public int? RelayDelayMs { get; init; }
+    public int? TransportDelayMs { get; init; }
+    public int? ReceiverDelayMs { get; init; }
+    public double? UplinkLossPercent { get; init; }
+    public int CapacityKbps { get; init; }
+    public RateCause LastCutCause { get; init; }
+    public long? LastCutAgeMs { get; init; }
+    public int LastCutFromKbps { get; init; }
+    public int LastCutToKbps { get; init; }
+}
 
 /// <summary>
 /// Delay-based send-rate control for a call on a reliable (TCP) path, GCC/BBR-flavoured and deliberately simple.
@@ -163,6 +179,9 @@ public readonly record struct SendRateDecision(int TotalKbps, int AudioKbps, int
 /// </summary>
 public sealed class SendRateController
 {
+    private RateCause _lastCutCause;
+    private int _lastCutFromKbps, _lastCutToKbps;
+    private long? _lastDiagnosticCutAt;
     /// <summary>After a decrease, how long a queue that is not growing further counts as draining.</summary>
     private const int DrainWindowMs = 4_000;
     /// <summary>Reports in a row a high, rising delay must persist before it counts on its own: a stall drains, overload grows.</summary>
@@ -384,6 +403,7 @@ public sealed class SendRateController
             ? input with { LocalQueueDelayMs = 0, LocalCapacityKbps = 0, LocalBaseLost = false }
             : input;
         var now = sample.NowMs;
+        var estimateBefore = _estimate;
         if (_startedAt == long.MinValue) _startedAt = now;
         var dt = _lastUpdateAt == long.MinValue ? 0 : Math.Clamp((now - _lastUpdateAt) / 1000.0, 0, 1);
         _lastUpdateAt = now;
@@ -449,6 +469,14 @@ public sealed class SendRateController
                        (capacityNow > 0 ? _estimate <= capacityNow * 0.95 : delay <= _delayAtDecrease + Math.Max(150, _delayAtDecrease / 2));
         bool overloadAfterCut(double capacity) => capacity > 0 && _estimate > capacity * 1.2;
 
+        var cause = (baseLost ? RateCause.BaseLost : RateCause.None)
+            | (standing ? RateCause.StandingQueue : RateCause.None)
+            | (shedding ? RateCause.RelayShedding : RateCause.None)
+            | (overload ? RateCause.Overload : RateCause.None)
+            | (lossy ? RateCause.UplinkLoss : RateCause.None)
+            | (_risingStreak >= RisingSamples ? RateCause.RisingQueue : RateCause.None)
+            | (!informed ? RateCause.FeedbackMissing : RateCause.None)
+            | (draining ? RateCause.Draining : RateCause.None);
         RateSignal signal;
         if (draining)
         {
@@ -496,7 +524,20 @@ public sealed class SendRateController
         // Receivers report once a stream has flowed a second: a new picture waits for that before it grows.
         var receiversCalm = receiver is { } heard ? heard.QueueDelayMs < _options.TargetDelayMs / 2
             : silent is null && !_receiverHeard && now - _pictureStartedAt >= ReceiverReportWaitMs;
-        return Allocate(now, sample, signal, delay) with { ReceiversCalm = receiversCalm };
+        if (_estimate < estimateBefore && _lastDecreaseAt == now)
+        {
+            _lastCutCause = cause; _lastDiagnosticCutAt = now;
+            _lastCutFromKbps = (int)estimateBefore; _lastCutToKbps = (int)_estimate;
+        }
+        return Allocate(now, sample, signal, delay) with
+        {
+            ReceiversCalm = receiversCalm, Cause = cause, LocalDelayMs = sample.LocalQueueDelayMs,
+            RelayDelayMs = relay?.QueueDelayMs, TransportDelayMs = transport?.QueueDelayMs ?? relay?.UplinkDelayMs,
+            ReceiverDelayMs = receiver?.QueueDelayMs, UplinkLossPercent = transport?.LossFraction * 100,
+            CapacityKbps = (int)capacityNow, LastCutCause = _lastCutCause,
+            LastCutAgeMs = _lastDiagnosticCutAt is { } cutAt ? now - cutAt : null,
+            LastCutFromKbps = _lastCutFromKbps, LastCutToKbps = _lastCutToKbps,
+        };
     }
 
     /// <summary>

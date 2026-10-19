@@ -9,6 +9,29 @@ namespace Bolt.Tests;
 [TestFixture]
 public sealed class BoltSFrameInteropTests
 {
+    [Test]
+    public async Task ReadCosts_OptIn_ResetsEachWindowAndOnCallEnd()
+    {
+        var (bridge, session) = Create(); await using var owned = bridge;
+        var call = Guid.NewGuid(); await bridge.ConfigureAsync(call, "alice");
+        await bridge.ActivateEpochAsync("1", new string('a', 64));
+        session.InvokeAsync<byte[]>("encrypt", Arg.Any<object?[]>()).Returns(new byte[] { 1 });
+        var encryption = bridge.ForStream(call, "alice");
+        await encryption.EncryptAsync([1], 0, 0, Guid.NewGuid());
+        Assert.That(bridge.ReadCosts(true), Is.Null, "first window has no prior measurements");
+        await encryption.EncryptAsync([1], 1, 0, Guid.NewGuid());
+        var costs = bridge.ReadCosts(true)!;
+        Assert.That(costs.Operations, Is.EqualTo(1));
+        Assert.That(costs.ProcessingMs, Is.GreaterThanOrEqualTo(0));
+        Assert.That(bridge.ReadCosts(true)!.Operations, Is.Zero);
+        bridge.ReadCosts(false);
+        await encryption.EncryptAsync([1], 2, 0, Guid.NewGuid());
+        Assert.That(bridge.ReadCosts(true), Is.Null);
+        Assert.That(bridge.ReadCosts(true)!.Operations, Is.Zero);
+        await bridge.EndCallAsync();
+        Assert.That(bridge.ReadCosts(true), Is.Null);
+    }
+
     [TestCase(false, 96)]
     [TestCase(true, 32)]
     public async Task VideoFragmentBurst_OrderedIngressVersusPreviousFanOut(bool previousFanOut, int expected)

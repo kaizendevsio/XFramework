@@ -39,12 +39,15 @@ public sealed partial class BoltMediaService
 
     public async ValueTask<VideoDiagnostics?> GetVideoDiagnosticsAsync(bool enabled)
     {
+        var costs = _sframe?.ReadCosts(enabled);
         var snapshot = await _video.DiagnosticsAsync(enabled);
         var path = MediaPath;
         var decision = _rateLoop?.LastDecision;
         var receive = GetVideoReceiveStats().ToDictionary(x => x.StreamId);
         return snapshot is null ? null : snapshot with
         {
+            EncryptionCosts = costs,
+            RateDetails = decision,
             SendQueue = _videoSend?.Reader.Count ?? 0,
             UplinkResent = _transport?.UplinkResent ?? 0,
             TotalBudgetKbps = decision?.TotalKbps, AudioBitrateKbps = decision?.AudioKbps,
