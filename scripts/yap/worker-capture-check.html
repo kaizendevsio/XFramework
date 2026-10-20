@@ -1,11 +1,11 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>Bolt worker capture checks</title>
-<p>Synthetic frames through the production worker. Tests hidden orientation, GPU pixels and transfers; does not emulate Safari's camera or measure phone temperature. Add ?nogpu to verify an explicit failure when WebGPU is unavailable.</p>
+<p>Synthetic frames through the production worker. Tests raw frame transfers and pacing; does not emulate Safari's camera or measure phone temperature. Add ?nogpu to verify direct capture also works without WebGPU.</p>
 <pre id="result">Running</pre>
 <script type="module">
 const moduleUrl = new URL('/src/Libraries/Bolt/Bolt.Media.Browser/wwwroot/bolt-video-capture-worker.js', location.href).href;
-// Only the camera source is simulated. All painting, normalization, pacing, frame ownership,
+// Only the camera source is simulated. All pacing, frame ownership,
 // transfers and cleanup run through the production worker, using actual browser VideoFrames.
 const bootstrap = `
 ${location.search.includes('nogpu') ? "Object.defineProperty(navigator,'gpu',{value:undefined});" : ''}
@@ -65,7 +65,7 @@ try {
         const output=await send(frame);
         try {
             const actual=pixels(output.frame);
-            const ok=output.path==='worker-webgpu' && JSON.stringify(size)===JSON.stringify([output.frame.displayWidth,output.frame.displayHeight]) &&
+            const ok=output.path==='worker-processor' && JSON.stringify(size)===JSON.stringify([output.frame.displayWidth,output.frame.displayHeight]) &&
                 expected.every((v,i)=>Math.abs(v-actual[i])<=2);
             results.push({rotation,flip,ok,path:output.path});
             if (!ok) throw Error(`orientation mismatch ${rotation}/${flip}: ${actual} versus ${expected}`);
@@ -86,7 +86,7 @@ try {
         }
         await encoder.flush(); await decoder.flush();
         results.push({encoded,decoded,codecErrors});
-        if(encoded!==10 || decoded!==10 || codecErrors.length) throw Error('normalized frame codec roundtrip failed');
+        if(encoded!==10 || decoded!==10 || codecErrors.length) throw Error('direct frame codec roundtrip failed');
     } finally {encoder.close();decoder.close();}
     for (const fps of [30,60]) {
         const costs=[], started=performance.now();let frames=0;

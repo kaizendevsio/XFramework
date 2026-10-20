@@ -1209,7 +1209,9 @@ class VideoPipeline {
             const oriented = calibratedCode === undefined ? this._orient(frame) : { frame, code: calibratedCode };
             if (preparedAt !== null) this._recordCost('capture', performance.now() - preparedAt);
             frame = oriented.frame;
-            this._noteSource(frame.displayWidth, frame.displayHeight);
+            // Missing display metadata must not make the encoder scale a landscape sensor into portrait.
+            this._noteSource(calibratedCode === undefined ? frame.displayWidth : frame.visibleRect?.width || frame.codedWidth || frame.displayWidth,
+                calibratedCode === undefined ? frame.displayHeight : frame.visibleRect?.height || frame.codedHeight || frame.displayHeight);
             this._encode(frame, this._takeKeyframe(Date.now()), oriented.code);
         } finally { frame.close(); }
     }
