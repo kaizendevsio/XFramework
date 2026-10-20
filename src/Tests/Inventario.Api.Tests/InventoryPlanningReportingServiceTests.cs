@@ -4,6 +4,8 @@ using System.Security.Claims;
 using IdentityServer.Domain.Shared.Contracts;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
+using Moq;
 using NUnit.Framework;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services.FeatureGates;
@@ -294,10 +296,47 @@ public sealed class InventoryPlanningReportingServiceTests
     private static InventoryReportingService CreateReportingService(
         FakeDataContext dataContext,
         Guid tenantId,
-        InventoryPlanningService planningService) =>
-        new(dataContext, new TestTrustedInvocationContextAccessor(tenantId,
+        InventoryPlanningService planningService)
+    {
+        var movements = new AsyncQuery<InventoryMovement>(dataContext.Set<InventoryMovement>().AsQueryable());
+        var set = new Mock<DbSet<InventoryMovement>>();
+        set.As<IQueryable<InventoryMovement>>().Setup(x => x.Provider).Returns(movements.Provider);
+        set.As<IQueryable<InventoryMovement>>().Setup(x => x.Expression).Returns(movements.Expression);
+        set.As<IQueryable<InventoryMovement>>().Setup(x => x.ElementType).Returns(movements.ElementType);
+        set.As<IQueryable<InventoryMovement>>().Setup(x => x.GetEnumerator()).Returns(() => movements.GetEnumerator());
+        var db = new Mock<DbContext>();
+        db.Setup(x => x.Set<InventoryMovement>()).Returns(set.Object);
+        return new(dataContext, new TestTrustedInvocationContextAccessor(tenantId,
             capabilities: new HashSet<string> { "inventario.reporting:view" }),
-            planningService, new FakeTenantModuleFeatureService());
+            planningService, new FakeTenantModuleFeatureService(), db.Object);
+    }
+
+    // Preserve async enumeration through the EF aggregate's Where/GroupBy/Select pipeline.
+    private sealed class AsyncQuery<T>(IQueryable<T> query) : IOrderedQueryable<T>, IAsyncEnumerable<T>
+    {
+        public Type ElementType => typeof(T);
+        public Expression Expression => query.Expression;
+        public IQueryProvider Provider => new AsyncQueryProvider(query.Provider);
+        public IEnumerator<T> GetEnumerator() => query.GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        public async IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+        {
+            foreach (var item in query)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return item;
+                await Task.Yield();
+            }
+        }
+    }
+
+    private sealed class AsyncQueryProvider(IQueryProvider inner) : IQueryProvider
+    {
+        public IQueryable CreateQuery(Expression expression) => inner.CreateQuery(expression);
+        public IQueryable<TElement> CreateQuery<TElement>(Expression expression) => new AsyncQuery<TElement>(inner.CreateQuery<TElement>(expression));
+        public object? Execute(Expression expression) => inner.Execute(expression);
+        public TResult Execute<TResult>(Expression expression) => inner.Execute<TResult>(expression);
+    }
 
     private sealed class FakeTenantModuleFeatureService : ITenantModuleFeatureService
     {

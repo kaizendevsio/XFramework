@@ -1,0 +1,142 @@
+@page "/finance/settings"
+@implements IDisposable
+@using IdentityServer.Domain.Shared.Contracts.Requests
+@using IdentityServer.Integration.Drivers
+@inject IIdentityServerServiceWrapper Identity
+@inject IPortalTenantContext Tenant
+@inject ToastService Toast
+@inject ILogger<Settings> Logger
+
+<PageTitle>Finance Settings - Portal</PageTitle>
+<div class="finance-settings-page" data-testid="finance-settings">
+    <div class="xf-page-header">
+        <div><BbTypographyH3>Finance Settings</BbTypographyH3><BbTypographyMuted>@Tenant.SelectedTenantName</BbTypographyMuted></div>
+        <div class="xf-page-actions">
+            <BbButton Variant="ButtonVariant.Outline" OnClick="Load" Disabled="@_busy"><LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />Refresh</BbButton>
+            <BbButton OnClick="Save" Disabled="@(!CanSave)"><LucideIcon Name="save" class="mr-2 h-4 w-4" />Save</BbButton>
+        </div>
+    </div>
+    @if (_error is not null)
+    {
+        <BbAlert Variant="AlertVariant.Danger"><BbAlertDescription>@_error</BbAlertDescription></BbAlert>
+    }
+    @if (Tenant.SelectedTenantId is null)
+    {
+        <BbEmpty Title="Select a tenant" />
+    }
+    else if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else if (_response is not null)
+    {
+        @if (_response.AvailableCurrencies.Count == 0)
+        {
+            <BbEmpty Title="No active currencies" Description="A tenant administrator must add or enable currencies before Finance settings can be saved." />
+            <a href="@($"/identity/tenants/{Tenant.SelectedTenantId}/reference-data")">Open tenant reference data</a>
+        }
+        else
+        {
+            <section class="finance-settings-section">
+                <BbTypographyH4>Currencies</BbTypographyH4>
+                <div class="finance-currency-field"><BbLabel>Supported currencies</BbLabel>
+                    <BbMultiSelect TValue="Guid" Class="w-full" Options="@CurrencyOptions" @bind-Values="_supported" Disabled="@ReadOnly" />
+                </div>
+                <div class="finance-currency-field"><BbLabel>Default currency</BbLabel>
+                    <BbCombobox TValue="Guid" Class="w-full" Options="@DefaultCurrencyOptions" @bind-Value="_settings.DefaultCurrencyId" Disabled="@ReadOnly" />
+                </div>
+            </section>
+            <BbSeparator />
+            <section class="finance-settings-section">
+                <BbTypographyH4>Sales Tax</BbTypographyH4>
+                <BbTypographyMuted>Added to the discounted sale amount.</BbTypographyMuted>
+                <label><BbSwitch @bind-Checked="_settings.TaxEnabled" Disabled="@ReadOnly" /> Tax enabled</label>
+                <div class="finance-tax-rate">
+                    <BbFormFieldNumericInput TValue="decimal" @bind-Value="_settings.TaxRatePercent" Label="Tax rate (%)" Min="0" Max="100" Disabled="@(ReadOnly || !_settings.TaxEnabled)" />
+                </div>
+            </section>
+        }
+    }
+</div>
+
+@code {
+    private TenantFinanceSettingsResponse? _response;
+    private TenantFinanceSettings _settings = new();
+    private IEnumerable<Guid> _supported = [];
+    private string? _error;
+    private bool _loading, _busy, _disposed;
+    private long _version;
+    private bool ReadOnly => _busy || _response?.CanManage != true || _response.TenantId != Tenant.SelectedTenantId;
+    private bool CanSave => !ReadOnly && _supported.Contains(_settings.DefaultCurrencyId) && _supported.Any();
+    private IEnumerable<SelectOption<Guid>> CurrencyOptions => (_response?.AvailableCurrencies ?? [])
+        .Select(x => new SelectOption<Guid>(x.Id, $"{x.Code} - {x.Name}"));
+    private IEnumerable<SelectOption<Guid>> DefaultCurrencyOptions => CurrencyOptions.Where(x => _supported.Contains(x.Value));
+
+    protected override async Task OnInitializedAsync()
+    {
+        Tenant.OnChanged += TenantChanged;
+        await Load();
+    }
+    private void TenantChanged()
+    {
+        _version++;
+        _response = null;
+        _ = InvokeAsync(Load);
+    }
+    private async Task Load()
+    {
+        var version = ++_version;
+        _response = null;
+        _error = null;
+        _loading = true;
+        try
+        {
+            if (Tenant.SelectedTenantId is not Guid tenantId) return;
+            var result = await Identity.GetTenantFinanceSettings(new() { Metadata = new() { RequestedTenantId = tenantId } });
+            if (_disposed || version != _version) return;
+            if (!result.IsSuccess || result.Response is null) { _error = result.Message ?? "Finance settings are unavailable."; return; }
+            if (result.Response.TenantId != tenantId) { _error = "Finance settings returned for a different tenant. Refresh to retry."; return; }
+            Apply(result.Response);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load tenant Finance settings");
+            if (version == _version) _error = "Finance settings could not be loaded. Refresh to retry.";
+        }
+        finally { if (version == _version) _loading = false; }
+    }
+    private void Apply(TenantFinanceSettingsResponse response)
+    {
+        _response = response;
+        _error = response.ConfigurationError;
+        _settings = response.Settings with { SupportedCurrencyIds = [.. response.Settings.SupportedCurrencyIds ?? []] };
+        _supported = _settings.SupportedCurrencyIds.Where(id => response.AvailableCurrencies.Any(x => x.Id == id)).ToArray();
+    }
+    private async Task Save()
+    {
+        if (!CanSave || Tenant.SelectedTenantId is not Guid tenantId || _response is null) return;
+        _busy = true;
+        _error = null;
+        var version = _version;
+        try
+        {
+            var result = await Identity.UpdateTenantFinanceSettings(new()
+            {
+                Metadata = new() { RequestedTenantId = tenantId }, ExpectedConcurrencyStamp = _response.ConcurrencyStamp,
+                Settings = _settings with { SupportedCurrencyIds = _supported.ToList() }
+            });
+            if (_disposed || version != _version) return;
+            if (!result.IsSuccess || result.Response is null) { _error = result.Message ?? "Finance settings could not be saved."; return; }
+            if (result.Response.TenantId != tenantId) { _response = null; _error = "Finance settings returned for a different tenant. Refresh before continuing."; return; }
+            Apply(result.Response);
+            Toast.Show("Finance settings saved.");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not save tenant Finance settings");
+            if (version == _version) _error = "Finance settings could not be saved. Refresh before trying again.";
+        }
+        finally { _busy = false; }
+    }
+    public void Dispose() { _disposed = true; _version++; Tenant.OnChanged -= TenantChanged; }
+}

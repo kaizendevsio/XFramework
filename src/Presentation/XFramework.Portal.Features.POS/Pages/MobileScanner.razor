@@ -47,27 +47,27 @@
         }
         <BbCollapsible @bind-Open="_manualPairOpen" Class="scanner-manual">
         <BbCollapsibleTrigger AsChild="false" class="scanner-disclosure">Enter pairing code</BbCollapsibleTrigger>
-        <BbCollapsibleContent>@if (_manualPairOpen) { <div class="scanner-fields">
+        <BbCollapsibleContent ForceMount="true"><div class="scanner-fields" inert="@(!_manualPairOpen)">
         <label for="scanner-tenant">Tenant ID</label>
         <BbInput Id="scanner-tenant" @bind-Value="_tenantHint" autocomplete="off" />
         <label for="scanner-challenge">Six-digit pairing code</label>
-        <BbInput Id="scanner-challenge" @bind-Value="_pairingCode" autocomplete="off" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" />
+        <BbInput Id="scanner-challenge" @bind-Value="_pairingCode" UpdateTiming="UpdateTiming.Immediate" autocomplete="off" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" />
         <BbButton OnClick="PairEntered" Disabled="@(_busy || !IsPairingCode(_pairingCode))" Variant="ButtonVariant.Outline">
             <LucideIcon Name="link" Size="18" />Pair with code
         </BbButton>
-        </div> }</BbCollapsibleContent></BbCollapsible>
+        </div></BbCollapsibleContent></BbCollapsible>
     }
     else
     {
         <BbCollapsible @bind-Open="_manualProductOpen" Class="scanner-manual">
         <BbCollapsibleTrigger AsChild="false" class="scanner-disclosure">Enter product code</BbCollapsibleTrigger>
-        <BbCollapsibleContent>@if (_manualProductOpen) { <div class="scanner-fields">
+        <BbCollapsibleContent ForceMount="true"><div class="scanner-fields" inert="@(!_manualProductOpen)">
         <label for="scanner-product-code">Product code</label>
-        <BbInput Id="scanner-product-code" @bind-Value="_manualCode" autocomplete="off" />
+        <BbInput Id="scanner-product-code" @bind-Value="_manualCode" UpdateTiming="UpdateTiming.Immediate" autocomplete="off" />
         <BbButton OnClick="SendEntered" Disabled="@(_busy || string.IsNullOrWhiteSpace(_manualCode))" Variant="ButtonVariant.Outline">
             <LucideIcon Name="send" Size="18" />Send code
         </BbButton>
-        </div> }</BbCollapsibleContent></BbCollapsible>
+        </div></BbCollapsibleContent></BbCollapsible>
         @if (_pendingCode is not null)
         {
             <BbButton OnClick="RetrySend" Disabled="@_busy"><LucideIcon Name="rotate-cw" Size="18" />Retry last code</BbButton>

@@ -1,0 +1,10 @@
+.settings-page { width: 100%; max-width: 960px; margin-inline: auto; padding-block: 16px 32px; min-width: 0; }
+.settings-page fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.settings-section { padding-block: 24px; border-bottom: 1px solid var(--border); }
+.settings-section ::deep h4 { margin-bottom: 20px; }
+.settings-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-bottom: 16px; }
+.settings-fields > div { min-width: 0; }
+.settings-fields ::deep .inventory-default-picker,
+.settings-fields ::deep [role="combobox"] { width: 100%; }
+.settings-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
+@media (max-width: 640px) { .settings-fields { grid-template-columns: minmax(0, 1fr); } }

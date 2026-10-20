@@ -54,7 +54,13 @@ public sealed class EntityPickerClickOutsideE2ETests : PageTest
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Services.AddRazorComponents().AddInteractiveServerComponents(options => options.DetailedErrors = true);
         builder.Services.AddBlazorBlueprintComponents(configureTheme: theme =>
-        { theme.DefaultDarkMode = false; theme.DetectSystemPreference = false; });
+        {
+            theme.DefaultBaseColor = BaseColor.Slate;
+            theme.DefaultPrimaryColor = PrimaryColor.Blue;
+            theme.DefaultRadius = 0.5;
+            theme.DefaultDarkMode = false;
+            theme.DetectSystemPreference = false;
+        });
         builder.Services.AddScoped<XfPortalService>();
         builder.Services.Replace(ServiceDescriptor.Scoped<IPortalService>(s => s.GetRequiredService<XfPortalService>()));
         builder.Services.AddSingleton<ClickOutsideCashierState>();
@@ -62,6 +68,7 @@ public sealed class EntityPickerClickOutsideE2ETests : PageTest
         builder.Services.AddScoped<TenantModuleNavigationService>();
         builder.Services.AddScoped<NavigationHistoryService>();
         builder.Services.AddSingleton(Mock.Of<IDataContext>());
+        builder.Services.AddSingleton(Mock.Of<IdentityServer.Integration.Drivers.IIdentityServerServiceWrapper>());
         builder.Services.AddSingleton(Mock.Of<IPortalModuleAvailability>());
         var fixtureActorId = Guid.NewGuid();
         builder.Services.AddSingleton(Mock.Of<IPortalActorContext>(a => a.CredentialId == fixtureActorId));
@@ -129,11 +136,16 @@ public sealed class EntityPickerClickOutsideE2ETests : PageTest
         }
 
         var response = await Page.GotoAsync(app.Urls.Single() + "/pos/cashier");
+        (await Page.APIRequest.GetAsync(app.Urls.Single() + "/css/utilities.css")).Status.Should().Be(200);
         response!.Status.Should().Be(200, await Page.ContentAsync());
         var picker = Page.GetByRole(AriaRole.Button, new() { Name = "Register", Exact = true });
         await picker.ClickAsync();
         var option = Page.GetByRole(AriaRole.Option, new() { Name = "Fixture register", Exact = true });
         await Expect(option).ToBeVisibleAsync();
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-base-color", "slate");
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-primary-color", "blue");
+        await Expect(Page.Locator("html")).ToHaveCSSAsync("--radius", "0.5rem");
+        (await Page.EvaluateAsync<bool>("() => document.documentElement.classList.contains('dark')")).Should().BeFalse();
         if (delayRegistration)
             await Page.WaitForFunctionAsync("window.outsideRegistrationPending === true");
         switch (closeAction)
@@ -190,7 +202,7 @@ public sealed class ClickOutsideFixtureRoot : ComponentBase
 {
     protected override void BuildRenderTree(RenderTreeBuilder b)
     {
-        b.AddMarkupContent(0, "<!doctype html><html><head><base href='/'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/css/themes.css'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/blazorblueprint.css'><link rel='stylesheet' href='css/app.css'></head><body>");
+        b.AddMarkupContent(0, "<!doctype html><html><head><base href='/'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/css/themes.css'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/blazorblueprint.css'><link rel='stylesheet' href='css/app.css'><link rel='stylesheet' href='css/utilities.css'></head><body>");
         b.OpenComponent<ClickOutsideFixtureSurface>(1);
         b.AddComponentRenderMode(new InteractiveServerRenderMode(prerender: false));
         b.CloseComponent();
@@ -241,6 +253,8 @@ public sealed class ClickOutsideFixtureCashier : Cashier
         Set("_selectedRegisterId", State.RegisterId.ToString());
         Set("_currencies", new List<CurrencyType>
         { new() { Id = State.CurrencyId, CurrencyIsoCode3 = "USD" } });
+        Set("_financeSettings", new IdentityServer.Domain.Shared.Contracts.TenantFinanceSettings
+        { DefaultCurrencyId = State.CurrencyId, SupportedCurrencyIds = [State.CurrencyId] });
         Set("_catalogItems", new List<PosCatalogItemResponse> { State.Item });
     }
     protected override Task OnInitializedAsync() => Task.CompletedTask;

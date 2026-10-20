@@ -60,6 +60,7 @@ public sealed class PosCashierBrowserFullscreenE2ETests : PageTest
         builder.Services.AddScoped<TenantModuleNavigationService>();
         builder.Services.AddScoped<NavigationHistoryService>();
         builder.Services.AddSingleton(Mock.Of<IDataContext>());
+        builder.Services.AddSingleton(Mock.Of<IdentityServer.Integration.Drivers.IIdentityServerServiceWrapper>());
         builder.Services.AddSingleton(Mock.Of<IPortalModuleAvailability>());
         var actorId = Guid.NewGuid();
         builder.Services.AddSingleton(Mock.Of<IPortalActorContext>(actor => actor.CredentialId == actorId));
@@ -287,6 +288,7 @@ public sealed class PosCashierBrowserFullscreenE2ETests : PageTest
     private async Task OpenFixture()
     {
         var response = await Page.GotoAsync(app.Urls.Single() + "/focus-fixture");
+        (await Page.APIRequest.GetAsync(app.Urls.Single() + "/css/utilities.css")).Status.Should().Be(200);
         response!.Status.Should().Be(200);
         await Expect(Toggle).ToBeEnabledAsync();
         await Expect(Cashier).ToBeVisibleAsync();
@@ -332,7 +334,7 @@ public sealed class CashierFocusFixtureRoot : ComponentBase
 {
     protected override void BuildRenderTree(RenderTreeBuilder b)
     {
-        b.AddMarkupContent(0, "<!doctype html><html><head><base href='/'><link rel='icon' href='favicon.svg'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/css/themes.css'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/blazorblueprint.css'><link rel='stylesheet' href='css/app.css'></head><body>");
+        b.AddMarkupContent(0, "<!doctype html><html><head><base href='/'><link rel='icon' href='favicon.svg'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/css/themes.css'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/blazorblueprint.css'><link rel='stylesheet' href='css/app.css'><link rel='stylesheet' href='css/utilities.css'></head><body>");
         b.OpenComponent<CashierFocusFixtureSurface>(1);
         b.AddComponentRenderMode(new InteractiveServerRenderMode(prerender: false));
         b.CloseComponent();

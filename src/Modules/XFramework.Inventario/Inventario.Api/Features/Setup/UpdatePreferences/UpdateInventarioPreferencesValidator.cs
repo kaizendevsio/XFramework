@@ -7,6 +7,9 @@ public sealed class UpdateInventarioPreferencesValidator : AbstractValidator<Upd
 {
     public UpdateInventarioPreferencesValidator()
     {
+        RuleFor(x => x.Mode).IsInEnum().When(x => x.Mode.HasValue);
+        RuleFor(x => x).Must(x => x.WarehouseId.HasValue == x.LocationId.HasValue)
+            .WithMessage("Select both a stock area and its location.");
         RuleFor(x => x.LowStockThreshold).GreaterThanOrEqualTo(0).WithMessage("Low stock threshold cannot be negative.");
         RuleFor(x => x.DefaultCurrency).Cascade(CascadeMode.Stop)
             .NotEmpty().WithMessage("Default currency is required.")

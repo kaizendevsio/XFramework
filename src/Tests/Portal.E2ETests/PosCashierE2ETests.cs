@@ -419,28 +419,28 @@ public sealed class PosCashierE2ETests : PageTest
     }
 
     [Test]
-    public async Task Adjustments_DiscountAndTax_RecalculateTotalsAndRejectNegativeTotal()
+    public async Task Adjustments_DiscountRecalculatesAutomaticTax_AndRejectsNegativeTotal()
     {
         await AddProductAsync(_settings.ProductName, _settings.ProductName);
-        var subtotal = await MoneyAsync(Page.GetByTestId("pos-total"));
+        var subtotal = await MoneyAsync(Page.GetByTestId("pos-subtotal"));
         subtotal.Should().BeGreaterThan(0);
         await OpenPaymentAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Discount and tax", Exact = true }).ClickAsync();
         var discountInput = Page.GetByLabel($"Discount amount ({_settings.Currency})", new() { Exact = true });
-        var taxInput = Page.GetByLabel($"Tax amount ({_settings.Currency})", new() { Exact = true });
+        await Expect(Page.Locator("input#pos-tax-amount")).ToHaveCountAsync(0);
+        await Expect(Page.Locator("output#pos-tax-amount")).ToBeVisibleAsync();
         var discount = Math.Round(subtotal / 2, 2, MidpointRounding.AwayFromZero);
         await SetMoneyAsync(discountInput, discount);
-        await SetMoneyAsync(taxInput, 0.25m);
         await ExpectMoneyAsync(Page.GetByTestId("pos-subtotal"), subtotal);
         await ExpectMoneyAsync(Page.GetByTestId("pos-discount"), discount);
         await Expect(Page.GetByTestId("pos-discount")).ToContainTextAsync("-");
-        await ExpectMoneyAsync(Page.GetByTestId("pos-tax"), 0.25m);
-        await ExpectMoneyAsync(Page.GetByTestId("pos-total"), subtotal - discount + 0.25m);
+        var tax = await MoneyAsync(Page.GetByTestId("pos-tax"));
+        await ExpectMoneyAsync(Page.GetByTestId("pos-total"), subtotal - discount + tax);
         await Page.GetByRole(AriaRole.Button, new() { Name = "Exact amount", Exact = true }).ClickAsync();
         await Expect(ConfirmPay).ToBeEnabledAsync();
 
         await SetMoneyAsync(discountInput, subtotal + 1m);
-        await ExpectMoneyAsync(Page.GetByTestId("pos-total"), -0.75m);
+        await ExpectMoneyAsync(Page.GetByTestId("pos-total"), -1m);
         await Expect(ConfirmPay).ToBeDisabledAsync();
         await Expect(PaymentStatus).ToContainTextAsync(new Regex("discount|negative|total"), new() { IgnoreCase = true });
     }

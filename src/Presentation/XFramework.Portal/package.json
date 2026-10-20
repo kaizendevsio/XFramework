@@ -1,0 +1,11 @@
+{
+  "name": "xframework-portal-styles",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i Styles/utilities.css -o wwwroot/css/utilities.css --minify"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "4.1.16",
+    "tailwindcss": "4.1.16"
+  }
+}

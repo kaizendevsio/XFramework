@@ -40,7 +40,7 @@
                     <BbPopoverTrigger AsChild="false" class="scanner-phone-link" aria-label="Phone scanner">
                         <LucideIcon Name="smartphone" Size="18" />Phone scanner
                     </BbPopoverTrigger>
-                    <BbPopoverContent Class="scanner-phone-popover" aria-label="Phone scanner" CloseOnClickOutside="false" CloseOnEscape="true" ZIndex="90"
+                    <BbPopoverContent Class="scanner-phone-popover" aria-label="Phone scanner" CloseOnClickOutside="false" CloseOnEscape="true" ZIndex="90" AutoFocusId="@_phoneCloseButtonId"
                                       OnContentReady="PhoneContentReady"
                                       style="width: min(280px, calc(100vw - 32px));">
                         <div @ref="_phoneLinkContent">
@@ -49,7 +49,7 @@
                                 <img src="@_phoneLinkQrSource" width="240" height="240" alt="Phone scanner HTTPS landing QR"
                                      style="max-width: 100%; height: auto; background: white;" />
                             }
-                            <BbButton OnClick="@(() => PhoneLinkOpenChanged(false))" Variant="ButtonVariant.Outline" aria-label="Close phone scanner QR" title="Close phone scanner QR">
+                            <BbButton id="@_phoneCloseButtonId" OnClick="@(() => PhoneLinkOpenChanged(false))" Variant="ButtonVariant.Outline" aria-label="Close phone scanner QR" title="Close phone scanner QR">
                                 <LucideIcon Name="x" Size="18" />
                             </BbButton>
                         </div>
@@ -86,6 +86,7 @@
     private string? _qrSource;
     private string? _phoneLinkQrSource;
     private bool _phoneLinkOpen;
+    private readonly string _phoneCloseButtonId = $"phone-scanner-close-{Guid.NewGuid():N}";
     private ElementReference _phoneLinkContent;
     private IAsyncDisposable? _phoneFocusTrap;
     private long _phoneFocusVersion;

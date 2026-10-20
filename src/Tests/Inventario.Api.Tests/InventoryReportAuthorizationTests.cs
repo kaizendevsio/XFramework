@@ -93,6 +93,6 @@ public sealed class InventoryReportAuthorizationTests
             .ReturnsAsync(enabled ? Result.Success() : Result.Forbidden("disabled"));
         var variations = new ProductVariationService(data.Object, context, features.Object);
         var planning = new InventoryPlanningService(data.Object, context, features.Object, variations);
-        return new(data.Object, context, planning, features.Object);
+        return new(data.Object, context, planning, features.Object, new Mock<Microsoft.EntityFrameworkCore.DbContext>().Object);
     }
 }

@@ -560,38 +560,8 @@ else
         PosPaymentMethod.WalletTransfer => "Wallet Transfer",
         _ => method.ToString()
     };
-    private static IReadOnlyDictionary<Guid, RefundAllocation> BuildSaleRefundAllocations(PosSaleReceiptResponse sale)
-    {
-        var orderedLines = sale.Lines.OrderBy(line => line.LineNumber).ToList();
-        var grossSubtotal = orderedLines.Sum(line => line.Quantity * line.UnitPrice);
-        var remainingHeaderDiscount = sale.DiscountAmount;
-        var remainingHeaderTax = sale.TaxAmount;
-        var allocations = new Dictionary<Guid, RefundAllocation>(orderedLines.Count);
-
-        for (var index = 0; index < orderedLines.Count; index++)
-        {
-            var line = orderedLines[index];
-            var isLast = index == orderedLines.Count - 1;
-            var grossLineAmount = line.Quantity * line.UnitPrice;
-            var headerDiscount = isLast
-                ? remainingHeaderDiscount
-                : AllocateProportion(sale.DiscountAmount, grossLineAmount, grossSubtotal);
-            var headerTax = isLast
-                ? remainingHeaderTax
-                : AllocateProportion(sale.TaxAmount, grossLineAmount, grossSubtotal);
-
-            remainingHeaderDiscount -= headerDiscount;
-            remainingHeaderTax -= headerTax;
-            allocations[line.Id] = new RefundAllocation(line.LineTotal - headerDiscount + headerTax);
-        }
-
-        return allocations;
-    }
-
-    private static decimal AllocateProportion(decimal amount, decimal lineAmount, decimal totalAmount) =>
-        amount == 0 || totalAmount == 0
-            ? 0
-            : decimal.Round(amount * lineAmount / totalAmount, 2, MidpointRounding.AwayFromZero);
+    private static IReadOnlyDictionary<Guid, RefundAllocation> BuildSaleRefundAllocations(PosSaleReceiptResponse sale) =>
+        sale.Lines.ToDictionary(line => line.Id, line => new RefundAllocation(line.RefundAmount));
 
     private static string GetReturnStatusBadge(PosReturnStatus status) =>
         status switch
@@ -630,8 +600,9 @@ else
         public decimal OriginalRefundAmount { get; set; }
         public decimal RemainingQuantity => PurchasedQuantity - PreviouslyReturnedQuantity;
         public decimal RefundAmount => ReturnQuantity == RemainingQuantity
-            ? OriginalRefundAmount - PreviouslyReturnedRefundAmount
-            : decimal.Round(OriginalRefundAmount * ReturnQuantity / PurchasedQuantity, 2, MidpointRounding.AwayFromZero);
+            ? Math.Max(0, OriginalRefundAmount - PreviouslyReturnedRefundAmount)
+            : Math.Min(Math.Max(0, OriginalRefundAmount - PreviouslyReturnedRefundAmount),
+                decimal.Round(OriginalRefundAmount * ReturnQuantity / PurchasedQuantity, 2, MidpointRounding.AwayFromZero));
     }
 
     private readonly record struct RefundAllocation(decimal RefundAmount);

@@ -9,10 +9,21 @@
     <div class="xf-page-header">
         <div><BbTypographyH3>Inventory Reports</BbTypographyH3><BbTypographyMuted>@TenantLabel</BbTypographyMuted></div>
         <div class="xf-page-actions">
-            <BbFormFieldSwitch Checked="@_live" CheckedChanged="@SetLive" Label="Live (30 seconds)" Disabled="@(_scope is null)" />
-            <BbButton Variant="ButtonVariant.Outline" OnClick="@Refresh" Disabled="@(_busy || _scope is null)">
-                <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />Refresh
-            </BbButton>
+            <div class="refresh-actions" role="group" aria-label="Refresh controls">
+                <BbButton Class="report-refresh-now" Variant="ButtonVariant.Outline" OnClick="@Refresh" Disabled="@(_busy || _scope is null)">
+                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" aria-hidden="true" />Refresh
+                </BbButton>
+                <BbDropdownMenu>
+                    <BbDropdownMenuTrigger>
+                        <BbButton Class="report-refresh-options" Variant="ButtonVariant.Outline" Size="ButtonSize.Icon" aria-label="Refresh options" title="Refresh options" Disabled="@(_scope is null)">
+                            <LucideIcon Name="chevron-down" Size="16" aria-hidden="true" />
+                        </BbButton>
+                    </BbDropdownMenuTrigger>
+                    <BbDropdownMenuContent>
+                        <BbDropdownMenuCheckboxItem Checked="@_live" CheckedChanged="@SetLive">Auto-refresh every 30 seconds</BbDropdownMenuCheckboxItem>
+                    </BbDropdownMenuContent>
+                </BbDropdownMenu>
+            </div>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@Share" Disabled="@(_snapshot is null || _busy)">
                 <LucideIcon Name="link" class="mr-2 h-4 w-4" />Share link
             </BbButton>
@@ -45,9 +56,9 @@
             <BbFormFieldNumericInput TValue="int" @bind-Value="_days" Label="Expiry window (days)" Min="1" Max="365" Step="1" />
             <div class="xf-filter-actions">
                 <BbButton Variant="ButtonVariant.Outline" OnClick="@Reset" Disabled="@_busy">
-                    <LucideIcon Name="rotate-ccw" class="mr-2 h-4 w-4" />Reset
+                    <LucideIcon Name="rotate-ccw" class="mr-2 h-4 w-4" aria-hidden="true" />Reset
                 </BbButton>
-                <BbButton OnClick="@Apply" Disabled="@_busy"><LucideIcon Name="filter" class="mr-2 h-4 w-4" />Apply</BbButton>
+                <BbButton OnClick="@Apply" Disabled="@_busy"><LucideIcon Name="filter" class="mr-2 h-4 w-4" aria-hidden="true" />Apply</BbButton>
             </div>
         </div>
         }
@@ -61,12 +72,7 @@
         }
         @if (_snapshot is { } snapshot)
         {
-            <p class="snapshot-scope">As of @snapshot.GeneratedAtUtc.ToString("yyyy-MM-dd HH:mm:ss 'UTC'") | @_snapshotScope</p>
-            @if (snapshot.PositionCount > snapshot.Positions.Count || snapshot.MovementCount > snapshot.Movements.Count)
-            {
-                <BbAlert><BbAlertDescription>Detail rows are capped at 1,000 per report. Summary quantities include all matching records.</BbAlertDescription></BbAlert>
-            }
-            <InventoryReportView Snapshot="@snapshot" />
+            <InventoryReportView Snapshot="@snapshot" View="@ActiveView" ViewChanged="@ChangeView" />
             @if (snapshot.Products.Count == 500 || snapshot.Warehouses.Count == 500 || snapshot.Locations.Count == 500)
             {
                 <p class="snapshot-scope">Filter choices are limited to the first 500 names in each catalog. Saved links retain their exact scope.</p>
@@ -90,12 +96,15 @@
     [SupplyParameterFromQuery(Name = "from")] public string? QueryFrom { get; set; }
     [SupplyParameterFromQuery(Name = "to")] public string? QueryTo { get; set; }
     [SupplyParameterFromQuery(Name = "expiry")] public string? QueryExpiry { get; set; }
+    [SupplyParameterFromQuery(Name = "view")] public string? QueryView { get; set; }
+    private string ActiveView => QueryView is "positions" or "movements" or "expiry" ? QueryView : "summary";
 
     private readonly SemaphoreSlim _requestGate = new(1, 1);
     private readonly CancellationTokenSource _lifetime = new();
     private CancellationTokenSource? _request;
     private CancellationTokenSource? _liveCancellation;
     private Task? _liveTask;
+    private IJSObjectReference? _refreshModule;
     private InventoryReportScope? _scope;
     private InventoryReportSnapshot? _snapshot;
     private string? _product, _warehouse, _location, _error, _shareUri;
@@ -119,11 +128,29 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        InventoryReportScope? nextScope;
+        try { nextScope = InventoryReportScope.Parse(Navigation.Uri, TenantFilter.SelectedTenantId); }
+        catch (FormatException ex)
+        {
+            Invalidate();
+            _scope = null;
+            _error = ex.Message;
+            return;
+        }
+        // Section-only navigation preserves the loaded snapshot and editable filters.
+        if (_snapshot is not null && _scope == nextScope) return;
         Invalidate();
         _initializing = true;
         try
         {
-            await ModuleNavigation.EnsureLoadedAsync(_lifetime.Token);
+            Guid? initializingTenant;
+            do
+            {
+                initializingTenant = TenantFilter.SelectedTenantId;
+                await ModuleNavigation.EnsureLoadedAsync(_lifetime.Token);
+                if (_disposed) return;
+            } while (initializingTenant != TenantFilter.SelectedTenantId);
+            // Tenant events are suppressed during initialization; resolve the current scope after the await.
             _scope = InventoryReportScope.Parse(Navigation.Uri, TenantFilter.SelectedTenantId);
             _products = []; _warehouses = []; _locations = [];
             if (_scope is not null)
@@ -270,7 +297,7 @@
             var scope = _scope with { ProductId = Id(_product), WarehouseId = Id(_warehouse), LocationId = Id(_location),
                 FromUtc = DateTime.SpecifyKind(_from.Value.Date, DateTimeKind.Utc),
                 ToUtc = DateTime.SpecifyKind(_to.Value.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc), DaysAhead = _days };
-            var uri = scope.ShareUri(Navigation);
+            var uri = scope.ShareUri(Navigation, ActiveView);
             InventoryReportScope.Parse(uri, null);
             Navigation.NavigateTo(uri);
         }
@@ -279,11 +306,16 @@
     }
     private void Reset()
     {
-        if (_scope is not null) Navigation.NavigateTo(InventoryReportScope.Default(_scope.TenantId).ShareUri(Navigation));
+        if (_scope is not null) Navigation.NavigateTo(InventoryReportScope.Default(_scope.TenantId).ShareUri(Navigation, ActiveView));
     }
     private void Share()
     {
-        if (_scope is not null && _snapshot is not null) _shareUri = _scope.ShareUri(Navigation);
+        if (_scope is not null && _snapshot is not null) _shareUri = _scope.ShareUri(Navigation, ActiveView);
+    }
+    private void ChangeView(string view)
+    {
+        if (_scope is not null) Navigation.NavigateTo(_scope.ShareUri(Navigation, view));
+        _shareUri = null;
     }
     private async Task Export()
     {
@@ -320,6 +352,19 @@
         finally { cancellation?.Dispose(); }
         if (value && !_disposed && revision == _liveRevision)
         {
+            try
+            {
+                _refreshModule ??= await JS.InvokeAsync<IJSObjectReference>("import",
+                    "./_content/XFramework.Portal.Features.Inventario/reports/refresh-visibility.js");
+            }
+            catch (JSException ex)
+            {
+                Logger.LogWarning(ex, "Could not start inventory report auto-refresh");
+                _live = false;
+                _error = "Could not start auto-refresh. Refresh manually or try again.";
+                return;
+            }
+            if (_disposed || revision != _liveRevision) return;
             _liveCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
             _liveTask = LiveLoop(_liveCancellation.Token);
         }
@@ -331,10 +376,26 @@
             while (!ct.IsCancellationRequested)
             {
                 await Task.Delay(TimeSpan.FromSeconds(30), ct);
-                await InvokeAsync(async () => { if (!_busy && !_exporting && _scope is not null) await Refresh(); });
+                await InvokeAsync(async () =>
+                {
+                    if (!_disposed && !_busy && !_exporting && !_denied && _scope is not null &&
+                        _refreshModule is not null && await _refreshModule.InvokeAsync<bool>("isVisible", ct))
+                        await Refresh();
+                });
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+        catch (JSDisconnectedException) { }
+        catch (JSException ex)
+        {
+            Logger.LogWarning(ex, "Inventory report auto-refresh visibility check failed");
+            await InvokeAsync(() =>
+            {
+                _live = false;
+                _error = "Auto-refresh stopped. Refresh manually or try again.";
+                StateHasChanged();
+            });
+        }
     }
     public async ValueTask DisposeAsync()
     {
@@ -345,6 +406,11 @@
         Invalidate();
         _lifetime.Cancel();
         await SetLive(false);
+        if (_refreshModule is not null)
+        {
+            try { await _refreshModule.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+        }
         _lifetime.Dispose();
     }
 }

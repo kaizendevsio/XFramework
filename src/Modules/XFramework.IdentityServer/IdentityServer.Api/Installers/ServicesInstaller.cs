@@ -33,6 +33,8 @@ public class ServicesInstaller : IInstaller
         services.Replace(ServiceDescriptor.Scoped<IActorIdentityProvider, IdentityServerLocalActorIdentityProvider>());
         XFramework.GeneratedServices.GeneratedEntityServiceRegistrations
             .AddGeneratedEntityServices(services);
+        services.Replace(ServiceDescriptor.Scoped<IRegistryConfigurationService,
+            Features.GeneratedEntityValidation.ProtectedRegistryConfigurationService>());
 
         // Register AuthService for VSA pattern
         services.AddHostedService<PasswordResetOutboxDispatcher>();
@@ -40,6 +42,7 @@ public class ServicesInstaller : IInstaller
         services.AddHostedService<StorageCleanupOutboxDispatcher>();
         services.AddHostedService<StorageClaimOutboxDispatcher>();
         services.AddScoped<AuthService>();
+        services.AddScoped<Features.FinanceSettings.TenantFinanceSettingsService>();
         services.AddSingleton<OpaqueExchanges>();
         services.AddSingleton<OpaqueSetup>();
         if (!string.IsNullOrWhiteSpace(configuration["Opaque:SetupPath"]))

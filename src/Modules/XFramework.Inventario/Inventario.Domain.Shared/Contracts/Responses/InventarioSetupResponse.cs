@@ -18,6 +18,8 @@ public partial record InventarioSetupResponse
     public Guid? LocationId { get; init; }
     public List<Warehouse> Warehouses { get; init; } = [];
     public List<InventoryLocation> Locations { get; init; } = [];
+    public List<string> SupportedCurrencies { get; init; } = [];
+    public bool DefaultProductAvailable { get; init; } = true;
     [MemoryPackIgnore]
     public bool ShouldPrompt => CanManage && CompletedAt is null && !HasExistingConfiguration;
 }

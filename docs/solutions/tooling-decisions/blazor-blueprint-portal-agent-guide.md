@@ -29,7 +29,7 @@ This guide is the local XFramework playbook for using BlazorBlueprint in the Por
 - The installed NuGet package is the final API check. Inspect XML/source before adding less-common parameters:
 
 ```powershell
-$xml = "$env:USERPROFILE\.nuget\packages\blazorblueprint.components\3.12.0\lib\net8.0\BlazorBlueprint.Components.xml"
+$xml = "$env:USERPROFILE\.nuget\packages\blazorblueprint.components\4.1.0\lib\net10.0\BlazorBlueprint.Components.xml"
 Select-String -Path $xml -Pattern 'BbDropdownMenuContent|BbPopoverContent|BbCombobox'
 ```
 
@@ -37,17 +37,44 @@ If the docs are ambiguous, open the official docs in the Codex built-in browser 
 
 ## Portal Setup
 
-The current Portal uses BlazorBlueprint `3.12.0`:
+The current Portal uses BlazorBlueprint Components/Primitives `4.1.0` and Lucide `2.0.2` (upgraded from Components/Primitives `3.16.0`):
 
 - Package versions are pinned in `Directory.Packages.props`.
 - `XFramework.Portal.csproj` references `BlazorBlueprint.Components` and `BlazorBlueprint.Icons.Lucide`.
 - `Program.cs` calls `AddInteractiveServerComponents()` and `AddBlazorBlueprintComponents(...)`.
 - `Components/_Imports.razor` imports `BlazorBlueprint.Components`, `BlazorBlueprint.Primitives`, `BlazorBlueprint.Primitives.Services`, `BlazorBlueprint.Icons.Lucide.Components`, and `BlazorBlueprint.Icons.Lucide.Data`.
 - `Components/App.razor` loads `_content/BlazorBlueprint.Components/css/themes.css` and `_content/BlazorBlueprint.Components/blazorblueprint.css`.
+- Portal's `css/app.css` is followed by generated `css/utilities.css`, then scoped styles. The utility build scans the host, shared UI, and feature RCL Razor/C# sources, without scanning Blueprint packages. Existing custom rules in `app.css` remain unchanged.
 - `Components/App.razor` renders routes with `@rendermode="InteractiveServer"`.
 - `Components/Layout/MainLayout.razor` includes `BbToastProvider`, `BbDialogProvider`, `XfContainerPortalHost`, and `BbOverlayPortalHost`. `XfPortalService` preserves BlazorBlueprint's public portal contract while giving the custom container host the changed portal ID, allowing it to queue only dialog/sheet refreshes whose content already rendered in the active cycle.
 
-Do not remove the portal-host composition. Portal-based controls such as Popover, Dialog, Sheet, Dropdown Menu, Combobox, and Select require it. In `MainLayout`, do not replace `XfPortalService`, `XfContainerPortalHost`, and `BbOverlayPortalHost` with the stock service/combined host until a BlazorBlueprint version newer than `3.12.0` has a verified fix for dropped container refreshes and repeated dialog browser tests pass.
+Do not remove the portal-host composition. Portal-based controls such as Popover, Dialog, Sheet, Dropdown Menu, Combobox, and Select require it. In `MainLayout`, retain `XfPortalService`, `XfContainerPortalHost`, and `BbOverlayPortalHost` until repeated dynamic-dialog browser tests verify the stock replacement. Version `4.1.0` contains upstream deferred refresh recovery, but that alone does not establish equivalence with the local workaround.
+
+## v4 Upgrade Notes
+
+Stable versions were checked against official NuGet on 2026-10-19: [Components 4.1.0](https://www.nuget.org/packages/BlazorBlueprint.Components/4.1.0), [Primitives 4.1.0](https://www.nuget.org/packages/BlazorBlueprint.Primitives/4.1.0), and [Lucide 2.0.2](https://www.nuget.org/packages/BlazorBlueprint.Icons.Lucide/2.0.2). The Components package records upstream commit `484e630073ff2861aebafc2093dd67bf0c8105f5`. Its bundled release notes still say "unreleased"; the published NuGet version is stable, not a prerelease.
+
+Read the [v4 migration guide](https://github.com/blazorblueprintui/ui/blob/484e630073ff2861aebafc2093dd67bf0c8105f5/V4-MIGRATION-GUIDE.md) and [changelog](https://github.com/blazorblueprintui/ui/blob/484e630073ff2861aebafc2093dd67bf0c8105f5/CHANGELOG.md) before further migration:
+
+- .NET 10 is required. Keep Components and Primitives versions aligned.
+- Library utilities now use `bb:` and a separate cascade layer. Keep app utilities unprefixed, with explicit theme border color and class-based dark mode. Do not select Blueprint internals by their former utility names; prefer `data-*` attributes.
+- Portal hosts now live in `BlazorBlueprint.Primitives`. Razor imports already include it; C# test fixtures that import only `.Services` need the root namespace too.
+- Drawer trigger/close now render buttons; use `AsChild="true"` around Blueprint buttons. Tooltip triggers default to wrappers; explicitly set `AsChild` when the child consumes trigger context.
+- Removed no-op calendar/command/chart parameters and changed primitive navigation registration are listed in the upstream guide. No matching Portal usages were found during the upgrade scan.
+- Version 4.1 adds stricter date-time minute-step and dock-ID validation, changes modified-arrow tab handling, and renames the grid resize module to `table-columns.js`. Dialog/Popover `Modal` dismissal behavior also changed; repeat nested-overlay tests.
+- Retain `XfPopoverClickOutside` and the controlled-tree reconciliation workaround pending focused browser verification. Upstream host registration now counts hosts, whereas the retained custom service uses a boolean; include layout disposal/remount in eventual replacement tests.
+- XML documentation also includes internal APIs. `BbFormWizard.GoToNextAsync`, `GoToBackAsync`, `CompleteAsync`, `CanGoBack`, and `IsLastStep` are internal in 4.1.0. Use public controlled-step parameters/events or built-in navigation, not an `@ref` call to these members.
+
+Regenerate only the separate utility bundle from `src/Presentation/XFramework.Portal`:
+
+```powershell
+npm ci --ignore-scripts
+npm run build:css
+```
+
+Commit the generated `wwwroot/css/utilities.css` with its source and lockfile. Node is not required for ordinary .NET builds or deployment of the checked-in CSS. Standalone browser fixtures must serve and load `utilities.css` after `app.css`, just as `App.razor` does. The version assertions in `IdentityServerPortalContractTests.PortalContainerHost_QueuesAlreadyRenderedDialogRefreshes` deliberately require review when the package changes; advance them only with the corresponding compatibility verification.
+
+Standalone interactive fixtures without the layout's theme controls must call `ThemeService.InitializeAsync()` after their first interactive render. Registration alone does not apply the configured theme. Assert the actual root theme attributes, radius, and rendered light/dark surface after initialization; static HTML attributes alone can hide incorrect fixture styling.
 
 ## Component Layering
 

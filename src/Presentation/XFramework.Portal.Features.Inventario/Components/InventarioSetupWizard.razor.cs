@@ -21,6 +21,10 @@ public partial class InventarioSetupWizard
     [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
     [Inject] private IPortalTenantContext TenantContext { get; set; } = default!;
     private Guid _tenantId, _completionRequestId;
+    private int _currentStep;
+    private int ReviewStep => ExplicitStorage ? 4 : 2;
+    private string _stockAreaName = "";
+    private bool _defaultProductAvailable = true;
     private bool _saving, _disposed;
     private string? _error;
     private string _mode = "basic", _warehouseId = "", _locationId = "", _parentLocationId = "";
@@ -29,6 +33,8 @@ public partial class InventarioSetupWizard
     private int _threshold = 5;
     private bool _isDefault = true, _pickable = true;
     private bool Advanced => _mode == "advanced";
+    private bool ExplicitStorage => Advanced && State.WarehousingEnabled;
+    private string StockAreaName => string.IsNullOrWhiteSpace(_stockAreaName) ? "My stock" : _stockAreaName.Trim();
     private List<SelectOption<string>> WarehouseOptions => [new("", "New warehouse"), .. State.Warehouses.Where(x => x.IsEnabled).Select(x => new SelectOption<string>(x.Id.ToString(), $"{x.Code} - {x.Name}"))];
     private IEnumerable<InventoryLocation> WarehouseLocations => State.Locations.Where(x => x.IsEnabled && x.WarehouseId.ToString() == _warehouseId);
     private List<SelectOption<string>> LocationOptions => [new("", "New location"), .. WarehouseLocations.Select(x => new SelectOption<string>(x.Id.ToString(), $"{x.Code} - {x.Name}"))];
@@ -41,20 +47,36 @@ public partial class InventarioSetupWizard
         if (_tenantId == State.TenantId) return;
         _tenantId = State.TenantId;
         _completionRequestId = Guid.NewGuid();
-        _mode = State.HasExistingConfiguration || !State.WarehousingEnabled || State.Mode == InventarioSetupMode.Advanced ? "advanced" : "basic";
+        _mode = State.Mode == InventarioSetupMode.Advanced ? "advanced" : "basic";
         _threshold = State.LowStockThreshold;
         _currency = State.DefaultCurrency;
-        var warehouse = State.Warehouses.FirstOrDefault(x => x.IsEnabled && x.IsDefault) ?? State.Warehouses.FirstOrDefault(x => x.IsEnabled);
+        _defaultProductAvailable = State.DefaultProductAvailable;
+        var warehouse = State.Warehouses.FirstOrDefault(x => x.IsEnabled && x.Id == State.WarehouseId) ?? State.Warehouses.FirstOrDefault(x => x.IsEnabled && x.IsDefault) ?? State.Warehouses.FirstOrDefault(x => x.IsEnabled);
         _warehouseId = warehouse?.Id.ToString() ?? "";
-        _locationId = State.Locations.FirstOrDefault(x => x.IsEnabled && x.WarehouseId == warehouse?.Id)?.Id.ToString() ?? "";
+        _locationId = (State.Locations.FirstOrDefault(x => x.IsEnabled && x.WarehouseId == warehouse?.Id && x.Id == State.LocationId) ?? State.Locations.FirstOrDefault(x => x.IsEnabled && x.WarehouseId == warehouse?.Id))?.Id.ToString() ?? "";
     }
 
     private void SelectWarehouse(string value) { _warehouseId = value; _locationId = ""; _parentLocationId = ""; }
     private bool Check(bool valid, string message) { _error = valid ? null : message; return valid; }
-    private bool ValidateMode() => Check(Advanced || (!State.HasExistingConfiguration && State.WarehousingEnabled), "Use advanced setup for existing configuration or disabled warehousing.");
-    private bool ValidateWarehouse() => Check(!State.WarehousingEnabled || _warehouseId != "" || (!string.IsNullOrWhiteSpace(_warehouseCode) && _warehouseCode.Length <= 50 && !string.IsNullOrWhiteSpace(_warehouseName) && _warehouseName.Length <= 200), "Warehouse code and name are required.");
-    private bool ValidateLocation() => Check(!State.WarehousingEnabled || _locationId != "" || (!string.IsNullOrWhiteSpace(_locationCode) && _locationCode.Length <= 50 && !string.IsNullOrWhiteSpace(_locationName) && _locationName.Length <= 200), "Location code and name are required.");
-    private bool ValidateDefaults() => Check(_threshold >= 0 && CurrencyCatalog.GetAllCurrencyCodes().Contains(_currency.Trim().ToUpperInvariant()), "Enter a non-negative threshold and supported currency code.");
+    // Recreate the wizard on path changes so conditional steps register in display order.
+    private void SelectMode(string value) { _mode = value; _currentStep = 0; _error = null; }
+    private void Back() { if (!_saving && _currentStep > 0) { --_currentStep; _error = null; } }
+    private void Next()
+    {
+        if (_saving || _currentStep >= ReviewStep) return;
+        var valid = _currentStep switch
+        {
+            0 => ValidateMode(),
+            1 when ExplicitStorage => ValidateWarehouse(),
+            2 when ExplicitStorage => ValidateLocation(),
+            _ => ValidateDefaults()
+        };
+        if (valid) ++_currentStep;
+    }
+    private bool ValidateMode() => Check(ExplicitStorage || StockAreaName.Length <= 200, "Stock area name must be 200 characters or fewer.");
+    private bool ValidateWarehouse() => Check(!ExplicitStorage || _warehouseId != "" || (!string.IsNullOrWhiteSpace(_warehouseCode) && _warehouseCode.Length <= 50 && !string.IsNullOrWhiteSpace(_warehouseName) && _warehouseName.Length <= 200), "Warehouse code and name are required.");
+    private bool ValidateLocation() => Check(!ExplicitStorage || _locationId != "" || (!string.IsNullOrWhiteSpace(_locationCode) && _locationCode.Length <= 50 && !string.IsNullOrWhiteSpace(_locationName) && _locationName.Length <= 200), "Location code and name are required.");
+    private bool ValidateDefaults() => Check(_threshold >= 0 && State.SupportedCurrencies.Contains(_currency), "Enter a non-negative threshold and select a supported currency.");
     private bool ValidateAll() => ValidateMode() && ValidateWarehouse() && ValidateLocation() && ValidateDefaults();
     private Task CancelAsync() => _saving ? Task.CompletedTask : Cancelled.InvokeAsync();
 
@@ -67,10 +89,11 @@ public partial class InventarioSetupWizard
             Metadata = new() { RequestedTenantId = tenantId }, CompletionRequestId = _completionRequestId,
             ExpectedConcurrencyStamp = State.ConcurrencyStamp, Mode = Advanced ? InventarioSetupMode.Advanced : InventarioSetupMode.Basic,
             LowStockThreshold = _threshold, DefaultCurrency = _currency.Trim().ToUpperInvariant(),
-            ExistingWarehouseId = State.WarehousingEnabled && Guid.TryParse(_warehouseId, out var w) ? w : null,
-            ExistingLocationId = State.WarehousingEnabled && Guid.TryParse(_locationId, out var l) ? l : null,
-            Warehouse = State.WarehousingEnabled && _warehouseId == "" ? new CreateWarehouseRequest { Code = _warehouseCode, Name = _warehouseName, Description = _warehouseDescription, AddressLine = _address, City = _city, Region = _region, PostalCode = _postalCode, CountryCode = _countryCode, IsDefault = _isDefault } : null,
-            Location = State.WarehousingEnabled && _locationId == "" ? new CreateInventoryLocationRequest { Code = _locationCode, Name = _locationName, Description = _locationDescription, LocationType = Enum.Parse<InventoryLocationType>(_locationType), ParentLocationId = Guid.TryParse(_parentLocationId, out var p) ? p : null, IsPickable = _pickable } : null
+            UseSimpleStorage = !Advanced && State.WarehousingEnabled, StockAreaName = StockAreaName, DefaultProductAvailable = _defaultProductAvailable,
+            ExistingWarehouseId = ExplicitStorage && Guid.TryParse(_warehouseId, out var w) ? w : null,
+            ExistingLocationId = ExplicitStorage && Guid.TryParse(_locationId, out var l) ? l : null,
+            Warehouse = ExplicitStorage && _warehouseId == "" ? new CreateWarehouseRequest { Code = _warehouseCode, Name = _warehouseName, Description = _warehouseDescription, AddressLine = _address, City = _city, Region = _region, PostalCode = _postalCode, CountryCode = _countryCode, IsDefault = _isDefault } : null,
+            Location = ExplicitStorage && _locationId == "" ? new CreateInventoryLocationRequest { Code = _locationCode, Name = _locationName, Description = _locationDescription, LocationType = Enum.Parse<InventoryLocationType>(_locationType), ParentLocationId = Guid.TryParse(_parentLocationId, out var p) ? p : null, IsPickable = _pickable } : null
         };
         _saving = true;
         try

@@ -270,6 +270,10 @@ public partial class PosSale : BaseModel
     [MemoryPackOrder(19)]
     public string? RequestHash { get; set; }
 
+    [MemoryPackOrder(20)]
+    // False retains historical gross-weight refund allocation for pre-automatic-tax sales.
+    public bool UsesAutomaticTax { get; set; }
+
     [MemoryPackIgnore]
     public virtual PosRegister Register { get; set; } = null!;
 

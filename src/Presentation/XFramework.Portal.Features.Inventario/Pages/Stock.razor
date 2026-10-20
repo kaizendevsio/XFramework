@@ -479,8 +479,17 @@ else
 
     private async Task OpenMovementDialog()
     {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
         await FocusJs.InvokeVoidAsync("inventarioFocus.capture", "stock-movement");
-        _movementForm = new();
+        XFramework.Inventario.Domain.Shared.Contracts.Responses.InventarioSetupResponse preferences;
+        try { preferences = await InventoryDisplay.PreferencesAsync(Inventario, tenantId); }
+        catch { ToastService.Show("Could not load stock defaults. Try again."); return; }
+        if (TenantFilter.SelectedTenantId != tenantId) return;
+        _movementForm = new() { ProductId = ProductId?.ToString() ?? "" };
+        var warehouse = _warehouses.FirstOrDefault(x => x.IsEnabled && x.Id == preferences.WarehouseId);
+        var location = _locations.FirstOrDefault(x => x.IsEnabled && x.Id == preferences.LocationId && x.WarehouseId == warehouse?.Id);
+        _movementForm.WarehouseId = warehouse?.Id.ToString() ?? "";
+        _movementForm.LocationId = location?.Id.ToString() ?? "";
         ApplyDefaultMovementSelections();
         _movementDialogOpen = true;
     }
@@ -510,8 +519,8 @@ else
     private void ApplyDefaultMovementSelections()
     {
 
-        _movementForm.WarehouseId = _movementForm.WarehouseId.Length > 0 ? _movementForm.WarehouseId : _warehouses.FirstOrDefault()?.Id.ToString() ?? "";
-        var location = LocationsForSelectedWarehouse().FirstOrDefault() ?? _locations.FirstOrDefault();
+        _movementForm.WarehouseId = _movementForm.WarehouseId.Length > 0 ? _movementForm.WarehouseId : _warehouses.FirstOrDefault(x => x.IsEnabled)?.Id.ToString() ?? "";
+        var location = LocationsForSelectedWarehouse().FirstOrDefault(x => x.IsEnabled && x.WarehouseId.ToString() == _movementForm.WarehouseId);
         _movementForm.LocationId = _movementForm.LocationId.Length > 0 ? _movementForm.LocationId : location?.Id.ToString() ?? "";
     }
 

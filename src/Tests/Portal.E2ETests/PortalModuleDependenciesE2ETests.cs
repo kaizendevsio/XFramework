@@ -21,6 +21,11 @@ public sealed class PortalModuleDependenciesE2ETests : PageTest
     {
         Assert.That(Environment.GetEnvironmentVariable("PORTAL_E2E_ALLOW_TENANT_CREATION"), Is.EqualTo("1"),
             "This test creates an isolated QA tenant; set PORTAL_E2E_ALLOW_TENANT_CREATION=1 on a test deployment.");
+        await Page.AddInitScriptAsync("""
+            localStorage.setItem('bb-theme', JSON.stringify({
+                baseColor: 'slate', primaryColor: 'blue', radius: 0.5, isDarkMode: true
+            }));
+            """);
         await Page.SetViewportSizeAsync(1920, 1080);
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("PORTAL_E2E_STORAGE_STATE")))
         {
@@ -53,6 +58,7 @@ public sealed class PortalModuleDependenciesE2ETests : PageTest
         var registers = Feature("POS Registers");
         var warehouse = Feature("Warehousing");
         await Expect(registers.GetByRole(AriaRole.Checkbox)).ToBeCheckedAsync(new() { Timeout = 30_000 });
+        await AssertPortalAssetsAndTheme();
         await Expect(warehouse.GetByRole(AriaRole.Checkbox)).Not.ToBeCheckedAsync();
         var warning = Page.GetByTestId("module-dependency-warning");
         await Expect(warning).ToBeVisibleAsync();
@@ -85,6 +91,7 @@ public sealed class PortalModuleDependenciesE2ETests : PageTest
         await Expect(Page.GetByText("POS Registers requires Warehousing. Disable the dependent feature first.", new() { Exact = false })).ToBeVisibleAsync();
         await Expect(warehouse.GetByRole(AriaRole.Checkbox)).ToBeCheckedAsync();
         await Expect(search).ToHaveValueAsync("Warehousing");
+        await AssertPortalAssetsAndTheme();
         await search.FillAsync("");
         await search.PressAsync("Tab");
         await Expect(registers).ToBeVisibleAsync();
@@ -152,6 +159,38 @@ public sealed class PortalModuleDependenciesE2ETests : PageTest
     }
 
     private ILocator Feature(string name) => Page.GetByRole(AriaRole.Treeitem, new() { NameRegex = new Regex($"^{Regex.Escape(name)} ") });
+
+    private async Task AssertPortalAssetsAndTheme()
+    {
+        var styles = await Page.Locator("link[rel='stylesheet']").EvaluateAllAsync<string[]>(
+            "links => links.map(link => link.href)");
+        var appIndex = Array.FindIndex(styles, href => new Uri(href).AbsolutePath.StartsWith("/css/app", StringComparison.Ordinal));
+        var utilitiesIndex = Array.FindIndex(styles, href => new Uri(href).AbsolutePath.StartsWith("/css/utilities", StringComparison.Ordinal));
+        Assert.That(appIndex, Is.GreaterThanOrEqualTo(0));
+        Assert.That(utilitiesIndex, Is.GreaterThan(appIndex), "The production v4 utilities must load after app.css.");
+        Assert.That((await Page.APIRequest.GetAsync(styles[utilitiesIndex])).Status, Is.EqualTo(200));
+        var root = Page.Locator("html");
+        await Expect(root).ToHaveClassAsync(new Regex(@"\bdark\b"));
+        await Expect(root).ToHaveAttributeAsync("data-base-color", "slate");
+        await Expect(root).ToHaveAttributeAsync("data-primary-color", "blue");
+        await Expect(root).ToHaveCSSAsync("--radius", "0.5rem");
+        var brightness = await Page.GetByRole(AriaRole.Tree).First.EvaluateAsync<double>("""
+            element => {
+                const backgrounds = [];
+                for (let node = element; node; node = node.parentElement)
+                    backgrounds.push(getComputedStyle(node).backgroundColor);
+                const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = 'white'; ctx.fillRect(0, 0, 1, 1);
+                for (const color of backgrounds.reverse()) {
+                    ctx.fillStyle = color; ctx.fillRect(0, 0, 1, 1);
+                }
+                const [r,g,b] = ctx.getImageData(0, 0, 1, 1).data;
+                return (r+g+b)/765;
+            }
+            """);
+        Assert.That(brightness, Is.LessThan(.25), "The tree surface must actually render dark after ThemeService initialization.");
+    }
 
     [TearDown]
     public async Task CaptureFailure()

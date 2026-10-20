@@ -491,6 +491,16 @@ public sealed class QueryExecutionService(
                 }
             }
 
+            // EF can attach navigation graphs from a serialized root. Every changed entity must
+            // have its own authorized, validated change entry; otherwise child writes bypass both.
+            dbContext.ChangeTracker.DetectChanges();
+            var explicitEntities = persistedEntities.Select(item => item.Entity)
+                .ToHashSet(ReferenceEqualityComparer.Instance);
+            if (dbContext.ChangeTracker.Entries().Any(entry =>
+                    entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted &&
+                    !explicitEntities.Contains(entry.Entity)))
+                return SerializeError("Remote mutations must target each entity explicitly; navigation writes are not supported.", 403);
+
             await dbContext.SaveChangesAsync(ct);
             InvalidateTenantModuleFeatureCache(serviceProvider, changedTenantModuleFeatures);
 

@@ -1,3 +1,4 @@
+using BlazorBlueprint.Primitives;
 using FluentAssertions;
 
 namespace Portal.E2ETests;
@@ -387,8 +388,11 @@ public sealed class IdentityServerPortalContractTests
         containerHost.Should().NotContain("_isDeferredRefreshRender");
         containerHost.Should().Contain("await InvokeAsync(StateHasChanged);");
 
-        packageVersions.Should().Contain("<PackageVersion Include=\"BlazorBlueprint.Components\" Version=\"3.16.0\" />");
-        packageVersions.Should().Contain("<PackageVersion Include=\"BlazorBlueprint.Primitives\" Version=\"3.16.0\" />");
+        // Keep the local host until replacement browser coverage passes; exercise its
+        // render-cycle behavior separately in XfContainerPortalHostTests.
+        typeof(BbOverlayPortalHost).Namespace.Should().Be("BlazorBlueprint.Primitives");
+        packageVersions.Should().Contain("<PackageVersion Include=\"BlazorBlueprint.Components\" Version=\"4.1.0\" />");
+        packageVersions.Should().Contain("<PackageVersion Include=\"BlazorBlueprint.Primitives\" Version=\"4.1.0\" />");
     }
 
     [Test]

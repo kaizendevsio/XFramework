@@ -12,14 +12,14 @@ else if (_error is not null)
 { <BbAlert Variant="AlertVariant.Danger"><BbAlertDescription>@_error</BbAlertDescription></BbAlert><BbButton OnClick="Reload">Reload</BbButton> }
 else if (_state is not null)
 {
-    <div class="inv-page space-y-6">
+    <div class="inv-page setup-page space-y-6">
         <div class="xf-page-header"><div><BbTypographyH3>Inventario Setup</BbTypographyH3><BbTypographyMuted>@TenantContext.SelectedTenantName</BbTypographyMuted></div></div>
         @if (!_state.CanManage)
         { <BbAlert><BbAlertTitle>Setup restricted</BbAlertTitle><BbAlertDescription>A tenant administrator must confirm Inventario setup.</BbAlertDescription></BbAlert> }
         else if (_state.CompletedAt is not null)
         {
             <BbAlert><BbAlertTitle>Setup complete</BbAlertTitle><BbAlertDescription>@_state.Mode setup saved for this tenant.</BbAlertDescription></BbAlert>
-            <BbButton OnClick="@(() => Navigation.NavigateTo("/inventario/settings"))">Open Settings</BbButton>
+            <BbButton OnClick="@(() => Navigation.NavigateTo("/inventario/settings"))"><LucideIcon Name="settings" class="mr-2 h-4 w-4" />Change mode and settings</BbButton>
             <InventarioConfigurationLinks />
         }
         else

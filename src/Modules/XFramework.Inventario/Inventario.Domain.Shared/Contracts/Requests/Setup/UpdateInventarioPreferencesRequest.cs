@@ -2,6 +2,7 @@ using Bolt.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Inventario.Domain.Shared.Contracts.Responses;
+using XFramework.Inventario.Domain.Shared.Enums;
 
 namespace XFramework.Inventario.Domain.Shared.Contracts.Requests.Setup;
 
@@ -13,4 +14,8 @@ public partial record UpdateInventarioPreferencesRequest : RequestBase,
     public Guid? ExpectedConcurrencyStamp { get; init; }
     public int LowStockThreshold { get; init; }
     public string DefaultCurrency { get; init; } = "PHP";
+    public InventarioSetupMode? Mode { get; init; }
+    public Guid? WarehouseId { get; init; }
+    public Guid? LocationId { get; init; }
+    public bool DefaultProductAvailable { get; init; } = true;
 }

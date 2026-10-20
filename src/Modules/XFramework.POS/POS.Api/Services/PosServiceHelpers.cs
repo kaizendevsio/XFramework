@@ -123,6 +123,9 @@ internal static class PosServiceHelpers
 
     public static IReadOnlyDictionary<Guid, PosSaleLineRefundAllocation> BuildSaleRefundAllocations(PosSale sale)
     {
+        if (sale.UsesAutomaticTax)
+            return BuildAutomaticTaxRefundAllocations(sale);
+
         var orderedLines = sale.Lines.OrderBy(line => line.LineNumber).ToList();
         var grossSubtotal = orderedLines.Sum(line => line.Quantity * line.UnitPrice);
         var remainingHeaderDiscount = sale.DiscountAmount;
@@ -151,6 +154,38 @@ internal static class PosServiceHelpers
         return allocations;
     }
 
+    private static IReadOnlyDictionary<Guid, PosSaleLineRefundAllocation> BuildAutomaticTaxRefundAllocations(PosSale sale)
+    {
+        var lines = sale.Lines.OrderBy(line => line.LineNumber).ToList();
+        var remainingNet = lines.Sum(line => line.Quantity * line.UnitPrice - line.DiscountAmount);
+        var remainingDiscount = sale.DiscountAmount;
+        var taxableAmounts = new Dictionary<Guid, decimal>(lines.Count);
+        // Allocate discounts first, keeping free lines at zero and rounding remainders on paid lines.
+        foreach (var line in lines)
+        {
+            var net = line.Quantity * line.UnitPrice - line.DiscountAmount;
+            var discount = net == remainingNet ? remainingDiscount
+                : Math.Min(net, Math.Min(remainingDiscount, AllocateProportion(remainingDiscount, net, remainingNet)));
+            taxableAmounts[line.Id] = net - discount;
+            remainingNet -= net;
+            remainingDiscount -= discount;
+        }
+
+        var remainingTaxable = taxableAmounts.Values.Sum();
+        var remainingTax = sale.TaxAmount;
+        var allocations = new Dictionary<Guid, PosSaleLineRefundAllocation>(lines.Count);
+        foreach (var line in lines)
+        {
+            var taxable = taxableAmounts[line.Id];
+            var tax = taxable == 0 ? 0 : taxable == remainingTaxable ? remainingTax
+                : Math.Min(remainingTax, AllocateProportion(remainingTax, taxable, remainingTaxable));
+            allocations[line.Id] = new(tax, taxable + tax);
+            remainingTaxable -= taxable;
+            remainingTax -= tax;
+        }
+        return allocations;
+    }
+
     public static PosSaleLineRefundAllocation BuildPartialReturnAllocation(
         PosSaleLineRefundAllocation original,
         decimal originalQuantity,
@@ -160,16 +195,18 @@ internal static class PosServiceHelpers
         decimal requestedQuantity)
     {
         var remainingQuantity = originalQuantity - previouslyReturnedQuantity;
+        var remainingTax = Math.Max(0, original.TaxAmount - previouslyReturnedTax);
+        var remainingRefund = Math.Max(0, original.RefundAmount - previouslyReturnedRefund);
         if (requestedQuantity == remainingQuantity)
         {
             return new PosSaleLineRefundAllocation(
-                original.TaxAmount - previouslyReturnedTax,
-                original.RefundAmount - previouslyReturnedRefund);
+                remainingTax,
+                remainingRefund);
         }
 
         return new PosSaleLineRefundAllocation(
-            decimal.Round(original.TaxAmount * requestedQuantity / originalQuantity, 2, MidpointRounding.AwayFromZero),
-            decimal.Round(original.RefundAmount * requestedQuantity / originalQuantity, 2, MidpointRounding.AwayFromZero));
+            Math.Min(remainingTax, Math.Max(0, decimal.Round(original.TaxAmount * requestedQuantity / originalQuantity, 2, MidpointRounding.AwayFromZero))),
+            Math.Min(remainingRefund, Math.Max(0, decimal.Round(original.RefundAmount * requestedQuantity / originalQuantity, 2, MidpointRounding.AwayFromZero))));
     }
 
     private static decimal AllocateProportion(decimal amount, decimal lineAmount, decimal totalAmount) =>
@@ -256,35 +293,39 @@ internal static class PosServiceHelpers
         ConcurrencyStamp = cart.ConcurrencyStamp
     };
 
-    public static PosSaleReceiptResponse ToSaleReceiptResponse(PosSale sale) => new()
+    public static PosSaleReceiptResponse ToSaleReceiptResponse(PosSale sale)
     {
-        Id = sale.Id,
-        TenantId = sale.TenantId,
-        SaleNumber = sale.SaleNumber,
-        RegisterId = sale.RegisterId,
-        CashierCredentialId = sale.CashierCredentialId,
-        CustomerCredentialId = sale.CustomerCredentialId,
-        Status = sale.Status,
-        SubtotalAmount = sale.SubtotalAmount,
-        DiscountAmount = sale.DiscountAmount,
-        TaxAmount = sale.TaxAmount,
-        TotalAmount = sale.TotalAmount,
-        CurrencyId = sale.CurrencyId,
-        WalletTypeId = sale.WalletTypeId,
-        PaymentMethod = sale.PaymentMethod,
-        IdempotencyKey = sale.IdempotencyKey,
-        CompletedAt = sale.CompletedAt,
-        FailureReason = sale.FailureReason,
-        RecoveryState = sale.RecoveryState,
-        Lines = sale.Lines
-            .OrderBy(line => line.LineNumber)
-            .Select(ToSaleLineResponse)
-            .ToList(),
-        Payments = sale.Payments
-            .OrderBy(payment => payment.CreatedAt)
-            .Select(ToPaymentResponse)
-            .ToList()
-    };
+        var allocations = BuildSaleRefundAllocations(sale);
+        return new()
+        {
+            Id = sale.Id,
+            TenantId = sale.TenantId,
+            SaleNumber = sale.SaleNumber,
+            RegisterId = sale.RegisterId,
+            CashierCredentialId = sale.CashierCredentialId,
+            CustomerCredentialId = sale.CustomerCredentialId,
+            Status = sale.Status,
+            SubtotalAmount = sale.SubtotalAmount,
+            DiscountAmount = sale.DiscountAmount,
+            TaxAmount = sale.TaxAmount,
+            TotalAmount = sale.TotalAmount,
+            CurrencyId = sale.CurrencyId,
+            WalletTypeId = sale.WalletTypeId,
+            PaymentMethod = sale.PaymentMethod,
+            IdempotencyKey = sale.IdempotencyKey,
+            CompletedAt = sale.CompletedAt,
+            FailureReason = sale.FailureReason,
+            RecoveryState = sale.RecoveryState,
+            Lines = sale.Lines
+                .OrderBy(line => line.LineNumber)
+                .Select(line => ToSaleLineResponse(line) with { RefundAmount = allocations[line.Id].RefundAmount })
+                .ToList(),
+            Payments = sale.Payments
+                .OrderBy(payment => payment.CreatedAt)
+                .Select(ToPaymentResponse)
+                .ToList()
+        };
+    }
 
     public static PosSaleSummaryResponse ToSaleSummaryResponse(PosSale sale) => new()
     {
