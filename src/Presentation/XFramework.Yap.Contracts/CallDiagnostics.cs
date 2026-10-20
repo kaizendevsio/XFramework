@@ -14,7 +14,8 @@ public enum CallMetric
     Nacked, Recovered, Abandoned, Declined, Incomplete, Skipped, Pictures, RecoveryMs,
     CapturePaintMs, CaptureFrameMs,
     FrameExperiment, RawWidth, RawHeight, DisplayWidth, DisplayHeight, FrameRotation, FrameFlip,
-    DecodedWidth, DecodedHeight, PrepareP95Ms, ScreenAngle, RearCamera
+    DecodedWidth, DecodedHeight, PrepareP95Ms, ScreenAngle, RearCamera,
+    WaitingForKeyframe, RecoveryRequests
 }
 public enum CallDevice { Other, Android, Ios, Desktop }
 public enum CallCapturePath { Unknown, Processor, WorkerProcessor, WorkerWebgl, Rvfc, RvfcWebgl, WorkerWebgpu }

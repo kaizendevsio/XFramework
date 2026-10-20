@@ -21,6 +21,7 @@ public sealed class LiveCallDiagnosticsTests
         Capturing = true, Strategy = "worker-webgl", Codec = "avc1.42001e", CameraWidth = 360, CameraHeight = 640,
         Width = 640, Height = 360, EncodedFps = 20.8, Transport = "UDP/srflx (relay UDP/relay)",
         Remotes = [new() { StreamId = Guid.NewGuid(), Codec = "hvc1.1.6.L60.B0", RenderedFps = 0,
+            WaitingForKeyframe = true, RecoveryRequests = 3,
             Recovery = new(Guid.NewGuid(), 67400, 81, 2489, 399, 372, 3, 23, 0, 3309, 350) }]
     }, Guid.NewGuid(), 1, CallDevice.Ios, true, 2000, 1080, 30);
 
@@ -59,6 +60,8 @@ public sealed class LiveCallDiagnosticsTests
         Assert.That(sample.RelayTransport, Is.EqualTo(CallTransportPath.Udp));
         Assert.That(sample.Remotes[0].Metrics[CallMetric.LocalDrops], Is.EqualTo(81));
         Assert.That(sample.Remotes[0].Metrics[CallMetric.RenderedFps], Is.Zero);
+        Assert.That(sample.Remotes[0].Metrics[CallMetric.WaitingForKeyframe], Is.EqualTo(1));
+        Assert.That(sample.Remotes[0].Metrics[CallMetric.RecoveryRequests], Is.EqualTo(3));
         Assert.That(YapCallDiagnostics.Valid(sample with { Codec = "secret message" }), Is.False);
         Assert.That(YapCallDiagnostics.Valid(sample with { Version = "Bearer token" }), Is.False);
         Assert.That(YapCallDiagnostics.Valid(sample with { Device = (CallDevice)99 }), Is.False);
