@@ -6,7 +6,7 @@ import vm from 'node:vm';
 // Values built inside the vm carry the vm's prototypes; compare them by value.
 const plain = value => JSON.parse(JSON.stringify(value));
 const source = readFileSync(new URL('../wwwroot/bolt-media.js', import.meta.url), 'utf8')
-    .replaceAll('export ', '').replaceAll('import.meta.url', "'https://example.test/bolt-media.js'");
+    .replace(/^import .*;$/gm, '').replaceAll('export ', '').replaceAll('import.meta.url', "'https://example.test/bolt-media.js'");
 
 // `support` decides what each probed configuration answers, so a test can describe a device
 // (hardware AV1, software VP9, H.264 only) without pretending to run a real encoder.
@@ -1509,11 +1509,11 @@ test('Safari worker diagnostics report its painter and window costs; disabling c
     const w = f.workers[0]; w.emit({ type: 'ready', supported: true });
     assert.equal(f.p.getDiagnostics().capturePrepareMs, null);
     const frame = new f.sandbox.VideoFrame({ width: 720, height: 1280 }, { timestamp: 0 });
-    w.emit({ type: 'frame', path: 'worker-webgpu', frame, prepareMs: 2.5 });
+    w.emit({ type: 'frame', path: 'worker-processor', frame, prepareMs: 2.5 });
     const info = f.p.getDiagnostics();
-    assert.equal(info.strategy, 'worker-webgpu');
+    assert.equal(info.strategy, 'worker-processor');
     assert.equal(info.capturePrepareMs, 2.5);
-    assert.equal(info.orientation, 'normalized upright in worker (webgpu)');
+    assert.equal(info.orientation, 'none');
     assert.equal(f.p.getDiagnostics().capturePrepareMs, null, 'no stale cost in an empty window');
     f.p.getDiagnostics(false);
     assert.equal(f.p.debugLoopTimer, null);
@@ -1536,25 +1536,25 @@ test('Safari waits for its first worker frame and does not use page capture', as
     await init(f);
     const starting = f.p.startCapture(f.host, {});
     await new Promise(resolve => setImmediate(resolve));
-    f.workers[0].emit({ type: 'frame', path: 'worker-webgpu',
+    f.workers[0].emit({ type: 'frame', path: 'worker-processor',
         frame: new f.sandbox.VideoFrame({ width: 720, height: 1280 }, { timestamp: 0 }) });
     assert.equal((await starting).capturing, true);
-    assert.equal(f.p.strategy(), 'worker-webgpu');
+    assert.equal(f.p.strategy(), 'worker-processor');
     assert.equal(f.canvases.length, 0);
-    f.workers[0].emit({ type: 'failed', reason: 'webgpu-failed' });
+    f.workers[0].emit({ type: 'failed', reason: 'direct-failed' });
     assert.equal(f.p.captureRunning, false);
-    assert.ok(f.stats.invoked.some(x => x[0] === 'OnVideoCaptureStopped' && x[1] === 'webgpu-failed'));
+    assert.ok(f.stats.invoked.some(x => x[0] === 'OnVideoCaptureStopped' && x[1] === 'direct-failed'));
     await f.p.dispose();
 });
 
 test('Safari worker failure rejects startup and releases the camera without fallback', async () => {
-    for (const failure of ['webgpu-unavailable', 'webgpu-failed', 'worker-processor-unavailable']) {
+    for (const failure of ['direct-unavailable', 'direct-failed', 'worker-processor-unavailable']) {
         const f = workerFixture(); f.sandbox.navigator.vendor = 'Apple Computer, Inc.';
         await init(f);
         const starting = f.p.startCapture(f.host, {});
         await new Promise(resolve => setImmediate(resolve));
         f.workers[0].emit({ type: 'failed', reason: failure });
-        await assert.rejects(starting, /webgpu-/);
+        await assert.rejects(starting, /direct-/);
         assert.equal(f.p.captureRunning, false);
         assert.equal(f.canvases.length, 0);
         assert.equal(f.stats.encoded.length, 0);
@@ -1565,8 +1565,51 @@ test('Safari worker failure rejects startup and releases the camera without fall
 test('Safari without a worker refuses camera capture explicitly', async () => {
     const f = fixture({ capture: 'rvfc' }); f.sandbox.navigator.vendor = 'Apple Computer, Inc.';
     await init(f);
-    await assert.rejects(f.p.startCapture(f.host, {}), /webgpu-capture-unavailable/);
+    await assert.rejects(f.p.startCapture(f.host, {}), /direct-capture-unavailable/);
     assert.equal(f.p.captureRunning, false);
     assert.equal(f.canvases.length, 0);
     await f.p.dispose();
+});
+
+
+test('Safari hidden metadata waits for calibration and carries receiver orientation without redraw', async () => {
+    const f = workerFixture(); f.sandbox.navigator.vendor = 'Apple Computer, Inc.';
+    let code = null;
+    f.sandbox.CameraOrientation = class { async resolve() { return code; } };
+    f.p._orientationPreview = () => f.video;
+    await init(f); f.p.setOrientationMetadata(true);
+    const starting = f.p.startCapture(f.host, {}); await new Promise(r => setImmediate(r));
+    const w = f.workers[0];
+    const send = async timestamp => {
+        const frame = new f.sandbox.VideoFrame({ width: 1920, height: 1080 }, { timestamp });
+        delete frame.rotation; delete frame.flip; w.emit({ type: 'frame', frame });
+        await new Promise(r => setImmediate(r)); assert.ok(frame.closed);
+    };
+    await send(0); assert.equal(f.stats.encoded.length, 0);
+    code = 1; await send(40000); await starting;
+    assert.equal(sent(f).at(-1)[6], 1);
+    assert.equal(f.p.orientationState.how, 'calibrated');
+    code = 7; await send(80000); assert.equal(sent(f).at(-1)[6], 7);
+    assert.equal(f.canvases.length, 0);
+    assert.equal(f.p.sourceWidth, 1920); assert.equal(f.p.sourceHeight, 1080);
+    f.p.stopCapture(); assert.equal(f.p.cameraOrientation, null);
+});
+
+test('Safari does not send late calibration or uncorrected frames to an old receiver', async () => {
+    for (const supported of [true, false]) {
+        const f = workerFixture(); f.sandbox.navigator.vendor = 'Apple Computer, Inc.';
+        let finish;
+        f.sandbox.CameraOrientation = class { resolve() { return new Promise(r => finish = r); } };
+        f.p._orientationPreview = () => f.video;
+        await init(f); f.p.setOrientationMetadata(supported);
+        const starting = f.p.startCapture(f.host, {});
+        const rejected = assert.rejects(starting, /direct-/);
+        await new Promise(r => setImmediate(r));
+        const frame = new f.sandbox.VideoFrame({ width: 1920, height: 1080 }, { timestamp: 0 });
+        delete frame.rotation; delete frame.flip; f.workers[0].emit({ type: 'frame', frame });
+        if (supported) { f.p.stopCapture(); finish(1); }
+        await rejected; await new Promise(r => setImmediate(r));
+        assert.ok(frame.closed); assert.equal(f.stats.encoded.length, 0);
+        assert.equal(f.p.captureRunning, false); assert.equal(f.canvases.length, 0);
+    }
 });

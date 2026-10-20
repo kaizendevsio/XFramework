@@ -1,3 +1,4 @@
+import { CameraOrientation } from './bolt-video-orientation.js';
 // Bolt Media — WebCodecs + Media Capture + Playback
 // Audio and Video pipelines for Blazor WASM interop
 
@@ -901,7 +902,7 @@ class VideoPipeline {
 
     /// Whether every receiver of the call reads the orientation from the (end-to-end encrypted) fragment header.
     /// Decided from the call's authenticated key envelopes; until then, and with any receiver that does not, the
-    /// picture is redrawn upright before it is encoded.
+    /// known orientation is redrawn upright; hidden Safari orientation requires a peer update.
     setOrientationMetadata(enabled) { this.orientationMetadata = enabled === true; }
 
     /// Opening the camera is the only place getUserMedia is called with video, and it happens
@@ -962,7 +963,7 @@ class VideoPipeline {
         } else {
             if (isWebKit()) {
                 this.stopCapture();
-                throw new Error('webgpu-capture-unavailable');
+                throw new Error('direct-capture-unavailable');
             }
             this._startFrameCallbacks(stream, generation);
         }
@@ -985,8 +986,8 @@ class VideoPipeline {
         const fallback = (reason) => {
             if (!current()) return;
             this.captureFallback = reason;
-            if (isWebKit() || reason.startsWith('webgpu-')) {
-                const failure = reason.startsWith('webgpu-') ? reason : 'webgpu-capture-failed';
+            if (isWebKit() || reason.startsWith('direct-')) {
+                const failure = reason.startsWith('direct-') ? reason : 'direct-capture-failed';
                 this.captureWorkerResolve?.(failure);
                 this.stopCapture(failure);
                 return;
@@ -1002,7 +1003,7 @@ class VideoPipeline {
             if (current() && performance.now() - lastFrame > 2500) fallback('worker-stalled');
         }, 1000);
         worker.onerror = event => { event.preventDefault?.(); fallback('worker-error'); };
-        worker.onmessage = ({ data }) => {
+        worker.onmessage = async ({ data }) => {
             if (!current()) { data.frame?.close(); return; }
             if (data.type === 'ready') {
                 if (!data.supported) { fallback('worker-processor-unavailable'); return; }
@@ -1016,16 +1017,27 @@ class VideoPipeline {
                 } catch { try { clone?.stop(); } catch { } fallback('track-transfer-failed'); }
             } else if (data.type === 'frame') {
                 lastFrame = performance.now();
-                this.activeCaptureStrategy = data.path === 'worker-webgpu' ? data.path : 'worker-processor';
-                this._recordCost('capture', data.prepareMs);
+                this.activeCaptureStrategy = 'worker-processor';
+                const workerPrepareMs = data.prepareMs ?? 0;
                 this._recordCost('capturePaint', data.paintMs);
                 this._recordCost('captureFrame', data.frameMs);
                 try {
-                    this._encodeProcessorFrame(data.frame);
+                    let code;
+                    if (typeof data.frame.rotation !== 'number' || typeof data.frame.flip !== 'boolean') {
+                        if (!this.orientationMetadata) throw Error('direct-orientation-peer-update');
+                        this.cameraOrientation ??= new CameraOrientation();
+                        const video = this._orientationPreview(stream);
+                        const began = this.debugSample ? performance.now() : null;
+                        code = await this.cameraOrientation.resolve(data.frame, video);
+                        if (began !== null) this._recordCost('capture', workerPrepareMs + performance.now() - began);
+                        if (!current() || code === null) { data.frame.close(); return; }
+                        this.orientationState = { code, how: 'calibrated' };
+                    } else this._recordCost('capture', workerPrepareMs);
+                    this._encodeProcessorFrame(data.frame, code);
                     this.captureWorkerResolve?.(null);
                     this.captureWorkerResolve = null;
                 }
-                catch { fallback('worker-frame-encode-failed'); }
+                catch (error) { data.frame.close(); fallback(error.message?.startsWith('direct-') ? error.message : 'worker-frame-encode-failed'); }
                 finally {
                     if (current()) {
                         const settings = track.getSettings?.() ?? {};
@@ -1038,8 +1050,26 @@ class VideoPipeline {
         return true;
     }
 
+    _orientationPreview(stream) {
+        if (this.preview?.readyState >= 2 && this.preview.srcObject === stream) {
+            if (this.ownsCaptureVideo) this._stopFrameCallbacks();
+            return this.preview;
+        }
+        if (!this.captureVideo) {
+            const video = this.captureVideo = document.createElement('video');
+            this.ownsCaptureVideo = true;
+            video.muted = video.defaultMuted = video.autoplay = video.playsInline = true;
+            video.setAttribute('playsinline', '');
+            video.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0.01;pointer-events:none';
+            video.srcObject = stream;
+            document.body.appendChild(video);
+            void video.play().catch(() => {});
+        }
+        return this.captureVideo;
+    }
+
     _stopWorkerCapture() {
-        this.captureWorkerResolve?.('webgpu-capture-stopped');
+        this.captureWorkerResolve?.('direct-capture-stopped');
         this.captureWorkerResolve = null;
         clearInterval(this.captureWorkerWatch);
         this.captureWorkerWatch = null;
@@ -1057,7 +1087,7 @@ class VideoPipeline {
 
     /// Compatibility path for other engines without a frame processor.
     _startFrameCallbacks(stream, generation) {
-        if (isWebKit()) throw new Error('webgpu-capture-unavailable');
+        if (isWebKit()) throw new Error('direct-capture-unavailable');
         const video = this.captureVideo = this.preview || globalThis.document.createElement('video');
         this.ownsCaptureVideo = video !== this.preview;
         video.srcObject = stream;
@@ -1168,7 +1198,7 @@ class VideoPipeline {
         }
     }
 
-    _encodeProcessorFrame(frame) {
+    _encodeProcessorFrame(frame, calibratedCode) {
         this.captureCount++;
         try {
             if (!this.encoder || this.encoder.state !== 'configured') return;
@@ -1176,10 +1206,12 @@ class VideoPipeline {
             if (this.encoder.encodeQueueSize >= 2) { this.stats.dropped++; return; }
             if (!this._acceptCaptureTime(frame.timestamp)) return;
             const preparedAt = this.debugSample && this.strategy() === 'processor' ? performance.now() : null;
-            const oriented = this._orient(frame);
+            const oriented = calibratedCode === undefined ? this._orient(frame) : { frame, code: calibratedCode };
             if (preparedAt !== null) this._recordCost('capture', performance.now() - preparedAt);
             frame = oriented.frame;
-            this._noteSource(frame.displayWidth, frame.displayHeight);
+            // Missing display metadata must not make the encoder scale a landscape sensor into portrait.
+            this._noteSource(calibratedCode === undefined ? frame.displayWidth : frame.visibleRect?.width || frame.codedWidth || frame.displayWidth,
+                calibratedCode === undefined ? frame.displayHeight : frame.visibleRect?.height || frame.codedHeight || frame.displayHeight);
             this._encode(frame, this._takeKeyframe(Date.now()), oriented.code);
         } finally { frame.close(); }
     }
@@ -1434,11 +1466,12 @@ class VideoPipeline {
 
     /// The sender's orientation handling, for diagnostics.
     _orientationLabel() {
-        if (this.strategy() === 'worker-webgpu') return 'normalized upright in worker (webgpu)';
         if (!this.captureRunning) return '';
         // The frame-callback path paints the element, which shows the camera upright already.
         if (this.strategy() === 'rvfc') return 'painted upright by the element (2d canvas)';
         const { code, how } = this.orientationState;
+        if (this.cameraOrientation?.code === null) return 'calibrating against native preview';
+        if (how === 'calibrated') return `verified against preview; receiver applies ${describeOrientation(code) || '0 degrees'}`;
         if (!code) return 'none';
         const angle = describeOrientation(code);
         return how === 'metadata' ? `sent as metadata (${angle})`
@@ -1646,6 +1679,7 @@ class VideoPipeline {
         // The next camera has its own shape; leaving these set would fit it to the old one's aspect.
         this.sourceWidth = this.sourceHeight = 0;
         this.rotateCanvas = this.rotateContext = null;
+        this.cameraOrientation = null;
         // The next camera starts on a keyframe with nothing baked in; its first frame says what it needs.
         this.bakedOrientation = 0;
         this.encodeOrientation.clear();

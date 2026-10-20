@@ -48,13 +48,14 @@ test('missing WebGPU is explicit and never retries raw frames', async () => {
 
 test('camera permission resolving after stop releases the new camera without starting a worker', async () => {
     const main = readFileSync(new URL('../../src/Presentation/XFramework.Yap.Client/wwwroot/frame-experiment.js', import.meta.url), 'utf8')
-        .replace('export async function create', 'async function create').replaceAll('import.meta.url', "'https://test/frame-experiment.js'");
+        .replace(/^import .*;$/gm, '').replace('export async function create', 'async function create').replaceAll('import.meta.url', "'https://test/frame-experiment.js'");
     let permission, workers = 0;
     const camera = { srcObject: null, async play() {} }, track = { stop() { this.stopped = true; } };
     const sandbox = { performance, Map, Math, Number, Error, URL, screen: {}, setTimeout, clearTimeout, setInterval, clearInterval,
         document: { addEventListener() {}, removeEventListener() {} },
         navigator: { mediaDevices: { getUserMedia: () => new Promise(r => permission = r) } },
         VideoEncoder: class {}, VideoDecoder: class {}, Worker: class { constructor() { workers++; } } };
+    sandbox.CameraOrientation = class {};
     vm.runInNewContext(main + ';globalThis.create = create;', sandbox);
     const api = await sandbox.create(camera, {}, { async invokeMethodAsync() {} });
     const starting = api.start({ mode: 'direct', height: 1080, fps: 30 }); await tick();

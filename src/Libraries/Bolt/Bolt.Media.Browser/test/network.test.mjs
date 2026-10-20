@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 const source = readFileSync(new URL('../wwwroot/bolt-media.js', import.meta.url), 'utf8')
-    .replaceAll('export ', '').replaceAll('import.meta.url', "'https://example.test/bolt-media.js'");
+    .replace(/^import .*;$/gm, '').replaceAll('export ', '').replaceAll('import.meta.url', "'https://example.test/bolt-media.js'");
 
 function fixture(connection) {
     const storage = new Map();

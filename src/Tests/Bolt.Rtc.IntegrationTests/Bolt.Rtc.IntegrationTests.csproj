@@ -41,6 +41,7 @@
     <None Include="bench\bench.js" CopyToOutputDirectory="PreserveNewest" />
     <None Include="bench\*.mjs" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\bolt-media.js" Link="bench\bolt-media.js" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\bolt-video-orientation.js" Link="bench\bolt-video-orientation.js" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\bolt-sframe.mjs" Link="bench\bolt-sframe.mjs" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\bolt-rtc.js" Link="bench\bolt-rtc.js" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\sframe\bolt_sframe.js" Link="bench\sframe\bolt_sframe.js" CopyToOutputDirectory="PreserveNewest" />
@@ -50,6 +51,7 @@
     <!-- The browser call tests (BrowserCallTests.cs): the synthetic devices served in place of bolt-media.js. -->
     <None Include="call\bolt-media.synthetic.js" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\bolt-media.js" Link="orientation\bolt-media.js" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\Libraries\Bolt\Bolt.Media.Browser\wwwroot\bolt-video-orientation.js" Link="orientation\bolt-video-orientation.js" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
