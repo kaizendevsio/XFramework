@@ -104,7 +104,7 @@ public sealed class PortalArchitectureTests
     }
 
     [Test]
-    public void InventarioSettings_UsesTenantOwnedRegistryGroup()
+    public void InventarioSettings_UsesTenantScopedBusinessWrappers()
     {
         var repositoryRoot = FindRepositoryRoot();
         var settingsPage = File.ReadAllText(Path.Combine(
@@ -115,8 +115,13 @@ public sealed class PortalArchitectureTests
             "Pages",
             "Settings.razor"));
 
-        settingsPage.Should().Contain(".Where(x => x.TenantId == tenantId && !x.IsDeleted)");
-        settingsPage.Should().Contain("TenantId = tenantId");
+        settingsPage.Should().Contain("Inventario.GetInventarioSetup(");
+        settingsPage.Should().Contain("RequestedTenantId = tenantId");
+        settingsPage.Should().Contain("Inventario.UpdateInventarioPreferences(request)");
+        settingsPage.Should().Contain("RequestedTenantId = id");
+        settingsPage.Should().Contain("ExpectedConcurrencyStamp = _state.ConcurrencyStamp");
+        settingsPage.Should().Contain("result.Response?.TenantId == id");
+        settingsPage.Should().NotContain("DataContext.SaveChangesAsync");
     }
 
     [Test]

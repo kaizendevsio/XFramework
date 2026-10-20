@@ -373,6 +373,7 @@ public class IntegrationTestFixture
         builder.Services.AddScoped<IIdentityAuthorizationService, IdentityAuthorizationService>();
         builder.Services.AddScoped<IIdentityAdministrationService, IdentityAdministrationService>();
         builder.Services.AddScoped<ITenantAdministrationService, TenantAdministrationService>();
+        builder.Services.AddScoped<IdentityServer.Api.Features.FinanceSettings.TenantFinanceSettingsService>();
         builder.Services.AddScoped<IServiceIdentityService, ServiceIdentityService>();
         builder.Services.AddSingleton(serviceProvider => ServiceIdentityConfiguration.FromConfiguration(
             serviceProvider.GetRequiredService<IConfiguration>(),
