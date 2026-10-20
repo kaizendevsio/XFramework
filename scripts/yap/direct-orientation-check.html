@@ -1,0 +1,50 @@
+<!doctype html><meta charset="utf-8"><title>Direct camera orientation regression</title>
+<style>body{background:#141414;color:white;font:16px monospace}canvas{width:240px;border:1px solid #555}pre{white-space:pre-wrap}</style>
+<h1>Direct frame → codec → receiver orientation</h1><div id="pictures"></div><pre id="result">Running…</pre>
+<script type="module">
+import { CameraOrientation } from '../../src/Libraries/Bolt/Bolt.Media.Browser/wwwroot/bolt-video-orientation.js';
+import { orientedSize, paintOriented } from '../../src/Libraries/Bolt/Bolt.Media.Browser/wwwroot/bolt-media.js';
+const results = []; window.results = results;
+const pause = ms => new Promise(r => setTimeout(r, ms));
+const raw = document.createElement('canvas'); raw.width = 640; raw.height = 360;
+const ctx = raw.getContext('2d');
+for (let y = 0; y < 12; y++) for (let x = 0; x < 16; x++) {
+    ctx.fillStyle = `hsl(${(x * 47 + y * 83) % 360} 70% ${20 + ((x * 31 + y * 17) % 60)}%)`;
+    ctx.fillRect(x * 40, y * 30, 40, 30);
+}
+ctx.fillStyle = 'white'; ctx.font = 'bold 38px sans-serif'; ctx.fillText('FRONT / REAR →', 23, 75);
+async function roundTrip(frame) {
+    let decoded, failure;
+    const decoder = new VideoDecoder({ output: f => decoded = f, error: e => failure = e });
+    const encoder = new VideoEncoder({ output(chunk, meta) { if (meta.decoderConfig) decoder.configure(meta.decoderConfig); decoder.decode(chunk); }, error: e => failure = e });
+    encoder.configure({ codec: 'avc1.42001f', width: frame.codedWidth, height: frame.codedHeight, bitrate: 3000000, framerate: 30, latencyMode: 'realtime', avc: { format: 'avc' } });
+    encoder.encode(frame, { keyFrame: true }); await encoder.flush(); await decoder.flush();
+    encoder.close(); decoder.close(); if (failure) throw failure; return decoded;
+}
+try {
+    const calibration = new CameraOrientation();
+    // A native preview fixture with independently rotated pixels (includes both front/rear mirror conventions).
+    for (const code of [1, 0, 3, 2, 5, 4, 7, 6]) {
+        const ref = document.createElement('canvas'), size = orientedSize(raw.width, raw.height, code);
+        ref.width = size.width; ref.height = size.height;
+        const c = ref.getContext('2d'); c.translate(ref.width / 2, ref.height / 2);
+        if (code & 4) c.scale(-1, 1); c.rotate((code & 3) * Math.PI / 2); c.drawImage(raw, -raw.width / 2, -raw.height / 2);
+        ref.videoWidth = ref.width; ref.videoHeight = ref.height; ref.readyState = 2;
+        const frame = new VideoFrame(raw, { timestamp: code * 100000 });
+        const began = performance.now();
+        let found = await calibration.resolve(frame, ref, code * 90);
+        await pause(180); found = await calibration.resolve(frame, ref, code * 90);
+        if (found !== code) throw Error(`Orientation ${code}: got ${found}`);
+        const output = await roundTrip(frame); frame.close();
+        const shown = document.createElement('canvas'); shown.width = size.width; shown.height = size.height;
+        paintOriented(shown.getContext('2d'), output, output.displayWidth, output.displayHeight, found); output.close();
+        const a = ref.getContext('2d').getImageData(0, 0, ref.width, ref.height).data;
+        const b = shown.getContext('2d').getImageData(0, 0, shown.width, shown.height).data;
+        let error = 0; for (let i = 0; i < a.length; i++) error += Math.abs(a[i] - b[i]); error /= a.length;
+        if (error > 8) throw Error(`Pixel mismatch ${code}: ${error}`);
+        results.push({ code, width: shown.width, height: shown.height, meanPixelError: error, calibrationAndCodecMs: performance.now() - began - 180 });
+        document.querySelector('#pictures').append(shown);
+    }
+    window.passed = true; result.textContent = JSON.stringify({ passed: true, results }, null, 2);
+} catch (error) { window.passed = false; result.textContent = error.stack; }
+</script>

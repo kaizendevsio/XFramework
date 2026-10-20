@@ -1,7 +1,10 @@
+import { CameraOrientation } from './_content/Bolt.Media.Browser/bolt-video-orientation.js';
+import { orientedSize, paintOriented } from './_content/Bolt.Media.Browser/bolt-media.js';
 // Local camera -> encoder -> decoder loop. No media leaves the device.
 // The production path's worker/main-thread boundary is retained for a fair preparation comparison.
 export async function create(camera, decoded, callback) {
     let stream, worker, encoder, decoder, timer, deadline, alive = true, running = false, configuring = false;
+    let orientation, orientationCodes = new Map();
     let generation = 0, decoderNeedsKey = true, rear = false;
     let mode, requestedFps, requestedHeight, source = {}, codec = '', shape = '', startTime, lastTime;
     let captured = 0, encoded = 0, rendered = 0, drops = 0, bytes = 0, key = true, previous = {}, dimensions = {};
@@ -44,7 +47,7 @@ export async function create(camera, decoded, callback) {
         }
         try { encoder?.close(); } catch { } try { decoder?.close(); } catch { }
         encoder = decoder = null;
-        encodeStarts.clear(); decodeStarts.clear();
+        encodeStarts.clear(); decodeStarts.clear(); orientationCodes.clear(); orientation = null;
         invoke('Finished', message);
     }
     function fail(error) { void stop(`Test stopped: ${error.message || error}`); }
@@ -71,8 +74,16 @@ export async function create(camera, decoded, callback) {
             if (!running || configuring || encoder.encodeQueueSize >= 2) { drops++; return; }
             configuring = true; captured++; lastFrameAt = performance.now(); source = data.source;
             prepare.push(data.prepareMs); paint.push(data.paintMs); snapshot.push(data.snapshotMs);
+            let code = 0;
+            if (mode === 'direct') {
+                code = await orientation.resolve(frame, camera);
+                if (!running || current !== generation || code === null) return;
+            }
             await configure(frame, current);
             if (!running || current !== generation) return;
+            dimensions.appliedOrientation = code;
+            orientationCodes.set(frame.timestamp, code);
+            if (orientationCodes.size > 120) orientationCodes.delete(orientationCodes.keys().next().value);
             bounded(encodeStarts, frame.timestamp);
             encoder.encode(frame, { keyFrame: key || captured % (requestedFps * 2) === 0 }); key = false;
         } catch (error) { if (current === generation) fail(error); }
@@ -85,6 +96,7 @@ export async function create(camera, decoded, callback) {
         const current = ++generation;
         rear = options.rear === true;
         mode = options.mode; requestedFps = options.fps === 60 ? 60 : 30; requestedHeight = options.height === 720 ? 720 : 1080;
+        orientation = new CameraOrientation(); orientationCodes.clear();
         source = {}; dimensions = {}; shape = ''; codec = ''; previous = {}; reports = []; report = {};
         prepare = []; paint = []; snapshot = []; encode = []; decode = []; render = [];
         captured = encoded = rendered = drops = bytes = 0; key = true; decoderNeedsKey = true; configuring = false; running = true;
@@ -105,10 +117,12 @@ export async function create(camera, decoded, callback) {
                     if (!running) return;
                     const began = performance.now(), then = decodeStarts.get(frame.timestamp);
                     if (then !== undefined) { decode.push(began - then); decodeStarts.delete(frame.timestamp); }
-                    dimensions.decodedWidth = frame.displayWidth; dimensions.decodedHeight = frame.displayHeight;
-                    if (decoded.width !== frame.displayWidth) decoded.width = frame.displayWidth;
-                    if (decoded.height !== frame.displayHeight) decoded.height = frame.displayHeight;
-                    decoded.getContext('2d', { alpha: false }).drawImage(frame, 0, 0);
+                    const code = orientationCodes.get(frame.timestamp) ?? 0; orientationCodes.delete(frame.timestamp);
+                    const shown = orientedSize(frame.displayWidth, frame.displayHeight, code);
+                    dimensions.decodedWidth = shown.width; dimensions.decodedHeight = shown.height;
+                    if (decoded.width !== shown.width) decoded.width = shown.width;
+                    if (decoded.height !== shown.height) decoded.height = shown.height;
+                    paintOriented(decoded.getContext('2d', { alpha: false }), frame, frame.displayWidth, frame.displayHeight, code);
                     render.push(performance.now() - began); rendered++;
                 } catch (error) { fail(error); } finally { frame.close(); }
             } });
@@ -118,7 +132,7 @@ export async function create(camera, decoded, callback) {
                 if (then !== undefined) { encode.push(performance.now() - then); encodeStarts.delete(chunk.timestamp); }
                 encoded++; bytes += chunk.byteLength;
                 try {
-                    if (metadata.decoderConfig) { decoder.configure({ ...metadata.decoderConfig, hardwareAcceleration: 'prefer-hardware', optimizeForLatency: true }); decoderNeedsKey = true; }
+                    if (metadata.decoderConfig) { decoder.configure({ ...metadata.decoderConfig, rotation: 0, flip: false, hardwareAcceleration: 'prefer-hardware', optimizeForLatency: true }); decoderNeedsKey = true; }
                     if (decoder.state !== 'configured') throw Error('Encoder did not supply decoder configuration.');
                     if (decoder.decodeQueueSize >= 2) { drops++; key = true; decoderNeedsKey = true; return; }
                     // After any skipped dependent frame, wait for a keyframe before decoding again.

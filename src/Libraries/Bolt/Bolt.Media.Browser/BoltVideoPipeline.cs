@@ -8,7 +8,7 @@ public sealed record VideoCapabilities(bool Supported, string? Reason, int Ceili
 /// <param name="DecodeHardware">The same for the decoder.</param>
 public sealed record VideoCodecProbe(string Codec, bool Encode, bool Decode, bool Hardware, int MaxHeight, int DecodeMaxHeight = 1080, bool DecodeHardware = false);
 /// <summary>The camera actually acquired, which may differ from what was asked for.
-/// <paramref name="Strategy"/> is how frames are read: "processor", "worker-processor", "worker-webgpu", or non-WebKit "rvfc" capture.</summary>
+/// <paramref name="Strategy"/> is how frames are read: "processor", "worker-processor", or non-WebKit "rvfc" capture.</summary>
 public sealed record VideoCaptureState(bool Capturing, string DeviceId, string FacingMode, int Width, int Height,
     string Codec, string Strategy = "");
 public sealed record VideoSendStats(double Fps, double Kbps, int Dropped, int Backlog);
@@ -32,7 +32,7 @@ public sealed class BoltVideoPipeline(IJSRuntime js, ILogger<BoltVideoPipeline> 
     /// orientation code it is to be shown with (<see cref="VideoFramePayload.Orientation"/>; 0 when its pixels are upright).
     /// </summary>
     public event Action<byte[], bool, uint, uint, int, int>? OnEncoded;
-    /// <summary>The browser released the camera: "hidden", "ended", "denied", "encoder", or an explicit "webgpu-" failure.</summary>
+    /// <summary>The browser released the camera: "hidden", "ended", "denied", "encoder", or an explicit "direct-" failure.</summary>
     public event Action<string>? OnCaptureStopped;
     /// <summary>A remote decoder failed; the caller should ask that sender for a keyframe.</summary>
     public event Action<string>? OnDecodeFailed;
@@ -57,7 +57,7 @@ public sealed class BoltVideoPipeline(IJSRuntime js, ILogger<BoltVideoPipeline> 
     /// <summary>
     /// Whether every receiver reads a picture's orientation from its (end-to-end encrypted) fragments, as their
     /// authenticated key envelopes say (<see cref="CallMediaFormat.Oriented"/>). Then a rotated camera frame is encoded
-    /// as the sensor delivered it, with no redraw; otherwise it is redrawn upright first.
+    /// as the sensor delivered it, with no redraw. Hidden Safari orientation requires this capability.
     /// </summary>
     public async Task SetOrientationMetadataAsync(bool enabled)
     {
