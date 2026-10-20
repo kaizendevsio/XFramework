@@ -15,6 +15,7 @@ The 2026-10-20 iPhone experiment delivered approximately 30 fps with direct sens
 
 - 178 JavaScript tests pass, including all eight transforms, NV12/RGBA stride handling, ambiguity rejection, zero steady-state reads, invalidation, old-peer rejection, and stopping during calibration.
 - Chromium WebCodecs round trip: eight rotation/mirror fixtures, independently constructed reference images; all pass dimension and decoded pixel comparisons (mean error 2.80/255 after H.264). Harness: `scripts/yap/direct-orientation-check.html`.
+- Three repository browser orientation integration tests pass. The production worker also passes with WebGPU disabled: eight metadata fixtures, ten-frame H.264 round trip, and synthetic delivery at 30.15/60.13 fps. This measures worker transfer, not sustained phone encoding or thermals.
 - 40 video-call/live-diagnostics client tests and 18 Bolt orientation tests pass.
 - Yap client builds with zero errors and existing warnings.
 
