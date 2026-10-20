@@ -18,6 +18,7 @@
         <ProjectReference Include="..\..\XFramework.Communications\Communications.Integration\Communications.Integration.csproj" />
         <ProjectReference Include="..\..\XFramework.Storage\Storage.Integration\Storage.Integration.csproj" />
         <ProjectReference Include="..\IdentityServer.Domain.Shared\IdentityServer.Domain.Shared.csproj" />
+        <ProjectReference Include="..\..\XFramework.Wallets\Wallets.Domain.Shared\Wallets.Domain.Shared.csproj" />
     </ItemGroup>
 
     <ItemGroup>

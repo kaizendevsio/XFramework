@@ -363,9 +363,9 @@ public sealed class PosPersistenceIntegrationTests
         var inventory = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
         var wallets = new Mock<IWalletsServiceWrapper>(MockBehavior.Strict);
         var sales = new PosSalesService(db, inventory.Object, wallets.Object, resolver.Object,
-            NullLogger<PosSalesService>.Instance);
+            NullLogger<PosSalesService>.Instance, new PosFinanceSettings(Mock.Of<IIdentityServerServiceWrapper>()));
         var cartService = new PosCartService(db, inventory.Object, sales, resolver.Object,
-            NullLogger<PosCartService>.Instance);
+            NullLogger<PosCartService>.Instance, new PosFinanceSettings(Mock.Of<IIdentityServerServiceWrapper>()));
         var registerService = new PosRegisterService(
             db,
             resolver.Object,
@@ -429,6 +429,61 @@ public sealed class PosPersistenceIntegrationTests
         Lines = [new CreatePosReturnLineRequest { SaleLineId = seed.Line.Id, Quantity = seed.Line.Quantity }],
         Metadata = new RequestMetadata { RequestedTenantId = seed.Sale.TenantId }
     };
+
+    [TestCase(PosPaymentMethod.CashDrawer, true)]
+    [TestCase(PosPaymentMethod.CashDrawer, false)]
+    [TestCase(PosPaymentMethod.WalletTransfer, true)]
+    [TestCase(PosPaymentMethod.WalletTransfer, false)]
+    public async Task Return_FreeLine_RestocksWithoutFinancialMovement_BeforeOrAfterPaidRefund(PosPaymentMethod method, bool freeFirst)
+    {
+        var tenantId = Guid.NewGuid();
+        var seed = CreateCompletedSale(tenantId, method);
+        seed.Sale.UsesAutomaticTax = true;
+        seed.Line.UnitPrice = 100;
+        seed.Line.LineTotal = 100;
+        seed.Sale.SubtotalAmount = 200;
+        seed.Sale.TaxAmount = 10;
+        seed.Sale.TotalAmount = 110;
+        seed.Payment.Amount = 110;
+        var free = new PosSaleLine
+        {
+            Id = Guid.NewGuid(), TenantId = tenantId, SaleId = seed.Sale.Id, Sale = seed.Sale, LineNumber = 2,
+            ProductId = Guid.NewGuid(), ProductName = "Fully discounted item", Quantity = 1,
+            UnitPrice = 100, DiscountAmount = 100, LineTotal = 0,
+            WarehouseId = seed.Sale.WarehouseId, LocationId = seed.Sale.LocationId, IsEnabled = true
+        };
+        seed.Sale.Lines.Add(free);
+        await using var db = CreateContext(tenantId);
+        db.AddRange(seed.Register, seed.Sale, seed.Payment);
+        await db.SaveChangesAsync();
+        var inventory = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
+        inventory.Setup(x => x.PostStockMovement(It.IsAny<PostStockMovementRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CmdResponse { HttpStatusCode = HttpStatusCode.OK });
+        var wallets = new Mock<IWalletsServiceWrapper>(MockBehavior.Strict);
+        wallets.Setup(x => x.DecrementWallet(It.Is<DecrementWalletRequest>(r => r.Amount == 110)))
+            .ReturnsAsync(new CmdResponse { HttpStatusCode = HttpStatusCode.OK });
+        wallets.Setup(x => x.TransferWallet(It.Is<TransferWalletRequest>(r => r.Amount == 110)))
+            .ReturnsAsync(new CmdResponse { HttpStatusCode = HttpStatusCode.OK });
+        var service = CreateReturnsService(db, tenantId, inventory, wallets);
+        foreach (var line in freeFirst ? new[] { free, seed.Line } : new[] { seed.Line, free })
+        {
+            var request = CreateReturnRequest(seed, method);
+            request.Lines = [new() { SaleLineId = line.Id, Quantity = 1 }];
+            var result = await service.CreateAsync(request, CancellationToken.None);
+            result.IsSuccess.Should().BeTrue(result.Message);
+            result.Data!.Status.Should().Be(PosReturnStatus.Completed);
+            result.Data.TotalRefundAmount.Should().Be(line.Id == free.Id ? 0 : 110);
+            result.Data.Lines.Single().TaxAmount.Should().Be(line.Id == free.Id ? 0 : 10);
+            result.Data.Lines.Single().InventoryMovementReferenceNumber.Should().NotBeNullOrEmpty();
+            var replay = await service.CreateAsync(request, CancellationToken.None);
+            replay.Data!.Status.Should().Be(PosReturnStatus.Completed);
+        }
+        inventory.Verify(x => x.PostStockMovement(It.IsAny<PostStockMovementRequest>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        wallets.Verify(x => x.DecrementWallet(It.IsAny<DecrementWalletRequest>()), method == PosPaymentMethod.CashDrawer ? Times.Once() : Times.Never());
+        wallets.Verify(x => x.TransferWallet(It.IsAny<TransferWalletRequest>()), method == PosPaymentMethod.WalletTransfer ? Times.Once() : Times.Never());
+        (await db.Set<PosPayment>().SingleAsync(x => x.Id == seed.Payment.Id)).RefundedAmount.Should().Be(110);
+        (await db.Set<PosReturnLine>().SumAsync(x => x.Quantity)).Should().Be(2);
+    }
 
     private static CompletedSaleSeed CreateCompletedSale(Guid tenantId, PosPaymentMethod paymentMethod)
     {

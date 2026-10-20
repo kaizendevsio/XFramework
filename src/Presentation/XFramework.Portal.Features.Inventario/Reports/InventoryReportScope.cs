@@ -46,13 +46,14 @@ public sealed record InventoryReportScope(Guid TenantId, Guid? ProductId, Guid? 
         return new(tenant, Id("product"), Id("warehouse"), Id("location"), from, to, days);
     }
 
-    public string ShareUri(NavigationManager navigation) => navigation.GetUriWithQueryParameters(
+    public string ShareUri(NavigationManager navigation, string? view = null) => navigation.GetUriWithQueryParameters(
         navigation.ToAbsoluteUri("inventario/reports").ToString(),
         new Dictionary<string, object?>
         {
             ["tenant"] = TenantId, ["product"] = ProductId, ["warehouse"] = WarehouseId,
             ["location"] = LocationId, ["from"] = FromUtc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            ["to"] = ToUtc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), ["expiry"] = DaysAhead
+            ["to"] = ToUtc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), ["expiry"] = DaysAhead,
+            ["view"] = view is "positions" or "movements" or "expiry" ? view : null
         });
 
     public GetInventoryReportSnapshotRequest Request() => new()

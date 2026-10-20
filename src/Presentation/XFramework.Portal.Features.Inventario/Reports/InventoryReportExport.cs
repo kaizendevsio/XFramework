@@ -26,9 +26,12 @@ public sealed record InventoryReportExport(string Title, string TenantLabel, Dat
                 snapshot.Movements.Select(x => new[] { D(x.MovementDate), x.ProductName, x.WarehouseName,
                     x.LocationName, x.MovementType.ToString(), N(x.QuantityDelta), x.ReferenceType ?? "" }).ToArray()),
              Expiry(snapshot.ExpiryEnabled ? "Near expiry (up to 1,000 rows)" : "Near expiry unavailable (Traceability disabled)", snapshot.NearExpiry),
-             Expiry(snapshot.ExpiryEnabled ? "Expired stock (up to 1,000 rows)" : "Expired stock unavailable (Traceability disabled)", snapshot.Expired)],
-            [new("Current stock quantities", ["On hand", "Reserved", "Available"],
-                [(double)snapshot.OnHand, (double)snapshot.Reserved, (double)snapshot.Available]),
+             Expiry(snapshot.ExpiryEnabled ? "Expired stock (up to 1,000 rows)" : "Expired stock unavailable (Traceability disabled)", snapshot.Expired),
+             new("Daily stock movements (all matching movements)", ["Date UTC", "Inbound", "Outbound"],
+                snapshot.MovementTimeline.Select(x => new[] { x.DateUtc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                    N(x.Inbound), N(x.Outbound) }).ToArray())],
+            [new("Current stock quantities", ["Available", "Reserved"],
+                [(double)snapshot.Available, (double)snapshot.Reserved]),
              new("Movement quantities in selected period", ["Inbound", "Outbound"],
                 [(double)snapshot.Inbound, (double)snapshot.Outbound])]);
     }

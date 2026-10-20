@@ -28,6 +28,8 @@ public sealed class PosPaymentStageTests
         Set("_registers", new List<PosRegisterResponse> { register });
         Set("_selectedRegisterId", register.Id.ToString());
         Set("_currencies", new List<CurrencyType> { new() { Id = register.CurrencyId, CurrencyIsoCode3 = "USD" } });
+        Set("_financeSettings", new IdentityServer.Domain.Shared.Contracts.TenantFinanceSettings
+        { DefaultCurrencyId = register.CurrencyId, SupportedCurrencyIds = [register.CurrencyId] });
         var lineType = typeof(Cashier).GetNestedType("CartLine", BindingFlags.NonPublic)!;
         var line = Activator.CreateInstance(lineType)!;
         lineType.GetProperty("Quantity")!.SetValue(line, 1m);

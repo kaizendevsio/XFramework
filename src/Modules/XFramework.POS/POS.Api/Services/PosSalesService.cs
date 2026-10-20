@@ -20,7 +20,8 @@ public sealed class PosSalesService(
     IInventarioServiceWrapper inventario,
     IWalletsServiceWrapper wallets,
     IPosRequestContextResolver contextResolver,
-    ILogger<PosSalesService> logger)
+    ILogger<PosSalesService> logger,
+    PosFinanceSettings financeSettings)
 {
     public async Task<Result<PosSaleReceiptResponse>> CheckoutAsync(
         CheckoutPosSaleRequest request,
@@ -29,6 +30,9 @@ public sealed class PosSalesService(
         var contextResult = contextResolver.Resolve(request, request.CashierCredentialId);
         if (!contextResult.IsSuccess)
             return Result<PosSaleReceiptResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
+
+        if (request.TaxAmount != 0 || request.Lines.Any(line => line.TaxAmount != 0))
+            return Result<PosSaleReceiptResponse>.Failure("Tax is calculated from tenant Finance settings and cannot be supplied", 400);
 
         var idempotencyKey = PosServiceHelpers.NormalizeOptional(request.IdempotencyKey)
             ?? string.Empty;
@@ -66,6 +70,9 @@ public sealed class PosSalesService(
         if (register is null)
             return Result<PosSaleReceiptResponse>.NotFound("POS register was not found");
 
+        if (request.CurrencyId.HasValue && request.CurrencyId.Value != register.CurrencyId)
+            return Result<PosSaleReceiptResponse>.Conflict("Sale currency must match the register currency");
+
         var paymentCustomerCredentialId = request.Payment.CustomerCredentialId ?? request.CustomerCredentialId;
         if (request.Payment.Method == PosPaymentMethod.WalletTransfer &&
             paymentCustomerCredentialId == register.MerchantCredentialId)
@@ -95,7 +102,7 @@ public sealed class PosSalesService(
             IdempotencyKey = idempotencyKey,
             RequestHash = requestHash,
             DiscountAmount = request.DiscountAmount,
-            TaxAmount = request.TaxAmount,
+            TaxAmount = 0,
             CreatedAt = now,
             ConcurrencyStamp = Guid.NewGuid(),
             IsEnabled = true
@@ -108,6 +115,14 @@ public sealed class PosSalesService(
 
         sale.Lines = lineBuildResult.Data!;
         sale.SubtotalAmount = sale.Lines.Sum(line => line.Quantity * line.UnitPrice);
+        var settings = await financeSettings.GetAsync(context.Metadata, tenantId, sale.CurrencyId, ct);
+        if (!settings.IsSuccess)
+            return Result<PosSaleReceiptResponse>.Failure(settings.Message!, settings.StatusCode);
+        var taxableSubtotal = sale.SubtotalAmount - sale.Lines.Sum(line => line.DiscountAmount) - sale.DiscountAmount;
+        if (taxableSubtotal < 0)
+            return Result<PosSaleReceiptResponse>.Failure("Sale discounts cannot exceed the subtotal", 400);
+        sale.TaxAmount = settings.Data!.CalculateTax(taxableSubtotal);
+        sale.UsesAutomaticTax = true;
         var allocations = PosServiceHelpers.BuildSaleRefundAllocations(sale);
         sale.TotalAmount = allocations.Values.Sum(allocation => allocation.RefundAmount);
 
@@ -479,7 +494,7 @@ public sealed class PosSalesService(
                 return Result<List<PosSaleLine>>.Conflict("Catalog price changed before checkout");
 
             var quantity = requestLine.Quantity;
-            var lineTotal = quantity * currentPrice - requestLine.DiscountAmount + requestLine.TaxAmount;
+            var lineTotal = quantity * currentPrice - requestLine.DiscountAmount;
             if (lineTotal < 0)
                 return Result<List<PosSaleLine>>.Failure("Line total cannot be negative", 400);
 
@@ -498,7 +513,7 @@ public sealed class PosSalesService(
                 UnitPrice = currentPrice,
                 ExpectedUnitPrice = requestLine.ExpectedUnitPrice,
                 DiscountAmount = requestLine.DiscountAmount,
-                TaxAmount = requestLine.TaxAmount,
+                TaxAmount = 0,
                 LineTotal = lineTotal,
                 WarehouseId = requestLine.WarehouseId ?? request.WarehouseId ?? register.DefaultWarehouseId,
                 LocationId = requestLine.LocationId ?? request.LocationId ?? register.DefaultLocationId,

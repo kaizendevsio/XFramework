@@ -17,7 +17,8 @@ public sealed class InventoryReportingService(
     IDataContext dataContext,
     ITrustedInvocationContextAccessor trustedInvocationContextAccessor,
     InventoryPlanningService planningService,
-    ITenantModuleFeatureService featureService)
+    ITenantModuleFeatureService featureService,
+    DbContext dbContext)
 {
     public async Task<Result<List<LowStockReportRow>>> GetLowStockAsync(
         GetLowStockReportRequest request,
@@ -321,11 +322,12 @@ public sealed class InventoryReportingService(
             (request.ProductId == null || x.ProductId == request.ProductId) &&
             (request.WarehouseId == null || x.WarehouseId == request.WarehouseId) &&
             (request.LocationId == null || x.LocationId == request.LocationId));
-        IRemoteQuery<InventoryMovement> Movements() => dataContext.Query<InventoryMovement>().NoCache().Where(x =>
+        System.Linq.Expressions.Expression<Func<InventoryMovement, bool>> movementScope = x =>
             x.TenantId == tenant.Data && x.MovementDate >= request.FromUtc && x.MovementDate <= to &&
             (request.ProductId == null || x.ProductId == request.ProductId) &&
             (request.WarehouseId == null || x.WarehouseId == request.WarehouseId) &&
-            (request.LocationId == null || x.LocationId == request.LocationId));
+            (request.LocationId == null || x.LocationId == request.LocationId);
+        IRemoteQuery<InventoryMovement> Movements() => dataContext.Query<InventoryMovement>().NoCache().Where(movementScope);
 
         // Scalar aggregates cover the full scope; only detail rows are capped.
         var positionCount = await Balances().CountAsync(ct);
@@ -333,10 +335,22 @@ public sealed class InventoryReportingService(
         var reserved = await Balances().SumAsync(x => x.ReservedQuantity, ct);
         var available = await Balances().SumAsync(x => x.AvailableQuantity, ct);
         var movementCount = await Movements().CountAsync(ct);
-        var inbound = await Movements().Where(x => x.MovementType != InventoryMovementType.Reservation &&
-            x.MovementType != InventoryMovementType.Release && x.QuantityDelta > 0).SumAsync(x => x.QuantityDelta, ct);
-        var outbound = -await Movements().Where(x => x.MovementType != InventoryMovementType.Reservation &&
-            x.MovementType != InventoryMovementType.Release && x.QuantityDelta < 0).SumAsync(x => x.QuantityDelta, ct);
+        // Aggregate in PostgreSQL before the detail cap. The validated range bounds this to 367 UTC dates.
+        var dailyTotals = await dbContext.Set<InventoryMovement>().AsNoTracking().Where(movementScope)
+            .Where(x => x.MovementType != InventoryMovementType.Reservation && x.MovementType != InventoryMovementType.Release)
+            .GroupBy(x => x.MovementDate.Date)
+            .OrderBy(group => group.Key)
+            .Select(group => new InventoryMovementDailyTotal(group.Key,
+                group.Sum(x => x.QuantityDelta > 0 ? x.QuantityDelta : 0),
+                group.Sum(x => x.QuantityDelta < 0 ? -x.QuantityDelta : 0)))
+            .Take(367).ToListAsync(ct);
+        var byDate = dailyTotals.ToDictionary(x => x.DateUtc);
+        // Keep a uniform UTC-day axis, including elapsed days with no activity but never future days.
+        var timeline = Enumerable.Range(0, Math.Max(0, (to.Date - request.FromUtc.Date).Days + 1))
+            .Select(offset => request.FromUtc.Date.AddDays(offset))
+            .Select(date => byDate.GetValueOrDefault(date) ?? new InventoryMovementDailyTotal(date, 0, 0)).ToList();
+        var inbound = timeline.Sum(x => x.Inbound);
+        var outbound = timeline.Sum(x => x.Outbound);
         var positions = await GetStockPositionsAsync(new()
         {
             Metadata = request.Metadata, ProductId = request.ProductId,
@@ -373,7 +387,8 @@ public sealed class InventoryReportingService(
             positions.Data!, movements.Data!, near, expired,
             products.Select(x => new InventoryReportFilterOption(x.Id, x.Name ?? "Unnamed product")).ToList(),
             warehouses.Select(x => new InventoryReportFilterOption(x.Id, $"{x.Code} - {x.Name}")).ToList(),
-            locations.Select(x => new InventoryReportFilterOption(x.Id, $"{x.Code} - {x.Name}", x.WarehouseId)).ToList()));
+            locations.Select(x => new InventoryReportFilterOption(x.Id, $"{x.Code} - {x.Name}", x.WarehouseId)).ToList())
+            { MovementTimeline = timeline });
     }
 
     private async Task<List<NearExpiryStockReportRow>> BuildExpiryRows(

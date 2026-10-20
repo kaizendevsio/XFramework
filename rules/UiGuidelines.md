@@ -12,14 +12,15 @@ This is the primary UI rules entrypoint for XFramework agents. Read this file be
 - Before using newer or less-common BlazorBlueprint parameters/components, inspect the installed NuGet XML because website docs can lead the pinned package version.
 
 ```powershell
-$xml = "$env:USERPROFILE\.nuget\packages\blazorblueprint.components\3.12.0\lib\net8.0\BlazorBlueprint.Components.xml"
+$xml = "$env:USERPROFILE\.nuget\packages\blazorblueprint.components\4.1.0\lib\net10.0\BlazorBlueprint.Components.xml"
 Select-String -Path $xml -Pattern 'BbDataGrid|BbDynamicForm|BbFormWizard|BbFilterBuilder|DialogOpenOptions|ToastData'
 ```
 
 ## Portal Baseline
 
 - Preserve BlazorBlueprint setup: `AddInteractiveServerComponents`, `AddBlazorBlueprintComponents`, `_content/BlazorBlueprint.Components` CSS, `InteractiveServer` render mode, and shared imports.
-- Preserve `BbToastProvider`, `BbDialogProvider`, `XfPortalService`, and the Portal host composition in layouts that use portal-based controls. `MainLayout` uses `XfContainerPortalHost` for dialogs/sheets plus `BbOverlayPortalHost` for popovers/selects because BlazorBlueprint `3.12.0` can discard dynamic container refreshes received during rendering. Re-evaluate and remove this compatibility layer when upgrading BlazorBlueprint.
+- Preserve `BbToastProvider`, `BbDialogProvider`, `XfPortalService`, and the Portal host composition in layouts that use portal-based controls. `MainLayout` retains `XfContainerPortalHost` for dialogs/sheets plus `BbOverlayPortalHost` for popovers/selects. The workaround originated with dropped refreshes in `3.12.0` and remained on the `3.16.0` baseline. Although `4.1.0` includes upstream refresh recovery, do not remove the local layer until repeated dynamic-dialog browser tests verify the replacement.
+- Blueprint Components and Primitives are pinned together at `4.1.0`; Lucide remains `2.0.2`. Blueprint v4 requires .NET 10 and supplies only `bb:`-prefixed utilities. Portal owns unprefixed utilities in `Styles/utilities.css`; run `npm ci --ignore-scripts` and `npm run build:css` from the Portal project after changing utility usage. Keep generated `wwwroot/css/utilities.css` loaded after the existing `app.css`; do not regenerate or overwrite the hand-maintained `app.css`.
 - Prefer styled `BlazorBlueprint.Components` controls. Use `BlazorBlueprint.Primitives` only when the styled component cannot support the workflow.
 - Use Lucide icon components from `BlazorBlueprint.Icons.Lucide.Components`; do not hand-draw common UI icons.
 

@@ -9,6 +9,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Testcontainers.PostgreSql;
 using XFramework.Core.Patterns;
+using XFramework.Core.DataContext;
+using XFramework.Core.Services.Caching;
+using Moq;
 using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.ServiceIdentity;
@@ -164,7 +167,6 @@ public sealed class InventarioSetupPostgresTests
         var service = Service(db, tenant);
         var read = await service.GetAsync(new());
         read.Data!.ShouldPrompt.Should().BeFalse();
-        (await service.CompleteAsync(Basic())).StatusCode.Should().Be(409);
         var result = await service.CompleteAsync(Basic() with { Mode = InventarioSetupMode.Advanced, ExistingWarehouseId = warehouse.Id, ExistingLocationId = location.Id, Warehouse = null, Location = null });
         result.IsSuccess.Should().BeTrue(result.Message);
         await using var reload = Database(tenant);
@@ -251,12 +253,154 @@ public sealed class InventarioSetupPostgresTests
         (await otherTenant.Set<InventarioSetup>().CountAsync()).Should().Be(0);
     }
 
+    [Test]
+    public async Task SimpleStorage_WithoutWarehouseFields_CreatesMinimalStockAreaAndReplays()
+    {
+        var tenant = Guid.NewGuid();
+        await using var db = Database(tenant);
+        var request = Basic() with { UseSimpleStorage = true, StockAreaName = "Home shop", Warehouse = null, Location = null, DefaultProductAvailable = false };
+        var result = await Service(db, tenant).CompleteAsync(request);
+        result.IsSuccess.Should().BeTrue(result.Message);
+        result.Data!.DefaultProductAvailable.Should().BeFalse();
+        (await db.Set<Warehouse>().SingleAsync()).Name.Should().Be("Home shop");
+        (await db.Set<InventoryLocation>().SingleAsync()).IsPickable.Should().BeTrue();
+        await using var replayDb = Database(tenant);
+        (await Service(replayDb, tenant).CompleteAsync(request)).IsSuccess.Should().BeTrue();
+        (await replayDb.Set<Warehouse>().CountAsync()).Should().Be(1);
+    }
+
+    [Test]
+    public async Task SimpleStorage_ExistingStorage_ReusesRecordsWithoutRenamingThem()
+    {
+        var tenant = Guid.NewGuid();
+        await using var db = Database(tenant);
+        var warehouse = new Warehouse { Id = Guid.NewGuid(), TenantId = tenant, Code = "SHOP", Name = "My shop", IsEnabled = true, ConcurrencyStamp = Guid.NewGuid() };
+        var location = new InventoryLocation { Id = Guid.NewGuid(), TenantId = tenant, WarehouseId = warehouse.Id, Code = "SHELF", Name = "Shelf", IsEnabled = true, IsPickable = true, ConcurrencyStamp = Guid.NewGuid() };
+        db.AddRange(warehouse, location);
+        await db.SaveChangesAsync();
+        var result = await Service(db, tenant).CompleteAsync(Basic() with { UseSimpleStorage = true, Warehouse = null, Location = null });
+        result.IsSuccess.Should().BeTrue(result.Message);
+        result.Data!.WarehouseId.Should().Be(warehouse.Id);
+        result.Data.LocationId.Should().Be(location.Id);
+        (await db.Set<Warehouse>().SingleAsync()).Name.Should().Be("My shop");
+        (await db.Set<InventoryLocation>().SingleAsync()).ConcurrencyStamp.Should().Be(location.ConcurrencyStamp);
+    }
+
+    [Test]
+    public async Task SimpleStorage_DisabledWarehousing_AllowsCatalogOnlyWithoutEnablingFeatures()
+    {
+        var tenant = Guid.NewGuid();
+        await using var db = Database(tenant);
+        var result = await Service(db, tenant, warehouseEnabled: false).CompleteAsync(Basic() with { UseSimpleStorage = true, Warehouse = null, Location = null });
+        result.IsSuccess.Should().BeTrue(result.Message);
+        result.Data!.Mode.Should().Be(InventarioSetupMode.Basic);
+        (await db.Set<Warehouse>().CountAsync()).Should().Be(0);
+        (await db.Set<TenantModuleFeature>().CountAsync()).Should().Be(0);
+    }
+
+    [Test]
+    public async Task Preferences_AdvancedToBasicAndBack_PreservesStorageAndCompletion()
+    {
+        var tenant = Guid.NewGuid();
+        await using var db = Database(tenant);
+        var initial = await Service(db, tenant).CompleteAsync(Basic() with { Mode = InventarioSetupMode.Advanced });
+        initial.IsSuccess.Should().BeTrue(initial.Message);
+        var previous = initial.Data!;
+        foreach (var mode in new[] { InventarioSetupMode.Basic, InventarioSetupMode.Advanced })
+        {
+            await using var next = Database(tenant);
+            var changed = await Service(next, tenant).UpdatePreferencesAsync(new()
+            {
+                ExpectedConcurrencyStamp = previous.ConcurrencyStamp, Mode = mode,
+                LowStockThreshold = previous.LowStockThreshold, DefaultCurrency = previous.DefaultCurrency,
+                DefaultProductAvailable = false
+            });
+            changed.IsSuccess.Should().BeTrue(changed.Message);
+            changed.Data!.Mode.Should().Be(mode);
+            changed.Data.WarehouseId.Should().Be(initial.Data.WarehouseId);
+            changed.Data.LocationId.Should().Be(initial.Data.LocationId);
+            changed.Data.CompletedAt.Should().Be(initial.Data.CompletedAt);
+            changed.Data.DefaultProductAvailable.Should().BeFalse();
+            (await next.Set<Warehouse>().CountAsync()).Should().Be(1);
+            (await next.Set<InventoryLocation>().CountAsync()).Should().Be(1);
+            previous = changed.Data;
+        }
+    }
+
+    [Test]
+    public async Task Preferences_ForeignOrMismatchedStockLocation_IsRejectedWithoutChangingDefaults()
+    {
+        var tenant = Guid.NewGuid();
+        await using var db = Database(tenant);
+        var initial = await Service(db, tenant).CompleteAsync(Basic());
+        var result = await Service(db, tenant).UpdatePreferencesAsync(new()
+        {
+            ExpectedConcurrencyStamp = initial.Data!.ConcurrencyStamp, WarehouseId = initial.Data.WarehouseId,
+            LocationId = Guid.NewGuid(), DefaultCurrency = "SGD", LowStockThreshold = 1
+        });
+        result.StatusCode.Should().Be(400);
+        (await db.Set<InventarioSetup>().SingleAsync()).LowStockThreshold.Should().Be(9);
+    }
+
+    [TestCase(null, false)]
+    [TestCase(true, true)]
+    public async Task ProductCreate_UsesTenantDefaultUnlessExplicitlyOverridden(bool? requested, bool expected)
+    {
+        var tenant = Guid.NewGuid();
+        await using var db = Database(tenant);
+        (await Service(db, tenant).CompleteAsync(Basic() with { DefaultProductAvailable = false })).IsSuccess.Should().BeTrue();
+        var category = new ProductCategory { Id = Guid.NewGuid(), TenantId = tenant, Name = "Test", IsEnabled = true, ConcurrencyStamp = Guid.NewGuid() };
+        db.Add(category);
+        await db.SaveChangesAsync();
+        var service = new ProductService(new ServerDataContext<AppDbContext>(db), Mock.Of<ICacheService>(), NullLogger<ProductService>.Instance, new SetupInvocation(tenant));
+        var result = await service.CreateAsync(new() { Name = "New product", Price = 10, CategoryId = category.Id, IsAvailable = requested });
+        result.IsSuccess.Should().BeTrue(result.Message);
+        result.Data!.IsAvailable.Should().Be(expected);
+    }
+
+    [Test]
+    public async Task Setup_FinanceDefaultAndSupportedCurrencies_AreAuthoritative()
+    {
+        var tenant = Guid.NewGuid();
+        await using var db = Database(tenant);
+        var service = new InventarioSetupService(db, new SetupInvocation(tenant), new SetupGates(true, true),
+            NullLogger<InventarioSetupService>.Instance, SetupFinanceStub.Create("SGD"));
+        var state = await service.GetAsync(new());
+        state.Data!.DefaultCurrency.Should().Be("SGD");
+        state.Data.SupportedCurrencies.Should().Equal("SGD");
+        var rejected = await service.CompleteAsync(Basic() with { DefaultCurrency = "USD" });
+        rejected.StatusCode.Should().Be(400);
+        (await db.Set<Warehouse>().CountAsync()).Should().Be(0);
+        (await db.Set<InventarioSetup>().CountAsync()).Should().Be(0);
+        var created = await service.CompleteAsync(Basic());
+        created.IsSuccess.Should().BeTrue(created.Message);
+        var update = await service.UpdatePreferencesAsync(new() { ExpectedConcurrencyStamp = created.Data!.ConcurrencyStamp, DefaultCurrency = "USD" });
+        update.StatusCode.Should().Be(400);
+        (await db.Set<InventarioSetup>().SingleAsync()).DefaultCurrency.Should().Be("SGD");
+    }
+
     private AppDbContext Database(Guid tenant) => new(new DbContextOptionsBuilder<AppDbContext>()
         .UseNpgsql(_postgres.GetConnectionString()).UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
         .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning, RelationalEventId.BoolWithDefaultWarning)).Options,
         new HttpContextAccessor(), new ConfigurationBuilder().Build(), new SetupInvocation(tenant));
+    [Test]
+    public async Task Setup_FinanceRepairDraft_IsNotUsableEvenWhenItContainsCurrencies()
+    {
+        var tenant = Guid.NewGuid();
+        await using var db = Database(tenant);
+        var service = new InventarioSetupService(db, new SetupInvocation(tenant, true, true), new SetupGates(true, true),
+            NullLogger<InventarioSetupService>.Instance, SetupFinanceStub.Create(false));
+        var read = await service.GetAsync(new());
+        read.IsSuccess.Should().BeTrue();
+        read.Data!.SupportedCurrencies.Should().BeEmpty();
+        var result = await service.CompleteAsync(Basic());
+        result.StatusCode.Should().Be(409);
+        (await db.Set<InventarioSetup>().AnyAsync()).Should().BeFalse();
+        (await db.Set<Warehouse>().AnyAsync()).Should().BeFalse();
+    }
+
     private static InventarioSetupService Service(DbContext db, Guid tenant, bool actor = true, bool manager = true, bool enabled = true, bool warehouseEnabled = true) =>
-        new(db, new SetupInvocation(tenant, actor, manager), new SetupGates(enabled, warehouseEnabled), NullLogger<InventarioSetupService>.Instance);
+        new(db, new SetupInvocation(tenant, actor, manager), new SetupGates(enabled, warehouseEnabled), NullLogger<InventarioSetupService>.Instance, SetupFinanceStub.Create());
     private static CompleteInventarioSetupRequest Basic() => new()
     {
         CompletionRequestId = Guid.NewGuid(), Mode = InventarioSetupMode.Basic, LowStockThreshold = 9, DefaultCurrency = "SGD",

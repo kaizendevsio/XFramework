@@ -52,7 +52,8 @@ public sealed class InventarioTransactionLayoutTests : PageTest
         var styles = Path.Combine(TestContext.CurrentContext.TestDirectory, "layout-styles");
         var css = File.ReadAllText(Path.Combine(styles, "themes.css"))
             + File.ReadAllText(Path.Combine(styles, "blazorblueprint.css"))
-            + File.ReadAllText(Path.Combine(root, "src", "Presentation", "XFramework.Portal", "wwwroot", "css", "app.css"));
+            + File.ReadAllText(Path.Combine(root, "src", "Presentation", "XFramework.Portal", "wwwroot", "css", "app.css"))
+            + File.ReadAllText(Path.Combine(root, "src", "Presentation", "XFramework.Portal", "wwwroot", "css", "utilities.css"));
         // Render the real Razor component and shipped styles, with data mocked and no service credentials.
         var html = $"<!doctype html><html class='{(dark ? "dark" : "")}' data-base-color='slate' data-primary-color='blue' style='--radius:0.5rem'><head>"
             + $"<meta name='viewport' content='width=device-width, initial-scale=1'><style>{css}</style></head>"

@@ -83,7 +83,7 @@ public sealed class InventarioSetupPageScopeTests
     {
         var firstTenant = _tenant;
         var stamp = Guid.NewGuid();
-        var state = new InventarioSetupResponse { TenantId = firstTenant, CanManage = true, ConcurrencyStamp = stamp };
+        var state = new InventarioSetupResponse { TenantId = firstTenant, CanManage = true, ConcurrencyStamp = stamp, SupportedCurrencies = ["SGD", "USD"] };
         var gate = new TaskCompletionSource<QueryResponse<InventarioSetupResponse>>(TaskCreationOptions.RunContinuationsAsynchronously);
         UpdateInventarioPreferencesRequest? captured = null;
         _wrapper.Setup(x => x.UpdateInventarioPreferences(It.IsAny<UpdateInventarioPreferencesRequest>(), It.IsAny<CancellationToken>()))
@@ -109,13 +109,14 @@ public sealed class InventarioSetupPageScopeTests
     public async Task Products_DefaultsRead_UsesOwningWrapperForThresholdAndCurrency()
     {
         _wrapper.Setup(x => x.GetInventarioSetup(It.IsAny<GetInventarioSetupRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Response(new() { TenantId = _tenant, LowStockThreshold = 19, DefaultCurrency = "SGD" }));
+            .ReturnsAsync(Response(new() { TenantId = _tenant, LowStockThreshold = 19, DefaultCurrency = "SGD", DefaultProductAvailable = false }));
         var page = new Products();
         typeof(Products).GetProperty("Inventario", Private)!.SetValue(page, _wrapper.Object);
         typeof(Products).GetProperty("TenantFilter", Private)!.SetValue(page, _context.Object);
         await (Task)typeof(Products).GetMethod("LoadSettings", Private)!.Invoke(page, [_tenant])!;
         Field<int>(page, "_lowStockThreshold").Should().Be(19);
         Field<string>(page, "_currency").Should().Be("SGD");
+        Field<bool>(page, "_defaultProductAvailable").Should().BeFalse();
         _wrapper.Verify(x => x.GetInventarioSetup(It.Is<GetInventarioSetupRequest>(r => r.Metadata.RequestedTenantId == _tenant), It.IsAny<CancellationToken>()), Times.Once);
         _wrapper.VerifyNoOtherCalls();
     }

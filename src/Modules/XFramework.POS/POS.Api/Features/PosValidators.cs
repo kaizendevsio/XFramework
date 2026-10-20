@@ -77,7 +77,7 @@ public sealed class CreatePosCartValidator : AbstractValidator<CreatePosCartRequ
         RuleFor(x => x.CustomerLabel).MaximumLength(200).When(x => !string.IsNullOrWhiteSpace(x.CustomerLabel));
         RuleFor(x => x.Notes).MaximumLength(1000).When(x => !string.IsNullOrWhiteSpace(x.Notes));
         RuleFor(x => x.DiscountAmount).GreaterThanOrEqualTo(0);
-        RuleFor(x => x.TaxAmount).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.TaxAmount).Equal(0).WithMessage("Tax is calculated from tenant Finance settings");
         RuleFor(x => x.IdempotencyKey).MaximumLength(160).When(x => !string.IsNullOrWhiteSpace(x.IdempotencyKey));
         RuleFor(x => x.Lines).NotEmpty();
         RuleFor(x => x.Lines).Must(lines => lines is not null && lines.Count <= PosValidationLimits.MaxTransactionLines)
@@ -94,7 +94,7 @@ public sealed class UpdatePosCartValidator : AbstractValidator<UpdatePosCartRequ
         RuleFor(x => x.CustomerLabel).MaximumLength(200).When(x => !string.IsNullOrWhiteSpace(x.CustomerLabel));
         RuleFor(x => x.Notes).MaximumLength(1000).When(x => !string.IsNullOrWhiteSpace(x.Notes));
         RuleFor(x => x.DiscountAmount).GreaterThanOrEqualTo(0);
-        RuleFor(x => x.TaxAmount).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.TaxAmount).Equal(0).WithMessage("Tax is calculated from tenant Finance settings");
         RuleFor(x => x.Lines).NotEmpty();
         RuleFor(x => x.Lines).Must(lines => lines is not null && lines.Count <= PosValidationLimits.MaxTransactionLines)
             .WithMessage($"A POS cart cannot contain more than {PosValidationLimits.MaxTransactionLines} lines");
@@ -110,7 +110,7 @@ public sealed class PosCartLineValidator : AbstractValidator<PosCartLineRequest>
         RuleFor(x => x.Quantity).GreaterThan(0);
         RuleFor(x => x.ExpectedUnitPrice).GreaterThanOrEqualTo(0).When(x => x.ExpectedUnitPrice.HasValue);
         RuleFor(x => x.DiscountAmount).GreaterThanOrEqualTo(0);
-        RuleFor(x => x.TaxAmount).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.TaxAmount).Equal(0).WithMessage("Tax is calculated from tenant Finance settings");
     }
 }
 
@@ -177,7 +177,7 @@ public sealed class CheckoutPosSaleValidator : AbstractValidator<CheckoutPosSale
         RuleFor(x => x.RegisterId).NotEmpty();
         RuleFor(x => x.CashierCredentialId).NotEmpty();
         RuleFor(x => x.DiscountAmount).GreaterThanOrEqualTo(0);
-        RuleFor(x => x.TaxAmount).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.TaxAmount).Equal(0).WithMessage("Tax is calculated from tenant Finance settings");
         RuleFor(x => x.IdempotencyKey).NotEmpty().MaximumLength(160);
         RuleFor(x => x.Lines).NotEmpty();
         RuleFor(x => x.Lines).Must(lines => lines is not null && lines.Count <= PosValidationLimits.MaxTransactionLines)
@@ -199,7 +199,7 @@ public sealed class CheckoutPosSaleValidator : AbstractValidator<CheckoutPosSale
             line.RuleFor(x => x.Quantity).GreaterThan(0);
             line.RuleFor(x => x.ExpectedUnitPrice).GreaterThanOrEqualTo(0);
             line.RuleFor(x => x.DiscountAmount).GreaterThanOrEqualTo(0);
-            line.RuleFor(x => x.TaxAmount).GreaterThanOrEqualTo(0);
+            line.RuleFor(x => x.TaxAmount).Equal(0).WithMessage("Tax is calculated from tenant Finance settings");
         });
     }
 }

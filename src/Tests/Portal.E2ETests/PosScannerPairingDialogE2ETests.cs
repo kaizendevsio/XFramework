@@ -63,13 +63,21 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
         StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Services.AddRazorComponents().AddInteractiveServerComponents(options => options.DetailedErrors = true);
-        builder.Services.AddBlazorBlueprintComponents();
+        builder.Services.AddBlazorBlueprintComponents(configureTheme: options =>
+        {
+            options.DefaultBaseColor = BaseColor.Slate;
+            options.DefaultPrimaryColor = PrimaryColor.Blue;
+            options.DefaultDarkMode = false;
+            options.DefaultRadius = 0.5;
+            options.PersistToLocalStorage = true;
+        });
         builder.Services.AddScoped<XfPortalService>();
         builder.Services.Replace(ServiceDescriptor.Scoped<IPortalService>(sp => sp.GetRequiredService<XfPortalService>()));
         builder.Services.AddSingleton(state);
         builder.Services.AddScoped<AuthenticationStateProvider, PosScannerFixtureAuthentication>();
         builder.Services.AddSingleton(Mock.Of<IPortalTenantContext>(t => t.SelectedTenantId == state.TenantId));
         builder.Services.AddSingleton(Mock.Of<IDataContext>());
+        builder.Services.AddSingleton(Mock.Of<IdentityServer.Integration.Drivers.IIdentityServerServiceWrapper>());
         builder.Services.AddSingleton(Mock.Of<IPortalModuleAvailability>());
         builder.Services.AddSingleton(Mock.Of<IPortalActorContext>(a => a.CredentialId == state.CashierId));
         builder.Services.AddScoped(_ => new RequestMetadata());
@@ -182,6 +190,7 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
         state.RevokedPairings.Clear(); state.CatalogRequests.Clear();
         var runtime = await Page.APIRequest.GetAsync(app.Urls.Single() + "/_framework/blazor.web.js");
         runtime.Status.Should().Be(200, "the framework script must be served from the built Portal's asset manifest");
+        (await Page.APIRequest.GetAsync(app.Urls.Single() + "/cashier-css/utilities.css")).Status.Should().Be(200);
         Page.PageError += (_, message) => TestContext.Progress.WriteLine(message);
         var response = await Page.GotoAsync(app.Urls.Single() + "/scanner-pairing-fixture");
         response!.Status.Should().Be(200, await Page.ContentAsync());
@@ -364,6 +373,15 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
         await Page.GotoAsync(app.Urls.Single() + "/pos/mobile-scanner?tenant=" + state.TenantId + "#" + new string('A',64));
         await Expect(Page.GetByRole(AriaRole.Button,new() {Name="Pair desktop",Exact=true})).ToBeEnabledAsync();
         await Expect(Page.GetByLabel("Six-digit pairing code",new() {Exact=true})).ToBeHiddenAsync();
+        var manualPair = Page.GetByRole(AriaRole.Button, new() { Name = "Enter pairing code", Exact = true });
+        await manualPair.FocusAsync();
+        await Page.Keyboard.PressAsync("Tab");
+        (await Page.EvaluateAsync<bool>("document.activeElement?.closest('[inert]') === null")).Should().BeTrue();
+        await manualPair.ClickAsync();
+        await Page.Keyboard.PressAsync("Tab");
+        await Expect(Page.GetByLabel("Tenant ID", new() { Exact = true })).ToBeFocusedAsync();
+        await manualPair.ClickAsync();
+        await Expect(Page.GetByLabel("Six-digit pairing code",new() {Exact=true})).ToBeHiddenAsync();
         new Uri(Page.Url).Fragment.Should().BeEmpty();
         await Page.GetByRole(AriaRole.Button,new() {Name="Pair desktop",Exact=true}).ClickAsync();
         await Expect(Page.GetByTestId("scanner-status")).ToHaveTextAsync("Paired");
@@ -404,10 +422,11 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Start camera", Exact = true })).ToHaveCountAsync(0);
         await Page.GetByRole(AriaRole.Button, new() { Name = "Pause camera", Exact = true }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Start camera", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Start camera", Exact = true })).ToBeEnabledAsync();
         (await Page.EvaluateAsync<bool>("scannerTestStream.getTracks().every(t => t.readyState === 'ended')")).Should().BeTrue();
         await Page.GetByText("Enter product code", new() { Exact = true }).ClickAsync();
         await Page.GetByLabel("Product code", new() { Exact = true }).FillAsync("SKU-1");
-        await Page.GetByLabel("Product code", new() { Exact = true }).BlurAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Send code", Exact = true })).ToBeEnabledAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Send code", Exact = true }).ClickAsync();
         await Expect(Page.GetByTestId("scanner-status")).ToHaveTextAsync("Sent to desktop");
         var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, "artifacts", "pos-scanner");
@@ -491,6 +510,56 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
         state.CatalogRequests.Should().BeEmpty();
     }
 
+    [TestCase(1920, 1080)]
+    [TestCase(768, 1024)]
+    public async Task CashierPayment_AutomaticTax_IsReadOnlyAndUpdatesAfterDiscount(int width, int height)
+    {
+        await Page.SetViewportSizeAsync(width, height);
+        await Page.AddInitScriptAsync("localStorage.setItem('bb-theme', JSON.stringify({ baseColor: 'slate', primaryColor: 'blue', radius: 0.5, isDarkMode: false }));");
+        await Page.GotoAsync(app.Urls.Single() + "/cashier-scanner-fixture");
+        await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync("10.00");
+        await state.Cashier!.TaxForFixture(10);
+        await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync("11.00");
+        await Page.GetByTestId("pos-checkout").ClickAsync();
+        await Expect(Page.GetByTestId("pos-payment-stage")).ToBeVisibleAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Discount and tax", Exact = true }).ClickAsync();
+        await Expect(Page.Locator("input#pos-tax-amount")).ToHaveCountAsync(0);
+        await Expect(Page.Locator("output#pos-tax-amount")).ToHaveTextAsync("USD 1.00");
+        await Page.Locator("#pos-discount-amount").FillAsync("2");
+        await Page.Locator("#pos-discount-amount").BlurAsync();
+        await Expect(Page.Locator("output#pos-tax-amount")).ToHaveTextAsync("USD 0.80");
+        await Expect(Page.Locator("label[for='pos-tax-amount']")).ToHaveTextAsync("Automatic tax (10%)");
+        await Expect(Page.Locator("label[for='pos-tax-amount']")).ToBeVisibleAsync();
+        await Expect(Page.Locator("label[for='pos-discount-amount']")).ToBeVisibleAsync();
+        await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync("8.80");
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-base-color", "slate");
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-primary-color", "blue");
+        (await Page.EvaluateAsync<bool>("document.documentElement.scrollWidth <= window.innerWidth")).Should().BeTrue();
+        await Page.Locator(".pos-adjustments-section").EvaluateAsync("async e => { await Promise.all(e.getAnimations({subtree: true}).filter(a => a.effect.getComputedTiming().iterations !== Infinity).map(a => a.finished.catch(() => {}))); }");
+        await Page.WaitForFunctionAsync("""
+            () => {
+                const trigger = document.querySelector('.pos-adjustments-trigger').getBoundingClientRect();
+                return ['pos-discount-amount', 'pos-tax-amount'].every(id => {
+                    const label = document.querySelector(`label[for='${id}']`).getBoundingClientRect();
+                    return label.height > 0 && label.top >= trigger.bottom;
+                });
+            }
+            """);
+        var path = Path.Combine(TestContext.CurrentContext.WorkDirectory, "artifacts", "pos-scanner", $"cashier-tax-{width}.png");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await Page.ScreenshotAsync(new() { Path = path, FullPage = true, Animations = ScreenshotAnimations.Disabled });
+        TestContext.AddTestAttachment(path);
+        var triggerBounds = await Page.GetByRole(AriaRole.Button, new() { Name = "Discount and tax", Exact = true }).BoundingBoxAsync();
+        var labelBounds = await Page.Locator("label[for='pos-discount-amount']").BoundingBoxAsync();
+        labelBounds.Should().NotBeNull();
+        labelBounds!.Y.Should().BeGreaterThanOrEqualTo(triggerBounds!.Y + triggerBounds.Height,
+            "the expanded adjustment labels must not overlap their trigger: " +
+            await Page.Locator(".pos-adjustments-section").EvaluateAsync<string>("e => e.outerHTML"));
+        var taxLabelBounds = await Page.Locator("label[for='pos-tax-amount']").BoundingBoxAsync();
+        taxLabelBounds!.Y.Should().BeGreaterThanOrEqualTo(triggerBounds.Y + triggerBounds.Height);
+        state.FinancialCalls.Should().Be(0);
+    }
+
     private static string RepoRoot()
     {
         for(var d=new DirectoryInfo(TestContext.CurrentContext.TestDirectory);d is not null;d=d.Parent)
@@ -534,7 +603,7 @@ public sealed class PosPairingFixtureRoot : ComponentBase
     [Inject] public NavigationManager Navigation { get; set; } = null!;
     protected override void BuildRenderTree(RenderTreeBuilder b)
     {
-        b.AddMarkupContent(0,"<!doctype html><html data-base-color='zinc' data-primary-color='green'><head><base href='/'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/css/themes.css'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/blazorblueprint.css'><link rel='stylesheet' href='_content/XFramework.Portal.Features.POS/XFramework.Portal.Features.POS.bundle.scp.css'><link rel='stylesheet' href='cashier-css/app.css'><style>body{margin:16px;font-family:Arial}button{gap:8px}.app-main{height:100dvh}.mobile-scanner{max-width:528px;margin:auto}</style></head><body>");
+        b.AddMarkupContent(0,"<!doctype html><html data-base-color='slate' data-primary-color='blue' style='--radius:0.5rem'><head><base href='/'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/css/themes.css'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/blazorblueprint.css'><link rel='stylesheet' href='cashier-css/app.css'><link rel='stylesheet' href='cashier-css/utilities.css'><link rel='stylesheet' href='_content/XFramework.Portal.Features.POS/XFramework.Portal.Features.POS.bundle.scp.css'><style>body{margin:16px;font-family:Arial}button{gap:8px}.app-main{height:100dvh}.mobile-scanner{max-width:528px;margin:auto}</style></head><body>");
         b.OpenComponent(1,new Uri(Navigation.Uri).AbsolutePath switch
         {
             "/cashier-scanner-fixture" => typeof(PosScannerFixtureCashierSurface),
@@ -577,6 +646,8 @@ public sealed class PosScannerFixtureCashier : Cashier
         Set("_registers",new List<PosRegisterResponse> {new() {Id=State.RegisterId,Name="Fixture register",CurrencyId=State.CurrencyId}});
         Set("_selectedRegisterId",State.RegisterId.ToString());
         Set("_currencies",new List<CurrencyType> {new() {Id=State.CurrencyId,CurrencyIsoCode3="USD"}});
+        Set("_financeSettings", new IdentityServer.Domain.Shared.Contracts.TenantFinanceSettings
+        { DefaultCurrencyId = State.CurrencyId, SupportedCurrencyIds = [State.CurrencyId] });
         Set("_catalogItems",new List<PosCatalogItemResponse> {State.Item});
         var type = typeof(Cashier).GetNestedType("CartLine",BindingFlags.NonPublic)!;
         var line = Activator.CreateInstance(type)!;
@@ -587,6 +658,12 @@ public sealed class PosScannerFixtureCashier : Cashier
         ((IList)typeof(Cashier).GetField("_cart",Private)!.GetValue(this)!).Add(line);
     }
     protected override Task OnInitializedAsync() => Task.CompletedTask;
+    public Task TaxForFixture(decimal rate) => InvokeAsync(() =>
+    {
+        Set("_financeSettings", new IdentityServer.Domain.Shared.Contracts.TenantFinanceSettings
+        { DefaultCurrencyId = State.CurrencyId, SupportedCurrencyIds = [State.CurrencyId], TaxEnabled = true, TaxRatePercent = rate });
+        StateHasChanged();
+    });
     public Task ClearForFixture() => InvokeAsync(() =>
     { typeof(Cashier).GetMethod("ClearCurrentCart",Private)!.Invoke(this,null); StateHasChanged(); });
     public Task UnavailableForFixture(string condition) => InvokeAsync(() =>

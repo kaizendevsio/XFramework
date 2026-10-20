@@ -3,6 +3,9 @@ using System.Net;
 using System.Reflection;
 using BlazorBlueprint.Components;
 using FluentAssertions;
+using IdentityServer.Domain.Shared.Contracts;
+using IdentityServer.Domain.Shared.Contracts.Requests;
+using IdentityServer.Integration.Drivers;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.RenderTree;
 using Microsoft.Extensions.DependencyInjection;
@@ -68,6 +71,8 @@ public sealed class PosScannerCashierIntegrationTests
         Set("_registers", new List<PosRegisterResponse> { register });
         Set("_selectedRegisterId", register.Id.ToString());
         Set("_currencies", new List<CurrencyType> { new() { Id = register.CurrencyId, CurrencyIsoCode3 = "USD" } });
+        Set("_financeSettings", new IdentityServer.Domain.Shared.Contracts.TenantFinanceSettings
+        { DefaultCurrencyId = register.CurrencyId, SupportedCurrencyIds = [register.CurrencyId] });
         renderer = new(services);
         renderer.Attach(page);
     }
@@ -234,6 +239,78 @@ public sealed class PosScannerCashierIntegrationTests
         Field<bool>("_paymentOpen").Should().BeFalse();
         Field<bool>("_searching").Should().BeFalse();
         Cart.Count.Should().Be(0);
+    }
+
+    [TestCase("failure")]
+    [TestCase("unusable")]
+    [TestCase("success")]
+    [TestCase("exception")]
+    public async Task Reload_TenantChangesDuringFinanceLoad_DiscardsOldResponseAndDrainsQueuedReload(string outcome)
+    {
+        var oldTenant = tenant!.Value;
+        var newTenant = Guid.NewGuid();
+        var oldReply = new TaskCompletionSource<QueryResponse<TenantFinanceSettingsResponse>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var newReply = new TaskCompletionSource<QueryResponse<TenantFinanceSettingsResponse>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var newRequestStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var financeRequests = new List<Guid?>();
+        var identity = new Mock<IIdentityServerServiceWrapper>(MockBehavior.Strict);
+        identity.Setup(x => x.GetTenantFinanceSettings(It.IsAny<GetTenantFinanceSettingsRequest>(), It.IsAny<CancellationToken>()))
+            .Returns((GetTenantFinanceSettingsRequest request, CancellationToken _) =>
+            {
+                financeRequests.Add(request.Metadata.RequestedTenantId);
+                if (request.Metadata.RequestedTenantId == oldTenant)
+                    return oldReply.Task;
+                newRequestStarted.SetResult();
+                return newReply.Task;
+            });
+        SetProperty("Identity", identity.Object);
+        var availability = new Mock<IPortalModuleAvailability>();
+        availability.Setup(x => x.EnsureLoadedAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        availability.Setup(x => x.IsFeatureEnabled(It.IsAny<string>(), "sales")).Returns(true);
+        SetProperty("ModuleNavigation", availability.Object);
+
+        var reload = renderer.Dispatcher.InvokeAsync(() => (Task)Invoke("Reload")!);
+        financeRequests.Should().Equal(oldTenant);
+        await renderer.Dispatcher.InvokeAsync(() => { tenant = newTenant; Invoke("OnTenantChanged"); });
+        Field<bool>("_reloadRequested").Should().BeTrue();
+        if (outcome == "exception")
+            oldReply.SetException(new InvalidOperationException("Old tenant transport failure"));
+        else
+            oldReply.SetResult(new()
+            {
+                HttpStatusCode = outcome == "failure" ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK,
+                Message = "Old tenant failure",
+                Response = new()
+                {
+                    TenantId = oldTenant, IsUsable = outcome == "success",
+                    ConfigurationError = "Old tenant configuration",
+                    Settings = new() { DefaultCurrencyId = register.CurrencyId, SupportedCurrencyIds = [register.CurrencyId] }
+                }
+            });
+        try
+        {
+            await newRequestStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await renderer.Dispatcher.InvokeAsync(() =>
+            {
+                Field<string?>("_loadError").Should().BeNull();
+                Field<TenantFinanceSettings?>("_financeSettings").Should().BeNull();
+                Field<Guid?>("_loadedTenantId").Should().Be(newTenant);
+            });
+        }
+        finally
+        {
+            newReply.SetResult(new()
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Response = new() { TenantId = newTenant, IsUsable = false, ConfigurationError = "Configure the new tenant" }
+            });
+            await reload;
+        }
+        financeRequests.Should().Equal(oldTenant, newTenant);
+        Field<string>("_loadError").Should().Be("Configure the new tenant");
+        Field<bool>("_reloading").Should().BeFalse();
+        Field<bool>("_reloadRequested").Should().BeFalse();
+        wrapper.VerifyNoOtherCalls();
     }
 
     private Task Receive(string code) => renderer.Dispatcher.InvokeAsync(() => (Task)Invoke("ReceiveMobileScan",code)!);

@@ -9,7 +9,8 @@ namespace Inventario.Api.Features.Setup.Complete;
 public static class CompleteInventarioSetupEndpoint
 {
     [BoltHandler(TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
+        RequiredActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPost("/api/inventario/setup/complete", Tags = ["Inventario Setup"], Summary = "Confirm tenant Inventario setup")]
     public static Task<Result<InventarioSetupResponse>> Handle(CompleteInventarioSetupRequest request, InventarioSetupService service, CancellationToken ct) =>
         service.CompleteAsync(request, ct);

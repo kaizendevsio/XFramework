@@ -10,12 +10,12 @@ else if (TenantContext.SelectedTenantId is null) { <ModuleUnavailable ModuleName
 else if (!_moduleEnabled) { <ModuleUnavailable ModuleName="Inventario" /> }
 else
 {
-    <div class="inv-page space-y-6">
+    <div class="inv-page settings-page space-y-6" data-testid="inventario-settings">
         <div class="xf-page-header">
             <div><BbTypographyH3>Inventario Settings</BbTypographyH3><BbTypographyMuted>@TenantContext.SelectedTenantName</BbTypographyMuted></div>
             <div class="xf-page-actions">
                 <BbButton Variant="ButtonVariant.Outline" OnClick="Reload" Disabled="@_saving"><LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />Reload</BbButton>
-                @if (_state?.CanManage == true)
+                @if (_state?.CanManage == true && _state.CompletedAt is null)
                 { <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo("/inventario/setup"))" Disabled="@_saving"><LucideIcon Name="settings" class="mr-2 h-4 w-4" />Setup</BbButton> }
             </div>
         </div>
@@ -24,19 +24,38 @@ else
         {
             @if (_state.ShouldPrompt)
             { <BbAlert><BbAlertTitle>Inventario is not set up</BbAlertTitle><BbAlertDescription>No configuration has been confirmed for this tenant.</BbAlertDescription></BbAlert> }
-            <section>
-                <BbTypographyH4>Catalog defaults</BbTypographyH4>
-                <fieldset disabled="@(_saving || !_state.CanManage)" style="border:0;padding:0;margin:16px 0">
-                    <div class="xf-detail-field-grid">
-                        <BbFormFieldNumericInput TValue="int" @bind-Value="_threshold" Min="0" AllowNegative="false" DisableDebounce="true" Label="Low stock threshold" />
-                        <BbFormFieldInput TValue="string" @bind-Value="_currency" UpdateTiming="UpdateTiming.Immediate" Label="Default currency" />
-                    </div>
-                </fieldset>
-                <p>Changing the currency does not convert existing prices.</p>
-                <div class="xf-page-actions">
-                    <BbButton OnClick="Save" Disabled="@(_saving || !_state.CanManage || !IsDirty)"><LucideIcon Name="save" class="mr-2 h-4 w-4" />@(_saving ? "Saving..." : "Save Settings")</BbButton>
+            <fieldset disabled="@(_saving || !_state.CanManage)">
+            <section class="settings-section">
+                <BbTypographyH4>Stock organization</BbTypographyH4>
+                <div class="settings-fields">
+                    <InventorySelect TValue="string" @bind-Value="_mode" Label="Setup mode" DisplayTextSelector="@(value => value == "advanced" ? "Advanced" : "Basic")">
+                        <BbSelectItem Value="@("basic")">Basic</BbSelectItem>
+                        <BbSelectItem Value="@("advanced")">Advanced</BbSelectItem>
+                    </InventorySelect>
                 </div>
+                <BbTypographyMuted>Changing mode keeps existing stock, warehouses and locations.</BbTypographyMuted>
             </section>
+            <section class="settings-section">
+                <BbTypographyH4>Catalog defaults</BbTypographyH4>
+                <InventarioPreferencesFields SupportedCurrencies="_state.SupportedCurrencies" @bind-Currency="_currency" @bind-Threshold="_threshold" @bind-DefaultProductAvailable="_defaultProductAvailable" />
+            </section>
+            <section class="settings-section">
+                <BbTypographyH4>Default stock area</BbTypographyH4>
+                @if (_state.WarehousingEnabled)
+                {
+                <div class="settings-fields">
+                    <div><BbLabel for="settings-warehouse">@WarehouseLabel</BbLabel><BbCombobox Id="settings-warehouse" AriaLabel="@WarehouseLabel" Class="w-full inventory-default-picker" TValue="string" Value="@_warehouseId" ValueChanged="SelectWarehouse" Options="WarehouseOptions" Placeholder="Select stock area" /></div>
+                    <div><BbLabel for="settings-location">@LocationLabel</BbLabel><BbCombobox Id="settings-location" AriaLabel="@LocationLabel" Class="w-full inventory-default-picker" TValue="string" @bind-Value="_locationId" Options="LocationOptions" Placeholder="Select stock location" Disabled="@string.IsNullOrEmpty(_warehouseId)" /></div>
+                </div>
+                }
+                else
+                { <BbTypographyMuted>Catalog only. Warehousing is disabled; existing stock defaults are preserved.</BbTypographyMuted> }
+            </section>
+            </fieldset>
+            <div class="settings-actions">
+                <BbButton Variant="ButtonVariant.Outline" OnClick="RestoreDraft" Disabled="@(_saving || !IsDirty)">Discard changes</BbButton>
+                <BbButton OnClick="Save" Disabled="@(_saving || !_state.CanManage || !IsDirty || !_state.SupportedCurrencies.Contains(_currency) || !StockSelectionValid)"><LucideIcon Name="save" class="mr-2 h-4 w-4" />@(_saving ? "Saving..." : "Save Settings")</BbButton>
+            </div>
             <InventarioConfigurationLinks />
         }
     </div>
@@ -51,9 +70,29 @@ else
     private InventarioSetupResponse? _state;
     private int _threshold, _revision;
     private string _currency = "PHP";
+    private string _mode = "basic", _warehouseId = "", _locationId = "";
+    private bool _defaultProductAvailable = true;
+    private string WarehouseLabel => _mode == "basic" ? "Stock area" : "Default warehouse";
+    private string LocationLabel => _mode == "basic" ? "Stock location" : "Default location";
+    private bool StockSelectionValid => _state?.WarehousingEnabled != true ||
+        (string.IsNullOrEmpty(_warehouseId) && string.IsNullOrEmpty(_locationId)) ||
+        (_state.Warehouses.Any(x => x.IsEnabled && x.Id.ToString() == _warehouseId) &&
+         _state.Locations.Any(x => x.IsEnabled && x.IsPickable && x.WarehouseId.ToString() == _warehouseId && x.Id.ToString() == _locationId));
+    private List<SelectOption<string>> WarehouseOptions => _state?.Warehouses.Where(x => x.IsEnabled).Select(x => new SelectOption<string>(x.Id.ToString(), $"{x.Code} - {x.Name}")).ToList() ?? [];
+    private List<SelectOption<string>> LocationOptions => _state?.Locations.Where(x => x.IsEnabled && x.IsPickable && x.WarehouseId.ToString() == _warehouseId).Select(x => new SelectOption<string>(x.Id.ToString(), $"{x.Code} - {x.Name}")).ToList() ?? [];
     private string? _error;
     private bool _loading = true, _saving, _moduleEnabled, _disposed;
-    private bool IsDirty => _state is not null && (_threshold != _state.LowStockThreshold || _currency != _state.DefaultCurrency);
+    private bool IsDirty => _state is not null && (_threshold != _state.LowStockThreshold || _currency != _state.DefaultCurrency || _defaultProductAvailable != _state.DefaultProductAvailable || _mode != (_state.Mode == InventarioSetupMode.Advanced ? "advanced" : "basic") || _warehouseId != (_state.WarehouseId?.ToString() ?? "") || _locationId != (_state.LocationId?.ToString() ?? ""));
+    private void SelectWarehouse(string value) { _warehouseId = value; _locationId = ""; }
+    private void RestoreDraft()
+    {
+        if (_state is null) return;
+        _threshold = _state.LowStockThreshold; _currency = _state.DefaultCurrency;
+        _mode = _state.Mode == InventarioSetupMode.Advanced ? "advanced" : "basic";
+        _defaultProductAvailable = _state.DefaultProductAvailable;
+        _warehouseId = _state.WarehouseId?.ToString() ?? ""; _locationId = _state.LocationId?.ToString() ?? "";
+        _error = null;
+    }
     protected override void OnInitialized() { TenantContext.OnChanged += Changed; Availability.OnChanged += Changed; }
     protected override Task OnInitializedAsync() => Reload();
     private void Changed()
@@ -76,7 +115,7 @@ else
             var result = await Inventario.GetInventarioSetup(new GetInventarioSetupRequest { Metadata = new() { RequestedTenantId = tenantId } });
             if (!Current(revision, id)) return;
             if (result.IsSuccess && result.Response?.TenantId == tenantId)
-            { _state = result.Response; _threshold = _state.LowStockThreshold; _currency = _state.DefaultCurrency; }
+            { _state = result.Response; RestoreDraft(); }
             else _error = "Inventario settings could not be loaded.";
         }
         catch { if (Current(revision, id)) _error = "Inventario settings could not be loaded."; }
@@ -85,18 +124,28 @@ else
     private async Task Save()
     {
         if (_saving || _state?.CanManage != true || TenantContext.SelectedTenantId != _state.TenantId) return;
-        if (_threshold < 0 || !CurrencyCatalog.GetAllCurrencyCodes().Contains(_currency.Trim().ToUpperInvariant()))
-        { _error = "Enter a non-negative threshold and supported currency code."; return; }
+        if (_threshold < 0 || !_state.SupportedCurrencies.Contains(_currency))
+        { _error = "Enter a non-negative threshold and select a supported currency."; return; }
+        if (!StockSelectionValid)
+        { _error = "Select an active stock area and pickable location."; return; }
         var revision = _revision;
         var id = _state.TenantId;
-        var request = new UpdateInventarioPreferencesRequest { Metadata = new() { RequestedTenantId = id }, ExpectedConcurrencyStamp = _state.ConcurrencyStamp, LowStockThreshold = _threshold, DefaultCurrency = _currency.Trim().ToUpperInvariant() };
+        var request = new UpdateInventarioPreferencesRequest
+        {
+            Metadata = new() { RequestedTenantId = id }, ExpectedConcurrencyStamp = _state.ConcurrencyStamp,
+            LowStockThreshold = _threshold, DefaultCurrency = _currency,
+            Mode = _mode == "advanced" ? InventarioSetupMode.Advanced : InventarioSetupMode.Basic,
+            DefaultProductAvailable = _defaultProductAvailable,
+            WarehouseId = _state.WarehousingEnabled && Guid.TryParse(_warehouseId, out var w) ? w : null,
+            LocationId = _state.WarehousingEnabled && Guid.TryParse(_locationId, out var l) ? l : null
+        };
         _saving = true; _error = null;
         try
         {
             var result = await Inventario.UpdateInventarioPreferences(request);
             if (!Current(revision, id)) return;
             if (result.IsSuccess && result.Response?.TenantId == id)
-            { _state = result.Response; _threshold = _state.LowStockThreshold; _currency = _state.DefaultCurrency; Toasts.Success("Inventario settings saved."); }
+            { _state = result.Response; RestoreDraft(); Toasts.Success("Inventario settings saved."); }
             else _error = result.HttpStatusCode == System.Net.HttpStatusCode.Conflict ? "Settings changed. Reload before saving." : "Settings could not be saved.";
         }
         catch { if (Current(revision, id)) _error = "Settings could not be saved."; }

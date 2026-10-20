@@ -398,7 +398,7 @@ else if (!_moduleEnabled)
                                     <span>Discount and tax</span><LucideIcon Name="@(_adjustmentsOpen ? "chevron-up" : "chevron-down")" class="h-4 w-4" />
                                 </BbButton>
                             </BbCollapsibleTrigger>
-                            <BbCollapsibleContent>
+                            <BbCollapsibleContent ForceMount="false">
                                 <div class="pos-adjustments">
                                     <BbField>
                                         <BbFieldLabel For="pos-discount-amount">Discount amount (@CurrencyCode)</BbFieldLabel>
@@ -406,9 +406,8 @@ else if (!_moduleEnabled)
                                                          CurrencyCode="@CurrencyCode" ShowSymbol="false" Min="0" Disabled="@IsInteractionLocked" DisableDebounce="true" />
                                     </BbField>
                                     <BbField>
-                                        <BbFieldLabel For="pos-tax-amount">Tax amount (@CurrencyCode)</BbFieldLabel>
-                                        <BbCurrencyInput Id="pos-tax-amount" @bind-Value="_taxAmount" AriaLabel="@($"Tax amount ({CurrencyCode})")"
-                                                         CurrencyCode="@CurrencyCode" ShowSymbol="false" Min="0" Disabled="@IsInteractionLocked" DisableDebounce="true" />
+                                        <BbFieldLabel For="pos-tax-amount">Automatic tax (@(_financeSettings is { TaxEnabled: true } ? _financeSettings.TaxRatePercent : 0)%)</BbFieldLabel>
+                                        <output id="pos-tax-amount">@FormatMoney(_taxAmount)</output>
                                     </BbField>
                                 </div>
                             </BbCollapsibleContent>
@@ -488,6 +487,7 @@ else if (!_moduleEnabled)
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IPOSServiceWrapper POS { get; set; } = default!;
+    [Inject] private IdentityServer.Integration.Drivers.IIdentityServerServiceWrapper Identity { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
     [Inject] private IPortalModuleAvailability ModuleNavigation { get; set; } = default!;
@@ -548,7 +548,8 @@ else if (!_moduleEnabled)
     private string _activeSaleIdempotencyKey = NewSaleIdempotencyKey();
     private string _activeCartCreateIdempotencyKey = NewCartIdempotencyKey();
     private decimal _discountAmount;
-    private decimal _taxAmount;
+    private TenantFinanceSettings? _financeSettings;
+    private decimal _taxAmount => _financeSettings?.CalculateTax(Subtotal - _discountAmount) ?? 0;
     private decimal _cashTenderedAmount;
     private PosPaymentMethod _paymentMethod = PosPaymentMethod.CashDrawer;
     private PosSaleReceiptResponse? _lastReceipt;
@@ -593,6 +594,7 @@ else if (!_moduleEnabled)
         _loadError is not null ? "Refresh to finish loading the register." :
         SelectedRegister is null ? "Select a register to start a sale." :
         RegisterCurrency is null ? "The register currency could not be loaded. Refresh to retry." :
+        _financeSettings is null || !_financeSettings.SupportedCurrencyIds.Contains(SelectedRegister.CurrencyId) ? "Configure this currency in Finance settings, then refresh." :
         ActorContext.CredentialId is null || ActorContext.CredentialId == Guid.Empty ? "Sign in again to identify the cashier." :
         !_cart.Any() ? "Add a product to start a sale." : null;
     private string? SaleRequirement => PaymentStageRequirement ?? (
@@ -685,9 +687,13 @@ else if (!_moduleEnabled)
         _loading = true;
         _loadError = null;
         _searchVersion++;
+        var requestedTenantId = TenantFilter.SelectedTenantId;
+        bool IsStale() => _disposed || _reloadRequested || TenantFilter.SelectedTenantId != requestedTenantId;
         try
         {
             await ModuleNavigation.EnsureLoadedAsync();
+            if (IsStale())
+                return;
             if (_loadedTenantId != TenantFilter.SelectedTenantId)
             {
                 ClearCurrentCart();
@@ -708,9 +714,20 @@ else if (!_moduleEnabled)
             _categories = [];
             _currencies = [];
             _suspendedCarts = [];
+            _financeSettings = null;
 
             if (_hasTenant && _moduleEnabled && TenantFilter.SelectedTenantId is Guid tenantId)
             {
+                var finance = await Identity.GetTenantFinanceSettings(new() { Metadata = BuildMetadata() });
+                if (IsStale())
+                    return;
+                if (!finance.IsSuccess || finance.Response is null || !finance.Response.IsUsable ||
+                    finance.Response.TenantId != tenantId)
+                {
+                    _loadError = finance.Response?.ConfigurationError ?? finance.Message ?? "Finance settings could not be loaded.";
+                    return;
+                }
+                _financeSettings = finance.Response.Settings;
                 await SearchRegisterOptions("");
                 await SearchCredentialOptions("");
 
@@ -732,20 +749,22 @@ else if (!_moduleEnabled)
         catch (Exception exception)
         {
             Logger.LogError(exception, "Could not load POS cashier data.");
-            _loadError = "Refresh to retry loading this register and its products.";
+            if (!IsStale())
+                _loadError = "Refresh to retry loading this register and its products.";
         }
         finally
         {
             _loading = false;
             _reloading = false;
             _focusPending = true;
-            if (!_disposed)
+            // Drain tenant changes even when an awaited load failed or returned early.
+            if (_reloadRequested && !_disposed)
+            {
+                _reloadRequested = false;
+                await Reload();
+            }
+            else if (!_disposed)
                 StateHasChanged();
-        }
-        if (_reloadRequested && !_disposed)
-        {
-            _reloadRequested = false;
-            await Reload();
         }
     }
 
@@ -1103,7 +1122,7 @@ else if (!_moduleEnabled)
                     CustomerLabel = _customerLabel,
                     Notes = _cartNotes,
                     DiscountAmount = _discountAmount,
-                    TaxAmount = _taxAmount,
+                    TaxAmount = 0,
                     Suspend = true,
                     IdempotencyKey = _activeCartCreateIdempotencyKey,
                     Lines = BuildCartLineRequests()
@@ -1229,7 +1248,7 @@ else if (!_moduleEnabled)
             CustomerLabel = _customerLabel,
             Notes = _cartNotes,
             DiscountAmount = _discountAmount,
-            TaxAmount = _taxAmount,
+            TaxAmount = 0,
             ExpectedConcurrencyStamp = _activeCartConcurrencyStamp,
             Lines = BuildCartLineRequests()
         });
@@ -1340,7 +1359,7 @@ else if (!_moduleEnabled)
                 CashierCredentialId = cashierCredentialId,
                 CustomerCredentialId = customerCredentialId,
                 DiscountAmount = _discountAmount,
-                TaxAmount = _taxAmount,
+                TaxAmount = 0,
                 IdempotencyKey = _activeSaleIdempotencyKey,
                 Lines = _cart.Select(line => new CheckoutPosSaleLineRequest
                 {
@@ -1448,7 +1467,6 @@ else if (!_moduleEnabled)
         _customerLabel = cart.CustomerLabel ?? "";
         _cartNotes = cart.Notes ?? "";
         _discountAmount = cart.DiscountAmount;
-        _taxAmount = cart.TaxAmount;
         _adjustmentsOpen = _discountAmount != 0 || _taxAmount != 0;
         _cashTenderedAmount = 0;
 
@@ -1482,7 +1500,6 @@ else if (!_moduleEnabled)
         _cartNotes = "";
         _selectedCustomerCredentialId = null;
         _discountAmount = 0;
-        _taxAmount = 0;
         _cashTenderedAmount = 0;
         _activeSaleIdempotencyKey = NewSaleIdempotencyKey();
         _activeCartCreateIdempotencyKey = NewCartIdempotencyKey();

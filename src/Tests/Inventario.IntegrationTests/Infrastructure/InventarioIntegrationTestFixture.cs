@@ -153,6 +153,8 @@ public sealed class InventarioIntegrationTestFixture
         builder.Services.AddSingleton<IDistributedCache>(_ => null!);
         builder.Services.AddSingleton<IConnectionMultiplexer>(_ => null!);
         builder.Services.AddCommunicationsWrapperServices();
+        // This host exercises the Inventario Bolt boundary; Finance is a controlled upstream dependency.
+        builder.Services.AddSingleton(InventarioOnboarding.IntegrationTests.SetupFinanceStub.Create());
         builder.Services.AddTenantResolver();
         builder.Services.AddTenantModuleFeatures();
         builder.Services.AddScoped<ProductService>();

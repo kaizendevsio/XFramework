@@ -123,9 +123,10 @@
     </SidebarSection>
 }
 
-@if (AnyWalletFinanceFeatureEnabled())
+@if (ModuleNavigation.HasConcreteTenant || AnyWalletFinanceFeatureEnabled())
 {
     <SidebarSection GroupId="finance" Title="Finance" Icon="wallet">
+        <SidebarNavItem Href="/finance/settings" Label="Settings" Icon="settings" />
         @if (WalletFeatureEnabled(TenantModuleFeatureKeys.Wallets))
         {
             <SidebarNavItem Href="/finance/wallets" Label="Wallets" Icon="wallet" />

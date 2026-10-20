@@ -135,6 +135,9 @@ Inventario is not the owner of identities, tenant membership, payments, wallet b
 
 ## Testing Expectations
 
+- Setup supports a simple stock area without asking small businesses for warehouse codes. `UseSimpleStorage` reuses enabled storage when possible; it creates only the minimum warehouse/location records required by stock accounting when warehousing is enabled, and never enables features implicitly. Basic and Advanced are setup preferences, not destructive data conversions. Mode changes through `UpdateInventarioPreferences` preserve storage IDs, stock, and setup completion.
+- New-product availability is a tenant default, applied by `ProductService` only when the create request omits an explicit choice. Existing products are never changed by a preferences update. Default storage selections must be tenant-owned, enabled, and a matching warehouse/pickable-location pair.
+
 - Calendar controls produce dates without a timezone. Portal sends these as UTC midnight without shifting the selected day (`InventoryDisplay.CalendarDateUtc`); services normalize incoming timestamps with `InventoryLotService.NormalizeUtc` before PostgreSQL `timestamptz` persistence and date comparisons. Cover purchasing, receiving lot dates, lot maintenance, and reservation expiry with real PostgreSQL wrapper tests.
 - Inventario selects use `InventorySelect` to provide an associated label and human-readable selected text before popup options mount. BlazorBlueprint 3.16 `BbFormFieldSelect` does not forward the required accessible name in this usage.
 - `XfEntityPicker` has one native trigger button; do not nest a button inside `BbPopoverTrigger AsChild="false"`. Preserve disabled state and keyboard focus when changing shared picker markup.

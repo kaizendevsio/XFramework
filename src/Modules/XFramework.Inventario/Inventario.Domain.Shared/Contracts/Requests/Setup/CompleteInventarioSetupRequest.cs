@@ -22,4 +22,7 @@ public partial record CompleteInventarioSetupRequest : RequestBase,
     public CreateInventoryLocationRequest? Location { get; init; }
     public int LowStockThreshold { get; init; } = 5;
     public string DefaultCurrency { get; init; } = "PHP";
+    public bool UseSimpleStorage { get; init; }
+    public string StockAreaName { get; init; } = "My stock";
+    public bool DefaultProductAvailable { get; init; } = true;
 }

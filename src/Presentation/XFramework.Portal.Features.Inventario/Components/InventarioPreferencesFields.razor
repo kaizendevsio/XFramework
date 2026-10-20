@@ -1,0 +1,29 @@
+@if (SupportedCurrencies.Count == 0)
+{
+    <BbAlert><BbAlertTitle>No active currencies</BbAlertTitle><BbAlertDescription>Configure active currencies in <a href="/finance/settings" class="text-primary underline">Finance settings</a>, then reload Inventario.</BbAlertDescription></BbAlert>
+}
+else if (!SupportedCurrencies.Contains(Currency))
+{
+    <BbAlert><BbAlertTitle>Select an active currency</BbAlertTitle><BbAlertDescription>The saved currency is not active in Finance. Select an active currency before saving. Existing prices will not be converted.</BbAlertDescription></BbAlert>
+}
+<div class="preferences-fields">
+    <InventorySelect TValue="string" Value="@Currency" ValueChanged="CurrencyChanged" Label="Default currency">
+        @foreach (var currency in SupportedCurrencies)
+        { <BbSelectItem Value="@currency">@currency</BbSelectItem> }
+    </InventorySelect>
+    <BbFormFieldNumericInput TValue="int" Value="Threshold" ValueChanged="ThresholdChanged" Min="0" AllowNegative="false" DisableDebounce="true" Label="Low stock threshold" />
+    <div class="preferences-availability">
+        <BbFormFieldSwitch Checked="DefaultProductAvailable" CheckedChanged="DefaultProductAvailableChanged" Label="Enable new products in catalog" />
+    </div>
+</div>
+<BbTypographyMuted>Currency changes do not convert existing prices. Product defaults apply to new products only.</BbTypographyMuted>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<string> SupportedCurrencies { get; set; } = [];
+    [Parameter] public string Currency { get; set; } = "PHP";
+    [Parameter] public EventCallback<string> CurrencyChanged { get; set; }
+    [Parameter] public int Threshold { get; set; }
+    [Parameter] public EventCallback<int> ThresholdChanged { get; set; }
+    [Parameter] public bool DefaultProductAvailable { get; set; } = true;
+    [Parameter] public EventCallback<bool> DefaultProductAvailableChanged { get; set; }
+}

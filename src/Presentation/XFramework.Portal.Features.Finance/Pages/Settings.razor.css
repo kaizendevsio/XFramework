@@ -1,0 +1,34 @@
+.finance-settings-page {
+    width: 100%;
+    max-width: 800px;
+    display: grid;
+    gap: 1.25rem;
+}
+
+.finance-settings-section {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.finance-settings-section > div {
+    display: grid;
+    gap: .4rem;
+    min-width: 0;
+}
+
+.finance-settings-section > label {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+.finance-currency-field {
+    width: 100%;
+    max-width: 28rem;
+}
+
+.finance-tax-rate {
+    width: 10rem;
+    max-width: 100%;
+}

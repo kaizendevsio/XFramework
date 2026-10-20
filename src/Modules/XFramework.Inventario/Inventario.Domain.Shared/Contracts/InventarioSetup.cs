@@ -13,4 +13,5 @@ public sealed class InventarioSetup : BaseModel
     public string DefaultCurrency { get; set; } = "PHP";
     public Guid? CompletionRequestId { get; set; }
     public string? CompletionHash { get; set; }
+    public bool DefaultProductAvailable { get; set; } = true;
 }

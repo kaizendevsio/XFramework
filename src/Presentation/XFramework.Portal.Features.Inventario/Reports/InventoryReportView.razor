@@ -1,6 +1,16 @@
 @using XFramework.Inventario.Domain.Shared.Contracts.Responses.Reports
 
 <div class="inventory-report-view">
+    <BbTabs Value="@View" ValueChanged="@ViewChanged" Class="report-tabs">
+        <BbTabsList aria-label="Report sections">
+            <BbTabsTrigger Value="summary">Summary</BbTabsTrigger>
+            <BbTabsTrigger Value="positions">Stock positions</BbTabsTrigger>
+            <BbTabsTrigger Value="movements">Movements</BbTabsTrigger>
+            <BbTabsTrigger Value="expiry">Expiry risks</BbTabsTrigger>
+        </BbTabsList>
+        @if (View == "summary")
+        {
+        <BbTabsContent Value="summary">
     <div class="xf-summary-grid xf-summary-grid-3" aria-label="Stock summary">
         <div><span>On hand</span><strong>@Snapshot.OnHand.ToString("N2")</strong></div>
         <div><span>Reserved</span><strong>@Snapshot.Reserved.ToString("N2")</strong></div>
@@ -9,28 +19,60 @@
     <div class="report-charts">
         <section aria-label="Current stock quantities">
             <h4>Current stock quantities</h4>
-            <BbBarChart @key="Snapshot.GeneratedAtUtc" Data="@StockChart" Height="260px">
-                <BbXAxis DataKey="Label" /><BbYAxis /><BbChartTooltip />
-                <BbBar DataKey="Value" Name="Quantity" Color="#16845b" />
-            </BbBarChart>
+            @if (Snapshot.Available < 0 || Snapshot.Reserved < 0)
+            {
+                <BbEmpty Title="Stock split unavailable" Description="Negative balances cannot be represented as proportions." />
+            }
+            else if (Snapshot.Available + Snapshot.Reserved == 0)
+            {
+                <BbEmpty Title="No stock quantities" />
+            }
+            else
+            {
+                <BbPieChart @key="Snapshot.GeneratedAtUtc" Data="@StockChart" Height="220px">
+                    <BbPie DataKey="Value" NameKey="Label" InnerRadius="40" OuterRadius="80" />
+                    <BbChartTooltip /><BbChartLegend />
+                </BbPieChart>
+            }
         </section>
         <section aria-label="Movement quantities in selected period">
             <h4>Movement quantities in selected period</h4>
-            <BbBarChart @key="Snapshot.GeneratedAtUtc" Data="@MovementChart" Height="260px">
-                <BbXAxis DataKey="Label" /><BbYAxis /><BbChartTooltip />
-                <BbBar DataKey="Value" Name="Quantity" Color="#ca4969" />
-            </BbBarChart>
+            @if (Snapshot.Inbound + Snapshot.Outbound == 0)
+            {
+                <BbEmpty Title="No stock movements" />
+            }
+            else
+            {
+                <BbPieChart @key="Snapshot.GeneratedAtUtc" Data="@MovementChart" Height="220px">
+                    <BbPie DataKey="Value" NameKey="Label" InnerRadius="40" OuterRadius="80" />
+                    <BbChartTooltip /><BbChartLegend />
+                </BbPieChart>
+            }
         </section>
     </div>
-    <BbTabs DefaultValue="positions" Class="report-tabs">
-        <BbTabsList>
-            <BbTabsTrigger Value="positions">Stock positions</BbTabsTrigger>
-            <BbTabsTrigger Value="movements">Movements</BbTabsTrigger>
-            <BbTabsTrigger Value="expiry">Expiry risks</BbTabsTrigger>
-        </BbTabsList>
+    <section class="movement-timeline" aria-label="Daily stock movement quantities">
+        <h4>Daily stock movements (UTC)</h4>
+        @if (Snapshot.MovementTimeline.Count == 0)
+        {
+            <BbEmpty Title="No stock movements in this period" />
+        }
+        else
+        {
+            <BbLineChart @key="Snapshot.GeneratedAtUtc" Data="@TimelineChart" Height="210px">
+                <BbXAxis DataKey="Date" BoundaryGap="true" /><BbYAxis /><BbChartTooltip /><BbChartLegend />
+                <BbLine DataKey="Inbound" Name="Inbound" Color="#16845b" ShowDots="true" />
+                <BbLine DataKey="Outbound" Name="Outbound" Color="#ca4969" ShowDots="true" />
+            </BbLineChart>
+        }
+    </section>
+        </BbTabsContent>
+        }
+        else if (View == "positions")
+        {
         <BbTabsContent Value="positions">
-            <p>@Snapshot.Positions.Count of @Snapshot.PositionCount positions. Current stock, not historical balances.</p>
-            <BbDataGrid Items="@Snapshot.Positions" ShowPagination="true" InitialPageSize="20">
+            <p>@Snapshot.Positions.Count of @Snapshot.PositionCount current positions@(Snapshot.PositionCount > Snapshot.Positions.Count ? " (detail limit: 1,000)" : "")</p>
+            <div class="report-grid">
+            <BbDataGrid Items="@Snapshot.Positions" ShowPagination="true" InitialPageSize="10" PageSizes="@PageSizes">
                 <Columns>
                     <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
                     <BbDataGridPropertyColumn Property="@(x => x.ProductVariationName)" Title="Variant" Filterable="true" />
@@ -43,10 +85,15 @@
                 </Columns>
                 <EmptyTemplate><BbEmpty Title="No stock positions" Description="No positions match this scope." /></EmptyTemplate>
             </BbDataGrid>
+            </div>
         </BbTabsContent>
+        }
+        else if (View == "movements")
+        {
         <BbTabsContent Value="movements">
-            <p>@Snapshot.Movements.Count of @Snapshot.MovementCount movements. Inbound @Snapshot.Inbound.ToString("N2") / outbound @Snapshot.Outbound.ToString("N2").</p>
-            <BbDataGrid Items="@Snapshot.Movements" ShowPagination="true" InitialPageSize="20">
+            <p>@Snapshot.Movements.Count of @Snapshot.MovementCount movements@(Snapshot.MovementCount > Snapshot.Movements.Count ? " (detail limit: 1,000)" : "")</p>
+            <div class="report-grid">
+            <BbDataGrid Items="@Snapshot.Movements" ShowPagination="true" InitialPageSize="10" PageSizes="@PageSizes">
                 <Columns>
                     <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Date (UTC)" Format="yyyy-MM-dd HH:mm" Sortable="true" Filterable="true" />
                     <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
@@ -58,7 +105,11 @@
                 </Columns>
                 <EmptyTemplate><BbEmpty Title="No movements" Description="No movements match this date range and scope." /></EmptyTemplate>
             </BbDataGrid>
+            </div>
         </BbTabsContent>
+        }
+        else if (View == "expiry")
+        {
         <BbTabsContent Value="expiry">
             @if (!Snapshot.ExpiryEnabled)
             {
@@ -66,16 +117,36 @@
             }
             else
             {
-                <InventoryExpiryReport Heading="Near expiry" Rows="@Snapshot.NearExpiry" />
-                <InventoryExpiryReport Heading="Expired stock" Rows="@Snapshot.Expired" />
+                <BbTabs @bind-Value="_expiryView">
+                    <BbTabsList aria-label="Expiry status">
+                        <BbTabsTrigger Value="near">Near expiry (@Snapshot.NearExpiry.Count)</BbTabsTrigger>
+                        <BbTabsTrigger Value="expired">Expired stock (@Snapshot.Expired.Count)</BbTabsTrigger>
+                    </BbTabsList>
+                    @if (_expiryView == "near")
+                    {
+                        <BbTabsContent Value="near"><InventoryExpiryReport Heading="Near expiry" Rows="@Snapshot.NearExpiry" /></BbTabsContent>
+                    }
+                    else
+                    {
+                        <BbTabsContent Value="expired"><InventoryExpiryReport Heading="Expired stock" Rows="@Snapshot.Expired" /></BbTabsContent>
+                    }
+                </BbTabs>
             }
         </BbTabsContent>
+        }
     </BbTabs>
 </div>
 
 @code {
     [Parameter, EditorRequired] public InventoryReportSnapshot Snapshot { get; set; } = default!;
-    private object[] StockChart => [new { Label = "On hand", Value = Snapshot.OnHand },
-        new { Label = "Reserved", Value = Snapshot.Reserved }, new { Label = "Available", Value = Snapshot.Available }];
+    [Parameter] public string View { get; set; } = "summary";
+    [Parameter] public EventCallback<string> ViewChanged { get; set; }
+    private static readonly int[] PageSizes = [10, 20, 50];
+    private string _expiryView = "near";
+    private object[] StockChart => [new { Label = "Available", Value = Snapshot.Available }, new { Label = "Reserved", Value = Snapshot.Reserved }];
     private object[] MovementChart => [new { Label = "Inbound", Value = Snapshot.Inbound }, new { Label = "Outbound", Value = Snapshot.Outbound }];
+    private object[] TimelineChart => Snapshot.MovementTimeline.Select(x => (object)new
+    {
+        Date = x.DateUtc.ToString("yyyy-MM-dd"), x.Inbound, x.Outbound
+    }).ToArray();
 }

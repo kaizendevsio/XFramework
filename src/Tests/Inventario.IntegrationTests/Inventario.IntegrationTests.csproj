@@ -15,6 +15,7 @@
         <PackageReference Include="NUnit3TestAdapter" />
         <PackageReference Include="coverlet.collector" />
         <PackageReference Include="FluentAssertions" />
+        <PackageReference Include="Moq" />
         <PackageReference Include="Testcontainers.PostgreSql" />
         <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     </ItemGroup>

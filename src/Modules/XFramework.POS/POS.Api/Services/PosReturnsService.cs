@@ -118,9 +118,7 @@ public sealed class PosReturnsService(
         posReturn.TotalRefundAmount = posReturn.Lines.Sum(line => line.RefundAmount);
         posReturn.SubtotalAmount = posReturn.TotalRefundAmount - posReturn.TaxAmount;
 
-        var capturedAmount = sale.Payments
-            .Where(payment => payment.Status == PosPaymentStatus.Captured)
-            .Sum(payment => payment.Amount);
+        var capturedAmount = capturedPayment.Amount;
         var saleLineIds = sale.Lines.Select(line => line.Id).ToList();
         var previouslyAllocatedRefund = await db.Set<PosReturnLine>()
             .AsNoTracking()
@@ -462,6 +460,10 @@ public sealed class PosReturnsService(
         PosPayment capturedPayment,
         RequestMetadata metadata)
     {
+        // Free lines still return inventory, but must not create a zero-value financial movement.
+        if (posReturn.TotalRefundAmount == 0)
+            return Result.Success();
+
         var reference = PosServiceHelpers.NormalizeOptional(posReturn.RefundReferenceNumber)
             ?? PosServiceHelpers.ReturnRefundReference(posReturn);
         posReturn.RefundReferenceNumber = reference;

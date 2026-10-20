@@ -16,7 +16,8 @@ public sealed class PosCartService(
     IInventarioServiceWrapper inventario,
     PosSalesService salesService,
     IPosRequestContextResolver contextResolver,
-    ILogger<PosCartService> logger)
+    ILogger<PosCartService> logger,
+    PosFinanceSettings financeSettings)
 {
     private static readonly TimeSpan CartTtl = TimeSpan.FromHours(24);
 
@@ -29,6 +30,9 @@ public sealed class PosCartService(
             return Result<PosCartResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
 
         var tenantId = contextResult.Data!.TenantId;
+
+        if (request.TaxAmount != 0 || request.Lines.Any(line => line.TaxAmount != 0))
+            return Result<PosCartResponse>.Failure("Tax is calculated from tenant Finance settings and cannot be supplied", 400);
 
         var idempotencyKey = PosServiceHelpers.NormalizeOptional(request.IdempotencyKey) ?? string.Empty;
         var requestHash = PosServiceHelpers.BuildCartRequestHash(request);
@@ -48,6 +52,9 @@ public sealed class PosCartService(
         if (register is null)
             return Result<PosCartResponse>.NotFound("POS register was not found");
 
+        if (request.CurrencyId.HasValue && request.CurrencyId.Value != register.CurrencyId)
+            return Result<PosCartResponse>.Conflict("Cart currency must match the register currency");
+
         var now = DateTime.UtcNow;
         var cart = new PosCart
         {
@@ -65,7 +72,7 @@ public sealed class PosCartService(
             WalletTypeId = request.WalletTypeId ?? register.WalletTypeId,
             Status = request.Suspend ? PosCartStatus.Suspended : PosCartStatus.Open,
             DiscountAmount = request.DiscountAmount,
-            TaxAmount = request.TaxAmount,
+            TaxAmount = 0,
             IdempotencyKey = idempotencyKey,
             RequestHash = requestHash,
             SuspendedAt = request.Suspend ? now : null,
@@ -90,7 +97,7 @@ public sealed class PosCartService(
             return Result<PosCartResponse>.Failure(lineResult.Message!, lineResult.StatusCode);
 
         cart.Lines = lineResult.Data!;
-        var totalsResult = ApplyTotals(cart);
+        var totalsResult = await ApplyTotalsAsync(cart, contextResult.Data.Metadata, ct);
         if (!totalsResult.IsSuccess)
             return Result<PosCartResponse>.Failure(totalsResult.Message!, totalsResult.StatusCode);
 
@@ -127,6 +134,9 @@ public sealed class PosCartService(
 
         var tenantId = contextResult.Data!.TenantId;
 
+        if (request.TaxAmount != 0 || request.Lines.Any(line => line.TaxAmount != 0))
+            return Result<PosCartResponse>.Failure("Tax is calculated from tenant Finance settings and cannot be supplied", 400);
+
         await ExpireDueCartsAsync(tenantId, ct);
         var cart = await LoadCartAsync(tenantId, request.Id, tracking: true, ct);
         if (cart is null)
@@ -144,6 +154,9 @@ public sealed class PosCartService(
         if (register is null)
             return Result<PosCartResponse>.NotFound("POS register was not found");
 
+        if (request.CurrencyId.HasValue && request.CurrencyId.Value != register.CurrencyId)
+            return Result<PosCartResponse>.Conflict("Cart currency must match the register currency");
+
         cart.CustomerCredentialId = request.CustomerCredentialId;
         cart.CustomerLabel = PosServiceHelpers.NormalizeOptional(request.CustomerLabel);
         cart.Notes = PosServiceHelpers.NormalizeOptional(request.Notes);
@@ -152,7 +165,7 @@ public sealed class PosCartService(
         cart.CurrencyId = request.CurrencyId ?? cart.CurrencyId;
         cart.WalletTypeId = request.WalletTypeId ?? cart.WalletTypeId;
         cart.DiscountAmount = request.DiscountAmount;
-        cart.TaxAmount = request.TaxAmount;
+        cart.TaxAmount = 0;
         cart.ModifiedAt = DateTime.UtcNow;
         cart.ConcurrencyStamp = Guid.NewGuid();
 
@@ -171,7 +184,7 @@ public sealed class PosCartService(
 
         var activeLines = SynchronizeCartLines(cart, lineResult.Data!);
 
-        var totalsResult = ApplyTotals(cart, activeLines);
+        var totalsResult = await ApplyTotalsAsync(cart, contextResult.Data.Metadata, ct, activeLines);
         if (!totalsResult.IsSuccess)
             return Result<PosCartResponse>.Failure(totalsResult.Message!, totalsResult.StatusCode);
 
@@ -439,7 +452,7 @@ public sealed class PosCartService(
                 return Result<List<PosCartLine>>.Conflict("Catalog price changed before cart save");
 
             var expectedPrice = requestLine.ExpectedUnitPrice ?? currentPrice;
-            var lineTotal = requestLine.Quantity * currentPrice - requestLine.DiscountAmount + requestLine.TaxAmount;
+            var lineTotal = requestLine.Quantity * currentPrice - requestLine.DiscountAmount;
             if (lineTotal < 0)
                 return Result<List<PosCartLine>>.Failure("Line total cannot be negative", 400);
 
@@ -458,7 +471,7 @@ public sealed class PosCartService(
                 UnitPrice = currentPrice,
                 ExpectedUnitPrice = expectedPrice,
                 DiscountAmount = requestLine.DiscountAmount,
-                TaxAmount = requestLine.TaxAmount,
+                TaxAmount = 0,
                 LineTotal = lineTotal,
                 WarehouseId = requestLine.WarehouseId ?? defaultWarehouseId,
                 LocationId = requestLine.LocationId ?? defaultLocationId,
@@ -545,7 +558,7 @@ public sealed class PosCartService(
             CurrencyId = cart.CurrencyId,
             WalletTypeId = cart.WalletTypeId,
             DiscountAmount = cart.DiscountAmount,
-            TaxAmount = cart.TaxAmount,
+            TaxAmount = 0,
             IdempotencyKey = PosServiceHelpers.NormalizeOptional(request.IdempotencyKey) ?? $"POS.CartCheckout.{cart.Id:N}",
             Lines = cart.Lines
                 .OrderBy(line => line.LineNumber)
@@ -556,7 +569,7 @@ public sealed class PosCartService(
                     Quantity = line.Quantity,
                     ExpectedUnitPrice = line.ExpectedUnitPrice,
                     DiscountAmount = line.DiscountAmount,
-                    TaxAmount = line.TaxAmount,
+                    TaxAmount = 0,
                     WarehouseId = line.WarehouseId,
                     LocationId = line.LocationId,
                     LotId = line.LotId
@@ -565,7 +578,7 @@ public sealed class PosCartService(
             Payment = new CheckoutPosPaymentRequest
             {
                 Method = request.Payment.Method,
-                Amount = cart.TotalAmount,
+                Amount = request.Payment.Amount,
                 CustomerCredentialId = customerCredentialId,
                 CashTenderedAmount = request.Payment.CashTenderedAmount
             }
@@ -700,13 +713,21 @@ public sealed class PosCartService(
         return active;
     }
 
-    private static Result ApplyTotals(
+    private async Task<Result> ApplyTotalsAsync(
         PosCart cart,
+        RequestMetadata metadata,
+        CancellationToken ct,
         IEnumerable<PosCartLine>? activeLines = null)
     {
         var lines = activeLines ?? cart.Lines;
         cart.SubtotalAmount = lines.Sum(line => line.Quantity * line.UnitPrice);
-        cart.TotalAmount = lines.Sum(line => line.LineTotal) - cart.DiscountAmount + cart.TaxAmount;
+        var taxableSubtotal = lines.Sum(line => line.LineTotal) - cart.DiscountAmount;
+        if (taxableSubtotal < 0)
+            return Result.Failure("Cart discounts cannot exceed the subtotal", 400);
+        var settings = await financeSettings.GetAsync(metadata, cart.TenantId, cart.CurrencyId, ct);
+        if (!settings.IsSuccess) return Result.Failure(settings.Message!, settings.StatusCode);
+        cart.TaxAmount = settings.Data!.CalculateTax(taxableSubtotal);
+        cart.TotalAmount = taxableSubtotal + cart.TaxAmount;
 
         return cart.TotalAmount < 0
             ? Result.Failure("Cart total cannot be negative", 400)

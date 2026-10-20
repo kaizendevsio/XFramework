@@ -120,7 +120,8 @@ public class ProductService
                 Brand = request.Brand,
                 Weight = request.Weight,
                 Image = request.Image,
-                IsAvailable = request.IsAvailable ?? true
+                IsAvailable = request.IsAvailable ?? (await _dataContext.Query<InventarioSetup>()
+                    .Where(x => x.TenantId == tenantId).FirstOrDefaultAsync(ct))?.DefaultProductAvailable ?? true
             };
 
             _dataContext.Add(product);

@@ -399,10 +399,16 @@ else
 
     private async Task OpenReceiveDialog()
     {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
         await FocusJs.InvokeVoidAsync("inventarioFocus.capture", "receiving");
+        XFramework.Inventario.Domain.Shared.Contracts.Responses.InventarioSetupResponse preferences;
+        try { preferences = await InventoryDisplay.PreferencesAsync(Inventario, tenantId); }
+        catch { ToastService.Show("Could not load stock defaults. Try again."); return; }
+        if (TenantFilter.SelectedTenantId != tenantId) return;
         _receiveError = null;
-        var warehouseId = _warehouses.FirstOrDefault()?.Id;
-        _form.Reset(warehouseId?.ToString() ?? "", _locations.FirstOrDefault(x => x.WarehouseId == warehouseId)?.Id.ToString() ?? "", "");
+        var warehouseId = (_warehouses.FirstOrDefault(x => x.IsEnabled && x.Id == preferences.WarehouseId) ?? _warehouses.FirstOrDefault(x => x.IsEnabled))?.Id;
+        var location = _locations.FirstOrDefault(x => x.IsEnabled && x.WarehouseId == warehouseId && x.Id == preferences.LocationId) ?? _locations.FirstOrDefault(x => x.IsEnabled && x.WarehouseId == warehouseId);
+        _form.Reset(warehouseId?.ToString() ?? "", location?.Id.ToString() ?? "", "");
         _receiveDialogOpen = true;
     }
 

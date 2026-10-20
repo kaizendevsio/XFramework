@@ -19,7 +19,8 @@ public sealed class InventoryReportScopeTests
             ProductId = Guid.NewGuid(), WarehouseId = Guid.NewGuid(), LocationId = Guid.NewGuid(), DaysAhead = 17
         };
         var navigation = new TestNavigation("https://portal.example/inventario/reports?token=do-not-share");
-        var uri = scope.ShareUri(navigation);
+        var uri = scope.ShareUri(navigation, "movements");
+        uri.Should().Contain("view=movements");
         InventoryReportScope.Parse(uri, selectedTenant).Should().Be(scope);
         uri.Should().NotContain("token").And.NotContain("bearer");
         scope.Request().Metadata.RequestedTenantId.Should().Be(tenant);
@@ -52,7 +53,8 @@ public sealed class InventoryReportScopeTests
         export.GeneratedAt.Should().Be(now);
         export.TenantLabel.Should().Be("Test tenant");
         export.Charts.Should().HaveCount(2);
-        export.Charts[0].Values.Should().Equal(20, 5, 15);
+        export.Charts[0].Labels.Should().Equal("Available", "Reserved");
+        export.Charts[0].Values.Should().Equal(15, 5);
         export.Charts[1].Values.Should().Equal(30, 10);
         export.Sections[1].Heading.Should().Contain("0 of 1200");
         export.Sections.SelectMany(x => x.Rows).Should().OnlyContain(x => x.All(cell => cell != null));

@@ -55,7 +55,14 @@ public sealed class FinancialReportsE2ETests : PageTest
         builder.Services.AddRazorComponents().AddInteractiveServerComponents(x => {
             x.DetailedErrors = true; x.DisconnectedCircuitRetentionPeriod = TimeSpan.Zero;
         });
-        builder.Services.AddBlazorBlueprintComponents();
+        builder.Services.AddBlazorBlueprintComponents(configureTheme: theme =>
+        {
+            theme.DefaultBaseColor = BaseColor.Slate;
+            theme.DefaultPrimaryColor = PrimaryColor.Blue;
+            theme.DefaultRadius = 0.5;
+            theme.DefaultDarkMode = false;
+            theme.DetectSystemPreference = false;
+        });
         builder.Services.AddScoped<XfPortalService>();
         builder.Services.Replace(ServiceDescriptor.Scoped<IPortalService>(sp => sp.GetRequiredService<XfPortalService>()));
         builder.Services.AddSingleton(Mock.Of<IPortalTenantContext>(x => x.SelectedTenantId == tenantId && x.SelectedTenantName == "Report fixture"));
@@ -104,7 +111,14 @@ public sealed class FinancialReportsE2ETests : PageTest
         var response = await Page.GotoAsync(app.Urls.Single() + $"/finance/reports?tenant={tenantId}&from=2026-09-01&through=2026-09-07");
         response!.Status.Should().Be(200, await Page.ContentAsync());
         (await Page.APIRequest.GetAsync(app.Urls.Single() + "/XFramework.Portal.styles.css")).Status.Should().Be(200);
+        (await Page.APIRequest.GetAsync(app.Urls.Single() + "/portal-assets/css/utilities.css")).Status.Should().Be(200);
+        await Expect(Page.Locator("link[href='portal-assets/css/app.css'] + link[href='portal-assets/css/utilities.css']"))
+            .ToHaveCountAsync(1);
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Daily activity - EUR" })).ToBeVisibleAsync();
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-base-color", "slate");
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-primary-color", "blue");
+        await Expect(Page.Locator("html")).ToHaveCSSAsync("--radius", "0.5rem");
+        (await Page.EvaluateAsync<bool>("() => document.documentElement.classList.contains('dark')")).Should().BeFalse();
         latest!.Metadata.RequestedTenantId.Should().Be(tenantId);
         latest.From.Should().Be(new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc));
         latest.ToExclusive.Should().Be(new DateTime(2026, 9, 8, 0, 0, 0, DateTimeKind.Utc));
@@ -304,7 +318,7 @@ public sealed class FinancialReportFixtureRoot : ComponentBase
 {
     protected override void BuildRenderTree(RenderTreeBuilder b)
     {
-        b.AddMarkupContent(0, "<!doctype html><html data-base-color='zinc' data-primary-color='blue' style='--radius:.5rem'><head><base href='/'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/css/themes.css'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/blazorblueprint.css'><link rel='stylesheet' href='portal-assets/css/app.css'><link rel='stylesheet' href='XFramework.Portal.styles.css'><style>body{padding:16px;margin:0;font-family:Arial}</style></head><body>");
+        b.AddMarkupContent(0, "<!doctype html><html data-base-color='zinc' data-primary-color='blue' style='--radius:.5rem'><head><base href='/'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/css/themes.css'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/blazorblueprint.css'><link rel='stylesheet' href='portal-assets/css/app.css'><link rel='stylesheet' href='portal-assets/css/utilities.css'><link rel='stylesheet' href='XFramework.Portal.styles.css'><style>body{padding:16px;margin:0;font-family:Arial}</style></head><body>");
         b.OpenComponent<FinancialReportFixtureSurface>(1); b.AddComponentRenderMode(new InteractiveServerRenderMode(prerender: false)); b.CloseComponent();
         b.AddMarkupContent(2, "<script src='_framework/blazor.web.js'></script></body></html>");
     }
@@ -313,7 +327,12 @@ public sealed class FinancialReportFixtureRoot : ComponentBase
 public sealed class FinancialReportFixtureSurface : ComponentBase
 {
     [Inject] public NavigationManager Navigation { get; set; } = null!;
+    [Inject] public ThemeService Theme { get; set; } = null!;
     private bool showReport = true;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Theme.InitializeAsync();
+    }
     protected override void BuildRenderTree(RenderTreeBuilder b)
     {
         if (showReport)

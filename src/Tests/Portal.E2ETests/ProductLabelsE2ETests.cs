@@ -39,7 +39,14 @@ public sealed class ProductLabelsE2ETests : PageTest
         StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Services.AddRazorComponents().AddInteractiveServerComponents(x => x.DetailedErrors = true);
-        builder.Services.AddBlazorBlueprintComponents();
+        builder.Services.AddBlazorBlueprintComponents(configureTheme: options =>
+        {
+            options.DefaultBaseColor = BaseColor.Slate;
+            options.DefaultPrimaryColor = PrimaryColor.Blue;
+            options.DefaultDarkMode = false;
+            options.DefaultRadius = 0.5;
+            options.PersistToLocalStorage = true;
+        });
         builder.Services.AddScoped<XfPortalService>();
         builder.Services.Replace(ServiceDescriptor.Scoped<IPortalService>(sp => sp.GetRequiredService<XfPortalService>()));
         app = builder.Build();
@@ -59,14 +66,34 @@ public sealed class ProductLabelsE2ETests : PageTest
             TestContext.Progress.WriteLine(await Page.Locator("body").InnerTextAsync());
     }
 
-    [TestCase(390,844)]
-    [TestCase(1920,1080)]
-    public async Task Labels_SelectPreviewDecode_DownloadAndPrintPdf(int width, int height)
+    [TestCase(390,844,false)]
+    [TestCase(1920,1080,false)]
+    [TestCase(390,844,true)]
+    [TestCase(1920,1080,true)]
+    public async Task Labels_SelectPreviewDecode_DownloadAndPrintPdf(int width, int height, bool dark)
     {
         await Page.SetViewportSizeAsync(width, height);
+        await Page.AddInitScriptAsync($"localStorage.setItem('bb-theme', JSON.stringify({{ baseColor: 'slate', primaryColor: 'blue', radius: 0.5, isDarkMode: {dark.ToString().ToLowerInvariant()} }}));");
         await Page.GotoAsync(app.Urls.Single() + "/product-labels-fixture");
+        (await Page.APIRequest.GetAsync(app.Urls.Single() + "/css/utilities.css")).Status.Should().Be(200);
         await Page.GetByRole(AriaRole.Button, new() { Name = "Print labels", Exact = true }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Dialog)).ToBeVisibleAsync();
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-base-color", "slate");
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-primary-color", "blue");
+        await Expect(Page.Locator("html")).ToHaveCSSAsync("--radius", "0.5rem");
+        (await Page.EvaluateAsync<bool>("() => document.documentElement.classList.contains('dark')")).Should().Be(dark);
+        var brightness = await Page.GetByRole(AriaRole.Dialog).EvaluateAsync<double>("""
+            element => {
+                const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = 'white'; ctx.fillRect(0, 0, 1, 1);
+                ctx.fillStyle = getComputedStyle(element).backgroundColor; ctx.fillRect(0, 0, 1, 1);
+                const [r,g,b] = ctx.getImageData(0, 0, 1, 1).data;
+                return (r+g+b)/765;
+            }
+            """);
+        if (dark) brightness.Should().BeLessThan(.25, "the dialog must actually render dark");
+        else brightness.Should().BeGreaterThan(.75, "the dialog must actually render light");
         await Expect(Page.GetByText("Products without a valid SKU cannot be printed.", new() { Exact = false })).ToBeVisibleAsync();
         var downloadButton = Page.GetByRole(AriaRole.Button, new() { Name = "Download PDF", Exact = true });
         await Expect(downloadButton).ToBeDisabledAsync();
@@ -84,7 +111,7 @@ public sealed class ProductLabelsE2ETests : PageTest
         decoded.Should().Be("COFFEE-001");
         var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, "artifacts", "product-labels");
         Directory.CreateDirectory(directory);
-        await Page.ScreenshotAsync(new() { Path = Path.Combine(directory, $"labels-{width}.png"), FullPage = true });
+        await Page.ScreenshotAsync(new() { Path = Path.Combine(directory, $"labels-{width}-{(dark ? "dark" : "light")}.png"), FullPage = true });
         (await Page.GetByRole(AriaRole.Dialog).EvaluateAsync<bool>("e => { const r=e.getBoundingClientRect();return r.left>=0 && r.right<=innerWidth; }")).Should().BeTrue();
         var download = await Page.RunAndWaitForDownloadAsync(() => downloadButton.ClickAsync());
         download.SuggestedFilename.Should().Be("Product-QR-labels.pdf");
@@ -141,7 +168,7 @@ public sealed class ProductLabelsFixtureRoot : ComponentBase
 {
     protected override void BuildRenderTree(RenderTreeBuilder b)
     {
-        b.AddMarkupContent(0,"<!doctype html><html data-base-color='zinc'><head><base href='/'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/css/themes.css'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/blazorblueprint.css'><link rel='stylesheet' href='XFramework.Portal.styles.css'><link rel='stylesheet' href='css/app.css'></head><body>");
+        b.AddMarkupContent(0,"<!doctype html><html data-base-color='zinc'><head><base href='/'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/css/themes.css'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/blazorblueprint.css'><link rel='stylesheet' href='css/app.css'><link rel='stylesheet' href='css/utilities.css'><link rel='stylesheet' href='XFramework.Portal.styles.css'></head><body>");
         b.OpenComponent<ProductLabelsFixtureSurface>(1); b.AddComponentRenderMode(new InteractiveServerRenderMode(prerender:false)); b.CloseComponent();
         b.AddMarkupContent(2,"<script src='_framework/blazor.web.js'></script></body></html>");
     }
@@ -149,9 +176,14 @@ public sealed class ProductLabelsFixtureRoot : ComponentBase
 
 public sealed class ProductLabelsFixtureSurface : ComponentBase
 {
+    [Inject] public ThemeService Theme { get; set; } = null!;
     private readonly Guid tenantId = Guid.NewGuid();
     private List<Product> products = [];
     private bool open;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Theme.InitializeAsync();
+    }
     protected override void OnInitialized() => products = [new() { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Coffee beans", SKU = "COFFEE-001" }, new() { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Missing SKU" }];
     protected override void BuildRenderTree(RenderTreeBuilder b)
     {

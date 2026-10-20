@@ -92,8 +92,8 @@
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.3.0" />
 
     <!-- Blazor & UI Components -->
-    <PackageVersion Include="BlazorBlueprint.Components" Version="3.16.0" />
-    <PackageVersion Include="BlazorBlueprint.Primitives" Version="3.16.0" />
+    <PackageVersion Include="BlazorBlueprint.Components" Version="4.1.0" />
+    <PackageVersion Include="BlazorBlueprint.Primitives" Version="4.1.0" />
     <PackageVersion Include="BlazorBlueprint.Icons.Lucide" Version="2.0.2" />
     <PackageVersion Include="HtmlSanitizer" Version="9.2.1039" />
     <PackageVersion Include="Blazored.LocalStorage" Version="4.5.0" />

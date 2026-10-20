@@ -102,8 +102,29 @@ public sealed class InventarioSetupValidationTests
             .Should().BeOfType<UpdateInventarioPreferencesValidator>();
     }
 
+    [Test]
+    public async Task Complete_SimpleStorageRejectsMixedExplicitStorageAndBlankName()
+    {
+        var validator = new CompleteInventarioSetupValidator();
+        var request = new CompleteInventarioSetupRequest { CompletionRequestId = Guid.NewGuid(), UseSimpleStorage = true, StockAreaName = "Home stock" };
+        (await validator.ValidateAsync(request)).IsValid.Should().BeTrue();
+        (await validator.ValidateAsync(request with { ExistingWarehouseId = Guid.NewGuid() })).IsValid.Should().BeFalse();
+        (await validator.ValidateAsync(request with { Warehouse = new() { Code = "X", Name = "X" } })).IsValid.Should().BeFalse();
+        (await validator.ValidateAsync(request with { StockAreaName = " " })).IsValid.Should().BeFalse();
+    }
+
+    [Test]
+    public async Task Preferences_RequiresMatchingStockDefaultsAndDefinedMode()
+    {
+        var validator = new UpdateInventarioPreferencesValidator();
+        (await validator.ValidateAsync(new UpdateInventarioPreferencesRequest { Mode = (InventarioSetupMode)99 })).IsValid.Should().BeFalse();
+        (await validator.ValidateAsync(new UpdateInventarioPreferencesRequest { WarehouseId = Guid.NewGuid() })).IsValid.Should().BeFalse();
+        (await validator.ValidateAsync(new UpdateInventarioPreferencesRequest { LocationId = Guid.NewGuid() })).IsValid.Should().BeFalse();
+        (await validator.ValidateAsync(new UpdateInventarioPreferencesRequest { Mode = InventarioSetupMode.Basic })).IsValid.Should().BeTrue();
+    }
+
     private static InventarioSetupService Service(DbContext db, bool manager = true) =>
-        new(db, new Invocation(manager), new EnabledFeatures(), NullLogger<InventarioSetupService>.Instance);
+        new(db, new Invocation(manager), new EnabledFeatures(), NullLogger<InventarioSetupService>.Instance, SetupFinanceStub.Create());
 
     private sealed class Invocation(bool manager) : ITrustedInvocationContextAccessor
     {

@@ -138,6 +138,7 @@ public partial record PosSaleReceiptResponse
 [MemoryPackable]
 public partial record PosSaleLineResponse
 {
+    public decimal RefundAmount { get; init; }
     public Guid Id { get; init; }
     public int LineNumber { get; init; }
     public Guid ProductId { get; init; }

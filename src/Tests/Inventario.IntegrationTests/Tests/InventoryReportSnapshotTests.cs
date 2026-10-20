@@ -56,6 +56,10 @@ public sealed class InventoryReportSnapshotTests : InventarioTestBase
         result.Response.Available.Should().Be(10);
         result.Response.Inbound.Should().Be(12);
         result.Response.Outbound.Should().Be(2);
+        result.Response.MovementTimeline.Should().HaveCount(31);
+        result.Response.MovementTimeline.Should().Contain(x => x.DateUtc == now.AddDays(-2).Date && x.Inbound == 12 && x.Outbound == 0);
+        result.Response.MovementTimeline.Should().Contain(x => x.DateUtc == now.AddDays(-1).Date && x.Inbound == 0 && x.Outbound == 2);
+        result.Response.MovementTimeline.Should().Contain(x => x.DateUtc == now.AddDays(-3).Date && x.Inbound == 0 && x.Outbound == 0);
         result.Response.MovementCount.Should().Be(4);
         result.Response.Positions.Should().ContainSingle();
         result.Response.NearExpiry.Should().ContainSingle(x => x.LotId == lot.Id);
@@ -69,5 +73,47 @@ public sealed class InventoryReportSnapshotTests : InventarioTestBase
             request with { Metadata = new() { RequestedTenantId = Guid.NewGuid() } });
         forged.IsSuccess.Should().BeFalse();
         forged.HttpStatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Test]
+    public async Task GetInventoryReportSnapshot_TimelineIncludesRowsBeyondDetailCap_AndUsesUtcDays()
+    {
+        await using var db = CreateDbContext();
+        var product = await TestInventarioSeed.SeedProduct(db, name: "Timeline cap product");
+        var warehouse = await TestInventarioSeed.SeedWarehouse(db);
+        var location = await TestInventarioSeed.SeedLocation(db, warehouse.Id);
+        var day = DateTime.UtcNow.Date.AddDays(-3);
+        var tenant = InventarioIntegrationTestFixture.TestTenantId;
+        for (var i = 0; i < 1005; i++)
+            db.Set<InventoryMovement>().Add(new()
+            {
+                Id = Guid.NewGuid(), TenantId = tenant, ProductId = product.Id,
+                WarehouseId = warehouse.Id, LocationId = location.Id,
+                MovementType = InventoryMovementType.Adjustment,
+                QuantityDelta = i < 1001 ? 2 : -3,
+                MovementDate = i < 1001 ? day.AddHours(23).AddMinutes(59) : day.AddDays(1),
+                IsEnabled = true, CreatedAt = day, IdempotencyKey = "timeline-cap-" + Guid.NewGuid()
+            });
+        await db.SaveChangesAsync();
+        var result = await InventarioIntegrationTestFixture.ServiceWrapper.GetInventoryReportSnapshot(new()
+        {
+            Metadata = CreateMetadata(), ProductId = product.Id, WarehouseId = warehouse.Id, LocationId = location.Id,
+            FromUtc = day, ToUtc = day.AddDays(2), DaysAhead = 10
+        });
+        result.IsSuccess.Should().BeTrue(result.Message);
+        var snapshot = result.Response!;
+        snapshot.Movements.Should().HaveCount(1000);
+        snapshot.MovementCount.Should().Be(1005);
+        snapshot.MovementTimeline.Should().HaveCount(3);
+        snapshot.MovementTimeline[0].DateUtc.Should().Be(day);
+        snapshot.MovementTimeline[0].Inbound.Should().Be(2002);
+        snapshot.MovementTimeline[1].DateUtc.Should().Be(day.AddDays(1));
+        snapshot.MovementTimeline[1].Outbound.Should().Be(12);
+        snapshot.MovementTimeline[2].DateUtc.Should().Be(day.AddDays(2));
+        snapshot.MovementTimeline[2].Inbound.Should().Be(0);
+        snapshot.MovementTimeline[2].Outbound.Should().Be(0);
+        snapshot.Inbound.Should().Be(2002);
+        snapshot.Outbound.Should().Be(12);
+        snapshot.MovementTimeline.Should().OnlyContain(x => x.Inbound >= 0 && x.Outbound >= 0);
     }
 }

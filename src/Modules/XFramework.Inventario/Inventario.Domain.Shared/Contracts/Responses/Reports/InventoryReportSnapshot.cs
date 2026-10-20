@@ -18,4 +18,10 @@ public partial record InventoryReportSnapshot(
     List<NearExpiryStockReportRow> Expired,
     List<InventoryReportFilterOption> Products,
     List<InventoryReportFilterOption> Warehouses,
-    List<InventoryReportFilterOption> Locations);
+    List<InventoryReportFilterOption> Locations)
+{
+    public List<InventoryMovementDailyTotal> MovementTimeline { get; init; } = [];
+}
+
+[MemoryPackable]
+public partial record InventoryMovementDailyTotal(DateTime DateUtc, decimal Inbound, decimal Outbound);

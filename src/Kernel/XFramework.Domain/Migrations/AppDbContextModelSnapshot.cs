@@ -7095,6 +7095,9 @@ namespace XFramework.Domain.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<bool>("UsesAutomaticTax")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid>("WalletTypeId")
                         .HasColumnType("uuid");
 
@@ -11136,6 +11139,9 @@ namespace XFramework.Domain.Migrations
                         .IsRequired()
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)");
+
+                    b.Property<bool>("DefaultProductAvailable")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");

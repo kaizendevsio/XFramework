@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using IdentityServer.Domain.Shared.Contracts;
+using IdentityServer.Domain.Shared.Contracts.Requests;
+using IdentityServer.Integration.Drivers;
 using Inventario.Api.Features.Setup;
 using Inventario.Api.Features.Setup.Complete;
 using Inventario.Api.Features.Setup.UpdatePreferences;
@@ -18,7 +20,8 @@ public sealed class InventarioSetupService(
     DbContext db,
     ITrustedInvocationContextAccessor invocation,
     ITenantModuleFeatureService features,
-    ILogger<InventarioSetupService> logger)
+    ILogger<InventarioSetupService> logger,
+    IIdentityServerServiceWrapper identity)
 {
     public async Task<Result<InventarioSetupResponse>> GetAsync(GetInventarioSetupRequest request, CancellationToken ct = default)
     {
@@ -36,6 +39,10 @@ public sealed class InventarioSetupService(
         if (!validation.IsValid)
             return Result<InventarioSetupResponse>.Failure(string.Join(" ", validation.Errors.Select(x => x.ErrorMessage)), 400);
 
+        var currencyValidation = await ValidateCurrencyAsync(access.Data, request.DefaultCurrency, ct);
+        if (!currencyValidation.IsSuccess)
+            return Result<InventarioSetupResponse>.Failure(currencyValidation.Message!, currencyValidation.StatusCode);
+
         var tenantId = access.Data;
         var hash = CompletionHash(request);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
@@ -50,10 +57,22 @@ public sealed class InventarioSetupService(
             return Result<InventarioSetupResponse>.Conflict("Settings changed. Reload setup before confirming.");
 
         var before = await ReadAsync(tenantId, ct);
-        if (request.Mode == InventarioSetupMode.Basic && before.HasExistingConfiguration)
-            return Result<InventarioSetupResponse>.Conflict("Existing configuration was found. Use advanced setup to keep existing records.");
-        if (request.Mode == InventarioSetupMode.Basic && !before.WarehousingEnabled)
-            return Result<InventarioSetupResponse>.Forbidden("Warehousing must be enabled before basic setup.");
+        if (request.UseSimpleStorage)
+        {
+            // Basic setup reuses storage; it never renames or removes existing stock dimensions.
+            var existingWarehouse = before.Warehouses.Where(x => x.IsEnabled)
+                .OrderByDescending(x => x.Id == before.WarehouseId).ThenByDescending(x => x.IsDefault).FirstOrDefault();
+            var existingLocation = before.Locations.FirstOrDefault(x => x.IsEnabled && x.IsPickable && x.WarehouseId == existingWarehouse?.Id);
+            request = request with
+            {
+                ExistingWarehouseId = existingWarehouse?.Id,
+                ExistingLocationId = existingLocation?.Id,
+                Warehouse = before.WarehousingEnabled && existingWarehouse is null
+                    ? new() { Code = "STOCK", Name = request.StockAreaName.Trim(), IsDefault = true } : null,
+                Location = before.WarehousingEnabled && existingLocation is null
+                    ? new() { Code = "STOCK", Name = "General stock", IsPickable = true } : null
+            };
+        }
 
         Warehouse? warehouse = null;
         InventoryLocation? location = null;
@@ -129,6 +148,7 @@ public sealed class InventarioSetupService(
         setup.WarehouseId = warehouse?.Id;
         setup.LocationId = location?.Id;
         SetPreferences(setup, request.LowStockThreshold, request.DefaultCurrency);
+        setup.DefaultProductAvailable = request.DefaultProductAvailable;
         try
         {
             await db.SaveChangesAsync(ct);
@@ -149,11 +169,22 @@ public sealed class InventarioSetupService(
         var validation = await new UpdateInventarioPreferencesValidator().ValidateAsync(request, ct);
         if (!validation.IsValid)
             return Result<InventarioSetupResponse>.Failure(string.Join(" ", validation.Errors.Select(x => x.ErrorMessage)), 400);
+        var currencyValidation = await ValidateCurrencyAsync(access.Data, request.DefaultCurrency, ct);
+        if (!currencyValidation.IsSuccess)
+            return Result<InventarioSetupResponse>.Failure(currencyValidation.Message!, currencyValidation.StatusCode);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         await LockTenantAsync(access.Data, ct);
         var setup = await db.Set<InventarioSetup>().AsTracking().SingleOrDefaultAsync(x => x.TenantId == access.Data, ct);
         if (setup?.ConcurrencyStamp != request.ExpectedConcurrencyStamp)
             return Result<InventarioSetupResponse>.Conflict("Settings changed. Reload before saving.");
+        if (request.WarehouseId is { } warehouseId)
+        {
+            var gate = await features.EnsureEnabledAsync(access.Data, TenantModuleFeatureKeys.Inventario, TenantModuleFeatureKeys.WarehousingSubFeature, ct);
+            if (!gate.IsSuccess) return Result<InventarioSetupResponse>.Forbidden("Warehousing is disabled for this tenant.");
+            if (!await db.Set<Warehouse>().AnyAsync(x => x.TenantId == access.Data && x.Id == warehouseId && x.IsEnabled, ct) ||
+                !await db.Set<InventoryLocation>().AnyAsync(x => x.TenantId == access.Data && x.Id == request.LocationId && x.WarehouseId == warehouseId && x.IsEnabled && x.IsPickable, ct))
+                return Result<InventarioSetupResponse>.Failure("Choose an enabled stock area and a pickable location within it.", 400);
+        }
         if (setup is null)
         {
             setup = NewSetup(access.Data);
@@ -161,6 +192,13 @@ public sealed class InventarioSetupService(
             db.Add(setup);
         }
         SetPreferences(setup, request.LowStockThreshold, request.DefaultCurrency);
+        setup.Mode = request.Mode ?? setup.Mode;
+        setup.DefaultProductAvailable = request.DefaultProductAvailable;
+        if (request.WarehouseId is not null)
+        {
+            setup.WarehouseId = request.WarehouseId;
+            setup.LocationId = request.LocationId;
+        }
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return Result<InventarioSetupResponse>.Success(await ReadAsync(access.Data, ct));
@@ -182,13 +220,19 @@ public sealed class InventarioSetupService(
             await db.Set<ProductCategory>().AnyAsync(x => x.TenantId == tenantId, ct) ||
             await db.Set<Supplier>().AnyAsync(x => x.TenantId == tenantId, ct);
         var threshold = int.TryParse(legacy.FirstOrDefault(x => x.Key == "Settings:Inventario:LowStockThreshold")?.Value, out var value) && value >= 0 ? value : 5;
-        var currency = (setup?.DefaultCurrency ?? legacy.FirstOrDefault(x => x.Key == "Settings:Inventario:DefaultCurrency")?.Value ?? "PHP").Trim().ToUpperInvariant();
+        var finance = await identity.GetTenantFinanceSettings(new GetTenantFinanceSettingsRequest { Metadata = new() { RequestedTenantId = tenantId } }, ct);
+        var financeState = finance.IsSuccess && finance.Response?.TenantId == tenantId && finance.Response.IsUsable ? finance.Response : null;
+        var currencies = financeState?.SupportedCurrencies.Select(x => x.Code.Trim().ToUpperInvariant()).Distinct().Order().ToList() ?? [];
+        var financeDefault = financeState?.SupportedCurrencies.FirstOrDefault(x => x.Id == financeState.Settings.DefaultCurrencyId)?.Code ?? "";
+        var currency = (setup?.DefaultCurrency ?? legacy.FirstOrDefault(x => x.Key == "Settings:Inventario:DefaultCurrency")?.Value ?? financeDefault).Trim().ToUpperInvariant();
         return new InventarioSetupResponse
         {
             TenantId = tenantId, ConcurrencyStamp = setup?.ConcurrencyStamp, Mode = setup?.Mode, CompletedAt = setup?.CompletedAt,
             HasExistingConfiguration = existing, WarehousingEnabled = warehousing, CanManage = CanManage(),
             LowStockThreshold = setup?.LowStockThreshold ?? threshold,
-            DefaultCurrency = SetupCurrency.IsSupported(currency) ? currency : "PHP",
+            DefaultProductAvailable = setup?.DefaultProductAvailable ?? true,
+            DefaultCurrency = currency,
+            SupportedCurrencies = currencies,
             WarehouseId = setup?.WarehouseId, LocationId = setup?.LocationId, Warehouses = warehouses, Locations = locations
         };
     }
@@ -206,6 +250,15 @@ public sealed class InventarioSetupService(
     }
 
     private bool CanManage() => invocation.Current?.Actor?.Capabilities.Contains(XFrameworkActorCapabilities.IdentityTenantsManage) == true;
+    private async Task<Result> ValidateCurrencyAsync(Guid tenantId, string currency, CancellationToken ct)
+    {
+        var finance = await identity.GetTenantFinanceSettings(new GetTenantFinanceSettingsRequest { Metadata = new() { RequestedTenantId = tenantId } }, ct);
+        if (!finance.IsSuccess || finance.Response?.TenantId != tenantId || !finance.Response.IsUsable)
+            return Result.Conflict("Configure tenant Finance currencies before saving inventory settings.");
+        return finance.Response.SupportedCurrencies.Any(x => string.Equals(x.Code, currency.Trim(), StringComparison.OrdinalIgnoreCase))
+            ? Result.Success()
+            : Result.Failure("Choose a currency supported by tenant Finance settings.", 400);
+    }
     private Task LockTenantAsync(Guid tenantId, CancellationToken ct) =>
         db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({"inventario:setup:" + tenantId}, 0))", ct);
     private static InventarioSetup NewSetup(Guid tenantId) => new() { Id = Guid.NewGuid(), TenantId = tenantId, IsEnabled = true, CreatedAt = DateTime.UtcNow };
@@ -222,6 +275,7 @@ public sealed class InventarioSetupService(
     private static string CompletionHash(CompleteInventarioSetupRequest request) => Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
     {
         request.Mode, request.ExistingWarehouseId, request.ExistingLocationId, request.LowStockThreshold,
+        request.UseSimpleStorage, request.StockAreaName, request.DefaultProductAvailable,
         Currency = request.DefaultCurrency.Trim().ToUpperInvariant(),
         Warehouse = request.Warehouse is { } w ? new { w.Code, w.Name, w.Description, w.AddressLine, w.City, w.Region, w.PostalCode, w.CountryCode, w.IsDefault } : null,
         Location = request.Location is { } l ? new { l.Code, l.Name, l.Description, l.ParentLocationId, l.LocationType, l.IsPickable } : null

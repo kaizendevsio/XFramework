@@ -2,8 +2,9 @@
 
 <section class="expiry-report">
     <h4>@Heading</h4>
-    <p>@Rows.Count rows, capped at 1,000; positive on-hand stock only.</p>
-    <BbDataGrid Items="@Rows" ShowPagination="true" InitialPageSize="10">
+    <p>@Rows.Count rows@(Rows.Count == 1000 ? " (detail limit: 1,000)" : "")</p>
+    <div class="expiry-grid">
+    <BbDataGrid Items="@Rows" ShowPagination="true" InitialPageSize="10" PageSizes="@(new int[] { 10, 20, 50 })">
         <Columns>
             <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
             <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" Filterable="true" />
@@ -14,6 +15,7 @@
         </Columns>
         <EmptyTemplate><BbEmpty Title="No expiry risks" Description="No lots match this scope and expiry window." /></EmptyTemplate>
     </BbDataGrid>
+    </div>
 </section>
 
 @code {

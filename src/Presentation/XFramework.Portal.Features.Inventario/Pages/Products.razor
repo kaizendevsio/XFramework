@@ -203,6 +203,7 @@ else
     private bool _productDialogOpen;
     private string _search = "";
     private int _lowStockThreshold = 5;
+    private bool _defaultProductAvailable = true;
 
     protected override void OnInitialized()
     {
@@ -284,6 +285,7 @@ else
         }
         _lowStockThreshold = preferences.LowStockThreshold;
         _currency = preferences.DefaultCurrency;
+        _defaultProductAvailable = preferences.DefaultProductAvailable;
         return true;
     }
 
@@ -329,7 +331,7 @@ else
     private void OpenCreateDialog()
     {
         _form.Reset();
-        _form.IsAvailable = true;
+        _form.IsAvailable = _defaultProductAvailable;
         _form.CategoryId = _categories.FirstOrDefault()?.Id.ToString() ?? "";
         _productDialogOpen = true;
     }

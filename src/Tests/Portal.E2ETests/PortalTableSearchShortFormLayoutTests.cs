@@ -162,7 +162,8 @@ public sealed class PortalTableSearchShortFormLayoutTests : PageTest
         var styles = Path.Combine(TestContext.CurrentContext.TestDirectory, "layout-styles");
         var css = File.ReadAllText(Path.Combine(styles, "themes.css"))
             + File.ReadAllText(Path.Combine(styles, "blazorblueprint.css"))
-            + File.ReadAllText(Path.Combine(root!.FullName, "src/Presentation/XFramework.Portal/wwwroot/css/app.css"));
+            + File.ReadAllText(Path.Combine(root!.FullName, "src/Presentation/XFramework.Portal/wwwroot/css/app.css"))
+            + File.ReadAllText(Path.Combine(root.FullName, "src/Presentation/XFramework.Portal/wwwroot/css/utilities.css"));
         await Page.SetViewportSizeAsync(width, height);
         await Page.EmulateMediaAsync(new() { ReducedMotion = ReducedMotion.Reduce });
         await Page.SetContentAsync($"<!doctype html><html class='{(dark ? "dark" : "")}' data-base-color='slate' data-primary-color='blue' style='--radius:0.5rem'>"

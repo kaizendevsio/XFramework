@@ -2,7 +2,9 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Linq.Expressions;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using BlazorBlueprint.Components;
+using BlazorBlueprint.Primitives;
 using BlazorBlueprint.Primitives.Services;
 using FluentAssertions;
 using Inventario.Integration.Drivers;
@@ -38,7 +40,7 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
     private WebApplication _app = null!;
     private readonly SetupBrowserState _state = new();
     private readonly ConcurrentQueue<string> _errors = new();
-    public override BrowserNewContextOptions ContextOptions() => new() { ReducedMotion = ReducedMotion.Reduce };
+    public override BrowserNewContextOptions ContextOptions() => new() { ReducedMotion = ReducedMotion.Reduce, ColorScheme = ColorScheme.Light };
 
     [OneTimeSetUp]
     public async Task Start()
@@ -54,7 +56,12 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
         var portalStyles = manifest.RootElement.GetProperty("Root").GetProperty("Children").EnumerateObject()
             .Single(x => x.Value.TryGetProperty("Asset", out var asset) && asset.ValueKind == JsonValueKind.Object &&
                 asset.GetProperty("SubPath").GetString() == "XFramework.Portal.styles.css").Name;
-        builder.Services.AddSingleton(new SetupBrowserAssets(portalStyles));
+        var root = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "XFramework.slnx"))) root = root.Parent;
+        var appSource = File.ReadAllText(Path.Combine(root!.FullName, "src", "Presentation", "XFramework.Portal", "Components", "App.razor"));
+        var themeScript = Regex.Match(appSource, "<script>.*?</script>", RegexOptions.Singleline).Value;
+        themeScript.Should().Contain("bb-theme", "the fixture must execute the Portal's actual theme initializer");
+        builder.Services.AddSingleton(new SetupBrowserAssets(portalStyles, themeScript));
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Services.AddRazorComponents().AddInteractiveServerComponents(o => o.DetailedErrors = true);
         builder.Services.AddBlazorBlueprintComponents();
@@ -63,6 +70,7 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
         builder.Services.AddSingleton(_state);
         var tenant = new Mock<IPortalTenantContext>();
         tenant.SetupGet(x => x.SelectedTenantId).Returns(() => _state.ActiveTenant);
+        tenant.SetupGet(x => x.SelectedTenantName).Returns(() => _state.ActiveTenant == _state.FirstTenant ? "QA Tenant A" : "QA Tenant B");
         _state.Changed += () => tenant.Raise(x => x.OnChanged += null);
         builder.Services.AddSingleton(tenant.Object);
         var availability = new Mock<IPortalModuleAvailability>();
@@ -73,16 +81,23 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
         var data = new Mock<IDataContext>(MockBehavior.Strict);
         ReadRows<Product>(data, () => [new Product { Id = Guid.NewGuid(), TenantId = _state.ActiveTenant, Name = "Synthetic QA product", Price = 17, StockQuantity = 7 }]);
         ReadRows<ProductCategory>(data, () => []);
+        ReadRows<Warehouse>(data, () => _state.Warehouses);
+        ReadRows<InventoryLocation>(data, () => _state.Locations);
+        ReadRows<ProductVariation>(data, () => []);
+        ReadRows<InventoryLot>(data, () => []);
+        ReadRows<StockBalance>(data, () => []);
+        ReadRows<InventoryMovement>(data, () => []);
         builder.Services.AddSingleton(data.Object);
         var wrapper = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
         wrapper.Setup(x => x.GetInventarioSetup(It.IsAny<GetInventarioSetupRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((GetInventarioSetupRequest request, CancellationToken _) => new QueryResponse<InventarioSetupResponse>
             {
-                HttpStatusCode = HttpStatusCode.OK, Response = new() { TenantId = request.Metadata.RequestedTenantId!.Value, CanManage = _state.CanManage, HasExistingConfiguration = _state.HasExistingConfiguration, WarehousingEnabled = true, LowStockThreshold = 19,
-                    DefaultCurrency = request.Metadata.RequestedTenantId == _state.FirstTenant ? "SGD" : "USD" }
+                HttpStatusCode = HttpStatusCode.OK, Response = _state.Get(request.Metadata.RequestedTenantId!.Value)
             });
         wrapper.Setup(x => x.CompleteInventarioSetup(It.IsAny<CompleteInventarioSetupRequest>(), It.IsAny<CancellationToken>()))
             .Returns((CompleteInventarioSetupRequest request, CancellationToken _) => _state.Complete(request));
+        wrapper.Setup(x => x.UpdateInventarioPreferences(It.IsAny<UpdateInventarioPreferencesRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((UpdateInventarioPreferencesRequest request, CancellationToken _) => _state.Update(request));
         builder.Services.AddSingleton(wrapper.Object);
         _app = builder.Build();
         _app.UseStaticFiles();
@@ -105,7 +120,10 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
         await Page.SetViewportSizeAsync(1920, 1080);
         var response = await Page.GotoAsync(_app.Urls.Single() + "/inventario-setup-fixture");
         response!.Status.Should().Be(200);
+        (await Page.APIRequest.GetAsync(_app.Urls.Single() + "/css/utilities.css")).Status.Should().Be(200);
         await Expect(Page.GetByTestId("inventario-setup-wizard")).ToBeVisibleAsync();
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-primary-color", "blue");
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-base-color", "slate");
     }
 
     [TearDown]
@@ -121,43 +139,61 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
     }
 
     [TestCase(1920, 1080)]
+    [TestCase(1024, 768)]
     [TestCase(390, 844)]
     public async Task Basic_ReviewConfirmAndReload_PreservesExplicitDefaultsAndCompletion(int width, int height)
     {
         await Page.SetViewportSizeAsync(width, height);
+        await Page.GetByLabel("Stock area name (optional)", new() { Exact = true }).FillAsync("Home");
+        await AssertWizardBounds();
+        await Screenshot($"basic-organization-{width}");
         await Next();
-        await Page.GetByLabel("Warehouse name", new() { Exact = true }).FillAsync("Confirmed QA warehouse");
+        await Select("Default currency", "SGD");
+        await DisableProductDefault();
+        await Screenshot($"basic-defaults-{width}");
         await Next();
-        await Page.GetByLabel("Location name", new() { Exact = true }).FillAsync("Confirmed QA bin");
-        await Next();
-        await Page.GetByLabel("Default currency", new() { Exact = true }).FillAsync("SGD");
-        await Next();
-        await Expect(Page.GetByTestId("inventario-setup-review")).ToContainTextAsync("Confirmed QA warehouse");
-        await Expect(Page.GetByTestId("inventario-setup-review")).ToContainTextAsync("Confirmed QA bin");
+        await Expect(Page.GetByTestId("inventario-setup-review")).ToContainTextAsync("Home");
         await Expect(Page.GetByTestId("inventario-setup-review")).ToContainTextAsync("SGD");
         _state.Requests.Should().BeEmpty("all steps before confirmation are read-only");
         await Screenshot($"basic-review-{width}");
+        await AssertWizardBounds();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Confirm setup", Exact = true }).ClickAsync();
         await Expect(Page.GetByTestId("setup-complete")).ToBeVisibleAsync();
         var request = _state.Requests.Should().ContainSingle().Subject;
         request.Mode.Should().Be(InventarioSetupMode.Basic);
         request.Metadata.RequestedTenantId.Should().Be(_state.FirstTenant);
-        request.Warehouse!.Name.Should().Be("Confirmed QA warehouse");
-        request.Location!.Name.Should().Be("Confirmed QA bin");
+        request.UseSimpleStorage.Should().BeTrue();
+        request.StockAreaName.Should().Be("Home");
+        request.Warehouse.Should().BeNull(); request.Location.Should().BeNull();
+        request.DefaultProductAvailable.Should().BeFalse();
         request.DefaultCurrency.Should().Be("SGD");
         await Page.ReloadAsync();
         await Expect(Page.GetByTestId("setup-complete")).ToContainTextAsync("Basic");
         _errors.Should().BeEmpty();
     }
 
-    [Test]
-    public async Task Advanced_FullOptionsAndConfigurationLinks_AreAvailableWithoutFeatureWrites()
+    [TestCase(1920, 1080)]
+    [TestCase(1024, 768)]
+    public async Task SetupPage_CenteredResponsiveSurface_ContainsHeaderAndInlineFooter(int width, int height)
     {
-        await Page.GetByRole(AriaRole.Combobox, new() { Name = "Setup mode", Exact = true }).ClickAsync();
-        await Page.GetByRole(AriaRole.Option, new() { Name = "Advanced", Exact = true }).ClickAsync();
+        await Page.SetViewportSizeAsync(width, height);
+        await Page.GotoAsync(_app.Urls.Single() + "/inventario-explicit-setup-fixture");
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Inventario Setup", Exact = true })).ToBeVisibleAsync();
+        await AssertWizardBounds();
+        await Screenshot($"setup-page-{width}");
+        _errors.Should().BeEmpty();
+    }
+
+    [TestCase(1920, 1080)]
+    [TestCase(1024, 768)]
+    public async Task Advanced_FullOptionsAndConfigurationLinks_AreAvailableWithoutFeatureWrites(int width, int height)
+    {
+        await Page.SetViewportSizeAsync(width, height);
+        await Select("Stock organization", "Multiple locations (Advanced)");
         await Next();
         await Page.GetByLabel("Address", new() { Exact = true }).FillAsync("QA address");
         await Page.GetByLabel("Country code", new() { Exact = true }).FillAsync("SG");
+        await Screenshot($"advanced-warehouse-{width}");
         await Next();
         await Expect(Page.GetByLabel("Location type", new() { Exact = true })).ToBeVisibleAsync();
         await Page.GetByLabel("Location description", new() { Exact = true }).FillAsync("QA inbound");
@@ -175,8 +211,7 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
     [Test]
     public async Task Cancel_DraftThenReload_DoesNotCallWrapperOrPersistMode()
     {
-        await Next();
-        await Page.GetByLabel("Warehouse name", new() { Exact = true }).FillAsync("Discard me");
+        await Page.GetByLabel("Stock area name (optional)", new() { Exact = true }).FillAsync("Discard me");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
         await Expect(Page.GetByTestId("setup-cancelled")).ToBeVisibleAsync();
         _state.Requests.Should().BeEmpty();
@@ -189,13 +224,15 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
     public async Task Products_CreateDialogAndWarnings_ConsumeSetupDefaultsWithoutLegacyReads()
     {
         _state.HasExistingConfiguration = true;
+        _state.DefaultProductAvailable = false;
         await Page.GotoAsync(_app.Urls.Single() + "/inventario-products-fixture");
         await Expect(Page.GetByText("SGD 17.00", new() { Exact = true })).ToBeVisibleAsync();
-        await Expect(Page.Locator(".bg-card").Filter(new() { Has = Page.GetByRole(AriaRole.Heading, new() { Name = "Low Stock", Exact = true }) }))
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Low Stock", Exact = true }).Locator("..").Locator(".."))
             .ToContainTextAsync("1");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Create Product", Exact = true }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Dialog)).ToBeVisibleAsync();
         await Expect(Page.GetByRole(AriaRole.Dialog).GetByLabel("Amount in Singapore Dollar", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Dialog).GetByRole(AriaRole.Switch, new() { Name = "Available", Exact = true })).Not.ToBeCheckedAsync();
         await Screenshot("product-create-defaults");
         _state.Requests.Should().BeEmpty();
         _errors.Should().BeEmpty();
@@ -216,9 +253,9 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
     public async Task Settings_TenantContextEvent_ReloadsAndRendersNewTenantDefaults()
     {
         await Page.GotoAsync(_app.Urls.Single() + "/inventario-settings-fixture");
-        await Expect(Page.GetByLabel("Default currency", new() { Exact = true })).ToHaveValueAsync("SGD");
+        await Expect(Page.GetByRole(AriaRole.Combobox, new() { Name = "Default currency", Exact = true })).ToContainTextAsync("SGD");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Switch QA tenant", Exact = true }).ClickAsync();
-        await Expect(Page.GetByLabel("Default currency", new() { Exact = true })).ToHaveValueAsync("USD");
+        await Expect(Page.GetByRole(AriaRole.Combobox, new() { Name = "Default currency", Exact = true })).ToContainTextAsync("USD");
         _state.Requests.Should().BeEmpty();
         _errors.Should().BeEmpty();
     }
@@ -226,7 +263,7 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
     [Test]
     public async Task FailedConfirmation_PreservesDraftAndAllowsRetry()
     {
-        await Next(); await Next(); await Next(); await Next();
+        await Next(); await Next();
         _state.FailNextConfirmation = true;
         await Page.GetByRole(AriaRole.Button, new() { Name = "Confirm setup", Exact = true }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("Setup could not be saved");
@@ -241,7 +278,7 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
     [Test]
     public async Task TenantChangedDuringSave_CapturedTenantCannotCompleteNewTenant()
     {
-        await Next(); await Next(); await Next(); await Next();
+        await Next(); await Next();
         _state.Delay = new(TaskCreationOptions.RunContinuationsAsynchronously);
         await Page.GetByRole(AriaRole.Button, new() { Name = "Confirm setup", Exact = true }).ClickAsync();
         await Expect(Page.GetByText("Saving setup...", new() { Exact = true })).ToBeVisibleAsync();
@@ -256,7 +293,272 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
         _errors.Should().BeEmpty();
     }
 
+    [Test]
+    public async Task ExistingConfiguration_SwitchPathsRepeatedly_KeepsBasicSelectableAndStepsOrdered()
+    {
+        SeedStorage();
+        await Page.ReloadAsync();
+        await Select("Stock organization", "Multiple locations (Advanced)");
+        await Next();
+        await Expect(Page.GetByRole(AriaRole.Combobox, new() { Name = "Warehouse", Exact = true })).ToBeVisibleAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Back", Exact = true }).ClickAsync();
+        await Select("Stock organization", "One stock area (Basic)");
+        await Select("Stock organization", "Multiple locations (Advanced)");
+        await Select("Stock organization", "One stock area (Basic)");
+        await Next();
+        await Expect(Page.GetByRole(AriaRole.Combobox, new() { Name = "Default currency", Exact = true })).ToBeVisibleAsync();
+        await Next();
+        await Expect(Page.GetByTestId("inventario-setup-review")).ToContainTextAsync("Basic");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Confirm setup", Exact = true }).ClickAsync();
+        await Expect(Page.GetByTestId("setup-complete")).ToBeVisibleAsync();
+        var request = _state.Requests.Should().ContainSingle().Subject;
+        request.UseSimpleStorage.Should().BeTrue(); request.StockAreaName.Should().Be("My stock");
+        request.Warehouse.Should().BeNull(); request.Location.Should().BeNull();
+        _state.Warehouses.Should().HaveCount(2); _state.Locations.Should().HaveCount(2);
+        _errors.Should().BeEmpty();
+    }
+
+    [TestCase("One stock area (Basic)")]
+    [TestCase("Multiple locations (Advanced)")]
+    public async Task WarehousingDisabled_CatalogOnly_HasNoStorageStepsOrWrites(string organization)
+    {
+        _state.WarehousingEnabled = false;
+        await Page.ReloadAsync();
+        await Select("Stock organization", organization);
+        await Expect(Page.GetByText("Catalog only", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByLabel("Stock area name (optional)", new() { Exact = true })).ToHaveCountAsync(0);
+        await Next(); await Next();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Confirm setup", Exact = true }).ClickAsync();
+        await Expect(Page.GetByTestId("setup-complete")).ToBeVisibleAsync();
+        var request = _state.Requests.Should().ContainSingle().Subject;
+        request.UseSimpleStorage.Should().BeFalse();
+        request.Warehouse.Should().BeNull(); request.Location.Should().BeNull();
+        request.ExistingWarehouseId.Should().BeNull(); request.ExistingLocationId.Should().BeNull();
+        _errors.Should().BeEmpty();
+    }
+
+    [TestCase(1920, 1080)]
+    [TestCase(1024, 768)]
+    public async Task Settings_CompletedTenant_SavesModeAndDefaultsWithoutRepeatingSetup(int width, int height)
+    {
+        SeedStorage();
+        var completed = DateTime.UtcNow.AddDays(-1);
+        _state.Saved[_state.ActiveTenant] = _state.Get(_state.ActiveTenant) with { Mode = InventarioSetupMode.Advanced, CompletedAt = completed };
+        await Page.SetViewportSizeAsync(width, height);
+        await Page.GotoAsync(_app.Urls.Single() + "/inventario-settings-fixture");
+        await Select("Setup mode", "Basic");
+        await Select("Default currency", "USD");
+        await DisableProductDefault();
+        await Select("Stock area", "STORE - Store");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save Settings", Exact = true })).ToBeDisabledAsync();
+        await Select("Stock location", "SHELF - Store shelf");
+        await AssertStockPickerWidths();
+        await Screenshot($"settings-{width}");
+        var bounds = await Page.GetByTestId("inventario-settings").BoundingBoxAsync();
+        bounds!.Width.Should().BeLessThanOrEqualTo(960);
+        Math.Abs(bounds.X + bounds.Width / 2 - width / 2f).Should().BeLessThan(2);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Save Settings", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save Settings", Exact = true })).ToBeDisabledAsync();
+        var request = _state.PreferenceRequests.Should().ContainSingle().Subject;
+        request.Mode.Should().Be(InventarioSetupMode.Basic); request.DefaultProductAvailable.Should().BeFalse();
+        request.WarehouseId.Should().Be(_state.Warehouses[1].Id); request.LocationId.Should().Be(_state.Locations[1].Id);
+        _state.Saved[_state.ActiveTenant].CompletedAt.Should().Be(completed);
+        _state.Requests.Should().BeEmpty();
+        await Page.ReloadAsync();
+        await Expect(Page.GetByRole(AriaRole.Combobox, new() { Name = "Setup mode", Exact = true })).ToContainTextAsync("Basic");
+        await Expect(Page.GetByRole(AriaRole.Combobox, new() { Name = "Stock area", Exact = true })).ToContainTextAsync("Store");
+        await Page.GotoAsync(_app.Urls.Single() + "/inventario-explicit-setup-fixture");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Change mode and settings", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByTestId("inventario-setup-wizard")).ToHaveCountAsync(0);
+        _errors.Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task StockMovement_NewDialog_UsesSavedStockArea()
+    {
+        SeedStorage();
+        _state.Saved[_state.ActiveTenant] = _state.Get(_state.ActiveTenant) with { WarehouseId = _state.Warehouses[1].Id, LocationId = _state.Locations[1].Id };
+        await Page.GotoAsync(_app.Urls.Single() + "/inventario-stock-fixture");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Post Movement", Exact = true }).ClickAsync();
+        var dialog = Page.GetByRole(AriaRole.Dialog);
+        await Expect(dialog).ToBeVisibleAsync();
+        await Expect(dialog.GetByRole(AriaRole.Button, new() { Name = "Warehouse", Exact = true })).ToContainTextAsync("Store");
+        await Expect(dialog.GetByRole(AriaRole.Button, new() { Name = "Location", Exact = true })).ToContainTextAsync("Store shelf");
+        _state.Requests.Should().BeEmpty(); _state.PreferenceRequests.Should().BeEmpty();
+        _errors.Should().BeEmpty();
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task CurrencyUnavailable_SettingsRequiresExplicitActiveCurrency(bool noCurrencies)
+    {
+        _state.Saved[_state.ActiveTenant] = _state.Get(_state.ActiveTenant) with { SupportedCurrencies = noCurrencies ? [] : ["USD"] };
+        await Page.GotoAsync(_app.Urls.Single() + "/inventario-settings-fixture");
+        await Select("Setup mode", "Advanced");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save Settings", Exact = true })).ToBeDisabledAsync();
+        if (noCurrencies)
+            await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Finance settings", Exact = true })).ToHaveAttributeAsync("href", "/finance/settings");
+        else
+        {
+            await Expect(Page.GetByText("Select an active currency", new() { Exact = true })).ToBeVisibleAsync();
+            await Select("Default currency", "USD");
+            await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save Settings", Exact = true })).ToBeEnabledAsync();
+        }
+        _state.PreferenceRequests.Should().BeEmpty();
+        _errors.Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task NoFinanceCurrencies_WizardCannotAdvanceToConfirmation()
+    {
+        _state.SupportedCurrencies.Clear();
+        await Page.ReloadAsync();
+        await Next();
+        await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Finance settings", Exact = true })).ToBeVisibleAsync();
+        await Next();
+        await Expect(Page.GetByTestId("inventario-setup-review")).ToHaveCountAsync(0);
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Confirm setup", Exact = true })).ToHaveCountAsync(0);
+        _state.Requests.Should().BeEmpty();
+        _errors.Should().BeEmpty();
+    }
+
+    [TestCase(1920, 1080)]
+    [TestCase(1024, 768)]
+    public async Task DarkTheme_SetupAndSettings_UsePortalThemeAndReadableOverlays(int width, int height)
+    {
+        await Page.SetViewportSizeAsync(width, height);
+        await Page.EmulateMediaAsync(new() { ColorScheme = ColorScheme.Dark });
+        await Page.GotoAsync(_app.Urls.Single() + "/inventario-explicit-setup-fixture");
+        await Expect(Page.Locator("html")).ToHaveClassAsync("dark");
+        await Next();
+        await AssertRenderedDarkTheme();
+        await Screenshot($"setup-defaults-dark-{width}");
+        await AssertWizardBounds();
+        SeedStorage();
+        await Page.GotoAsync(_app.Urls.Single() + "/inventario-settings-fixture");
+        await Select("Stock area", "STORE - Store");
+        await Select("Stock location", "SHELF - Store shelf");
+        await AssertStockPickerWidths();
+        await Page.GetByRole(AriaRole.Combobox, new() { Name = "Default currency", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Option, new() { Name = "USD", Exact = true })).ToBeVisibleAsync();
+        await AssertRenderedDarkTheme();
+        await Screenshot($"settings-dark-{width}");
+        await Page.Keyboard.PressAsync("Escape");
+        await Expect(Page.GetByRole(AriaRole.Option, new() { Name = "USD", Exact = true })).ToHaveCountAsync(0);
+        await AssertRenderedDarkTheme();
+        _state.Requests.Should().BeEmpty(); _state.PreferenceRequests.Should().BeEmpty();
+        _errors.Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task Settings_OnlyPickableLocations_SaveWaitsForCompleteSelection()
+    {
+        SeedStorage();
+        _state.Locations.Add(new() { Id = Guid.NewGuid(), TenantId = _state.ActiveTenant, WarehouseId = _state.Warehouses[1].Id, Code = "HOLD", Name = "Not pickable", IsEnabled = true, IsPickable = false });
+        await Page.GotoAsync(_app.Urls.Single() + "/inventario-settings-fixture");
+        await Select("Stock area", "STORE - Store");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save Settings", Exact = true })).ToBeDisabledAsync();
+        await Page.GetByRole(AriaRole.Combobox, new() { Name = "Stock location", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Option, new() { Name = "HOLD - Not pickable", Exact = true })).ToHaveCountAsync(0);
+        await Page.GetByRole(AriaRole.Option, new() { Name = "SHELF - Store shelf", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save Settings", Exact = true })).ToBeEnabledAsync();
+        _state.PreferenceRequests.Should().BeEmpty();
+        _errors.Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task FinanceCurrencies_EmptyThenConfigured_ReloadsWithoutChangingSavedCurrency()
+    {
+        _state.SupportedCurrencies.Clear();
+        await Page.GotoAsync(_app.Urls.Single() + "/inventario-settings-fixture");
+        await Expect(Page.GetByText("No active currencies", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save Settings", Exact = true })).ToBeDisabledAsync();
+        _state.SupportedCurrencies.Add("USD");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Reload", Exact = true }).ClickAsync();
+        await Expect(Page.GetByText("Select an active currency", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Combobox, new() { Name = "Default currency", Exact = true })).ToContainTextAsync("SGD");
+        await Select("Default currency", "USD");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save Settings", Exact = true })).ToBeEnabledAsync();
+        _state.PreferenceRequests.Should().BeEmpty();
+        _errors.Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task Settings_DiscardChanges_RestoresDefaultsWithoutWrites()
+    {
+        await Page.GotoAsync(_app.Urls.Single() + "/inventario-settings-fixture");
+        await Select("Setup mode", "Advanced");
+        await Select("Default currency", "USD");
+        await DisableProductDefault();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Discard changes", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Combobox, new() { Name = "Setup mode", Exact = true })).ToContainTextAsync("Basic");
+        await Expect(Page.GetByRole(AriaRole.Combobox, new() { Name = "Default currency", Exact = true })).ToContainTextAsync("SGD");
+        await Expect(Page.GetByRole(AriaRole.Switch, new() { Name = "Enable new products in catalog", Exact = true })).ToBeCheckedAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save Settings", Exact = true })).ToBeDisabledAsync();
+        _state.PreferenceRequests.Should().BeEmpty();
+        _errors.Should().BeEmpty();
+    }
+
+    private void SeedStorage()
+    {
+        _state.HasExistingConfiguration = true;
+        _state.Warehouses.AddRange([
+            new() { Id = Guid.NewGuid(), TenantId = _state.ActiveTenant, Code = "HOME", Name = "Home", IsEnabled = true },
+            new() { Id = Guid.NewGuid(), TenantId = _state.ActiveTenant, Code = "STORE", Name = "Store", IsEnabled = true }
+        ]);
+        _state.Locations.AddRange([
+            new() { Id = Guid.NewGuid(), TenantId = _state.ActiveTenant, WarehouseId = _state.Warehouses[0].Id, Code = "HOME", Name = "Home shelf", IsEnabled = true },
+            new() { Id = Guid.NewGuid(), TenantId = _state.ActiveTenant, WarehouseId = _state.Warehouses[1].Id, Code = "SHELF", Name = "Store shelf", IsEnabled = true }
+        ]);
+    }
+
     private Task Next() => Page.GetByRole(AriaRole.Button, new() { Name = "Next", Exact = true }).ClickAsync();
+    private async Task DisableProductDefault()
+    {
+        var toggle = Page.GetByRole(AriaRole.Switch, new() { Name = "Enable new products in catalog", Exact = true });
+        await toggle.ClickAsync();
+        await Expect(toggle).Not.ToBeCheckedAsync();
+    }
+    private async Task Select(string label, string option)
+    {
+        await Page.GetByRole(AriaRole.Combobox, new() { Name = label, Exact = true }).ClickAsync();
+        await Page.GetByRole(AriaRole.Option, new() { Name = option, Exact = true }).ClickAsync();
+    }
+    private async Task AssertWizardBounds()
+    {
+        var wizard = await Page.GetByTestId("inventario-setup-wizard").BoundingBoxAsync();
+        wizard.Should().NotBeNull();
+        wizard!.Width.Should().BeLessThanOrEqualTo(960);
+        var viewport = Page.ViewportSize!;
+        Math.Abs(wizard.X + wizard.Width / 2 - viewport.Width / 2).Should().BeLessThan(2);
+        var footer = Page.GetByTestId("inventario-setup-footer");
+        var footerBounds = await footer.BoundingBoxAsync();
+        Math.Abs(footerBounds!.Width - wizard.Width).Should().BeLessThan(2, "footer must span the wizard width");
+        var cancel = await footer.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).BoundingBoxAsync();
+        var back = await footer.GetByRole(AriaRole.Button, new() { Name = "Back", Exact = true }).BoundingBoxAsync();
+        Math.Abs(cancel!.Y - back!.Y).Should().BeLessThan(2, "Cancel and navigation share a single footer row");
+        if (viewport.Width >= 768) (cancel.Y + cancel.Height).Should().BeLessThanOrEqualTo(viewport.Height);
+    }
+    private async Task AssertRenderedDarkTheme()
+    {
+        var root = Page.Locator("html");
+        await Expect(root).ToHaveClassAsync("dark");
+        await Expect(root).ToHaveAttributeAsync("data-base-color", "slate");
+        await Expect(root).ToHaveAttributeAsync("data-primary-color", "blue");
+        await Expect(root).ToHaveCSSAsync("--radius", "0.5rem");
+        await Expect(Page.Locator("body")).ToHaveCSSAsync("background-color", "rgb(30, 30, 30)");
+        await Expect(Page.Locator("body")).ToHaveCSSAsync("color", "rgb(244, 244, 245)");
+    }
+
+    private async Task AssertStockPickerWidths()
+    {
+        var currency = await Page.GetByRole(AriaRole.Combobox, new() { Name = "Default currency", Exact = true }).BoundingBoxAsync();
+        foreach (var label in new[] { "Stock area", "Stock location" })
+        {
+            var picker = await Page.GetByRole(AriaRole.Combobox, new() { Name = label, Exact = true }).BoundingBoxAsync();
+            Math.Abs(picker!.Width - currency!.Width).Should().BeLessThan(2, "stock pickers must fill their field columns");
+        }
+    }
     private static void ReadRows<T>(Mock<IDataContext> data, Func<List<T>> rows) where T : class
     {
         var query = new Mock<IRemoteQuery<T>>(MockBehavior.Strict);
@@ -265,6 +567,8 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
         query.Setup(x => x.Where(It.IsAny<Expression<Func<T, bool>>>())).Returns(query.Object);
         query.Setup(x => x.Take(It.IsAny<int>())).Returns(query.Object);
         query.Setup(x => x.OrderBy(It.IsAny<Expression<Func<T, string>>>())).Returns(query.Object);
+        query.Setup(x => x.OrderBy(It.IsAny<Expression<Func<T, Guid>>>())).Returns(query.Object);
+        query.Setup(x => x.OrderByDescending(It.IsAny<Expression<Func<T, DateTime>>>())).Returns(query.Object);
         query.Setup(x => x.ToListAsync(It.IsAny<CancellationToken>())).ReturnsAsync(rows);
         data.Setup(x => x.Query<T>()).Returns(query.Object);
     }
@@ -282,18 +586,19 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
 [Route("/inventario-settings-fixture")]
 [Route("/inventario-products-fixture")]
 [Route("/inventario-explicit-setup-fixture")]
+[Route("/inventario-stock-fixture")]
 public sealed class SetupBrowserRoot : ComponentBase
 {
     [Inject] public SetupBrowserAssets Styles { get; set; } = null!;
     protected override void BuildRenderTree(RenderTreeBuilder b)
     {
-        b.AddMarkupContent(0, $"<!doctype html><html data-base-color='zinc' data-primary-color='green'><head><base href='/'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/css/themes.css'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/blazorblueprint.css'><link rel='stylesheet' href='css/app.css'><link rel='stylesheet' href='{Styles.PortalStyles}'></head><body>");
+        b.AddMarkupContent(0, $"<!doctype html><html lang='en'><head><base href='/'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/css/themes.css'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/blazorblueprint.css'><link rel='stylesheet' href='css/app.css'><link rel='stylesheet' href='css/utilities.css'><link rel='stylesheet' href='{Styles.PortalStyles}'>{Styles.ThemeScript}</head><body class='font-sans antialiased'>");
         b.OpenComponent<SetupBrowserSurface>(1); b.AddComponentRenderMode(new InteractiveServerRenderMode(prerender: false)); b.CloseComponent();
-        b.AddMarkupContent(2, "<script src='_framework/blazor.web.js'></script></body></html>");
+        b.AddMarkupContent(2, "<script>window.inventarioFocus={capture:()=>{},restore:()=>{}}</script><script src='_framework/blazor.web.js'></script></body></html>");
     }
 }
 
-public sealed record SetupBrowserAssets(string PortalStyles);
+public sealed record SetupBrowserAssets(string PortalStyles, string ThemeScript);
 
 public sealed class SetupBrowserSurface : ComponentBase, IDisposable
 {
@@ -307,7 +612,7 @@ public sealed class SetupBrowserSurface : ComponentBase, IDisposable
         b.OpenComponent<BbToastProvider>(0); b.CloseComponent();
         b.OpenComponent<XfContainerPortalHost>(1); b.CloseComponent();
         b.OpenComponent<BbOverlayPortalHost>(2); b.CloseComponent();
-        b.OpenElement(3, "main"); b.AddAttribute(4, "style", "padding:24px;max-width:1000px;margin:auto");
+        b.OpenElement(3, "main"); b.AddAttribute(4, "style", "padding:24px;margin:auto");
         b.OpenElement(5, "h1"); b.AddContent(6, State.ActiveTenant == State.FirstTenant ? "QA Tenant A" : "QA Tenant B"); b.CloseElement();
         b.OpenComponent<BbButton>(7); b.AddAttribute(8, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, State.Switch)); b.AddAttribute(9, "ChildContent", (RenderFragment)(x => x.AddContent(0, "Switch QA tenant"))); b.CloseComponent();
         if (new Uri(Navigation.Uri).AbsolutePath == "/inventario-settings-fixture")
@@ -316,13 +621,15 @@ public sealed class SetupBrowserSurface : ComponentBase, IDisposable
         { b.OpenComponent<XFramework.Portal.Features.Inventario.Pages.Products>(10); b.CloseComponent(); }
         else if (new Uri(Navigation.Uri).AbsolutePath == "/inventario-explicit-setup-fixture")
         { b.OpenComponent<XFramework.Portal.Features.Inventario.Pages.Setup>(10); b.CloseComponent(); }
+        else if (new Uri(Navigation.Uri).AbsolutePath == "/inventario-stock-fixture")
+        { b.OpenComponent<XFramework.Portal.Features.Inventario.Pages.Stock>(10); b.CloseComponent(); }
         else if (_cancelled) { b.OpenElement(10, "p"); b.AddAttribute(11, "data-testid", "setup-cancelled"); b.AddContent(12, "Cancelled"); b.CloseElement(); }
         else if (State.Saved.TryGetValue(State.ActiveTenant, out var saved))
         { b.OpenElement(13, "p"); b.AddAttribute(14, "data-testid", "setup-complete"); b.AddContent(15, saved.Mode + " setup complete"); b.CloseElement(); }
         else
         {
             b.OpenComponent<InventarioSetupWizard>(16); b.SetKey(State.ActiveTenant);
-            b.AddAttribute(17, "State", new InventarioSetupResponse { TenantId = State.ActiveTenant, CanManage = true, WarehousingEnabled = true });
+            b.AddAttribute(17, "State", State.Get(State.ActiveTenant));
             b.AddAttribute(18, "TenantName", State.ActiveTenant == State.FirstTenant ? "QA Tenant A" : "QA Tenant B");
             b.AddAttribute(19, "Completed", EventCallback.Factory.Create<InventarioSetupResponse>(this, _ => StateHasChanged()));
             b.AddAttribute(20, "Cancelled", EventCallback.Factory.Create(this, () => _cancelled = true)); b.CloseComponent();
@@ -338,20 +645,43 @@ public sealed class SetupBrowserState
     public Guid SecondTenant { get; private set; }
     public Guid ActiveTenant { get; private set; }
     public ConcurrentQueue<CompleteInventarioSetupRequest> Requests { get; } = new();
+    public ConcurrentQueue<UpdateInventarioPreferencesRequest> PreferenceRequests { get; } = new();
     public ConcurrentDictionary<Guid, InventarioSetupResponse> Saved { get; } = new();
     public TaskCompletionSource? Delay { get; set; }
     public bool FailNextConfirmation { get; set; }
     public bool CanManage { get; set; } = true;
     public bool HasExistingConfiguration { get; set; }
+    public bool WarehousingEnabled { get; set; } = true;
+    public bool DefaultProductAvailable { get; set; } = true;
+    public List<Warehouse> Warehouses { get; } = [];
+    public List<InventoryLocation> Locations { get; } = [];
+    public List<string> SupportedCurrencies { get; } = ["PHP", "SGD", "USD"];
+    public InventarioSetupResponse Get(Guid tenantId) => Saved.TryGetValue(tenantId, out var saved) ? saved : new()
+    {
+        TenantId = tenantId, CanManage = CanManage, HasExistingConfiguration = HasExistingConfiguration,
+        WarehousingEnabled = WarehousingEnabled, LowStockThreshold = 19, SupportedCurrencies = SupportedCurrencies,
+        DefaultCurrency = tenantId == FirstTenant ? "SGD" : "USD", DefaultProductAvailable = DefaultProductAvailable,
+        Warehouses = Warehouses, Locations = Locations
+    };
+    public QueryResponse<InventarioSetupResponse> Update(UpdateInventarioPreferencesRequest request)
+    {
+        PreferenceRequests.Enqueue(request);
+        var state = Get(request.Metadata.RequestedTenantId!.Value);
+        var response = state with { Mode = request.Mode ?? state.Mode, WarehouseId = request.WarehouseId ?? state.WarehouseId,
+            LocationId = request.LocationId ?? state.LocationId, DefaultCurrency = request.DefaultCurrency,
+            LowStockThreshold = request.LowStockThreshold, DefaultProductAvailable = request.DefaultProductAvailable, ConcurrencyStamp = Guid.NewGuid() };
+        Saved[state.TenantId] = response;
+        return new() { HttpStatusCode = HttpStatusCode.OK, Response = response };
+    }
     public event Action? Changed;
-    public void Reset() { FirstTenant = Guid.NewGuid(); SecondTenant = Guid.NewGuid(); ActiveTenant = FirstTenant; Requests.Clear(); Saved.Clear(); Delay = null; FailNextConfirmation = false; CanManage = true; HasExistingConfiguration = false; }
+    public void Reset() { FirstTenant = Guid.NewGuid(); SecondTenant = Guid.NewGuid(); ActiveTenant = FirstTenant; Requests.Clear(); PreferenceRequests.Clear(); Saved.Clear(); Warehouses.Clear(); Locations.Clear(); SupportedCurrencies.Clear(); SupportedCurrencies.AddRange(["PHP", "SGD", "USD"]); Delay = null; FailNextConfirmation = false; CanManage = true; HasExistingConfiguration = false; WarehousingEnabled = true; DefaultProductAvailable = true; }
     public void Switch() { ActiveTenant = SecondTenant; Changed?.Invoke(); }
     public async Task<QueryResponse<InventarioSetupResponse>> Complete(CompleteInventarioSetupRequest request)
     {
         Requests.Enqueue(request);
         if (Delay is not null) await Delay.Task;
         if (FailNextConfirmation) { FailNextConfirmation = false; return new() { HttpStatusCode = HttpStatusCode.ServiceUnavailable }; }
-        var response = new InventarioSetupResponse { TenantId = request.Metadata.RequestedTenantId!.Value, Mode = request.Mode, CompletedAt = DateTime.UtcNow, ConcurrencyStamp = Guid.NewGuid(), LowStockThreshold = request.LowStockThreshold, DefaultCurrency = request.DefaultCurrency };
+        var response = Get(request.Metadata.RequestedTenantId!.Value) with { Mode = request.Mode, CompletedAt = DateTime.UtcNow, ConcurrencyStamp = Guid.NewGuid(), LowStockThreshold = request.LowStockThreshold, DefaultCurrency = request.DefaultCurrency, DefaultProductAvailable = request.DefaultProductAvailable };
         Saved[response.TenantId] = response;
         return new() { HttpStatusCode = HttpStatusCode.OK, Response = response };
     }
