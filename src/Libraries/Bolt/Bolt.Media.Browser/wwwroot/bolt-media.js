@@ -1286,6 +1286,7 @@ class VideoPipeline {
                 decoderDelayMs: renderedFps > 0 ? remote.decodeDelayMs : null,
                 renderMs: average(`render:${remote.streamId}`),
                 acceleration: remote.acceleration || 'no-preference', resets: remote.resets,
+                waitingForKeyframe: !remote.primed, recoveryRequests: remote.recoveryRequests,
                 rotation: describeOrientation(remote.orientation) || 'none' };
         });
         const encodedFps = rate(this.encodeCount, previous?.encode);
@@ -1521,6 +1522,7 @@ class VideoPipeline {
         if (!context) return false;
         const remote = { streamId, canvas, context, codec: codec || 'h264', decoder: null, width: 0, height: 0,
             primed: false, pending: new Map(), lateFrames: 0, software: false, fallbackTried: false,
+            keyframeRequestedAt: -Infinity, recoveryRequests: 0,
             received: 0, rendered: 0, bytes: 0, resets: 0, decodeDelayMs: null,
             // The sender's orientation for pictures in the decoder that are not upright (by timestamp), and the
             // orientation of the picture on the canvas.
@@ -1546,7 +1548,7 @@ class VideoPipeline {
                 remote.software = false;
                 if (remote.acceleration === 'prefer-hardware') remote.hardwareFailed = true;
                 if (this.remotes.get(streamId) === remote) this._openDecoder(streamId, remote);
-                void this.hostRef?.invokeMethodAsync('OnVideoDecodeFailed', streamId);
+                this._requestDecoderKeyframe(streamId, remote);
             }
         });
         remote.decoder = decoder;
@@ -1584,7 +1586,12 @@ class VideoPipeline {
             }
         }
         // A decoder that has not seen a keyframe yet cannot use deltas; feeding them wastes work.
-        if (!remote.primed && !isKeyframe) return false;
+        if (!remote.primed && !isKeyframe) {
+            // The first PLI can be coalesced away, and its keyframe can be lost. Retry while deltas
+            // arrive instead of freezing until the sender's ten-second safety keyframe. No idle timer.
+            this._requestDecoderKeyframe(streamId, remote);
+            return false;
+        }
         if (remote.decoder.decodeQueueSize >= 6 || (discontinuity && !isKeyframe)) {
             this._recoverDecoder(streamId, remote);
             return false;
@@ -1609,6 +1616,14 @@ class VideoPipeline {
         if (remote.decoder?.state !== 'closed') remote.decoder?.close();
         this._openDecoder(streamId, remote);
         // Ignore dependent deltas until a new reference picture arrives.
+        this._requestDecoderKeyframe(streamId, remote);
+    }
+
+    _requestDecoderKeyframe(streamId, remote) {
+        const now = performance.now();
+        if (now - remote.keyframeRequestedAt < KEYFRAME_REQUEST_GAP_MS) return;
+        remote.keyframeRequestedAt = now;
+        remote.recoveryRequests++;
         void this.hostRef?.invokeMethodAsync('OnVideoDecodeFailed', streamId);
     }
 

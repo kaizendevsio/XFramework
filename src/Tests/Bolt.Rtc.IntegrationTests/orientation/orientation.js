@@ -65,6 +65,53 @@ export async function codecSupported(codec) {
     catch { return false; }
 }
 
+// Production sender and receiver with real WebCodecs. Lose a picture and the first recovery
+// request, then keep delivering deltas: playback must recover before the ten-second safety keyframe.
+export async function lostKeyframeRequest({ codec }) {
+    const sender = createVideoPipeline(), receiver = createVideoPipeline();
+    const generator = new MediaStreamTrackGenerator({ kind: 'video' });
+    const writer = generator.writable.getWriter();
+    const originalGetUserMedia = navigator.mediaDevices.getUserMedia;
+    navigator.mediaDevices.getUserMedia = async () => new MediaStream([generator]);
+    const canvas = document.createElement('canvas'), source = sensorCanvas();
+    let requests = 0, produced = 0, lostAt = null, recoveredAt = null;
+    const receiveHost = { invokeMethodAsync: async name => {
+        if (name === 'OnVideoDecodeFailed' && ++requests > 1) sender.requestKeyframe();
+    } };
+    const sendHost = { invokeMethodAsync: async (name, data, key, id, timestamp, layer, orientation) => {
+        if (name !== 'OnVideoEncoded') return;
+        produced++;
+        const broken = produced === 12;
+        if (broken) lostAt = performance.now();
+        receiver.decodeFrame('remote', data, timestamp * 1000 / 90, key, broken, orientation);
+    } };
+    try {
+        receiver.addRemote('remote', canvas, codec, receiveHost);
+        sender.useCaptureStrategy('processor');
+        await sender.initEncoder(codec, 640, 360, 1500, 30, 10);
+        await sender.startCapture(sendHost, {});
+        const remote = receiver.remotes.get('remote');
+        let renderedAtLoss = 0;
+        for (let i = 0; i < 150; i++) {
+            await writer.write(new VideoFrame(source, { timestamp: i * 33_334 }));
+            await new Promise(resolve => setTimeout(resolve, 34));
+            if (lostAt !== null && !renderedAtLoss) renderedAtLoss = remote.rendered;
+            if (lostAt !== null && requests >= 2 && remote.rendered > renderedAtLoss) {
+                recoveredAt = performance.now();
+                break;
+            }
+        }
+        return { requests, produced, resets: remote.resets, rendered: remote.rendered,
+            recoveredMs: recoveredAt === null ? null : recoveredAt - lostAt };
+    } finally {
+        sender.stopCapture();
+        if (sender.encoder?.state !== 'closed') sender.encoder?.close();
+        receiver.removeRemote('remote');
+        navigator.mediaDevices.getUserMedia = originalGetUserMedia;
+        writer.releaseLock();
+    }
+}
+
 /// Send `frames` pictures of one orientation from a phone-shaped camera, decode them on the far side, and report what the
 /// far side's canvas shows next to what the browser shows for the camera frame.
 export async function roundTrip({ codec, rotation, flip, metadata, frames = 6 }) {

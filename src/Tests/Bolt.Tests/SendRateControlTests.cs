@@ -13,6 +13,48 @@ namespace Bolt.Tests;
 public sealed class SendRateControlTests
 {
     [Test]
+    public void FirstCongestion_CannotCollapseTheBudgetInOneCut_AtRealDeviceUptime()
+    {
+        var controller = new SendRateController(16_087);
+        const long now = 6_000_000;
+        var first = controller.Update(new SendPathSample(now, 5000, 40, 800, 1000, true,
+            Receiver: new(now, 800, 1000), Transport: new(now, 300, 0, 0, 1000)));
+        Assert.That(first.TotalKbps, Is.InRange(8043, 8044), "the first transient costs at most half, not 16 Mbps to 917 kbps");
+        // A genuinely small link must still win once the brief first-congestion protection has expired.
+        var sustained = controller.Update(new SendPathSample(now + 4000, 1000, 40, 1200, 1000, true,
+            Receiver: new(now + 4000, 1200, 1000), Transport: new(now + 4000, 900, 0, 0.2, 1000)));
+        Assert.That(sustained.TotalKbps, Is.LessThanOrEqualTo(1000));
+        controller.StartPicture(16_087);
+        var restarted = controller.Update(new SendPathSample(now + 10_000, 5000, 40, 800, 1000, true,
+            Receiver: new(now + 10_000, 800, 1000)));
+        Assert.That(restarted.TotalKbps, Is.InRange(8043, 8044), "a new picture gets its own first-congestion window");
+    }
+
+    [Test]
+    public void CalmReceiverThroughput_IsNotACapacityLimit_WhenOnlyTheUplinkQueues()
+    {
+        var controller = new SendRateController(12_000);
+        var decision = controller.Update(new SendPathSample(1000, 5000, 40, 600, 0, true,
+            Receiver: new(1000, 10, 500), Transport: new(1000, 300, 0, 0, 4000)));
+        Assert.That(decision.CapacityKbps, Is.EqualTo(4000),
+            "the receiver's quiet/application-limited window must not override measured uplink capacity");
+        var downstream = controller.Update(new SendPathSample(5000, 5000, 40, 600, 0, true,
+            Receiver: new(5000, 600, 500), Transport: new(5000, 300, 0, 0, 4000)));
+        Assert.That(downstream.CapacityKbps, Is.EqualTo(500), "a backlogged receiver still constrains the path");
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void ConfirmedOverload_BypassesFirstCutProtection(bool relayLimited)
+    {
+        var controller = new SendRateController(16_000);
+        var decision = controller.Update(new SendPathSample(6_000_000, 5000, 40, 900, 0, true,
+            Relay: relayLimited ? new(6_000_000, 900, 0, 450, true, BaseLost: true) : null,
+            Transport: relayLimited ? null : new(6_000_000, 900, 0, 0.25, 450)));
+        Assert.That(decision.TotalKbps, Is.LessThanOrEqualTo(450), "confirmed overload still cuts directly to capacity");
+    }
+
+    [Test]
     public void Diagnostics_UplinkLoss_ExplainsCutAndKeepsItAfterRecovery()
     {
         var controller = new SendRateController(6000);

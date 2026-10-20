@@ -107,6 +107,7 @@ public sealed class LiveCallDiagnostics(ChatApi api, IJSRuntime js) : IAsyncDisp
                 [M.Width] = x.Width, [M.Height] = x.Height, [M.ReceivedFps] = x.ReceivedFps, [M.RenderedFps] = x.RenderedFps,
                 [M.ReceivedKbps] = x.ReceivedKbps, [M.DecoderQueue] = x.DecoderQueue, [M.PendingFrames] = x.PendingFrames,
                 [M.RenderMs] = x.RenderMs, [M.DecoderDelayMs] = x.DecoderDelayMs, [M.Resets] = x.Resets,
+                [M.WaitingForKeyframe] = x.WaitingForKeyframe ? 1 : 0, [M.RecoveryRequests] = x.RecoveryRequests,
                 [M.Fragments] = x.Recovery?.Fragments, [M.LocalDrops] = x.Recovery?.LocalDrops, [M.Nacked] = x.Recovery?.Nacked,
                 [M.Recovered] = x.Recovery?.Recovered, [M.Abandoned] = x.Recovery?.Abandoned, [M.Declined] = x.Recovery?.Declined,
                 [M.Incomplete] = x.Recovery?.Incomplete, [M.Skipped] = x.Recovery?.Skipped, [M.Pictures] = x.Recovery?.Pictures,

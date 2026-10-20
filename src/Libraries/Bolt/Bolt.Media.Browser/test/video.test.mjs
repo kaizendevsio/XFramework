@@ -989,6 +989,34 @@ for (const reason of ['backlog', 'missing-picture']) test(`decoder recovers from
     assert.equal(f.p.decodeFrame('s1', new Uint8Array([1]), 500, false), true);
 });
 
+for (const reason of ['missing-picture', 'error', 'new-tile']) test(`waiting decoder retries a lost keyframe request without a request storm: ${reason}`, () => {
+    let now = 0;
+    const f = fixture({ clock: () => now });
+    f.p.addRemote('s', f.canvas, 'h264', f.host);
+    if (reason !== 'new-tile') {
+        f.p.decodeFrame('s', new Uint8Array([1]), 1, true);
+        if (reason === 'error') f.p.remotes.get('s').decoder.callbacks.error(new Error('decode failed'));
+        else f.p.decodeFrame('s', new Uint8Array([1]), 2, false, true);
+    }
+    const requests = () => f.stats.invoked.filter(x => x[0] === 'OnVideoDecodeFailed').length;
+    // The first request or replacement keyframe is lost. Deltas keep arriving, exactly as in the Android trace.
+    for (now = 0; now < 3000; now += 20) {
+        assert.equal(f.p.decodeFrame('s', new Uint8Array([1]), now + 10, false), false);
+    }
+    assert.equal(requests(), 3, 'one request each second while unprimed, not one per delta and not just once');
+    const waiting = f.p.getDiagnostics(true).remotes[0];
+    assert.equal(waiting.waitingForKeyframe, true);
+    assert.equal(waiting.recoveryRequests, 3);
+    f.p.decodeFrame('s', new Uint8Array([1]), 4000, true);
+    for (now = 3000; now < 6000; now += 20) f.p.decodeFrame('s', new Uint8Array([1]), now + 5000, false);
+    assert.equal(requests(), 3, 'a keyframe ends the retries');
+    assert.equal(f.p.getDiagnostics(true).remotes[0].waitingForKeyframe, false);
+    f.p.removeRemote('s');
+    now = 8000;
+    assert.equal(f.p.decodeFrame('s', new Uint8Array([1]), 10000, false), false);
+    assert.equal(requests(), 3, 'a removed tile cannot request more keyframes');
+});
+
 for (const capture of ['processor', 'rvfc']) test(`${capture} paces a 60fps camera at a 30fps target before conversion`, async () => {
     const f = fixture({ capture }); await init(f); await f.p.startCapture(f.host, {});
     for (let i = 0; i < 60; i++) {

@@ -464,7 +464,7 @@ public sealed class SendRateController
         // that time are the old rate, not new congestion, and cutting again is how controllers undershoot. With a
         // capacity measurement the test is exact (the estimate already fits the link); without one, the delay must
         // not have grown much past where it was when the cut was made.
-        var capacityNow = Capacity(sample, relay, receiver ?? silent, delay, transport);
+        var capacityNow = Capacity(sample, relay, receiver ?? silent, transport);
         var draining = overuse && now - _lastDecreaseAt < DrainWindowMs && !overloadAfterCut(capacityNow) &&
                        (capacityNow > 0 ? _estimate <= capacityNow * 0.95 : delay <= _delayAtDecrease + Math.Max(150, _delayAtDecrease / 2));
         bool overloadAfterCut(double capacity) => capacity > 0 && _estimate > capacity * 1.2;
@@ -519,6 +519,9 @@ public sealed class SendRateController
             _calmSince = null;
         }
 
+        // An exact probe/downlink limit arriving after a cut still constrains the current rate,
+        // not just future increases. The first-cut safeguard must not override measured capacity.
+        if (StartCeilingKbps is { } startLimit) _estimate = Math.Min(_estimate, startLimit);
         _estimate = Math.Clamp(_estimate, _options.MinTotalKbps, _options.MaxTotalKbps);
         if (receiver is not null) _receiverHeard = true;
         // Receivers report once a stream has flowed a second: a new picture waits for that before it grows.
@@ -594,12 +597,13 @@ public sealed class SendRateController
     /// agree the larger wins; when the relay claims far more, the receiver's end-to-end view wins. The sender's own
     /// uplink is a different link: the smaller of the two ends is the path.
     /// </summary>
-    private double Capacity(in SendPathSample sample, RelaySignal? relay, ReceiverSignal? receiver, int delay, TransportSignal? transport = null)
+    private double Capacity(in SendPathSample sample, RelaySignal? relay, ReceiverSignal? receiver, TransportSignal? transport = null)
     {
         var downstream = 0.0;
         if (relay is { CapacityKbps: > 0 } rs) downstream = rs.CapacityKbps;
-        // What a receiver got while its queue grew is what the path carries.
-        if (receiver is { ReceivedKbps: > 0 } rq && delay >= _options.TargetDelayMs)
+        // Only a receiver reporting its own backlog measures downstream capacity. A local/uplink
+        // queue cannot turn a quiet receiver's application-limited throughput into a link limit.
+        if (receiver is { ReceivedKbps: > 0 } rq && rq.QueueDelayMs >= _options.TargetDelayMs)
             downstream = downstream > 0 && downstream <= rq.ReceivedKbps * 2 ? Math.Max(downstream, rq.ReceivedKbps) : rq.ReceivedKbps;
         // What reached the relay while the uplink queued or dropped is what the uplink carries.
         var uplink = sample.LocalCapacityKbps;
@@ -616,13 +620,12 @@ public sealed class SendRateController
     private void Decrease(long now, in SendPathSample sample, RelaySignal? relay, ReceiverSignal? receiver, int delay, bool severe,
         TransportSignal? transport = null)
     {
-        var capacity = Capacity(sample, relay, receiver, delay, transport);
+        var capacity = Capacity(sample, relay, receiver, transport);
         var measured = capacity > 0;
         // No measurement yet (the first reports of an overload): a queue growing by g ms every second means the
         // link takes 1000 / (1000 + g) of what is sent.
         if (!measured) capacity = sample.SentKbps > 0 ? sample.SentKbps * 1000.0 / (1000 + Math.Max(0, _lastGradient)) : _estimate;
         var basis = Math.Min(_estimate, capacity);
-        // A deep queue needs a deeper cut to drain within a few seconds.
         // A deep queue needs a deeper cut to drain within a few seconds; a standing queue of seconds (a buffer that
         // filled when the link shrank) is best drained almost without video.
         var factor = !severe ? _options.DecreaseFactor
@@ -631,6 +634,7 @@ public sealed class SendRateController
             : _options.DecreaseFactor;
         // The congestion point is the link's measured capacity where there is one: probing slows near it.
         _lastCongestionKbps = measured ? capacity : basis;
+        if (!_congestionObserved) _firstCongestionAt = now;
         _congestedOnce = _congestionObserved = true;
         var next = basis * factor;
         if (!severe)
@@ -639,11 +643,12 @@ public sealed class SendRateController
             next = Math.Max(next, _estimate * 0.75);
             next = Math.Max(next, Math.Min(_estimate, AudioWireKbps(sample) + _options.SuspendVideoKbps + 20));
         }
-        // The path's first congestion, and the next few seconds: at most half per cut. A new picture's start is a
-        // transient (first keyframes, warming channels, receivers' pages still busy starting their own) whose reports
-        // can measure a capacity of almost nothing; halving per cut still reaches a real small link within a few cuts.
-        if (!_congestionObserved) _firstCongestionAt = now;
-        if (now - _firstCongestionAt < StartupCutWindowMs) next = Math.Max(next, _estimate * 0.5);
+        // First congestion can be a browser stall whose short observation window reports almost
+        // no throughput. Limit those first cuts, but keep cutting directly to a backlogged relay's
+        // measured bottleneck or a heavily lossy uplink: protection must not prolong confirmed overload.
+        if (now - _firstCongestionAt < StartupCutWindowMs && relay is not { CapacityKbps: > 0 } &&
+            (transport?.LossFraction ?? 0) <= _options.OveruseLossFraction)
+            next = Math.Max(next, _estimate * 0.5);
         var beforeCut = _estimate;
         _estimate = Math.Max(_options.MinTotalKbps, Math.Min(_estimate, next));
         // A cut inside a picture's start, the first one or one after the last recovery held: a start transient. Remember
