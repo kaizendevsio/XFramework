@@ -16,7 +16,7 @@
 //
 // Every helper the media service imports from the real module comes from it unchanged (export * below).
 export * from './bolt-media.real.js';
-import { temporalModeFor } from './bolt-media.real.js';
+import { temporalModeFor, VideoPlayout } from './bolt-media.real.js';
 
 const MAGIC = 0x4e595342; // 'BSYN'
 const AUDIO_MAGIC = 0x44554142; // 'BAUD'
@@ -177,14 +177,23 @@ class SyntheticVideoPipeline {
 
     addRemote(streamId, canvas, codec, hostRef) {
         this.hostRef = hostRef ?? this.hostRef;
-        state.remotes.set(streamId, {
+        const remote = {
             streamId, primed: false, received: 0, bytes: 0, rendered: 0, resets: 0, waiting: 0, corrupt: 0, brokenReference: 0,
             keyframes: 0, decoded: new Set(), order: [], renders: [], lastRender: 0, events: [],
+        };
+        // Keep the real display scheduler even though the codec/device is synthetic. Decoder
+        // bursts must not count as multiple displayed pictures inside one animation callback.
+        remote.playout = new VideoPlayout(() => {
+            const now = performance.now();
+            remote.rendered++; remote.lastRender = now;
+            remote.renders.push(now);
+            if (remote.renders.length > 20000) remote.renders.splice(0, 10000);
         });
+        state.remotes.set(streamId, remote);
         return true;
     }
 
-    removeRemote(streamId) { state.remotes.delete(streamId); }
+    removeRemote(streamId) { state.remotes.get(streamId)?.playout.clear(); state.remotes.delete(streamId); }
 
     decodeFrame(streamId, data, timestamp, isKeyframe, discontinuity = false) {
         const remote = state.remotes.get(streamId);
@@ -193,14 +202,14 @@ class SyntheticVideoPipeline {
         if (!remote.primed && !isKeyframe) { remote.waiting++; return false; }
         if (discontinuity && !isKeyframe) {
             // The real decoder: close, reopen, ignore deltas until a keyframe, ask the sender for one.
-            remote.resets++; remote.primed = false;
+            remote.resets++; remote.primed = false; remote.playout.clear();
             void this.hostRef?.invokeMethodAsync('OnVideoDecodeFailed', streamId);
             return false;
         }
         const header = inspect(data instanceof Uint8Array ? data : new Uint8Array(data));
         if (!header || header.key !== isKeyframe) {
             // A real decoder errors on a damaged bitstream: it is rebuilt and asks for a keyframe.
-            remote.corrupt++; remote.primed = false;
+            remote.corrupt++; remote.primed = false; remote.playout.clear();
             if (remote.events.length < 30) remote.events.push({ at: Math.round(performance.now()), what: 'corrupt', bytes: data.byteLength, isKeyframe, header });
             void this.hostRef?.invokeMethodAsync('OnVideoDecodeFailed', streamId);
             return false;
@@ -216,10 +225,7 @@ class SyntheticVideoPipeline {
         }
         remote.decoded.add(header.frameId); remote.order.push(header.frameId);
         if (remote.order.length > 64) remote.decoded.delete(remote.order.shift());
-        const now = performance.now();
-        remote.rendered++; remote.lastRender = now;
-        remote.renders.push(now);
-        if (remote.renders.length > 20000) remote.renders.splice(0, 10000);
+        remote.playout.push({ timestamp, close() {} }, 0);
         return true;
     }
 
@@ -241,7 +247,7 @@ class SyntheticVideoPipeline {
             dropped: 0, orientation: 'none', remotes };
     }
 
-    dispose() { this.stopCapture(); }
+    dispose() { this.stopCapture(); for (const remote of state.remotes.values()) remote.playout.clear(); }
 }
 
 class SyntheticAudioPipeline {
