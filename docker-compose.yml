@@ -23,6 +23,8 @@ x-common-env: &common-env
   BoltConfiguration__ServerUrls__0: ws://bolt-hub:8080/bolt/ws
   BoltConfiguration__RequireSecureTransport: false
   BoltConfiguration__GenerateServiceAccessToken: false
+  # At most 4 active + 4 draining sockets per instance; Hub principal quota stays 16.
+  BoltConfiguration__MaxConnections: 4
   ServiceIdentity__Issuer: XFramework.IdentityServer
   ServiceIdentity__Authority: http://identityserver:8080
   ServiceIdentity__AllowInsecureHttp: true

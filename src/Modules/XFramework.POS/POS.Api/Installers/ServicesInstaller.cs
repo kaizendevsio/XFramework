@@ -18,6 +18,7 @@ public sealed class ServicesInstaller : IInstaller
         services.AddScoped<PosCatalogService>();
         services.AddScoped<PosCartService>();
         services.AddScoped<PosFinanceSettings>();
+        services.AddScoped<PosCheckoutSettingsService>();
         services.AddScoped<PosSalesService>();
         services.AddScoped<PosReturnsService>();
     }

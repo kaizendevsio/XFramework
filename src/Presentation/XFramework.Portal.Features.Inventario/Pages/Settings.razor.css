@@ -6,5 +6,6 @@
 .settings-fields > div { min-width: 0; }
 .settings-fields ::deep .inventory-default-picker,
 .settings-fields ::deep [role="combobox"] { width: 100%; }
-.settings-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
+.settings-section:last-child { border-bottom: 0; }
+.settings-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; padding-block: 16px; }
 @media (max-width: 640px) { .settings-fields { grid-template-columns: minmax(0, 1fr); } }

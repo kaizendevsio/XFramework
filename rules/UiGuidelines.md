@@ -124,6 +124,10 @@ Before creating custom UI, check the installed BlazorBlueprint component surface
 - List pages must not embed create or update forms as cards/sections above, below, or beside the grid. Provide a visible create action button that opens a focused dialog/sheet or navigates to a dedicated create page.
 - Existing-record edit workflows belong on detail pages with a clear edit mode, not list-page edit modals.
 - Detail pages should show the operational context needed for the entity.
+- Keep view-mode Edit and edit-mode Save/Discard actions in the same bottom-right form action area, with consistent spacing. Do not move actions between the header and footer when modes change.
+- Use outlined or filled buttons for back navigation and configuration shortcuts when presented as page actions; do not render those actions as unstyled text links.
+- Give filter inputs and entity selectors readable widths and align action buttons with the controls. Wrap the filter bar on narrower screens instead of squeezing labels or dropdown values onto multiple lines.
+- Main sidebar groups start collapsed on login and tenant changes. Entity/detail sidebars expand their section by default.
 - Detail pages should have only one section-navigation surface. If the app shell or left sidebar already exposes entity detail navigation, use that navigation and do not render a second in-page detail sidebar.
 - If a detail page grows beyond a few scannable sections, split major sections into dedicated detail subpages or routes. Add an in-page detail sidebar/navigation only when the shell has no suitable detail navigation. Do not force many unrelated sections into one long scrolling page.
 - Product-specific inventory workflows should keep operators on `/inventario/products/{id}` or a detail-sidebar route when practical.

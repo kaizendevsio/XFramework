@@ -170,6 +170,7 @@ public static class ServiceCollectionExtensions
             }
             else if (!boltConfig.Anonymous)
             {
+                builder.WithOptions(options => options.RenewConnectionsBeforeExpiry = true);
                 builder.WithAccessTokenProvider<IBoltTransportTokenProvider>(
                     async (provider, ct) => await provider.GetTokenAsync(ct));
             }

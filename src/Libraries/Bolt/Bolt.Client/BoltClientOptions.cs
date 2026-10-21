@@ -65,6 +65,15 @@ public class BoltClientOptions
     /// </summary>
     public bool AutoReconnect { get; set; } = true;
 
+    /// <summary>
+    /// Replace expiring connections before closing them, when AccessTokenProvider is configured.
+    /// Opt-in for RPC hosts supporting connection-local expiry/drain commands. No RPC is replayed.
+    /// </summary>
+    public bool RenewConnectionsBeforeExpiry { get; set; }
+
+    /// <summary>Start renewal this many seconds before expiry (capped at half the remaining lifetime).</summary>
+    public int ConnectionRenewalLeadSeconds { get; set; } = 45;
+
     /// <summary>Minimum WebSocket connections to maintain. Default: 1.</summary>
     public int MinConnections { get; set; } = 1;
 

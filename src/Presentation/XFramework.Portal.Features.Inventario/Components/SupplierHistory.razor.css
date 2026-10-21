@@ -1,0 +1,3 @@
+.supplier-history { min-width: 0; }
+.supplier-history ::deep [role="tablist"] { display: flex; flex-wrap: wrap; height: auto; gap: .25rem; }
+.supplier-history ::deep [role="tabpanel"] { margin-top: 1rem; }

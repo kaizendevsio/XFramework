@@ -16,42 +16,27 @@ namespace Bolt.Tests;
 [CancelAfter(30_000)]
 public sealed class BoltInboundRequestContextTests
 {
-    private static int _portCounter = 25_000;
     private WebApplication _serverApp = null!;
     private ILoggerFactory _loggerFactory = null!;
-    private int _port;
+    private Uri _serverUri = null!;
 
     [OneTimeSetUp]
     public async Task OneTimeSetUp()
     {
-        _port = Interlocked.Increment(ref _portCounter);
         var builder = WebApplication.CreateBuilder();
-        builder.WebHost.UseUrls($"http://localhost:{_port}");
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Services.AddBoltServer();
         builder.Logging.SetMinimumLevel(LogLevel.Warning);
 
         _serverApp = builder.Build();
         _serverApp.UseWebSockets();
         _serverApp.MapBolt("/bolt");
-        _serverApp.MapGet("/health", () => "ok");
-        _ = Task.Run(() => _serverApp.RunAsync());
-
-        using var http = new HttpClient();
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        while (DateTime.UtcNow < deadline)
+        await _serverApp.StartAsync();
+        _serverUri = new UriBuilder(_serverApp.Urls.Single())
         {
-            try
-            {
-                if ((await http.GetAsync($"http://localhost:{_port}/health")).IsSuccessStatusCode)
-                    break;
-            }
-            catch
-            {
-                // Server startup is still in progress.
-            }
-
-            await Task.Delay(50);
-        }
+            Scheme = "ws",
+            Path = "/bolt"
+        }.Uri;
 
         _loggerFactory = _serverApp.Services.GetRequiredService<ILoggerFactory>();
     }
@@ -118,7 +103,7 @@ public sealed class BoltInboundRequestContextTests
 
     private BoltClient CreateClient(string clientId) =>
         new(
-            new Uri($"ws://localhost:{_port}/bolt"),
+            _serverUri,
             clientId,
             clientId,
             new BoltClientOptions

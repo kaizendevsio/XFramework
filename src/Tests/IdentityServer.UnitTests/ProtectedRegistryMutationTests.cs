@@ -27,6 +27,8 @@ public sealed class ProtectedRegistryMutationTests
     [TestCase("finance.settings.v1")]
     [TestCase("FINANCE.SETTINGS.V1")]
     [TestCase(" finance.settings.v1 ")]
+    [TestCase("pos.checkout.settings")]
+    [TestCase(" POS.CHECKOUT.SETTINGS ")]
     public async Task RequestValidators_ProtectedKey_RejectCreateAndUpdate(string key)
     {
         var groupId = Guid.NewGuid();
@@ -58,10 +60,11 @@ public sealed class ProtectedRegistryMutationTests
     [TestCase("rename-in", true)]
     [TestCase("rename-out", true)]
     [TestCase("delete", true)]
-    public async Task GeneratedService_ProtectedMutation_IsRejectedWithoutPersistence(string operation, bool financeManager)
+    public async Task GeneratedService_ProtectedMutation_IsRejectedWithoutPersistence(string operation, bool financeManager,
+        string registryKey = TenantFinanceSettings.RegistryKey)
     {
         await using var fixture = await Fixture.CreateAsync(financeManager);
-        var originalKey = operation == "rename-in" ? "ordinary" : TenantFinanceSettings.RegistryKey;
+        var originalKey = operation == "rename-in" ? "ordinary" : registryKey;
         var row = await fixture.SeedAsync(originalKey);
         (bool IsSuccess, int StatusCode, string? Message) result;
         if (operation == "delete")
@@ -73,10 +76,10 @@ public sealed class ProtectedRegistryMutationTests
         {
             var changed = operation == "create"
                 ? await fixture.Service.CreateAsync(new()
-                { Key = TenantFinanceSettings.RegistryKey, GroupId = row.GroupId, Value = "replacement" })
+                { Key = registryKey, GroupId = row.GroupId, Value = "replacement" })
                 : await fixture.Service.UpdateAsync(row.Id, row.ConcurrencyStamp, new()
             {
-                Key = operation == "rename-out" ? "ordinary" : TenantFinanceSettings.RegistryKey,
+                Key = operation == "rename-out" ? "ordinary" : registryKey,
                 GroupId = row.GroupId, Value = "replacement"
             });
             result = (changed.IsSuccess, changed.StatusCode, changed.Message);
@@ -102,10 +105,11 @@ public sealed class ProtectedRegistryMutationTests
     [TestCase("rename-in", true)]
     [TestCase("rename-out", true)]
     [TestCase("delete", true)]
-    public async Task RemoteDataContext_ProtectedMutation_IsRejectedWithoutPersistence(string operation, bool financeManager)
+    public async Task RemoteDataContext_ProtectedMutation_IsRejectedWithoutPersistence(string operation, bool financeManager,
+        string registryKey = TenantFinanceSettings.RegistryKey)
     {
         await using var fixture = await Fixture.CreateAsync(financeManager);
-        var originalKey = operation == "rename-in" ? "ordinary" : TenantFinanceSettings.RegistryKey;
+        var originalKey = operation == "rename-in" ? "ordinary" : registryKey;
         var row = await fixture.SeedAsync(originalKey);
         ChangeEntry change;
         if (operation == "create")
@@ -113,7 +117,7 @@ public sealed class ProtectedRegistryMutationTests
             change = FullChange(ChangeOperation.Add, new()
             {
                 Id = Guid.NewGuid(), TenantId = fixture.TenantId, GroupId = row.GroupId,
-                Key = TenantFinanceSettings.RegistryKey, Value = "replacement"
+                Key = registryKey, Value = "replacement"
             });
         }
         else if (operation == "delete")
@@ -124,7 +128,7 @@ public sealed class ProtectedRegistryMutationTests
         }
         else
         {
-            change = Patch(row, operation == "rename-out" ? "ordinary" : TenantFinanceSettings.RegistryKey);
+            change = Patch(row, operation == "rename-out" ? "ordinary" : registryKey);
         }
 
         var result = await fixture.ExecuteAsync(change);
@@ -136,6 +140,17 @@ public sealed class ProtectedRegistryMutationTests
         persisted.Key.Should().Be(originalKey);
         persisted.Value.Should().Be("original");
         persisted.ConcurrencyStamp.Should().Be(row.ConcurrencyStamp);
+    }
+
+    [TestCase("create")]
+    [TestCase("update")]
+    [TestCase("rename-in")]
+    [TestCase("rename-out")]
+    [TestCase("delete")]
+    public async Task PosSettings_GenericAndRemoteMutation_IsRejected(string operation)
+    {
+        await GeneratedService_ProtectedMutation_IsRejectedWithoutPersistence(operation, false, "pos.checkout.settings");
+        await RemoteDataContext_ProtectedMutation_IsRejectedWithoutPersistence(operation, false, "pos.checkout.settings");
     }
 
     [Test]

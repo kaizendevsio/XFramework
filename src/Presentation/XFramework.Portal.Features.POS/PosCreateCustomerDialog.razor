@@ -1,0 +1,71 @@
+@inject IdentityServer.Integration.Drivers.IIdentityServerServiceWrapper Identity
+@using Microsoft.Extensions.Logging
+@inject ILogger<PosCreateCustomerDialog> Logger
+
+<BbDialog Open="@Open" OpenChanged="@ChangeOpen">
+    <BbDialogContent Class="max-w-lg" ShowClose="@(!_saving)">
+        <BbDialogHeader><BbDialogTitle>Create customer</BbDialogTitle></BbDialogHeader>
+        <div class="space-y-4">
+            <BbFormFieldInput @bind-Value="_name" Label="Customer name" Disabled="@(_saving || _creation?.IdentityId is not null)" />
+            <BbFormFieldInput @bind-Value="_userName" Label="Username" Disabled="@_saving" />
+            <BbFormFieldInput @bind-Value="_password" Label="Password" Type="InputType.Password" Disabled="@_saving" />
+            @if (_error is not null)
+            {
+                <BbAlert Variant="AlertVariant.Warning"><BbAlertDescription>@_error</BbAlertDescription></BbAlert>
+            }
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => ChangeOpen(false))" Disabled="@_saving">Cancel</BbButton>
+            <BbButton OnClick="@Create" Disabled="@(_saving || TenantId is null)">
+                <LucideIcon Name="user-plus" class="mr-2 h-4 w-4" />@(_saving ? "Creating..." : "Create customer")
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter] public EventCallback<IdentityCredential> OnCreated { get; set; }
+    [Parameter] public Guid? TenantId { get; set; }
+    [Parameter] public RequestMetadata Metadata { get; set; } = new();
+    private PosCustomerCreation? _creation;
+    private string _name = "";
+    private string _userName = "";
+    private string _password = "";
+    private string? _error;
+    private bool _saving;
+
+    private async Task ChangeOpen(bool open)
+    {
+        if (_saving) return;
+        if (!open) _password = "";
+        await OpenChanged.InvokeAsync(open);
+    }
+
+    private async Task Create()
+    {
+        if (_saving || TenantId is not Guid tenantId) return;
+        _saving = true;
+        _error = null;
+        try
+        {
+            _creation ??= new(Identity);
+            var result = await _creation.CreateAsync(tenantId, _name, _userName, _password, Metadata);
+            if (TenantId != tenantId) return;
+            if (!result.IsSuccess) { _error = result.Message; return; }
+            _password = "";
+            _name = "";
+            _userName = "";
+            _creation = null;
+            await OnCreated.InvokeAsync(result.Response!);
+            await OpenChanged.InvokeAsync(false);
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "POS customer creation failed");
+            _error = "Could not finish customer creation. Check existing customers before retrying.";
+        }
+        finally { _saving = false; }
+    }
+}

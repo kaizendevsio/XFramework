@@ -149,6 +149,34 @@ public sealed class PosBoltRuntimeIntegrationTests
         ((int)denied.HttpStatusCode).Should().Be(403);
     }
 
+    [Test]
+    public async Task GetPosCheckoutSettings_ThroughGeneratedBoltWrapper_EnforcesSalesCapabilityAndTenant()
+    {
+        var wrapper = clientScope!.ServiceProvider.GetRequiredService<IPOSServiceWrapper>();
+        var request = new GetPosCheckoutSettingsRequest
+        { Metadata = new RequestMetadata { RequestedTenantId = tenantId } };
+        var salesToken = TestInvocationIdentityExtensions.CreateTestActorToken(
+            tenantId, credentialId, Guid.NewGuid(), Guid.NewGuid(), ["Cashier"], [PosAuthorizationCapabilities.SalesView]);
+        using (TestInvocationActorTokenScope.Push(salesToken))
+        {
+            var allowed = await wrapper.GetPosCheckoutSettings(request);
+            allowed.IsSuccess.Should().BeTrue(allowed.Message);
+            allowed.Response!.TenantId.Should().Be(tenantId);
+            allowed.Response.Settings.TableTrackingEnabled.Should().BeTrue();
+            allowed.Response.Settings.CheckoutFields.Should().ContainSingle(field => field.Key == "coupon" && field.Required);
+
+            var crossTenant = await wrapper.GetPosCheckoutSettings(new()
+            { Metadata = new RequestMetadata { RequestedTenantId = Guid.NewGuid() } });
+            ((int)crossTenant.HttpStatusCode).Should().Be(403);
+            crossTenant.Response.Should().BeNull();
+        }
+
+        // The default actor can view registers, but cannot read sales settings.
+        var denied = await wrapper.GetPosCheckoutSettings(request);
+        ((int)denied.HttpStatusCode).Should().Be(403);
+        denied.Response.Should().BeNull();
+    }
+
     private async Task MigrateAndSeedAsync()
     {
         System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(PosRegister).TypeHandle);
@@ -163,6 +191,24 @@ public sealed class PosBoltRuntimeIntegrationTests
             new ConfigurationBuilder().Build(),
             new TestEffectiveTenantContextAccessor(tenantId));
         await db.Database.MigrateAsync();
+        var groupId = Guid.NewGuid();
+        db.Add(new IdentityServer.Domain.Shared.Contracts.Tenant
+        { Id = tenantId, TenantId = tenantId, Name = "POS Bolt tenant", Version = 1, IsEnabled = true });
+        db.Add(new IdentityServer.Domain.Shared.Contracts.RegistryConfigurationGroup
+        {
+            Id = groupId, TenantId = tenantId, Name = "POS", SystemReferenceId = Guid.NewGuid(),
+            IsEnabled = true, CreatedAt = DateTime.UtcNow, ConcurrencyStamp = Guid.NewGuid()
+        });
+        db.Add(new IdentityServer.Domain.Shared.Contracts.RegistryConfiguration
+        {
+            Id = Guid.NewGuid(), TenantId = tenantId, GroupId = groupId, Key = PosCheckoutSettings.RegistryKey,
+            Value = System.Text.Json.JsonSerializer.Serialize(new PosCheckoutSettings
+            {
+                TableTrackingEnabled = true,
+                CheckoutFields = [new() { Key = "coupon", Label = "Coupon", Enabled = true, Required = true }]
+            }),
+            IsEnabled = true, CreatedAt = DateTime.UtcNow, ConcurrencyStamp = Guid.NewGuid()
+        });
         db.Add(new PosRegister
         {
             Id = registerId,

@@ -1,10 +1,15 @@
 @inject IPortalModuleAvailability Availability
+@inject NavigationManager Navigation
 
 <nav aria-label="Inventario configuration" class="space-y-3 mt-6">
     <BbTypographyH4>Configuration</BbTypographyH4>
     <div class="flex flex-wrap gap-4">
         @foreach (var entry in Entries.Where(x => Availability.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, x.Feature)))
-        { <a href="@entry.Url" class="text-primary underline">@entry.Name</a> }
+        {
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo(entry.Url))">
+                <LucideIcon Name="arrow-up-right" class="mr-2 h-4 w-4" />@entry.Name
+            </BbButton>
+        }
     </div>
 </nav>
 

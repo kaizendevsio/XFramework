@@ -21,6 +21,7 @@ public sealed class PosPaymentStageTests
     public void SetUp()
     {
         _page = new();
+        Set("_checkoutSettings", new POS.Domain.Shared.Contracts.PosCheckoutSettings());
         var actor = new Mock<IPortalActorContext>();
         actor.SetupGet(x => x.CredentialId).Returns(Guid.NewGuid());
         typeof(Cashier).GetProperty("ActorContext", Private)!.SetValue(_page, actor.Object);
@@ -71,6 +72,42 @@ public sealed class PosPaymentStageTests
         Set("_discountAmount", 0m);
         Set("_cashTenderedAmount", 10m);
         Get<bool>("CanCheckout").Should().BeTrue();
+    }
+
+    [Test]
+    public void CreateCustomerDialog_PausesMobileScanner()
+    {
+        Set("_loading", false);
+        Set("_hasTenant", true);
+        Set("_moduleEnabled", true);
+        Get<bool>("IsMobileScannerPaused").Should().BeFalse();
+        Set("_createCustomerOpen", true);
+        Get<bool>("IsMobileScannerPaused").Should().BeTrue();
+    }
+
+    [Test]
+    public void RequiredCheckoutFields_BlockConfirmation_ButAllowOpeningPay()
+    {
+        Set("_cashTenderedAmount", 10m);
+        Set("_checkoutSettings", new POS.Domain.Shared.Contracts.PosCheckoutSettings
+        { CheckoutFields = [new() { Key = "coupon", Label = "Coupon", Enabled = true, Required = true }] });
+        Get<bool>("CanBeginPayment").Should().BeTrue();
+        Get<bool>("CanCheckout").Should().BeFalse();
+        Set("_checkoutMetadata", new POS.Domain.Shared.Contracts.PosCheckoutMetadata
+        { Fields = new() { ["coupon"] = "REFERENCE" } });
+        Get<bool>("CanCheckout").Should().BeTrue();
+        Get<decimal>("Total").Should().Be(10m);
+    }
+
+    [Test]
+    public void DisabledCheckoutFields_StaleDraftValuesAreRemovedFromNextSave()
+    {
+        Set("_checkoutMetadata", new POS.Domain.Shared.Contracts.PosCheckoutMetadata
+        { TableNumber = "12", Fields = new() { ["old"] = "Historical value" } });
+        var payload = (POS.Domain.Shared.Contracts.PosCheckoutMetadata)typeof(Cashier)
+            .GetMethod("BuildCheckoutMetadata", Private)!.Invoke(_page, null)!;
+        payload.TableNumber.Should().BeNull();
+        payload.Fields.Should().BeEmpty();
     }
 
     [Test]

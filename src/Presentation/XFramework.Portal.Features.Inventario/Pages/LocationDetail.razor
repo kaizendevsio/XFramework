@@ -139,6 +139,9 @@ else
                 </BbCard>
             </div>
 
+            <BbTabs DefaultValue="balances" Class="inv-workspace-tabs">
+                <BbTabsList><BbTabsTrigger Value="balances">Balances</BbTabsTrigger><BbTabsTrigger Value="movements">Movements</BbTabsTrigger><BbTabsTrigger Value="reservations">Reservations</BbTabsTrigger></BbTabsList>
+                <BbTabsContent Value="balances">
             <BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Stock Balances</BbCardTitle>
@@ -160,6 +163,8 @@ else
                 </BbCardContent>
             </BbCard>
 
+                </BbTabsContent>
+                <BbTabsContent Value="movements">
             <BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Recent Movements</BbCardTitle>
@@ -185,6 +190,8 @@ else
                 </BbCardContent>
             </BbCard>
 
+                </BbTabsContent>
+                <BbTabsContent Value="reservations">
             <BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Reservations</BbCardTitle>
@@ -209,6 +216,8 @@ else
                     </BbDataGrid>
                 </BbCardContent>
             </BbCard>
+                </BbTabsContent>
+            </BbTabs>
         </div>
     </FadeInContent>
 }

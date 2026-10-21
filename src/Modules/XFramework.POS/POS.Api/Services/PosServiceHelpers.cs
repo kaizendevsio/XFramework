@@ -46,6 +46,7 @@ internal static class PosServiceHelpers
             request.RegisterId,
             request.CashierCredentialId,
             request.CustomerCredentialId,
+            CheckoutMetadata = CheckoutHashData(request.CheckoutMetadata),
             request.WarehouseId,
             request.LocationId,
             request.CurrencyId,
@@ -99,6 +100,7 @@ internal static class PosServiceHelpers
             request.CustomerCredentialId,
             request.CustomerLabel,
             request.Notes,
+            CheckoutMetadata = CheckoutHashData(request.CheckoutMetadata),
             request.WarehouseId,
             request.LocationId,
             request.CurrencyId,
@@ -217,8 +219,25 @@ internal static class PosServiceHelpers
     private static string Hash<T>(T value)
     {
         var json = JsonSerializer.Serialize(value);
+        // Preserve pre-metadata idempotency hashes for otherwise unchanged requests.
+        var node = System.Text.Json.Nodes.JsonNode.Parse(json)!.AsObject();
+        if (node.TryGetPropertyValue("CheckoutMetadata", out var metadata) && metadata is null)
+        {
+            node.Remove("CheckoutMetadata");
+            json = node.ToJsonString();
+        }
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json)));
     }
+
+    private static object? CheckoutHashData(PosCheckoutMetadata metadata) =>
+        metadata.TableNumber is null && metadata.Fields.Count == 0 ? null : new
+    {
+        metadata.TableNumber,
+        Fields = metadata.Fields.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToArray()
+    };
+
+    public static PosCheckoutMetadata ReadCheckoutMetadata(string? json) =>
+        string.IsNullOrWhiteSpace(json) ? new() : JsonSerializer.Deserialize<PosCheckoutMetadata>(json)!;
 
     public static PosRegisterResponse ToRegisterResponse(PosRegister register) => new()
     {
@@ -248,6 +267,7 @@ internal static class PosServiceHelpers
         CustomerCredentialId = cart.CustomerCredentialId,
         CustomerLabel = cart.CustomerLabel,
         Notes = cart.Notes,
+        CheckoutMetadata = ReadCheckoutMetadata(cart.CheckoutMetadataJson),
         WarehouseId = cart.WarehouseId,
         LocationId = cart.LocationId,
         Status = cart.Status,
@@ -276,6 +296,7 @@ internal static class PosServiceHelpers
 
     public static PosCartSummaryResponse ToCartSummaryResponse(PosCart cart) => new()
     {
+        TableNumber = ReadCheckoutMetadata(cart.CheckoutMetadataJson).TableNumber,
         Id = cart.Id,
         TenantId = cart.TenantId,
         CartNumber = cart.CartNumber,
@@ -304,6 +325,7 @@ internal static class PosServiceHelpers
             RegisterId = sale.RegisterId,
             CashierCredentialId = sale.CashierCredentialId,
             CustomerCredentialId = sale.CustomerCredentialId,
+            CheckoutMetadata = ReadCheckoutMetadata(sale.CheckoutMetadataJson),
             Status = sale.Status,
             SubtotalAmount = sale.SubtotalAmount,
             DiscountAmount = sale.DiscountAmount,

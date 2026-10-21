@@ -76,6 +76,7 @@ public partial record CreatePosCartRequest : RequestBase,
     ICommand<CmdResponse<PosCartResponse>>,
     IBoltRequest<CreatePosCartRequest, CmdResponse<PosCartResponse>>
 {
+    public PosCheckoutMetadata CheckoutMetadata { get; set; } = new();
     public Guid RegisterId { get; set; }
     public Guid CashierCredentialId { get; set; }
     public Guid? CustomerCredentialId { get; set; }
@@ -97,6 +98,7 @@ public partial record UpdatePosCartRequest : RequestBase,
     ICommand<CmdResponse<PosCartResponse>>,
     IBoltRequest<UpdatePosCartRequest, CmdResponse<PosCartResponse>>
 {
+    public PosCheckoutMetadata CheckoutMetadata { get; set; } = new();
     public Guid Id { get; set; }
     public Guid? CustomerCredentialId { get; set; }
     public string? CustomerLabel { get; set; }
@@ -193,6 +195,7 @@ public partial record CheckoutPosSaleRequest : RequestBase,
     ICommand<CmdResponse<PosSaleReceiptResponse>>,
     IBoltRequest<CheckoutPosSaleRequest, CmdResponse<PosSaleReceiptResponse>>
 {
+    public PosCheckoutMetadata CheckoutMetadata { get; set; } = new();
     public Guid RegisterId { get; set; }
     public Guid CashierCredentialId { get; set; }
     public Guid? CustomerCredentialId { get; set; }

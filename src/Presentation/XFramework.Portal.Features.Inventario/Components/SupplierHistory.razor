@@ -1,0 +1,139 @@
+@implements IDisposable
+@using DataGridRequest = BlazorBlueprint.Primitives.DataGrid.DataGridRequest
+@inject IDataContext DataContext
+@inject NavigationManager Navigation
+
+<div class="supplier-history">
+    <BbTabs @key="(TenantId, SupplierId, PurchasingEnabled, MovementsEnabled, ProductsEnabled)" DefaultValue="orders" Class="inv-workspace-tabs">
+        <BbTabsList>
+            <BbTabsTrigger Value="orders">Purchase orders</BbTabsTrigger>
+            @if (PurchasingEnabled) { <BbTabsTrigger Value="receipts">Receipts</BbTabsTrigger> }
+            @if (PurchasingEnabled && MovementsEnabled) { <BbTabsTrigger Value="movements">Product movements</BbTabsTrigger> }
+        </BbTabsList>
+        <BbTabsContent Value="orders">
+            @if (_ordersError is not null) { <BbAlert role="alert">@_ordersError</BbAlert><BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _ordersVersion++)">Retry purchase orders</BbButton> }
+            <BbDataGrid @key="_ordersVersion" TData="PurchaseOrder" ItemsProvider="LoadOrders" ShowPagination="true" InitialPageSize="10" PageSizes="@(new[] { 10, 25, 50, 100 })"
+                        OnRowClick="@((PurchaseOrder item) => Navigation.NavigateTo($"/inventario/purchase-orders/{item.Id}?supplierId={SupplierId}"))">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.OrderNumber)" Title="Order" Sortable="true" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.OrderDate)" Title="Ordered" Sortable="true" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.ExpectedDate)" Title="Expected" Sortable="true" Filterable="true" />
+                </Columns>
+                <EmptyTemplate>@if (_ordersError is null) { <span>No purchase orders for this supplier.</span> }</EmptyTemplate>
+            </BbDataGrid>
+        </BbTabsContent>
+        @if (PurchasingEnabled)
+        {
+        <BbTabsContent Value="receipts">
+            @if (_receiptsError is not null) { <BbAlert role="alert">@_receiptsError</BbAlert><BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _receiptsVersion++)">Retry receipts</BbButton> }
+            <BbDataGrid @key="_receiptsVersion" TData="ReceivingDocument" ItemsProvider="LoadReceipts" ShowPagination="true" InitialPageSize="10" PageSizes="@(new[] { 10, 25, 50, 100 })"
+                        OnRowClick="@((ReceivingDocument item) => Navigation.NavigateTo($"/inventario/receiving/{item.Id}"))">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.ReceiptNumber)" Title="Receipt" Sortable="true" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" Filterable="true" />
+                </Columns>
+                <EmptyTemplate>@if (_receiptsError is null) { <span>No receipts for this supplier.</span> }</EmptyTemplate>
+            </BbDataGrid>
+        </BbTabsContent>
+        }
+        @if (PurchasingEnabled && MovementsEnabled)
+        {
+            <BbTabsContent Value="movements">
+                <BbTypographyMuted>Product movements linked to this supplier's receipts.</BbTypographyMuted>
+                @if (_movementsError is not null) { <BbAlert role="alert">@_movementsError</BbAlert><BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _movementsVersion++)">Retry product movements</BbButton> }
+                <BbDataGrid @key="_movementsVersion" TData="ReceivingLine" ItemsProvider="LoadMovements" ShowPagination="true" InitialPageSize="10" PageSizes="@(new[] { 10, 25, 50, 100 })"
+                            OnRowClick="@((ReceivingLine item) => Navigation.NavigateTo($"/inventario/stock/movements/{item.InventoryMovementId}"))">
+                    <Columns>
+                        <BbDataGridTemplateColumn TData="ReceivingLine" Id="Product.Name" Title="Product" Sortable="true" Filterable="true"
+                                                  SortBy="@(line => line.Product!.Name)" FilterBy="@(line => line.Product!.Name)">
+                            <ChildContent Context="line">@(line.Product?.Name ?? "Unavailable product")</ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Received quantity" Format="0.####" Sortable="true" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.UnitOfMeasure)" Title="Unit" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Posted" Sortable="true" Filterable="true" />
+                    </Columns>
+                    <EmptyTemplate>@if (_movementsError is null) { <span>No receipt-linked product movements for this supplier.</span> }</EmptyTemplate>
+                </BbDataGrid>
+            </BbTabsContent>
+        }
+    </BbTabs>
+</div>
+
+@code {
+    [Parameter] public Guid TenantId { get; set; }
+    [Parameter] public Guid SupplierId { get; set; }
+    [Parameter] public bool PurchasingEnabled { get; set; }
+    [Parameter] public bool MovementsEnabled { get; set; }
+    [Parameter] public bool ProductsEnabled { get; set; }
+    private string? _ordersError, _receiptsError, _movementsError;
+    private int _ordersVersion, _receiptsVersion, _movementsVersion;
+    private bool _disposed, _rendered;
+    private readonly CancellationTokenSource _lifetime = new();
+    protected override void OnAfterRender(bool firstRender) => _rendered = true;
+    private ValueTask<BlazorBlueprint.Primitives.DataGrid.DataGridResult<PurchaseOrder>> LoadOrders(DataGridRequest request) => Load(request, PurchasingEnabled,
+        () => DataContext.Query<PurchaseOrder>().NoCache().Where(x => x.TenantId == TenantId && x.SupplierId == SupplierId && !x.IsDeleted),
+        error => _ordersError = error, "OrderDate", ["OrderNumber", "Status", "OrderDate", "ExpectedDate"]);
+
+    private ValueTask<BlazorBlueprint.Primitives.DataGrid.DataGridResult<ReceivingDocument>> LoadReceipts(DataGridRequest request) => Load(request, PurchasingEnabled,
+        () => DataContext.Query<ReceivingDocument>().NoCache().Where(x => x.TenantId == TenantId && x.SupplierId == SupplierId && !x.IsDeleted),
+        error => _receiptsError = error, "ReceivedAt", ["ReceiptNumber", "Status", "ReceivedAt", "ReferenceNumber"]);
+
+    private ValueTask<BlazorBlueprint.Primitives.DataGrid.DataGridResult<ReceivingLine>> LoadMovements(DataGridRequest request) => Load(request, PurchasingEnabled && MovementsEnabled,
+        () => DataContext.Query<ReceivingLine>().NoCache().Where(x => x.TenantId == TenantId && !x.IsDeleted && x.InventoryMovementId != null &&
+            x.ReceivingDocument != null && x.ReceivingDocument.TenantId == TenantId &&
+            x.ReceivingDocument.SupplierId == SupplierId && !x.ReceivingDocument.IsDeleted),
+        error => _movementsError = error, "CreatedAt", ["Product.Name", "Quantity", "UnitOfMeasure", "LotNumber", "CreatedAt"], ResolveProducts);
+
+    private async Task ResolveProducts(List<ReceivingLine> rows, CancellationToken ct)
+    {
+        if (!ProductsEnabled || rows.Count == 0) return;
+        // Names are optional enrichment. A declined catalog read must not hide movement history.
+        try
+        {
+            foreach (var batch in rows.Select(x => x.ProductId).Distinct().Chunk(64))
+            {
+                var ids = batch.ToList();
+                var products = await DataContext.Query<Product>().NoCache()
+                    .Where(x => x.TenantId == TenantId && !x.IsDeleted && ids.Contains(x.Id)).Take(ids.Count).ToListAsync(ct);
+                foreach (var line in rows) line.Product ??= products.FirstOrDefault(x => x.Id == line.ProductId);
+            }
+        }
+        catch (OperationCanceledException) { throw; }
+        catch { /* Movement facts remain visible when catalog access is unavailable. */ }
+    }
+
+    private async ValueTask<BlazorBlueprint.Primitives.DataGrid.DataGridResult<T>> Load<T>(DataGridRequest request, bool enabled, Func<IRemoteQuery<T>> source,
+        Action<string?> error, string defaultSort, string[] fields, Func<List<T>, CancellationToken, Task>? enrich = null) where T : class
+    {
+        if (_disposed || !enabled || TenantId == Guid.Empty || SupplierId == Guid.Empty) return new() { Items = [], TotalItemCount = 0 };
+        var scope = (TenantId, SupplierId, PurchasingEnabled, MovementsEnabled, ProductsEnabled);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(request.CancellationToken, _lifetime.Token);
+        try
+        {
+            error(null);
+            var query = SupplierHistoryQuery.Apply(source(), request, defaultSort, fields);
+            var count = await query.CountAsync(linked.Token);
+            var rows = await query.Skip(Math.Max(0, request.StartIndex)).Take(Math.Clamp(request.Count ?? 10, 1, 100)).ToListAsync(linked.Token);
+            if (enrich is not null) await enrich(rows, linked.Token);
+            if (_disposed || linked.IsCancellationRequested || scope != (TenantId, SupplierId, PurchasingEnabled, MovementsEnabled, ProductsEnabled))
+                return new() { Items = [], TotalItemCount = 0 };
+            if (_rendered) await InvokeAsync(StateHasChanged);
+            return new() { Items = rows, TotalItemCount = count };
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            if (!_disposed && !linked.IsCancellationRequested && scope == (TenantId, SupplierId, PurchasingEnabled, MovementsEnabled, ProductsEnabled))
+            {
+                error(ex is NotSupportedException ? "This filter is not supported by history search. Change or clear the column filter and retry." : "This history tab could not be loaded. Check access or try again.");
+                if (_rendered) await InvokeAsync(StateHasChanged);
+            }
+        }
+        return new() { Items = [], TotalItemCount = 0 };
+    }
+    public void Dispose() { _disposed = true; _lifetime.Cancel(); _lifetime.Dispose(); }
+}

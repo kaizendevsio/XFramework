@@ -6,6 +6,7 @@
 @using XFramework.Domain.Shared.BusinessObjects
 @using XFramework.Domain.Shared.Contracts
 @using XFramework.Domain.Shared.DataContext
+@using XFramework.Integration.DataContext
 @implements IDisposable
 
 <PageTitle>Wallet Detail - Portal</PageTitle>
@@ -16,7 +17,8 @@
 }
 else if (_wallet is null)
 {
-    <BbTypographyMuted>Wallet not found.</BbTypographyMuted>
+    <BbEmpty Title="@(_loadError is null ? "Wallet not found" : "Wallet unavailable")" Description="@_loadError" />
+    <BbButton Variant="ButtonVariant.Outline" OnClick="ReloadWalletDetail">Retry</BbButton>
 }
 else if (_outsideTenantContext)
 {
@@ -37,7 +39,7 @@ else
     <div class="space-y-6">
         @* Header *@
         <div class="xf-page-header">
-            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Icon"
                       AriaLabel="Back to wallets"
                       OnClick="@GoBack">
                 <LucideIcon Name="arrow-left" class="h-4 w-4" />
@@ -75,11 +77,18 @@ else
             </div>
         </div>
 
+        @if (_loadError is not null)
+        {
+            <BbAlert Variant="AlertVariant.Warning">
+                <BbAlertTitle>Section unavailable</BbAlertTitle>
+                <BbAlertDescription>@_loadError</BbAlertDescription>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="ReloadWalletDetail">Retry</BbButton>
+            </BbAlert>
+        }
+
         @if (CurrentSection == "summary")
         {
-        @* Wallet Summary Card *@
-        <BbCard>
-            <BbCardHeader>
+        <section class="space-y-4">
                 <div class="flex items-center justify-between">
                     <div>
                         <BbCardTitle>Wallet Summary</BbCardTitle>
@@ -89,58 +98,26 @@ else
                     </div>
                     <StatusBadge Text="@_wallet.Status.ToString()" Status="@GetStatusKey(_wallet.Status)" />
                 </div>
-            </BbCardHeader>
-            <BbCardContent>
-                <div class="xf-summary-grid xf-summary-grid-4">
-                    <BbCard>
-                        <BbCardContent>
-                            <div class="space-y-1 pt-4">
-                                <BbTypographyMuted>Balance</BbTypographyMuted>
-                                <BbTypographyH3>@_wallet.Balance.ToString("N2")</BbTypographyH3>
-                            </div>
-                        </BbCardContent>
-                    </BbCard>
-                    <BbCard>
-                        <BbCardContent>
-                            <div class="space-y-1 pt-4">
-                                <BbTypographyMuted>Available Balance</BbTypographyMuted>
-                                <BbTypographyH3 Class="@(_wallet.AvailableBalance < 0 ? "text-red-500" : "")">
-                                    @_wallet.AvailableBalance.ToString("N2")
-                                </BbTypographyH3>
-                            </div>
-                        </BbCardContent>
-                    </BbCard>
-                    <BbCard>
-                        <BbCardContent>
-                            <div class="space-y-1 pt-4">
-                                <BbTypographyMuted>Debit On Hold</BbTypographyMuted>
-                                <BbTypographyH3 Class="@(_wallet.DebitOnHoldBalance > 0 ? "text-yellow-600" : "")">
-                                    @_wallet.DebitOnHoldBalance.ToString("N2")
-                                </BbTypographyH3>
-                            </div>
-                        </BbCardContent>
-                    </BbCard>
-                    <BbCard>
-                        <BbCardContent>
-                            <div class="space-y-1 pt-4">
-                                <BbTypographyMuted>Credit On Hold</BbTypographyMuted>
-                                <BbTypographyH3 Class="@(_wallet.CreditOnHoldBalance > 0 ? "text-yellow-600" : "")">
-                                    @_wallet.CreditOnHoldBalance.ToString("N2")
-                                </BbTypographyH3>
-                            </div>
-                        </BbCardContent>
-                    </BbCard>
+                <div class="wallet-balance-grid">
+                    @foreach (var metric in BalanceMetrics)
+                    {
+                        <BbCard>
+                            <BbCardContent>
+                                <div class="space-y-2 pt-4">
+                                    <BbTooltip>
+                                        <BbTooltipTrigger Focusable="true">
+                                            <span class="wallet-metric-label">@metric.Label <LucideIcon Name="info" class="h-4 w-4" /></span>
+                                        </BbTooltipTrigger>
+                                        <BbTooltipContent Class="max-w-xs">@metric.Description</BbTooltipContent>
+                                    </BbTooltip>
+                                    <BbTypographyH3>@metric.Value.ToString("N2")</BbTypographyH3>
+                                </div>
+                            </BbCardContent>
+                        </BbCard>
+                    }
                 </div>
 
-                <div class="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
-                    <div class="space-y-1">
-                        <BbTypographyMuted>Total Balance</BbTypographyMuted>
-                        <BbTypographyLarge>@(_wallet.TotalBalance?.ToString("N2") ?? "N/A")</BbTypographyLarge>
-                    </div>
-                    <div class="space-y-1">
-                        <BbTypographyMuted>Transferable Balance</BbTypographyMuted>
-                        <BbTypographyLarge>@_wallet.TransferableBalance.ToString("N2")</BbTypographyLarge>
-                    </div>
+                <div class="mt-4 grid grid-cols-2 gap-4">
                     <div class="space-y-1">
                         <BbTypographyMuted>Account Number</BbTypographyMuted>
                         <BbTypographyLarge>@(_wallet.AccountNumber ?? "N/A")</BbTypographyLarge>
@@ -150,11 +127,10 @@ else
                         <BbTypographyLarge>@_wallet.CreatedAt.ToString("g")</BbTypographyLarge>
                     </div>
                 </div>
-            </BbCardContent>
-        </BbCard>
+        </section>
         }
 
-        else if (CurrentSection == "workflows")
+        else if (_loadError is null && CurrentSection == "workflows")
         {
         @* Admin Operations *@
         <BbCard>
@@ -326,7 +302,7 @@ else
         </BbCard>
         }
 
-        else if (CurrentSection == "transactions")
+        else if (_loadError is null && CurrentSection == "transactions")
         {
         @* Transaction History *@
         <BbCard>
@@ -559,6 +535,7 @@ else
     [Parameter] public Guid Id { get; set; }
     [Parameter] public string? Section { get; set; }
     [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private IServiceProvider Services { get; set; } = default!;
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
@@ -578,6 +555,10 @@ else
     private bool _loading = true;
     private bool _isProcessing;
     private bool _outsideTenantContext;
+    private string? _loadError;
+    private string? _loadedSection;
+    private bool _disposed;
+    private readonly SemaphoreSlim _loadGate = new(1, 1);
     private bool MoneyOperationsDisabled => _isProcessing || _wallet?.Status == WalletStatus.Closed;
 
     // Add Funds form
@@ -609,6 +590,15 @@ else
     private decimal _rulesBondBalance;
     private decimal _rulesMaintainingBalance;
     private string CurrentSection => NormalizeSection(Section);
+    private IEnumerable<(string Label, decimal Value, string Description)> BalanceMetrics => _wallet is null ? [] :
+    [
+        ("Posted balance", _wallet.Balance, "The balance recorded on the wallet before pending debit and credit holds."),
+        ("Available balance", _wallet.AvailableBalance, "Posted balance minus debit holds. Funds currently available to spend or withdraw."),
+        ("Total including holds", _wallet.TotalBalance ?? 0, "Posted balance plus credit holds minus debit holds. Matches posted balance when there are no holds."),
+        ("Transferable balance", _wallet.TransferableBalance, "The amount currently permitted for transfers under this wallet's balance rules."),
+        ("Debit on hold", _wallet.DebitOnHoldBalance, "Funds reserved for pending outgoing transactions; excluded from available balance."),
+        ("Credit on hold", _wallet.CreditOnHoldBalance, "Pending incoming funds that are not yet available to spend.")
+    ];
 
     private static string NormalizeSection(string? section) =>
         string.IsNullOrWhiteSpace(section)
@@ -633,12 +623,13 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
-        if (_loadedId == Id)
+        if (_loadedId == Id && _loadedSection == CurrentSection)
         {
             return;
         }
 
         _loadedId = Id;
+        _loadedSection = CurrentSection;
         await ReloadWalletDetail();
     }
 
@@ -653,15 +644,18 @@ else
 
     private async Task ReloadWalletDetail()
     {
+        await _loadGate.WaitAsync();
+        if (_disposed) { _loadGate.Release(); return; }
         _loading = true;
+        _loadError = null;
         try
         {
             _transactions = [];
             await LoadWallet();
             if (_wallet is not null && !_outsideTenantContext)
             {
-                await LoadWorkflowOptions(_wallet.TenantId);
-                await LoadTransactions();
+                if (CurrentSection == "workflows") await LoadWorkflowOptions(_wallet.TenantId);
+                if (CurrentSection == "transactions") await LoadTransactions();
             }
             else
             {
@@ -671,17 +665,21 @@ else
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to load wallet detail.");
-            ToastService.Error("Could not load wallet details.", "Wallets");
+            _loadError = _wallet is null
+                ? "Wallet details could not be loaded. Retry to reconnect."
+                : $"The {CurrentSection} section could not be loaded. Check access to this tenant and retry.";
         }
         finally
         {
             _loading = false;
+            _loadGate.Release();
         }
     }
 
     private async Task LoadWallet()
     {
         _outsideTenantContext = false;
+        _wallet = null;
         _wallet = await DataContext.Query<Wallet>()
             .IgnoreQueryFilters()
             .NoCache()
@@ -702,7 +700,8 @@ else
         }
 
         var walletTenantId = _wallet.TenantId;
-        _transactions = await DataContext.Query<WalletTransaction>()
+        var context = new RemoteDataContext(Services, BuildCommandMetadata(walletTenantId));
+        _transactions = await context.Query<WalletTransaction>()
             .IgnoreQueryFilters()
             .NoCache()
             .Where(x => x.WalletId == Id && x.TenantId == walletTenantId && !x.IsDeleted)
@@ -1465,6 +1464,7 @@ else
 
     public void Dispose()
     {
+        _disposed = true;
         TenantFilter.OnChanged -= OnTenantFilterChanged;
     }
 }

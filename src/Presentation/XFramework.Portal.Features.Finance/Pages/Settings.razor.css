@@ -1,6 +1,8 @@
 .finance-settings-page {
     width: 100%;
-    max-width: 800px;
+    max-width: 960px;
+    margin-inline: auto;
+    padding-block: 1rem;
     display: grid;
     gap: 1.25rem;
 }
@@ -11,7 +13,7 @@
     min-width: 0;
 }
 
-.finance-settings-section > div {
+.finance-currency-field {
     display: grid;
     gap: .4rem;
     min-width: 0;
@@ -25,8 +27,12 @@
 
 .finance-currency-field {
     width: 100%;
-    max-width: 28rem;
 }
+
+.finance-settings-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; }
+.finance-settings-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .75rem; padding-top: 1rem; }
+.finance-settings-shortcut { display: inline-flex; align-items: center; gap: .5rem; width: fit-content; padding: .6rem .85rem; border: 1px solid var(--border); border-radius: .5rem; color: inherit; text-decoration: none; }
+@media (max-width: 640px) { .finance-settings-fields { grid-template-columns: minmax(0, 1fr); } }
 
 .finance-tax-rate {
     width: 10rem;

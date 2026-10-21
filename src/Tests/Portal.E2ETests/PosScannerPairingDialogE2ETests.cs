@@ -40,7 +40,7 @@ namespace Portal.E2ETests;
 [Category("Kind:E2E")]
 [Category("Module:POS")]
 [Category("Area:Scanner")]
-public sealed class PosScannerPairingDialogE2ETests : PageTest
+public sealed partial class PosScannerPairingDialogE2ETests : PageTest
 {
     private WebApplication app = null!;
     private PairingFixtureState state = null!;
@@ -77,11 +77,11 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
         builder.Services.AddScoped<AuthenticationStateProvider, PosScannerFixtureAuthentication>();
         builder.Services.AddSingleton(Mock.Of<IPortalTenantContext>(t => t.SelectedTenantId == state.TenantId));
         builder.Services.AddSingleton(Mock.Of<IDataContext>());
-        builder.Services.AddSingleton(Mock.Of<IdentityServer.Integration.Drivers.IIdentityServerServiceWrapper>());
-        builder.Services.AddSingleton(Mock.Of<IPortalModuleAvailability>());
+        ConfigureCheckoutIdentity(builder.Services);
         builder.Services.AddSingleton(Mock.Of<IPortalActorContext>(a => a.CredentialId == state.CashierId));
         builder.Services.AddScoped(_ => new RequestMetadata());
         var wrapper = new Mock<IPOSServiceWrapper>();
+        ConfigureHeldCartWrapper(wrapper);
         wrapper.Setup(w => w.CreatePosScannerPairing(It.IsAny<CreatePosScannerPairingRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() =>
             {
@@ -188,6 +188,8 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
         state.Polls = 0; state.PausedPolls = 0; state.Revokes = 0; state.Acknowledged = 0;
         state.QueuedScan = null; state.LatestPairing = null; state.Cashier = null; state.FinancialCalls = 0;
         state.RevokedPairings.Clear(); state.CatalogRequests.Clear();
+        state.CheckoutSettings = new(); state.HeldCart = null; state.SettingsSaves = 0;
+        state.DenyCustomerCreate = false; state.IdentityCreates = 0; state.CredentialCreates = 0;
         var runtime = await Page.APIRequest.GetAsync(app.Urls.Single() + "/_framework/blazor.web.js");
         runtime.Status.Should().Be(200, "the framework script must be served from the built Portal's asset manifest");
         (await Page.APIRequest.GetAsync(app.Urls.Single() + "/cashier-css/utilities.css")).Status.Should().Be(200);
@@ -568,7 +570,7 @@ public sealed class PosScannerPairingDialogE2ETests : PageTest
     }
 }
 
-public sealed class PairingFixtureState
+public sealed partial class PairingFixtureState
 {
     public Guid TenantId { get; } = Guid.NewGuid();
     public Guid RegisterId { get; } = Guid.NewGuid();
@@ -597,6 +599,7 @@ public sealed record PairingFixtureQueuedScan(Guid PairingId,long Sequence,strin
 
 [Route("/scanner-pairing-fixture")]
 [Route("/cashier-scanner-fixture")]
+[Route("/pos-settings-fixture")]
 [Route("/pos/mobile-scanner")]
 public sealed class PosPairingFixtureRoot : ComponentBase
 {
@@ -607,6 +610,7 @@ public sealed class PosPairingFixtureRoot : ComponentBase
         b.OpenComponent(1,new Uri(Navigation.Uri).AbsolutePath switch
         {
             "/cashier-scanner-fixture" => typeof(PosScannerFixtureCashierSurface),
+            "/pos-settings-fixture" => typeof(PosSettingsFixtureSurface),
             "/pos/mobile-scanner" => typeof(MobileScanner),
             _ => typeof(PosPairingFixtureSurface)
         });
@@ -643,6 +647,8 @@ public sealed class PosScannerFixtureCashier : Cashier
     {
         State.Cashier = this;
         Set("_loading",false);Set("_hasTenant",true);Set("_moduleEnabled",true);
+        Set("_checkoutSettings",State.CheckoutSettings);
+        Set("_cartsEnabled",true);
         Set("_registers",new List<PosRegisterResponse> {new() {Id=State.RegisterId,Name="Fixture register",CurrencyId=State.CurrencyId}});
         Set("_selectedRegisterId",State.RegisterId.ToString());
         Set("_currencies",new List<CurrencyType> {new() {Id=State.CurrencyId,CurrencyIsoCode3="USD"}});
