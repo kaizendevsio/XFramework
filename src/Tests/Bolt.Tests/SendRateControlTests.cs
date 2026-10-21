@@ -13,6 +13,44 @@ namespace Bolt.Tests;
 public sealed class SendRateControlTests
 {
     [Test]
+    public void DelaySourceChange_DoesNotMakeOneSpikeAStandingQueue()
+    {
+        var controller = new SendRateController(14911);
+        for (var now = 10000; now < 13000; now += 100)
+            controller.Update(new SendPathSample(now, 5000, 40, 0, 0, false,
+                Receiver: new(now, 10, 5000)));
+        var spike = controller.Update(new SendPathSample(13000, 5000, 40, 180, 0, false,
+            Receiver: new(13000, 10, 5000)));
+        Assert.That(spike.Cause.HasFlag(RateCause.StandingQueue), Is.False);
+        Assert.That(spike.LastCut, Is.Null);
+    }
+
+    [Test]
+    public void SustainedQueue_StillCountsWhenDominantSourceAlternates()
+    {
+        var controller = new SendRateController(6000);
+        SendRateDecision decision = default;
+        for (var now = 10000; now <= 12500; now += 100)
+        {
+            var local = now % 200 == 0;
+            decision = controller.Update(new SendPathSample(now, 5000, 40, local ? 200 : 0, 0, false,
+                Receiver: new(now, local ? 10 : 200, 5000)));
+            if (now < 12000) Assert.That(decision.Cause.HasFlag(RateCause.StandingQueue), Is.False);
+        }
+        Assert.That(decision.TotalKbps, Is.LessThan(6000));
+        Assert.That(decision.LastCut!.Cause.HasFlag(RateCause.StandingQueue), Is.True);
+    }
+
+    [Test]
+    public void ObservationGap_DoesNotCountAsSustainedQueue()
+    {
+        var controller = new SendRateController(6000);
+        controller.Update(new SendPathSample(10000, 5000, 40, 200, 0, false));
+        var resumed = controller.Update(new SendPathSample(15000, 5000, 40, 200, 0, false));
+        Assert.That(resumed.Cause.HasFlag(RateCause.StandingQueue), Is.False);
+    }
+
+    [Test]
     public void StaleReceiver_CannotInventGrowingDelayOrMeasuredCapacity()
     {
         var controller = new SendRateController(6000);

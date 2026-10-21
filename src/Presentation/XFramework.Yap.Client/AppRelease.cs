@@ -2,10 +2,16 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.93";
+    public const string Version = "1.3.94";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
-        (Version, "20 October 2026", [
+        (Version, "21 October 2026", [
+            "Video quality ignores brief queue spikes when congestion measurements change source, while responding to confirmed bandwidth limits.",
+            "Incoming video follows display callbacks with bounded buffering to smooth bursty frame delivery.",
+            "Call diagnostics separate received, decoded and drawn FPS, show frame spacing, and distinguish camera capabilities from actual capture rate."]),
+        ("1.3.93", "21 October 2026", [
+            "One-to-one calls prefer a direct peer connection, with Cloudflare TURN and the existing server route available when needed."]),
+        ("1.3.92", "20 October 2026", [
             "Video retries recovery when a replacement picture is lost, reducing freezes after a decoder reset.",
             "Brief connection stalls are less likely to cause an abrupt quality collapse; confirmed bandwidth limits still reduce video quality.",
             "Call diagnostics show when video is waiting for a keyframe and how many recovery requests it has made."]),

@@ -140,6 +140,7 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
     };
     let track = null;
     const sandbox = {
+        requestAnimationFrame: () => 1, cancelAnimationFrame() {},
         setTimeout, clearTimeout, setInterval: (...args) => setInterval(...args).unref(), clearInterval,
         console, URL, Uint8Array, Float32Array, Math, Date, JSON, Promise, Set, Map, Number, performance: { now: clock }, isSecureContext: true,
         AudioEncoder: class { static async isConfigSupported() { return { supported: true }; } },
@@ -191,6 +192,8 @@ function fixture({ support = () => ({ supported: true }), hardwareConcurrency = 
     vm.runInContext(source + `
 this.meter = socketBufferedAmount;
 this.temporalModeFor = temporalModeFor;
+this.VideoPlayout = VideoPlayout;
+this.cameraConstraints = cameraConstraints;
 this.pipeline = createVideoPipeline();
 this.probe = probeVideoCodecs;
 this.ceiling = videoDeviceCeiling;
@@ -207,11 +210,79 @@ this.orientationCode = orientationCode;`, sandbox);
     const host = { invokeMethodAsync: async (...args) => { stats.invoked.push(args); } };
     const canvas = { width: 0, height: 0, getContext: () => ({ drawImage() {} }) };
     return { p: sandbox.pipeline, sandbox, stats, listeners, host, canvas, pushFrame, canvases,
+        paint() { for (const r of sandbox.pipeline.remotes.values()) { r.playout.clock = () => clock() + 50; r.playout.tick(); } },
         get track() { return track; }, get video() { return element; } };
 }
 
 const tier = { width: 1280, height: 720, bitrate: 1500, framerate: 30 };
 const init = (f, codec = 'h264') => f.p.initEncoder(codec, tier.width, tier.height, tier.bitrate, tier.framerate, 2);
+
+function playoutFixture() {
+    let now = 0, callback = null;
+    const frames = [], draws = [];
+    const playout = new (fixture().sandbox.VideoPlayout)((frame, code) => draws.push({ at: now, timestamp: frame.timestamp, code }),
+        cb => { callback = cb; return 1; }, () => { callback = null; }, () => now);
+    return { playout, frames, draws,
+        push(stamp, code = 0) { const frame = { timestamp: stamp * 1000, closed: 0, close() { this.closed++; } }; frames.push(frame); playout.push(frame, code); },
+        advance(time, draw = true) { now = time; if (draw && callback) { const cb = callback; callback = null; cb(); } },
+        get scheduled() { return callback !== null; } };
+}
+
+test('playout spaces a paired arrival burst instead of drawing both pictures together', () => {
+    const f = playoutFixture();
+    f.push(0, 1); f.push(33, 0);
+    f.advance(33); assert.equal(f.draws.length, 0);
+    f.advance(50); assert.equal(f.draws.length, 1);
+    f.advance(83); assert.equal(f.draws.length, 2);
+    assert.deepEqual(f.draws.map(x => x.code), [1, 0]);
+    assert.equal(f.playout.diagnostics().drawGapMaxMs, 33);
+    assert.ok(f.frames.every(x => x.closed === 1));
+    assert.equal(f.scheduled, false);
+});
+
+test('playout discards superseded frames after a late display callback', () => {
+    const f = playoutFixture();
+    f.push(0); f.push(16); f.push(33);
+    f.advance(100);
+    assert.equal(f.draws.length, 1);
+    assert.equal(f.draws[0].timestamp, 33000);
+    assert.equal(f.playout.dropped, 2);
+    assert.ok(f.frames.every(x => x.closed === 1));
+});
+
+test('playout bounds hidden-tab surfaces and clears them on removal', () => {
+    const f = playoutFixture();
+    for (let i = 0; i < 20; i++) { f.advance(i * 16, false); f.push(i * 16); }
+    assert.equal(f.playout.queue.length, 6);
+    f.playout.clear();
+    assert.ok(f.frames.every(x => x.closed === 1));
+    assert.equal(f.scheduled, false);
+});
+
+test('playout rejects stale background pictures and rebases after a timestamp restart', () => {
+    const f = playoutFixture();
+    f.push(5000); f.advance(500);
+    assert.equal(f.draws.length, 0);
+    f.push(0); f.advance(550);
+    assert.equal(f.draws.length, 1);
+    assert.equal(f.draws[0].timestamp, 0);
+    assert.ok(f.frames.every(x => x.closed === 1));
+});
+
+test('playout ignores duplicate frames and keeps its latency bounded after a network stall', () => {
+    const f = playoutFixture();
+    f.push(0); f.push(0); f.advance(50);
+    f.advance(500); f.push(33); f.advance(550);
+    assert.equal(f.draws.length, 2);
+    assert.ok(f.frames.every(x => x.closed === 1));
+    assert.ok(f.playout.diagnostics().playoutMs <= 50);
+});
+
+test('60fps camera preference has an optional minimum, not a mandatory camera rejection', () => {
+    const c = plain(fixture().sandbox.cameraConstraints(1280, 720, 60));
+    assert.deepEqual(c.frameRate, { ideal: 60, max: 60 });
+    assert.deepEqual(c.advanced, [{ frameRate: { min: 60 } }]);
+});
 
 // ── Codec probing ──
 
@@ -412,6 +483,23 @@ test('one participant per decoder, and removing a tile closes it', async () => {
     f.p.removeRemote('s1');
     assert.equal(closed.state, 'closed');
     assert.equal(f.p.remotes.size, 1);
+});
+
+test('decoder replacement and tile removal close queued and late frames without painting them', () => {
+    const f = fixture();
+    f.p.addRemote('s', f.canvas, 'h264', f.host);
+    const remote = f.p.remotes.get('s'), first = remote.decoder;
+    const frame = timestamp => new f.sandbox.VideoFrame({ width: 640, height: 360 }, { timestamp });
+    const queued = frame(1000); first.callbacks.output(queued);
+    assert.equal(remote.playout.queue.length, 1);
+    first.callbacks.error(new Error('reset'));
+    assert.equal(queued.closed, true);
+    const late = frame(2000); first.callbacks.output(late);
+    assert.equal(late.closed, true);
+    const removed = frame(3000); remote.decoder.callbacks.output(removed);
+    f.p.removeRemote('s');
+    assert.equal(removed.closed, true);
+    assert.equal(remote.rendered, 0);
 });
 
 test('a decoder that errors is rebuilt and the sender is asked for a keyframe', async () => {
@@ -725,6 +813,7 @@ test('Safari paints upright element pixels, rather than retaining sensor metadat
     assert.equal(f.stats.encoded.length, 1);
     const canvas = f.p.captureCanvas;
     assert.equal(f.stats.encoded[0].frame.source, canvas);
+    f.paint();
     assert.deepEqual([canvas.width, canvas.height], [720, 1280]);
     assert.equal(canvas.ops.find(op => op[0] === 'drawImage')[1], f.video);
     assert.equal(canvas.ops.some(op => op[0] === 'rotate'), false);
@@ -888,6 +977,7 @@ test('the receiver paints each code at the displayed size, with one transformed 
         assert.equal(f.p.decodeFrame('s', new Uint8Array([1]), timestamp, true, false, code), true);
         canvas.ops.length = 0;
         remote.decoder.callbacks.output({ timestamp, displayWidth: 1280, displayHeight: 720, close() {} });
+        f.paint();
         const [width, height] = code & 1 ? [720, 1280] : [1280, 720];
         assert.deepEqual([canvas.width, canvas.height], [width, height], `code ${code}`);
         assert.deepEqual([remote.width, remote.height], [width, height]);
@@ -925,8 +1015,10 @@ test('a decoded picture is turned by the code it was sent with, not by the lates
     f.p.decodeFrame('s', new Uint8Array([1]), 100, true, false, 1);
     f.p.decodeFrame('s', new Uint8Array([1]), 200, false, false, 0);
     remote.decoder.callbacks.output({ timestamp: 100, displayWidth: 1280, displayHeight: 720, close() {} });
+    f.paint();
     assert.deepEqual([canvas.width, canvas.height], [720, 1280]);
     remote.decoder.callbacks.output({ timestamp: 200, displayWidth: 1280, displayHeight: 720, close() {} });
+    f.paint();
     assert.deepEqual([canvas.width, canvas.height], [1280, 720], 'the phone was turned back between the two');
     for (let i = 0; i < 100; i++) f.p.decodeFrame('s', new Uint8Array([1]), 1000 + i, false, false, 3);
     assert.equal(remote.orientations.size, 32, 'bounded while the decoder holds pictures back');
@@ -962,6 +1054,7 @@ test('diagnostics say how the sender handles orientation and what the receiver a
     assert.equal(metadata.p.getDiagnostics().remotes[0].rotation, 'none');
     metadata.p.decodeFrame('s', new Uint8Array([1]), 5, true, false, 1);
     metadata.p.remotes.get('s').decoder.callbacks.output({ timestamp: 5, displayWidth: 1280, displayHeight: 720, close() {} });
+    metadata.paint();
     const remote = metadata.p.getDiagnostics().remotes[0];
     assert.equal(remote.rotation, '90°');
     assert.deepEqual([remote.width, remote.height], [720, 1280], 'the incoming size is the displayed one');
@@ -1151,7 +1244,8 @@ test('Safari fresh frame callbacks survive a repeated or reset media clock', asy
 test('render scales decoded display pixels into the canvas rather than using coded raster size', () => {
     const f = fixture(); const canvas = f.sandbox.document.createElement('canvas');
     f.p.addRemote('s', canvas, 'h264', f.host);
-    f.p._render(f.p.remotes.get('s'), {displayWidth: 1440, displayHeight: 1920, close() {}});
+    f.p._render(f.p.remotes.get('s'), {timestamp: 100, displayWidth: 1440, displayHeight: 1920, close() {}});
+    f.paint();
     assert.deepEqual(canvas.ops.at(-1).slice(2), [0, 0, 1440, 1920]);
 });
 
@@ -1198,10 +1292,12 @@ test('receive-only diagnostics distinguish received frames, rendered frames and 
     remote.decoder.callbacks.output({ timestamp: 123, displayWidth: 720, displayHeight: 1280, close() {} });
     f.p.decodeFrame('incoming', new Uint8Array(100), 124, false);
     remote.acceleration = 'prefer-software';
+    now = 65; remote.playout.tick();
     now = 1000;
     const info = f.p.getDiagnostics();
     assert.equal(info.capturing, false);
     assert.equal(info.remotes[0].receivedFps, 2);
+    assert.equal(info.remotes[0].decodedFps, 1);
     assert.equal(info.remotes[0].renderedFps, 1);
     assert.equal(info.remotes[0].decoderDelayMs, 25);
     assert.equal(info.remotes[0].pendingFrames, 1);

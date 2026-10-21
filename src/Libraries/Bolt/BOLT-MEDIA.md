@@ -30,6 +30,14 @@ Diagnostics show `peer-direct`, `peer-turn`, `peer-unknown` (until ICE statistic
 
 Validation covers browser offer/answer and early candidates, peer-to-peer media/feedback/repair, failure-to-server fallback, old clients, group expansion, authorization revocation, and congestion regressions. A real Chromium test exchanged 220 messages in each direction over host/UDP candidates including an ICE restart. Physical iPhone/Android routing, sustained 1080p, and thermal improvement still require the live device comparison; simulated ICE tests are not evidence of those outcomes.
 
+### Congestion persistence and display pacing (1.3.94)
+
+Standing-queue detection requires a complete two-second observation window, independent of the currently dominant delay source. Changing from receiver delay to local delay resets the gradient, but cannot turn one spike into a sustained queue. A reporting gap clears persistence. Confirmed loss, fast queue growth, and a backlogged relay's measured capacity still trigger fast reductions; these are not gated behind the standing-queue window.
+
+Decoded pictures enter a timestamp-based playout queue with an initial 40 ms cushion. Each animation callback draws only the latest due picture, closes superseded frames, and retains at most six surfaces. Timestamp discontinuities, decoder replacement, remote removal and excessive lateness clear or rebase the queue. This trades a small video-only delay for smoother delivery after packet/decoder bursts; it is not a full audio/video synchronization clock. Frames older than 150 ms are not painted after a background stall.
+
+Diagnostics distinguish received pictures, decoder output and canvas draws per second. They also expose draw-gap p95/max, playout wait, queue depth and skipped pictures. Canvas submission is not proof of physical display presentation. Camera diagnostics distinguish the requested rate, track settings, advertised range and observed source frames. Capture requests include an optional minimum matching the preferred FPS; unsupported cameras keep working. In the physical Android comparison, the front camera delivered about 30 FPS despite a 60 FPS setting, while the rear delivered about 60 at 720p. This locates the limit before encoding, but does not establish whether the front sensor, exposure mode or browser driver is responsible. An advertised maximum is not a guarantee for every resolution/lighting combination ([Media Capture specification](https://w3c.github.io/mediacapture-main/getusermedia.html)). Re-test both cameras after updating; no synthetic test can establish that phone's front-camera maximum.
+
 ---
 
 ## Architecture

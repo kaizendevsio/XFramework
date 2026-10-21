@@ -224,6 +224,9 @@ public sealed class SendRateController
 
     private readonly SendRateOptions _options;
     private readonly Queue<(long At, int Delay)> _history = new();
+    // Queue persistence is independent of which source currently has the largest delay.
+    // Resetting the gradient on a source change must not turn one spike into a standing queue.
+    private readonly Queue<(long At, int Delay)> _floorHistory = new();
     private double _estimate;
     private double _lastCongestionKbps;
     private bool _congestedOnce;
@@ -305,6 +308,7 @@ public sealed class SendRateController
     public void StartPicture(int totalKbps)
     {
         _history.Clear();
+        _floorHistory.Clear();
         _lastCongestionKbps = 0;
         _congestedOnce = _congestionObserved = false;
         _lastDecreaseAt = long.MinValue / 2;
@@ -468,7 +472,8 @@ public sealed class SendRateController
         var baseLost = sample.LocalBaseLost || relay?.BaseLost == true;
         var rising = delay >= _options.HighDelayMs && gradient >= _options.OveruseGradientMsPerSecond;
         _risingStreak = rising ? _risingStreak + 1 : 0;
-        var standing = floor >= _options.TargetDelayMs;
+        var standing = _floorHistory.Count > 0 && now - _floorHistory.Peek().At >= FloorWindowMs &&
+                       floor >= _options.TargetDelayMs;
         // Shed enhancement layers are the relay protecting a receiver; with a queue that also stands, it is congestion.
         var shedding = relay?.Dropping == true && floor >= _options.TargetDelayMs / 2;
         // A queue growing faster than any stall could make it, or a receiver getting a fraction of what is sent
@@ -477,7 +482,11 @@ public sealed class SendRateController
                    (delay - DelayAgo(now, 500) >= OverloadJumpMs || delay - DelayAgo(now, 250) >= OverloadJumpMs * 8 / 15);
         var starved = receiver is { ReceivedKbps: > 0 } got && delay >= _options.TargetDelayMs && _sentAverage > 0 &&
                       got.ReceivedKbps < _sentAverage * StarvedFraction;
-        var overload = delay >= _options.HighDelayMs && (gradient >= OverloadGradientMsPerSecond || jump || starved);
+        // A backlogged relay measures its own drain capacity. That is stronger evidence than a
+        // transient delay, and must not wait for the standing-queue observation window.
+        var relayLimited = relay is { CapacityKbps: > 0 } limited && limited.QueueDelayMs >= _options.HighDelayMs &&
+                           _sentAverage > limited.CapacityKbps * 1.2;
+        var overload = delay >= _options.HighDelayMs && (gradient >= OverloadGradientMsPerSecond || jump || starved || relayLimited);
         // GCC's loss half, on the uplink: heavy loss is congestion whatever the delay says.
         var lossy = transport is { } lt && lt.LossFraction > _options.OveruseLossFraction;
         var overuse = baseLost || standing || shedding || overload || lossy || _risingStreak >= RisingSamples;
@@ -589,6 +598,7 @@ public sealed class SendRateController
         var audioWire = _audioKbps + _options.AudioOverheadBytes * 8 * _options.AudioPacketsPerSecond / 1000;
         _estimate = Math.Clamp(Math.Max(_estimate, StableKbps), _options.MinTotalKbps, _options.MaxTotalKbps);
         _history.Clear();
+        _floorHistory.Clear();
         _lastCongestionKbps = 0;
         _congestedOnce = _congestionObserved = false;
         _risingStreak = _cutStreak = 0;
@@ -608,6 +618,7 @@ public sealed class SendRateController
         _estimate = RestartKbps(StableKbps, _options, audioWireKbps);
         Restarts++;
         _history.Clear();
+        _floorHistory.Clear();
         _lastCongestionKbps = 0;
         _congestedOnce = _congestionObserved = false;
         _lastDecreaseAt = long.MinValue / 2;
@@ -828,14 +839,19 @@ public sealed class SendRateController
     private int Floor(long now)
     {
         var floor = int.MaxValue;
-        foreach (var (at, value) in _history)
-            if (now - at <= FloorWindowMs) floor = Math.Min(floor, value);
+        foreach (var (_, value) in _floorHistory) floor = Math.Min(floor, value);
         return floor == int.MaxValue ? 0 : floor;
     }
 
     /// <summary>Least-squares slope of the delay over the last second, in ms per second.</summary>
     private double Gradient(long now, int delay)
     {
+        if (_floorHistory.Count > 0 && now - _floorHistory.Last().At > _options.ReportFreshMs)
+            _floorHistory.Clear();
+        _floorHistory.Enqueue((now, delay));
+        // Keep the sample at the left edge so the window proves a full observation interval.
+        while (_floorHistory.Count > 1 && _floorHistory.ElementAt(1).At <= now - FloorWindowMs)
+            _floorHistory.Dequeue();
         _history.Enqueue((now, delay));
         while (_history.Count > 0 && now - _history.Peek().At > FloorWindowMs) _history.Dequeue();
         _lastGradient = GradientOfHistory(now);

@@ -45,6 +45,8 @@
             @if (info.Capturing)
             {
                 <div>Camera: @Size(info.CameraWidth, info.CameraHeight) / @Number(info.CameraFps) fps setting</div>
+                <div>Camera facing: @info.CameraFacing · advertised range: @Number(info.CameraMinFps)–@Number(info.CameraMaxFps) fps</div>
+                @if (info.CameraConstraintRejected) { <div>Camera rejected the last settings change; the working capture was retained.</div> }
                 <div>Encoder: @Size(info.Width, info.Height) / @Number(info.TargetFps) fps · @info.Codec</div>
                 <div>Capture → encoded: @Number(info.CaptureFps) → @Number(info.EncodedFps) fps</div>
                 <div>Encoded: @Number(info.EncodedKbps) kbps · last encode: @Number(info.EncoderDelayMs) ms</div>
@@ -61,7 +63,9 @@
             var remote = info.Remotes[i];
             <div class="debug-stream" @key="remote.StreamId">
                 <strong>Incoming @(i + 1) · @Size(remote.Width, remote.Height) · @remote.Codec</strong>
-                <div>Received → rendered: @Number(remote.ReceivedFps) → @Number(remote.RenderedFps) fps</div>
+                <div>Received → decoded → canvas draws: @Number(remote.ReceivedFps) → @Number(remote.DecodedFps) → @Number(remote.RenderedFps) fps</div>
+                <div>Draw gaps p95 / max: @Number(remote.DrawGapP95Ms) / @Number(remote.DrawGapMaxMs) ms</div>
+                <div>Playout wait: @Number(remote.PlayoutMs) ms · queued: @remote.PlayoutQueue · skipped: @remote.PlayoutDropped</div>
                 <div>Received: @Number(remote.ReceivedKbps) kbps · last decode: @Number(remote.DecoderDelayMs) ms</div>
                 <div>Queue: decoder @remote.DecoderQueue / pending @remote.PendingFrames · resets: @remote.Resets</div>
                 <div>Waiting for keyframe: @(remote.WaitingForKeyframe ? "yes" : "no") · recovery requests: @remote.RecoveryRequests</div>
@@ -80,7 +84,7 @@
         @if (info.Remotes.Length == 0) { <div>No incoming video stream.</div> }
     }
     else { <div>Collecting video measurements…</div> }
-    <p>Updates every second. — means no sample. Hardware preference does not confirm GPU use. Rates exclude transport overhead; codec delays include queueing, not CPU usage or call latency. Preparation/copy/render are submission costs, not GPU completion times. Timings run while this panel is open or live sharing is enabled in Settings.</p>
+    <p>Updates every second. — means no sample. Camera settings and advertised ranges do not guarantee actual FPS. Canvas draws are scheduled for display refresh; physical presentation is not measurable here. At 30 fps, evenly spaced draws are about 33 ms apart; at 60 fps, about 17 ms. Hardware preference does not confirm GPU use. Rates exclude transport overhead; codec delays include queueing, not CPU usage or call latency. Preparation/copy/render are submission costs, not GPU completion times. Timings run while this panel is open or live sharing is enabled in Settings.</p>
 </aside>
 @code {
     [Parameter] public VideoDiagnostics? Snapshot { get; set; }

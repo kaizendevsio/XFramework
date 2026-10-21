@@ -89,6 +89,9 @@ public sealed class LiveCallDiagnostics(ChatApi api, IJSRuntime js) : IAsyncDisp
             [M.Visible] = visible ? 1 : 0, [M.ElapsedMs] = elapsed, [M.RequestedHeight] = height, [M.RequestedFps] = fps,
             [M.Capturing] = s.Capturing ? 1 : 0, [M.CameraWidth] = s.CameraWidth, [M.CameraHeight] = s.CameraHeight,
             [M.CameraFps] = s.CameraFps, [M.Width] = s.Width, [M.Height] = s.Height, [M.TargetFps] = s.TargetFps,
+            [M.CameraMinFps] = s.CameraMinFps, [M.CameraMaxFps] = s.CameraMaxFps,
+            [M.RearCamera] = s.CameraFacing == "environment" ? 1 : s.CameraFacing == "user" ? 0 : null,
+            [M.CameraConstraintRejected] = s.CameraConstraintRejected ? 1 : 0,
             [M.CaptureFps] = s.CaptureFps, [M.EncodedFps] = s.EncodedFps, [M.EncodedKbps] = s.EncodedKbps,
             [M.EncoderQueue] = s.EncoderQueue, [M.SendQueue] = s.SendQueue, [M.EncoderDelayMs] = s.EncoderDelayMs,
             [M.CaptureDrops] = s.Dropped, [M.CapturePrepareMs] = s.CapturePrepareMs, [M.EncodedCopyMs] = s.EncodedCopyMs,
@@ -114,6 +117,8 @@ public sealed class LiveCallDiagnostics(ChatApi api, IJSRuntime js) : IAsyncDisp
             s.Remotes.Take(8).Select(x => new CallDiagnosticRemote(x.StreamId, x.Codec, new()
             {
                 [M.Width] = x.Width, [M.Height] = x.Height, [M.ReceivedFps] = x.ReceivedFps, [M.RenderedFps] = x.RenderedFps,
+                [M.DecodedFps] = x.DecodedFps, [M.DrawGapP95Ms] = x.DrawGapP95Ms, [M.DrawGapMaxMs] = x.DrawGapMaxMs,
+                [M.PlayoutMs] = x.PlayoutMs, [M.PlayoutQueue] = x.PlayoutQueue, [M.PlayoutDropped] = x.PlayoutDropped,
                 [M.ReceivedKbps] = x.ReceivedKbps, [M.DecoderQueue] = x.DecoderQueue, [M.PendingFrames] = x.PendingFrames,
                 [M.RenderMs] = x.RenderMs, [M.DecoderDelayMs] = x.DecoderDelayMs, [M.Resets] = x.Resets,
                 [M.WaitingForKeyframe] = x.WaitingForKeyframe ? 1 : 0, [M.RecoveryRequests] = x.RecoveryRequests,

@@ -16,7 +16,8 @@ public enum CallMetric
     FrameExperiment, RawWidth, RawHeight, DisplayWidth, DisplayHeight, FrameRotation, FrameFlip,
     DecodedWidth, DecodedHeight, PrepareP95Ms, ScreenAngle, RearCamera,
     WaitingForKeyframe, RecoveryRequests, Topology, DelaySource, ReceiverAgeMs, TransportAgeMs, SentKbps, ApplicationLimited,
-    CutLocalMs, CutTransportMs, CutReceiverMs, CutReceiverAgeMs, CutTransportAgeMs, CutSentKbps, CutCapacityKbps, CutLossPercent, CutGradient, CutAtMs
+    CutLocalMs, CutTransportMs, CutReceiverMs, CutReceiverAgeMs, CutTransportAgeMs, CutSentKbps, CutCapacityKbps, CutLossPercent, CutGradient, CutAtMs,
+    CameraMinFps, CameraMaxFps, CameraConstraintRejected, DecodedFps, DrawGapP95Ms, DrawGapMaxMs, PlayoutMs, PlayoutQueue, PlayoutDropped
 }
 public enum CallDevice { Other, Android, Ios, Desktop }
 public enum CallCapturePath { Unknown, Processor, WorkerProcessor, WorkerWebgl, Rvfc, RvfcWebgl, WorkerWebgpu }

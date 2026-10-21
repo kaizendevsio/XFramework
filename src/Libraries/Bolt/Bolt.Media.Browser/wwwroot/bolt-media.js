@@ -1,4 +1,77 @@
 import { CameraOrientation } from './bolt-video-orientation.js';
+
+// A small playout cushion absorbs repair/decoder bursts. One canvas draw per display callback,
+// never a catch-up burst; retained VideoFrames and latency are strictly bounded.
+export class VideoPlayout {
+    constructor(paint, request = cb => requestAnimationFrame(cb), cancel = id => cancelAnimationFrame(id), clock = () => performance.now()) {
+        this.paint = paint; this.request = request; this.cancel = cancel; this.clock = clock;
+        this.queue = []; this.callback = null; this.origin = null; this.lastStamp = null;
+        this.dropped = 0; this.gaps = []; this.lastDraw = null; this.waitMs = 0; this.draws = 0;
+    }
+    clear() {
+        if (this.callback !== null) this.cancel(this.callback);
+        this.callback = null;
+        for (const item of this.queue) item.frame.close();
+        this.queue = []; this.origin = this.lastStamp = this.lastDraw = null;
+    }
+    push(frame, orientation) {
+        const now = this.clock(), stamp = frame.timestamp / 1000;
+        if (!Number.isFinite(stamp)) { frame.close(); this.dropped++; return; }
+        // Timestamp discontinuities (camera restart or 32-bit wire-clock wrap) start a fresh timeline.
+        if (this.lastStamp !== null && (stamp < this.lastStamp - 1000 || stamp > this.lastStamp + 1000)) this.clear();
+        if (this.lastStamp !== null && stamp <= this.lastStamp) { frame.close(); this.dropped++; return; }
+        this.origin ??= now + 40 - stamp;
+        // A long network stall must not leave every subsequent frame permanently late.
+        if (stamp + this.origin < now - 100 || stamp + this.origin > now + 100) {
+            this.clear(); this.origin = now + 40 - stamp;
+        }
+        this.lastStamp = stamp;
+        this.queue.push({ frame, orientation, due: stamp + this.origin, at: now });
+        while (this.queue.length > 6) { this.queue.shift().frame.close(); this.dropped++; }
+        if (this.callback === null) this.callback = this.request(() => this.tick());
+    }
+    tick() {
+        this.callback = null;
+        const now = this.clock();
+        let latest = null;
+        while (this.queue.length && this.queue[0].due <= now + 1) {
+            const item = this.queue.shift();
+            if (latest) { latest.frame.close(); this.dropped++; }
+            latest = item;
+        }
+        if (latest) {
+            try {
+                // Background tabs and long main-thread stalls must not display stale queued video.
+                if (now - latest.at > 150) this.dropped++;
+                else {
+                    this.paint(latest.frame, latest.orientation);
+                    if (this.lastDraw !== null) {
+                        this.gaps.push(now - this.lastDraw);
+                        if (this.gaps.length > 240) this.gaps.shift();
+                    }
+                    this.lastDraw = now; this.waitMs += now - latest.at; this.draws++;
+                }
+            } finally { latest.frame.close(); }
+        }
+        if (this.queue.length) this.callback = this.request(() => this.tick());
+    }
+    diagnostics() {
+        const gaps = this.gaps.slice().sort((a, b) => a - b);
+        const result = { playoutQueue: this.queue.length, playoutDropped: this.dropped,
+            drawGapP95Ms: gaps.length ? gaps[Math.ceil(gaps.length * .95) - 1] : null,
+            drawGapMaxMs: gaps.length ? gaps[gaps.length - 1] : null,
+            playoutMs: this.draws ? this.waitMs / this.draws : null };
+        this.gaps = []; this.waitMs = this.draws = 0;
+        return result;
+    }
+}
+
+// Ask for a preferred minimum without making 60fps a mandatory constraint that rejects a
+// working front camera. Report the actual source rate separately; settings are not measurements.
+export function cameraConstraints(width, height, fps) {
+    return { width: { ideal: width }, height: { ideal: height }, frameRate: { ideal: fps, max: fps },
+        advanced: [{ frameRate: { min: fps } }] };
+}
 // Bolt Media — WebCodecs + Media Capture + Playback
 // Audio and Video pipelines for Blazor WASM interop
 
@@ -919,10 +992,7 @@ class VideoPipeline {
         if (this.captureRunning) this.stopCapture();
         this.lastRequest = wanted;
         const generation = ++this.captureGeneration;
-        const video = {
-            width: { ideal: this.config.width }, height: { ideal: this.config.height },
-            frameRate: { ideal: this.config.framerate, max: this.config.framerate }
-        };
+        const video = cameraConstraints(this.config.width, this.config.height, this.config.framerate);
         if (wanted.deviceId) video.deviceId = { exact: wanted.deviceId };
         else if (wanted.facingMode) video.facingMode = { ideal: wanted.facingMode };
         let stream;
@@ -935,6 +1005,7 @@ class VideoPipeline {
         const track = stream.getVideoTracks()[0];
         if (!track) { stream.getTracks().forEach(t => t.stop()); throw new Error('No camera was available.'); }
         this.mediaStream = stream;
+        this.cameraConstraintRejected = false;
         const settings = track.getSettings?.() ?? {};
         this.deviceId = settings.deviceId || wanted.deviceId || '';
         this.facingMode = settings.facingMode || wanted.facingMode || 'user';
@@ -1274,16 +1345,19 @@ class VideoPipeline {
         const average = stage => this.costs[stage]?.count ? this.costs[stage].ms / this.costs[stage].count : null;
         const elapsed = previous ? now - previous.at : 0;
         const rate = (count, before) => elapsed > 0 && before !== undefined ? Math.max(0, count - before) * 1000 / elapsed : null;
-        const camera = this.mediaStream?.getVideoTracks()[0]?.getSettings?.() ?? {};
+        const cameraTrack = this.mediaStream?.getVideoTracks()[0];
+        const camera = cameraTrack?.getSettings?.() ?? {};
+        const cameraCapabilities = cameraTrack?.getCapabilities?.() ?? {};
         const remotes = [...this.remotes.values()].map(remote => {
             const before = previous?.remotes.get(remote.streamId);
             const renderedFps = rate(remote.rendered, before?.rendered);
             return { streamId: remote.streamId, codec: remote.bitstreamCodec || remote.codec,
                 width: remote.width, height: remote.height,
-                receivedFps: rate(remote.received, before?.received), renderedFps,
+                receivedFps: rate(remote.received, before?.received), decodedFps: rate(remote.decoded, before?.decoded), renderedFps,
+                ...remote.playout.diagnostics(),
                 receivedKbps: before && elapsed > 0 ? rate(remote.bytes, before.bytes) * 8 / 1000 : null,
                 decoderQueue: remote.decoder?.decodeQueueSize ?? 0, pendingFrames: remote.pending.size,
-                decoderDelayMs: renderedFps > 0 ? remote.decodeDelayMs : null,
+                decoderDelayMs: rate(remote.decoded, before?.decoded) > 0 ? remote.decodeDelayMs : null,
                 renderMs: average(`render:${remote.streamId}`),
                 acceleration: remote.acceleration || 'no-preference', resets: remote.resets,
                 waitingForKeyframe: !remote.primed, recoveryRequests: remote.recoveryRequests,
@@ -1299,6 +1373,8 @@ class VideoPipeline {
             width: this.captureRunning ? this.config?.width ?? 0 : 0, height: this.captureRunning ? this.config?.height ?? 0 : 0,
             targetFps: this.captureRunning ? this.config?.framerate ?? 0 : 0,
             cameraWidth: camera.width ?? 0, cameraHeight: camera.height ?? 0, cameraFps: camera.frameRate ?? null,
+            cameraMinFps: cameraCapabilities.frameRate?.min ?? null, cameraMaxFps: cameraCapabilities.frameRate?.max ?? null,
+            cameraFacing: camera.facingMode || this.facingMode || '', cameraConstraintRejected: !!this.cameraConstraintRejected,
             captureFps: rate(this.captureCount, previous?.capture), encodedFps,
             encodedKbps: previous && elapsed > 0 ? rate(this.encodedBytes, previous.bytes) * 8 / 1000 : null,
             encoderQueue: this.encoder?.encodeQueueSize ?? 0,
@@ -1306,7 +1382,7 @@ class VideoPipeline {
             acceleration: this.config?.hardwareAcceleration || 'no-preference', dropped: this.stats.dropped,
             orientation: this._orientationLabel(), remotes };
         this.debugSample = { at: now, capture: this.captureCount, encode: this.encodeCount, bytes: this.encodedBytes,
-            remotes: new Map([...this.remotes.values()].map(r => [r.streamId, { received: r.received, rendered: r.rendered, bytes: r.bytes }])) };
+            remotes: new Map([...this.remotes.values()].map(r => [r.streamId, { received: r.received, decoded: r.decoded, rendered: r.rendered, bytes: r.bytes }])) };
         this.costs = {};
         this.eventLoopLagMs = 0;
         return result;
@@ -1377,11 +1453,10 @@ class VideoPipeline {
         // A bitrate change is the encoder's business alone; only a new size or rate asks the camera.
         const reshaped = !before || before.width !== width || before.height !== height || before.framerate !== framerate;
         if (changed && reshaped && track?.applyConstraints) {
-            const constraints = { width: { ideal: width }, height: { ideal: height },
-                frameRate: { ideal: framerate, max: framerate } };
+            const constraints = cameraConstraints(width, height, framerate);
             this.captureWorker?.postMessage({ type: 'constraints', constraints, framerate });
-            try { await track.applyConstraints(constraints); }
-            catch { /* Keep the working track; encoder pacing still enforces the limit. */ }
+            try { await track.applyConstraints(constraints); this.cameraConstraintRejected = false; }
+            catch { this.cameraConstraintRejected = true; /* Keep the working track and expose the failed request. */ }
         }
         return changed;
     }
@@ -1523,23 +1598,28 @@ class VideoPipeline {
         const remote = { streamId, canvas, context, codec: codec || 'h264', decoder: null, width: 0, height: 0,
             primed: false, pending: new Map(), lateFrames: 0, software: false, fallbackTried: false,
             keyframeRequestedAt: -Infinity, recoveryRequests: 0,
-            received: 0, rendered: 0, bytes: 0, resets: 0, decodeDelayMs: null,
+            received: 0, decoded: 0, rendered: 0, bytes: 0, resets: 0, decodeDelayMs: null,
             // The sender's orientation for pictures in the decoder that are not upright (by timestamp), and the
             // orientation of the picture on the canvas.
             orientations: new Map(), orientation: 0 };
+        remote.playout = new VideoPlayout((frame, code) => this._paint(remote, frame, code));
         this._openDecoder(streamId, remote);
         this.remotes.set(streamId, remote);
         return true;
     }
 
     _openDecoder(streamId, remote) {
+        remote.playout.clear();
         remote.primed = false;
         remote.pending.clear();
         remote.orientations.clear();
         remote.lateFrames = 0;
         remote.acceleration = remote.software ? 'prefer-software' : remote.hardwareFailed ? 'no-preference' : 'prefer-hardware';
         const decoder = new VideoDecoder({
-            output: (frame) => this._render(remote, frame),
+            output: (frame) => {
+                if (this.remotes.get(streamId) !== remote || remote.decoder !== decoder) { frame.close(); return; }
+                this._render(remote, frame);
+            },
             error: (error) => {
                 if (this.remotes.get(streamId) !== remote || remote.decoder !== decoder) return;
                 console.error('Bolt video decoder:', error);
@@ -1566,6 +1646,7 @@ class VideoPipeline {
     removeRemote(streamId) {
         const remote = this.remotes.get(streamId);
         if (!remote) return;
+        remote.playout.clear();
         if (remote.decoder?.state !== 'closed') remote.decoder?.close();
         this.remotes.delete(streamId);
     }
@@ -1629,7 +1710,7 @@ class VideoPipeline {
 
     _render(remote, frame) {
         try {
-            this.renderCount++;
+            remote.decoded++;
             const submitted = remote.pending.get(frame.timestamp);
             remote.pending.delete(frame.timestamp);
             if (submitted !== undefined) {
@@ -1638,6 +1719,12 @@ class VideoPipeline {
             }
             const code = remote.orientations.get(frame.timestamp) ?? 0;
             if (code) remote.orientations.delete(frame.timestamp);
+            remote.playout.push(frame, code);
+        } catch { frame.close(); }
+    }
+
+    _paint(remote, frame, code) {
+        try {
             // The canvas is the displayed size, after the sender's rotation: the tile's fit, the swap and the
             // picture-in-picture all read the shape from it.
             const shown = orientedSize(frame.displayWidth, frame.displayHeight, code);
@@ -1650,8 +1737,8 @@ class VideoPipeline {
             paintOriented(remote.context, frame, frame.displayWidth, frame.displayHeight, code);
             if (paintStarted !== null) this._recordCost(`render:${remote.streamId}`, performance.now() - paintStarted);
             remote.rendered++;
+            this.renderCount++;
         } catch { /* A detached canvas is a closed tile, not a call failure. */ }
-        finally { frame.close(); }
     }
 
     async _considerDecoderLatency(remote, frame, elapsed) {
