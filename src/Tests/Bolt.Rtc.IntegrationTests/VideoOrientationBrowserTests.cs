@@ -85,6 +85,24 @@ public sealed class VideoOrientationBrowserTests
     private static readonly (int Rotation, bool Flip)[] Orientations =
         [(0, false), (90, false), (180, false), (270, false), (0, true), (90, true), (180, true), (270, true)];
 
+    [TestCase("h264")]
+    [TestCase("vp9")]
+    public async Task LostKeyframeRequest_RetriesAndRestoresRealDecodedVideo(string codec)
+    {
+        Assert.That(await _page!.EvaluateAsync<bool>("codec => window.orientationCheck.codecSupported(codec)", codec), Is.True);
+        var result = await _page!.EvaluateAsync<JsonElement>("args => window.orientationCheck.lostKeyframeRequest(args)", new { codec });
+        TestContext.Progress.WriteLine($"Decoder recovery with first request lost ({codec}): {result}");
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.GetProperty("requests").GetInt32(), Is.InRange(2, 4));
+            Assert.That(result.GetProperty("resets").GetInt32(), Is.EqualTo(1));
+            Assert.That(result.GetProperty("rendered").GetInt32(), Is.GreaterThan(1));
+            Assert.That(result.GetProperty("recoveredMs").ValueKind, Is.EqualTo(JsonValueKind.Number), "must resume rendering");
+            if (result.GetProperty("recoveredMs").ValueKind == JsonValueKind.Number)
+                Assert.That(result.GetProperty("recoveredMs").GetDouble(), Is.LessThan(3500), "do not wait for the ten-second safety keyframe");
+        });
+    }
+
     [TestCase(true)]
     [TestCase(false)]
     public async Task TheReceiverShowsThePictureTheWayTheSendersCameraDoes(bool metadata)

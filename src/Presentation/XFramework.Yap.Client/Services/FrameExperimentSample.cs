@@ -39,6 +39,7 @@ public sealed record FrameExperimentSample
     public double? RenderMs { get; init; }
     public double? EncoderQueue { get; init; }
     public double? DecoderQueue { get; init; }
+    public int? AppliedOrientation { get; init; }
     public double? ScreenAngle { get; init; }
 
     public Dictionary<CallMetric, double?> Metrics() => new()

@@ -67,6 +67,9 @@ public sealed record RemoteVideoDiagnostics
     public double? RenderMs { get; init; }
     public double? DecoderDelayMs { get; init; }
     public int Resets { get; init; }
+    public bool WaitingForKeyframe { get; init; }
+    /// <summary>Browser recovery notifications; the transport may coalesce their keyframe requests.</summary>
+    public int RecoveryRequests { get; init; }
     /// <summary>The sender's orientation applied when painting: "90°", "180°, mirrored" or "none".</summary>
     public string Rotation { get; init; } = "";
     /// <summary>Recovery counters since this stream appeared, not rates.</summary>

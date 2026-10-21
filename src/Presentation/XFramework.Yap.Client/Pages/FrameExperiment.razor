@@ -6,10 +6,10 @@
 <PageTitle>Camera frame experiment · Yap</PageTitle>
 <ScrollSurface><Header><div class="appbar plain"><a class="iconbtn" href="/settings/help" aria-label="Back"><Icon Name="back" /></a><h1>Camera experiment</h1></div></Header>
 <ChildContent><div class="body frame-test">
-    <p>Compare direct camera frames with the current WebGPU preparation. Each test lasts 30 seconds. Camera video stays on this device; only numeric results are shared if you enable sharing.</p>
+    <p>Compare direct camera frames with the previous WebGPU preparation. Each test lasts 30 seconds. Camera video stays on this device; only numeric results are shared if you enable sharing.</p>
     <p>Use the same settings for both modes. Hold up text, test front and rear cameras, and rotate the phone during each test. Both previews are unmirrored. A fast result is only useful if the decoded picture stays upright and uncropped.</p>
     <div class="frame-options">
-        <label>Mode<select @bind="mode" disabled="@running"><option value="direct">Direct frame (experimental)</option><option value="webgpu">WebGPU (reference)</option></select></label>
+        <label>Mode<select @bind="mode" disabled="@running"><option value="direct">Direct frame + receiver orientation</option><option value="webgpu">WebGPU (reference)</option></select></label>
         <label>Resolution<select @bind="height" disabled="@running"><option value="1080">1080p</option><option value="720">720p</option></select></label>
         <label>Frame rate<select @bind="fps" disabled="@running"><option value="30">30 fps</option><option value="60">60 fps</option></select></label>
         <label class="frame-rear"><input type="checkbox" @bind="rear" disabled="@running" /> Rear camera</label>
@@ -24,6 +24,7 @@
 Raw: @sample.Width × @sample.Height; display @sample.DisplayWidth × @sample.DisplayHeight
 Rotation metadata: @(sample.Rotation?.ToString() ?? "hidden"); flip: @(sample.Flip?.ToString() ?? "hidden")
 Encoder: @sample.EncoderWidth × @sample.EncoderHeight · @sample.Codec
+Receiver orientation code: @sample.AppliedOrientation
 Decoded: @sample.DecodedWidth × @sample.DecodedHeight
 Capture → encoded → rendered: @F(sample.CaptureFps) → @F(sample.EncodedFps) → @F(sample.RenderedFps) fps
 Preparation avg / p95: @F(sample.PrepareMs) / @F(sample.PrepareP95Ms) ms

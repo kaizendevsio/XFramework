@@ -2,10 +2,16 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.90";
+    public const string Version = "1.3.92";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
-        (Version, "19 October 2026", [
+        (Version, "20 October 2026", [
+            "Video retries recovery when a replacement picture is lost, reducing freezes after a decoder reset.",
+            "Brief connection stalls are less likely to cause an abrupt quality collapse; confirmed bandwidth limits still reduce video quality.",
+            "Call diagnostics show when video is waiting for a keyframe and how many recovery requests it has made."]),
+        ("1.3.91", "20 October 2026", [
+            "Safari sends direct camera frames with orientation corrected on the receiving phone, avoiding per-frame canvas conversion."]),
+        ("1.3.90", "19 October 2026", [
             "Added an opt-in local camera experiment to compare direct frames with WebGPU preparation, with numeric diagnostics and orientation previews."]),
         ("1.3.89", "19 October 2026", [
             "Safari video uses WebGPU camera preparation and shows a clear notice if it cannot run; voice calls can continue."]),

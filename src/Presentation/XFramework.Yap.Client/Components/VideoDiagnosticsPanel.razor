@@ -57,6 +57,7 @@
                 <div>Received → rendered: @Number(remote.ReceivedFps) → @Number(remote.RenderedFps) fps</div>
                 <div>Received: @Number(remote.ReceivedKbps) kbps · last decode: @Number(remote.DecoderDelayMs) ms</div>
                 <div>Queue: decoder @remote.DecoderQueue / pending @remote.PendingFrames · resets: @remote.Resets</div>
+                <div>Waiting for keyframe: @(remote.WaitingForKeyframe ? "yes" : "no") · recovery requests: @remote.RecoveryRequests</div>
                 @if (remote.Recovery is { } recovery)
                 {
                     <div>Recovery window: @recovery.RecoveryMs ms ? counters since stream start</div>
