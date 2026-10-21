@@ -199,6 +199,7 @@ public sealed partial class BoltMediaService : IAsyncDisposable
         // Remote senders start their pictures under this device's downlink (its start probe).
         mediaClient.DownlinkReport = DownlinkForReports;
         _transport = CreateDatagramTransport(client, mediaClient);
+        mediaClient.SendPeerFeedback = bytes => _transport?.TrySend(bytes.Span) == true;
         return mediaClient;
     }
 

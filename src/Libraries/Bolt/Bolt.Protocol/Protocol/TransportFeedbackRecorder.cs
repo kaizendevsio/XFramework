@@ -1,7 +1,6 @@
 using System.Diagnostics;
-using Bolt.Protocol;
 
-namespace Bolt.Server;
+namespace Bolt.Protocol;
 
 /// <summary>
 /// Arrival times of one participant's transport-sequenced datagrams (<see cref="FrameType.TransportSequenced"/>), for
@@ -9,7 +8,7 @@ namespace Bolt.Server;
 /// since the previous one; a message that arrives after its number was reported missing stays missing. The relay
 /// learns nothing from this it did not already see (sizes and timing of what it forwards).
 /// </summary>
-internal sealed class TransportFeedbackRecorder
+public sealed class TransportFeedbackRecorder
 {
     private const int Window = TransportFeedbackCodec.MaxPackets;
     private readonly (ushort Sequence, long ArrivalUs, bool Used)[] _slots = new (ushort, long, bool)[Window];

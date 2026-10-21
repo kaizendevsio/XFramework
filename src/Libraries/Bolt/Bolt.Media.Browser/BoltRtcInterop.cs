@@ -63,7 +63,7 @@ public sealed class BrowserRtcPeer : IRtcPeer, IRtcProbeEchoSource
         _logger = logger;
     }
 
-    public RtcPeerRole Role => RtcPeerRole.Offer;
+    public RtcPeerRole Role { get; private set; }
     public RtcChannelState State => (RtcChannelState)Volatile.Read(ref _state);
     public RtcPath? Path => Volatile.Read(ref _path);
     public int MaxMessageBytes { get; }
@@ -88,20 +88,22 @@ public sealed class BrowserRtcPeer : IRtcPeer, IRtcProbeEchoSource
 
     internal async Task StartAsync(IJSObjectReference module, RtcPeerOptions options, CancellationToken ct)
     {
+        Role = options.Role;
         _self = DotNetObjectReference.Create(this);
         _peer = await module.InvokeAsync<IJSObjectReference>("createPeer", ct, _self, new
         {
             iceServers = options.IceServers.Select(x => new { urls = x.Urls, username = x.Username, credential = x.Credential }).ToArray(),
             iceTransportPolicy = options.RelayOnly ? "relay" : "all",
             maxMessageBytes = options.MaxMessageBytes,
+            answerer = options.Role == RtcPeerRole.Answer,
         });
     }
 
     public async Task<string> CreateOfferAsync(bool iceRestart, CancellationToken ct) =>
         await Require().InvokeAsync<string>("createOffer", ct, iceRestart);
 
-    public Task<string> AnswerAsync(string offerSdp, CancellationToken ct) =>
-        throw new NotSupportedException("The browser always offers.");
+    public async Task<string> AnswerAsync(string offerSdp, CancellationToken ct) =>
+        await Require().InvokeAsync<string>("answer", ct, offerSdp);
 
     public async Task SetAnswerAsync(string answerSdp, CancellationToken ct) =>
         await Require().InvokeVoidAsync("setAnswer", ct, answerSdp);

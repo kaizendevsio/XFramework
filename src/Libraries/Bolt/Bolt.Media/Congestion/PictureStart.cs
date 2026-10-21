@@ -31,6 +31,15 @@ public sealed class PictureStart(SendRateController controller)
     /// <summary>The start rate, as last placed or revised (diagnostics).</summary>
     public StartEstimate? Estimate { get; private set; }
 
+    /// <summary>Measurements from the previous route cannot constrain the replacement route.</summary>
+    public void PathChanged()
+    {
+        _hints = _applied = default;
+        _active = false;
+        Estimate = null;
+        controller.StartCeilingKbps = null;
+    }
+
     /// <summary>Start a picture on <paramref name="hints"/> and the worst receiver's downlink; returns its first setting.</summary>
     public VideoSetting Begin(long nowMs, StartHints hints, int audioWireKbps, VideoRateLadder ladder, (int Kbps, bool AtLeast)? receivers)
     {

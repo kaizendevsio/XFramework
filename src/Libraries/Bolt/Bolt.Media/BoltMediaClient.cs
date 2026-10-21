@@ -256,7 +256,7 @@ public sealed class BoltMediaClient : IAsyncDisposable
         _keyframeRequestedAt[streamId] = now;
         var writer = RentedBufferWriter.GetThreadLocal();
         BoltCodec.WriteMediaKeyRequest(writer, streamId);
-        try { await _client.GetPrimaryConnection().SendAsync(writer.WrittenMemory, ct); }
+        try { if (SendPeerFeedback?.Invoke(writer.WrittenMemory) != true) await _client.GetPrimaryConnection().SendAsync(writer.WrittenMemory, ct); }
         catch (Exception ex) { _logger.LogDebug(ex, "Keyframe request for {StreamId} was not delivered", streamId); }
     }
 
@@ -272,6 +272,11 @@ public sealed class BoltMediaClient : IAsyncDisposable
     /// senders fit the first picture to the worst receiver (<see cref="MediaFeedbackData.DownlinkKbps"/>).
     /// </summary>
     public Func<(uint Kbps, bool AtLeast)?>? DownlinkReport { get; set; }
+    public Func<ReadOnlyMemory<byte>, bool>? SendPeerFeedback { get; set; }
+    public void ResetFeedbackPath()
+    {
+        foreach (var controller in _bitrateControllers.Values) controller.ResetPath();
+    }
 
     public void ConfigureVideoFeedback(Guid streamId, int bitrateKbps)
     {
@@ -360,7 +365,7 @@ public sealed class BoltMediaClient : IAsyncDisposable
         // VAD/PLC primitives operate on decoded PCM, not compressed Opus packets.
         // Encoded frames must reach the codec unchanged.
 
-        var controller = new AdaptiveBitrateController(conn, config.StreamId, config.BitrateKbps, isAudio) { Downlink = () => DownlinkReport?.Invoke() };
+        var controller = new AdaptiveBitrateController(conn, config.StreamId, config.BitrateKbps, isAudio) { Downlink = () => DownlinkReport?.Invoke(), SendFeedback = bytes => SendPeerFeedback?.Invoke(bytes) == true };
         _bitrateControllers[config.StreamId] = controller;
         controller.Start();
         controller.OnBitrateChanged += kbps => stream.RaiseBitrateChanged(kbps);

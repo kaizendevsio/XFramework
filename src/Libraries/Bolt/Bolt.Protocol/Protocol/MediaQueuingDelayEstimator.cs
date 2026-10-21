@@ -57,6 +57,8 @@ public sealed class MediaQueuingDelayEstimator
         DelayMs = (int)Math.Clamp(_lastTransit - floor, 0, ushort.MaxValue);
     }
 
+    public void Reset() { _started = false; DelayMs = 0; }
+
     private void Restart(long nowMs)
     {
         _started = true;

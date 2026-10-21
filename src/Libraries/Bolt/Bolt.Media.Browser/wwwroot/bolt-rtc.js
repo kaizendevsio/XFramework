@@ -62,7 +62,38 @@ export class BoltRtcPeer {
             iceTransportPolicy: options?.iceTransportPolicy === 'relay' ? 'relay' : 'all',
             bundlePolicy: 'max-bundle',
         });
-        const channel = this.#channel = this.#pc.createDataChannel('bolt-media', channelOptions);
+        if (options?.answerer) {
+            this.#early = [];
+            this.#pc.ondatachannel = event => {
+                const c = event.channel;
+                if (this.#channel || c.label !== 'bolt-media' || c.ordered || c.maxRetransmits !== 0 || c.maxPacketLifeTime !== null) {
+                    c.close(); return;
+                }
+                this.#attachChannel(c);
+            };
+        } else this.#attachChannel(this.#pc.createDataChannel('bolt-media', channelOptions));
+        this.#pc.onicecandidate = event => {
+            const candidate = event.candidate;
+            this.#notify('OnCandidate', candidate?.candidate || '', candidate?.sdpMid ?? null, candidate?.sdpMLineIndex ?? null);
+        };
+        this.#pc.onconnectionstatechange = () => {
+            const state = this.#pc.connectionState;
+            if (state === 'failed') this.#setState('failed');
+            else if (state === 'closed') this.#setState('closed');
+        };
+        // The channel stays "open" while ICE hears nothing (Chrome declares ICE failed only ~30 s later) and while
+        // it checks again after a restart. Media sent then is lost, so the channel is "stalled" and takes nothing:
+        // the call's media goes on the WebSocket until ICE is connected again.
+        this.#pc.oniceconnectionstatechange = () => {
+            const ice = this.#pc.iceConnectionState;
+            if (ice === 'failed') this.#setState('failed');
+            else if (this.#state === 'open' && (ice === 'disconnected' || ice === 'checking')) this.#setState('stalled');
+            else if (this.#state === 'stalled' && (ice === 'connected' || ice === 'completed')) this.#setState('open');
+        };
+    }
+
+    #attachChannel(channel) {
+        this.#channel = channel;
         // Safari defaults to Blob; media must arrive as bytes.
         channel.binaryType = 'arraybuffer';
         channel.bufferedAmountLowThreshold = 16 * 1024;
@@ -82,24 +113,15 @@ export class BoltRtcPeer {
             }
             this.#notify('OnMessage', bytes);
         };
-        this.#pc.onicecandidate = event => {
-            const candidate = event.candidate;
-            this.#notify('OnCandidate', candidate?.candidate || '', candidate?.sdpMid ?? null, candidate?.sdpMLineIndex ?? null);
-        };
-        this.#pc.onconnectionstatechange = () => {
-            const state = this.#pc.connectionState;
-            if (state === 'failed') this.#setState('failed');
-            else if (state === 'closed') this.#setState('closed');
-        };
-        // The channel stays "open" while ICE hears nothing (Chrome declares ICE failed only ~30 s later) and while
-        // it checks again after a restart. Media sent then is lost, so the channel is "stalled" and takes nothing:
-        // the call's media goes on the WebSocket until ICE is connected again.
-        this.#pc.oniceconnectionstatechange = () => {
-            const ice = this.#pc.iceConnectionState;
-            if (ice === 'failed') this.#setState('failed');
-            else if (this.#state === 'open' && (ice === 'disconnected' || ice === 'checking')) this.#setState('stalled');
-            else if (this.#state === 'stalled' && (ice === 'connected' || ice === 'completed')) this.#setState('open');
-        };
+    }
+
+    async answer(sdp) {
+        await this.#pc.setRemoteDescription({ type: 'offer', sdp });
+        const early = this.#early ?? [];
+        this.#early = null;
+        for (const candidate of early) await this.#apply(candidate);
+        await this.#pc.setLocalDescription(await this.#pc.createAnswer());
+        return this.#pc.localDescription.sdp;
     }
 
     async createOffer(iceRestart) {
@@ -135,7 +157,7 @@ export class BoltRtcPeer {
     // Synchronous on purpose: called from the sender's pacer for every frame. Never throws.
     send(bytes) {
         const channel = this.#channel;
-        if (this.#closed || this.#state !== 'open' || channel.readyState !== 'open' || !bytes || bytes.length === 0 || bytes.length > this.#maxMessage) {
+        if (this.#closed || this.#state !== 'open' || channel?.readyState !== 'open' || !bytes || bytes.length === 0 || bytes.length > this.#maxMessage) {
             this.#dropped++;
             return false;
         }
@@ -143,7 +165,7 @@ export class BoltRtcPeer {
         catch { this.#dropped++; return false; }
     }
 
-    bufferedAmount() { return this.#closed ? 0 : this.#channel.bufferedAmount || 0; }
+    bufferedAmount() { return this.#closed ? 0 : this.#channel?.bufferedAmount || 0; }
     dropped() { return this.#dropped; }
     state() { return this.#state; }
 
@@ -151,7 +173,7 @@ export class BoltRtcPeer {
         if (this.#closed) return;
         this.#closed = true;
         clearInterval(this.#pathTimer);
-        try { this.#channel.close(); } catch { /* already closed */ }
+        try { this.#channel?.close(); } catch { /* already closed */ }
         try { this.#pc.close(); } catch { /* already closed */ }
         this.#dotnet = null;
     }

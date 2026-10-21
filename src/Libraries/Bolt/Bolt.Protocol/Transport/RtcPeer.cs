@@ -55,7 +55,8 @@ public sealed record RtcPeerOptions(
     bool RelayOnly,
     int MaxMessageBytes = RtcDefaults.MaxMessageBytes,
     int MinCwndBytes = 0,
-    bool AllowLoopback = false);
+    bool AllowLoopback = false,
+    RtcPeerRole Role = RtcPeerRole.Offer);
 
 public static class RtcDefaults
 {

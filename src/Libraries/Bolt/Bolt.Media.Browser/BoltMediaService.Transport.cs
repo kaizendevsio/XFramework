@@ -1,5 +1,6 @@
 using Bolt.Client;
 using Bolt.Media.Congestion;
+using Bolt.Protocol.Transport;
 
 namespace Bolt.Media.Browser;
 
@@ -37,20 +38,21 @@ public sealed partial class BoltMediaService
     private MediaTransportClient? CreateDatagramTransport(BoltClient client, BoltMediaClient media)
     {
         if (!_datagramSupported || _rtc is not { } rtc) return null;
-        var transport = new MediaTransportClient(client, rtc.CreatePeerAsync, _logger)
+        var transport = new MediaTransportClient(client, rtc.CreatePeerAsync, _logger, new MediaTransportClientOptions { DirectPeer = true })
         {
             ReceiveLossPermille = media.SampleAudioReceiveLoss,
         };
         transport.StatusChanged += status =>
         {
+            _signals.SingleReceiver = status.Topology is "peer-direct" or "peer-turn" or "peer-unknown";
             // The first time this transport's data channel opens, measure the link before media needs it.
             if (status.Kind == MediaPathKind.Datagram) StartLinkProbe(transport);
             OnMediaPathChanged?.Invoke(status);
         };
         // A channel that failed or stopped draining under the sender: what the rate control measured on it was the
         // dead channel, not the link. It starts over on the WebSocket instead of suspending video for a dead pipe.
-        transport.PathLost += () => _rateLoop?.PathChanged();
-        transport.PathAvailable += () => _rateLoop?.PathChanged();
+        transport.PathLost += () => { media.ResetFeedbackPath(); _rateLoop?.PathChanged(); };
+        transport.PathAvailable += () => { media.ResetFeedbackPath(); _rateLoop?.PathChanged(); };
         // The relay's per-message arrival times on this device's uplink: the rate loop's GCC-style delay-gradient and loss input.
         transport.TransportFeedback += signal => _signals.OnTransportFeedback(signal);
         // The probe's padding can still sit in the channel's buffer as it ends: not this device's congestion.
@@ -62,7 +64,7 @@ public sealed partial class BoltMediaService
 
     // ── Start probe ──
 
-    private MediaTransportClient? _probedTransport;
+    private IRtcPeer? _probedPeer;
     private Task<LinkProbeResult?>? _probeTask;
     /// <summary>What this device's start probe found on the current transport, once it finished.</summary>
     public LinkProbeResult? LinkProbe { get; private set; }
@@ -72,18 +74,21 @@ public sealed partial class BoltMediaService
 
     private void StartLinkProbe(MediaTransportClient transport)
     {
-        if (!_options.StartProbe || ReferenceEquals(_probedTransport, transport)) return;
-        _probedTransport = transport;
+        if (!_options.StartProbe || transport.ActivePeer is not { } peer || ReferenceEquals(_probedPeer, peer)) return;
+        _probedPeer = peer;
         LinkProbe = null;
-        _probeTask = ProbeLinkAsync(transport);
+        _probeTask = ProbeLinkAsync(transport, peer, _probeTask);
     }
 
-    private async Task<LinkProbeResult?> ProbeLinkAsync(MediaTransportClient transport)
+    private async Task<LinkProbeResult?> ProbeLinkAsync(MediaTransportClient transport, IRtcPeer peer, Task<LinkProbeResult?>? previous)
     {
         try
         {
+            // A route change stops the old probe. Serialize probes so its cleanup cannot erase the new one.
+            if (previous is { IsCompleted: false }) await previous;
+            if (!ReferenceEquals(transport.ActivePeer, peer)) return null;
             var result = await transport.ProbeAsync(_options.StartProbeStepsKbps);
-            if (result is null || !ReferenceEquals(_transport, transport)) return result;
+            if (result is null || !ReferenceEquals(_transport, transport) || !ReferenceEquals(transport.ActivePeer, peer)) return null;
             LinkProbe = result;
             // A picture that started before the probe finished takes the measurement now.
             _rateLoop?.UplinkMeasured(result);

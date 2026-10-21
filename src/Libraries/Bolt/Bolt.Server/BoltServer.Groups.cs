@@ -69,6 +69,7 @@ public sealed partial class BoltServer
                     if (_activeMediaStreams.TryGetValue(id, out var stream)) stream.AddRecipient(connection);
                 call.ParticipantAuthorizedAt[connection.StreamId] = Environment.TickCount64;
             }
+            await CloseInvalidDirectPairsAsync();
             return true;
         }
         finally
@@ -239,6 +240,7 @@ public sealed partial class BoltServer
             }
             CleanupEmptyGroupCall(call);
         }
+        await CloseInvalidDirectPairsAsync();
         // State is removed before notifications; a slow or disconnected recipient cannot retain access.
         foreach (var streamId in removedStreams)
         {

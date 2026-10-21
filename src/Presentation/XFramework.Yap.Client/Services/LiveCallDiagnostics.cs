@@ -77,6 +77,15 @@ public sealed class LiveCallDiagnostics(ChatApi api, IJSRuntime js) : IAsyncDisp
         var rate = s.RateDetails;
         var metrics = new Dictionary<M, double?>
         {
+            [M.Topology] = s.Topology switch { "peer-direct" => 1, "peer-turn" => 2, "peer-unknown" => 3, _ => 0 },
+            [M.DelaySource] = rate is { } detail ? (int)detail.DelaySource : null,
+            [M.ReceiverAgeMs] = rate?.ReceiverAgeMs, [M.TransportAgeMs] = rate?.TransportAgeMs,
+            [M.SentKbps] = rate?.SentKbps, [M.ApplicationLimited] = rate?.ApplicationLimited == true ? 1 : 0,
+            [M.CutLocalMs] = rate?.LastCut?.LocalMs, [M.CutTransportMs] = rate?.LastCut?.TransportMs,
+            [M.CutReceiverMs] = rate?.LastCut?.ReceiverMs, [M.CutReceiverAgeMs] = rate?.LastCut?.ReceiverAgeMs,
+            [M.CutTransportAgeMs] = rate?.LastCut?.TransportAgeMs, [M.CutSentKbps] = rate?.LastCut?.SentKbps,
+            [M.CutCapacityKbps] = rate?.LastCut?.CapacityKbps, [M.CutLossPercent] = rate?.LastCut?.LossPercent,
+            [M.CutGradient] = rate?.LastCut?.Gradient,
             [M.Visible] = visible ? 1 : 0, [M.ElapsedMs] = elapsed, [M.RequestedHeight] = height, [M.RequestedFps] = fps,
             [M.Capturing] = s.Capturing ? 1 : 0, [M.CameraWidth] = s.CameraWidth, [M.CameraHeight] = s.CameraHeight,
             [M.CameraFps] = s.CameraFps, [M.Width] = s.Width, [M.Height] = s.Height, [M.TargetFps] = s.TargetFps,
@@ -112,7 +121,18 @@ public sealed class LiveCallDiagnostics(ChatApi api, IJSRuntime js) : IAsyncDisp
                 [M.Recovered] = x.Recovery?.Recovered, [M.Abandoned] = x.Recovery?.Abandoned, [M.Declined] = x.Recovery?.Declined,
                 [M.Incomplete] = x.Recovery?.Incomplete, [M.Skipped] = x.Recovery?.Skipped, [M.Pictures] = x.Recovery?.Pictures,
                 [M.RecoveryMs] = x.Recovery?.RecoveryMs
-            })).ToArray());
+            })).ToArray())
+        {
+            Cuts = (rate?.Cuts ?? []).Select(cut => new Dictionary<M, double?>
+            {
+                [M.CutAtMs] = cut.AtMs, [M.DelaySource] = (int)cut.Source,
+                [M.LastCutFromKbps] = cut.FromKbps, [M.LastCutToKbps] = cut.ToKbps, [M.LastCutCause] = (int)cut.Cause,
+                [M.CutLocalMs] = cut.LocalMs, [M.CutTransportMs] = cut.TransportMs, [M.CutReceiverMs] = cut.ReceiverMs,
+                [M.CutReceiverAgeMs] = cut.ReceiverAgeMs, [M.CutTransportAgeMs] = cut.TransportAgeMs,
+                [M.CutSentKbps] = cut.SentKbps, [M.CutCapacityKbps] = cut.CapacityKbps,
+                [M.CutLossPercent] = cut.LossPercent, [M.CutGradient] = cut.Gradient
+            }).ToArray()
+        };
     }
     private static CallTransportPath Transport(string path) => path switch
     { var p when p.StartsWith("UDP", StringComparison.OrdinalIgnoreCase) => CallTransportPath.Udp,

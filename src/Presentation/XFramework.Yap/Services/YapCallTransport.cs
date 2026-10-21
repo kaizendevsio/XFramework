@@ -179,12 +179,12 @@ public sealed class YapTurnCredentials(YapTurnOptions options, IHttpClientFactor
     }
 
     /// <summary>
-    /// What the browser gets: TURN over UDP, minus port 53 (browsers block it). A network that blocks UDP gets no
+    /// What the browser gets: STUN for direct discovery and TURN over UDP, minus port 53 (browsers block it). A network that blocks UDP gets no
     /// datagram path and keeps the call on its WebSocket, which beats media over TCP through TURN. With
     /// <paramref name="allowTcp"/>, TCP and TLS URLs too.
     /// </summary>
     internal static IReadOnlyList<RtcIceServer> ForBrowser(IReadOnlyList<RtcIceServer> servers, bool allowTcp = false) =>
-        Keep(servers, url => !IsPort(url, 53) && (allowTcp || IsUdpTurn(url)));
+        Keep(servers, url => !IsPort(url, 53) && (url.StartsWith("stun:", StringComparison.OrdinalIgnoreCase) || allowTcp || IsUdpTurn(url)));
 
     /// <summary>
     /// What the relay's own peer gets: TURN over UDP on 3478, and on 53 should 3478 be filtered; and, unless
@@ -208,7 +208,7 @@ public sealed class YapTurnCredentials(YapTurnOptions options, IHttpClientFactor
     internal static bool IsTlsTurn(string url) => url.StartsWith("turns:", StringComparison.OrdinalIgnoreCase);
 
     private static IReadOnlyList<RtcIceServer> Keep(IReadOnlyList<RtcIceServer> servers, Func<string, bool> keep) =>
-        servers.Where(x => x.Credential is not null)
+        servers.Where(x => x.Credential is not null || x.Urls.All(url => url.StartsWith("stun:", StringComparison.OrdinalIgnoreCase)))
             .Select(x => x with { Urls = x.Urls.Where(keep).ToArray() })
             .Where(x => x.Urls.Length > 0)
             .ToArray();

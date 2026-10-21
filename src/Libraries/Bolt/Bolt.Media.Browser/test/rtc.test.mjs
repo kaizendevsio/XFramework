@@ -22,6 +22,7 @@ class FakePeerConnection {
     offers = [];
     constructor(config) { this.config = config; FakePeerConnection.last = this; }
     createDataChannel(label, init) { return this.channel = new FakeChannel(label, init); }
+    async createAnswer() { return { type: 'answer', sdp: 'v=0 answer' }; }
     async createOffer(options) { this.offers.push(options); return { type: 'offer', sdp: 'v=0 offer' }; }
     async setLocalDescription(description) { this.localDescription = description; }
     async setRemoteDescription(description) { this.remote = description; }
@@ -222,4 +223,32 @@ test('candidates that arrive before their answer are applied after it, never dro
         await peer.addCandidate('candidate:3 1 udp 1 198.51.100.9 3478 typ relay', '0', 0);
         assert.equal(pc.candidates.length, 3);
     } finally { peer.close(); }
+});
+
+
+test('answerer accepts exactly one unordered channel and applies candidates after the offer', async () => {
+    const target = dotnet();
+    const peer = createPeer(target, { answerer: true });
+    const pc = FakePeerConnection.last;
+    assert.equal(pc.channel, undefined);
+    assert.equal(peer.bufferedAmount(), 0);
+    await peer.addCandidate('candidate:early', '0', 0);
+    assert.equal(pc.candidates.length, 0);
+    assert.equal(await peer.answer('v=0 offer'), 'v=0 answer');
+    assert.equal(pc.remote.type, 'offer');
+    assert.equal(pc.candidates.length, 1);
+    const wrong = new FakeChannel('other', {});
+    pc.ondatachannel({ channel: wrong });
+    assert.equal(wrong.readyState, 'closed');
+    const channel = new FakeChannel('bolt-media', {});
+    Object.assign(channel, { ordered: false, maxRetransmits: 0, maxPacketLifeTime: null });
+    pc.ondatachannel({ channel });
+    channel.readyState = 'open'; channel.onopen();
+    assert.equal(peer.send(new Uint8Array([0x21])), true);
+    assert.equal(channel.binaryType, 'arraybuffer');
+    const duplicate = new FakeChannel('bolt-media', {});
+    Object.assign(duplicate, { ordered: false, maxRetransmits: 0, maxPacketLifeTime: null });
+    pc.ondatachannel({ channel: duplicate });
+    assert.equal(duplicate.readyState, 'closed');
+    peer.close();
 });

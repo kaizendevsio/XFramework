@@ -52,8 +52,7 @@ public sealed partial class BoltGroupCallLifecycleTests
         ((List<BoltConnection>)typeof(BoltClient).GetField("_connections", flags)!.GetValue(client)!).Add(connection);
         typeof(BoltClient).GetField("_isRegistered", flags)!.SetValue(client, true);
         connection.ReceiveLoop = (Task)typeof(BoltClient).GetMethod("ReceiveLoopAsync", flags)!.Invoke(client, [connection, CancellationToken.None])!;
-        var factory = network.Factory(RtcPeerRole.Offer);
-        var transport = new MediaTransportClient(client, (peerOptions, ct) => factory.CreateAsync(RtcPeerRole.Offer, peerOptions, ct), NullLogger.Instance, options ?? FastClient, clock);
+        var transport = new MediaTransportClient(client, (peerOptions, ct) => network.Factory(peerOptions.Role).CreateAsync(peerOptions.Role, peerOptions, ct), NullLogger.Instance, options ?? FastClient, clock);
         return new Participant { Client = client, Transport = transport, Bridge = bridge };
     }
 
@@ -495,7 +494,7 @@ public sealed partial class BoltGroupCallLifecycleTests
         }
 
         now += rttMs + Bolt.Server.BoltServer.TransportFeedbackIntervalMs;
-        sender.Deliver(TransportFeedbackCodec.Write(transportSequence, [-1L, Bolt.Server.TransportFeedbackRecorder.NowMicroseconds()]));
+        sender.Deliver(TransportFeedbackCodec.Write(transportSequence, [-1L, Bolt.Protocol.TransportFeedbackRecorder.NowMicroseconds()]));
         if (paced)
         {
             Assert.That(a.Transport.UplinkResent, Is.Zero, "a delayed loss report cannot bypass a full channel");

@@ -53,6 +53,12 @@ public sealed class AdaptiveBitrateController : IAsyncDisposable
     /// can start its picture at what the worst receiver takes (see <see cref="MediaFeedbackData.DownlinkKbps"/>).
     /// </summary>
     public Func<(uint Kbps, bool AtLeast)?>? Downlink { get; set; }
+    public Func<ReadOnlyMemory<byte>, bool>? SendFeedback { get; set; }
+    public void ResetPath()
+    {
+        lock (_delay) _delay.Reset();
+        Interlocked.Exchange(ref _flowingSince, 0);
+    }
 
     /// <summary>Current target bitrate in kbps (sender side).</summary>
     public int CurrentBitrateKbps => _currentBitrateKbps;
@@ -193,7 +199,7 @@ public sealed class AdaptiveBitrateController : IAsyncDisposable
                 // A stream that went quiet (a camera off, a suspended picture) has no current delay: no report.
                 BoltCodec.WriteMediaFeedback(writer, _streamId, _highestSeqReceived, _cumulativeLost, jitterX100, 0, hint,
                     _haveTimestamps ? report : null, Downlink?.Invoke());
-                await _connection.SendAsync(writer.WrittenMemory, ct);
+                if (SendFeedback?.Invoke(writer.WrittenMemory) != true) await _connection.SendAsync(writer.WrittenMemory, ct);
             }
             catch (OperationCanceledException)
             {

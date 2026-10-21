@@ -68,6 +68,26 @@ public sealed class LiveCallDiagnosticsTests
         Assert.That(YapCallDiagnostics.Valid(sample with { Metrics = new() { [(CallMetric)999] = 1 } }), Is.False);
         Assert.That(YapCallDiagnostics.Valid(sample with { Metrics = new() { [CallMetric.RttMs] = double.NaN } }), Is.False);
         Assert.That(YapCallDiagnostics.Valid(sample with { Metrics = null! }), Is.False);
+        Assert.That(YapCallDiagnostics.Valid(sample with { Cuts = null! }), Is.False);
+        Assert.That(YapCallDiagnostics.Valid(sample with { Cuts = [new() { [CallMetric.CutGradient] = double.NaN }] }), Is.False);
+        Assert.That(YapCallDiagnostics.Valid(sample with { Cuts = Enumerable.Range(0, 9).Select(_ => new Dictionary<CallMetric, double?>()).ToArray() }), Is.False);
+    }
+
+    [Test] public void Schema_PreservesRouteAndEveryRecentCutWithoutAddressesOrCredentials()
+    {
+        var cut = new Bolt.Media.Congestion.RateCutSnapshot(1000, Bolt.Media.Congestion.RateDelaySource.Receiver,
+            0, 12, 300, 30, 20, 2000, 0, 0, 100, 3000, 2400, Bolt.Media.Congestion.RateCause.StandingQueue);
+        var sample = LiveCallDiagnostics.Project(new VideoDiagnostics
+        {
+            Topology = "peer-direct", Transport = "UDP/host", Codec = "avc1.420028",
+            RateDetails = new Bolt.Media.Congestion.SendRateDecision(2400, 40, 2360, false, Bolt.Media.Congestion.RateSignal.Hold, 300)
+            { LastCut = cut, Cuts = [cut], ReceiverAgeMs = 30, TransportAgeMs = 20 }
+        }, Guid.NewGuid(), 1, CallDevice.Ios, true, 2000, 1080, 30);
+        Assert.That(YapCallDiagnostics.Valid(sample), Is.True);
+        Assert.That(sample.Metrics[CallMetric.Topology], Is.EqualTo(1));
+        Assert.That(sample.Transport, Is.EqualTo(CallTransportPath.Udp));
+        Assert.That(sample.Cuts.Single()[CallMetric.LastCutFromKbps], Is.EqualTo(3000));
+        Assert.That(sample.Cuts.Single()[CallMetric.CutReceiverMs], Is.EqualTo(300));
     }
 
     [Test] public void Schema_PreservesWebGpuPreparationBreakdown()

@@ -429,6 +429,18 @@ public sealed class BoltCallCongestionTests
     // ── Sender signals ──
 
     [Test]
+    public void Signals_ReplaceOldExtrema_WithOneMatchingFreshReport()
+    {
+        var signals = new SendPathSignals { SingleReceiver = true };
+        signals.OnReceiverFeedback(Feedback(Video, 900, 100), true, 1000);
+        signals.OnReceiverFeedback(Feedback(Video, 20, 5000), true, 1250);
+        var current = signals.Take(1300, 5000, 40).Receiver!.Value;
+        Assert.That(current, Is.EqualTo(new ReceiverSignal(1250, 20, 5040)));
+        Assert.That(signals.Take(2300, 5000, 40).Receiver!.Value.ReceivedAtMs, Is.EqualTo(1250),
+            "reading a report again does not refresh its age");
+    }
+
+    [Test]
     public void Signals_AddTheRelaysShares_AndKeepASilentReceiversLastWord()
     {
         var signals = new SendPathSignals();

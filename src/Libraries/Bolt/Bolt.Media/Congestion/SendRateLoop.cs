@@ -11,7 +11,7 @@ public sealed class SendPathSignals
     private readonly object _sync = new();
     private (MediaCongestionData Report, long At)? _relayVideo, _relayAudio;
     private bool _relayDropping, _relayBaseLost;
-    private readonly List<(long At, bool Video, int DelayMs, int Kbps)> _feedback = [];
+    private readonly List<(long At, Guid Stream, bool Video, int DelayMs, int Kbps)> _feedback = [];
     private ReceiverSignal? _lastReceiver;
     private TransportSignal? _transport;
     private readonly List<(long At, int Kbps, bool AtLeast)> _downlinks = [];
@@ -20,6 +20,8 @@ public sealed class SendPathSignals
     private const int FeedbackWindowMs = 1_000;
     /// <summary>A receiver that went quiet is still reported, as it last was, for this long (see <see cref="SendRateController"/>).</summary>
     public const int SilentReceiverMs = 15_000;
+    /// <summary>Direct one-to-one routes have exactly one reporter per stream. Server routes may fan out.</summary>
+    public bool SingleReceiver { get; set; }
 
     public void Clear()
     {
@@ -84,7 +86,9 @@ public sealed class SendPathSignals
         if (!feedback.HasDelayReport) return;
         lock (_sync)
         {
-            _feedback.Add((nowMs, video, feedback.QueueDelayMs, (int)Math.Min(feedback.ReceivedKbps, int.MaxValue)));
+            var stream = feedback.StreamId;
+            if (SingleReceiver) _feedback.RemoveAll(x => x.Stream == stream);
+            _feedback.Add((nowMs, feedback.StreamId, video, feedback.QueueDelayMs, (int)Math.Min(feedback.ReceivedKbps, int.MaxValue)));
             _feedback.RemoveAll(x => nowMs - x.At > FeedbackWindowMs);
         }
     }
@@ -127,12 +131,12 @@ public sealed class SendPathSignals
             _feedback.RemoveAll(x => nowMs - x.At > FeedbackWindowMs);
             if (_feedback.Count > 0)
             {
-                var delay = _feedback.Max(x => x.DelayMs);
-                // Several receivers may report on one stream: the least any of them got is what the path carries.
-                var videoKbps = _feedback.Where(x => x.Video).Select(x => x.Kbps).DefaultIfEmpty(-1).Min();
-                var audioKbps = _feedback.Where(x => !x.Video).Select(x => x.Kbps).DefaultIfEmpty(-1).Min();
-                var received = (videoKbps >= 0 ? videoKbps : sentVideoKbps) + (audioKbps >= 0 ? audioKbps : sentAudioKbps);
-                receiver = _lastReceiver = new ReceiverSignal(_feedback.Max(x => x.At), delay, received);
+                // Delay and throughput must describe the same report, not extrema from different moments.
+                var worst = _feedback.MaxBy(x => x.DelayMs);
+                var other = _feedback.Where(x => x.Video != worst.Video).OrderByDescending(x => x.At).FirstOrDefault();
+                var otherRate = other.At > 0 ? other.Kbps : worst.Video ? sentAudioKbps : sentVideoKbps;
+                receiver = _lastReceiver = new ReceiverSignal(worst.At, worst.DelayMs, worst.Kbps + otherRate);
+
             }
             // Receivers that stopped reporting are not fine: their feedback rides the same congested path back.
             else if (_lastReceiver is { } last && nowMs - last.ReceivedAtMs <= SilentReceiverMs)
@@ -236,6 +240,7 @@ public sealed class SendRateLoop
         {
             // Reports from the dead path (or their silence) must not be read as the new path's queue.
             _signals.Clear();
+            _pictureStart.PathChanged();
             Pacer.ResetForPathChange();
             Controller.RestartAfterPathChange(nowMs);
         }

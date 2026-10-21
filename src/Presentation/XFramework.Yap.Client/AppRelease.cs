@@ -2,7 +2,7 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.92";
+    public const string Version = "1.3.93";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
         (Version, "20 October 2026", [

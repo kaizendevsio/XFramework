@@ -35,6 +35,7 @@ public sealed record VideoDiagnostics
     public string Orientation { get; init; } = "";
     /// <summary>The media path: "UDP/relay", "TLS/relay", "WebSocket" and so on.</summary>
     public string Transport { get; init; } = "";
+    public string Topology { get; init; } = "server";
     /// <summary>Why media is on the WebSocket, when it is (no TURN offered, ICE failed, negotiating).</summary>
     public string? TransportReason { get; init; }
     public double? TransportRttMs { get; init; }

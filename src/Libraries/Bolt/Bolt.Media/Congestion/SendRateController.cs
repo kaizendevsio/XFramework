@@ -121,6 +121,8 @@ public readonly record struct SendPathSample(
     int AudioPacketsPerSecond = 0,
     bool AudioRedundancy = false);
 
+public enum RateDelaySource { Local, Transport, Relay, Receiver }
+
 public enum RateSignal { Normal, Overuse, Hold }
 
 [Flags]
@@ -138,6 +140,13 @@ public enum RateCause { None = 0, BaseLost = 1, StandingQueue = 2, RelayShedding
 public readonly record struct SendRateDecision(int TotalKbps, int AudioKbps, int VideoKbps, bool VideoSuspended, RateSignal Signal, int DelayMs,
     bool ReceiversCalm = true)
 {
+    public RateDelaySource DelaySource { get; init; }
+    public long? ReceiverAgeMs { get; init; }
+    public long? TransportAgeMs { get; init; }
+    public int SentKbps { get; init; }
+    public bool ApplicationLimited { get; init; }
+    public RateCutSnapshot? LastCut { get; init; }
+    public RateCutSnapshot[] Cuts { get; init; } = [];
     public RateCause Cause { get; init; }
     public int LocalDelayMs { get; init; }
     public int? RelayDelayMs { get; init; }
@@ -150,6 +159,9 @@ public readonly record struct SendRateDecision(int TotalKbps, int AudioKbps, int
     public int LastCutFromKbps { get; init; }
     public int LastCutToKbps { get; init; }
 }
+
+public sealed record RateCutSnapshot(long AtMs, RateDelaySource Source, int LocalMs, int? TransportMs, int? ReceiverMs,
+    long? ReceiverAgeMs, long? TransportAgeMs, int SentKbps, int CapacityKbps, double? LossPercent, double Gradient, int FromKbps, int ToKbps, RateCause Cause);
 
 /// <summary>
 /// Delay-based send-rate control for a call on a reliable (TCP) path, GCC/BBR-flavoured and deliberately simple.
@@ -179,6 +191,9 @@ public readonly record struct SendRateDecision(int TotalKbps, int AudioKbps, int
 /// </summary>
 public sealed class SendRateController
 {
+    private RateDelaySource _delaySource;
+    private RateCutSnapshot? _lastCut;
+    private RateCutSnapshot[] _cuts = [];
     private RateCause _lastCutCause;
     private int _lastCutFromKbps, _lastCutToKbps;
     private long? _lastDiagnosticCutAt;
@@ -432,13 +447,22 @@ public sealed class SendRateController
         var informed = silent is null &&
                        (relay is not null || receiver is not null || transport is not null || (!_remoteSeen && now - _startedAt >= _options.RemoteGraceMs));
 
+        var source = RateDelaySource.Local;
         var delay = sample.LocalQueueDelayMs;
-        if (relay is { } rs) delay = Math.Max(delay, rs.QueueDelayMs + (transport is null ? rs.UplinkDelayMs : 0));
-        if (transport is { } ts) delay = Math.Max(delay, ts.QueueDelayMs + (relay?.QueueDelayMs ?? 0));
-        if (receiver is { } rq) delay = Math.Max(delay, rq.QueueDelayMs);
-        else if (silent is { } sq && sq.QueueDelayMs >= _options.TargetDelayMs)
-            delay = Math.Max(delay, sq.QueueDelayMs + (int)Math.Min(int.MaxValue / 2, now - sq.ReceivedAtMs));
+        void Consider(int candidate, RateDelaySource origin)
+        {
+            if (candidate <= delay) return;
+            delay = candidate; source = origin;
+        }
+        if (relay is { } rs) Consider(rs.QueueDelayMs + (transport is null ? rs.UplinkDelayMs : 0), RateDelaySource.Relay);
+        if (transport is { } ts) Consider(ts.QueueDelayMs + (relay?.QueueDelayMs ?? 0), RateDelaySource.Transport);
+        if (receiver is { } rq) Consider(rq.QueueDelayMs, RateDelaySource.Receiver);
+        // Silence is uncertainty, not an ever-growing measured queue. Switching sources must not create a slope.
+        if (_delaySource != source) { _history.Clear(); _risingStreak = 0; }
+        _delaySource = source;
         var gradient = Gradient(now, delay);
+        if (source == RateDelaySource.Transport && transport is { } trend && (relay?.QueueDelayMs ?? 0) == 0)
+            gradient = trend.TrendMsPerSecond;
         var floor = Floor(now);
 
         var baseLost = sample.LocalBaseLost || relay?.BaseLost == true;
@@ -464,10 +488,11 @@ public sealed class SendRateController
         // that time are the old rate, not new congestion, and cutting again is how controllers undershoot. With a
         // capacity measurement the test is exact (the estimate already fits the link); without one, the delay must
         // not have grown much past where it was when the cut was made.
-        var capacityNow = Capacity(sample, relay, receiver ?? silent, transport);
-        var draining = overuse && now - _lastDecreaseAt < DrainWindowMs && !overloadAfterCut(capacityNow) &&
-                       (capacityNow > 0 ? _estimate <= capacityNow * 0.95 : delay <= _delayAtDecrease + Math.Max(150, _delayAtDecrease / 2));
-        bool overloadAfterCut(double capacity) => capacity > 0 && _estimate > capacity * 1.2;
+        var capacityNow = Capacity(sample, relay, receiver, transport);
+        var draining = overuse && now - _lastDecreaseAt < DrainWindowMs && !lossy &&
+                       (relay is not { CapacityKbps: > 0 } capacityReport || _estimate <= capacityReport.CapacityKbps * 1.2) &&
+                       (delay <= _delayAtDecrease + Math.Max(150, _delayAtDecrease / 2) ||
+                        capacityNow > 0 && _estimate <= capacityNow * 0.95);
 
         var cause = (baseLost ? RateCause.BaseLost : RateCause.None)
             | (standing ? RateCause.StandingQueue : RateCause.None)
@@ -498,7 +523,7 @@ public sealed class SendRateController
             // Once decreased, wait for the queue to drain unless it keeps getting much worse.
             var deeper = !localOnly && delay >= _options.HighDelayMs * 2 && gradient > 0;
             if (now - _lastDecreaseAt >= _options.HoldAfterDecreaseMs || (deeper && now - _lastDecreaseAt >= _options.HoldAfterDecreaseMs / 2))
-                Decrease(now, localOnly ? sample with { LocalCapacityKbps = 0 } : sample, relay, receiver ?? silent, delay,
+                Decrease(now, localOnly ? sample with { LocalCapacityKbps = 0 } : sample, relay, receiver, delay,
                     severe: !localOnly && (baseLost || overload || lossy || _cutStreak > 0), transport);
         }
         else if (calm)
@@ -529,11 +554,19 @@ public sealed class SendRateController
             : silent is null && !_receiverHeard && now - _pictureStartedAt >= ReceiverReportWaitMs;
         if (_estimate < estimateBefore && _lastDecreaseAt == now)
         {
+            _lastCut = new(now, source, sample.LocalQueueDelayMs, transport?.QueueDelayMs, receiver?.QueueDelayMs,
+                receiver is { } cr ? now - cr.ReceivedAtMs : null, transport is { } ct ? now - ct.ReceivedAtMs : null,
+                sample.SentKbps, (int)capacityNow, transport?.LossFraction * 100, gradient, (int)estimateBefore, (int)_estimate, cause);
+            _cuts = [.. _cuts.TakeLast(7), _lastCut];
             _lastCutCause = cause; _lastDiagnosticCutAt = now;
             _lastCutFromKbps = (int)estimateBefore; _lastCutToKbps = (int)_estimate;
         }
         return Allocate(now, sample, signal, delay) with
         {
+            DelaySource = source, LastCut = _lastCut, Cuts = _cuts, SentKbps = sample.SentKbps,
+            ApplicationLimited = sample.SentKbps < estimateBefore * 0.8 && sample.LocalQueueDelayMs < _options.TargetDelayMs,
+            ReceiverAgeMs = sample.Receiver is { } ar ? now - ar.ReceivedAtMs : null,
+            TransportAgeMs = sample.Transport is { } at ? now - at.ReceivedAtMs : null,
             ReceiversCalm = receiversCalm, Cause = cause, LocalDelayMs = sample.LocalQueueDelayMs,
             RelayDelayMs = relay?.QueueDelayMs, TransportDelayMs = transport?.QueueDelayMs ?? relay?.UplinkDelayMs,
             ReceiverDelayMs = receiver?.QueueDelayMs, UplinkLossPercent = transport?.LossFraction * 100,
@@ -624,7 +657,7 @@ public sealed class SendRateController
         var measured = capacity > 0;
         // No measurement yet (the first reports of an overload): a queue growing by g ms every second means the
         // link takes 1000 / (1000 + g) of what is sent.
-        if (!measured) capacity = sample.SentKbps > 0 ? sample.SentKbps * 1000.0 / (1000 + Math.Max(0, _lastGradient)) : _estimate;
+        if (!measured) capacity = sample.SentKbps > 0 && sample.LocalQueueDelayMs >= _options.TargetDelayMs ? sample.SentKbps * 1000.0 / (1000 + Math.Max(0, _lastGradient)) : _estimate;
         var basis = Math.Min(_estimate, capacity);
         // A deep queue needs a deeper cut to drain within a few seconds; a standing queue of seconds (a buffer that
         // filled when the link shrank) is best drained almost without video.
