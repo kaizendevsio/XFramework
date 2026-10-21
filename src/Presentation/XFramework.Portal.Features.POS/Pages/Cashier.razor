@@ -697,7 +697,8 @@ else if (!_moduleEnabled)
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        // The route/access shell can defer the cashier DOM beyond the first render.
+        if (!_disposed && _focusControllerTask is null && !string.IsNullOrEmpty(_cashierElement.Id))
         {
             _focusControllerTask = InitializeFocusAsync();
             await _focusControllerTask;

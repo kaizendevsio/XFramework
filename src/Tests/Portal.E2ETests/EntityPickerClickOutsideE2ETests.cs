@@ -244,6 +244,25 @@ public sealed class ClickOutsideCashierState
 // Render the real Cashier with an empty cart and no deployed services or credentials.
 public sealed class ClickOutsideFixtureCashier : Cashier
 {
+    [Parameter] public bool DelayInitialRender { get; set; }
+    private bool initialRenderCompleted;
+
+    protected override void BuildRenderTree(RenderTreeBuilder builder)
+    {
+        if (!DelayInitialRender || initialRenderCompleted)
+            base.BuildRenderTree(builder);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+        if (firstRender && DelayInitialRender)
+        {
+            initialRenderCompleted = true;
+            StateHasChanged();
+        }
+    }
+
     [Inject] public ClickOutsideCashierState State { get; set; } = null!;
     protected override void OnInitialized()
     {

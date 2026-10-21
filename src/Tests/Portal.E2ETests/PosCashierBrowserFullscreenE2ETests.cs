@@ -120,6 +120,16 @@ public sealed class PosCashierBrowserFullscreenE2ETests : PageTest
     }
 
     [Test]
+    public async Task Focus_DelayedCashierRender_InitializesAfterElementExists()
+    {
+        await OpenFixture();
+        await Toggle.ClickAsync();
+        await AssertFocused(fullscreen: true);
+        await Toggle.ClickAsync();
+        await AssertNormal();
+    }
+
+    [Test]
     public async Task Focus_TrustedClick_RequestsRealFullscreenAndSurvivesServerRender()
     {
         await Page.AddInitScriptAsync("""
@@ -359,6 +369,7 @@ public sealed class CashierFocusFixtureSurface : ComponentBase
             if (showCashier)
             {
                 body.OpenComponent<ClickOutsideFixtureCashier>(4);
+                body.AddAttribute(5, nameof(ClickOutsideFixtureCashier.DelayInitialRender), true);
                 body.CloseComponent();
             }
         }));
