@@ -80,7 +80,8 @@ public sealed class YapCallTransportTests
                 Assert.That(JsonDocument.Parse(body).RootElement.GetProperty("ttl").GetInt32(), Is.EqualTo(1800));
             });
         }
-        var client = grant!.Client.Single();
+        Assert.That(grant!.Client.SelectMany(x => x.Urls), Does.Contain("stun:stun.cloudflare.com:3478"));
+        var client = grant.Client.Single(x => x.Credential is not null);
         var relay = grant.Server.Single();
         Assert.Multiple(() =>
         {
@@ -96,7 +97,8 @@ public sealed class YapCallTransportTests
                     "turns:turn.cloudflare.com:443?transport=tcp",
                 }),
                 "the relay allocates over UDP on 3478 or 53, with TLS on 443 as the fallback its sidecar only dials when UDP gets no answer");
-            Assert.That(grant.Client.Concat(grant.Server).SelectMany(x => new[] { x.Username, x.Credential }.Concat(x.Urls)), Has.None.Contains(Token));
+            Assert.That(grant.Client.Concat(grant.Server).SelectMany(x => new[] { x.Username, x.Credential }.Concat(x.Urls)).Where(x => x is not null), Has.None.Contains(Token));
+            Assert.That(grant.Client.SelectMany(x => x.Urls), Does.Contain("stun:stun.cloudflare.com:3478"));
             Assert.That(grant.ExpiresAt, Is.EqualTo(before.AddSeconds(1800)).Within(TimeSpan.FromSeconds(5)));
         });
     }
@@ -110,7 +112,7 @@ public sealed class YapCallTransportTests
         var grant = await credentials.GrantAsync(Participant, CancellationToken.None);
         Assert.Multiple(() =>
         {
-            Assert.That(grant!.Client.Single().Urls, Does.Contain("turns:turn.cloudflare.com:443?transport=tcp"));
+            Assert.That(grant!.Client.Single(x => x.Credential is not null).Urls, Does.Contain("turns:turn.cloudflare.com:443?transport=tcp"));
             Assert.That(grant.Server.Single().Urls, Does.Contain("turns:turn.cloudflare.com:443?transport=tcp"));
             Assert.That(YapTurnOptions.From(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
                 { ["Yap:Calls:Turn:AllowTcp"] = "true" }).Build()).AllowTcp, Is.True);

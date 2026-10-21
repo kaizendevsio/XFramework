@@ -28,7 +28,7 @@ public enum MediaTransportKind : byte
 }
 
 /// <summary>A participant asks for a datagram path. <paramref name="MaxMessageBytes"/> is the largest message it will send.</summary>
-public sealed record MediaTransportRequest(int Version, int MaxMessageBytes);
+public sealed record MediaTransportRequest(int Version, int MaxMessageBytes, bool DirectPeer = false);
 
 /// <summary>
 /// The relay's answer to a request. When <paramref name="Unavailable"/> is set there is no session (no TURN
@@ -44,7 +44,9 @@ public sealed record MediaTransportConfig(
     int MaxMessageBytes,
     long ExpiresAtUnixSeconds,
     string? Unavailable = null,
-    string[]? Features = null);
+    string[]? Features = null,
+    bool DirectPeer = false,
+    bool Answerer = false);
 
 /// <summary>What a relay announces in <see cref="MediaTransportConfig.Features"/>.</summary>
 public static class MediaTransportFeatures

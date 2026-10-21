@@ -6,6 +6,7 @@
         <div class="debug-stream">
             <strong>Transport: @(string.IsNullOrEmpty(info.Transport) ? "—" : info.Transport)</strong>
             @if (info.TransportReason is { Length: > 0 } reason) { <div>On the WebSocket: @reason</div> }
+            <div>Route: @info.Topology</div>
             <div>Uplink repairs: @info.UplinkResent fragments since transport start</div>
             @if (info.TransportRttMs is { } rtt) { <div>Round trip: @Number(rtt) ms@(info.AudioRedundancy ? " · audio sent twice" : "")</div> }
         </div>
@@ -17,9 +18,15 @@
                 <div>Queue delay: @info.QueueDelayMs ms</div>
                 @if (info.RateDetails is { } rate)
                 {
-                    <div>Reason: @rate.Cause</div>
+                    <div>Reason: @rate.Cause; source: @rate.DelaySource</div>
+                    <div>Actual sent: @rate.SentKbps kbps; application limited: @rate.ApplicationLimited</div>
+                    <div>Feedback age receiver / transport: @rate.ReceiverAgeMs / @rate.TransportAgeMs ms</div>
                     <div>Delays local / uplink / relay / receiver: @rate.LocalDelayMs / @Number(rate.TransportDelayMs) / @Number(rate.RelayDelayMs) / @Number(rate.ReceiverDelayMs) ms</div>
                     <div>Uplink loss: @Number(rate.UplinkLossPercent)% · measured capacity: @(rate.CapacityKbps > 0 ? $"{rate.CapacityKbps} kbps" : "—")</div>
+                    @if (rate.LastCut is { } cut)
+                    {
+                        <div>At cut: @cut.Source; local / transport / receiver @cut.LocalMs / @cut.TransportMs / @cut.ReceiverMs ms; sent @cut.SentKbps kbps</div>
+                    }
                     @if (rate.LastCutAgeMs is { } age)
                     {
                         <div>Last cut: @rate.LastCutFromKbps → @rate.LastCutToKbps kbps (@rate.LastCutCause), @Number(age / 1000.0)s ago</div>

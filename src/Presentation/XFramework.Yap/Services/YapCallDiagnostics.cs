@@ -76,10 +76,10 @@ public sealed partial class YapCallDiagnostics(TimeProvider time, string? direct
     public static bool Valid(CallDiagnosticSample sample) => sample.CallId != Guid.Empty && sample.Sequence is >= 0 and <= 10000 &&
         Enum.IsDefined(sample.Device) && Enum.IsDefined(sample.CapturePath) && Enum.IsDefined(sample.Transport) && Enum.IsDefined(sample.RelayTransport) &&
         sample.Version is { Length: <= 24 } && VersionLabel().IsMatch(sample.Version) && ValidCodec(sample.Codec) &&
-        ValidMetrics(sample.Metrics) && sample.Remotes is { Length: <= 8 } &&
+        ValidMetrics(sample.Metrics) && sample.Cuts is { Length: <= 8 } && sample.Cuts.All(ValidMetrics) && sample.Remotes is { Length: <= 8 } &&
         sample.Remotes.All(x => x is not null && x.StreamId != Guid.Empty && ValidCodec(x.Codec) && ValidMetrics(x.Metrics));
     private static bool ValidCodec(string? value) => value is { Length: <= 64 } && (value.Length == 0 || CodecLabel().IsMatch(value));
-    private static bool ValidMetrics(Dictionary<CallMetric, double?>? metrics) => metrics is { Count: <= 70 } &&
+    private static bool ValidMetrics(Dictionary<CallMetric, double?>? metrics) => metrics is { Count: <= 90 } &&
         metrics.All(x => Enum.IsDefined(x.Key) && (x.Value is null || double.IsFinite(x.Value.Value) && Math.Abs(x.Value.Value) <= 1e12));
     [GeneratedRegex(@"^\d{1,4}\.\d{1,4}\.\d{1,4}$", RegexOptions.CultureInvariant)] private static partial Regex VersionLabel();
     [GeneratedRegex(@"^(h264|h265|hevc|vp8|vp9|av1|(avc1|hvc1|hev1|vp09|av01)(\.[A-Za-z0-9]{1,12}){1,8})$", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)] private static partial Regex CodecLabel();

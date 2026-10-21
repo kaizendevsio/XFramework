@@ -14,7 +14,21 @@ Yap's encrypted group path additionally carries camera video under the same per-
 
 Bolt Hub enforces `BoltConfiguration:MediaEnabled`, which defaults to `false` and is explicitly disabled in every XFramework Hub environment and Compose deployment. Deployments must not override this shared Hub quarantine or route production media clients to it. The documented Yap exception uses a dedicated media-only server with `AuthenticatedMediaOnly`, an authorization policy, server-assigned identities and explicit `TrustedServerTls` configuration. Only that authenticated WSS voice path may instantiate the browser media services for Yap; other media capabilities remain unavailable. Recognition of media frame types alone does not constitute production enablement.
 
-QUIC/WebTransport and direct P2P are not wired as supported end-to-end transports. They must remain absent from negotiated capabilities and production documentation until secure browser and server integration tests pass.
+QUIC/WebTransport and the legacy unauthenticated DirectOffer/DirectAnswer signalling remain quarantined. Yap's authenticated group-call transport now supports the separately scoped one-to-one peer route below.
+
+### Yap direct-first calls (1.3.93)
+
+For exactly two admitted participants advertising `MediaTransportRequest.DirectPeer`, the host brokers an offer/answer between their exact authenticated connections. ICE uses Cloudflare STUN (`stun:stun.cloudflare.com:3478`) and short-lived Cloudflare TURN credentials. An ICE-selected direct path is preferred; a TURN candidate connects the two browser peers when direct connectivity is unavailable. The existing server path remains available during negotiation and resumes if negotiation or the peer channel fails. The peer media path carries the existing encrypted Bolt frames over an unordered, non-retransmitting WebRTC data channel; it does not replace the codecs or SFrame protocol with WebRTC RTP.
+
+Signalling, membership authorization, stream configurations, and key distribution stay on authenticated server connections. Only a single active call per connection is eligible. Adding a third participant, removing authorization, or disconnecting closes the pair and restores server routing. Older clients retain server routing. Failed peers are not repeatedly renegotiated during the same connection; expiring credentials permit a new attempt after renewal. The general Hub media quarantine is unchanged.
+
+The receiving phone reports transport arrival times directly to its sender. Receiver feedback, keyframe requests and packet repairs also use the peer channel. Route changes discard old queue estimates and invalidate in-progress bandwidth probes. STUN is discovery only; a successful peer route avoids the Yap media server in the media path. UDP-blocked browsers retain the WebSocket fallback by default (`Yap:CallTransport:AllowTcp` still controls TURN TCP/TLS).
+
+Congestion decisions pair delay and throughput from the same report, preserve the report's age, and keep separate delay-source histories. Silence does not manufacture queue growth, application-limited sending is not itself a capacity measurement, and a draining queue gets time to recover after a cut. Group routes conservatively retain the worst recent receiver report. Real loss, growing queues, and server-reported capacity limits can still reduce the rate.
+
+Diagnostics show `peer-direct`, `peer-turn`, `peer-unknown` (until ICE statistics arrive), or `server`; the source and age of feedback; actual sent rate; and the last cut's inputs. Shared samples retain the last eight cuts (bounded numeric fields only, no SDP, IP addresses, TURN credentials, media, or message contents). Numeric topology values are respectively 1, 2, 3, and 0. Repeated cuts can be deduplicated by `CutAtMs` within a diagnostic session.
+
+Validation covers browser offer/answer and early candidates, peer-to-peer media/feedback/repair, failure-to-server fallback, old clients, group expansion, authorization revocation, and congestion regressions. A real Chromium test exchanged 220 messages in each direction over host/UDP candidates including an ICE restart. Physical iPhone/Android routing, sustained 1080p, and thermal improvement still require the live device comparison; simulated ICE tests are not evidence of those outcomes.
 
 ---
 

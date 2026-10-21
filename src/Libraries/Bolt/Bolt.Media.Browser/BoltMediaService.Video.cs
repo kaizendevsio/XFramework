@@ -55,7 +55,7 @@ public sealed partial class BoltMediaService
             Congestion = decision?.Signal.ToString(), VideoSuspended = decision?.VideoSuspended ?? false,
             Remotes = snapshot.Remotes.Select(remote => remote with { Recovery = receive.GetValueOrDefault(remote.StreamId) }).ToArray(),
             // Both legs: "UDP/relay (relay UDP/relay)". A TCP or TLS leg on either side is the first thing to look for.
-            Transport = path.RelayLeg is { } relayLeg ? $"{path.Description} (relay {relayLeg})" : path.Description, TransportReason = path.Reason, TransportRttMs = path.RttMs, AudioRedundancy = path.AudioRedundancy,
+            Topology = path.Topology, Transport = path.RelayLeg is { } relayLeg ? $"{path.Description} (relay {relayLeg})" : path.Description, TransportReason = path.Reason, TransportRttMs = path.RttMs, AudioRedundancy = path.AudioRedundancy,
         };
     }
 

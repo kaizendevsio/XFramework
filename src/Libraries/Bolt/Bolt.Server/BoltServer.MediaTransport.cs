@@ -48,6 +48,8 @@ public sealed partial class BoltServer
         public string? ActiveSession;
         public long LossQuietSince;
         public bool Closed;
+        public bool DirectPeer;
+        public bool DirectAttempted;
     }
 
     internal sealed class TransportSession(string id, BoltIceGrant grant)
@@ -135,9 +137,11 @@ public sealed partial class BoltServer
             return;
         var payload = payloadSpan.ToArray();
         var connection = transport.Connection;
+        if (await ForwardPeerSignalAsync(transport, kind, payload)) return;
         switch (kind)
         {
             case MediaTransportKind.Request:
+                transport.DirectPeer = MediaTransportCodec.Decode<MediaTransportRequest>(payload)?.DirectPeer == true;
                 await HandleTransportRequestAsync(transport, ct);
                 break;
             case MediaTransportKind.Offer:
@@ -468,6 +472,7 @@ public sealed partial class BoltServer
             transport.ActiveSession = null;
         }
         transport.Inbox.Writer.TryComplete();
+        await CloseInvalidDirectPairsAsync();
         foreach (var session in sessions)
         {
             if (session.Peer is not { } peer) continue;
@@ -638,8 +643,10 @@ public sealed partial class BoltServer
     private async Task MediaTransportTickAsync()
     {
         if (_mediaTransport is not { } options || _shutdownCts.IsCancellationRequested) return;
+        await UpdateDirectPeersAsync();
         foreach (var transport in _mediaTransports.Values)
         {
+            if (_directPairs.Values.Any(p => p.Contains(transport))) continue;
             TransportSession? active;
             lock (transport.Sync)
                 active = transport.ActiveSession is { } id ? transport.Sessions.GetValueOrDefault(id) : null;

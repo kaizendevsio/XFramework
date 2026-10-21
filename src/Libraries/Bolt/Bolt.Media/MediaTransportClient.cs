@@ -18,10 +18,11 @@ public enum MediaPathKind { WebSocket, Negotiating, Datagram }
 /// <param name="AudioRedundancy">Audio leaves with the previous frame alongside (the relay reported loss).</param>
 /// <param name="RelayLeg">The relay's own leg to its TURN server ("UDP/relay", "TLS/relay"), as the relay reported it.</param>
 public sealed record MediaPathStatus(MediaPathKind Kind, string Description, double? RttMs = null, string? Reason = null, bool AudioRedundancy = false,
-    string? RelayLeg = null);
+    string? RelayLeg = null, string Topology = "server");
 
 public sealed class MediaTransportClientOptions
 {
+    public bool DirectPeer { get; init; }
     /// <summary>Give up on a session whose channel has not opened by then (ICE through TURN takes 1-3 s normally).</summary>
     public TimeSpan OpenTimeout { get; init; } = TimeSpan.FromSeconds(15);
     /// <summary>Backoff after a failed attempt: first, then doubling up to <see cref="MaxRetryDelay"/>.</summary>
@@ -98,7 +99,10 @@ public sealed class MediaTransportClient : IAsyncDisposable
     private string? _relayLeg;
     /// <summary>The relay was told the active channel is stalled (and has not been told it is back).</summary>
     private bool _reportedStalled;
-    private readonly TransportFeedbackEstimator _feedback = new();
+    private TransportFeedbackEstimator _feedback = new();
+    private TransportFeedbackRecorder _peerArrivals = new();
+    private Timer? _peerFeedbackTimer;
+    private long _echoBytes;
     private readonly List<long> _arrivals = [];
     private int _transportSequence;
     /// <summary>Stamped video messages, by transport sequence, until the relay reports them arrived or lost.</summary>
@@ -225,7 +229,13 @@ public sealed class MediaTransportClient : IAsyncDisposable
             lock (_sync)
             {
                 if (!_drain.Stalled && _path.Usable && OpenPeerLocked() is { } peer)
-                    return new(MediaPathKind.Datagram, peer.Path?.Describe() ?? "UDP", peer.Path?.RttMs, AudioRedundancy: AudioRedundancy, RelayLeg: _relayLeg);
+                {
+                    var direct = _active!.Config.DirectPeer;
+                    var topology = !direct ? "server" : peer.Path is not { } p ? "peer-unknown" :
+                        p.Local == "relay" || p.Remote == "relay" ? "peer-turn" : "peer-direct";
+                    return new(MediaPathKind.Datagram, peer.Path?.Describe() ?? "UDP", peer.Path?.RttMs,
+                        AudioRedundancy: AudioRedundancy, RelayLeg: direct ? null : _relayLeg, Topology: topology);
+                }
                 if (_pending is not null || (_active is not null && !_active.Opened))
                     return new(MediaPathKind.Negotiating, "WebSocket", Reason: "negotiating");
                 return new(MediaPathKind.WebSocket, "WebSocket", Reason: _reason);
@@ -412,6 +422,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
                 var backlogLimit = Math.Max(16_384L, rate * ProbeBacklogMs / 8);
                 while (!ct.IsCancellationRequested)
                 {
+                    if (!ReferenceEquals(ActivePeer, first)) return null;
                     var elapsedUs = NowMicroseconds() - begin;
                     if (elapsedUs >= stepMs * 1000L) break;
                     // Token bucket: whatever the timer's jitter, the step offers its rate over its length.
@@ -429,6 +440,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
                 var deadline = _clock() + (long)Math.Clamp(rtt * 2 + 120, 150, 3_000);
                 while (_clock() < deadline && !ct.IsCancellationRequested)
                 {
+                    if (!ReferenceEquals(ActivePeer, first)) return null;
                     var (uplink, echoes) = probe.Pending(step, echo);
                     if (uplink == 0 && echoes == 0) break;
                     await Pause(10);
@@ -448,6 +460,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
             Volatile.Write(ref _probe, null);
             ProbeEnded?.Invoke();
         }
+        if (!ReferenceEquals(ActivePeer, first) || ct.IsCancellationRequested) return null;
         var result = LinkProbe.Conclude(steps, _clock() - started, probe.MinRoundTripMs());
         _logger.LogInformation("Start probe: {Result}", result);
         return result;
@@ -477,12 +490,26 @@ public sealed class MediaTransportClient : IAsyncDisposable
     }
 
     /// <summary>A message from the relay: transport feedback is this client's own, everything else goes to the frame handlers.</summary>
-    private void OnPeerMessage(ReadOnlyMemory<byte> data)
+    private void OnPeerMessage(ReadOnlyMemory<byte> data, Session session)
     {
         var message = data.Span;
         if (message.IsEmpty) return;
+        if (session.Config.DirectPeer && message[0] == (byte)FrameType.TransportSequenced)
+        {
+            if (!TransportSequenceCodec.TryRead(message, out var sequence, out var inner)) return;
+            _peerArrivals.Record(sequence, NowMicroseconds());
+            message = inner;
+        }
         if (message[0] == (byte)FrameType.Padding)
         {
+            if (session.Config.DirectPeer && PaddingCodec.TryRead(message, out var echoFlags, out _, out _) &&
+                (echoFlags & PaddingCodec.Echo) != 0 && session.Peer is { BufferedAmount: < 98304 } echoPeer &&
+                Interlocked.Add(ref _echoBytes, message.Length) <= 2 * 1024 * 1024)
+            {
+                var echo = message.ToArray();
+                PaddingCodec.MarkEchoed(echo);
+                echoPeer.TrySend(echo);
+            }
             // The echo of a start probe message: only the probe reads it.
             if (PaddingCodec.TryRead(message, out var flags, out var step, out var index) && (flags & PaddingCodec.Echoed) != 0)
                 Volatile.Read(ref _probe)?.OnEcho(step, index, NowMicroseconds());
@@ -596,7 +623,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
                     await FailAsync(expired, "timeout", notifyRelay: true);
                 }
                 if (request)
-                    await SendAsync(MediaTransportKind.Request, new MediaTransportRequest(1, RtcDefaults.MaxMessageBytes));
+                    await SendAsync(MediaTransportKind.Request, new MediaTransportRequest(1, RtcDefaults.MaxMessageBytes, _options.DirectPeer));
                 await EvaluatePathAsync(now);
                 SendIdleFeedback(now);
                 if (now >= nextReport)
@@ -717,6 +744,16 @@ public sealed class MediaTransportClient : IAsyncDisposable
                 case MediaTransportKind.Config when MediaTransportCodec.Decode<MediaTransportConfig>(payload) is { } config:
                     await OnConfigAsync(config);
                     break;
+                case MediaTransportKind.Offer when MediaTransportCodec.Decode<MediaTransportDescription>(payload) is { } offer:
+                    subject = FindSession(offer.Session);
+                    if (subject is { Config.Answerer: true, Peer: { } answering })
+                    {
+                        subject.Candidates.Hold();
+                        var sdp = await answering.AnswerAsync(offer.Sdp, _lifetime.Token);
+                        await SendAsync(MediaTransportKind.Answer, new MediaTransportDescription(subject.Id, sdp, offer.IceRestart));
+                        await SendHeldCandidatesAsync(subject);
+                    }
+                    break;
                 case MediaTransportKind.Answer when MediaTransportCodec.Decode<MediaTransportDescription>(payload) is { } answer:
                     subject = FindSession(answer.Session);
                     if (subject?.Peer is { } peer)
@@ -731,7 +768,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
                         await target.AddCandidateAsync(new RtcCandidate(candidate.Candidate, candidate.SdpMid, candidate.SdpMLineIndex), _lifetime.Token);
                     break;
                 case MediaTransportKind.State when MediaTransportCodec.Decode<MediaTransportStateMessage>(payload) is { State: "open", Path: { } relayPath } open
-                                                   && FindSession(open.Session) is not null:
+                                                   && FindSession(open.Session) is { Config.DirectPeer: false }:
                     // The relay's own leg, for diagnostics: "UDP/relay" is the point of the datagram path; TCP or TLS is not.
                     lock (_sync) _relayLeg = relayPath.Describe();
                     Raise();
@@ -745,7 +782,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
                         await FailAsync(closed, close.Reason == "superseded" ? null : "relay-closed", notifyRelay: false);
                     break;
                 case MediaTransportKind.Report when MediaTransportCodec.Decode<MediaTransportReport>(payload) is { } report:
-                    ApplyRelayLoss(Math.Clamp(report.ReceiveLossPermille, 0, 1000));
+                    if (FindSession(report.Session) is not null) ApplyRelayLoss(Math.Clamp(report.ReceiveLossPermille, 0, 1000));
                     break;
             }
         }
@@ -790,7 +827,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
         if (replaced is not null) await CloseSessionAsync(replaced, notifyRelay: false);
         Raise();
         var maxMessage = Math.Clamp(config.MaxMessageBytes, 256, RtcDefaults.MaxMessageBytes);
-        var peer = await _createPeer(new RtcPeerOptions(config.IceServers, config.IceTransportPolicy == "relay", maxMessage), _lifetime.Token);
+        var peer = await _createPeer(new RtcPeerOptions(config.IceServers, config.IceTransportPolicy == "relay", maxMessage, Role: config.Answerer ? RtcPeerRole.Answer : RtcPeerRole.Offer), _lifetime.Token);
         lock (_sync)
         {
             if (session.Closed || _disposed) { _ = peer.DisposeAsync(); return; }
@@ -802,9 +839,10 @@ public sealed class MediaTransportClient : IAsyncDisposable
         };
         peer.StateChanged += state => _ = OnPeerStateAsync(session, state);
         peer.PathChanged += _ => Raise();
-        peer.Message += OnPeerMessage;
+        peer.Message += data => { if (!session.Closed) OnPeerMessage(data, session); };
         // A peer that times probe echoes where they land (a browser's page) hands them over that way instead.
         if (peer is IRtcProbeEchoSource echoes) echoes.ProbeEcho += (step, index, arrivedUs) => Volatile.Read(ref _probe)?.OnEcho(step, index, arrivedUs);
+        if (config.Answerer) return;
         session.Candidates.Hold();
         var offer = await peer.CreateOfferAsync(iceRestart: false, _lifetime.Token);
         await SendAsync(MediaTransportKind.Offer, new MediaTransportDescription(session.Id, offer));
@@ -854,7 +892,20 @@ public sealed class MediaTransportClient : IAsyncDisposable
                 return;
             }
             _logger.LogInformation("Call media moved to the datagram path ({Path})", session.Peer?.Path?.Describe() ?? "UDP");
-            if (superseded is not null) await CloseSessionAsync(superseded, notifyRelay: false);
+            if (superseded is not null) await CloseSessionAsync(superseded, notifyRelay: true);
+            if (session.Config.DirectPeer)
+            {
+                _feedback = new TransportFeedbackEstimator();
+                lock (_resendable) Array.Clear(_resendable);
+                _peerArrivals = new TransportFeedbackRecorder();
+                _peerFeedbackTimer?.Dispose();
+                _peerFeedbackTimer = new Timer(_ =>
+                {
+                    if (!session.Closed && session.Peer is { State: RtcChannelState.Open } direct && _peerArrivals.TryBuild() is { } report)
+                        direct.TrySend(report);
+                }, null, 100, 100);
+                PathAvailable?.Invoke();
+            }
             await EvaluatePathAsync(_clock());
             Raise();
             return;
@@ -896,6 +947,12 @@ public sealed class MediaTransportClient : IAsyncDisposable
         try
         {
             if (session.Peer is not { } peer || session.Closed) return false;
+            if (session.Config.Answerer)
+            {
+                // One offerer prevents restart glare. Falling back lets both sides reconnect safely.
+                await FailAsync(session, "peer-network-change", notifyRelay: true);
+                return false;
+            }
             session.Restart = answered;
             session.Candidates.Hold();
             var offer = await peer.CreateOfferAsync(iceRestart: true, _lifetime.Token);
@@ -1022,6 +1079,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
             active = _active;
             pending = _pending;
         }
+        _peerFeedbackTimer?.Dispose();
         _client.UnregisterFrameHandler(FrameType.MediaTransport, _handler);
         _inbox.Writer.TryComplete();
         try { await _lifetime.CancelAsync(); } catch (ObjectDisposedException) { }

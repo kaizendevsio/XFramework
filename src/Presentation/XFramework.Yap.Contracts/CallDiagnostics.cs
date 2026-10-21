@@ -15,7 +15,8 @@ public enum CallMetric
     CapturePaintMs, CaptureFrameMs,
     FrameExperiment, RawWidth, RawHeight, DisplayWidth, DisplayHeight, FrameRotation, FrameFlip,
     DecodedWidth, DecodedHeight, PrepareP95Ms, ScreenAngle, RearCamera,
-    WaitingForKeyframe, RecoveryRequests
+    WaitingForKeyframe, RecoveryRequests, Topology, DelaySource, ReceiverAgeMs, TransportAgeMs, SentKbps, ApplicationLimited,
+    CutLocalMs, CutTransportMs, CutReceiverMs, CutReceiverAgeMs, CutTransportAgeMs, CutSentKbps, CutCapacityKbps, CutLossPercent, CutGradient, CutAtMs
 }
 public enum CallDevice { Other, Android, Ios, Desktop }
 public enum CallCapturePath { Unknown, Processor, WorkerProcessor, WorkerWebgl, Rvfc, RvfcWebgl, WorkerWebgpu }
@@ -23,5 +24,8 @@ public enum CallTransportPath { Unknown, Udp, Tcp, Tls, WebSocket }
 public sealed record CallDiagnosticRemote(Guid StreamId, string Codec, Dictionary<CallMetric, double?> Metrics);
 public sealed record CallDiagnosticSample(Guid CallId, int Sequence, CallDevice Device, string Version,
     CallCapturePath CapturePath, CallTransportPath Transport, CallTransportPath RelayTransport,
-    string Codec, Dictionary<CallMetric, double?> Metrics, CallDiagnosticRemote[] Remotes);
+    string Codec, Dictionary<CallMetric, double?> Metrics, CallDiagnosticRemote[] Remotes)
+{
+    public Dictionary<CallMetric, double?>[] Cuts { get; init; } = [];
+}
 public sealed record CallDiagnosticSession(Guid Id, DateTimeOffset ExpiresAt);

@@ -13,6 +13,35 @@ namespace Bolt.Tests;
 public sealed class SendRateControlTests
 {
     [Test]
+    public void StaleReceiver_CannotInventGrowingDelayOrMeasuredCapacity()
+    {
+        var controller = new SendRateController(6000);
+        var decision = controller.Update(new SendPathSample(5000, 1000, 40, 0, 0, false,
+            Receiver: new(1000, 900, 100), Transport: new(5000, 5, 0, 0, 1000)));
+        Assert.Multiple(() =>
+        {
+            Assert.That(decision.DelayMs, Is.EqualTo(5));
+            Assert.That(decision.CapacityKbps, Is.Zero);
+            Assert.That(decision.ReceiverAgeMs, Is.EqualTo(4000));
+            Assert.That(decision.ApplicationLimited, Is.True);
+        });
+    }
+
+    [Test]
+    public void DrainingReceiver_DoesNotRepeatedlyCutFromTheOldRate()
+    {
+        var controller = new SendRateController(6000);
+        var first = controller.Update(new SendPathSample(10000, 5000, 40, 900, 0, true,
+            Receiver: new(10000, 900, 1000)));
+        var next = controller.Update(new SendPathSample(11000, 1000, 40, 0, 0, false,
+            Receiver: new(11000, 700, 300), Transport: new(11000, 10, 0, 0, 1000)));
+        Assert.That(next.TotalKbps, Is.EqualTo(first.TotalKbps));
+        Assert.That(next.Cause.HasFlag(RateCause.Draining), Is.True);
+        Assert.That(next.LastCut!.LocalMs, Is.EqualTo(900), "diagnostics retain the actual cut inputs");
+        Assert.That(next.Cuts, Has.Length.EqualTo(1));
+    }
+
+    [Test]
     public void FirstCongestion_CannotCollapseTheBudgetInOneCut_AtRealDeviceUptime()
     {
         var controller = new SendRateController(16_087);
