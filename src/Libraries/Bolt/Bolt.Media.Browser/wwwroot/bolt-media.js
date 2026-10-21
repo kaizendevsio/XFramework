@@ -997,6 +997,9 @@ class VideoPipeline {
         this.lastRequest = wanted;
         const generation = ++this.captureGeneration;
         const video = cameraConstraints(this.config.width, this.config.height, this.config.framerate);
+        // Pick the requested camera first. An advanced minimum during device selection could
+        // prefer a 60fps rear camera over a 30fps front camera despite facingMode's preference.
+        delete video.advanced;
         if (wanted.deviceId) video.deviceId = { exact: wanted.deviceId };
         else if (wanted.facingMode) video.facingMode = { ideal: wanted.facingMode };
         let stream;
@@ -1010,6 +1013,11 @@ class VideoPipeline {
         if (!track) { stream.getTracks().forEach(t => t.stop()); throw new Error('No camera was available.'); }
         this.mediaStream = stream;
         this.cameraConstraintRejected = false;
+        if (this.config.framerate > 30 && track.applyConstraints) {
+            try { await track.applyConstraints(cameraConstraints(this.config.width, this.config.height, this.config.framerate)); }
+            catch { this.cameraConstraintRejected = true; }
+            if (generation !== this.captureGeneration) { stream.getTracks().forEach(t => t.stop()); return this.describe(); }
+        }
         const settings = track.getSettings?.() ?? {};
         this.deviceId = settings.deviceId || wanted.deviceId || '';
         this.facingMode = settings.facingMode || wanted.facingMode || 'user';

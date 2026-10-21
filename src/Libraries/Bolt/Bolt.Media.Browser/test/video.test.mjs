@@ -287,6 +287,47 @@ test('60fps camera preference has an optional minimum, not a mandatory camera re
     assert.deepEqual(c.advanced, [{ frameRate: { min: 60 } }]);
 });
 
+test('the stronger FPS request applies to the selected camera, never to camera selection', async () => {
+    for (const reject of [false, true]) {
+        const f = fixture();
+        const open = f.sandbox.navigator.mediaDevices.getUserMedia;
+        let applied;
+        f.sandbox.navigator.mediaDevices.getUserMedia = async constraints => {
+            const stream = await open(constraints);
+            stream.getVideoTracks()[0].applyConstraints = async value => {
+                applied = plain(value);
+                if (reject) throw new Error('unsupported mode');
+            };
+            return stream;
+        };
+        await f.p.initEncoder('h264', 1280, 720, 3000, 60, 2);
+        await f.p.startCapture(f.host, { facingMode: 'user' });
+        assert.equal(f.stats.opened[0].video.advanced, undefined);
+        assert.deepEqual(applied.advanced, [{ frameRate: { min: 60 } }]);
+        assert.equal(f.p.facingMode, 'user');
+        assert.equal(f.p.captureRunning, true);
+        assert.equal(f.p.getDiagnostics().cameraConstraintRejected, reject);
+        await f.p.dispose();
+    }
+});
+
+test('cancelling while the camera applies its FPS preference cannot restart capture', async () => {
+    const f = fixture(), open = f.sandbox.navigator.mediaDevices.getUserMedia;
+    let finish;
+    f.sandbox.navigator.mediaDevices.getUserMedia = async constraints => {
+        const stream = await open(constraints);
+        stream.getVideoTracks()[0].applyConstraints = () => new Promise(resolve => finish = resolve);
+        return stream;
+    };
+    await f.p.initEncoder('h264', 1280, 720, 3000, 60, 2);
+    const starting = f.p.startCapture(f.host, { facingMode: 'user' });
+    await new Promise(resolve => setImmediate(resolve));
+    f.p.stopCapture(); finish(); await starting;
+    assert.equal(f.p.captureRunning, false);
+    assert.equal(f.track.live, false);
+    await f.p.dispose();
+});
+
 test('timeline rebasing accounts for queued pictures it discards', () => {
     const f = playoutFixture();
     f.push(5000); f.push(5033); f.push(0);
