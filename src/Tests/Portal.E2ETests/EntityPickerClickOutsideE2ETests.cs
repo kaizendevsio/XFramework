@@ -255,6 +255,7 @@ public sealed class ClickOutsideFixtureCashier : Cashier
         { new() { Id = State.CurrencyId, CurrencyIsoCode3 = "USD" } });
         Set("_financeSettings", new IdentityServer.Domain.Shared.Contracts.TenantFinanceSettings
         { DefaultCurrencyId = State.CurrencyId, SupportedCurrencyIds = [State.CurrencyId] });
+        Set("_checkoutSettings", new POS.Domain.Shared.Contracts.PosCheckoutSettings());
         Set("_catalogItems", new List<PosCatalogItemResponse> { State.Item });
     }
     protected override Task OnInitializedAsync() => Task.CompletedTask;

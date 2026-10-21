@@ -73,6 +73,7 @@ public sealed class PosScannerCashierIntegrationTests
         Set("_currencies", new List<CurrencyType> { new() { Id = register.CurrencyId, CurrencyIsoCode3 = "USD" } });
         Set("_financeSettings", new IdentityServer.Domain.Shared.Contracts.TenantFinanceSettings
         { DefaultCurrencyId = register.CurrencyId, SupportedCurrencyIds = [register.CurrencyId] });
+        Set("_checkoutSettings", new POS.Domain.Shared.Contracts.PosCheckoutSettings());
         renderer = new(services);
         renderer.Attach(page);
     }
