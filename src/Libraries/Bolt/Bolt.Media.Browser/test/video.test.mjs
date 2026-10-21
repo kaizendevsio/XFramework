@@ -341,12 +341,20 @@ test('a repaired burst after a playout underrun is spaced instead of immediately
     const f = playoutFixture();
     f.push(0); f.advance(50);
     f.advance(120); f.push(33); f.push(66); f.push(99); f.push(132);
-    f.advance(160); assert.equal(f.draws.length, 2);
-    f.advance(193); assert.equal(f.draws.length, 3);
-    f.advance(226); assert.equal(f.draws.length, 4);
-    f.advance(259); assert.equal(f.draws.length, 5);
+    for (let now = 120; now <= 270; now += 16) f.advance(now);
+    assert.equal(f.draws.length, 5);
     assert.equal(f.playout.dropped, 0);
     assert.ok(f.frames.every(x => x.closed === 1));
+});
+
+test('a five-picture catch-up burst advances its timeline without purging fresh pictures', () => {
+    const f = playoutFixture();
+    for (let i = 0; i < 5; i++) f.push(i * 33);
+    for (let now = 0; now <= 144; now += 16) f.advance(now);
+    assert.equal(f.draws.length, 5);
+    assert.equal(f.playout.dropped, 0);
+    assert.ok(f.frames.every(x => x.closed === 1));
+    assert.ok(f.playout.diagnostics().playoutMs < 150);
 });
 
 // ── Codec probing ──

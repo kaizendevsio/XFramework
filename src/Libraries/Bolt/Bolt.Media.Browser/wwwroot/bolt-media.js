@@ -26,8 +26,16 @@ export class VideoPlayout {
         // than marking all of its pictures immediately due and overwriting them together.
         if (!this.queue.length && stamp + this.origin < now) this.origin = now + 40 - stamp;
         // A long network stall must not leave every subsequent frame permanently late.
-        if (stamp + this.origin < now - 100 || stamp + this.origin > now + 150) {
+        if (stamp + this.origin < now - 100) {
             this.clear(true); this.origin = now + 40 - stamp;
+        }
+        // Catch-up bursts can extend beyond the playout horizon. Move their timeline earlier,
+        // rather than clearing every retained picture when the newest one crosses that bound.
+        // Leave room for the next display callback before the 150ms freshness deadline.
+        const advance = stamp + this.origin - now - 120;
+        if (advance > 0) {
+            this.origin -= advance;
+            for (const item of this.queue) item.due -= advance;
         }
         this.lastStamp = stamp;
         this.queue.push({ frame, orientation, due: stamp + this.origin, at: now });
