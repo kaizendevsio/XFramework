@@ -589,6 +589,8 @@ public sealed class SendRateController
         var audioWire = _audioKbps + _options.AudioOverheadBytes * 8 * _options.AudioPacketsPerSecond / 1000;
         _estimate = Math.Clamp(Math.Max(_estimate, StableKbps), _options.MinTotalKbps, _options.MaxTotalKbps);
         _history.Clear();
+        _lastCongestionKbps = 0;
+        _congestedOnce = _congestionObserved = false;
         _risingStreak = _cutStreak = 0;
         _lastDecreaseAt = long.MinValue / 2;
         _delayAtDecrease = 0;

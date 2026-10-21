@@ -240,7 +240,7 @@ public sealed class SendRateLoop
         {
             // Reports from the dead path (or their silence) must not be read as the new path's queue.
             _signals.Clear();
-            _pictureStart.PathChanged();
+            _pictureStart.PathChanged(nowMs);
             Pacer.ResetForPathChange();
             Controller.RestartAfterPathChange(nowMs);
         }

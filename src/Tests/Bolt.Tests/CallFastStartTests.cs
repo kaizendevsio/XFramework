@@ -15,6 +15,24 @@ public sealed class CallFastStartTests
 {
     private const int AudioWire = 84; // Opus 32k plus framing, as the browser client counts it.
 
+    [Test]
+    public void PeerRouteDuringStartup_DiscardsOldLimit_ButAcceptsItsOwnProbe()
+    {
+        var controller = new SendRateController(500);
+        var start = new PictureStart(controller);
+        start.Begin(0, new StartHints(UplinkKbps: 500, UplinkAtLeast: false), AudioWire, new VideoRateLadder(1), null);
+        controller.Update(new SendPathSample(1000, 500, 32, 0, 0, false,
+            Receiver: new ReceiverSignal(1000, 900, 300)));
+        start.PathChanged(1250);
+        controller.RestartAfterPathChange(1250);
+        Assert.That(controller.StartCeilingKbps, Is.Null);
+        Assert.That(controller.StartingUp, Is.True);
+        start.UplinkMeasured(7500, atLeast: true);
+        start.Tick(2250, null);
+        Assert.That(start.Estimate?.Source, Is.EqualTo(StartRate.UplinkProbe));
+        Assert.That(controller.EstimateKbps, Is.GreaterThan(5000), "the new route's measured capacity must revise startup");
+    }
+
     // ── The probe's judgement ──
 
     [Test]
@@ -452,7 +470,9 @@ public sealed class CallFastStartTests
         TestContext.Out.WriteLine(sim);
         Assert.Multiple(() =>
         {
-            Assert.That(sim.EstimateAt(2_500), Is.LessThan(4_000), "it did react: the receiver was behind");
+            Assert.That(sim.EstimateAt(2_500), Is.LessThan(sim.EstimateAt(0)), "it did react: the receiver was behind");
+            Assert.That(sim.EstimateAt(2_500), Is.GreaterThan(4_000),
+                "a brief busy receiver is not evidence that a measured fast link lost half its capacity");
             Assert.That(sim.Height, Is.EqualTo(1080), "and is back at the preference");
             Assert.That(sim.LastRungChangeMs, Is.LessThanOrEqualTo(9_000), "within seconds, not half a minute");
             Assert.That(sim.RungChangesAfter(10_000), Is.Zero);

@@ -898,6 +898,7 @@ public sealed class MediaTransportClient : IAsyncDisposable
                 _feedback = new TransportFeedbackEstimator();
                 lock (_resendable) Array.Clear(_resendable);
                 _peerArrivals = new TransportFeedbackRecorder();
+                Interlocked.Exchange(ref _echoBytes, 0);
                 _peerFeedbackTimer?.Dispose();
                 _peerFeedbackTimer = new Timer(_ =>
                 {
