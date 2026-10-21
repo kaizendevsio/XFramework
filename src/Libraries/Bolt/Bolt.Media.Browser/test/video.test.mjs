@@ -299,9 +299,11 @@ test('timeline rebasing accounts for queued pictures it discards', () => {
 test('a repaired burst after a playout underrun is spaced instead of immediately discarded', () => {
     const f = playoutFixture();
     f.push(0); f.advance(50);
-    f.advance(120); f.push(33); f.push(66);
+    f.advance(120); f.push(33); f.push(66); f.push(99); f.push(132);
     f.advance(160); assert.equal(f.draws.length, 2);
     f.advance(193); assert.equal(f.draws.length, 3);
+    f.advance(226); assert.equal(f.draws.length, 4);
+    f.advance(259); assert.equal(f.draws.length, 5);
     assert.equal(f.playout.dropped, 0);
     assert.ok(f.frames.every(x => x.closed === 1));
 });

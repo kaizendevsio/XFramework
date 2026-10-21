@@ -179,7 +179,7 @@ class SyntheticVideoPipeline {
         this.hostRef = hostRef ?? this.hostRef;
         const remote = {
             streamId, primed: false, received: 0, bytes: 0, rendered: 0, resets: 0, waiting: 0, corrupt: 0, brokenReference: 0,
-            keyframes: 0, decoded: new Set(), order: [], renders: [], lastRender: 0, events: [],
+            keyframes: 0, decoded: new Set(), order: [], outputs: [], renders: [], lastRender: 0, events: [],
         };
         // Keep the real display scheduler even though the codec/device is synthetic. Decoder
         // bursts must not count as multiple displayed pictures inside one animation callback.
@@ -225,6 +225,8 @@ class SyntheticVideoPipeline {
         }
         remote.decoded.add(header.frameId); remote.order.push(header.frameId);
         if (remote.order.length > 64) remote.decoded.delete(remote.order.shift());
+        remote.outputs.push(performance.now());
+        if (remote.outputs.length > 20000) remote.outputs.splice(0, 10000);
         remote.playout.push({ timestamp, close() {} }, 0);
         return true;
     }
@@ -354,6 +356,8 @@ globalThis.__boltCallResult = () => {
             previous = at;
         }
         return { streamId: remote.streamId, received: remote.received, rendered: remote.rendered, renderedInWindow: renders.length,
+            decodedFps: remote.outputs.filter(at => at >= from).length * 1000 / Math.max(1, now - from),
+            playoutDropped: remote.playout.dropped,
             fps: renders.length * 1000 / Math.max(1, now - from), longestFreezeMs: Math.round(longest), frozenMs: Math.round(frozen),
             resets: remote.resets, corrupt: remote.corrupt, brokenReference: remote.brokenReference, waitingForKeyframe: remote.waiting,
             events: remote.events,

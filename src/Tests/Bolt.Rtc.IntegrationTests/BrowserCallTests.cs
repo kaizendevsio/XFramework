@@ -304,6 +304,8 @@ public sealed class BrowserCallTests
             var line = new JsonObject
             {
                 ["sentFps"] = Math.Round(sentFps, 1), ["sentKbps"] = Math.Round(sentBytes * 8.0 / windowMs), ["renderedFps"] = Math.Round(renderedFps, 1),
+                ["decodedFps"] = remote?["decodedFps"]?.GetValue<double>(),
+                ["playoutDropped"] = (remote?["playoutDropped"]?.GetValue<int>() ?? 0) - (beforeRemote?["playoutDropped"]?.GetValue<int>() ?? 0),
                 ["longestFreezeMs"] = freeze, ["frozenMs"] = remote?["frozenMs"]?.GetValue<int>(), ["decoderResets"] = resets, ["corrupt"] = corrupt,
                 ["largestKeyframe"] = sent["largestKeyframe"]?.GetValue<long>(), ["audioDelivered"] = audio?["delivered"]?.GetValue<double>(),
                 ["audioP50"] = audio?["p50"]?.GetValue<int?>(), ["audioP99"] = audio?["p99"]?.GetValue<int?>(),
