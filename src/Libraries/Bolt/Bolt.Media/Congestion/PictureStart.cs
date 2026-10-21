@@ -32,12 +32,19 @@ public sealed class PictureStart(SendRateController controller)
     public StartEstimate? Estimate { get; private set; }
 
     /// <summary>Measurements from the previous route cannot constrain the replacement route.</summary>
-    public void PathChanged()
+    public void PathChanged(long nowMs)
     {
         _hints = _applied = default;
-        _active = false;
         Estimate = null;
         controller.StartCeilingKbps = null;
+        // Keep accepting the replacement route's probe while the picture is starting. Turning this off
+        // discarded the peer measurement and left a healthy link climbing from the old route's low rate.
+        if (_active)
+        {
+            _startedAt = nowMs;
+            controller.BeginStartWindow(nowMs, WindowMs);
+            controller.IgnoreLocalUntil(nowMs + LocalGraceMs);
+        }
     }
 
     /// <summary>Start a picture on <paramref name="hints"/> and the worst receiver's downlink; returns its first setting.</summary>
