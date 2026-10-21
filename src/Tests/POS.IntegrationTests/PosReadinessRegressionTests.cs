@@ -345,7 +345,8 @@ public sealed class PosReadinessRegressionTests
                 new PosRequestContext(tenant, actor, request.Metadata, true, false)));
         return new PosSalesService(db, inventory.Object, (wallets ?? new Mock<IWalletsServiceWrapper>(MockBehavior.Strict)).Object,
             resolver.Object, NullLogger<PosSalesService>.Instance,
-            new PosFinanceSettings(Mock.Of<IdentityServer.Integration.Drivers.IIdentityServerServiceWrapper>()));
+            new PosFinanceSettings(Mock.Of<IdentityServer.Integration.Drivers.IIdentityServerServiceWrapper>()),
+            new PosCheckoutSettingsService(db, resolver.Object));
     }
 
     private static PosSale Sale(Guid tenant, PosSaleStatus status)

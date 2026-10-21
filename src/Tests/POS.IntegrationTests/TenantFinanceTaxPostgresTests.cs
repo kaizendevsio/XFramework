@@ -1,5 +1,6 @@
 using System.Net;
 using IdentityServer.Api.Features.FinanceSettings;
+using IdentityServer.Api.Features.PosSettings;
 using IdentityServer.Domain.Shared.Contracts;
 using IdentityServer.Domain.Shared.Contracts.Requests;
 using IdentityServer.Integration.Drivers;
@@ -176,8 +177,8 @@ public sealed class TenantFinanceTaxPostgresTests
         resolver.Setup(x => x.Resolve(It.IsAny<RequestBase>(), It.IsAny<Guid?>()))
             .Returns((RequestBase r, Guid? actor) => Result<PosRequestContext>.Success(new(tenant, actor, r.Metadata, true, false)));
         var finance = new PosFinanceSettings(identity.Object);
-        var sales = new PosSalesService(db, inventory.Object, null!, resolver.Object, NullLogger<PosSalesService>.Instance, finance);
-        var carts = new PosCartService(db, inventory.Object, sales, resolver.Object, NullLogger<PosCartService>.Instance, finance);
+        var sales = new PosSalesService(db, inventory.Object, null!, resolver.Object, NullLogger<PosSalesService>.Instance, finance, new PosCheckoutSettingsService(db, resolver.Object));
+        var carts = new PosCartService(db, inventory.Object, sales, resolver.Object, NullLogger<PosCartService>.Instance, finance, new PosCheckoutSettingsService(db, resolver.Object));
         var cart = await carts.CreateAsync(new()
         { RegisterId = register.Id, CashierCredentialId = Guid.NewGuid(), DiscountAmount = 10, Lines = [new() { ProductId = productId, Quantity = 1, DiscountAmount = 20 }] }, CancellationToken.None);
         cart.IsSuccess.Should().BeTrue(cart.Message);
@@ -208,6 +209,56 @@ public sealed class TenantFinanceTaxPostgresTests
         changedRate.StatusCode.Should().Be(409);
         changedRate.Message.Should().Contain("Payment amount does not match");
         (await db.Set<PosSale>().CountAsync()).Should().Be(1, "a changed quote must not persist or charge a new sale");
+    }
+
+    [Test]
+    public async Task PosSettings_AdminSave_CashierRead_ConcurrencyTenantAndRepairAreEnforced()
+    {
+        var tenant = Guid.NewGuid();
+        await using var db = Context(tenant);
+        db.Add(new Tenant { Id = tenant, TenantId = tenant, Name = "POS settings test", Version = 1, IsEnabled = true });
+        await db.SaveChangesAsync();
+        var admin = PosSettings(db, tenant, true);
+        var cashier = PosSettings(db, tenant, false);
+        var settings = new PosCheckoutSettings { TableTrackingEnabled = true,
+            CheckoutFields = [new() { Key = "coupon", Label = "Coupon", Enabled = true, Required = true }] };
+        (await cashier.UpdateAsync(new() { Settings = settings }, CancellationToken.None)).StatusCode.Should().Be(403);
+        (await admin.UpdateAsync(new() { Settings = settings, Metadata = new() { RequestedTenantId = Guid.NewGuid() } },
+            CancellationToken.None)).StatusCode.Should().Be(403);
+        var saved = await admin.UpdateAsync(new() { Settings = settings }, CancellationToken.None);
+        saved.IsSuccess.Should().BeTrue(saved.Message);
+        saved.Data!.CanManage.Should().BeTrue();
+        var read = await cashier.GetAsync(new(), CancellationToken.None);
+        read.IsSuccess.Should().BeTrue(read.Message);
+        read.Data!.CanManage.Should().BeFalse();
+        read.Data.Settings.Should().BeEquivalentTo(settings);
+        (await admin.UpdateAsync(new() { Settings = settings }, CancellationToken.None)).StatusCode.Should().Be(409);
+        await using (var otherDb = Context(Guid.NewGuid()))
+            (await otherDb.Set<RegistryConfiguration>().AnyAsync(x => x.Key == PosCheckoutSettings.RegistryKey)).Should().BeFalse();
+
+        var row = await db.Set<RegistryConfiguration>().AsTracking().SingleAsync(x => x.Key == PosCheckoutSettings.RegistryKey);
+        row.Value = "{invalid";
+        await db.SaveChangesAsync();
+        (await cashier.GetAsync(new(), CancellationToken.None)).StatusCode.Should().Be(409);
+        var repair = await admin.GetAsync(new(), CancellationToken.None);
+        repair.IsSuccess.Should().BeTrue();
+        repair.Data!.IsUsable.Should().BeFalse();
+        var repaired = await admin.UpdateAsync(new()
+        {
+            ExpectedConcurrencyStamp = repair.Data.ConcurrencyStamp, Settings = settings
+        }, CancellationToken.None);
+        repaired.IsSuccess.Should().BeTrue(repaired.Message);
+        repaired.Data!.IsUsable.Should().BeTrue();
+    }
+
+    private static TenantPosSettingsService PosSettings(AppDbContext db, Guid tenant, bool canManage)
+    {
+        var actor = new TrustedActorIdentity(Guid.NewGuid(), null, tenant, Guid.NewGuid(), new HashSet<string>(),
+            canManage ? new HashSet<string> { "identity.tenants:manage", "pos.sales:view" } : new HashSet<string> { "pos.sales:view" },
+            "test", DateTimeOffset.UtcNow.AddHours(1));
+        var accessor = new Mock<ITrustedInvocationContextAccessor>();
+        accessor.SetupGet(x => x.Current).Returns(new TrustedInvocationContext(actor, null, tenant, tenant, Guid.NewGuid()));
+        return new(db, accessor.Object, NullLogger<TenantPosSettingsService>.Instance);
     }
 
     private AppDbContext Context(Guid tenant) => new(options, new HttpContextAccessor(), new ConfigurationBuilder().Build(), new TestEffectiveTenantContextAccessor(tenant));

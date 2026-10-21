@@ -57,15 +57,24 @@ else
             await ModuleNavigation.EnsureLoadedAsync();
             _enabled = TenantFilter.SelectedTenantId is Guid && ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "planning");
             _rule = null;
+            _productName = "Product";
+            _variantName = "Base product";
+            _warehouseName = "Any warehouse";
+            _locationName = "Any location";
             if (!_enabled) return;
             var tenantId = TenantFilter.SelectedTenantId!.Value;
             _rule = await DataContext.Query<InventoryReorderRule>().NoCache().Where(x => x.TenantId == tenantId && x.Id == Id && !x.IsDeleted).FirstOrDefaultAsync();
             if (_rule is null) return;
             _productName = (await DataContext.Query<Product>().NoCache().Where(x => x.TenantId == tenantId && x.Id == _rule.ProductId && !x.IsDeleted).FirstOrDefaultAsync())?.Name ?? "Product";
-            var variants = await DataContext.Query<ProductVariation>().NoCache().Where(x => x.TenantId == tenantId && x.Id == _rule.ProductVariationId && !x.IsDeleted).ToListAsync();
-            _variantName = InventoryDisplay.Variant(variants, _rule.ProductVariationId);
-            _warehouseName = (await DataContext.Query<Warehouse>().NoCache().Where(x => x.TenantId == tenantId && x.Id == _rule.WarehouseId && !x.IsDeleted).FirstOrDefaultAsync())?.Name ?? "Any warehouse";
-            _locationName = (await DataContext.Query<InventoryLocation>().NoCache().Where(x => x.TenantId == tenantId && x.Id == _rule.LocationId && !x.IsDeleted).FirstOrDefaultAsync())?.Name ?? "Any location";
+            if (_rule.ProductVariationId is Guid variantId)
+            {
+                var variant = await DataContext.Query<ProductVariation>().NoCache().Where(x => x.TenantId == tenantId && x.Id == variantId && !x.IsDeleted).FirstOrDefaultAsync();
+                _variantName = InventoryDisplay.Variant(variant is null ? [] : [variant], variantId);
+            }
+            if (_rule.WarehouseId is Guid warehouseId)
+                _warehouseName = (await DataContext.Query<Warehouse>().NoCache().Where(x => x.TenantId == tenantId && x.Id == warehouseId && !x.IsDeleted).FirstOrDefaultAsync())?.Name ?? "Unavailable warehouse";
+            if (_rule.LocationId is Guid locationId)
+                _locationName = (await DataContext.Query<InventoryLocation>().NoCache().Where(x => x.TenantId == tenantId && x.Id == locationId && !x.IsDeleted).FirstOrDefaultAsync())?.Name ?? "Unavailable location";
         }
         catch { ToastService.Error("Could not load record."); }
         finally { _loading = false; }

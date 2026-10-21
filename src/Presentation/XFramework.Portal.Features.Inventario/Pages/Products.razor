@@ -70,13 +70,13 @@ else
                             <BbCardTitle>Product Catalog</BbCardTitle>
                             <BbCardDescription>@_filteredProducts.Count product(s) shown</BbCardDescription>
                         </div>
-                        <div class="xf-filter-actions">
+                        <InventoryFilterBar Label="Product filters">
                             <BbInput @bind-Value="_search" AriaLabel="Search products" Placeholder="Search products..." @oninput="OnSearchChanged" />
                             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => { _search = ""; ApplySearch(); })">Clear search</BbButton><BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
                                 <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
                                 Refresh
                             </BbButton>
-                        </div>
+                        </InventoryFilterBar>
                     </div>
                 </BbCardHeader>
                 <BbCardContent>

@@ -80,6 +80,10 @@ else if (!_moduleEnabled)
                                             <div class="pos-held-cart-row">
                                                 <div class="pos-held-cart-main">
                                                     <strong>@cart.CartNumber</strong>
+                                                    @if (!string.IsNullOrWhiteSpace(cart.TableNumber))
+                                                    {
+                                                        <span>Table @cart.TableNumber</span>
+                                                    }
                                                     <span>@HeldCartCustomer(cart) | @FormatMoney(cart.TotalAmount)</span>
                                                     <small>Held @FormatDateTime(cart.SuspendedAt) | Expires @FormatDateTime(cart.ExpiresAt)</small>
                                                 </div>
@@ -118,6 +122,10 @@ else if (!_moduleEnabled)
                                 <BbDialogDescription>Customer reference and notes for this sale.</BbDialogDescription>
                             </BbDialogHeader>
                             <div class="flex flex-col gap-4">
+                                @if (_checkoutSettings?.TableTrackingEnabled == true)
+                                {
+                                    <BbFormFieldInput @bind-Value="_checkoutMetadata.TableNumber" Label="Table number" Disabled="@IsInteractionLocked" />
+                                }
                                 <BbFormFieldInput @bind-Value="_customerLabel" Label="Customer reference" Placeholder="Name or queue number" Disabled="@IsInteractionLocked" />
                                 <BbFormFieldTextarea @bind-Value="_cartNotes" Label="Sale notes" Placeholder="Optional note" Disabled="@IsInteractionLocked" />
                             </div>
@@ -389,7 +397,27 @@ else if (!_moduleEnabled)
                                             SearchRequested="@SearchCredentialOptions"
                                             AdvancedSearchScope="Searches customer username, alias, and last seen date."
                                             AdvancedSearchTitle="Find customer" AdvancedSearchDescription="Select the customer paying for this sale."
+                                            ShowCreate="true" CreateLabel="Create customer" OnCreate="@OpenCreateCustomer"
                                             Disabled="@IsInteractionLocked" />
+                        }
+
+                        @if (_checkoutSettings is { } checkoutSettings)
+                        {
+                            <div class="flex flex-col gap-4">
+                                @if (checkoutSettings.TableTrackingEnabled)
+                                {
+                                    <BbFormFieldInput @bind-Value="_checkoutMetadata.TableNumber" Label="Table number"
+                                                      Disabled="@IsInteractionLocked" />
+                                }
+                                @foreach (var field in checkoutSettings.CheckoutFields.Where(item => item.Enabled))
+                                {
+                                    <BbFormFieldInput TValue="string" @key="field.Key" Value="@CheckoutFieldValue(field.Key)"
+                                                      ValueChanged="@((string value) => { _checkoutMetadata.Fields[field.Key] = value ?? string.Empty; })"
+                                                      Label="@(field.Required ? field.Label + " *" : field.Label)"
+                                                      Required="@field.Required"
+                                                      Disabled="@IsInteractionLocked" />
+                                }
+                            </div>
                         }
 
                         <BbCollapsible @bind-Open="_adjustmentsOpen" Class="pos-adjustments-section">
@@ -484,6 +512,10 @@ else if (!_moduleEnabled)
         </div>
     </div>
 
+    <PosCreateCustomerDialog @key="TenantFilter.SelectedTenantId" Open="@_createCustomerOpen"
+                             OpenChanged="@CustomerDialogChanged" OnCreated="@CustomerCreated"
+                             TenantId="@TenantFilter.SelectedTenantId" Metadata="@BuildMetadata()" />
+
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IPOSServiceWrapper POS { get; set; } = default!;
@@ -549,6 +581,9 @@ else if (!_moduleEnabled)
     private string _activeCartCreateIdempotencyKey = NewCartIdempotencyKey();
     private decimal _discountAmount;
     private TenantFinanceSettings? _financeSettings;
+    private PosCheckoutSettings? _checkoutSettings;
+    private PosCheckoutMetadata _checkoutMetadata = new();
+    private bool _createCustomerOpen;
     private decimal _taxAmount => _financeSettings?.CalculateTax(Subtotal - _discountAmount) ?? 0;
     private decimal _cashTenderedAmount;
     private PosPaymentMethod _paymentMethod = PosPaymentMethod.CashDrawer;
@@ -573,7 +608,7 @@ else if (!_moduleEnabled)
         PosSaleStatus.Cancelled;
     private bool IsInteractionLocked => IsBusy || HasPendingPayment || HasTerminalCheckoutFailure;
     private bool IsCashierVisible => !_loading && _hasTenant && _moduleEnabled;
-    private bool IsMobileScannerPaused => _disposed || _paymentOpen || IsInteractionLocked ||
+    private bool IsMobileScannerPaused => _disposed || _paymentOpen || _createCustomerOpen || IsInteractionLocked ||
         _loading || _searching || !_hasTenant || !_moduleEnabled || _loadError is not null ||
         SelectedRegister is null;
     private PosRegisterResponse? SelectedRegister => _registers.FirstOrDefault(item => item.Id.ToString() == _selectedRegisterId);
@@ -592,12 +627,14 @@ else if (!_moduleEnabled)
         .Where(amount => amount > Total).Distinct().Take(2);
     private string? PaymentStageRequirement =>
         _loadError is not null ? "Refresh to finish loading the register." :
+        _checkoutSettings is null ? "Refresh to load checkout settings." :
         SelectedRegister is null ? "Select a register to start a sale." :
         RegisterCurrency is null ? "The register currency could not be loaded. Refresh to retry." :
         _financeSettings is null || !_financeSettings.SupportedCurrencyIds.Contains(SelectedRegister.CurrencyId) ? "Configure this currency in Finance settings, then refresh." :
         ActorContext.CredentialId is null || ActorContext.CredentialId == Guid.Empty ? "Sign in again to identify the cashier." :
         !_cart.Any() ? "Add a product to start a sale." : null;
-    private string? SaleRequirement => PaymentStageRequirement ?? (
+    private string? SaleRequirement => PaymentStageRequirement ??
+        _checkoutSettings?.Validate(BuildCheckoutMetadata(), requireValues: true) ?? (
         Total <= 0 || _discountAmount < 0 || _taxAmount < 0 ? "Discount and tax must be valid amounts; the sale total must be greater than zero." : null);
     private string? CheckoutRequirement => SaleRequirement ?? (
         IsCashPayment && _cashTenderedAmount < Total ? $"Enter cash received. {FormatMoney(Total - _cashTenderedAmount)} remaining." :
@@ -715,6 +752,7 @@ else if (!_moduleEnabled)
             _currencies = [];
             _suspendedCarts = [];
             _financeSettings = null;
+            _checkoutSettings = null;
 
             if (_hasTenant && _moduleEnabled && TenantFilter.SelectedTenantId is Guid tenantId)
             {
@@ -728,6 +766,14 @@ else if (!_moduleEnabled)
                     return;
                 }
                 _financeSettings = finance.Response.Settings;
+                var checkout = await POS.GetPosCheckoutSettings(new() { Metadata = BuildMetadata() });
+                if (IsStale()) return;
+                if (!checkout.IsSuccess || checkout.Response?.TenantId != tenantId)
+                {
+                    _loadError = checkout.Message ?? "Checkout settings could not be loaded.";
+                    return;
+                }
+                _checkoutSettings = checkout.Response.Settings;
                 await SearchRegisterOptions("");
                 await SearchCredentialOptions("");
 
@@ -936,7 +982,7 @@ else if (!_moduleEnabled)
 
             if (_disposed || version != _searchVersion || tenantId != TenantFilter.SelectedTenantId ||
                 (mobileScan && (generation != _scannerSaleGeneration || registerId != TryResolveSelectedRegisterId() ||
-                    _paymentOpen || IsInteractionLocked || _loading || !_hasTenant || !_moduleEnabled || _loadError is not null)))
+                    _paymentOpen || _createCustomerOpen || IsInteractionLocked || _loading || !_hasTenant || !_moduleEnabled || _loadError is not null)))
                 return null;
 
             _lastCatalogSearch = searchText;
@@ -1121,6 +1167,7 @@ else if (!_moduleEnabled)
                     CustomerCredentialId = TryResolveSelectedCustomer(),
                     CustomerLabel = _customerLabel,
                     Notes = _cartNotes,
+                    CheckoutMetadata = BuildCheckoutMetadata(),
                     DiscountAmount = _discountAmount,
                     TaxAmount = 0,
                     Suspend = true,
@@ -1247,6 +1294,7 @@ else if (!_moduleEnabled)
             CustomerCredentialId = TryResolveSelectedCustomer(),
             CustomerLabel = _customerLabel,
             Notes = _cartNotes,
+            CheckoutMetadata = BuildCheckoutMetadata(),
             DiscountAmount = _discountAmount,
             TaxAmount = 0,
             ExpectedConcurrencyStamp = _activeCartConcurrencyStamp,
@@ -1358,6 +1406,7 @@ else if (!_moduleEnabled)
                 RegisterId = registerId,
                 CashierCredentialId = cashierCredentialId,
                 CustomerCredentialId = customerCredentialId,
+                CheckoutMetadata = BuildCheckoutMetadata(),
                 DiscountAmount = _discountAmount,
                 TaxAmount = 0,
                 IdempotencyKey = _activeSaleIdempotencyKey,
@@ -1466,6 +1515,7 @@ else if (!_moduleEnabled)
         _selectedCustomerCredentialId = cart.CustomerCredentialId?.ToString();
         _customerLabel = cart.CustomerLabel ?? "";
         _cartNotes = cart.Notes ?? "";
+        _checkoutMetadata = cart.CheckoutMetadata;
         _discountAmount = cart.DiscountAmount;
         _adjustmentsOpen = _discountAmount != 0 || _taxAmount != 0;
         _cashTenderedAmount = 0;
@@ -1498,6 +1548,8 @@ else if (!_moduleEnabled)
         _activeCartNumber = null;
         _customerLabel = "";
         _cartNotes = "";
+        _checkoutMetadata = new();
+        _createCustomerOpen = false;
         _selectedCustomerCredentialId = null;
         _discountAmount = 0;
         _cashTenderedAmount = 0;
@@ -1546,6 +1598,38 @@ else if (!_moduleEnabled)
         _lastReceipt = null;
         ClearCurrentCart();
         ToastService.Show("Cart cleared.");
+    }
+
+    private string CheckoutFieldValue(string key) => _checkoutMetadata.Fields.GetValueOrDefault(key, "");
+
+    private PosCheckoutMetadata BuildCheckoutMetadata() => new()
+    {
+        TableNumber = _checkoutSettings?.TableTrackingEnabled == true ? _checkoutMetadata.TableNumber : null,
+        Fields = _checkoutMetadata.Fields.Where(pair =>
+            _checkoutSettings?.CheckoutFields.Any(field => field.Enabled && field.Key == pair.Key) == true)
+            .ToDictionary(pair => pair.Key, pair => pair.Value)
+    };
+
+    private void OpenCreateCustomer()
+    {
+        if (IsInteractionLocked) return;
+        _paymentOpen = false;
+        _createCustomerOpen = true;
+    }
+
+    private void CustomerDialogChanged(bool open)
+    {
+        _createCustomerOpen = open;
+        if (!open && !_disposed && IsCashierVisible) _paymentOpen = true;
+    }
+
+    private void CustomerCreated(IdentityCredential credential)
+    {
+        if (credential.TenantId != TenantFilter.SelectedTenantId) return;
+        _credentials.Insert(0, credential);
+        _selectedCustomerCredentialId = credential.Id.ToString();
+        _customerLabel = credential.UserAlias ?? credential.UserName ?? "";
+        ToastService.Info("Customer created. Wallet payment requires an existing funded wallet.");
     }
 
     private void StartNewSale()

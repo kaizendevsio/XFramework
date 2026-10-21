@@ -82,6 +82,10 @@
         {
             <SidebarNavItem Href="/pos/returns" Label="Returns" Icon="undo-2" />
         }
+        @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "sales"))
+        {
+            <SidebarNavItem Href="/pos/settings" Label="Settings" Icon="settings" />
+        }
     </SidebarSection>
 }
 

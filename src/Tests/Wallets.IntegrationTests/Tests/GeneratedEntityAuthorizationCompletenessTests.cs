@@ -96,6 +96,7 @@ public sealed class GeneratedEntityAuthorizationCompletenessTests
     [TestCase(typeof(Wallet))]
     [TestCase(typeof(WalletType))]
     [TestCase(typeof(CurrencyType))]
+    [TestCase(typeof(WalletTransaction))]
     public void PosPrerequisiteEntity_ReadPolicy_AllowsManagedTenantDelegation(Type entityType)
     {
         var registryType = typeof(global::Wallets.Api.Services.IWalletOperationsService)

@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -24,6 +25,7 @@ using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Inventario.Domain.Shared.Contracts;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Setup;
+using XFramework.Inventario.Domain.Shared.Contracts.Requests.Variations;
 using XFramework.Inventario.Domain.Shared.Contracts.Responses;
 using XFramework.Inventario.Domain.Shared.Enums;
 using XFramework.Portal.Features.Inventario.Components;
@@ -35,9 +37,10 @@ namespace Portal.E2ETests;
 
 [TestFixture, NonParallelizable]
 [Category("Kind:E2E"), Category("Module:Inventario"), Category("Area:Setup")]
-public sealed class InventarioSetupWizardE2ETests : PageTest
+public sealed partial class InventarioSetupWizardE2ETests : PageTest
 {
     private WebApplication _app = null!;
+    private Mock<IDataContext> _data = null!;
     private readonly SetupBrowserState _state = new();
     private readonly ConcurrentQueue<string> _errors = new();
     public override BrowserNewContextOptions ContextOptions() => new() { ReducedMotion = ReducedMotion.Reduce, ColorScheme = ColorScheme.Light };
@@ -64,7 +67,11 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
         builder.Services.AddSingleton(new SetupBrowserAssets(portalStyles, themeScript));
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Services.AddRazorComponents().AddInteractiveServerComponents(o => o.DetailedErrors = true);
-        builder.Services.AddBlazorBlueprintComponents();
+        builder.Services.AddBlazorBlueprintComponents(configureTheme: options =>
+        {
+            options.DefaultBaseColor = BaseColor.Slate;
+            options.DefaultPrimaryColor = PrimaryColor.Blue;
+        });
         builder.Services.AddScoped<XfPortalService>();
         builder.Services.Replace(ServiceDescriptor.Scoped<IPortalService>(sp => sp.GetRequiredService<XfPortalService>()));
         builder.Services.AddSingleton(_state);
@@ -74,21 +81,49 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
         _state.Changed += () => tenant.Raise(x => x.OnChanged += null);
         builder.Services.AddSingleton(tenant.Object);
         var availability = new Mock<IPortalModuleAvailability>();
-        availability.Setup(x => x.IsFeatureEnabled(It.IsAny<string>(), It.IsAny<string?>())).Returns(true);
+        availability.Setup(x => x.IsFeatureEnabled(It.IsAny<string>(), It.IsAny<string?>()))
+            .Returns((string _, string? feature) => _state.VariationsOnly ? feature is null or "variations" : feature != "movements" || _state.MovementsEnabled);
         availability.SetupGet(x => x.ActiveTenantId).Returns(() => _state.ActiveTenant);
         availability.Setup(x => x.EnsureLoadedAsync()).Returns(Task.CompletedTask);
         builder.Services.AddSingleton(availability.Object);
         var data = new Mock<IDataContext>(MockBehavior.Strict);
-        ReadRows<Product>(data, () => [new Product { Id = Guid.NewGuid(), TenantId = _state.ActiveTenant, Name = "Synthetic QA product", Price = 17, StockQuantity = 7 }]);
+        _data = data;
+        ReadRows<Product>(data, () => [new Product { Id = _state.PolishProductId, TenantId = _state.ActiveTenant, Name = "Synthetic QA product", Price = 17, StockQuantity = 7 }]);
         ReadRows<ProductCategory>(data, () => []);
         ReadRows<Warehouse>(data, () => _state.Warehouses);
         ReadRows<InventoryLocation>(data, () => _state.Locations);
-        ReadRows<ProductVariation>(data, () => []);
+        ReadRows<ProductVariation>(data, () => _state.VariationsOnly || _state.PolishRuleScoped
+            ? [new ProductVariation { Id = _state.PolishVariantId, TenantId = _state.ActiveTenant, ProductId = _state.PolishProductId, Name = "Large", VariationType = "Size", Price = 20 }]
+            : []);
+        ReadRows<InventoryReorderRule>(data, () => [new InventoryReorderRule
+        {
+            Id = _state.PolishRuleId, TenantId = _state.ActiveTenant, ProductId = _state.PolishProductId,
+            ProductVariationId = _state.PolishRuleScoped ? _state.PolishVariantId : null,
+            WarehouseId = _state.PolishRuleScoped ? _state.Warehouses.Single().Id : null,
+            LocationId = _state.PolishRuleScoped ? _state.Locations.Single().Id : null,
+            MinimumQuantity = 2, ReorderPoint = 5, ReorderQuantity = 10, IsActive = true
+        }]);
         ReadRows<InventoryLot>(data, () => []);
         ReadRows<StockBalance>(data, () => []);
         ReadRows<InventoryMovement>(data, () => []);
+        ReadRows<Reservation>(data, () => []);
+        ReadRows<Supplier>(data, () => [new Supplier { Id = _state.PolishSupplierId, TenantId = _state.ActiveTenant, Name = "Polish fixture supplier", IsActive = true }]);
+        ReadRows<PurchaseOrder>(data, () => Enumerable.Range(1, 523).Select(i => new PurchaseOrder
+            { Id = i == 1 ? _state.PolishOrderId : Guid.NewGuid(), TenantId = _state.ActiveTenant, SupplierId = _state.PolishSupplierId, OrderNumber = $"PO-{i:000}", OrderDate = DateTime.UtcNow.Date }).ToList());
+        ReadRows<PurchaseOrderLine>(data, () => []);
+        ReadRows<ReceivingDocument>(data, () => _state.DenyReceipts ? throw new UnauthorizedAccessException("Receiving access declined") : Enumerable.Range(1, 12).Select(i => new ReceivingDocument
+            { Id = Guid.NewGuid(), TenantId = _state.ActiveTenant, SupplierId = _state.PolishSupplierId, ReceiptNumber = $"REC-{i:000}", ReceivedAt = DateTime.UtcNow.Date }).ToList());
+        ReadRows<ReceivingLine>(data, () => [new ReceivingLine { Id = Guid.NewGuid(), TenantId = _state.ActiveTenant,
+            ProductId = _state.PolishProductId, InventoryMovementId = Guid.NewGuid(), Quantity = 12, UnitOfMeasure = "each",
+            ReceivingDocument = new() { TenantId = _state.ActiveTenant, SupplierId = _state.PolishSupplierId } }]);
         builder.Services.AddSingleton(data.Object);
         var wrapper = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
+        wrapper.Setup(x => x.GetProductVariationTypes(It.IsAny<GetProductVariationTypesRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => new QueryResponse<List<ProductVariationType>>
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Response = [new ProductVariationType { Id = Guid.NewGuid(), TenantId = _state.ActiveTenant, Name = "Size", Code = "SIZE" }]
+            });
         wrapper.Setup(x => x.GetInventarioSetup(It.IsAny<GetInventarioSetupRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((GetInventarioSetupRequest request, CancellationToken _) => new QueryResponse<InventarioSetupResponse>
             {
@@ -102,6 +137,8 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
         _app = builder.Build();
         _app.UseStaticFiles();
         _app.UseAntiforgery();
+        _app.MapGet("/inventory-polish.css", () => Results.File(Path.Combine(root.FullName,
+            "src/Presentation/XFramework.Portal.Features.Inventario/obj/Debug/net10.0/scopedcss/projectbundle/XFramework.Portal.Features.Inventario.bundle.scp.css"), "text/css"));
         _app.MapRazorComponents<SetupBrowserRoot>().AddInteractiveServerRenderMode();
         await _app.StartAsync();
     }
@@ -113,6 +150,8 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
     public async Task Open()
     {
         _state.Reset(); _errors.Clear();
+        _state.VariationsOnly = false;
+        _state.PolishRuleScoped = false;
         Page.PageError += (_, error) => _errors.Enqueue(error);
         Page.Console += (_, message) => { if (message.Type == "error") TestContext.Progress.WriteLine(message.Text); };
         Page.Response += (_, response) => { if (response.Status >= 400) TestContext.Progress.WriteLine($"Resource HTTP {response.Status}: {response.Url}"); };
@@ -199,7 +238,7 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
         await Page.GetByLabel("Location description", new() { Exact = true }).FillAsync("QA inbound");
         await Next(); await Next();
         await Expect(Page.GetByRole(AriaRole.Navigation, new() { Name = "Inventario configuration" })).ToBeVisibleAsync();
-        await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Suppliers", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Suppliers", Exact = true })).ToBeVisibleAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Confirm setup", Exact = true }).ClickAsync();
         await Expect(Page.GetByTestId("setup-complete")).ToContainTextAsync("Advanced");
         var request = _state.Requests.Should().ContainSingle().Subject;
@@ -561,16 +600,31 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
     }
     private static void ReadRows<T>(Mock<IDataContext> data, Func<List<T>> rows) where T : class
     {
+        data.Setup(x => x.Query<T>()).Returns(() =>
+        {
+        var skip = 0;
+        var take = int.MaxValue;
         var query = new Mock<IRemoteQuery<T>>(MockBehavior.Strict);
         query.Setup(x => x.IgnoreQueryFilters()).Returns(query.Object);
         query.Setup(x => x.NoCache()).Returns(query.Object);
         query.Setup(x => x.Where(It.IsAny<Expression<Func<T, bool>>>())).Returns(query.Object);
-        query.Setup(x => x.Take(It.IsAny<int>())).Returns(query.Object);
+        query.Setup(x => x.Skip(It.IsAny<int>())).Callback<int>(value => skip = value).Returns(query.Object);
+        query.Setup(x => x.Take(It.IsAny<int>())).Callback<int>(value => take = value).Returns(query.Object);
+        query.Setup(x => x.CountAsync(It.IsAny<CancellationToken>())).ReturnsAsync(() => rows().Count);
+        query.Setup(x => x.OrderBy(It.IsAny<Expression<Func<T, object>>>())).Returns(query.Object);
+        query.Setup(x => x.OrderByDescending(It.IsAny<Expression<Func<T, object>>>())).Returns(query.Object);
+        query.Setup(x => x.ThenBy(It.IsAny<Expression<Func<T, object>>>())).Returns(query.Object);
+        query.Setup(x => x.ThenByDescending(It.IsAny<Expression<Func<T, object>>>())).Returns(query.Object);
         query.Setup(x => x.OrderBy(It.IsAny<Expression<Func<T, string>>>())).Returns(query.Object);
+        query.Setup(x => x.ThenBy(It.IsAny<Expression<Func<T, string>>>())).Returns(query.Object);
         query.Setup(x => x.OrderBy(It.IsAny<Expression<Func<T, Guid>>>())).Returns(query.Object);
+        query.Setup(x => x.OrderBy(It.IsAny<Expression<Func<T, DateTime>>>())).Returns(query.Object);
+        query.Setup(x => x.ThenBy(It.IsAny<Expression<Func<T, Guid>>>())).Returns(query.Object);
         query.Setup(x => x.OrderByDescending(It.IsAny<Expression<Func<T, DateTime>>>())).Returns(query.Object);
-        query.Setup(x => x.ToListAsync(It.IsAny<CancellationToken>())).ReturnsAsync(rows);
-        data.Setup(x => x.Query<T>()).Returns(query.Object);
+        query.Setup(x => x.ToListAsync(It.IsAny<CancellationToken>())).ReturnsAsync(() => rows().Skip(skip).Take(take).ToList());
+        query.Setup(x => x.FirstOrDefaultAsync(It.IsAny<CancellationToken>())).ReturnsAsync(() => rows().FirstOrDefault());
+        return query.Object;
+        });
     }
     private async Task Screenshot(string name)
     {
@@ -587,12 +641,18 @@ public sealed class InventarioSetupWizardE2ETests : PageTest
 [Route("/inventario-products-fixture")]
 [Route("/inventario-explicit-setup-fixture")]
 [Route("/inventario-stock-fixture")]
+[Route("/inventario-supplier-polish-fixture")]
+[Route("/inventario-order-polish-fixture")]
+[Route("/inventario-location-polish-fixture")]
+[Route("/inventario-variations-polish-fixture")]
+[Route("/inventario-rule-polish-fixture")]
 public sealed class SetupBrowserRoot : ComponentBase
 {
     [Inject] public SetupBrowserAssets Styles { get; set; } = null!;
     protected override void BuildRenderTree(RenderTreeBuilder b)
     {
         b.AddMarkupContent(0, $"<!doctype html><html lang='en'><head><base href='/'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/css/themes.css'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/blazorblueprint.css'><link rel='stylesheet' href='css/app.css'><link rel='stylesheet' href='css/utilities.css'><link rel='stylesheet' href='{Styles.PortalStyles}'>{Styles.ThemeScript}</head><body class='font-sans antialiased'>");
+        b.AddMarkupContent(3, "<link rel='stylesheet' href='/inventory-polish.css'>");
         b.OpenComponent<SetupBrowserSurface>(1); b.AddComponentRenderMode(new InteractiveServerRenderMode(prerender: false)); b.CloseComponent();
         b.AddMarkupContent(2, "<script>window.inventarioFocus={capture:()=>{},restore:()=>{}}</script><script src='_framework/blazor.web.js'></script></body></html>");
     }
@@ -604,6 +664,8 @@ public sealed class SetupBrowserSurface : ComponentBase, IDisposable
 {
     [Inject] public SetupBrowserState State { get; set; } = null!;
     [Inject] public NavigationManager Navigation { get; set; } = null!;
+    [Inject] public ThemeService Theme { get; set; } = null!;
+    protected override async Task OnAfterRenderAsync(bool firstRender) { if (firstRender) await Theme.InitializeAsync(); }
     private bool _cancelled;
     protected override void OnInitialized() => State.Changed += Changed;
     private void Changed() => _ = InvokeAsync(StateHasChanged);
@@ -623,6 +685,16 @@ public sealed class SetupBrowserSurface : ComponentBase, IDisposable
         { b.OpenComponent<XFramework.Portal.Features.Inventario.Pages.Setup>(10); b.CloseComponent(); }
         else if (new Uri(Navigation.Uri).AbsolutePath == "/inventario-stock-fixture")
         { b.OpenComponent<XFramework.Portal.Features.Inventario.Pages.Stock>(10); b.CloseComponent(); }
+        else if (new Uri(Navigation.Uri).AbsolutePath == "/inventario-supplier-polish-fixture")
+        { b.OpenComponent<XFramework.Portal.Features.Inventario.Pages.SupplierDetail>(10); b.AddAttribute(11, "Id", State.PolishSupplierId); b.CloseComponent(); }
+        else if (new Uri(Navigation.Uri).AbsolutePath == "/inventario-order-polish-fixture")
+        { b.OpenComponent<XFramework.Portal.Features.Inventario.Pages.PurchaseOrderDetail>(10); b.AddAttribute(11, "Id", State.PolishOrderId); b.CloseComponent(); }
+        else if (new Uri(Navigation.Uri).AbsolutePath == "/inventario-location-polish-fixture")
+        { b.OpenComponent<XFramework.Portal.Features.Inventario.Pages.LocationDetail>(10); b.AddAttribute(11, "Id", State.Locations.First().Id); b.CloseComponent(); }
+        else if (new Uri(Navigation.Uri).AbsolutePath == "/inventario-variations-polish-fixture")
+        { b.OpenComponent<XFramework.Portal.Features.Inventario.Pages.ProductDetail>(10); b.AddAttribute(11, "Id", State.PolishProductId); b.AddAttribute(12, "Section", "variations"); b.CloseComponent(); }
+        else if (new Uri(Navigation.Uri).AbsolutePath == "/inventario-rule-polish-fixture")
+        { b.OpenComponent<XFramework.Portal.Features.Inventario.Pages.ReorderRuleDetail>(10); b.AddAttribute(11, "Id", State.PolishRuleId); b.CloseComponent(); }
         else if (_cancelled) { b.OpenElement(10, "p"); b.AddAttribute(11, "data-testid", "setup-cancelled"); b.AddContent(12, "Cancelled"); b.CloseElement(); }
         else if (State.Saved.TryGetValue(State.ActiveTenant, out var saved))
         { b.OpenElement(13, "p"); b.AddAttribute(14, "data-testid", "setup-complete"); b.AddContent(15, saved.Mode + " setup complete"); b.CloseElement(); }
@@ -641,6 +713,15 @@ public sealed class SetupBrowserSurface : ComponentBase, IDisposable
 
 public sealed class SetupBrowserState
 {
+    public bool VariationsOnly { get; set; }
+    public bool PolishRuleScoped { get; set; }
+    public Guid PolishRuleId { get; } = Guid.NewGuid();
+    public Guid PolishVariantId { get; } = Guid.NewGuid();
+    public bool DenyReceipts { get; set; }
+    public bool MovementsEnabled { get; set; } = true;
+    public Guid PolishSupplierId { get; } = Guid.NewGuid();
+    public Guid PolishProductId { get; } = Guid.NewGuid();
+    public Guid PolishOrderId { get; } = Guid.NewGuid();
     public Guid FirstTenant { get; private set; }
     public Guid SecondTenant { get; private set; }
     public Guid ActiveTenant { get; private set; }
@@ -674,7 +755,7 @@ public sealed class SetupBrowserState
         return new() { HttpStatusCode = HttpStatusCode.OK, Response = response };
     }
     public event Action? Changed;
-    public void Reset() { FirstTenant = Guid.NewGuid(); SecondTenant = Guid.NewGuid(); ActiveTenant = FirstTenant; Requests.Clear(); PreferenceRequests.Clear(); Saved.Clear(); Warehouses.Clear(); Locations.Clear(); SupportedCurrencies.Clear(); SupportedCurrencies.AddRange(["PHP", "SGD", "USD"]); Delay = null; FailNextConfirmation = false; CanManage = true; HasExistingConfiguration = false; WarehousingEnabled = true; DefaultProductAvailable = true; }
+    public void Reset() { DenyReceipts = false; MovementsEnabled = true; FirstTenant = Guid.NewGuid(); SecondTenant = Guid.NewGuid(); ActiveTenant = FirstTenant; Requests.Clear(); PreferenceRequests.Clear(); Saved.Clear(); Warehouses.Clear(); Locations.Clear(); SupportedCurrencies.Clear(); SupportedCurrencies.AddRange(["PHP", "SGD", "USD"]); Delay = null; FailNextConfirmation = false; CanManage = true; HasExistingConfiguration = false; WarehousingEnabled = true; DefaultProductAvailable = true; }
     public void Switch() { ActiveTenant = SecondTenant; Changed?.Invoke(); }
     public async Task<QueryResponse<InventarioSetupResponse>> Complete(CompleteInventarioSetupRequest request)
     {

@@ -53,14 +53,14 @@ else
                     <a href="/inventario/stock">Clear product scope</a>
                 </div>
             }
-            <div class="xf-filter-actions">
+            <InventoryFilterBar Label="Stock filters">
                 <BbFormFieldInput TValue="string" @bind-Value="_search" Label="Search stock" Placeholder="Product, SKU, variant or lot" />
                 <InventorySelect TValue="string" @bind-Value="_warehouseFilter" Label="Warehouse" DisplayTextSelector="@(value => value == "all" ? "All warehouses" : _warehouses.FirstOrDefault(x => x.Id.ToString() == value)?.Name ?? "Select warehouse")">
                     <BbSelectItem Value="@("all")">All warehouses</BbSelectItem>
                     @foreach (var warehouse in _warehouses) { <BbSelectItem Value="@warehouse.Id.ToString()">@warehouse.Name</BbSelectItem> }
                 </InventorySelect>
-                <BbButton Variant="ButtonVariant.Outline" OnClick="@ClearFilters">Clear filters</BbButton>
-            </div>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@ClearFilters"><LucideIcon Name="filter-x" class="mr-2 h-4 w-4" />Clear filters</BbButton>
+            </InventoryFilterBar>
             <BbTabs Value="@_stockView" ValueChanged="@(v => _stockView = v)" Class="inv-workspace-tabs">
                 <BbTabsList>
                     @if (_stockEnabled) { <BbTabsTrigger Value="balances">Balances (@FilteredBalanceCount)</BbTabsTrigger> }

@@ -21,7 +21,8 @@ public sealed class PosSalesService(
     IWalletsServiceWrapper wallets,
     IPosRequestContextResolver contextResolver,
     ILogger<PosSalesService> logger,
-    PosFinanceSettings financeSettings)
+    PosFinanceSettings financeSettings,
+    PosCheckoutSettingsService checkoutSettings)
 {
     public async Task<Result<PosSaleReceiptResponse>> CheckoutAsync(
         CheckoutPosSaleRequest request,
@@ -44,6 +45,8 @@ public sealed class PosSalesService(
 
         var context = contextResult.Data!;
         var tenantId = context.TenantId;
+        if (request.CheckoutMetadata?.Fields is null)
+            return Result<PosSaleReceiptResponse>.Failure("Checkout details are required", 400);
         var requestHash = PosServiceHelpers.BuildSaleRequestHash(request);
 
         var replay = await LoadSaleByIdempotencyAsync(tenantId, idempotencyKey, tracking: true, ct);
@@ -84,6 +87,10 @@ public sealed class PosSalesService(
         if (request.Lines.Count == 0)
             return Result<PosSaleReceiptResponse>.Failure("At least one sale line is required", 400);
 
+        var checkout = await checkoutSettings.ValidateAsync(tenantId, request.CheckoutMetadata, requireValues: true, ct);
+        if (!checkout.IsSuccess)
+            return Result<PosSaleReceiptResponse>.Failure(checkout.Message!, checkout.StatusCode);
+
         var now = DateTime.UtcNow;
         var sale = new PosSale
         {
@@ -101,6 +108,7 @@ public sealed class PosSalesService(
             PaymentMethod = request.Payment.Method,
             IdempotencyKey = idempotencyKey,
             RequestHash = requestHash,
+            CheckoutMetadataJson = System.Text.Json.JsonSerializer.Serialize(checkout.Data),
             DiscountAmount = request.DiscountAmount,
             TaxAmount = 0,
             CreatedAt = now,

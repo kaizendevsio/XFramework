@@ -1,7 +1,7 @@
 @typeparam TValue
 @attribute [CascadingTypeParameter(nameof(TValue))]
 
-<div class="xf-form-field">
+<div class="xf-form-field inventory-select">
     <BbLabel for="@_controlId">@Label</BbLabel>
     <BbSelect TValue="TValue" Value="@Value" ValueChanged="@ValueChanged" Disabled="@Disabled">
         <BbSelectTrigger TValue="TValue" id="@_controlId" aria-label="@Label">

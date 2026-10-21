@@ -10,6 +10,9 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using MemoryPack;
+using Microsoft.Extensions.DependencyInjection;
+using Wallets.Integration.Drivers;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Portal.Features.Administration;
@@ -25,6 +28,33 @@ public sealed class ReferenceDataTenantAccessTests
     private static readonly Guid TenantId = Guid.NewGuid();
     private static readonly Guid CredentialId = Guid.NewGuid();
     private const BindingFlags PrivateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
+
+    [Test]
+    public async Task CurrencyMutation_WithAllTenantsSelected_UsesExplicitRouteTenant()
+    {
+        SaveChangesRequest? submitted = null;
+        var wallets = new Mock<IWalletsServiceWrapper>();
+        wallets.Setup(x => x.ExecuteChangesAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((byte[] bytes, CancellationToken _) =>
+            {
+                submitted = MemoryPackSerializer.Deserialize<SaveChangesRequest>(bytes);
+                return MemoryPackSerializer.Serialize(DataContextResult.Success());
+            });
+        using var services = new ServiceCollection().AddSingleton(wallets.Object).BuildServiceProvider();
+        var page = new ReferenceData { TenantId = TenantId };
+        SetProperty(page, "Services", services);
+        SetProperty(page, "TenantFilter", Mock.Of<IPortalTenantContext>(x => x.SelectedTenantId == null));
+        var context = (IDataContext)typeof(ReferenceData).GetMethod("CreateMutationContext", PrivateInstance)!
+            .Invoke(page, [TenantId])!;
+        context.Add(new Wallets.Domain.Shared.Contracts.CurrencyType
+        {
+            Id = Guid.NewGuid(), TenantId = TenantId, Name = "QA currency", CurrencyIsoCode3 = "SGD"
+        });
+        (await context.SaveChangesAsync()).IsSuccess.Should().BeTrue();
+        submitted!.Metadata!.RequestedTenantId.Should().Be(TenantId);
+        MemoryPackSerializer.Deserialize<Wallets.Domain.Shared.Contracts.CurrencyType>(submitted.Changes.Single().SerializedEntity)!
+            .TenantId.Should().Be(TenantId);
+    }
 
     [TestCase(false)]
     [TestCase(true)]

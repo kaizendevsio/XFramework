@@ -1,5 +1,6 @@
 @page "/inventario/suppliers/{Id:guid}"
 @implements IDisposable
+@using XFramework.Portal.Features.Inventario.Components
 <PageTitle>Supplier - Inventario</PageTitle>
 @if (_loading) { <CenteredSpinner /> }
 else if (!_enabled) { <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" /> }
@@ -7,9 +8,8 @@ else if (_supplier is null) { <BbEmpty Title="Record not found" Description="Cho
 else
 {
     <div class="space-y-6 inv-page">
-        <a href="/inventario/suppliers">Back to suppliers</a>
+        <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo("/inventario/suppliers"))"><LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />Back to suppliers</BbButton>
         <div class="xf-page-header"><BbTypographyH3>@_supplier.Name</BbTypographyH3><BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">Refresh</BbButton></div>
-        <a href="@($"/inventario/purchase-orders?supplierId={Id}")">View supplier purchase orders</a>
         <BbCard><BbCardHeader><BbCardTitle>Supplier Summary</BbCardTitle></BbCardHeader><BbCardContent>@if (_maintenanceEditing)
                     {
                         @if (_maintenanceError is not null) { <BbAlert><BbAlertDescription>@_maintenanceError</BbAlertDescription></BbAlert> }
@@ -20,19 +20,36 @@ else
 <BbFormFieldSwitch @bind-Checked="_editIsActive" Label="Is Active" />
 </div>
                         <p class="text-sm text-muted-foreground">Inactive suppliers remain in order history.</p>
-                        <div class="xf-page-actions"><BbButton OnClick="@SaveMaintenance" Disabled="@_maintenanceSaving">Save changes</BbButton><BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _maintenanceEditing = false)" Disabled="@_maintenanceSaving">Discard</BbButton></div>
                     }
                     else
                     {
-                        <BbButton Variant="ButtonVariant.Outline" OnClick="@BeginMaintenance">Edit details</BbButton>
 <div class="xf-detail-field-grid"><div><BbTypographyMuted>Name</BbTypographyMuted><p>@_supplier.Name</p></div><div><BbTypographyMuted>Contact name</BbTypographyMuted><p>@_supplier.ContactName</p></div><div><BbTypographyMuted>Email</BbTypographyMuted><p>@_supplier.Email</p></div><div><BbTypographyMuted>Phone</BbTypographyMuted><p>@_supplier.Phone</p></div><div><BbTypographyMuted>Status</BbTypographyMuted><p>@(_supplier.IsActive ? "Active" : "Inactive")</p></div></div>
                     }
-</BbCardContent></BbCard>
+</BbCardContent>
+            <BbCardFooter>
+                <div class="supplier-actions">
+                    @if (_maintenanceEditing)
+                    {
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _maintenanceEditing = false)" Disabled="@_maintenanceSaving">Discard</BbButton>
+                        <BbButton OnClick="@SaveMaintenance" Disabled="@_maintenanceSaving"><LucideIcon Name="save" class="mr-2 h-4 w-4" />Save changes</BbButton>
+                    }
+                    else
+                    {
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@BeginMaintenance"><LucideIcon Name="pencil" class="mr-2 h-4 w-4" />Edit details</BbButton>
+                    }
+                </div>
+            </BbCardFooter>
+        </BbCard>
+        <SupplierHistory @key="(_supplier.TenantId, _supplier.Id)" TenantId="@_supplier.TenantId" SupplierId="@_supplier.Id"
+                         PurchasingEnabled="@ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "purchasing")"
+                         ProductsEnabled="@ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "products")"
+                         MovementsEnabled="@ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "movements")" />
     </div>
 }
 @code {
     [Parameter] public Guid Id { get; set; }
     [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
     [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
     [Inject] private IPortalModuleAvailability ModuleNavigation { get; set; } = default!;
@@ -40,25 +57,30 @@ else
     private Supplier? _supplier;
     private bool _loading = true;
     private bool _enabled;
-    protected override void OnInitialized() => TenantFilter.OnChanged += TenantChanged;
+    private int _revision;
+    protected override void OnInitialized() { TenantFilter.OnChanged += TenantChanged; ModuleNavigation.OnChanged += TenantChanged; }
     protected override Task OnParametersSetAsync() => Reload();
     private void TenantChanged() => _ = InvokeAsync(Reload);
     private async Task Reload()
     {
         _loading = true;
+        _maintenanceEditing = false;
+        var revision = ++_revision;
+        var tenantId = TenantFilter.SelectedTenantId;
         try
         {
             await ModuleNavigation.EnsureLoadedAsync();
+            if (revision != _revision || tenantId != TenantFilter.SelectedTenantId) return;
             _enabled = TenantFilter.SelectedTenantId is Guid && ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "purchasing");
             _supplier = null;
             if (!_enabled) return;
-            var tenantId = TenantFilter.SelectedTenantId!.Value;
-            _supplier = await DataContext.Query<Supplier>().NoCache().Where(x => x.TenantId == tenantId && x.Id == Id && !x.IsDeleted).FirstOrDefaultAsync();
+            var supplier = await DataContext.Query<Supplier>().NoCache().Where(x => x.TenantId == tenantId && x.Id == Id && !x.IsDeleted).FirstOrDefaultAsync();
+            if (revision == _revision && tenantId == TenantFilter.SelectedTenantId) _supplier = supplier;
         }
         catch { ToastService.Error("Could not load record."); }
-        finally { _loading = false; }
+        finally { if (revision == _revision) _loading = false; }
     }
-    public void Dispose() => TenantFilter.OnChanged -= TenantChanged;
+    public void Dispose() { _revision++; TenantFilter.OnChanged -= TenantChanged; ModuleNavigation.OnChanged -= TenantChanged; }
 
     private string? _maintenanceError;
     private bool _maintenanceEditing;

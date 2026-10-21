@@ -142,6 +142,23 @@ public sealed class InventoryReportsE2ETests : PageTest
         await Expect(Page.GetByText("Fixture Widget", new() { Exact = true }).First).ToBeVisibleAsync();
     }
 
+    [TestCase(1920, 1080)]
+    [TestCase(768, 1024)]
+    public async Task Polish_ReportDateControls_FitTheirFilterColumns(int width, int height)
+    {
+        await Page.SetViewportSizeAsync(width, height);
+        // Reproduce the available content width beside the tablet shell.
+        await Page.Locator(".inventory-reports").EvaluateAsync("(e, width) => e.style.width = `${width - 226}px`", width);
+        var dates = Page.Locator(".report-filters [data-slot=field-content] > button");
+        await Expect(dates).ToHaveCountAsync(2);
+        (await dates.EvaluateAllAsync<bool>("elements => elements.every(e => e.getBoundingClientRect().width <= e.parentElement.getBoundingClientRect().width + 1)")).Should().BeTrue();
+        var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, "artifacts", "inventory-polish");
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, $"report-dates-{width}.png");
+        await Page.ScreenshotAsync(new() { Path = path, FullPage = true });
+        TestContext.AddTestAttachment(path);
+    }
+
     [TestCase(390, 844, false)]
     [TestCase(1920, 1080, false)]
     [TestCase(1024, 768, false)]

@@ -1,6 +1,5 @@
 @inherits LayoutComponentBase
 @implements IDisposable
-@using System.Text.Json
 @using XFramework.Portal.Services
 @using XFramework.Domain.Shared.DataContext
 @using XFramework.Inventario.Domain.Shared.Contracts
@@ -208,7 +207,7 @@
         await Js.InvokeVoidAsync("inventarioFocus.capture", "navigation");
         _inventarioNavigationOpen = true;
     }
-    private readonly PortalSidebarState _inventarioMobileSidebar = new(["inventario", "product-detail"]);
+    private readonly PortalSidebarState _inventarioMobileSidebar = new([]);
 
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager Nav { get; set; } = default!;
@@ -222,7 +221,6 @@
     private const string AllTenantsValue = "__all_tenants__";
     private const string ActiveTenantStorageKey = "xframework.portal.activeTenantId";
     private const string SidebarCollapsedStorageKey = "xframework.portal.sidebarCollapsed";
-    private const string SidebarOpenGroupsStorageKey = "xframework.portal.sidebarOpenGroups.v2";
 
     private readonly PortalSidebarState _sidebarState = new(DefaultOpenSidebarGroups);
     private List<IdentityServer.Domain.Shared.Contracts.Tenant> _tenants = [];
@@ -444,33 +442,8 @@
             _sidebarState.IsCollapsed = isCollapsed;
         }
 
-        var storedOpenGroups = await ReadStorageItem(SidebarOpenGroupsStorageKey);
-        var restoredStoredOpenGroups = false;
-        if (!string.IsNullOrWhiteSpace(storedOpenGroups))
-        {
-            try
-            {
-                var groupIds = JsonSerializer.Deserialize<string[]>(storedOpenGroups);
-                if (groupIds is not null)
-                {
-                    _sidebarState.ReplaceOpenGroups(groupIds);
-                    restoredStoredOpenGroups = true;
-                }
-            }
-            catch (JsonException)
-            {
-                _sidebarState.ReplaceOpenGroups(DefaultOpenSidebarGroups);
-            }
-        }
-
-        var activeGroup = UpdateActiveSidebarGroup();
-
-        if (!restoredStoredOpenGroups && activeGroup is not null)
-        {
-            _sidebarState.SetGroupOpen(activeGroup, true);
-        }
-
-        await StoreSidebarGroups();
+        _sidebarState.ResetGroups();
+        UpdateActiveSidebarGroup();
         StateHasChanged();
     }
 
@@ -501,22 +474,17 @@
         _sidebarState.IsHoverExpanded = false;
     }
 
-    private async Task ToggleSidebarGroup(string groupId)
+    private Task ToggleSidebarGroup(string groupId)
     {
         _sidebarState.SetGroupOpen(groupId, !_sidebarState.IsGroupOpen(groupId));
-        await StoreSidebarGroups();
-    }
-
-    private async Task StoreSidebarGroups()
-    {
-        var groupIds = _sidebarState.OpenGroupIds.OrderBy(static groupId => groupId, StringComparer.OrdinalIgnoreCase);
-        await StoreStorageItem(SidebarOpenGroupsStorageKey, JsonSerializer.Serialize(groupIds));
+        return Task.CompletedTask;
     }
 
     private string? UpdateActiveSidebarGroup()
     {
         var activeGroup = GetActiveSidebarGroup();
-        _sidebarState.ActiveGroupId = activeGroup;
+        _sidebarState.ActivateGroup(activeGroup);
+        _inventarioMobileSidebar.ActivateGroup(activeGroup);
         return activeGroup;
     }
 
@@ -560,6 +528,7 @@
         {
             "identity" => "identity",
             "inventario" => "inventario",
+            "pos" => "pos",
             "communications" => "communications",
             "community" => "community",
             "attendance" => "attendance",
@@ -967,6 +936,9 @@
     {
         _ = InvokeAsync(async () =>
         {
+            _sidebarState.ResetGroups();
+            _inventarioMobileSidebar.ResetGroups();
+            UpdateActiveSidebarGroup();
             _contentRenderKey++;
             await RefreshBreadcrumbEntityLabels();
             StateHasChanged();

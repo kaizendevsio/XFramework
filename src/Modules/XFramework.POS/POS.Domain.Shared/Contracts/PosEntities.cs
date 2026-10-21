@@ -134,6 +134,9 @@ public partial class PosCart : BaseModel
     [MemoryPackOrder(22)]
     public string? RequestHash { get; set; }
 
+    [MemoryPackOrder(23)]
+    public string? CheckoutMetadataJson { get; set; }
+
     [MemoryPackIgnore]
     public virtual PosRegister Register { get; set; } = null!;
 
@@ -273,6 +276,9 @@ public partial class PosSale : BaseModel
     [MemoryPackOrder(20)]
     // False retains historical gross-weight refund allocation for pre-automatic-tax sales.
     public bool UsesAutomaticTax { get; set; }
+
+    [MemoryPackOrder(21)]
+    public string? CheckoutMetadataJson { get; set; }
 
     [MemoryPackIgnore]
     public virtual PosRegister Register { get; set; } = null!;

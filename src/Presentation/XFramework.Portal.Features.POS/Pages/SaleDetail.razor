@@ -68,6 +68,23 @@ else
                 </BbCardContent></BbCard>
             </div>
 
+            @if (!string.IsNullOrWhiteSpace(_sale.CheckoutMetadata.TableNumber) || _sale.CheckoutMetadata.Fields.Count > 0)
+            {
+                <section aria-label="Checkout details">
+                    <BbTypographyH4>Checkout details</BbTypographyH4>
+                    <dl class="xf-detail-field-grid">
+                        @if (!string.IsNullOrWhiteSpace(_sale.CheckoutMetadata.TableNumber))
+                        {
+                            <div><dt>Table number</dt><dd>@_sale.CheckoutMetadata.TableNumber</dd></div>
+                        }
+                        @foreach (var field in _sale.CheckoutMetadata.Fields)
+                        {
+                            <div style="overflow-wrap:anywhere"><dt>@_sale.CheckoutMetadata.Labels.GetValueOrDefault(field.Key, field.Key)</dt><dd>@field.Value</dd></div>
+                        }
+                    </dl>
+                </section>
+            }
+
             <BbCard><BbCardHeader><BbCardTitle>Items</BbCardTitle></BbCardHeader><BbCardContent>
                 <BbDataGrid Items="@_sale.Lines" ShowPagination="false"><Columns>
                     <BbDataGridPropertyColumn Property="@(x => x.LineNumber)" Title="#" Sortable="true" />
