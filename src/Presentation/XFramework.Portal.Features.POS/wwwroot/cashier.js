@@ -31,7 +31,10 @@ export function restoreDialogFocus(name) {
 let fullscreenOwner = null;
 
 export function initializeFocus(root) {
+    // Navigation or an access-state render can remove the element before interop arrives.
+    if (!root?.isConnected) return null;
     const button = root.querySelector('[data-pos-focus-toggle]');
+    if (!button) return null;
     const owner = {};
     let focused = false;
     let disposed = false;
