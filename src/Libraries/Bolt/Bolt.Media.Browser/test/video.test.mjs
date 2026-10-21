@@ -210,7 +210,10 @@ this.orientationCode = orientationCode;`, sandbox);
     const host = { invokeMethodAsync: async (...args) => { stats.invoked.push(args); } };
     const canvas = { width: 0, height: 0, getContext: () => ({ drawImage() {} }) };
     return { p: sandbox.pipeline, sandbox, stats, listeners, host, canvas, pushFrame, canvases,
-        paint() { for (const r of sandbox.pipeline.remotes.values()) { r.playout.clock = () => clock() + 50; r.playout.tick(); } },
+        paint() { for (const r of sandbox.pipeline.remotes.values()) {
+            const original = r.playout.clock;
+            r.playout.clock = () => clock() + 50; r.playout.tick(); r.playout.clock = original;
+        } },
         get track() { return track; }, get video() { return element; } };
 }
 
@@ -290,6 +293,16 @@ test('timeline rebasing accounts for queued pictures it discards', () => {
     assert.equal(f.playout.dropped, 2);
     f.advance(50);
     assert.equal(f.draws.length, 1);
+    assert.ok(f.frames.every(x => x.closed === 1));
+});
+
+test('a repaired burst after a playout underrun is spaced instead of immediately discarded', () => {
+    const f = playoutFixture();
+    f.push(0); f.advance(50);
+    f.advance(120); f.push(33); f.push(66);
+    f.advance(160); assert.equal(f.draws.length, 2);
+    f.advance(193); assert.equal(f.draws.length, 3);
+    assert.equal(f.playout.dropped, 0);
     assert.ok(f.frames.every(x => x.closed === 1));
 });
 

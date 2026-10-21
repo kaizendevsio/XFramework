@@ -22,6 +22,9 @@ export class VideoPlayout {
         if (this.lastStamp !== null && (stamp < this.lastStamp - 1000 || stamp > this.lastStamp + 1000)) this.clear(true);
         if (this.lastStamp !== null && stamp <= this.lastStamp) { frame.close(); this.dropped++; return; }
         this.origin ??= now + 40 - stamp;
+        // An empty queue has underrun: start a fresh cushion for the repaired burst rather
+        // than marking all of its pictures immediately due and overwriting them together.
+        if (!this.queue.length && stamp + this.origin < now) this.origin = now + 40 - stamp;
         // A long network stall must not leave every subsequent frame permanently late.
         if (stamp + this.origin < now - 100 || stamp + this.origin > now + 100) {
             this.clear(true); this.origin = now + 40 - stamp;

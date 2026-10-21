@@ -83,7 +83,9 @@ export async function lostKeyframeRequest({ codec }) {
         produced++;
         const broken = produced === 12;
         if (broken) lostAt = performance.now();
-        receiver.decodeFrame('remote', data, timestamp * 1000 / 90, key, broken, orientation);
+        // OnVideoEncoded and decodeFrame both use microseconds. The 90 kHz clock belongs
+        // to the outer media envelope, not the encoded picture's presentation timestamp.
+        receiver.decodeFrame('remote', data, timestamp, key, broken, orientation);
     } };
     try {
         receiver.addRemote('remote', canvas, codec, receiveHost);
@@ -152,7 +154,9 @@ export async function roundTrip({ codec, rotation, flip, metadata, frames = 6 })
     for (let attempt = 0; attempt < 3; attempt++) {
         const decoder = remote.decoder, before = remote.rendered;
         for (const [data, key, , timestamp, , orientation] of encoded) receiver.decodeFrame('s', data, timestamp, key, false, orientation);
-        try { await until(() => remote.rendered - before >= encoded.length || remote.decoder !== decoder, 5_000); } catch { }
+        // Pacing may skip superseded pictures from this deliberate burst. Check the actual
+        // canvas, not an assumption that every decoded picture is painted immediately.
+        try { await until(() => remote.rendered > before || remote.decoder !== decoder, 5_000); } catch { }
         if (remote.decoder === decoder && remote.rendered > before) break;
     }
     await until(() => remote.rendered > 0, 1_000, receiving);
