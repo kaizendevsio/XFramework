@@ -284,6 +284,15 @@ test('60fps camera preference has an optional minimum, not a mandatory camera re
     assert.deepEqual(c.advanced, [{ frameRate: { min: 60 } }]);
 });
 
+test('timeline rebasing accounts for queued pictures it discards', () => {
+    const f = playoutFixture();
+    f.push(5000); f.push(5033); f.push(0);
+    assert.equal(f.playout.dropped, 2);
+    f.advance(50);
+    assert.equal(f.draws.length, 1);
+    assert.ok(f.frames.every(x => x.closed === 1));
+});
+
 // ── Codec probing ──
 
 test('probing reports codec limits without treating an acceleration preference as proof', async () => {

@@ -8,9 +8,10 @@ export class VideoPlayout {
         this.queue = []; this.callback = null; this.origin = null; this.lastStamp = null;
         this.dropped = 0; this.gaps = []; this.lastDraw = null; this.waitMs = 0; this.draws = 0;
     }
-    clear() {
+    clear(countDropped = false) {
         if (this.callback !== null) this.cancel(this.callback);
         this.callback = null;
+        if (countDropped) this.dropped += this.queue.length;
         for (const item of this.queue) item.frame.close();
         this.queue = []; this.origin = this.lastStamp = this.lastDraw = null;
     }
@@ -18,12 +19,12 @@ export class VideoPlayout {
         const now = this.clock(), stamp = frame.timestamp / 1000;
         if (!Number.isFinite(stamp)) { frame.close(); this.dropped++; return; }
         // Timestamp discontinuities (camera restart or 32-bit wire-clock wrap) start a fresh timeline.
-        if (this.lastStamp !== null && (stamp < this.lastStamp - 1000 || stamp > this.lastStamp + 1000)) this.clear();
+        if (this.lastStamp !== null && (stamp < this.lastStamp - 1000 || stamp > this.lastStamp + 1000)) this.clear(true);
         if (this.lastStamp !== null && stamp <= this.lastStamp) { frame.close(); this.dropped++; return; }
         this.origin ??= now + 40 - stamp;
         // A long network stall must not leave every subsequent frame permanently late.
         if (stamp + this.origin < now - 100 || stamp + this.origin > now + 100) {
-            this.clear(); this.origin = now + 40 - stamp;
+            this.clear(true); this.origin = now + 40 - stamp;
         }
         this.lastStamp = stamp;
         this.queue.push({ frame, orientation, due: stamp + this.origin, at: now });
