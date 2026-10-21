@@ -60,6 +60,18 @@ public sealed class BoltMediaServiceResumeTests
             if (frame.WrittenCount > 0) Assert.That(f.First.DispatchDatagram(frame.WrittenSpan), Is.EqualTo(1));
             Assert.That(() => loop.Pacer.RateKbps, Is.LessThan(8_496).After(1200, 20),
                 "the old path's rate must respond to media congestion before the probe finishes");
+            if (source == "receiver")
+            {
+                // One report can describe a transient stall: the controller deliberately waits for
+                // drainage instead of repeatedly cutting from that stale observation. Keep reporting
+                // a genuinely constrained receiver, as a live call does, until the encoder follows.
+                var deadline = Environment.TickCount64 + 8_000;
+                while (f.Js.AppliedVideoTiers[^1].BitrateKbps >= 5600 && Environment.TickCount64 < deadline)
+                {
+                    await Task.Delay(250);
+                    Assert.That(f.First.DispatchDatagram(frame.WrittenSpan), Is.EqualTo(1));
+                }
+            }
             Assert.That(() => f.Js.AppliedVideoTiers[^1].BitrateKbps, Is.LessThan(5600).After(1000, 20),
                 "the encoder follows the cut while the probe is still pending");
             Assert.That(transport.Probing, Is.True);
