@@ -139,7 +139,7 @@ else if (!_moduleEnabled)
                         <LucideIcon Name="refresh-cw" class="h-4 w-4" />
                     </BbButton>
                     <BbButton Size="ButtonSize.IconLarge" Variant="ButtonVariant.Ghost"
-                              Disabled="@(_focusControllerTask?.IsCompletedSuccessfully != true)"
+                              Disabled="@(_focusControllerTask?.IsCompletedSuccessfully != true || _focusControllerTask.Result is null)"
                               data-pos-focus-toggle="true" aria-label="Enter cashier focus"
                               title="Enter cashier focus" aria-pressed="false">
                         <span data-pos-focus-enter-icon><LucideIcon Name="maximize" class="h-4 w-4" /></span>
@@ -564,7 +564,7 @@ else if (!_moduleEnabled)
     private string _lastCatalogSearch = "";
     private Task<IJSObjectReference>? _scriptTask;
     private ElementReference _cashierElement;
-    private Task<IJSObjectReference>? _focusControllerTask;
+    private Task<IJSObjectReference?>? _focusControllerTask;
     private CartLine? _removedLine;
     private int _removedLineIndex;
     private string _catalogSearch = "";
@@ -701,8 +701,10 @@ else if (!_moduleEnabled)
         if (!_disposed && _focusControllerTask is null && !string.IsNullOrEmpty(_cashierElement.Id))
         {
             _focusControllerTask = InitializeFocusAsync();
-            await _focusControllerTask;
-            if (!_disposed)
+            var controller = await _focusControllerTask;
+            if (controller is null)
+                _focusControllerTask = null;
+            else if (!_disposed)
                 StateHasChanged();
         }
         if (_dialogFocusTarget is { } target)
@@ -1711,8 +1713,8 @@ else if (!_moduleEnabled)
     private Task<IJSObjectReference> GetScriptAsync() => _scriptTask ??=
         JSRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/XFramework.Portal.Features.POS/cashier.js").AsTask();
 
-    private async Task<IJSObjectReference> InitializeFocusAsync() =>
-        await (await GetScriptAsync()).InvokeAsync<IJSObjectReference>("initializeFocus", _cashierElement);
+    private async Task<IJSObjectReference?> InitializeFocusAsync() =>
+        await (await GetScriptAsync()).InvokeAsync<IJSObjectReference?>("initializeFocus", _cashierElement);
 
     private async Task FocusCatalogSearchAsync()
     {
@@ -1807,8 +1809,11 @@ else if (!_moduleEnabled)
             try
             {
                 var controller = await _focusControllerTask;
-                await controller.InvokeVoidAsync("dispose");
-                await controller.DisposeAsync();
+                if (controller is not null)
+                {
+                    await controller.InvokeVoidAsync("dispose");
+                    await controller.DisposeAsync();
+                }
             }
             catch (Exception exception) when (exception is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {

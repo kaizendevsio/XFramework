@@ -120,6 +120,29 @@ public sealed class PosCashierBrowserFullscreenE2ETests : PageTest
     }
 
     [Test]
+    public async Task Focus_MissingOrDetachedElement_DoesNotThrowOrAttachListeners()
+    {
+        await OpenFixture();
+        (await Page.EvaluateAsync<bool>("""
+            async () => {
+                const module = await import('/_content/XFramework.Portal.Features.POS/cashier.js');
+                const detached = document.createElement('div');
+                const empty = document.createElement('div');
+                document.body.append(empty);
+                try {
+                    return module.initializeFocus(null) === null
+                        && module.initializeFocus(detached) === null
+                        && module.initializeFocus(empty) === null;
+                } finally { empty.remove(); }
+            }
+            """)).Should().BeTrue();
+        await Toggle.ClickAsync();
+        await AssertFocused(fullscreen: true);
+        await Toggle.ClickAsync();
+        await AssertNormal();
+    }
+
+    [Test]
     public async Task Focus_DelayedCashierRender_InitializesAfterElementExists()
     {
         await OpenFixture();
