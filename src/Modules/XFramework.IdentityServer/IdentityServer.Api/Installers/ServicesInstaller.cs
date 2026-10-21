@@ -43,6 +43,7 @@ public class ServicesInstaller : IInstaller
         services.AddHostedService<StorageClaimOutboxDispatcher>();
         services.AddScoped<AuthService>();
         services.AddScoped<Features.FinanceSettings.TenantFinanceSettingsService>();
+        services.AddScoped<Features.PosSettings.TenantPosSettingsService>();
         services.AddSingleton<OpaqueExchanges>();
         services.AddSingleton<OpaqueSetup>();
         if (!string.IsNullOrWhiteSpace(configuration["Opaque:SetupPath"]))

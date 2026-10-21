@@ -1428,6 +1428,12 @@ else
             </div>
         </div>
 
+        <BbTabs DefaultValue="types">
+            <BbTabsList>
+                <BbTabsTrigger Value="types">Variation types</BbTabsTrigger>
+                <BbTabsTrigger Value="variants">Variants</BbTabsTrigger>
+            </BbTabsList>
+            <BbTabsContent Value="types">
         <BbCard>
             <BbCardHeader>
                 <BbCardTitle>Variation Types</BbCardTitle>
@@ -1447,6 +1453,8 @@ else
             </BbCardContent>
         </BbCard>
 
+            </BbTabsContent>
+            <BbTabsContent Value="variants">
         <BbCard>
             <BbCardHeader>
                 <BbCardTitle>Variant List</BbCardTitle>
@@ -1477,6 +1485,8 @@ else
                 </BbDataGrid>
             </BbCardContent>
         </BbCard>
+            </BbTabsContent>
+        </BbTabs>
     </div>;
 
     private RenderFragment TransactionsSection => @<div class="space-y-6"><p>This view contains Inventario product sales records. POS shipment and return references are recorded separately in the stock movement ledger.</p><a href="@($"/inventario/stock?productId={Id}")">View product stock movements</a>

@@ -21,7 +21,7 @@ namespace Bolt.Client;
 /// Features: RPC, Push, bidirectional streaming, connection pooling, offline queue.
 /// For voice/video calls, add the Bolt.Media package.
 /// </summary>
-public sealed class BoltClient : IAsyncDisposable
+public sealed partial class BoltClient : IAsyncDisposable
 {
     private readonly Uri _serverUri;
 
@@ -280,7 +280,11 @@ public sealed class BoltClient : IAsyncDisposable
             {
                 // A client disposed while this attempt was in flight must not be revived by it.
                 added = !_disposed;
-                if (added) _connections.Add(conn);
+                if (added)
+                {
+                    _connections.Add(conn);
+                    StartConnectionRenewal(conn);
+                }
             }
             if (!added)
             {
@@ -806,6 +810,7 @@ public sealed class BoltClient : IAsyncDisposable
                     if (!_disposed && _connections.Count < _config.MaxConnections)
                     {
                         _connections.Add(conn);
+                        StartConnectionRenewal(conn);
                         added = true;
                     }
                 }
@@ -870,7 +875,16 @@ public sealed class BoltClient : IAsyncDisposable
         if (payload.Length > _maxLargeRpcPayloadBytes)
             return (HttpStatusCode.RequestEntityTooLarge, ReadOnlyMemory<byte>.Empty);
 
-        var conn = GetConnection();
+        // Select and register the call before renewal can remove this connection from the pool.
+        Task<(HttpStatusCode StatusCode, ReadOnlyMemory<byte> Data)> invocation;
+        lock (_connectionsLock)
+            invocation = InvokeOnConnectionAsync(GetConnection(), recipientId, commandName, payload, ct);
+        return await invocation;
+    }
+
+    private async Task<(HttpStatusCode StatusCode, ReadOnlyMemory<byte> Data)> InvokeOnConnectionAsync(
+        BoltConnection conn, string recipientId, string commandName, ReadOnlyMemory<byte> payload, CancellationToken ct)
+    {
 
         // Auto-stream large payloads transparently
         if (payload.Length > _largePayloadThreshold)
@@ -881,6 +895,7 @@ public sealed class BoltClient : IAsyncDisposable
         var commandHash = GetCommandHash(commandName);
         var rpcCall = PooledRpcCall.Rent(_config.RunRpcContinuationsAsynchronously);
         var responseTask = rpcCall.GetTask();
+        _pendingCallConnections[requestId] = conn;
         _pendingCalls[requestId] = rpcCall;
         var requestSent = false;
         var responseConsumed = false;
@@ -952,7 +967,11 @@ public sealed class BoltClient : IAsyncDisposable
                 await CompleteFailedRpcAsync(requestId, rpcCall, responseTask, ex);
             throw;
         }
-        finally { _pendingCalls.TryRemove(new KeyValuePair<Guid, PooledRpcCall>(requestId, rpcCall)); }
+        finally
+        {
+            _pendingCalls.TryRemove(new KeyValuePair<Guid, PooledRpcCall>(requestId, rpcCall));
+            _pendingCallConnections.TryRemove(requestId, out _);
+        }
     }
 
     /// <summary>
@@ -973,6 +992,7 @@ public sealed class BoltClient : IAsyncDisposable
         // Register pending RPC — response comes back as normal Response frame
         var rpcCall = PooledRpcCall.Rent(_config.RunRpcContinuationsAsynchronously);
         var responseTask = rpcCall.GetTask();
+        _pendingCallConnections[requestId] = conn;
         _pendingCalls[requestId] = rpcCall;
         var responseConsumed = false;
         BoltConnection? requestConnection = null;
@@ -1040,7 +1060,11 @@ public sealed class BoltClient : IAsyncDisposable
                 await CompleteFailedRpcAsync(requestId, rpcCall, responseTask, ex);
             throw;
         }
-        finally { _pendingCalls.TryRemove(new KeyValuePair<Guid, PooledRpcCall>(requestId, rpcCall)); }
+        finally
+        {
+            _pendingCalls.TryRemove(new KeyValuePair<Guid, PooledRpcCall>(requestId, rpcCall));
+            _pendingCallConnections.TryRemove(requestId, out _);
+        }
     }
 
     private async Task CompleteFailedRpcAsync(
@@ -1714,6 +1738,7 @@ public sealed class BoltClient : IAsyncDisposable
             ArrayPool<byte>.Shared.Return(buffer);
             if (largeBuffer != null) ArrayPool<byte>.Shared.Return(largeBuffer);
             RetireStreamsForConnection(conn, HttpStatusCode.ServiceUnavailable);
+            FailPendingCallsForConnection(conn);
             if (!_disposed)
             {
                 conn.Retire(new IOException("Bolt receive loop ended before the connection was disposed."));
@@ -2150,37 +2175,41 @@ public sealed class BoltClient : IAsyncDisposable
             await ConnectWithRetryAsync(_lifetimeCts.Token);
             Interlocked.Increment(ref _totalSuccessfulReconnects);
             RaiseLifecycleEvent(Reconnected);
-
-            // Re-send all active subscriptions after reconnect
-            foreach (var (key, sub) in _transientSubscriptions)
-            {
-                try
-                {
-                    await BindTransientSubscriptionAsync(key, sub, CancellationToken.None);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to re-send transient subscription for topic {Topic}", sub.Topic);
-                }
-            }
-
-            foreach (var (_, sub) in _durableSubscriptions)
-            {
-                try
-                {
-                    var actorAccessToken = await ResolveActorAccessTokenAsync(sub.ActorAccessTokenProvider, CancellationToken.None);
-                    var w = RentedBufferWriter.GetThreadLocal();
-                    BoltCodec.WriteSubscribe(w, sub.Topic, sub.SubscriberId, durable: true, actorAccessToken);
-                    await GetPrimaryConnection().SendReliableAsync(w, CancellationToken.None);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to re-send durable subscription for topic {Topic} subscriber {SubscriberId}", sub.Topic, sub.SubscriberId);
-                }
-            }
+            await RestoreSubscriptionsAsync(_lifetimeCts.Token);
         }
         catch (Exception) when (_disposed) { /* Disposed mid-reconnect: nothing to report. */ }
         catch (Exception ex) { _logger.LogError(ex, "Reconnection failed"); }
+    }
+
+    private async Task RestoreSubscriptionsAsync(CancellationToken ct)
+    {
+        // Re-send all active subscriptions after reconnect or planned replacement.
+        foreach (var (key, sub) in _transientSubscriptions)
+        {
+            try
+            {
+                await BindTransientSubscriptionAsync(key, sub, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to re-send transient subscription for topic {Topic}", sub.Topic);
+            }
+        }
+
+        foreach (var (_, sub) in _durableSubscriptions)
+        {
+            try
+            {
+                var actorAccessToken = await ResolveActorAccessTokenAsync(sub.ActorAccessTokenProvider, ct);
+                var w = RentedBufferWriter.GetThreadLocal();
+                BoltCodec.WriteSubscribe(w, sub.Topic, sub.SubscriberId, durable: true, actorAccessToken);
+                await GetPrimaryConnection().SendReliableAsync(w, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to re-send durable subscription for topic {Topic} subscriber {SubscriberId}", sub.Topic, sub.SubscriberId);
+            }
+        }
     }
 
     private void RaiseLifecycleEvent(Action? handler)
@@ -2212,6 +2241,10 @@ public sealed class BoltClient : IAsyncDisposable
             try { cts.Cancel(); }
             catch (ObjectDisposedException) { }
         }
+        Task[] renewals;
+        lock (_connectionsLock)
+            renewals = _connectionRenewalTasks.ToArray();
+        await Task.WhenAll(renewals);
         var connections = ClearConnections();
         foreach (var connection in connections)
             RetireStreamsForConnection(connection, HttpStatusCode.ServiceUnavailable);
@@ -2273,6 +2306,7 @@ public sealed class BoltClient : IAsyncDisposable
             return;
 
         RetireStreamsForConnection(connection, HttpStatusCode.ServiceUnavailable);
+        FailPendingCallsForConnection(connection);
         connection.CompleteSendChannel();
         connection.ReceiveCts?.Cancel();
         _ = Task.Run(async () =>

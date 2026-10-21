@@ -1,0 +1,8 @@
+<div class="xf-filter-actions inventory-filter-bar" role="group" aria-label="@Label">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "Inventory filters";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

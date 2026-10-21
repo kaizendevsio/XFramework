@@ -80,6 +80,9 @@ else
                 </BbCardContent>
             </BbCard>
 
+            <BbTabs DefaultValue="lines" Class="inv-workspace-tabs">
+                <BbTabsList><BbTabsTrigger Value="lines">Order lines</BbTabsTrigger><BbTabsTrigger Value="receiving">Receiving documents</BbTabsTrigger></BbTabsList>
+                <BbTabsContent Value="lines">
             <BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Lines</BbCardTitle>
@@ -103,6 +106,8 @@ else
                 </BbCardContent>
             </BbCard>
 
+                </BbTabsContent>
+                <BbTabsContent Value="receiving">
             <BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Receiving Documents</BbCardTitle>
@@ -123,6 +128,8 @@ else
                     </BbDataGrid>
                 </BbCardContent>
             </BbCard>
+                </BbTabsContent>
+            </BbTabs>
         </div>
     </FadeInContent>
 }

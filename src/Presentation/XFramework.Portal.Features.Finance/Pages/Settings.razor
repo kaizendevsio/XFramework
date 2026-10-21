@@ -13,7 +13,6 @@
         <div><BbTypographyH3>Finance Settings</BbTypographyH3><BbTypographyMuted>@Tenant.SelectedTenantName</BbTypographyMuted></div>
         <div class="xf-page-actions">
             <BbButton Variant="ButtonVariant.Outline" OnClick="Load" Disabled="@_busy"><LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />Refresh</BbButton>
-            <BbButton OnClick="Save" Disabled="@(!CanSave)"><LucideIcon Name="save" class="mr-2 h-4 w-4" />Save</BbButton>
         </div>
     </div>
     @if (_error is not null)
@@ -33,17 +32,19 @@
         @if (_response.AvailableCurrencies.Count == 0)
         {
             <BbEmpty Title="No active currencies" Description="A tenant administrator must add or enable currencies before Finance settings can be saved." />
-            <a href="@($"/identity/tenants/{Tenant.SelectedTenantId}/reference-data")">Open tenant reference data</a>
+            <a class="finance-settings-shortcut" href="@($"/identity/tenants/{Tenant.SelectedTenantId}/reference-data")"><LucideIcon Name="database" class="h-4 w-4" />Tenant reference data</a>
         }
         else
         {
             <section class="finance-settings-section">
                 <BbTypographyH4>Currencies</BbTypographyH4>
+                <div class="finance-settings-fields">
                 <div class="finance-currency-field"><BbLabel>Supported currencies</BbLabel>
                     <BbMultiSelect TValue="Guid" Class="w-full" Options="@CurrencyOptions" @bind-Values="_supported" Disabled="@ReadOnly" />
                 </div>
                 <div class="finance-currency-field"><BbLabel>Default currency</BbLabel>
                     <BbCombobox TValue="Guid" Class="w-full" Options="@DefaultCurrencyOptions" @bind-Value="_settings.DefaultCurrencyId" Disabled="@ReadOnly" />
+                </div>
                 </div>
             </section>
             <BbSeparator />
@@ -55,6 +56,10 @@
                     <BbFormFieldNumericInput TValue="decimal" @bind-Value="_settings.TaxRatePercent" Label="Tax rate (%)" Min="0" Max="100" Disabled="@(ReadOnly || !_settings.TaxEnabled)" />
                 </div>
             </section>
+            <div class="finance-settings-actions">
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Apply(_response))" Disabled="@ReadOnly">Discard changes</BbButton>
+                <BbButton OnClick="Save" Disabled="@(!CanSave)"><LucideIcon Name="save" class="mr-2 h-4 w-4" />Save</BbButton>
+            </div>
         }
     }
 </div>

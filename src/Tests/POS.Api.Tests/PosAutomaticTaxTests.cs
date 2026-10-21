@@ -25,8 +25,8 @@ public sealed class PosAutomaticTaxTests
     public async Task WriteServices_ClientTaxOverride_RejectedBeforePersistence(decimal header, decimal line)
     {
         var resolver = new Resolver();
-        var sales = new PosSalesService(null!, null!, null!, resolver, NullLogger<PosSalesService>.Instance, null!);
-        var carts = new PosCartService(null!, null!, sales, resolver, NullLogger<PosCartService>.Instance, null!);
+        var sales = new PosSalesService(null!, null!, null!, resolver, NullLogger<PosSalesService>.Instance, null!, null!);
+        var carts = new PosCartService(null!, null!, sales, resolver, NullLogger<PosCartService>.Instance, null!, null!);
         var sale = await sales.CheckoutAsync(new CheckoutPosSaleRequest
         { TaxAmount = header, Lines = [new() { TaxAmount = line }] }, CancellationToken.None);
         var create = await carts.CreateAsync(new CreatePosCartRequest

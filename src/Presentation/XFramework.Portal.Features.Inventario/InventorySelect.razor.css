@@ -1,0 +1,2 @@
+.inventory-select { min-width: 0; width: 100%; }
+.inventory-select ::deep [role="combobox"] { width: 100%; min-width: 0; }

@@ -38,6 +38,7 @@ public partial record PosRegisterResponse
 [MemoryPackable]
 public partial record PosCartResponse
 {
+    public PosCheckoutMetadata CheckoutMetadata { get; init; } = new();
     public Guid Id { get; init; }
     public Guid TenantId { get; init; }
     public string CartNumber { get; init; } = string.Empty;
@@ -93,6 +94,7 @@ public partial record PosCartLineResponse
 [MemoryPackable]
 public partial record PosCartSummaryResponse
 {
+    public string? TableNumber { get; init; }
     public Guid Id { get; init; }
     public Guid TenantId { get; init; }
     public string CartNumber { get; init; } = string.Empty;
@@ -113,6 +115,7 @@ public partial record PosCartSummaryResponse
 [MemoryPackable]
 public partial record PosSaleReceiptResponse
 {
+    public PosCheckoutMetadata CheckoutMetadata { get; init; } = new();
     public Guid Id { get; init; }
     public Guid TenantId { get; init; }
     public string SaleNumber { get; init; } = string.Empty;

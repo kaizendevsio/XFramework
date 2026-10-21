@@ -6269,6 +6269,9 @@ namespace XFramework.Domain.Migrations
 
             modelBuilder.Entity("POS.Domain.Shared.Contracts.PosCart", b =>
                 {
+                    b.Property<string>("CheckoutMetadataJson")
+                        .HasColumnType("jsonb");
+
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
@@ -6992,6 +6995,9 @@ namespace XFramework.Domain.Migrations
 
             modelBuilder.Entity("POS.Domain.Shared.Contracts.PosSale", b =>
                 {
+                    b.Property<string>("CheckoutMetadataJson")
+                        .HasColumnType("jsonb");
+
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")

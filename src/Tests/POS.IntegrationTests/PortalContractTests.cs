@@ -60,8 +60,8 @@ public sealed class PortalContractTests
         cashier.Should().Contain("Layout=\"DataViewLayout.Grid\"");
         cashier.Should().Contain("GridColumnMinWidth=\"12rem\"");
         cashier.Should().Contain("<BbRadioGroup TValue=\"PosPaymentMethod\" @bind-Value=\"_paymentMethod\"");
-        cashier.Should().Contain("<BbDialog Open=\"@_saleDetailsOpen\"");
-        cashier.Should().Contain("<BbDialog Open=\"@_heldCartsOpen\"");
+        cashier.Should().Contain("<BbDialog Open=\"@(_saleDetailsOpen && IsCashierVisible)\"");
+        cashier.Should().Contain("<BbDialog Open=\"@(_heldCartsOpen && IsCashierVisible)\"");
         cashier.Should().Contain("ButtonSize.Large");
         cashier.Should().Contain("ButtonSize.IconLarge");
         cashier.Should().Contain("pos-cashier-shell");
@@ -69,7 +69,8 @@ public sealed class PortalContractTests
         cashier.Should().Contain("pos-cart-panel");
         cashier.Should().Contain("pos-total-bar");
         cashier.Should().Contain("CategoryId = _selectedCategoryId");
-        cashier.Should().Contain("RegisterId = TryResolveSelectedRegisterId()");
+        cashier.Should().Contain("var registerId = TryResolveSelectedRegisterId();");
+        cashier.Should().Contain("RegisterId = registerId");
         cashier.Should().Contain("DataContext.Query<ProductCategory>()");
         cashier.Should().NotContain("grid-cols-[");
     }
@@ -410,7 +411,7 @@ public sealed class PortalContractTests
         cashier.Should().Contain("var refreshCatalogAfterCheckout = false;");
         cashier.Should().Contain("refreshCatalogAfterCheckout = true;");
         Regex.Matches(cashier,
-                @"finally\s*\{\s*_checkingOut = false;\s*if \(refreshCatalogAfterCheckout\)\s*await SearchCatalog\(false, false\);")
+                @"finally\s*\{\s*_checkingOut = false;\s*(?:if \(_lastReceipt is not null\)\s*_paymentOpen = false;\s*)?if \(refreshCatalogAfterCheckout\)\s*await SearchCatalog\(false, false\);")
             .Count.Should().Be(2, "both checkout and pending-payment recovery must refresh displayed availability");
     }
 

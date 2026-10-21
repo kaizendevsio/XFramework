@@ -45,9 +45,9 @@ else
                     <BbCardDescription>@_lots.Count lot(s) loaded</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <div class="xf-filter-actions"><BbFormFieldInput TValue="string" @bind-Value="_search" Label="Search lots" />
+                    <InventoryFilterBar Label="Lot filters"><BbFormFieldInput TValue="string" @bind-Value="_search" Label="Search lots" />
 <InventorySelect TValue="string" @bind-Value="_expiry" Label="Expiry" DisplayTextSelector="@(value => value switch { "soon" => "Next 30 days", "expired" => "Expired", "none" => "No expiry", _ => "All dates" })"><BbSelectItem Value="@("all")">All dates</BbSelectItem><BbSelectItem Value="@("soon")">Next 30 days</BbSelectItem><BbSelectItem Value="@("expired")">Expired</BbSelectItem><BbSelectItem Value="@("none")">No expiry</BbSelectItem></InventorySelect>
-<InventorySelect TValue="string" @bind-Value="_eligibility" Label="Eligibility" DisplayTextSelector="@(value => value == "all" ? "All statuses" : value == "Available" ? "Eligible" : value)"><BbSelectItem Value="@("all")">All statuses</BbSelectItem>@foreach (var status in Enum.GetValues<InventoryLotStatus>()) { <BbSelectItem Value="@status.ToString()">@status</BbSelectItem> }</InventorySelect></div><BbDataGrid Items="@_lots.Where(MatchesLot).Where(x => ($"{x.LotNumber} {GetProductName(x.ProductId)}" ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase)).ToList()" ShowPagination="true" InitialPageSize="20"
+<InventorySelect TValue="string" @bind-Value="_eligibility" Label="Eligibility" DisplayTextSelector="@(value => value == "all" ? "All statuses" : value == "Available" ? "Eligible" : value)"><BbSelectItem Value="@("all")">All statuses</BbSelectItem>@foreach (var status in Enum.GetValues<InventoryLotStatus>()) { <BbSelectItem Value="@status.ToString()">@status</BbSelectItem> }</InventorySelect></InventoryFilterBar><BbDataGrid Items="@_lots.Where(MatchesLot).Where(x => ($"{x.LotNumber} {GetProductName(x.ProductId)}" ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase)).ToList()" ShowPagination="true" InitialPageSize="20"
                                 OnRowClick="@((InventoryLot item) => Navigation.NavigateTo($"/inventario/lots/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>

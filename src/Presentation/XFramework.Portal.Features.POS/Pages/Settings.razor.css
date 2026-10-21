@@ -1,0 +1,40 @@
+.pos-settings-page {
+    width: 100%;
+    max-width: 72rem;
+    margin-inline: auto;
+    padding-block: 1rem;
+    display: grid;
+    gap: 1.25rem;
+    min-width: 0;
+}
+
+.pos-settings-page ::deep .pos-checkout-fields {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.pos-settings-page ::deep .pos-checkout-fields-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.pos-settings-page ::deep .pos-checkout-fields table {
+    min-width: 44rem;
+}
+
+.pos-settings-page ::deep .pos-settings-field-input {
+    width: 100%;
+    min-width: 10rem;
+}
+
+.pos-settings-section {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.pos-settings-switch {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+}

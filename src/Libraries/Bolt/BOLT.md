@@ -108,6 +108,44 @@ XFramework Hub intentionally fixes the required service scope to `bolt.service` 
 
 ### Transport and Invocation Authorization
 
+XFramework service clients with a transport token provider opt into
+`RenewConnectionsBeforeExpiry`. The client opens and registers a replacement before retiring
+the old socket. Renewal uses ordinary RPC frames with two reserved, connection-local commands:
+`__bolt_connection_expiry__` returns the server-enforced expiry as an Int64 Unix timestamp in
+milliseconds (zero means unbounded), and `__bolt_connection_drain__` excludes only its sending
+socket from new service routing/subscriptions. Both require empty payloads and retain existing
+registration, sender-provenance, and admission checks. No frame layout or wire version changes.
+
+The client serializes replacement handshakes; draining sockets remain subject to the Hub's existing
+principal quota. Configure connection headroom for active and draining sockets (normally twice the
+active pool during simultaneous renewal). A replacement must have a later authenticated deadline;
+cached tickets and acquisition failures leave the original deadline unchanged. Accepted unary
+and large RPCs drain on their original sockets without replay, bounded by the RPC timeout and
+original connection expiry. Long-lived streams are not migrated. Subscriptions are re-established
+on the active pool. Generic/media clients do not opt in by default; old Hubs retain disconnect/reconnect
+behavior when they do not support the expiry command. Deploy Hub support before updated clients.
+
+The drain acknowledgement only stops new routing; it is not a completion fence for frames already
+queued by another connection. Even a locally idle socket stays open for the full bounded grace:
+the lesser of the client RPC timeout and time remaining until the original expiry minus 250 ms.
+The old deadline is never extended, so work exceeding that boundary can still fail with unknown
+outcome. The close handshake is separately bounded to one second and cannot extend Hub authorization.
+
+With the Compose defaults (120-second tickets, 45-second renewal lead, 30-second RPC timeout),
+renewal starts about 73-75 seconds after issuance and normal draining ends around 103-105 seconds,
+before expiry and before the next replacement generation. Compose explicitly caps each client pool
+at four active connections instead of the CPU-derived library default. The unchanged Hub principal
+quota of 16 therefore accommodates two instances of the same service with four active plus four
+draining sockets each. More replicas, shorter tickets, long handshakes/drains, or tickets whose expiry
+advances only slightly require a separate capacity review: quotas continue to reject excess sockets,
+and failed replacement never bypasses authentication or extends the old connection. Non-Compose
+hosts must configure their pool and aggregate same-principal headroom explicitly.
+
+Transient pub/sub remains best-effort: there is a brief delivery gap between draining the old
+subscription and authorizing its replacement. Draining subscribers do not receive duplicate live
+events. Durable subscriptions rebind with their existing subscriber identity and replay policy;
+this renewal mechanism does not promise atomic subscription migration or migrate media sessions.
+
 Transport authentication and RPC authorization are separate checks. XFramework Bolt Hub authenticates the WebSocket and binds the registration identity. Per-invocation actor and service tokens travel in the Bolt invocation envelope, outside business request metadata. Each source-generated `[BoltHandler]` resolves an immutable `TrustedInvocationContext` through the configured identity providers before validation, dependency resolution, or business-handler execution. The validated service caller must produce the same deterministic Bolt sender route as the Hub-verified frame sender.
 
 Generated handlers return `401 Unauthorized` for a missing or invalid destination token, `403 Forbidden` for a sender mismatch, missing required scope, or disallowed caller, and `503 Service Unavailable` when IdentityServer signing-key validation infrastructure is unavailable. Successful base JWT validation is cached by token digest and destination audience, with a fixed entry bound and no lifetime beyond the token expiry. Failed validation is not cached. Signing-key refresh is single-flight and keeps one active key set, so attacker-controlled key IDs cannot create unbounded cache entries. An unknown key ID can force one globally throttled refresh, allowing normal key rotation without creating a per-key cache or refresh storm. Manual low-level handlers remain responsible for their own invocation policy; use the context-aware `RegisterHandler` overload when the verified request ID and sender hash are required.

@@ -66,6 +66,88 @@ public sealed class PosPersistenceIntegrationTests
     }
 
     [Test]
+    public async Task CheckoutMetadata_PersistsOnSaleAndHeldCart_AndIsTenantIsolated()
+    {
+        var tenant = Guid.NewGuid();
+        var register = CreateRegister(tenant);
+        var sale = CreateSale(tenant, register.Id);
+        var cart = CreateCart(tenant, register.Id, "checkout-metadata");
+        var metadata = new PosCheckoutMetadata { TableNumber = "T12",
+            Fields = new() { ["coupon"] = "REFERENCE-ONLY" }, Labels = new() { ["coupon"] = "Coupon" } };
+        sale.CheckoutMetadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
+        cart.CheckoutMetadataJson = sale.CheckoutMetadataJson;
+        cart.Status = PosCartStatus.Suspended;
+        await using (var db = CreateContext(tenant))
+        {
+            db.AddRange(register, sale, cart);
+            await db.SaveChangesAsync();
+        }
+        await using (var db = CreateContext(tenant))
+        {
+            var savedSale = await db.Set<PosSale>().SingleAsync(item => item.Id == sale.Id);
+            var savedCart = await db.Set<PosCart>().SingleAsync(item => item.Id == cart.Id);
+            System.Text.Json.JsonSerializer.Deserialize<PosCheckoutMetadata>(savedSale.CheckoutMetadataJson!)
+                .Should().BeEquivalentTo(metadata);
+            System.Text.Json.JsonSerializer.Deserialize<PosCheckoutMetadata>(savedCart.CheckoutMetadataJson!)
+                .Should().BeEquivalentTo(metadata);
+        }
+        await using (var db = CreateContext(Guid.NewGuid()))
+        {
+            (await db.Set<PosSale>().AnyAsync(item => item.Id == sale.Id)).Should().BeFalse();
+            (await db.Set<PosCart>().AnyAsync(item => item.Id == cart.Id)).Should().BeFalse();
+        }
+    }
+
+    [Test]
+    public async Task CheckoutSettings_UseTrustedTenant_ValidateValuesAndSnapshotServerLabels()
+    {
+        var tenant = Guid.NewGuid();
+        var group = new IdentityServer.Domain.Shared.Contracts.RegistryConfigurationGroup
+        {
+            Id = Guid.NewGuid(), TenantId = tenant, Name = "POS", SystemReferenceId = Guid.NewGuid(),
+            IsEnabled = true, CreatedAt = DateTime.UtcNow, ConcurrencyStamp = Guid.NewGuid()
+        };
+        var settings = new PosCheckoutSettings { TableTrackingEnabled = true,
+            CheckoutFields = [new() { Key = "coupon", Label = "Coupon", Required = true, Enabled = true }] };
+        await using (var db = CreateContext(tenant))
+        {
+            db.Add(new IdentityServer.Domain.Shared.Contracts.Tenant
+            { Id = tenant, TenantId = tenant, Name = "POS settings test", Version = 1, IsEnabled = true });
+            db.Add(group);
+            db.Add(new IdentityServer.Domain.Shared.Contracts.RegistryConfiguration
+            {
+                Id = Guid.NewGuid(), TenantId = tenant, GroupId = group.Id,
+                Key = PosCheckoutSettings.RegistryKey, Value = System.Text.Json.JsonSerializer.Serialize(settings),
+                IsEnabled = true, CreatedAt = DateTime.UtcNow, ConcurrencyStamp = Guid.NewGuid()
+            });
+            await db.SaveChangesAsync();
+            var service = new PosCheckoutSettingsService(db, CreateResolver(tenant).Object);
+            (await service.ValidateAsync(tenant, new(), true, CancellationToken.None)).StatusCode.Should().Be(400);
+            (await service.ValidateAsync(tenant, new(), false, CancellationToken.None)).IsSuccess.Should().BeTrue();
+            var result = await service.ValidateAsync(tenant, new()
+            {
+                TableNumber = " T1 ", Fields = new() { ["coupon"] = " VALUE " },
+                Labels = new() { ["coupon"] = "Untrusted label" }
+            }, true, CancellationToken.None);
+            result.IsSuccess.Should().BeTrue();
+            result.Data!.TableNumber.Should().Be("T1");
+            result.Data.Fields["coupon"].Should().Be("VALUE");
+            result.Data.Labels["coupon"].Should().Be("Coupon");
+        }
+        var otherTenant = Guid.NewGuid();
+        await using (var db = CreateContext(otherTenant))
+        {
+            var service = new PosCheckoutSettingsService(db, CreateResolver(otherTenant).Object);
+            var result = await service.GetAsync(new(), CancellationToken.None);
+            result.Data!.TenantId.Should().Be(otherTenant);
+            result.Data.Settings.TableTrackingEnabled.Should().BeFalse();
+            result.Data.Settings.CheckoutFields.Should().BeEmpty();
+            (await service.ValidateAsync(otherTenant, new() { TableNumber = "T1" }, false, CancellationToken.None))
+                .StatusCode.Should().Be(400);
+        }
+    }
+
+    [Test]
     public async Task PosMigration_EnforcesSingleActivePaymentAndPersistsCartRequestHash()
     {
         var tenantId = Guid.NewGuid();
@@ -363,9 +445,11 @@ public sealed class PosPersistenceIntegrationTests
         var inventory = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
         var wallets = new Mock<IWalletsServiceWrapper>(MockBehavior.Strict);
         var sales = new PosSalesService(db, inventory.Object, wallets.Object, resolver.Object,
-            NullLogger<PosSalesService>.Instance, new PosFinanceSettings(Mock.Of<IIdentityServerServiceWrapper>()));
+            NullLogger<PosSalesService>.Instance, new PosFinanceSettings(Mock.Of<IIdentityServerServiceWrapper>()),
+            new PosCheckoutSettingsService(db, resolver.Object));
         var cartService = new PosCartService(db, inventory.Object, sales, resolver.Object,
-            NullLogger<PosCartService>.Instance, new PosFinanceSettings(Mock.Of<IIdentityServerServiceWrapper>()));
+            NullLogger<PosCartService>.Instance, new PosFinanceSettings(Mock.Of<IIdentityServerServiceWrapper>()),
+            new PosCheckoutSettingsService(db, resolver.Object));
         var registerService = new PosRegisterService(
             db,
             resolver.Object,

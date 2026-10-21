@@ -23,6 +23,20 @@ public sealed class PortalSidebarState
 
     public bool IsGroupOpen(string groupId) => _openGroups.Contains(groupId);
 
+    public void ResetGroups()
+    {
+        _openGroups.Clear();
+        ActiveGroupId = null;
+    }
+
+    public void ActivateGroup(string? groupId)
+    {
+        if (ActiveGroupId == groupId) return;
+        ActiveGroupId = groupId;
+        if (groupId is "tenant-detail" or "user-detail" or "wallet-detail" or "product-detail" or "tenant-admin")
+            _openGroups.Add(groupId);
+    }
+
     public bool SetGroupOpen(string groupId, bool open)
     {
         return open

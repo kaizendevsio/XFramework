@@ -11,6 +11,29 @@ namespace Wallets.IntegrationTests.Tests;
 [Category(TestCategories.DataContext)]
 public class DataContextTests : WalletsTestBase
 {
+    [TestCase(true, true)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    public async Task WalletTransactions_ManagedTenantRead_RequiresReportingAndDelegation(bool reporting, bool delegation)
+    {
+        var capabilities = new List<string>();
+        if (reporting) capabilities.Add(WalletAuthorizationCapabilities.ReportingView);
+        if (delegation) capabilities.Add("identity.tenants:manage");
+        var token = TestInvocationIdentityExtensions.CreateTestActorToken(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), [], capabilities);
+        using var actor = TestInvocationActorTokenScope.Push(token);
+        var query = async () => await WalletsTestFixture.DataContext.Query<WalletTransaction>()
+            .NoCache()
+            .Where(x => x.TenantId == WalletsTestFixture.TestTenantId)
+            .Take(10)
+            .ToListAsync();
+
+        if (reporting && delegation)
+            await query.Should().NotThrowAsync();
+        else
+            await query.Should().ThrowAsync<InvalidOperationException>().WithMessage("*status 403*");
+    }
+
     [Test]
     public async Task GeneratedWalletTypeRead_WithCapability_SucceedsAcrossAllGeneratedPaths()
     {

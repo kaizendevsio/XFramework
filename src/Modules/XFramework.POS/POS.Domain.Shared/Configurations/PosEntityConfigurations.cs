@@ -28,6 +28,7 @@ public sealed class PosSaleConfiguration : IEntityTypeConfiguration<PosSale>
     {
         entity.ToTable("PosSale", "POS");
         entity.ConfigurePosBaseModel("PK_POS_Sale");
+        entity.Property(e => e.CheckoutMetadataJson).HasColumnType("jsonb");
 
         entity.Property(e => e.SaleNumber).IsRequired().HasMaxLength(80);
         entity.Property(e => e.Status).HasConversion<int>();
@@ -66,6 +67,7 @@ public sealed class PosCartConfiguration : IEntityTypeConfiguration<PosCart>
     {
         entity.ToTable("PosCart", "POS");
         entity.ConfigurePosBaseModel("PK_POS_Cart");
+        entity.Property(e => e.CheckoutMetadataJson).HasColumnType("jsonb");
 
         entity.Property(e => e.CartNumber).IsRequired().HasMaxLength(80);
         entity.Property(e => e.CustomerLabel).HasMaxLength(200);

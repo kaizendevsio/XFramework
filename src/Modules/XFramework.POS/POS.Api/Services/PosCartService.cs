@@ -17,7 +17,8 @@ public sealed class PosCartService(
     PosSalesService salesService,
     IPosRequestContextResolver contextResolver,
     ILogger<PosCartService> logger,
-    PosFinanceSettings financeSettings)
+    PosFinanceSettings financeSettings,
+    PosCheckoutSettingsService checkoutSettings)
 {
     private static readonly TimeSpan CartTtl = TimeSpan.FromHours(24);
 
@@ -35,6 +36,8 @@ public sealed class PosCartService(
             return Result<PosCartResponse>.Failure("Tax is calculated from tenant Finance settings and cannot be supplied", 400);
 
         var idempotencyKey = PosServiceHelpers.NormalizeOptional(request.IdempotencyKey) ?? string.Empty;
+        if (request.CheckoutMetadata?.Fields is null)
+            return Result<PosCartResponse>.Failure("Checkout details are required", 400);
         var requestHash = PosServiceHelpers.BuildCartRequestHash(request);
         if (!string.IsNullOrWhiteSpace(idempotencyKey))
         {
@@ -54,6 +57,10 @@ public sealed class PosCartService(
 
         if (request.CurrencyId.HasValue && request.CurrencyId.Value != register.CurrencyId)
             return Result<PosCartResponse>.Conflict("Cart currency must match the register currency");
+
+        var checkout = await checkoutSettings.ValidateAsync(tenantId, request.CheckoutMetadata, requireValues: false, ct);
+        if (!checkout.IsSuccess)
+            return Result<PosCartResponse>.Failure(checkout.Message!, checkout.StatusCode);
 
         var now = DateTime.UtcNow;
         var cart = new PosCart
@@ -75,6 +82,7 @@ public sealed class PosCartService(
             TaxAmount = 0,
             IdempotencyKey = idempotencyKey,
             RequestHash = requestHash,
+            CheckoutMetadataJson = System.Text.Json.JsonSerializer.Serialize(checkout.Data),
             SuspendedAt = request.Suspend ? now : null,
             ExpiresAt = now.Add(CartTtl),
             CreatedAt = now,
@@ -157,6 +165,11 @@ public sealed class PosCartService(
         if (request.CurrencyId.HasValue && request.CurrencyId.Value != register.CurrencyId)
             return Result<PosCartResponse>.Conflict("Cart currency must match the register currency");
 
+        var checkout = await checkoutSettings.ValidateAsync(tenantId, request.CheckoutMetadata, requireValues: false, ct);
+        if (!checkout.IsSuccess)
+            return Result<PosCartResponse>.Failure(checkout.Message!, checkout.StatusCode);
+
+        cart.CheckoutMetadataJson = System.Text.Json.JsonSerializer.Serialize(checkout.Data);
         cart.CustomerCredentialId = request.CustomerCredentialId;
         cart.CustomerLabel = PosServiceHelpers.NormalizeOptional(request.CustomerLabel);
         cart.Notes = PosServiceHelpers.NormalizeOptional(request.Notes);
@@ -553,6 +566,7 @@ public sealed class PosCartService(
             RegisterId = cart.RegisterId,
             CashierCredentialId = cart.CashierCredentialId,
             CustomerCredentialId = customerCredentialId,
+            CheckoutMetadata = PosServiceHelpers.ReadCheckoutMetadata(cart.CheckoutMetadataJson),
             WarehouseId = cart.WarehouseId,
             LocationId = cart.LocationId,
             CurrencyId = cart.CurrencyId,

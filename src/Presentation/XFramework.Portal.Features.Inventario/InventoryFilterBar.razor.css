@@ -1,0 +1,28 @@
+.inventory-filter-bar {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: flex-start;
+    gap: 1rem;
+    width: 100%;
+    margin-bottom: 1rem;
+}
+
+.inventory-filter-bar ::deep > div,
+.inventory-filter-bar ::deep > input {
+    flex: 0 1 20rem;
+    min-width: 0;
+    max-width: min(100%, 24rem);
+}
+
+.inventory-filter-bar ::deep > button {
+    flex: 0 0 auto;
+    min-height: 2.5rem;
+}
+
+.inventory-filter-bar ::deep input,
+.inventory-filter-bar ::deep [role="combobox"] {
+    width: 100%;
+    min-width: 0;
+}

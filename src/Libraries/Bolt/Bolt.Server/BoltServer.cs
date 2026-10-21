@@ -399,7 +399,7 @@ public sealed partial class BoltServer : IDisposable
             await CloseTransportAsync(transport);
             return;
         }
-        using var connectionCts = CreateConnectionCancellation(user, ct);
+        using var connectionCts = CreateConnectionCancellation(user, ct, out var expiresAtUtc);
         var connectionCt = connectionCts.Token;
         var connection = new BoltHubConnection(
             transport,
@@ -409,7 +409,8 @@ public sealed partial class BoltServer : IDisposable
             _transportSendStallTimeoutMs,
             _mediaEnabled ? _mediaSendQueueOptions : null)
         {
-            User = user
+            User = user,
+            ExpiresAtUtc = expiresAtUtc
         };
         connection.StartSendLoop(connectionCt, ex =>
         {
@@ -573,9 +574,11 @@ public sealed partial class BoltServer : IDisposable
         catch { }
     }
 
-    private CancellationTokenSource CreateConnectionCancellation(ClaimsPrincipal? user, CancellationToken ct)
+    private CancellationTokenSource CreateConnectionCancellation(
+        ClaimsPrincipal? user, CancellationToken ct, out DateTimeOffset? expiresAtUtc)
     {
         var cts = CancellationTokenSource.CreateLinkedTokenSource(ct, _shutdownCts.Token);
+        var now = DateTimeOffset.UtcNow;
         var lifetime = _maxConnectionLifetime;
 
         var expirationValue = user?.FindFirstValue("exp");
@@ -583,7 +586,7 @@ public sealed partial class BoltServer : IDisposable
         {
             try
             {
-                var untilExpiration = DateTimeOffset.FromUnixTimeSeconds(expirationUnixSeconds) - DateTimeOffset.UtcNow;
+                var untilExpiration = DateTimeOffset.FromUnixTimeSeconds(expirationUnixSeconds) - now;
                 if (untilExpiration < TimeSpan.Zero)
                     untilExpiration = TimeSpan.Zero;
 
@@ -596,6 +599,7 @@ public sealed partial class BoltServer : IDisposable
             }
         }
 
+        expiresAtUtc = lifetime == Timeout.InfiniteTimeSpan ? null : now.Add(lifetime);
         if (lifetime != Timeout.InfiniteTimeSpan)
             cts.CancelAfter(lifetime);
 
@@ -928,6 +932,28 @@ public sealed partial class BoltServer : IDisposable
                 caller.ClientId,
                 caller.ServiceHash,
                 frame.SenderHash);
+            return;
+        }
+
+        // Control commands apply only to the authenticated sending connection, never a routed peer.
+        if (frame.CommandHash == BoltConnectionControl.GetExpiryHash ||
+            frame.CommandHash == BoltConnectionControl.DrainHash)
+        {
+            var status = frame.PayloadLength == 0 ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
+            byte[] payload = [];
+            if (status == HttpStatusCode.OK)
+            {
+                if (frame.CommandHash == BoltConnectionControl.DrainHash)
+                    caller.IsDraining = true;
+                else
+                {
+                    payload = new byte[sizeof(long)];
+                    BinaryPrimitives.WriteInt64LittleEndian(payload, caller.ExpiresAtUtc?.ToUnixTimeMilliseconds() ?? 0);
+                }
+            }
+            var controlWriter = RentedBufferWriter.GetThreadLocal();
+            BoltCodec.WriteResponse(controlWriter, frame.RequestId, status, payload);
+            await caller.SendAsync(controlWriter, ct);
             return;
         }
 
@@ -3146,6 +3172,8 @@ public sealed partial class BoltServer : IDisposable
 
     private async Task HandleSubscribeFrameAsync(BoltHubConnection conn, byte[] buffer, int length, CancellationToken ct)
     {
+        if (conn.IsDraining)
+            return;
         if (!BoltCodec.TryReadSubscribe(buffer.AsSpan(0, length), out var topicHash, out var durable, out var subscriberId, out var topic, out var actorAccessToken, out _))
             return;
 
@@ -3670,6 +3698,7 @@ public sealed partial class BoltServer : IDisposable
             foreach (var (binding, expiresAtUtc) in topicSetForPublish)
             {
                 var (subscriberConn, transientId) = binding;
+                if (subscriberConn.IsDraining) continue;
                 if (subscriberConn == publisher) continue;
                 if (transientId.Length == 0 && deliveredConnections.Contains(subscriberConn)) continue;
                 if (expiresAtUtc is { } expiry && expiry <= DateTimeOffset.UtcNow) continue;
@@ -4285,7 +4314,7 @@ public sealed partial class BoltServer : IDisposable
 
         foreach (var client in connections)
         {
-            if (client.IsRegistered && client.IsAlive)
+            if (client.IsRegistered && client.IsAlive && !client.IsDraining)
             {
                 firstAlive ??= client;
                 aliveCount++;
@@ -4300,7 +4329,7 @@ public sealed partial class BoltServer : IDisposable
         var current = 0;
         foreach (var client in connections)
         {
-            if (client.IsRegistered && client.IsAlive)
+            if (client.IsRegistered && client.IsAlive && !client.IsDraining)
             {
                 if (current == targetIdx) return client;
                 current++;
@@ -5282,6 +5311,8 @@ public sealed class BoltHubConnection
     public ClaimsPrincipal? User { get; set; }
     public int ServiceHash { get; set; }
     public bool IsRegistered { get; set; }
+    internal DateTimeOffset? ExpiresAtUtc { get; init; }
+    internal volatile bool IsDraining;
     public bool IsAlive => !IsClosing && _transport.IsConnected;
     internal bool IsClosing => Volatile.Read(ref _isClosing) != 0;
     public BoltTransport TransportType => _transport.TransportType;
