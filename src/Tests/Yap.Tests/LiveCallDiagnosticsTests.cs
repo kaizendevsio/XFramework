@@ -103,6 +103,27 @@ public sealed class LiveCallDiagnosticsTests
         Assert.That(sample.Metrics[CallMetric.CaptureFrameMs], Is.EqualTo(7.5));
     }
 
+    [Test] public void Schema_DistinguishesCameraSettingsDecodedRateAndDisplayScheduling()
+    {
+        var sample = LiveCallDiagnostics.Project(new VideoDiagnostics
+        {
+            Codec = "avc1.420028", CameraFps = 60, CameraMinFps = 15, CameraMaxFps = 60,
+            CameraFacing = "user", CaptureFps = 30, CameraConstraintRejected = true,
+            Remotes = [new() { StreamId = Guid.NewGuid(), Codec = "avc1.420028", ReceivedFps = 30,
+                DecodedFps = 30, RenderedFps = 24, DrawGapP95Ms = 50, DrawGapMaxMs = 100,
+                PlayoutMs = 40, PlayoutQueue = 2, PlayoutDropped = 6 }]
+        }, Guid.NewGuid(), 1, CallDevice.Android, true, 2000, 1080, 60);
+        Assert.That(YapCallDiagnostics.Valid(sample), Is.True);
+        Assert.That(sample.Metrics[CallMetric.RearCamera], Is.Zero);
+        Assert.That(sample.Metrics[CallMetric.CameraMaxFps], Is.EqualTo(60));
+        Assert.That(sample.Metrics[CallMetric.CaptureFps], Is.EqualTo(30));
+        Assert.That(sample.Metrics[CallMetric.CameraConstraintRejected], Is.EqualTo(1));
+        Assert.That(sample.Remotes[0].Metrics[CallMetric.DecodedFps], Is.EqualTo(30));
+        Assert.That(sample.Remotes[0].Metrics[CallMetric.RenderedFps], Is.EqualTo(24));
+        Assert.That(sample.Remotes[0].Metrics[CallMetric.DrawGapMaxMs], Is.EqualTo(100));
+        Assert.That(sample.Remotes[0].Metrics[CallMetric.PlayoutDropped], Is.EqualTo(6));
+    }
+
     [Test] public void Schema_PreservesDirectFrameExperimentAndHiddenOrientation()
     {
         var experiment = new FrameExperimentSample { Mode = 1, Width = 1920, Height = 1080,

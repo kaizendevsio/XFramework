@@ -470,7 +470,7 @@ public sealed class CallFastStartTests
         TestContext.Out.WriteLine(sim);
         Assert.Multiple(() =>
         {
-            Assert.That(sim.EstimateAt(2_500), Is.LessThan(sim.EstimateAt(0)), "it did react: the receiver was behind");
+            Assert.That(sim.EstimateAt(2_500), Is.EqualTo(sim.EstimateAt(0)), "a brief receiver stall is not a sustained queue");
             Assert.That(sim.EstimateAt(2_500), Is.GreaterThan(4_000),
                 "a brief busy receiver is not evidence that a measured fast link lost half its capacity");
             Assert.That(sim.Height, Is.EqualTo(1080), "and is back at the preference");

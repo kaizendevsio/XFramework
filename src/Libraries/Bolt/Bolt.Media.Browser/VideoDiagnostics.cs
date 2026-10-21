@@ -21,6 +21,10 @@ public sealed record VideoDiagnostics
     public int CameraWidth { get; init; }
     public int CameraHeight { get; init; }
     public double? CameraFps { get; init; }
+    public double? CameraMinFps { get; init; }
+    public double? CameraMaxFps { get; init; }
+    public string CameraFacing { get; init; } = "";
+    public bool CameraConstraintRejected { get; init; }
     public double? CaptureFps { get; init; }
     public double? EncodedFps { get; init; }
     public double? EncodedKbps { get; init; }
@@ -61,7 +65,14 @@ public sealed record RemoteVideoDiagnostics
     public int Width { get; init; }
     public int Height { get; init; }
     public double? ReceivedFps { get; init; }
+    public double? DecodedFps { get; init; }
+    /// <summary>Canvas draws scheduled on animation frames, not proof of physical display presentation.</summary>
     public double? RenderedFps { get; init; }
+    public double? DrawGapP95Ms { get; init; }
+    public double? DrawGapMaxMs { get; init; }
+    public double? PlayoutMs { get; init; }
+    public int PlayoutQueue { get; init; }
+    public int PlayoutDropped { get; init; }
     public double? ReceivedKbps { get; init; }
     public int DecoderQueue { get; init; }
     public int PendingFrames { get; init; }
