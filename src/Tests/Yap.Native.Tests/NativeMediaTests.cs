@@ -38,6 +38,34 @@ public sealed class NativeMediaTests
         try { using var stream = await accepted; } catch (Exception) { }
     }
     [Test]
+    public async Task ConnectAsync_UnresponsiveTlsPeer_ReportsHandshakeTimeoutInsteadOfStopped()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(25));
+        using var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        var invitation = new PairingInvitation(1, "127.0.0.1",
+            ((System.Net.IPEndPoint)listener.LocalEndpoint).Port, new string('0', 64), Convert.ToBase64String(new byte[32]));
+        var stages = new List<string>();
+        var connecting = PairingClient.ConnectAsync(invitation, timeout.Token, stages.Add);
+        using var peer = await listener.AcceptTcpClientAsync(timeout.Token);
+        var exception = Assert.ThrowsAsync<TimeoutException>(async () => await connecting);
+        Assert.That(exception!.Message, Does.Contain("TLS handshake"));
+        Assert.That(stages.Last(), Does.Contain("Host reached"));
+    }
+    [Test]
+    public async Task ConnectAsync_UserCancelsHandshake_PreservesCancellation()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        var invitation = new PairingInvitation(1, "127.0.0.1",
+            ((System.Net.IPEndPoint)listener.LocalEndpoint).Port, new string('0', 64), Convert.ToBase64String(new byte[32]));
+        var connecting = PairingClient.ConnectAsync(invitation, timeout.Token);
+        using var peer = await listener.AcceptTcpClientAsync(timeout.Token);
+        timeout.Cancel();
+        Assert.CatchAsync<OperationCanceledException>(async () => await connecting);
+    }
+    [Test]
     public async Task Wrong_pairing_secret_is_rejected_even_with_valid_certificate()
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));

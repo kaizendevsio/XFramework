@@ -40,6 +40,10 @@ Device verification on the Galaxy S25 Ultra confirmed the fresh pairing TCP list
 
 The subsequent iPhone `Argument_InvalidHostName` failure came from using the display label `Yap native benchmark` as the TLS client's `TargetHost`. It now uses the invitation's IPv4 address. The exact certificate SHA-256 pin and pairing-secret verification remain unchanged. This fix requires updating the native iPhone app; refreshing the web page alone cannot apply it.
 
+The next device test stalled before TLS: an iPhone header-only RVI trace showed repeated TCP SYNs from `192.168.50.10` to the current Android invitation port, with no SYN-ACK. Android was still listening; the Mac (`192.168.50.79`) connected to the same listener in about 20 ms. Retrying with only the iPhone VPN disabled still showed unanswered SYNs to a new invitation port. This narrows the failure to the phone-to-phone TCP path but does not establish which device/network rule drops the traffic. A separate retry of an already-consumed port received TCP resets, so distinguish expired invitations from silent connection timeouts.
+
+Pairing now reports TCP connection, TLS negotiation, secret verification and camera startup separately. Its internal connection/handshake deadlines produce descriptive timeout errors, while explicit user/lifecycle cancellation remains `Stopped`. Fourteen shared tests pass, including a real stalled TLS peer and explicit cancellation. No certificate verification was removed, and no claim of successful two-phone video follows from these transport tests.
+
 ## Interpretation
 
 `captureFps` counts native camera callbacks; `encodedFps` counts compressed pictures; `receivedFps` counts complete peer pictures. Android output counts MediaCodec frame-rendered callbacks. iOS output counts AVSampleBufferVideoRenderer submissions, **not decoder completion or physical display presentation**. Do not compare those counters as equivalent hardware measurements. Use Instruments/Perfetto for presentation cadence and decoder attribution.

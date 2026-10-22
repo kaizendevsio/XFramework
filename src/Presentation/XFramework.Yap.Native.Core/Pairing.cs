@@ -51,25 +51,35 @@ public sealed class PairingHost : IDisposable
         Invitation = new(1, address, ((IPEndPoint)listener.LocalEndpoint).Port,
             Convert.ToHexString(SHA256.HashData(certificate.RawData)), Convert.ToBase64String(secret));
     }
-    public async Task<SslStream> AcceptAsync(CancellationToken ct)
+    public async Task<SslStream> AcceptAsync(CancellationToken ct, Action<string>? progress = null)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct); timeout.CancelAfter(TimeSpan.FromMinutes(3));
-        var client = await listener.AcceptTcpClientAsync(timeout.Token);
+        progress?.Invoke($"Waiting for peer at {Invitation.Address}:{Invitation.Port} (three-minute invitation)");
+        TcpClient client;
+        try { client = await listener.AcceptTcpClientAsync(timeout.Token); }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
+        { throw new TimeoutException("No peer connected before the invitation expired. Create a new invitation.", ex); }
         client.NoDelay = true; client.SendBufferSize = 65536; client.ReceiveBufferSize = 65536;
         listener.Stop(); // One peer, one run. Re-pair after failure or disconnect.
         var stream = new SslStream(client.GetStream(), false);
+        var stage = "TLS handshake";
         try
         {
             using var handshake = CancellationTokenSource.CreateLinkedTokenSource(ct); handshake.CancelAfter(TimeSpan.FromSeconds(15));
+            progress?.Invoke("Peer reached this phone. Negotiating TLS encryption...");
             await stream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions
             {
                 ServerCertificate = certificate, EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13
             }, handshake.Token);
+            stage = "pairing-secret verification";
+            progress?.Invoke("TLS connected. Verifying pairing secret...");
             var offered = new byte[32]; await stream.ReadExactlyAsync(offered, handshake.Token);
             if (!CryptographicOperations.FixedTimeEquals(secret, offered)) throw new AuthenticationException("Pairing secret did not match.");
             await stream.WriteAsync(new byte[] { 1 }, handshake.Token);
             return stream;
         }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
+        { stream.Dispose(); client.Dispose(); throw new TimeoutException($"Peer connected, but {stage} timed out after 15 seconds. Create a new invitation and retry.", ex); }
         catch { stream.Dispose(); client.Dispose(); throw; }
     }
     public void Dispose() { listener.Stop(); certificate.Dispose(); CryptographicOperations.ZeroMemory(secret); }
@@ -77,15 +87,19 @@ public sealed class PairingHost : IDisposable
 
 public static class PairingClient
 {
-    public static async Task<SslStream> ConnectAsync(PairingInvitation invite, CancellationToken ct)
+    public static async Task<SslStream> ConnectAsync(PairingInvitation invite, CancellationToken ct, Action<string>? progress = null)
     {
         var expected = Convert.FromHexString(invite.CertificateSha256);
         var client = new TcpClient { NoDelay = true, SendBufferSize = 65536, ReceiveBufferSize = 65536 };
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct); timeout.CancelAfter(TimeSpan.FromSeconds(15));
         SslStream? stream = null;
+        var stage = "TCP connection";
         try
         {
+            progress?.Invoke($"Connecting to host {invite.Address}:{invite.Port}...");
             await client.ConnectAsync(IPAddress.Parse(invite.Address), invite.Port, timeout.Token);
+            stage = "TLS handshake";
+            progress?.Invoke("Host reached. Negotiating TLS encryption...");
             stream = new SslStream(client.GetStream(), false, (_, cert, _, _) => cert is not null &&
                 CryptographicOperations.FixedTimeEquals(expected, SHA256.HashData(cert.GetRawCertData())));
             await stream.AuthenticateAsClientAsync(new SslClientAuthenticationOptions
@@ -94,11 +108,15 @@ public static class PairingClient
                 // a display label. Identity is still verified by the exact certificate pin.
                 TargetHost = invite.Address, EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13
             }, timeout.Token);
+            stage = "pairing confirmation";
+            progress?.Invoke("TLS connected. Waiting for host to confirm pairing...");
             await stream.WriteAsync(Convert.FromBase64String(invite.Secret), timeout.Token);
             var ack = new byte[1]; await stream.ReadExactlyAsync(ack, timeout.Token);
             if (ack[0] != 1) throw new AuthenticationException("Pairing rejected.");
             return stream;
         }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
+        { stream?.Dispose(); client.Dispose(); throw new TimeoutException($"Pairing timed out during {stage} to {invite.Address}:{invite.Port} (15-second limit). Check the host is waiting and use its newest invitation.", ex); }
         catch { stream?.Dispose(); client.Dispose(); throw; }
     }
 }

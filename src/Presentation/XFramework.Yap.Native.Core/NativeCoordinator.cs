@@ -43,19 +43,19 @@ public sealed class NativeCoordinator(Func<Task<INativeVideo>> createVideo, stri
                 var host = new PairingHost(command.Address ?? "");
                 waitingForPeer = true;
                 Notify(new("invitation", Invitation: host.Invitation.Encode()));
-                job = RunAsync(host.AcceptAsync(lifetime.Token), settings, host, lifetime.Token);
+                job = RunAsync(() => host.AcceptAsync(lifetime.Token, PairingProgress), settings, host, lifetime.Token);
             }
-            else job = RunAsync(PairingClient.ConnectAsync(PairingInvitation.Parse(command.Invitation ?? ""), lifetime.Token), settings, null, lifetime.Token);
+            else job = RunAsync(() => PairingClient.ConnectAsync(PairingInvitation.Parse(command.Invitation ?? ""), lifetime.Token, PairingProgress), settings, null, lifetime.Token);
         }
         finally { gate.Release(); }
     }
-    private async Task RunAsync(Task<System.Net.Security.SslStream> connected, VideoSettings settings, PairingHost? host, CancellationToken ct)
+    private void PairingProgress(string text) => Notify(new("status", text));
+    private async Task RunAsync(Func<Task<System.Net.Security.SslStream>> connect, VideoSettings settings, PairingHost? host, CancellationToken ct)
     {
         INativeVideo? video = null;
         try
         {
-            Notify(new("status", "Waiting for encrypted peer connection"));
-            using var stream = await connected; ct.ThrowIfCancellationRequested();
+            using var stream = await connect(); ct.ThrowIfCancellationRequested();
             waitingForPeer = false;
             if (foregroundResume is { } resume)
             {
@@ -63,6 +63,7 @@ public sealed class NativeCoordinator(Func<Task<INativeVideo>> createVideo, stri
                 await resume.Task.WaitAsync(TimeSpan.FromMinutes(3), ct);
             }
             ct.ThrowIfCancellationRequested();
+            Notify(new("status", "Encrypted pairing complete. Opening native camera..."));
             video = await createVideo(); ct.ThrowIfCancellationRequested();
             await using var run = new BenchmarkRun(video, stream);
             Directory.CreateDirectory(outputDirectory);
@@ -75,7 +76,7 @@ public sealed class NativeCoordinator(Func<Task<INativeVideo>> createVideo, stri
             try { await run.Completion.WaitAsync(ct); } catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
             finally { await run.DisposeAsync(); } // Stop sampling before the report writer is disposed.
         }
-        catch (OperationCanceledException) { Notify(new("status", "Stopped")); }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { Notify(new("status", "Stopped")); }
         catch (Exception ex) { Notify(new("error", ex.Message)); }
         finally { waitingForPeer = false; video?.Dispose(); host?.Dispose(); Notify(new("finished")); }
     }
