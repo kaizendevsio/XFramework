@@ -2,10 +2,12 @@ namespace Yap.Client;
 
 public static class AppRelease
 {
-    public const string Version = "1.3.94";
+    public const string Version = "1.3.95";
     public static readonly (string Version, string Date, string[] Notes)[] History =
     [
-        (Version, "21 October 2026", [
+        (Version, "22 October 2026", [
+            "Added a separate native video benchmark page for paired device testing; normal web calls are unchanged."]),
+        ("1.3.94", "21 October 2026", [
             "Video quality ignores brief queue spikes when congestion measurements change source, while responding to confirmed bandwidth limits.",
             "Incoming video follows display callbacks with bounded buffering to smooth bursty frame delivery.",
             "Call diagnostics separate received, decoded and drawn FPS, show frame spacing, and distinguish camera capabilities from actual capture rate."]),
