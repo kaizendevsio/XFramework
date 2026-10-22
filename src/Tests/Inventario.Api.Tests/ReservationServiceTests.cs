@@ -264,6 +264,27 @@ public sealed class ReservationServiceTests
     }
 
     [Test]
+    public async Task FulfillAsync_FeatureDisabled_DoesNotReleaseReserveOrShip()
+    {
+        var tenantId = Guid.NewGuid();
+        var ids = TestIds.Create();
+        var reservationId = Guid.NewGuid();
+        var data = SeedReservationData(tenantId, ids, 5, 2, reservationId);
+        var service = CreateService(data, tenantId, fulfillmentEnabled: false);
+
+        var result = await service.FulfillAsync(new() { ReservationId = reservationId });
+
+        result.StatusCode.Should().Be(403);
+        result.Message.Should().Contain(TenantModuleFeatureKeys.InventarioFulfillment);
+        data.Set<Reservation>().Single().Status.Should().Be(ReservationStatus.Active);
+        data.Set<StockBalance>().Single().OnHandQuantity.Should().Be(5);
+        data.Set<StockBalance>().Single().ReservedQuantity.Should().Be(2);
+        data.Added.Should().BeEmpty();
+        data.Updated.Should().BeEmpty();
+        data.SaveCount.Should().Be(0);
+    }
+
+    [Test]
     public async Task FulfillAsync_AlreadyFulfilledReservation_ReplaysWithoutPostingStockAgain()
     {
         var tenantId = Guid.NewGuid();
@@ -451,14 +472,15 @@ public sealed class ReservationServiceTests
     private static ReservationService CreateService(
         FakeDataContext dataContext,
         Guid tenantId,
-        bool includeAdminClaim = false)
+        bool includeAdminClaim = false,
+        bool fulfillmentEnabled = true)
     {
         var roles = includeAdminClaim
             ? new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Admin" }
             : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var invocationContext = new TestTrustedInvocationContextAccessor(tenantId, roles);
 
-        var featureService = new FakeTenantModuleFeatureService();
+        var featureService = new FakeTenantModuleFeatureService(fulfillmentEnabled);
         var productVariationService = new ProductVariationService(dataContext, invocationContext, featureService);
         var stockPostingService = new StockPostingService(
             dataContext,
@@ -466,24 +488,28 @@ public sealed class ReservationServiceTests
             featureService,
             productVariationService);
         var allocationService = new InventoryAllocationService(dataContext, invocationContext, stockPostingService);
-        return new ReservationService(dataContext, invocationContext, allocationService);
+        return new ReservationService(dataContext, invocationContext, allocationService, featureService);
     }
 
-    private sealed class FakeTenantModuleFeatureService : ITenantModuleFeatureService
+    private sealed class FakeTenantModuleFeatureService(bool fulfillmentEnabled) : ITenantModuleFeatureService
     {
         public Task<Result<bool>> IsEnabledAsync(
             Guid tenantId,
             string moduleKey,
             string? subFeatureKey = null,
             CancellationToken ct = default) =>
-            Task.FromResult(Result<bool>.Success(false));
+            Task.FromResult(Result<bool>.Success(IsEnabled(moduleKey, subFeatureKey)));
 
         public Task<Result> EnsureEnabledAsync(
             Guid tenantId,
             string moduleKey,
             string? subFeatureKey = null,
             CancellationToken ct = default) =>
-            Task.FromResult(Result.Forbidden($"Feature disabled: '{TenantModuleFeatureKeys.Combine(moduleKey, subFeatureKey)}' is not enabled for this tenant."));
+            Task.FromResult(IsEnabled(moduleKey, subFeatureKey) ? Result.Success() :
+                Result.Forbidden($"Feature disabled: '{TenantModuleFeatureKeys.Combine(moduleKey, subFeatureKey)}' is not enabled for this tenant."));
+
+        private bool IsEnabled(string module, string? feature) => fulfillmentEnabled &&
+            TenantModuleFeatureKeys.Combine(module, feature) == TenantModuleFeatureKeys.InventarioFulfillment;
 
         public void Invalidate(Guid tenantId, string moduleKey, string? subFeatureKey = null)
         {

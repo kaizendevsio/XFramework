@@ -413,7 +413,8 @@ else
                                 </BbDataGridTemplateColumn>
                             </Columns>
                             <EmptyTemplate>
-                                <BbEmpty Title="No sessions" Description="No sessions are linked to this user's credentials." />
+                                <BbEmpty Title="@(_sessionsLoadFailed ? "Could not load sessions" : "No sessions")"
+                                         Description="@(_sessionsLoadFailed ? "Refresh to try again." : "No sessions are linked to this user's credentials.")" />
                             </EmptyTemplate>
                         </BbDataGrid>
                     </BbCardContent>
@@ -451,7 +452,8 @@ else
                                 <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Time" Sortable="true" Filterable="true" />
                             </Columns>
                             <EmptyTemplate>
-                                <BbEmpty Title="No authorization logs" Description="No authorization logs are linked to this user's credentials." />
+                                <BbEmpty Title="@(_authLogsLoadFailed ? "Could not load authorization logs" : "No authorization logs")"
+                                         Description="@(_authLogsLoadFailed ? "Refresh to try again." : "No authorization logs are linked to this user's credentials.")" />
                             </EmptyTemplate>
                         </BbDataGrid>
                     </BbCardContent>
@@ -1054,6 +1056,8 @@ else
     private List<IdentityRole> _roles = [];
     private bool _rolesLoadFailed;
     private bool _credentialsLoadFailed;
+    private bool _sessionsLoadFailed;
+    private bool _authLogsLoadFailed;
     private List<IdentityContact> _contacts = [];
     private List<IdentityAddress> _addresses = [];
     private List<Session> _sessions = [];
@@ -1298,6 +1302,8 @@ else
 
     private void ClearChildData()
     {
+        _assignRoleDialogOpen = false;
+        _roleForm = new RoleForm();
         _credentials = [];
         _roles = [];
         _contacts = [];
@@ -1318,10 +1324,12 @@ else
         _credentialsLoadFailed = false;
         try
         {
+            var tenantId = _user?.TenantId ?? Guid.Empty;
             _credentials = (await DataContext.Query<IdentityCredential>()
                     .IgnoreQueryFilters()
                     .NoCache()
                     .Where(x => x.IdentityInfoId == Id)
+                    .Where(x => x.TenantId == tenantId)
                     .OrderByDescending(x => x.CreatedAt)
                     .Take(100)
                     .ToListAsync())
@@ -1414,8 +1422,11 @@ else
 
     private async Task LoadSessions()
     {
+        _sessionsLoadFailed = false;
         try
         {
+            if (_credentialsLoadFailed)
+                throw new InvalidOperationException("Credentials could not be loaded.");
             var tenantId = _user?.TenantId ?? Guid.Empty;
             var credentialIds = _credentials
                 .Where(credential => credential.TenantId == tenantId)
@@ -1434,13 +1445,21 @@ else
                     .ToListAsync())
                 .ToList();
         }
-        catch { _sessions = []; }
+        catch (Exception ex)
+        {
+            _sessions = [];
+            _sessionsLoadFailed = true;
+            Logger.LogWarning(ex, "Could not load sessions for identity {IdentityId}", Id);
+        }
     }
 
     private async Task LoadAuthLogs()
     {
+        _authLogsLoadFailed = false;
         try
         {
+            if (_credentialsLoadFailed)
+                throw new InvalidOperationException("Credentials could not be loaded.");
             var tenantId = _user?.TenantId ?? Guid.Empty;
             var credentialIds = _credentials
                 .Where(credential => credential.TenantId == tenantId)
@@ -1458,7 +1477,12 @@ else
                     .ToListAsync())
                 .ToList();
         }
-        catch { _authLogs = []; }
+        catch (Exception ex)
+        {
+            _authLogs = [];
+            _authLogsLoadFailed = true;
+            Logger.LogWarning(ex, "Could not load authorization logs for identity {IdentityId}", Id);
+        }
     }
 
     private async Task LoadWallets()
@@ -1523,15 +1547,28 @@ else
     {
         try
         {
+            var tenantId = _user?.TenantId ?? Guid.Empty;
+            if (tenantId == Guid.Empty)
+            {
+                _roleTypes = [];
+                return;
+            }
+
             _roleTypes = (await DataContext.Query<IdentityRoleType>()
                     .IgnoreQueryFilters()
                     .NoCache()
+                    .Where(x => x.TenantId == tenantId)
+                    .Where(x => !x.IsDeleted && x.IsEnabled)
                     .OrderBy(x => x.Name)
                     .Take(100)
                     .ToListAsync())
                 .ToList();
         }
-        catch { _roleTypes = []; }
+        catch (Exception ex)
+        {
+            _roleTypes = [];
+            Logger.LogWarning(ex, "Could not load role types for identity {IdentityId}", Id);
+        }
     }
 
     private async Task LoadContactLookups()
@@ -1841,6 +1878,12 @@ else
             return;
         }
 
+        if (!CanAssignRole(credId, typeId))
+        {
+            ToastService.Warning("Select a credential and role type from this user's tenant.", "Invalid assignment");
+            return;
+        }
+
         _saving = true;
         try
         {
@@ -1878,6 +1921,11 @@ else
             _saving = false;
         }
     }
+
+    private bool CanAssignRole(Guid credentialId, Guid roleTypeId) =>
+        _user is { TenantId: var tenantId } && tenantId != Guid.Empty && !_outsideTenantContext &&
+        _credentials.Any(x => x.Id == credentialId && x.TenantId == tenantId) &&
+        _roleTypes.Any(x => x.Id == roleTypeId && x.TenantId == tenantId && x.IsEnabled && !x.IsDeleted);
 
     private void OpenRemoveRoleDialog(IdentityRole role)
     {

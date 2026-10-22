@@ -4,6 +4,7 @@ using NUnit.Framework;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.DataContext;
+using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Attributes;
 using XFramework.Integration.Security;
 using XFramework.Inventario.Api.Services;
@@ -63,7 +64,7 @@ public sealed class InventoryReportAuthorizationTests
         var endpoints = typeof(global::Inventario.Api.Features.Reports.Snapshot.InventoryReportSnapshotEndpoint)
             .Assembly.GetTypes().Where(x => x.Namespace?.StartsWith("Inventario.Api.Features.Reports.") == true)
             .SelectMany(x => x.GetMethods()).Where(x => x.Name == "Handle").ToList();
-        endpoints.Should().HaveCount(7);
+        endpoints.Should().HaveCount(8);
         foreach (var method in endpoints)
         {
             var bolt = method.GetCustomAttributes(typeof(BoltHandlerAttribute), false).Cast<BoltHandlerAttribute>().Single();
@@ -76,6 +77,38 @@ public sealed class InventoryReportAuthorizationTests
             rest.AllowAnonymous.Should().BeFalse();
             rest.RequireAuthorization.Should().BeTrue();
         }
+    }
+
+    [Test]
+    public void PlanningPage_RequiresPlanningViewOnBothTransports()
+    {
+        var method = typeof(global::Inventario.Api.Features.Planning.GetReorderSuggestionPage.GetReorderSuggestionPageEndpoint).GetMethod("Handle")!;
+        var bolt = method.GetCustomAttributes(typeof(BoltHandlerAttribute), false).Cast<BoltHandlerAttribute>().Single();
+        var rest = method.GetCustomAttributes(typeof(MapEndpointAttribute), false).Cast<MapEndpointAttribute>().Single();
+        bolt.RequiredActorCapabilities.Should().Contain("inventario.planning:view");
+        rest.RequiredActorCapabilities.Should().Contain("inventario.planning:view");
+        bolt.TenantAccessMode.Should().Be(TenantAccessMode.DelegatedTenant);
+        rest.TenantAccessMode.Should().Be(TenantAccessMode.DelegatedTenant);
+        bolt.AllowAnonymous.Should().BeFalse();
+        rest.AllowAnonymous.Should().BeFalse();
+        rest.RequireAuthorization.Should().BeTrue();
+    }
+
+    [TestCase(false, 401)]
+    [TestCase(true, 403)]
+    public async Task PlanningPage_UnauthenticatedOrTenantManagerWithoutPlanningCapability_DeniesBeforeQuery(bool authenticated, int status)
+    {
+        var tenant = Guid.NewGuid();
+        var data = new Mock<IDataContext>(MockBehavior.Strict);
+        var context = new TestTrustedInvocationContextAccessor(authenticated ? tenant : null,
+            capabilities: new HashSet<string> { XFrameworkActorCapabilities.IdentityTenantsManage });
+        var features = new Mock<ITenantModuleFeatureService>(MockBehavior.Strict);
+        var service = new InventoryPlanningService(data.Object, context, features.Object,
+            new ProductVariationService(data.Object, context, features.Object), new Mock<Microsoft.EntityFrameworkCore.DbContext>().Object);
+        var result = await global::Inventario.Api.Features.Planning.GetReorderSuggestionPage.GetReorderSuggestionPageEndpoint.Handle(
+            new() { Metadata = new() { RequestedTenantId = tenant } }, service, CancellationToken.None);
+        result.StatusCode.Should().Be(status);
+        result.IsSuccess.Should().BeFalse();
     }
 
     private static GetInventoryReportSnapshotRequest Request(Guid tenant) => new()
@@ -92,7 +125,7 @@ public sealed class InventoryReportAuthorizationTests
         features.Setup(x => x.EnsureEnabledAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(enabled ? Result.Success() : Result.Forbidden("disabled"));
         var variations = new ProductVariationService(data.Object, context, features.Object);
-        var planning = new InventoryPlanningService(data.Object, context, features.Object, variations);
+        var planning = new InventoryPlanningService(data.Object, context, features.Object, variations, new Mock<Microsoft.EntityFrameworkCore.DbContext>().Object);
         return new(data.Object, context, planning, features.Object, new Mock<Microsoft.EntityFrameworkCore.DbContext>().Object);
     }
 }

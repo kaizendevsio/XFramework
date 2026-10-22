@@ -6,6 +6,7 @@
 @inject IPortalModuleAvailability Availability
 @inject DialogService DialogService
 @inject ToastService ToastService
+@inject ILogger<StockFeatureSetup> Logger
 
 <BbAlert>
     <BbAlertTitle>Stock tracking needs to be enabled</BbAlertTitle>
@@ -37,7 +38,12 @@
         {
             var tenant = await DataContext.Query<Tenant>().IgnoreQueryFilters().NoCache()
                 .Where(x => x.Id == tenantId && !x.IsDeleted).FirstOrDefaultAsync();
-            if (tenant is null || TenantContext.SelectedTenantId != tenantId) return;
+            if (TenantContext.SelectedTenantId != tenantId) return;
+            if (tenant is null)
+            {
+                ToastService.Error("The selected tenant could not be found. Refresh and try again.");
+                return;
+            }
             var features = await DataContext.Query<TenantModuleFeature>().IgnoreQueryFilters().NoCache()
                 .Where(x => x.TenantId == tenantId).ToListAsync();
             if (TenantContext.SelectedTenantId != tenantId) return;
@@ -61,11 +67,21 @@
                 }).ToList()
             });
             if (TenantContext.SelectedTenantId != tenantId) return;
-            if (!result.IsSuccess) { ToastService.Error("Stock tracking could not be enabled. Refresh and try again."); return; }
+            if (!result.IsSuccess)
+            {
+                Logger.LogWarning("Stock enablement failed for tenant {TenantId}: {StatusCode} {Message}", tenantId, result.HttpStatusCode, result.Message);
+                ToastService.Error("Stock tracking could not be enabled. Refresh and try again.");
+                return;
+            }
             await Availability.ReloadAsync();
             await Enabled.InvokeAsync();
         }
-        catch { ToastService.Error("Stock tracking could not be enabled."); }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Stock enablement failed for tenant {TenantId}", tenantId);
+            if (TenantContext.SelectedTenantId == tenantId)
+                ToastService.Error("Stock tracking could not be enabled. Refresh and try again.");
+        }
         finally { _saving = false; }
     }
 }

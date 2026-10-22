@@ -43,7 +43,7 @@ per-feature updates or replace backend authorization. Disable a dependent first 
 disabling a prerequisite; the Portal does not cascade-disable features.
 
 POS Registers declares Identity Credentials, Wallets, and Inventario Warehousing prerequisites;
-POS Sales also declares catalog/reservation access, and POS Returns declares stock movements.
+POS Sales also declares catalog/reservation/fulfillment access, and POS Returns declares stock movements.
 These flags permit workflows but do not create credentials, wallets, warehouses, or inventory.
 
 ## Wrapper First For Business Workflows

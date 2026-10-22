@@ -61,6 +61,7 @@
 }
 
 @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "registers")
+     || ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "reporting")
      || ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "sales")
      || ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "returns"))
 {

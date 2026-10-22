@@ -22,6 +22,54 @@ namespace Inventario.Api.Tests;
 public sealed class InventoryPlanningReportingServiceTests
 {
     [Test]
+    public async Task LowStock_LegacyListsRetainThousandRowsWhilePageAndCountIncludeAllRules()
+    {
+        var tenant = Guid.NewGuid();
+        var ids = TestIds.Create();
+        var data = SeedPlanningData(tenant, ids, 3);
+        for (var i = 0; i < 1200; i++)
+            data.Set<InventoryReorderRule>().Add(new()
+            {
+                Id = Guid.NewGuid(), TenantId = tenant, ProductId = Guid.NewGuid(),
+                WarehouseId = ids.WarehouseId, IsActive = true, ReorderPoint = 5, ReorderQuantity = 10
+            });
+        var planning = CreatePlanningService(data, tenant);
+        var reporting = CreateReportingService(data, tenant, planning);
+        (await planning.GetReorderSuggestionsAsync(new())).Data.Should().HaveCount(1000);
+        (await planning.GetLowStockAsync(new())).Data.Should().HaveCount(1000);
+        (await reporting.GetLowStockAsync(new())).Data.Should().HaveCount(1000);
+        (await reporting.GetLowStockCountAsync(new())).Data.Should().Be(1201);
+        var page = await planning.GetReorderSuggestionPageAsync(new() { Skip = 1200, Take = 20 });
+        page.IsSuccess.Should().BeTrue(page.Message);
+        page.Data!.TotalCount.Should().Be(1201);
+        page.Data.TotalSuggestedQuantity.Should().Be(18017);
+        page.Data.Items.Should().ContainSingle();
+        var withoutAcme = await planning.GetReorderSuggestionPageAsync(new() { SupplierFilter = "ACME", SupplierFilterOperator = "NotContains" });
+        withoutAcme.IsSuccess.Should().BeTrue(withoutAcme.Message);
+        withoutAcme.Data!.TotalCount.Should().Be(1200, "NotContains is case insensitive and includes rules without a preferred supplier");
+        withoutAcme.Data.TotalSuggestedQuantity.Should().Be(18000);
+        (await planning.GetReorderSuggestionPageAsync(new() { Take = 1000 })).StatusCode.Should().Be(400);
+    }
+
+    [Test]
+    public async Task LowStock_AggregatesAllBalancesBeforePagingAndValidatesWarehouseTenant()
+    {
+        var tenant = Guid.NewGuid();
+        var ids = TestIds.Create();
+        var data = SeedPlanningData(tenant, ids, 0);
+        for (var i = 0; i < 5001; i++)
+            data.Set<StockBalance>().Add(new() { Id = Guid.NewGuid(), TenantId = tenant,
+                ProductId = ids.ProductId, WarehouseId = ids.WarehouseId, LocationId = ids.LocationId, AvailableQuantity = 1 });
+        data.Set<InventoryReorderRule>()[0].ReorderPoint = 5000;
+        var planning = CreatePlanningService(data, tenant);
+        (await planning.GetReorderSuggestionPageAsync(new())).Data!.TotalCount.Should().Be(0);
+        (await planning.GetReorderSuggestionPageAsync(new() { WarehouseId = Guid.NewGuid() })).StatusCode.Should().Be(404);
+        var reporting = CreateReportingService(data, tenant, planning);
+        (await reporting.GetLowStockCountAsync(new())).Data.Should().Be(0);
+        (await reporting.GetLowStockCountAsync(new() { WarehouseId = Guid.NewGuid() })).StatusCode.Should().Be(404);
+    }
+
+    [Test]
     public async Task GetReorderSuggestionsAsync_AvailableBelowReorderPoint_ReturnsSuggestedQuantity()
     {
         var tenantId = Guid.NewGuid();
@@ -286,11 +334,26 @@ public sealed class InventoryPlanningReportingServiceTests
 
     private static InventoryPlanningService CreatePlanningService(FakeDataContext dataContext, Guid tenantId)
     {
-        var invocationContext = new TestTrustedInvocationContextAccessor(tenantId);
+        var invocationContext = new TestTrustedInvocationContextAccessor(tenantId,
+            capabilities: new HashSet<string> { "inventario.planning:view" });
         var featureService = new FakeTenantModuleFeatureService();
         var productVariationService = new ProductVariationService(dataContext, invocationContext, featureService);
 
-        return new InventoryPlanningService(dataContext, invocationContext, featureService, productVariationService);
+        var db = new Mock<DbContext>();
+        db.Setup(x => x.Set<InventoryReorderRule>()).Returns(QuerySet(dataContext.Set<InventoryReorderRule>()));
+        db.Setup(x => x.Set<StockBalance>()).Returns(QuerySet(dataContext.Set<StockBalance>()));
+        return new InventoryPlanningService(dataContext, invocationContext, featureService, productVariationService, db.Object);
+    }
+
+    private static DbSet<T> QuerySet<T>(IEnumerable<T> values) where T : class
+    {
+        var query = new AsyncQuery<T>(values.AsQueryable());
+        var set = new Mock<DbSet<T>>();
+        set.As<IQueryable<T>>().Setup(x => x.Provider).Returns(query.Provider);
+        set.As<IQueryable<T>>().Setup(x => x.Expression).Returns(query.Expression);
+        set.As<IQueryable<T>>().Setup(x => x.ElementType).Returns(query.ElementType);
+        set.As<IQueryable<T>>().Setup(x => x.GetEnumerator()).Returns(() => query.GetEnumerator());
+        return set.Object;
     }
 
     private static InventoryReportingService CreateReportingService(
@@ -330,12 +393,18 @@ public sealed class InventoryPlanningReportingServiceTests
         }
     }
 
-    private sealed class AsyncQueryProvider(IQueryProvider inner) : IQueryProvider
+    private sealed class AsyncQueryProvider(IQueryProvider inner) : Microsoft.EntityFrameworkCore.Query.IAsyncQueryProvider
     {
         public IQueryable CreateQuery(Expression expression) => inner.CreateQuery(expression);
         public IQueryable<TElement> CreateQuery<TElement>(Expression expression) => new AsyncQuery<TElement>(inner.CreateQuery<TElement>(expression));
         public object? Execute(Expression expression) => inner.Execute(expression);
         public TResult Execute<TResult>(Expression expression) => inner.Execute<TResult>(expression);
+        public TResult ExecuteAsync<TResult>(Expression expression, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return (TResult)typeof(Task).GetMethod(nameof(Task.FromResult))!
+                .MakeGenericMethod(typeof(TResult).GetGenericArguments()[0]).Invoke(null, [inner.Execute(expression)])!;
+        }
     }
 
     private sealed class FakeTenantModuleFeatureService : ITenantModuleFeatureService

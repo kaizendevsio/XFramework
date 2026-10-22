@@ -1,4 +1,6 @@
+using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.AspNetCore.Http;
+using XFramework.Core.Services.FeatureGates;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.DataContext;
@@ -13,7 +15,8 @@ using XFramework.Integration.Security;
 public sealed class ReservationService(
     IDataContext dataContext,
     ITrustedInvocationContextAccessor trustedInvocationContextAccessor,
-    InventoryAllocationService allocationService)
+    InventoryAllocationService allocationService,
+    ITenantModuleFeatureService featureService)
 {
     public async Task<Result<List<Reservation>>> GetReservationsAsync(
         GetReservationsRequest request,
@@ -156,6 +159,16 @@ public sealed class ReservationService(
         FulfillReservationRequest request,
         CancellationToken ct = default)
     {
+        var tenantResult = GetCurrentTenantId(request);
+        if (!tenantResult.IsSuccess)
+            return Result<Reservation>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var featureResult = await featureService.EnsureEnabledAsync(
+            tenantResult.Data, TenantModuleFeatureKeys.Inventario,
+            TenantModuleFeatureKeys.FulfillmentSubFeature, ct);
+        if (!featureResult.IsSuccess)
+            return Result<Reservation>.Failure(featureResult.Message!, featureResult.StatusCode);
+
         var reservationResult = await GetReservation(request, request.ReservationId, ct);
         if (!reservationResult.IsSuccess)
             return reservationResult;

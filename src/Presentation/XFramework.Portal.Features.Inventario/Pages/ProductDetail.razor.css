@@ -1,0 +1,2 @@
+.movement-option { display: flex; flex-direction: column; gap: .25rem; min-width: 0; max-width: 26rem; white-space: normal; overflow-wrap: anywhere; }
+.movement-option-description { color: var(--muted-foreground); font-size: .75rem; line-height: 1.4; }

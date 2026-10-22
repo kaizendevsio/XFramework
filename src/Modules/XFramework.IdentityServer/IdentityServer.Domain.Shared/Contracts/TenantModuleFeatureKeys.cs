@@ -113,17 +113,18 @@ public static class TenantModuleFeatureKeys
         new(Inventario, StockBalancesSubFeature, "Stock Balances", "Stock-on-hand, available, allocated, and reserved balance views.", "scale", false),
         new(Inventario, MovementsSubFeature, "Movements", "Physical stock movement tracking between locations and states.", "move", false),
         new(Inventario, ReservationsSubFeature, "Reservations", "Stock reservations, holds, and allocation commitments.", "bookmark-check", false),
-        new(Inventario, FulfillmentSubFeature, "Fulfillment", "Pick, pack, ship, and order fulfillment operations.", "truck", false),
+        new(Inventario, FulfillmentSubFeature, "Fulfillment", "Ship reserved inventory and complete its allocations; no separate pick/pack workflow.", "truck", false)
+            { RequiredFeatureKeys = [InventarioReservations] },
         new(Inventario, PurchasingSubFeature, "Purchasing", "Purchase orders, receiving, and supplier replenishment workflows.", "shopping-cart", false),
-        new(Inventario, TraceabilitySubFeature, "Traceability", "Lot, serial, batch, and inventory lineage tracking.", "scan-line", false),
-        new(Inventario, PlanningSubFeature, "Planning", "Demand planning, reorder planning, and replenishment forecasting.", "calendar-clock", false),
-        new(Inventario, InventarioReportingSubFeature, "Reporting", "Inventory analytics, valuation, audit, and operational reports.", "bar-chart-3", false),
+        new(Inventario, TraceabilitySubFeature, "Traceability", "Product and variant lots/batches, expiry dates, and lot-aware stock and allocation tracking.", "scan-line", false),
+        new(Inventario, PlanningSubFeature, "Planning", "Reorder rules, low-stock review, and rule-based replenishment suggestions.", "calendar-clock", false),
+        new(Inventario, InventarioReportingSubFeature, "Reporting", "Stock positions, movement ledgers, reservation allocations, low-stock/expiry reports, and inventory snapshots.", "bar-chart-3", false),
         new(Inventario, NegativeStockSubFeature, "Negative Stock", "Controls for allowing or blocking negative stock positions.", "circle-minus", false),
         new(Pos, string.Empty, "POS", "Point of sale checkout, payment capture, returns, and receipts.", "scan-barcode"),
         new(Pos, RegistersSubFeature, "POS Registers", "Register setup, default warehouse/location, cash drawer wallet, and merchant credentials.", "store")
             { RequiredFeatureKeys = [IdentityCredentials, Wallets, InventarioWarehousing] },
         new(Pos, SalesSubFeature, "POS Sales", "Cashier checkout, receipts, inventory reservation, and sale recovery.", "receipt")
-            { RequiredFeatureKeys = [PosRegisters, InventarioCatalog, InventarioReservations] },
+            { RequiredFeatureKeys = [PosRegisters, InventarioCatalog, InventarioReservations, InventarioFulfillment] },
         new(Pos, CartsSubFeature, "POS Carts", "Suspended cashier carts for queue recovery and later checkout.", "shopping-cart"),
         new(Pos, ReturnsSubFeature, "POS Returns", "Partial and full returns with inventory restock and Wallets refunds.", "undo-2")
             { RequiredFeatureKeys = [PosSales, InventarioMovements] },

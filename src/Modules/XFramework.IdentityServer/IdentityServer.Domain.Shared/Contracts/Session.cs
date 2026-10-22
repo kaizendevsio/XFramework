@@ -10,6 +10,7 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/sessions",
     RequireAuthorization = true,
+    TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     AuthorizationFeature = "identity.sessions"
 )]
 public partial class Session : BaseModel

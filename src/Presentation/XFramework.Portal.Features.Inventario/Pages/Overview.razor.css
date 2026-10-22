@@ -4,10 +4,10 @@
 .overview-filter ::deep > div { max-width: 100%; }
 .overview-filter ::deep input { width: 100%; min-width: 0; }
 .overview-asof { font-size: .875rem; color: var(--muted-foreground); }
-.overview-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; padding-block: 1rem; border-block: 1px solid var(--border); }
-.overview-metrics > div { display: flex; flex-direction: column; gap: .5rem; min-width: 0; }
-.overview-metrics strong { font-size: 1.5rem; overflow-wrap: anywhere; }
-.overview-metrics span { color: var(--muted-foreground); font-size: .875rem; }
+.overview-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1rem; padding-block: 1rem; border-block: 1px solid var(--border); }
+.overview-metrics ::deep .overview-metric { display: flex; flex-direction: column; align-items: start; gap: .5rem; min-width: 0; height: auto; padding: .5rem; text-align: left; white-space: normal; }
+.overview-metrics ::deep strong { font-size: 1.5rem; overflow-wrap: anywhere; max-width: 100%; }
+.overview-metrics ::deep span { color: var(--muted-foreground); font-size: .875rem; }
 .overview-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; }
 .overview-charts section { min-width: 0; }
 .overview-section-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }

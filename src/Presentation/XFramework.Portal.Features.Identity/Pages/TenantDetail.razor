@@ -873,7 +873,7 @@ else
                         definition.ModuleKey,
                         definition.SubFeatureKey,
                         feature?.DisplayName ?? definition.DisplayName,
-                        feature?.Description ?? definition.Description,
+                        GetModuleFeatureDescription(definition, feature?.Description),
                         definition.IconName,
                         feature?.IsEnabled ?? false,
                         resolved.IsBlocked,
@@ -1272,6 +1272,19 @@ else
     private static string GetStatusText(short? status) => status switch { 0 => "Pending", 1 => "Active", 2 => "Suspended", 3 => "Inactive", _ => "Unknown" };
     private static string GetStatusKey(short? status) => status switch { 0 => "pending", 1 => "active", 2 => "suspended", 3 => "inactive", _ => "inactive" };
 
+    private static string GetModuleFeatureDescription(TenantModuleFeatureDefinition definition, string? storedDescription)
+    {
+        var legacyBuiltIn = (definition.Key, storedDescription) switch
+        {
+            (TenantModuleFeatureKeys.InventarioFulfillment, "Pick, pack, ship, and order fulfillment operations.") or
+            (TenantModuleFeatureKeys.InventarioTraceability, "Lot, serial, batch, and inventory lineage tracking.") or
+            (TenantModuleFeatureKeys.InventarioPlanning, "Demand planning, reorder planning, and replenishment forecasting.") or
+            (TenantModuleFeatureKeys.InventarioReporting, "Inventory analytics, valuation, audit, and operational reports.") => true,
+            _ => false
+        };
+        return legacyBuiltIn || storedDescription is null ? definition.Description : storedDescription;
+    }
+
     private static string GetModuleFeatureCoverageText(ModuleFeatureRow row) =>
         row.Key switch
         {
@@ -1286,15 +1299,15 @@ else
             TenantModuleFeatureKeys.InventarioStockBalances or
             TenantModuleFeatureKeys.InventarioMovements or
             TenantModuleFeatureKeys.InventarioReservations or
-            TenantModuleFeatureKeys.CommunicationsChat or
-            TenantModuleFeatureKeys.Community or
-            TenantModuleFeatureKeys.Notifications => "API gated",
-            TenantModuleFeatureKeys.InventarioFulfillment or
             TenantModuleFeatureKeys.InventarioPurchasing or
             TenantModuleFeatureKeys.InventarioTraceability or
             TenantModuleFeatureKeys.InventarioPlanning or
             TenantModuleFeatureKeys.InventarioReporting or
             TenantModuleFeatureKeys.InventarioNegativeStock or
+            TenantModuleFeatureKeys.InventarioFulfillment or
+            TenantModuleFeatureKeys.CommunicationsChat or
+            TenantModuleFeatureKeys.Community or
+            TenantModuleFeatureKeys.Notifications => "API gated",
             TenantModuleFeatureKeys.CommunicationsAudioVideo => "Planned flag",
             TenantModuleFeatureKeys.Payments => "No API yet",
             _ => "Stored"
@@ -1313,15 +1326,15 @@ else
             TenantModuleFeatureKeys.InventarioStockBalances or
             TenantModuleFeatureKeys.InventarioMovements or
             TenantModuleFeatureKeys.InventarioReservations or
-            TenantModuleFeatureKeys.CommunicationsChat or
-            TenantModuleFeatureKeys.Community or
-            TenantModuleFeatureKeys.Notifications => "active",
-            TenantModuleFeatureKeys.InventarioFulfillment or
             TenantModuleFeatureKeys.InventarioPurchasing or
             TenantModuleFeatureKeys.InventarioTraceability or
             TenantModuleFeatureKeys.InventarioPlanning or
             TenantModuleFeatureKeys.InventarioReporting or
             TenantModuleFeatureKeys.InventarioNegativeStock or
+            TenantModuleFeatureKeys.InventarioFulfillment or
+            TenantModuleFeatureKeys.CommunicationsChat or
+            TenantModuleFeatureKeys.Community or
+            TenantModuleFeatureKeys.Notifications => "active",
             TenantModuleFeatureKeys.CommunicationsAudioVideo => "pending",
             TenantModuleFeatureKeys.Payments => "inactive",
             _ => "inactive"

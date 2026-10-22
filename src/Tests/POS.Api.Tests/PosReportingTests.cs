@@ -99,6 +99,47 @@ public sealed class PosReportingTests
         rest.RequiredCrossTenantActorCapabilities.Should().Contain(XFrameworkActorCapabilities.IdentityTenantsManage);
     }
 
+    [TestCase(false, true, false, true, 400)]
+    [TestCase(false, true, false, false, 403)]
+    [TestCase(true, true, true, true, 400)]
+    [TestCase(true, true, true, false, 403)]
+    [TestCase(true, true, false, true, 403)]
+    [TestCase(true, false, true, true, 403)]
+    [TestCase(false, false, true, true, 403)]
+    public async Task Service_ReportingAccess_RequiresPermissionDelegationAndSelectedTenantFeature(
+        bool delegated, bool canReport, bool canManageTenants, bool targetFeatureEnabled, int expectedStatus)
+    {
+        var homeTenant = Guid.NewGuid();
+        var targetTenant = delegated ? Guid.NewGuid() : homeTenant;
+        var capabilities = new HashSet<string>();
+        if (canReport) capabilities.Add(PosAuthorizationCapabilities.ReportingView);
+        if (canManageTenants) capabilities.Add(XFrameworkActorCapabilities.IdentityTenantsManage);
+        var actor = new TrustedActorIdentity(Guid.NewGuid(), Guid.NewGuid(), homeTenant, Guid.NewGuid(),
+            new HashSet<string> { "SuperAdmin" }, capabilities, "tests", DateTimeOffset.UtcNow.AddMinutes(10));
+        var accessor = new Accessor { Current = new(actor, null, targetTenant, null, Guid.NewGuid()) };
+        var features = new Features(targetFeatureEnabled);
+        await using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().Options,
+            new HttpContextAccessor(), new ConfigurationBuilder().Build(), new TestEffectiveTenantContextAccessor(targetTenant));
+        var service = new PosReportingService(db, new PosRequestContextResolver(accessor), accessor, features,
+            NullLogger<PosReportingService>.Instance);
+        // Invalid paging stops authorized requests after the feature gate, before any database access.
+        var request = Request() with { PageSize = int.MaxValue };
+        request.Metadata.RequestedTenantId = targetTenant;
+
+        var result = await service.GetSalesReportAsync(request, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(expectedStatus);
+        result.Data.Should().BeNull();
+        var reachesFeatureGate = canReport && (!delegated || canManageTenants);
+        features.Calls.Should().Be(reachesFeatureGate ? 1 : 0);
+        if (reachesFeatureGate)
+        {
+            features.LastTenantId.Should().Be(targetTenant);
+            if (!targetFeatureEnabled) result.Message.Should().Be("Disabled");
+        }
+    }
+
     private static GetPosSalesReportRequest Request() => new()
     {
         FromUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
@@ -108,9 +149,11 @@ public sealed class PosReportingTests
     private sealed class Features(bool enabled) : ITenantModuleFeatureService
     {
         public int Calls { get; private set; }
+        public Guid? LastTenantId { get; private set; }
         public Task<Result> EnsureEnabledAsync(Guid tenantId, string moduleKey, string? subFeatureKey = null, CancellationToken ct = default)
         {
             Calls++;
+            LastTenantId = tenantId;
             moduleKey.Should().Be("pos"); subFeatureKey.Should().Be("reporting");
             return Task.FromResult(enabled ? Result.Success() : Result.Forbidden("Disabled"));
         }

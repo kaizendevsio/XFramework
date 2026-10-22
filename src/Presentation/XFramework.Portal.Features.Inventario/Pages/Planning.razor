@@ -1,6 +1,8 @@
 @page "/inventario/planning"
 @using XFramework.Domain.Shared.DataContext
 @using XFramework.Inventario.Domain.Shared.Contracts.Requests.Planning
+@using XFramework.Inventario.Domain.Shared.Contracts.Responses.Reports
+@using DataGridRequest = BlazorBlueprint.Primitives.DataGrid.DataGridRequest
 @implements IDisposable
 
 <PageTitle>Inventario Planning - Portal</PageTitle>
@@ -17,6 +19,11 @@ else if (!_planningEnabled)
 {
     <ModuleUnavailable ModuleName="Inventario Planning" />
 }
+else if (_loadError is not null)
+{
+    <BbAlert role="alert">@_loadError</BbAlert>
+    <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">Retry planning</BbButton>
+}
 else
 {
     <FadeInContent>
@@ -24,7 +31,7 @@ else
             <div class="xf-page-header">
                 <div>
                     <BbTypographyH3>Replenishment Planning</BbTypographyH3>
-                    <BbTypographyMuted>Maintain reorder rules and review suggested replenishment quantities.</BbTypographyMuted>
+                    <BbTypographyMuted>@(_warehouseId is null ? "All warehouses" : GetWarehouseName(_warehouseId))</BbTypographyMuted>
                 </div>
                 <div class="xf-page-actions">
                     <BbButton OnClick="@OpenRuleDialog">
@@ -43,7 +50,7 @@ else
                     <BbCardContent>
                         <div class="space-y-1 pt-4">
                             <BbTypographyMuted>Active Rules</BbTypographyMuted>
-                            <BbTypographyH3>@_rules.Count(x => x.IsActive)</BbTypographyH3>
+                            <BbTypographyH3>@_activeRuleCount</BbTypographyH3>
                         </div>
                     </BbCardContent>
                 </BbCard>
@@ -51,7 +58,7 @@ else
                     <BbCardContent>
                         <div class="space-y-1 pt-4">
                             <BbTypographyMuted>Low Stock</BbTypographyMuted>
-                            <BbTypographyH3>@_lowStock.Count</BbTypographyH3>
+                            <BbTypographyH3 title="Low-stock positions matching active reorder rules">@(_lowStockCount?.ToString("N0") ?? "Unavailable")</BbTypographyH3>
                         </div>
                     </BbCardContent>
                 </BbCard>
@@ -59,7 +66,7 @@ else
                     <BbCardContent>
                         <div class="space-y-1 pt-4">
                             <BbTypographyMuted>Suggested Quantity</BbTypographyMuted>
-                            <BbTypographyH3>@_suggestions.Sum(x => x.SuggestedQuantity).ToString("N2")</BbTypographyH3>
+                            <BbTypographyH3>@(_suggestedQuantity?.ToString("N2") ?? "Unavailable")</BbTypographyH3>
                         </div>
                     </BbCardContent>
                 </BbCard>
@@ -68,20 +75,22 @@ else
             <BbTabs DefaultValue="view0" Class="inv-workspace-tabs"><BbTabsList><BbTabsTrigger Value="view0">Suggestions</BbTabsTrigger><BbTabsTrigger Value="view1">Rules</BbTabsTrigger></BbTabsList><BbTabsContent Value="view0" ForceMount="true"><BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Reorder Suggestions</BbCardTitle>
-                    <BbCardDescription>@_suggestions.Count suggestion(s). When available stock reaches the reorder point, order the greater of configured reorder quantity or the gap to maximum stock (or point + reorder quantity when no maximum is set). Review supplier and quantities in a draft PO.</BbCardDescription>
+                    <BbCardDescription>@(_lowStockCount?.ToString("N0") ?? "Unavailable") low-stock positions matching active reorder rules</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <BbDataGrid Items="@_suggestions" ShowPagination="true" InitialPageSize="20">
+                    @if (_suggestionsError is not null) { <BbAlert role="alert">@_suggestionsError</BbAlert> }
+                    <BbDataGrid @key="_revision" TData="ReorderSuggestionRow" ItemsProvider="LoadSuggestions" ShowPagination="true" InitialPageSize="20" PageSizes="@(new[] { 20, 50, 100 })">
                         <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Sortable="true" Filterable="true" />
-                            <InventoryTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></InventoryTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.WarehouseName)" Title="Warehouse" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.LocationName)" Title="Location" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Format="0.####" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Reorder Point" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.SuggestedQuantity)" Title="Suggested Qty" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ProductVariationName)" Title="Variant" />
+                            <BbDataGridPropertyColumn Property="@(x => x.WarehouseName)" Title="Warehouse" />
+                            <BbDataGridPropertyColumn Property="@(x => x.LocationName)" Title="Location" />
+                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Format="0.####" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Reorder Point" />
+                            <BbDataGridPropertyColumn Property="@(x => x.SuggestedQuantity)" Title="Suggested Qty" />
                             <BbDataGridPropertyColumn Property="@(x => x.PreferredSupplier)" Title="Preferred Supplier" Filterable="true" /><BbDataGridTemplateColumn Title="Next step"><ChildContent Context="item"><BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo($"/inventario/purchase-orders?productId={item.ProductId}&variantId={item.ProductVariationId}&preferredSupplier={Uri.EscapeDataString(item.PreferredSupplier ?? "")}&quantity={item.SuggestedQuantity.ToString(CultureInfo.InvariantCulture)}&scope={Uri.EscapeDataString($"Replenish {item.WarehouseName} / {item.LocationName}. Preferred supplier: {item.PreferredSupplier}")}"))">Prepare draft PO</BbButton></ChildContent></BbDataGridTemplateColumn>
                         </Columns>
+                        <EmptyTemplate>@if (_suggestionsError is null) { <span>No low-stock positions in this scope.</span> }</EmptyTemplate>
                     </BbDataGrid>
                 </BbCardContent>
             </BbCard></BbTabsContent>
@@ -207,6 +216,7 @@ else
 </BbDialog>
 
 @code {
+    [SupplyParameterFromQuery(Name = "warehouseId")] public string? WarehouseId { get; set; }
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
@@ -219,10 +229,14 @@ else
     private List<ProductVariation> _variants = [];
     private List<Warehouse> _warehouses = [];
     private List<InventoryLocation> _locations = [];
-    private List<StockBalance> _balances = [];
     private List<InventoryReorderRule> _rules = [];
-    private List<PlanningRow> _lowStock = [];
-    private List<PlanningRow> _suggestions = [];
+    private Guid? _tenantId, _warehouseId;
+    private int _activeRuleCount, _revision;
+    private int? _lowStockCount;
+    private decimal? _suggestedQuantity;
+    private string? _loadError, _suggestionsError, _loadedWarehouseParameter;
+    private bool _parametersLoaded, _disposed;
+    private CancellationTokenSource _load = new();
     private bool _loading = true;
     private bool _hasTenant;
     private bool _planningEnabled;
@@ -235,12 +249,33 @@ else
         ModuleNavigation.OnChanged += OnTenantChanged;
     }
 
-    protected override async Task OnInitializedAsync() => await Reload();
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_parametersLoaded && _loadedWarehouseParameter == WarehouseId) return;
+        _parametersLoaded = true;
+        _loadedWarehouseParameter = WarehouseId;
+        await Reload();
+    }
 
     private void OnTenantChanged() => _ = InvokeAsync(Reload);
 
     private async Task Reload()
     {
+        if (_disposed) return;
+        _load.Cancel();
+        _load.Dispose();
+        _load = new();
+        var ct = _load.Token;
+        var revision = ++_revision;
+        var tenantId = TenantFilter.SelectedTenantId;
+        _tenantId = tenantId;
+        _warehouseId = null;
+        _loadError = _suggestionsError = null;
+        _lowStockCount = null;
+        _suggestedQuantity = null;
+        _activeRuleCount = 0;
+        _ruleDialogOpen = false;
+        ResetForm();
         _loading = true;
         try
         {
@@ -251,67 +286,86 @@ else
             _variants = [];
             _warehouses = [];
             _locations = [];
-            _balances = [];
             _rules = [];
-            _lowStock = [];
-            _suggestions = [];
 
             if (!_hasTenant || !_planningEnabled) return;
 
-            var tenantId = TenantFilter.SelectedTenantId!.Value;
-            _variants = await DataContext.Query<ProductVariation>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
-            _products = await DataContext.Query<Product>().IgnoreQueryFilters().NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.Name).Take(500).ToListAsync();
-            _warehouses = await DataContext.Query<Warehouse>().IgnoreQueryFilters().NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.Code).Take(500).ToListAsync();
-            _locations = await DataContext.Query<InventoryLocation>().IgnoreQueryFilters().NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.Code).Take(500).ToListAsync();
-            _balances = await DataContext.Query<StockBalance>().IgnoreQueryFilters().NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
-            _rules = await DataContext.Query<InventoryReorderRule>().IgnoreQueryFilters().NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.CreatedAt).Take(500).ToListAsync();
-
-            BuildSuggestions();
+            Warehouse? selectedWarehouse = null;
+            if (WarehouseId is not null)
+            {
+                if (!Guid.TryParse(WarehouseId, out var warehouseId) || warehouseId == Guid.Empty)
+                    throw new InvalidOperationException("Invalid warehouse scope.");
+                selectedWarehouse = await DataContext.Query<Warehouse>().NoCache()
+                    .Where(x => x.Id == warehouseId && x.TenantId == tenantId && !x.IsDeleted).FirstOrDefaultAsync(ct);
+                if (selectedWarehouse is null) throw new InvalidOperationException("Warehouse is unavailable in the selected tenant.");
+            }
+            var scope = selectedWarehouse?.Id;
+            var variants = await DataContext.Query<ProductVariation>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync(ct);
+            var products = await DataContext.Query<Product>().NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.Name).Take(500).ToListAsync(ct);
+            var warehouses = await DataContext.Query<Warehouse>().NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.Code).Take(500).ToListAsync(ct);
+            if (selectedWarehouse is not null && warehouses.All(x => x.Id != selectedWarehouse.Id)) warehouses.Add(selectedWarehouse);
+            var locations = await DataContext.Query<InventoryLocation>().NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted && (scope == null || x.WarehouseId == scope)).OrderBy(x => x.Code).Take(500).ToListAsync(ct);
+            var rulesQuery = DataContext.Query<InventoryReorderRule>().NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted && (scope == null || x.WarehouseId == null || x.WarehouseId == scope));
+            var activeRules = await rulesQuery.Where(x => x.IsActive).CountAsync(ct);
+            var rules = await rulesQuery.OrderBy(x => x.CreatedAt).Take(500).ToListAsync(ct);
+            if (!IsCurrent(revision, tenantId) || ct.IsCancellationRequested) return;
+            _warehouseId = scope;
+            _variants = variants; _products = products; _warehouses = warehouses; _locations = locations; _rules = rules;
+            _activeRuleCount = activeRules;
             ApplyDefaults();
         }
-        catch
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
         {
-            ToastService.Show("Could not load planning.");
+            if (IsCurrent(revision, tenantId)) _loadError = ex is InvalidOperationException ? ex.Message : "Could not load planning. Try again.";
         }
         finally
         {
-            _loading = false;
-            StateHasChanged();
+            if (IsCurrent(revision, tenantId)) { _loading = false; StateHasChanged(); }
         }
     }
 
-    private void BuildSuggestions()
-    {
-        _lowStock = [];
-        _suggestions = [];
-        foreach (var rule in _rules.Where(x => x.IsActive))
-        {
-            var available = _balances
-                .Where(x =>
-                    x.ProductId == rule.ProductId && x.ProductVariationId == rule.ProductVariationId &&
-                    (rule.WarehouseId is null || x.WarehouseId == rule.WarehouseId) &&
-                    (rule.LocationId is null || x.LocationId == rule.LocationId))
-                .Sum(x => x.AvailableQuantity);
-            var reorderPoint = rule.ReorderPoint > 0 ? rule.ReorderPoint : rule.MinimumQuantity;
-            if (available > reorderPoint) continue;
+    private bool IsCurrent(int revision, Guid? tenant) => !_disposed && revision == _revision && tenant == TenantFilter.SelectedTenantId;
 
-            var row = new PlanningRow(
-                rule.ProductId, rule.ProductVariationId,
-                GetProductName(rule.ProductId),
-                GetWarehouseName(rule.WarehouseId),
-                GetLocationName(rule.LocationId),
-                available,
-                reorderPoint,
-                Math.Max(rule.ReorderQuantity, Math.Max(0, (rule.MaximumQuantity ?? reorderPoint + rule.ReorderQuantity) - available)),
-                rule.PreferredSupplier);
-            _lowStock.Add(row);
-            _suggestions.Add(row);
+    private async ValueTask<BlazorBlueprint.Primitives.DataGrid.DataGridResult<ReorderSuggestionRow>> LoadSuggestions(DataGridRequest request)
+    {
+        var revision = _revision;
+        var tenant = _tenantId;
+        if (_disposed || _loading || !_planningEnabled || tenant is null || _loadError is not null)
+            return new() { Items = [], TotalItemCount = 0 };
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(request.CancellationToken, _load.Token);
+        try
+        {
+            var filter = request.Filters?.GetValueOrDefault(nameof(ReorderSuggestionRow.PreferredSupplier));
+            var result = await Inventario.GetReorderSuggestionPage(new GetReorderSuggestionPageRequest
+            {
+                Metadata = new() { RequestedTenantId = tenant }, WarehouseId = _warehouseId,
+                Skip = Math.Max(0, request.StartIndex), Take = Math.Clamp(request.Count ?? 20, 1, 100),
+                SupplierFilter = Convert.ToString(filter?.Value), SupplierFilterOperator = filter?.Operator.ToString()
+            }, linked.Token);
+            if (!IsCurrent(revision, tenant) || linked.IsCancellationRequested) return new() { Items = [], TotalItemCount = 0 };
+            if (!result.IsSuccess || result.Response is null) throw new InvalidOperationException();
+            _suggestionsError = null;
+            _lowStockCount = result.Response.TotalCount;
+            _suggestedQuantity = result.Response.TotalSuggestedQuantity;
+            await InvokeAsync(StateHasChanged);
+            return new() { Items = result.Response.Items, TotalItemCount = result.Response.TotalCount };
         }
+        catch (OperationCanceledException) { }
+        catch
+        {
+            if (IsCurrent(revision, tenant))
+            {
+                _lowStockCount = null; _suggestedQuantity = null;
+                _suggestionsError = "Could not load suggestions. Refresh planning to retry.";
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        return new() { Items = [], TotalItemCount = 0 };
     }
 
     private async Task CreateRule()
@@ -383,8 +437,11 @@ else
         return _locations.Where(x => x.WarehouseId == warehouseId);
     }
 
-    private void ApplyDefaults() =>
+    private void ApplyDefaults()
+    {
         _form.ProductId = _form.ProductId.Length > 0 ? _form.ProductId : _products.FirstOrDefault()?.Id.ToString() ?? "";
+        _form.WarehouseId = _warehouseId?.ToString() ?? "";
+    }
 
     private void ResetForm()
     {
@@ -436,19 +493,12 @@ else
 
     public void Dispose()
     {
+        _disposed = true;
+        _load.Cancel();
+        _load.Dispose();
         TenantFilter.OnChanged -= OnTenantChanged;
         ModuleNavigation.OnChanged -= OnTenantChanged;
     }
-
-    private sealed record PlanningRow(
-        Guid ProductId, Guid? ProductVariationId,
-        string ProductName,
-        string WarehouseName,
-        string LocationName,
-        decimal AvailableQuantity,
-        decimal ReorderPoint,
-        decimal SuggestedQuantity,
-        string? PreferredSupplier);
 
     private sealed class RuleForm
     {

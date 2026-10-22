@@ -228,6 +228,69 @@ public sealed class StockPostingServiceTests
         dataContext.SaveCount.Should().Be(1);
     }
 
+    [TestCase(false, false, 409)]
+    [TestCase(true, false, 403)]
+    [TestCase(false, true, 409)]
+    [TestCase(true, true, 200)]
+    public async Task PostAsync_TransferBeyondAvailableStock_RequiresOptInAndTenantFeature(
+        bool allowNegativeStock, bool negativeStockEnabled, int expectedStatus)
+    {
+        var tenantId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var warehouseId = Guid.NewGuid();
+        var locationId = Guid.NewGuid();
+        var destinationId = Guid.NewGuid();
+        var dataContext = SeedStockData(tenantId, productId, warehouseId, locationId);
+        dataContext.Set<Product>().Single().StockQuantity = 3;
+        dataContext.Set<InventoryLocation>().Add(new InventoryLocation
+        {
+            Id = destinationId, TenantId = tenantId, WarehouseId = warehouseId,
+            Code = "BIN-02", Name = "Bin 02", IsEnabled = true
+        });
+        var source = new StockBalance
+        {
+            Id = Guid.NewGuid(), TenantId = tenantId, ProductId = productId,
+            WarehouseId = warehouseId, LocationId = locationId,
+            OnHandQuantity = 3, AvailableQuantity = 3, IsEnabled = true
+        };
+        var destination = new StockBalance
+        {
+            Id = Guid.NewGuid(), TenantId = tenantId, ProductId = productId,
+            WarehouseId = warehouseId, LocationId = destinationId, IsEnabled = true
+        };
+        dataContext.Set<StockBalance>().AddRange([source, destination]);
+        var service = CreateService(dataContext, tenantId, negativeStockEnabled);
+
+        var result = await service.PostAsync(new PostStockMovementRequest
+        {
+            ProductId = productId, WarehouseId = warehouseId, LocationId = locationId,
+            DestinationWarehouseId = warehouseId, DestinationLocationId = destinationId,
+            MovementType = InventoryMovementType.Transfer, Quantity = 5,
+            AllowNegativeStock = allowNegativeStock
+        });
+
+        result.StatusCode.Should().Be(expectedStatus);
+        result.IsSuccess.Should().Be(expectedStatus == 200);
+        dataContext.Set<Product>().Single().StockQuantity.Should().Be(3);
+        if (result.IsSuccess)
+        {
+            source.OnHandQuantity.Should().Be(-2);
+            source.AvailableQuantity.Should().Be(-2);
+            destination.OnHandQuantity.Should().Be(5);
+            dataContext.Added.OfType<InventoryMovement>().Should().HaveCount(2);
+            dataContext.Added.OfType<InventoryMovement>().Sum(x => x.QuantityDelta).Should().Be(0);
+            dataContext.SaveCount.Should().Be(1);
+        }
+        else
+        {
+            source.OnHandQuantity.Should().Be(3);
+            destination.OnHandQuantity.Should().Be(0);
+            dataContext.Added.Should().BeEmpty();
+            dataContext.Updated.Should().BeEmpty();
+            dataContext.SaveCount.Should().Be(0);
+        }
+    }
+
     [Test]
     public async Task PostAsync_SameProductLocationWithDifferentLots_CreatesSeparateBalances()
     {

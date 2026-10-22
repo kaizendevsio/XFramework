@@ -526,12 +526,14 @@
 
         return segments[0].ToLowerInvariant() switch
         {
+            "audit" => "audit",
             "identity" => "identity",
             "inventario" => "inventario",
             "pos" => "pos",
             "communications" => "communications",
             "community" => "community",
             "attendance" => "attendance",
+            "storage" => "storage",
             "finance" => "finance",
             "admin" => "system",
             _ => null

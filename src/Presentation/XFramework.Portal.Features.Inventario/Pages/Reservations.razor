@@ -95,7 +95,9 @@ else
                                         @if (item.Status == ReservationStatus.Active)
                                         {
                                             <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => ReleaseReservation(item.Id))">Release</BbButton>
-                                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => FulfillReservation(item.Id))">Fulfill</BbButton>
+                                            <span title="@(FulfillmentEnabled ? null : FulfillmentUnavailableReason)">
+                                                <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" Disabled="@(!FulfillmentEnabled)" OnClick="@(() => FulfillReservation(item.Id))">Fulfill</BbButton>
+                                            </span>
                                             <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Destructive" OnClick="@(() => CancelReservation(item.Id))">Cancel</BbButton>
                                         }
                                     </div>
@@ -255,6 +257,8 @@ else
     private bool _hasTenant;
     private bool _reservationsEnabled;
     private bool _traceabilityEnabled;
+    private bool FulfillmentEnabled => ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "fulfillment");
+    private const string FulfillmentUnavailableReason = "Fulfillment is disabled for this tenant. Reservations can still be released or expired.";
     private bool _reserving;
     private bool _expiring;
     private bool _reservationDialogOpen;
@@ -463,7 +467,14 @@ else
             }),
             "Reservation released.");
 
-    private async Task FulfillReservation(Guid reservationId) =>
+    private async Task FulfillReservation(Guid reservationId)
+    {
+        if (!FulfillmentEnabled)
+        {
+            ToastService.Warning(FulfillmentUnavailableReason);
+            return;
+        }
+
         await RunReservationAction(
             () => Inventario.FulfillReservation(new FulfillReservationRequest
             {
@@ -471,6 +482,7 @@ else
                 ReservationId = reservationId
             }),
             "Reservation fulfilled.");
+    }
 
     private async Task CancelReservation(Guid reservationId) =>
         await RunReservationAction(

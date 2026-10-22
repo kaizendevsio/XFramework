@@ -1,3 +1,4 @@
+using IdentityServer.Domain.Shared.Contracts;
 using Inventario.Integration.Drivers;
 using Microsoft.EntityFrameworkCore;
 using POS.Domain.Shared.Contracts;
@@ -7,6 +8,7 @@ using POS.Domain.Shared.Enums;
 using Wallets.Domain.Shared.Contracts.Requests;
 using Wallets.Integration.Drivers;
 using XFramework.Core.Patterns;
+using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Enums;
@@ -22,7 +24,8 @@ public sealed class PosSalesService(
     IPosRequestContextResolver contextResolver,
     ILogger<PosSalesService> logger,
     PosFinanceSettings financeSettings,
-    PosCheckoutSettingsService checkoutSettings)
+    PosCheckoutSettingsService checkoutSettings,
+    ITenantModuleFeatureService featureService)
 {
     public async Task<Result<PosSaleReceiptResponse>> CheckoutAsync(
         CheckoutPosSaleRequest request,
@@ -175,6 +178,10 @@ public sealed class PosSalesService(
         if (sale.Status == PosSaleStatus.Cancelled)
             return Result<PosSaleReceiptResponse>.Success(PosServiceHelpers.ToSaleReceiptResponse(sale), "POS sale is cancelled");
 
+        var fulfillmentFeature = await EnsureFulfillmentEnabledAsync(sale.TenantId, ct);
+        if (!fulfillmentFeature.IsSuccess)
+            return Result<PosSaleReceiptResponse>.Failure(fulfillmentFeature.Message!, fulfillmentFeature.StatusCode);
+
         if (sale.Status is PosSaleStatus.Draft or PosSaleStatus.ReservingInventory or PosSaleStatus.InventoryReservationFailed)
         {
             var reservationResult = await ReserveSaleInventoryAsync(sale, metadata, ct);
@@ -190,10 +197,20 @@ public sealed class PosSalesService(
 
         if (sale.Status is PosSaleStatus.InventoryReserved or PosSaleStatus.PaymentPending)
         {
-            sale.Status = PosSaleStatus.PaymentPending;
             var payment = sale.Payments
                 .OrderBy(item => item.CreatedAt)
                 .FirstOrDefault();
+
+            // Check before creating Pending: a rejected, never-attempted payment must remain cancellable.
+            // Existing Pending payments may already have charged and must retain their recovery state.
+            if (payment is null || payment.Status is not (PosPaymentStatus.Failed or PosPaymentStatus.Captured))
+            {
+                fulfillmentFeature = await EnsureFulfillmentEnabledAsync(sale.TenantId, ct);
+                if (!fulfillmentFeature.IsSuccess)
+                    return Result<PosSaleReceiptResponse>.Failure(fulfillmentFeature.Message!, fulfillmentFeature.StatusCode);
+            }
+
+            sale.Status = PosSaleStatus.PaymentPending;
             if (payment is null)
             {
                 if (request is null)
@@ -421,6 +438,10 @@ public sealed class PosSalesService(
         if (sale.Status != PosSaleStatus.InventoryFulfillmentFailed)
             return Result<PosSaleReceiptResponse>.Conflict("Only sales with failed inventory fulfillment can be retried");
 
+        var fulfillmentFeature = await EnsureFulfillmentEnabledAsync(sale.TenantId, ct);
+        if (!fulfillmentFeature.IsSuccess)
+            return Result<PosSaleReceiptResponse>.Failure(fulfillmentFeature.Message!, fulfillmentFeature.StatusCode);
+
         var fulfillmentResult = await FulfillReservationsAsync(sale, contextResult.Data.Metadata);
         if (!fulfillmentResult.IsSuccess)
         {
@@ -466,6 +487,10 @@ public sealed class PosSalesService(
             ct: ct,
             replayed: true);
     }
+
+    private Task<Result> EnsureFulfillmentEnabledAsync(Guid tenantId, CancellationToken ct) =>
+        featureService.EnsureEnabledAsync(tenantId, TenantModuleFeatureKeys.Inventario,
+            TenantModuleFeatureKeys.FulfillmentSubFeature, ct);
 
     private async Task<Result<List<PosSaleLine>>> BuildSaleLinesAsync(
         PosSale sale,
