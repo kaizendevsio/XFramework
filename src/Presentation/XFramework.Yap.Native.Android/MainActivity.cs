@@ -117,8 +117,15 @@ public sealed class MainActivity : Activity
     {
         base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
         permission?.TrySetResult(grantResults.Length > 0 && grantResults[0] == Permission.Granted);
+        permission = null;
     }
-    protected override void OnPause() { base.OnPause(); _ = coordinator.HandleAsync("{\"action\":\"stop\"}"); }
+    protected override void OnResume() { base.OnResume(); if (coordinator is not null) _ = coordinator.HandleAsync("{\"action\":\"foreground\"}"); }
+    protected override void OnPause()
+    {
+        base.OnPause();
+        // A system camera permission dialog pauses the activity too.
+        if (permission is null) _ = coordinator.HandleAsync("{\"action\":\"background\"}");
+    }
     protected override void OnDestroy() { _ = coordinator.DisposeAsync(); web.Destroy(); base.OnDestroy(); }
     private sealed class Client(MainActivity owner) : WebViewClient
     {

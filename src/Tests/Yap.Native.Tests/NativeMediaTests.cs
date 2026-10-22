@@ -90,6 +90,51 @@ public sealed class NativeMediaTests
         await runA.DisposeAsync(); await runB.DisposeAsync();
         Assert.That(a.Disposed && b.Disposed, Is.True);
     }
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task Host_BackgroundedDuringInvitation_RemainsPairableAndCapturesOnlyAfterResume(bool connectWhileBackgrounded)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var invitation = new TaskCompletionSource<PairingInvitation>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var waiting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var video = new FakeVideo();
+        var directory = Path.Combine(Path.GetTempPath(), "yap-native-test-" + Guid.NewGuid().ToString("N"));
+        await using var coordinator = new NativeCoordinator(() => Task.FromResult<INativeVideo>(video), directory);
+        coordinator.Message += json =>
+        {
+            using var parsed = JsonDocument.Parse(json);
+            var root = parsed.RootElement;
+            if (root.GetProperty("kind").GetString() == "invitation")
+                invitation.TrySetResult(PairingInvitation.Parse(root.GetProperty("invitation").GetString()!));
+            if (root.TryGetProperty("text", out var text))
+            {
+                if (text.GetString()?.StartsWith("Peer connected.") == true) waiting.TrySetResult();
+                if (text.GetString()?.StartsWith("Native video running") == true) started.TrySetResult();
+            }
+        };
+        try
+        {
+            await coordinator.HandleAsync("{\"action\":\"host\",\"address\":\"127.0.0.1\"}");
+            await coordinator.HandleAsync("{\"action\":\"background\"}");
+            if (!connectWhileBackgrounded) await coordinator.HandleAsync("{\"action\":\"foreground\"}");
+            using var peer = await PairingClient.ConnectAsync(await invitation.Task.WaitAsync(timeout.Token), timeout.Token);
+            if (connectWhileBackgrounded)
+            {
+                await waiting.Task.WaitAsync(timeout.Token);
+                Assert.That(started.Task.IsCompleted, Is.False, "Camera must not start in the background");
+                await coordinator.HandleAsync("{\"action\":\"foreground\"}");
+            }
+            await started.Task.WaitAsync(timeout.Token);
+            await coordinator.HandleAsync("{\"action\":\"background\"}");
+            Assert.That(video.Disposed, Is.True, "An active camera must stop when backgrounded");
+        }
+        finally
+        {
+            await coordinator.HandleAsync("{\"action\":\"stop\"}");
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+        }
+    }
     private sealed class FakeVideo : INativeVideo
     {
         public TaskCompletionSource Received { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);

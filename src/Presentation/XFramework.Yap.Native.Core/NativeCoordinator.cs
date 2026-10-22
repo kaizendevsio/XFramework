@@ -9,6 +9,8 @@ public sealed class NativeCoordinator(Func<Task<INativeVideo>> createVideo, stri
     private readonly SemaphoreSlim gate = new(1);
     private CancellationTokenSource? lifetime;
     private Task job = Task.CompletedTask;
+    private volatile bool waitingForPeer;
+    private TaskCompletionSource? foregroundResume;
     public event Action<string>? Message;
     public string? LastReport { get; private set; }
     public async Task HandleAsync(string json)
@@ -19,6 +21,18 @@ public sealed class NativeCoordinator(Func<Task<INativeVideo>> createVideo, stri
         await gate.WaitAsync();
         try
         {
+            if (command.Action == "foreground")
+            {
+                foregroundResume?.TrySetResult(); foregroundResume = null; return;
+            }
+            if (command.Action == "background")
+            {
+                foregroundResume ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
+                // Copying an invitation into another app must not close its listener.
+                // Active video still stops as soon as the app leaves the foreground.
+                if (!waitingForPeer) await StopAsync();
+                return;
+            }
             if (command.Action == "stop") { await StopAsync(); return; }
             if (command.Action is not ("host" or "join")) throw new ArgumentException("Unknown command.");
             if (!job.IsCompleted) throw new InvalidOperationException("Stop the current test first.");
@@ -27,6 +41,7 @@ public sealed class NativeCoordinator(Func<Task<INativeVideo>> createVideo, stri
             if (command.Action == "host")
             {
                 var host = new PairingHost(command.Address ?? "");
+                waitingForPeer = true;
                 Notify(new("invitation", Invitation: host.Invitation.Encode()));
                 job = RunAsync(host.AcceptAsync(lifetime.Token), settings, host, lifetime.Token);
             }
@@ -41,6 +56,13 @@ public sealed class NativeCoordinator(Func<Task<INativeVideo>> createVideo, stri
         {
             Notify(new("status", "Waiting for encrypted peer connection"));
             using var stream = await connected; ct.ThrowIfCancellationRequested();
+            waitingForPeer = false;
+            if (foregroundResume is { } resume)
+            {
+                Notify(new("status", "Peer connected. Return to the benchmark app to start the camera."));
+                await resume.Task.WaitAsync(TimeSpan.FromMinutes(3), ct);
+            }
+            ct.ThrowIfCancellationRequested();
             video = await createVideo(); ct.ThrowIfCancellationRequested();
             await using var run = new BenchmarkRun(video, stream);
             Directory.CreateDirectory(outputDirectory);
@@ -55,7 +77,7 @@ public sealed class NativeCoordinator(Func<Task<INativeVideo>> createVideo, stri
         }
         catch (OperationCanceledException) { Notify(new("status", "Stopped")); }
         catch (Exception ex) { Notify(new("error", ex.Message)); }
-        finally { video?.Dispose(); host?.Dispose(); Notify(new("finished")); }
+        finally { waitingForPeer = false; video?.Dispose(); host?.Dispose(); Notify(new("finished")); }
     }
     private void Notify(NativeNotice notice) => Message?.Invoke(JsonSerializer.Serialize(notice, NativeJson.Default.NativeNotice));
     private async Task StopAsync()

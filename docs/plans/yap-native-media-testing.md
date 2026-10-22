@@ -30,6 +30,14 @@ Apple: [personal device testing](https://developer.apple.com/help/account/basics
 6. Cool devices before measurements. Run 12 minutes at 1080p30 (discard first two), followed by an equivalent web call with both microphones muted, same brightness/scene/bitrate and network where possible. Repeat in reverse order. Only then test 1080p60. If a camera/codec rejects 60 FPS, record the rejection rather than substituting 30 FPS.
 7. Stop and press **Export numeric report**. iOS uses its share sheet; Android copies numeric JSONL to the clipboard. Reports are also stored in the app's private `benchmarks/` directory. Never enable camera/microphone data logging.
 
+### Pairing troubleshooting
+
+If iPhone reports **connection refused**, check the Android host status before changing IP addresses. The original Android build stopped its listener on every activity pause, including switching apps to transfer the invitation. The corrected Android build preserves a pending invitation during its existing three-minute window. Return Android to the benchmark before joining from iPhone; an active video test still stops when backgrounded. Create a fresh invitation after a stop, timeout, or app reinstall. Only the host needs its own Wi-Fi address. The iPhone client uses the address and port inside the invitation.
+
+The Android lifecycle fix has shared TLS integration coverage for connecting before and after returning to the foreground, and verifies that active video resources are disposed on backgrounding. This does not yet change the iOS host's background behavior; use Android as the host for this comparison.
+
+Device verification on the Galaxy S25 Ultra confirmed the fresh pairing TCP listener remained open after pressing Home and returning to the app. All twelve shared tests passed, and the corrected Release APK was installed through ADB. The full iPhone-to-Android video run still needs verification.
+
 ## Interpretation
 
 `captureFps` counts native camera callbacks; `encodedFps` counts compressed pictures; `receivedFps` counts complete peer pictures. Android output counts MediaCodec frame-rendered callbacks. iOS output counts AVSampleBufferVideoRenderer submissions, **not decoder completion or physical display presentation**. Do not compare those counters as equivalent hardware measurements. Use Instruments/Perfetto for presentation cadence and decoder attribution.
