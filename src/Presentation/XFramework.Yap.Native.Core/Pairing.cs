@@ -90,7 +90,9 @@ public static class PairingClient
                 CryptographicOperations.FixedTimeEquals(expected, SHA256.HashData(cert.GetRawCertData())));
             await stream.AuthenticateAsClientAsync(new SslClientAuthenticationOptions
             {
-                TargetHost = "Yap native benchmark", EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13
+                // Apple's TLS implementation requires a valid DNS name or IP, not
+                // a display label. Identity is still verified by the exact certificate pin.
+                TargetHost = invite.Address, EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13
             }, timeout.Token);
             await stream.WriteAsync(Convert.FromBase64String(invite.Secret), timeout.Token);
             var ack = new byte[1]; await stream.ReadExactlyAsync(ack, timeout.Token);

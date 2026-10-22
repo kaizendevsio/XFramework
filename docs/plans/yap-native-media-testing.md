@@ -38,6 +38,8 @@ The Android lifecycle fix has shared TLS integration coverage for connecting bef
 
 Device verification on the Galaxy S25 Ultra confirmed the fresh pairing TCP listener remained open after pressing Home and returning to the app. All twelve shared tests passed, and the corrected Release APK was installed through ADB. The full iPhone-to-Android video run still needs verification.
 
+The subsequent iPhone `Argument_InvalidHostName` failure came from using the display label `Yap native benchmark` as the TLS client's `TargetHost`. It now uses the invitation's IPv4 address. The exact certificate SHA-256 pin and pairing-secret verification remain unchanged. This fix requires updating the native iPhone app; refreshing the web page alone cannot apply it.
+
 ## Interpretation
 
 `captureFps` counts native camera callbacks; `encodedFps` counts compressed pictures; `receivedFps` counts complete peer pictures. Android output counts MediaCodec frame-rendered callbacks. iOS output counts AVSampleBufferVideoRenderer submissions, **not decoder completion or physical display presentation**. Do not compare those counters as equivalent hardware measurements. Use Instruments/Perfetto for presentation cadence and decoder attribution.
