@@ -3,6 +3,7 @@ using Wallets.Domain.Shared.Contracts;
 using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Integration.Security;
+using XFramework.Domain.Shared.ServiceIdentity;
 
 namespace Wallets.Api.Features.Batch.IncrementBatch;
 
@@ -40,7 +41,8 @@ public static class Endpoint
             new InvocationAuthorizationPolicy
             {
                 ActorRequirement = ActorRequirement.Required,
-                TenantAccessMode = TenantAccessMode.ActorTenant,
+                TenantAccessMode = TenantAccessMode.DelegatedTenant,
+                RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
                 RequireServiceIdentity = false,
                 RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update]
             },

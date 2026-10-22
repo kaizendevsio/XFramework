@@ -251,7 +251,14 @@
             }, request.Token);
             if (version != _version || _disposed || tenantId != Tenant.SelectedTenantId) return;
             if (!result.IsSuccess || result.Response is null || result.Response.TenantId != tenantId)
-            { _report = null; _error = "Financial data could not be loaded. Check your report permissions and try again."; return; }
+            {
+                _report = null;
+                Logger.LogWarning("Financial report rejected: {Status} {Message}", result.HttpStatusCode, result.Message);
+                _error = result.Message == "Configure a currency for each wallet type before generating financial totals."
+                    ? "A wallet type has no currency. Set its currency in Tenant Settings > Reference Data > Wallet Types, then refresh this report."
+                    : "Financial data could not be loaded. Check your report permissions and try again.";
+                return;
+            }
             _report = result.Response;
         }
         catch (OperationCanceledException) when (request.IsCancellationRequested) { }

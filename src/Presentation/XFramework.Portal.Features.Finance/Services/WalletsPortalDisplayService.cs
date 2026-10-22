@@ -7,6 +7,14 @@ namespace XFramework.Portal.Features.Finance.Services;
 
 public sealed class WalletsPortalDisplayService(IDataContext dataContext)
 {
+    public static string WorkflowFailureMessage(string? message, string fallback) => message switch
+    {
+        "Requester cannot resolve their own wallet case" or
+        "Requester cannot approve their own maker-checker request" =>
+            "A different authorized user must approve or reject this request.",
+        _ => fallback
+    };
+
     public async Task<IReadOnlyDictionary<Guid, string>> LoadWalletLabelsAsync(
         Guid tenantId,
         IEnumerable<Guid?> walletIds,

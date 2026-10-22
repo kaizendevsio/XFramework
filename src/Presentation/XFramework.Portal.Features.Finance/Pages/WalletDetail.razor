@@ -850,24 +850,10 @@ else
 
     private async Task LoadPaymentGateways(Guid tenantId)
     {
-        try
-        {
-            _gateways = await DataContext.Query<PaymentGateway>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Include(x => x.PaymentGatewayCategory)
-                .Where(x => !x.IsDeleted)
-                .OrderBy(x => x.Name)
-                .Take(100)
-                .ToListAsync();
-            _gateways = _gateways
-                .Where(x => x.TenantId == tenantId || x.TenantId == Guid.Empty)
-                .ToList();
-        }
-        catch (InvalidOperationException ex) when (IsMissingPaymentGatewayWrapper(ex))
-        {
-            _gateways = [];
-        }
+        _gateways = [];
+        var gateways = await WalletsAdminContracts.GetPaymentGatewaysAsync(tenantId);
+        if (TenantFilter.SelectedTenantId == tenantId)
+            _gateways = gateways;
     }
 
     private void ResetWorkflowOptions()
@@ -1128,10 +1114,6 @@ else
         string.IsNullOrWhiteSpace(gateway.Name)
             ? gateway.Id.ToString()[..8]
             : $"{gateway.Name} - {gateway.ServiceCharge.ToString("N2", CultureInfo.CurrentCulture)}";
-
-    private static bool IsMissingPaymentGatewayWrapper(Exception ex) =>
-        ex.Message.Contains("PaymentGateway", StringComparison.OrdinalIgnoreCase)
-        && ex.Message.Contains("service wrapper", StringComparison.OrdinalIgnoreCase);
 
     private IReadOnlyList<XfEntityPickerColumn<global::Wallets.Domain.Shared.Contracts.CurrencyType>> CurrencyAdvancedColumns =>
     [

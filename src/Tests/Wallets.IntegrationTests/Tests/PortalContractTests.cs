@@ -348,7 +348,8 @@ public sealed class PortalContractTests
 
             Regex.Matches(text, @"<BbTabsContent\b").Count.Should().Be(tabs.Length,
                 $"{page} should have one tab panel for each data-heavy section");
-            Regex.Matches(text, @"<BbDataGrid\b").Count.Should().Be(tabs.Length,
+            var pageSurface = Regex.Replace(text, @"<BbDialog\b[\s\S]*?</BbDialog>", string.Empty);
+            Regex.Matches(pageSurface, @"<BbDataGrid\b").Count.Should().Be(tabs.Length,
                 $"{page} should keep each data-heavy grid in its own tab panel");
 
             var firstTabsIndex = text.IndexOf("<BbTabs", StringComparison.Ordinal);
@@ -360,6 +361,7 @@ public sealed class PortalContractTests
                 text.AsSpan(0, firstTabsIndex).ToString(),
                 text.AsSpan(lastTabsCloseIndex + "</BbTabs>".Length).ToString());
 
+            outsideTabs = Regex.Replace(outsideTabs, @"<BbDialog\b[\s\S]*?</BbDialog>", string.Empty);
             Regex.Matches(outsideTabs, @"<BbDataGrid\b").Count.Should().Be(0,
                 $"{page} should not stack sibling grids outside the tabbed surface");
         }
@@ -404,10 +406,8 @@ public sealed class PortalContractTests
             repositoryRoot.FullName,
             "src",
             "Presentation",
-            "XFramework.Portal",
-            "Components",
-            "Pages",
-            "Finance"));
+            "XFramework.Portal.Features.Finance",
+            "Pages"));
 
     private static DirectoryInfo GetLayoutRoot(DirectoryInfo repositoryRoot) =>
         new(Path.Combine(

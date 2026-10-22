@@ -98,7 +98,10 @@ public sealed class PosCatalogService(
                         balanceResponse.Message ?? "Inventario stock balance lookup failed",
                         (int)balanceResponse.HttpStatusCode);
 
-                var availableQuantity = balanceResponse.Response?.Sum(balance => balance.AvailableQuantity);
+                // A null variant filter returns every SKU in the product family.
+                var availableQuantity = balanceResponse.Response?
+                    .Where(balance => balance.ProductVariationId == item.ProductVariationId)
+                    .Sum(balance => balance.AvailableQuantity);
                 var enrichedItem = item with
                 {
                     AvailableQuantity = availableQuantity,

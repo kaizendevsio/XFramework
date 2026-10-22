@@ -22,6 +22,13 @@
     {
         <CenteredSpinner />
     }
+    else if (_loadError is not null)
+    {
+        <BbAlert role="alert">
+            <BbAlertDescription>@_loadError</BbAlertDescription>
+        </BbAlert>
+        <BbButton Variant="ButtonVariant.Outline" OnClick="@LoadData">Retry</BbButton>
+    }
     else if (!_hasTenant)
     {
         <ModuleUnavailable ModuleName="Wallets" RequiresTenant="true" />
@@ -96,6 +103,7 @@
     private List<WalletTransfer> _items = [];
     private IReadOnlyDictionary<Guid, string> _transactionLabels = new Dictionary<Guid, string>();
     private bool _loading = true;
+    private string? _loadError;
     private bool _hasTenant;
     private bool _moduleEnabled;
     private decimal _totalFees;
@@ -113,6 +121,7 @@
 
     private async Task LoadData()
     {
+        _loadError = null;
         _loading = true;
         try
         {
@@ -151,7 +160,7 @@
             _totalFees = 0;
             _latest = null;
             Logger.LogError(ex, "Failed to load transfers.");
-            ToastService.Error("Could not load transfers.", "Wallets");
+            _loadError = "Could not load transfers. Retry to load current data.";
         }
         finally
         {

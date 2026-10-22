@@ -8,6 +8,7 @@ namespace Wallets.Domain.Shared.Contracts;
     Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/wallet-ledger-entries",
     RequireAuthorization = true,
+    TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     AuthorizationFeature = "wallets.reporting",
     CacheDurationSeconds = 60,
     CacheKeyPrefix = "wallet-ledger-entries"

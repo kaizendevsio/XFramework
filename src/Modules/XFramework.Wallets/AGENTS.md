@@ -24,7 +24,7 @@ not ordinary CRUD.
   used by other modules and Portal.
 - `src/Tests/Wallets.IntegrationTests` contains integration and contract tests.
 - Portal Wallets surfaces live under
-  `src/Presentation/XFramework.Portal/Components/Pages/Finance`.
+  `src/Presentation/XFramework.Portal.Features.Finance/Pages`.
 
 ## Source Of Truth For Money
 
@@ -67,6 +67,10 @@ not ordinary CRUD.
   or one-off Bolt/query bypasses. Tenant-wide wallet/address reads require
   `wallets.reporting:view`; owner-facing reads use the custom ownership-aware
   endpoints.
+- Managed-tenant operational reads and administrative commands use delegated
+  tenant authorization. Retain the operation capability and require
+  `identity.tenants:manage` for cross-tenant access on both Bolt and REST.
+  Do not apply actor delegation to anonymous or service-only webhook ingestion.
 - Do not trust `TenantId`, actor, credential, fee, status, or provider result
   values from request bodies when the server can resolve or verify them.
 - Use the tenant feature taxonomy already wired in `Wallets.Api/Program.cs`:
@@ -121,12 +125,26 @@ not ordinary CRUD.
 
 ## Portal Rules
 
+- Gateway pickers use `WalletPaymentGatewayOptionsRequest` through the Wallets
+  wrapper, not remote `IDataContext.Query<PaymentGateway>()`. This read-only,
+  paginated lookup requires the root `wallets` feature and
+  `wallets.reporting:view` (the existing Finance page read capability);
+  delegated access also requires
+  `identity.tenants:manage`. Return only enabled, non-deleted gateways for the
+  trusted effective tenant, with display/category/fee fields, never provider
+  endpoints or credentials. This does not enable gateway CRUD or provisioning.
+
 - Reference Data catalog exception: `WalletType`, `CurrencyType`, and
   `ExchangeRate` explicitly allow remote DataContext mutations under the
   generated Wallets capability and delegated-tenant policies. This does not
   permit writes to balances, ledger entries, transactions, or workflows.
   Currency and exchange-rate writes are validated server-side; currency links
   must be tenant-owned or global. Global reference rows remain read-only here.
+  Wallet-type currency links must be enabled and not deleted. Once a wallet type
+  has wallet, ledger, deposit, or withdrawal history (including soft-deleted rows),
+  its established currency cannot be changed or cleared through remote mutation.
+  Initial assignment when the persisted currency is null remains a metadata
+  repair, including for used types; it does not convert balances or ledger amounts.
 
 - Portal mutations must call Wallets service wrappers or backend workflow
   APIs. Read-only `IDataContext` queries are acceptable for grids, details,

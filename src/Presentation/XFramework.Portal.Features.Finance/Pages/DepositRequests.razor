@@ -28,6 +28,13 @@
     {
         <CenteredSpinner />
     }
+    else if (_loadError is not null)
+    {
+        <BbAlert role="alert">
+            <BbAlertDescription>@_loadError</BbAlertDescription>
+        </BbAlert>
+        <BbButton Variant="ButtonVariant.Outline" OnClick="@LoadData">Retry</BbButton>
+    }
     else if (!_hasTenant)
     {
         <ModuleUnavailable ModuleName="Wallets" RequiresTenant="true" />
@@ -224,6 +231,10 @@
                                 ClearText="Clear gateway"
                                 AdvancedSearchTitle="Find Payment Gateway"
                                 AdvancedSearchDescription="Search configured payment gateways for deposit settlement." />
+                @if (_gateways.Count == 0)
+                {
+                    <p class="text-sm text-muted-foreground">No enabled payment gateway is configured for this tenant. An administrator must configure a gateway before a deposit can be requested.</p>
+                }
                 <BbFormFieldCurrencyInput @bind-Value="_createAmount" Label="Amount" ShowSymbol="false" Min="0" />
                 <BbFormFieldCurrencyInput @bind-Value="_createRequestedFee" Label="Requested Fee" ShowSymbol="false" Min="0" />
                 <BbFormFieldInput TValue="string" @bind-Value="_createExternalReference" Label="External Reference" Placeholder="Optional provider/reference id" />
@@ -263,6 +274,7 @@
     private List<IdentityCredential> _credentials = [];
     private Dictionary<Guid, string> _credentialLabels = [];
     private bool _loading = true;
+    private string? _loadError;
     private bool _acting;
     private bool _createDialogOpen;
     private bool _hasTenant;
@@ -294,6 +306,7 @@
 
     private async Task LoadData()
     {
+        _loadError = null;
         _loading = true;
         try
         {
@@ -331,7 +344,7 @@
             ResetCreateOptions();
             ResetSummary();
             Logger.LogError(ex, "Failed to load deposit requests.");
-            ToastService.Error("Could not load deposit requests.", "Wallets");
+            _loadError = "Could not load deposit requests. Retry to load current data.";
         }
         finally
         {
@@ -392,24 +405,10 @@
 
     private async Task LoadPaymentGateways(Guid tenantId)
     {
-        try
-        {
-            _gateways = await DataContext.Query<PaymentGateway>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Include(x => x.PaymentGatewayCategory)
-                .Where(x => !x.IsDeleted)
-                .OrderBy(x => x.Name)
-                .Take(100)
-                .ToListAsync();
-            _gateways = _gateways
-                .Where(x => x.TenantId == tenantId || x.TenantId == Guid.Empty)
-                .ToList();
-        }
-        catch (InvalidOperationException ex) when (IsMissingPaymentGatewayWrapper(ex))
-        {
-            _gateways = [];
-        }
+        _gateways = [];
+        var gateways = await WalletsAdminContracts.GetPaymentGatewaysAsync(tenantId);
+        if (TenantFilter.SelectedTenantId == tenantId)
+            _gateways = gateways;
     }
 
     private async Task CreateDeposit()
@@ -579,7 +578,7 @@
             else
             {
                 Logger.LogWarning("{Label} failed: {Message}", label, result.Message);
-                ToastService.Error($"{label} could not be completed.", "Wallets");
+                ToastService.Error(WalletsPortalDisplayService.WorkflowFailureMessage(result.Message, $"{label} could not be completed."), "Wallets");
             }
         }
         catch (Exception ex)
@@ -744,10 +743,6 @@
         string.IsNullOrWhiteSpace(gateway.Name)
             ? gateway.Id.ToString()[..8]
             : $"{gateway.Name} - {gateway.ServiceCharge.ToString("N2", CultureInfo.CurrentCulture)}";
-
-    private static bool IsMissingPaymentGatewayWrapper(Exception ex) =>
-        ex.Message.Contains("PaymentGateway", StringComparison.OrdinalIgnoreCase)
-        && ex.Message.Contains("service wrapper", StringComparison.OrdinalIgnoreCase);
 
     private static string GetCredentialSortText(IdentityCredential credential) =>
         credential.IdentityInfo?.FullName

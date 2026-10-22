@@ -8,6 +8,7 @@ namespace Wallets.Domain.Shared.Contracts;
     Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/wallet-reconciliation-runs",
     RequireAuthorization = true,
+    TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     AuthorizationFeature = "wallets.reconciliation",
     ReadCapability = "manage",
     CacheDurationSeconds = 30,

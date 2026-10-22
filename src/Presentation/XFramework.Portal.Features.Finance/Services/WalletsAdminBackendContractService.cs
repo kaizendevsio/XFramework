@@ -4,6 +4,7 @@ using Wallets.Domain.Shared.Contracts.Responses;
 using Wallets.Domain.Shared.Enums;
 using Wallets.Integration.Drivers;
 using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Domain.Shared.Contracts;
 using XFramework.Portal.Shared;
 
 namespace XFramework.Portal.Features.Finance.Services;
@@ -41,6 +42,41 @@ public sealed class WalletsAdminBackendContractService(
     public const string GenerateStatementRoute = "POST /api/wallets/reports/statement";
     public const string CreateWalletCaseRoute = "POST /api/wallets/cases";
     public const string ResolveWalletCaseRoute = "POST /api/wallets/cases/resolve";
+
+    public async Task<List<PaymentGateway>> GetPaymentGatewaysAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        var gateways = new List<PaymentGateway>();
+        for (var page = 1; ; page++)
+        {
+            ct.ThrowIfCancellationRequested();
+            var metadata = Metadata();
+            metadata.RequestedTenantId = tenantId;
+            var response = await wallets.WalletPaymentGatewayOptions(new WalletPaymentGatewayOptionsRequest
+            {
+                Page = page,
+                PageSize = 100,
+                Metadata = metadata
+            }, ct);
+            if (!response.IsSuccess || response.Response is null)
+                throw new InvalidOperationException("Payment gateways could not be loaded. Check Finance access and try again.");
+
+            gateways.AddRange(response.Response.Select(x => new PaymentGateway
+            {
+                Id = x.Id,
+                TenantId = tenantId,
+                IsEnabled = true,
+                Name = x.Name,
+                Description = x.Description,
+                GatewayCategoryId = x.GatewayCategoryId,
+                PaymentGatewayCategory = new PaymentGatewayCategory { Id = x.GatewayCategoryId, Name = x.CategoryName ?? "" },
+                ServiceCharge = x.ServiceCharge,
+                ConvenienceFee = x.ConvenienceFee,
+                Discount = x.Discount
+            }));
+            if (response.Response.Count < 100)
+                return gateways;
+        }
+    }
 
     public async Task<CmdResponse> CreateDepositAsync(CreateDepositWorkflowRequest request, CancellationToken ct = default)
     {
@@ -326,12 +362,12 @@ public sealed class WalletsAdminBackendContractService(
         return ToCommandResponse(response);
     }
 
-    public async Task<CmdResponse> GenerateStatementAsync(Guid? walletId = null, CancellationToken ct = default)
+    public async Task<CmdResponse<List<WalletStatementLineResponse>>> GenerateStatementAsync(Guid? walletId = null, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         if (!walletId.HasValue)
         {
-            return new CmdResponse
+            return new CmdResponse<List<WalletStatementLineResponse>>
             {
                 HttpStatusCode = HttpStatusCode.BadRequest,
                 Message = "Select a wallet before generating a statement."
@@ -343,7 +379,7 @@ public sealed class WalletsAdminBackendContractService(
             WalletId = walletId.Value,
             Metadata = Metadata()
         });
-        return ToCommandResponse(response);
+        return response;
     }
 
     public async Task<CmdResponse> CreateWalletCaseAsync(

@@ -79,6 +79,9 @@ public sealed class GeneratedEntityAuthorizationCompletenessTests
                 policies.Should().ContainKey((entityName, operation));
                 var policy = policies[(entityName, operation)];
                 policy.ActorRequirement.Should().Be(XFramework.Integration.Security.ActorRequirement.Required);
+                policy.TenantAccessMode.Should().Be(TenantAccessMode.DelegatedTenant);
+                policy.RequiredCrossTenantActorCapabilities.Should().ContainSingle()
+                    .Which.Should().Be(XFrameworkActorCapabilities.IdentityTenantsManage);
                 policy.RequiredCapability.Should().BeOneOf(WalletAuthorizationCapabilities.All);
                 if (operation == GeneratedEntityOperation.Read)
                 {
@@ -131,6 +134,27 @@ public sealed class GeneratedEntityAuthorizationCompletenessTests
         policy.TenantAccessMode.Should().Be(TenantAccessMode.DelegatedTenant);
         policy.RequiredCrossTenantActorCapabilities.Should().ContainSingle()
             .Which.Should().Be(XFrameworkActorCapabilities.IdentityTenantsManage);
+    }
+
+    [Test]
+    public void AdvancedAndBatchActorHandlers_RequireCapabilityProtectedTenantDelegation()
+    {
+        var methods = typeof(global::Wallets.Api.Features.AdvancedWallets.WalletStatementEndpoint).Assembly
+            .GetTypes()
+            .Where(type => type.Namespace is "Wallets.Api.Features.AdvancedWallets" or "Wallets.Api.Features.Batch")
+            .SelectMany(type => type.GetMethods())
+            .SelectMany(method => method.GetCustomAttributes(typeof(BoltHandlerAttribute), false)
+                .Cast<BoltHandlerAttribute>())
+            .Where(policy => policy.RequiredActorCapabilities is { Length: > 0 })
+            .ToList();
+
+        methods.Should().NotBeEmpty();
+        foreach (var policy in methods)
+        {
+            policy.TenantAccessMode.Should().Be(TenantAccessMode.DelegatedTenant);
+            policy.RequiredCrossTenantActorCapabilities.Should().ContainSingle()
+                .Which.Should().Be(XFrameworkActorCapabilities.IdentityTenantsManage);
+        }
     }
 
     private sealed record GeneratedEntityExpectation(

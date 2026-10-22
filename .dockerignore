@@ -28,6 +28,7 @@
 **/TestResults
 docs/
 artifacts/
+.local/
 *.md
 
 **/target

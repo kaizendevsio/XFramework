@@ -140,6 +140,40 @@ public sealed class ReferenceDataSaveTests
     }
 
     [Test]
+    public async Task EditWalletCurrency_PersistsTenantCurrencyAsFieldPatch()
+    {
+        var wallet = ExistingWallet();
+        wallet.CurrencyTypeId = null;
+        _wrapper.Wallet = wallet;
+        OpenWalletEditor(wallet);
+        var currency = new CurrencyType { Id = Guid.NewGuid(), TenantId = _tenantId, CurrencyIsoCode3 = "USD" };
+        SetField("_currencyTypes", new List<CurrencyType> { currency });
+        SetField("_formWalletCurrencyId", currency.Id.ToString());
+
+        await Invoke("SaveRecord");
+
+        var change = _wrapper.Batches.Should().ContainSingle().Subject.Changes.Single();
+        var patch = MemoryPackSerializer.Deserialize<FieldPatch>(change.SerializedEntity)!;
+        patch.Changes.Keys.Should().Equal(nameof(WalletType.CurrencyTypeId));
+        MemoryPackSerializer.Deserialize<Guid?>(patch.Changes[nameof(WalletType.CurrencyTypeId)]).Should().Be(currency.Id);
+    }
+
+    [Test]
+    public async Task EditWalletCurrency_RejectsAnotherTenantsCurrency()
+    {
+        var wallet = ExistingWallet();
+        _wrapper.Wallet = wallet;
+        OpenWalletEditor(wallet);
+        var currency = new CurrencyType { Id = Guid.NewGuid(), TenantId = Guid.NewGuid() };
+        SetField("_currencyTypes", new List<CurrencyType> { currency });
+        SetField("_formWalletCurrencyId", currency.Id.ToString());
+
+        await Invoke("SaveRecord");
+
+        _wrapper.Batches.Should().BeEmpty();
+    }
+
+    [Test]
     public async Task Edit_StaleRecordDoesNotSave()
     {
         var wallet = ExistingWallet();

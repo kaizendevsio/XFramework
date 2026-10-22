@@ -8,6 +8,7 @@ namespace Wallets.Domain.Shared.Contracts;
     Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/wallet-cases",
     RequireAuthorization = true,
+    TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     AuthorizationFeature = "wallets.reporting",
     CacheDurationSeconds = 30,
     CacheKeyPrefix = "wallet-cases"
