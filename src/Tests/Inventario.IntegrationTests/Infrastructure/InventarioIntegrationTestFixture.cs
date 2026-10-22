@@ -47,13 +47,15 @@ public sealed class InventarioIntegrationTestFixture
         Guid.Parse("00000000-0000-0000-0000-000000000821"),
         Guid.Parse("00000000-0000-0000-0000-000000000822"),
         Guid.Parse("00000000-0000-0000-0000-000000000823"),
-        ActorCapabilities: ["inventario.reporting:view"]);
+        ActorCapabilities: ["inventario.reporting:view", "inventario.movements:create", "inventario.warehousing:create"]);
 
     public static string ConnectionString { get; private set; } = null!;
     public static string BoltUrl => TestConstants.Ports.InventarioBolt;
     public static string InventarioUrl => TestConstants.Ports.InventarioServer;
     public static string TestClientUrl => TestConstants.Ports.InventarioTestClient;
     public static Guid TestTenantId => TestConstants.TenantId;
+    public static Guid TestCredentialId => InvocationIdentity.CredentialId;
+    public static Guid TestIdentityId => InvocationIdentity.IdentityId;
     public static string TestActorAccessToken => InvocationIdentity.ActorToken;
 
     public static IServiceProvider Services => _inventarioApp.Services;
@@ -158,8 +160,10 @@ public sealed class InventarioIntegrationTestFixture
         builder.Services.AddTenantResolver();
         builder.Services.AddTenantModuleFeatures();
         builder.Services.AddScoped<ProductService>();
+        builder.Services.AddScoped<ProductBrandService>();
         builder.Services.AddScoped<InventarioSetupService>();
         builder.Services.AddScoped<StockPostingService>();
+        builder.Services.AddScoped<BasicProductStockService>();
         builder.Services.AddScoped<WarehouseService>();
         builder.Services.AddScoped<ReservationService>();
         builder.Services.AddScoped<InventoryAllocationService>();

@@ -11884,6 +11884,13 @@ namespace XFramework.Domain.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<string>("CombinationKey")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("CombinationOptions")
+                        .HasColumnType("jsonb");
+
                     b.Property<Guid>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
@@ -11949,6 +11956,11 @@ namespace XFramework.Domain.Migrations
                     b.HasIndex("TenantId", "ProductId");
 
                     b.HasIndex("TenantId", "ProductVariationTypeId");
+
+                    b.HasIndex("TenantId", "ProductId", "CombinationKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ProductVariation_Tenant_Product_Combination")
+                        .HasFilter("\"IsDeleted\" = false AND \"CombinationKey\" IS NOT NULL");
 
                     b.ToTable("ProductVariation", "Inventario");
                 });

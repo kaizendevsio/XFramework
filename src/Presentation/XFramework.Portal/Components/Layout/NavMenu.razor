@@ -18,9 +18,13 @@
 @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario))
 {
     <SidebarSection GroupId="inventario" Title="Inventario" Icon="package">
-        <SidebarNavItem Href="/inventario" Label="Overview" Icon="layout-dashboard" Match="NavLinkMatch.All" />
+        @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "reporting"))
+        {
+            <SidebarNavItem Href="/inventario/overview" Label="Overview" Icon="layout-dashboard" Match="NavLinkMatch.All" />
+        }
         <SidebarNavItem Href="/inventario/products" Label="Products" Icon="package" />
         <SidebarNavItem Href="/inventario/categories" Label="Categories" Icon="folders" />
+        <SidebarNavItem Href="/inventario/brands" Label="Brands" Icon="tags" />
         @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "warehousing"))
         {
             <SidebarNavItem Href="/inventario/warehouses" Label="Warehouses" Icon="warehouse" />
@@ -28,11 +32,6 @@
         @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "traceability"))
         {
             <SidebarNavItem Href="/inventario/lots" Label="Lots" Icon="scan-barcode" />
-        }
-        @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "stock_balances")
-             || ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "movements"))
-        {
-            <SidebarNavItem Href="/inventario/stock" Label="Stock" Icon="boxes" />
         }
         @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "reservations"))
         {
@@ -69,6 +68,11 @@
         @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "sales"))
         {
             <SidebarNavItem Href="/pos/cashier" Label="Cashier" Icon="shopping-cart" />
+        }
+        @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "reporting"))
+        {
+            <SidebarNavItem Href="/pos/overview" Label="Overview" Icon="layout-dashboard" />
+            <SidebarNavItem Href="/pos/reports" Label="Reports" Icon="chart-no-axes-combined" />
         }
         @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "registers"))
         {

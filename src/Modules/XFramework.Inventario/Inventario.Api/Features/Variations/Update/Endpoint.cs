@@ -14,7 +14,7 @@ public static class UpdateProductVariationEndpoint
         RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPut("/api/inventario/product-variations", Tags = ["Inventario Variations"],
         Summary = "Update product variant",
-        Description = "Updates a product variant type, name, and absolute catalog price.")]
+        Description = "Updates a variant or option combination and its absolute price. Combination edits require the saved concurrency stamp.")]
     public static Task<Result<ProductVariation>> Handle(
         UpdateProductVariationRequest request,
         [FromServices] ProductVariationService variationService,

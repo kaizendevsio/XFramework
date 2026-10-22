@@ -32,4 +32,13 @@ public partial class ProductVariation : BaseModel
     public ProductVariationType? ProductVariationType { get; set; }
     [MemoryPackOrder(6)]
     public decimal Price { get; set; }
+    [MemoryPackOrder(7)]
+    public List<ProductVariationOption>? CombinationOptions { get; set; }
+    [MemoryPackOrder(8)]
+    public string? CombinationKey { get; set; }
+
+    public decimal GetSellingPrice(decimal basePrice) =>
+        CombinationOptions is null && CombinationKey is null && ProductVariationTypeId is null && Price == 0m
+            ? basePrice + AdditionalPrice
+            : Price;
 }

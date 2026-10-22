@@ -16,4 +16,6 @@ public partial record UpdateProductVariationRequest : RequestBase,
     public Guid ProductVariationTypeId { get; init; }
     public string? Name { get; init; }
     public decimal Price { get; init; }
+    public List<ProductVariationOption>? CombinationOptions { get; init; }
+    public Guid? ExpectedConcurrencyStamp { get; init; }
 }

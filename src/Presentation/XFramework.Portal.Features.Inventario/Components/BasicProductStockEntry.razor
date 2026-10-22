@@ -1,0 +1,105 @@
+@inject IInventarioServiceWrapper Inventario
+@inject IPortalTenantContext TenantContext
+@inject ToastService ToastService
+
+<BbButton OnClick="Open" Disabled="@(Disabled || _saving)"><LucideIcon Name="package-plus" class="mr-2 h-4 w-4" />Add stock</BbButton>
+<BbDialog @bind-Open="_open">
+    <BbDialogContent>
+        <BbDialogHeader><BbDialogTitle>Add stock</BbDialogTitle><BbDialogDescription>@Product.Name</BbDialogDescription></BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            @if (Variations.Count > 0)
+            {
+                <XfEntityPicker TItem="ProductVariation" Label="Variant" @bind-Value="_variantId" Items="@Variations"
+                                ValueSelector="@(x => x.Id.ToString())" TextSelector="@(x => x.Name ?? "Variant")"
+                                SearchTextSelector="@(x => x.Name ?? "")" Placeholder="Base product"
+                                AllowClear="true" ClearText="Base product" ShowCreate="false" Disabled="@(_pendingRequest is not null)" />
+            }
+            <BbFormFieldInput TValue="decimal" @bind-Value="_quantity" Label="Quantity to add" Required="true" Disabled="@(_pendingRequest is not null)" />
+            <BbFormFieldInput TValue="string" @bind-Value="_reason" Label="Reference or reason" Disabled="@(_pendingRequest is not null)" />
+            @if (_error is not null || _pendingRequest is not null)
+            {
+                <BbAlert Variant="AlertVariant.Danger"><BbAlertDescription>
+                    @if (_error is not null) { <p>@_error</p> }
+                    @if (_pendingRequest is not null)
+                    {
+                        <p>This receipt is unresolved. Retry this same entry to confirm it; do not enter it again as a new receipt. If retry remains unavailable, ask an administrator to reconcile receipt reference <code>@_pendingRequest.IdempotencyKey</code>.</p>
+                    }
+                </BbAlertDescription></BbAlert>
+            }
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" Disabled="@_saving" OnClick="@(() => _open = false)">Cancel</BbButton>
+            <BbButton Disabled="@(_saving || _quantity <= 0)" OnClick="Save">@(_saving ? "Adding..." : "Add stock")</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    [Parameter, EditorRequired] public Product Product { get; set; } = default!;
+    [Parameter] public List<ProductVariation> Variations { get; set; } = [];
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback Saved { get; set; }
+    private bool _open, _saving;
+    private string? _variantId, _error;
+    private string _reason = "", _key = "";
+    private decimal _quantity = 1;
+    private Guid _productId, _tenantId;
+    private PostBasicProductStockRequest? _pendingRequest;
+
+    protected override void OnParametersSet()
+    {
+        if (_open && (Product.Id != _productId || TenantContext.SelectedTenantId != _tenantId)) _open = false;
+    }
+
+    private void Open()
+    {
+        if (Disabled || _saving || Product.TenantId != TenantContext.SelectedTenantId) return;
+        if (_pendingRequest is not null && _pendingRequest.ProductId == Product.Id
+            && _pendingRequest.Metadata.RequestedTenantId == TenantContext.SelectedTenantId)
+        {
+            _open = true;
+            return;
+        }
+        _productId = Product.Id; _tenantId = Product.TenantId;
+        _variantId = null; _quantity = 1; _reason = ""; _error = null;
+        _key = Guid.NewGuid().ToString("N"); _pendingRequest = null; _open = true;
+    }
+
+    private async Task Save()
+    {
+        if (_saving || _quantity <= 0 || TenantContext.SelectedTenantId != _tenantId || Product.Id != _productId) return;
+        _saving = true;
+        _error = null;
+        // Retain the same request when retrying an uncertain response to avoid posting stock twice.
+        _pendingRequest ??= new PostBasicProductStockRequest
+        {
+            Metadata = new() { RequestedTenantId = _tenantId }, ProductId = _productId,
+            ProductVariationId = Guid.TryParse(_variantId, out var variant) ? variant : null,
+            Quantity = _quantity, Reason = _reason.Trim(), IdempotencyKey = _key
+        };
+        var request = _pendingRequest;
+        try
+        {
+            var result = await Inventario.PostBasicProductStock(request);
+            if (result.IsSuccess && ReferenceEquals(_pendingRequest, request)) _pendingRequest = null;
+            if (TenantContext.SelectedTenantId != request.Metadata.RequestedTenantId || Product.Id != request.ProductId) return;
+            if (!result.IsSuccess)
+            {
+                // Validation rejection cannot have committed a receipt; allow correcting the draft.
+                if ((int)result.HttpStatusCode is 400 or 422 && ReferenceEquals(_pendingRequest, request))
+                    _pendingRequest = null;
+                _error = "Stock could not be added. Check stock access and inventory setup, then retry.";
+                return;
+            }
+            _open = false;
+            ToastService.Success("Stock added.");
+            await Saved.InvokeAsync();
+        }
+        catch
+        {
+            if (TenantContext.SelectedTenantId == request.Metadata.RequestedTenantId && Product.Id == request.ProductId)
+                _error = "The result could not be confirmed. Retry to check this stock entry.";
+        }
+        finally { _saving = false; }
+    }
+}

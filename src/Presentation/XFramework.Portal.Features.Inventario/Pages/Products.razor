@@ -93,7 +93,7 @@ else
                             <InventoryTemplateColumn Title="Category" Filterable="true" SortBy="@(item => GetCategoryName(item.CategoryId))" FilterBy="@(item => GetCategoryName(item.CategoryId))">
                                 <ChildContent Context="item">@GetCategoryName(item.CategoryId)</ChildContent>
                             </InventoryTemplateColumn>
-                            <InventoryTemplateColumn Title="Price" Sortable="true" Filterable="true" SortBy="@(item => item.Price)" FilterBy="@(item => item.Price)">
+                            <InventoryTemplateColumn Title="Base price" Sortable="true" Filterable="true" SortBy="@(item => item.Price)" FilterBy="@(item => item.Price)">
                                 <ChildContent Context="item">@_currency @item.Price.ToString("N2")</ChildContent>
                             </InventoryTemplateColumn>
                             <InventoryTemplateColumn Title="Stock" Sortable="true" Filterable="true" SortBy="@(item => item.StockQuantity)" FilterBy="@(item => item.StockQuantity)">
@@ -141,30 +141,16 @@ else
                 <BbFormFieldInput TValue="string" @bind-Value="_form.Name" Label="Name" Required="true" />
                 <BbFormFieldInput TValue="string" @bind-Value="_form.Sku" Label="SKU" />
             </div>
-            <XfEntityPicker TItem="ProductCategory"
-                            Label="Category"
-                            Value="@_form.CategoryId"
-                            ValueChanged="@(value => _form.CategoryId = value ?? "")"
-                            Items="@_categories"
-                            ValueSelector="@GetCategoryPickerValue"
-                            TextSelector="@GetCategoryLabel"
-                            SearchTextSelector="@GetCategorySearchText"
-                            AdvancedColumns="@CategoryAdvancedColumns"
-                            AdvancedFilters="@CategoryAdvancedFilters"
-                            AdvancedSearchScope="Searches category name, description, product count, and created date."
-                            Placeholder="Select category"
-                            SearchPlaceholder="Search categories..."
-                            EmptyMessage="No categories found."
-                            ShowCreate="false"
-                            AdvancedSearchTitle="Find Category"
-                            AdvancedSearchDescription="Select the category for this product." />
+            <XFramework.Portal.Features.Inventario.Components.ProductCategoryPicker Value="@_form.CategoryId"
+                ValueChanged="@(value => _form.CategoryId = value ?? "")" Items="@_categories"
+                Created="@(category => _categories.Add(category))" />
             <div class="grid gap-4 md:grid-cols-2">
                 <BbFormFieldCurrencyInput CurrencyCode="@_currency" @bind-Value="_form.Price"
-                                           Label="Price"
+                                           Label="Base price"
                                            Min="0"
                                           Required="true"
                                           ShowSymbol="false" />
-                <BbFormFieldInput TValue="string" @bind-Value="_form.Brand" Label="Brand" />
+                <XFramework.Portal.Features.Inventario.Components.ProductBrandPicker CategoryId="@(Guid.TryParse(_form.CategoryId, out var categoryId) ? categoryId : null)" Value="@_form.Brand" ValueChanged="@(value => _form.Brand = value ?? "")" Disabled="@_saving" />
             </div>
             <BbFormFieldInput TValue="string" @bind-Value="_form.Description" Label="Description" />
             <BbFormFieldSwitch Checked="@_form.IsAvailable"
@@ -197,6 +183,8 @@ else
     private List<Product> _filteredProducts = [];
     private List<ProductCategory> _categories = [];
     private bool _loading = true;
+    private int _reloadRevision;
+    private bool _disposed;
     private bool _saving;
     private bool _hasTenant;
     private bool _moduleEnabled;
@@ -222,20 +210,27 @@ else
 
     private void OnTenantChanged()
     {
+        if (_disposed) return;
         _labelsOpen = false;
+        _productDialogOpen = false;
         _ = InvokeAsync(Reload);
     }
 
     private async Task Reload()
     {
+        var revision = ++_reloadRevision;
+        var selectedTenant = TenantFilter.SelectedTenantId;
+        bool Current() => !_disposed && revision == _reloadRevision && selectedTenant == TenantFilter.SelectedTenantId;
         _loading = true;
+        _products = [];
+        _filteredProducts = [];
+        _categories = [];
         try
         {
             await ModuleNavigation.EnsureLoadedAsync();
+            if (!Current()) return;
             _hasTenant = TenantFilter.SelectedTenantId is Guid;
             _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario);
-            _products = [];
-            _categories = [];
 
             if (!_hasTenant || !_moduleEnabled)
             {
@@ -245,39 +240,46 @@ else
 
             var tenantId = TenantFilter.SelectedTenantId!.Value;
             if (!await LoadSettings(tenantId)) return;
-            _categories = await DataContext.Query<ProductCategory>()
+            if (!Current()) return;
+            var categories = await DataContext.Query<ProductCategory>()
                 .IgnoreQueryFilters()
                 .NoCache()
                 .Where(x => x.TenantId == tenantId && !x.IsDeleted)
                 .OrderBy(x => x.Name)
                 .Take(200)
                 .ToListAsync();
-
-            _products = await DataContext.Query<Product>()
+            if (!Current()) return;
+            var products = await DataContext.Query<Product>()
                 .IgnoreQueryFilters()
                 .NoCache()
                 .Where(x => x.TenantId == tenantId && !x.IsDeleted)
                 .OrderBy(x => x.Name)
                 .Take(250)
                 .ToListAsync();
-
+            if (!Current()) return;
+            _categories = categories;
+            _products = products;
             ApplySearch();
         }
         catch
         {
-            ToastService.Show("Could not load products.");
+            if (Current()) ToastService.Show("Could not load products.");
         }
         finally
         {
-            _loading = false;
-            StateHasChanged();
+            if (Current())
+            {
+                _loading = false;
+                StateHasChanged();
+            }
         }
     }
 
     private async Task<bool> LoadSettings(Guid tenantId)
     {
+        var revision = _reloadRevision;
         var preferences = await InventoryDisplay.PreferencesAsync(Inventario, tenantId);
-        if (TenantFilter.SelectedTenantId != tenantId) return false;
+        if (_disposed || revision != _reloadRevision || TenantFilter.SelectedTenantId != tenantId) return false;
         if (!SkipSetup && preferences.ShouldPrompt && preferences.CanManage)
         {
             Navigation.NavigateTo("/inventario/setup");
@@ -338,7 +340,8 @@ else
 
     private async Task SaveProduct()
     {
-        if (TenantFilter.SelectedTenantId is not Guid)
+        if (_saving) return;
+        if (TenantFilter.SelectedTenantId is not Guid tenantId)
         {
             ToastService.Show("Select a tenant before saving products.");
             return;
@@ -378,11 +381,12 @@ else
                 IsAvailable = _form.IsAvailable
             });
 
-            if (result.IsSuccess)
+            if (TenantFilter.SelectedTenantId != tenantId) return;
+            if (result.IsSuccess && result.Response is { } created && created.Id != Guid.Empty)
             {
                 ToastService.Show("Product created.");
                 _productDialogOpen = false;
-                await Reload();
+                Navigation.NavigateTo($"/inventario/products/{created.Id}");
             }
             else
             {
@@ -411,6 +415,8 @@ else
 
     public void Dispose()
     {
+        _disposed = true;
+        ++_reloadRevision;
         TenantFilter.OnChanged -= OnTenantChanged;
         ModuleNavigation.OnChanged -= OnTenantChanged;
     }

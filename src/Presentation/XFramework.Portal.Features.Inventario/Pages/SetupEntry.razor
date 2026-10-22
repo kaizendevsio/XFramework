@@ -37,7 +37,10 @@ else
             if (tenant is not Guid id || !_moduleEnabled) return;
             var result = await Inventario.GetInventarioSetup(new GetInventarioSetupRequest { Metadata = new() { RequestedTenantId = id } });
             if (!Current(revision, tenant) || !result.IsSuccess || result.Response?.TenantId != id) return;
-            Navigation.NavigateTo(result.Response.ShouldPrompt ? "/inventario/setup" : "/inventario/products", replace: true);
+            var destination = result.Response.ShouldPrompt ? "/inventario/setup"
+                : Availability.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "reporting") ? "/inventario/overview"
+                : "/inventario/products";
+            Navigation.NavigateTo(destination, replace: true);
         }
         catch { }
         finally { if (Current(revision, tenant)) _loading = false; }

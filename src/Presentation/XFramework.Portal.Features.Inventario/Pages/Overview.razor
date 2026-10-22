@@ -1,0 +1,212 @@
+@page "/inventario/overview"
+@using XFramework.Portal.Features.Inventario.Reports
+@using XFramework.Inventario.Domain.Shared.Contracts.Responses.Reports
+@implements IDisposable
+
+<PageTitle>Inventory Overview - Portal</PageTitle>
+<div class="inventory-overview">
+    <div class="xf-page-header">
+        <div><BbTypographyH3>Inventory Overview</BbTypographyH3><BbTypographyMuted>@Tenant.SelectedTenantName</BbTypographyMuted></div>
+        <div class="xf-page-actions">
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@Load" Disabled="@_loading"><LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />Refresh</BbButton>
+            <BbButton Variant="ButtonVariant.Outline" OnClick='@(() => OpenReport("summary"))' Disabled="@(_snapshot is null || _loading)"><LucideIcon Name="chart-no-axes-combined" class="mr-2 h-4 w-4" />Reports</BbButton>
+        </div>
+    </div>
+    @if (_error is not null)
+    {
+        <BbAlert Variant="AlertVariant.Danger"><BbAlertDescription>@_error</BbAlertDescription></BbAlert>
+    }
+    @if (Tenant.SelectedTenantId is null)
+    {
+        <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" />
+    }
+    else if (_enabled)
+    {
+        <div class="overview-filters">
+            <div class="overview-filter"><BbLabel>Warehouse</BbLabel><BbCombobox TValue="string" @bind-Value="_warehouse" Options="@WarehouseOptions" Placeholder="All warehouses" AriaLabel="Warehouse" /></div>
+            <div class="overview-filter"><BbLabel>Movements from (UTC)</BbLabel><BbDatePicker @bind-Value="_from" DateFormat="yyyy-MM-dd" Editable="true" /></div>
+            <div class="overview-filter"><BbLabel>Through (UTC)</BbLabel><BbDatePicker @bind-Value="_through" DateFormat="yyyy-MM-dd" Editable="true" /></div>
+            <BbButton OnClick="@Apply" Disabled="@_loading"><LucideIcon Name="filter" class="mr-2 h-4 w-4" />Apply</BbButton>
+        </div>
+        @if (_snapshot is { } snapshot)
+        {
+            <div class="overview-asof">As of @snapshot.GeneratedAtUtc.ToString("yyyy-MM-dd HH:mm:ss") UTC</div>
+            <div class="overview-metrics" aria-label="Current stock summary">
+                <div><span>On hand</span><strong>@snapshot.OnHand.ToString("N2")</strong></div>
+                <div><span>Reserved</span><strong>@snapshot.Reserved.ToString("N2")</strong></div>
+                <div><span>Available</span><strong>@snapshot.Available.ToString("N2")</strong></div>
+                <div><span>Stock positions</span><strong>@snapshot.PositionCount.ToString("N0")</strong></div>
+            </div>
+            <div class="overview-charts">
+                <section aria-label="Stock quantities">
+                    <div class="overview-section-heading"><BbTypographyH4>Stock quantities</BbTypographyH4><BbButton Variant="ButtonVariant.Outline" OnClick='@(() => OpenReport("positions"))'>Stock positions<LucideIcon Name="arrow-right" class="ml-2 h-4 w-4" /></BbButton></div>
+                    @if (snapshot.Available < 0 || snapshot.Reserved < 0)
+                    {
+                        <BbEmpty Title="Stock split unavailable" Description="Negative balances cannot be represented as proportions." />
+                    }
+                    else if (snapshot.Available + snapshot.Reserved <= 0)
+                    {
+                        <BbEmpty Title="No stock quantities" />
+                    }
+                    else
+                    {
+                        <BbPieChart @key="snapshot.GeneratedAtUtc" Data="@StockChart" Height="250px" OnDataPointClick='@(_ => OpenReport("positions"))'>
+                            <BbPie DataKey="Quantity" NameKey="Label" InnerRadius="45" OuterRadius="85" />
+                            <BbChartTooltip /><BbChartLegend />
+                        </BbPieChart>
+                    }
+                </section>
+                <section aria-label="Movement quantities">
+                    <div class="overview-section-heading"><BbTypographyH4>Movement quantities</BbTypographyH4><BbButton Variant="ButtonVariant.Outline" OnClick='@(() => OpenReport("movements"))'>Movements<LucideIcon Name="arrow-right" class="ml-2 h-4 w-4" /></BbButton></div>
+                    <div class="overview-movement-totals"><span>Inbound <strong>@snapshot.Inbound.ToString("N2")</strong></span><span>Outbound <strong>@snapshot.Outbound.ToString("N2")</strong></span></div>
+                    @if (snapshot.MovementTimeline.Count == 0 || snapshot.MovementCount == 0) { <BbEmpty Title="No movements in this period" /> }
+                    else
+                    {
+                        <BbLineChart @key="snapshot.GeneratedAtUtc" Data="@Timeline" Height="250px" OnDataPointClick="@OpenDay">
+                            <BbXAxis DataKey="Date" /><BbYAxis /><BbChartTooltip /><BbChartLegend />
+                            <BbLine DataKey="Inbound" Name="Inbound" Color="#16845b" ShowDots="true" />
+                            <BbLine DataKey="Outbound" Name="Outbound" Color="#ca4969" ShowDots="true" />
+                        </BbLineChart>
+                    }
+                </section>
+            </div>
+            <section>
+                <div class="overview-section-heading"><BbTypographyH4>Recent movements</BbTypographyH4>
+                    @if (snapshot.ExpiryEnabled) { <BbButton Variant="ButtonVariant.Outline" OnClick='@(() => OpenReport("expiry"))'><LucideIcon Name="calendar-clock" class="mr-2 h-4 w-4" />Expiry risks</BbButton> }
+                </div>
+                <BbDataGrid Items="@RecentMovements" ShowPagination="true" InitialPageSize="10" OnRowClick="@((MovementLedgerReportRow row) => OpenProductMovements(row))">
+                    <Columns>
+                        <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Date (UTC)" Format="yyyy-MM-dd HH:mm" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.WarehouseName)" Title="Warehouse" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Quantity" Format="0.####" Filterable="true" />
+                    </Columns>
+                    <EmptyTemplate><BbEmpty Title="No recent movements" /></EmptyTemplate>
+                </BbDataGrid>
+            </section>
+        }
+    }
+    else if (!_loading) { <ModuleUnavailable ModuleName="Inventario Reporting" /> }
+    @if (_loading) { <CenteredSpinner /> }
+</div>
+
+@code {
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
+    [Inject] private IPortalTenantContext Tenant { get; set; } = default!;
+    [Inject] private IPortalModuleAvailability Modules { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private ILogger<Overview> Logger { get; set; } = default!;
+    private InventoryReportScope? _scope;
+    private InventoryReportSnapshot? _snapshot;
+    private string _warehouse = "all";
+    private DateTime? _from = DateTime.UtcNow.Date.AddDays(-29), _through = DateTime.UtcNow.Date;
+    private string? _error;
+    private bool _loading, _enabled, _disposed;
+    private int _revision;
+    private CancellationTokenSource? _request;
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private List<SelectOption<string>> WarehouseOptions => [new("all", "All warehouses"), .. (_snapshot?.Warehouses ?? []).Select(x => new SelectOption<string>(x.Id.ToString(), x.Label))];
+    private List<MovementLedgerReportRow> RecentMovements => _snapshot?.Movements.Take(10).ToList() ?? [];
+    private object[] StockChart => [new { Label = "Reserved", Quantity = _snapshot!.Reserved }, new { Label = "Available", Quantity = _snapshot.Available }];
+    private object[] Timeline => _snapshot!.MovementTimeline.Select(x => (object)new { Date = x.DateUtc.ToString("yyyy-MM-dd"), x.Inbound, x.Outbound }).ToArray();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Tenant.OnChanged += ContextChanged;
+        Modules.OnChanged += ContextChanged;
+        await Load();
+    }
+
+    private void ContextChanged()
+    {
+        if (_disposed) return;
+        _revision++;
+        _request?.Cancel();
+        _snapshot = null;
+        if (_scope?.TenantId != Tenant.SelectedTenantId)
+        {
+            _scope = null; _warehouse = "all";
+            _from = DateTime.UtcNow.Date.AddDays(-29); _through = DateTime.UtcNow.Date;
+        }
+        _ = InvokeAsync(Load);
+    }
+
+    private async Task Apply()
+    {
+        if (Tenant.SelectedTenantId is not { } tenant) return;
+        if (_from is not { } from || _through is not { } through || through < from ||
+            through.Date >= DateTime.MaxValue.Date || (through.Date - from.Date).Days >= 366 ||
+            (_warehouse != "all" && (!Guid.TryParse(_warehouse, out var id) || id == Guid.Empty)))
+        { _error = "Choose a valid warehouse and reporting period of up to 366 days."; return; }
+        _scope = InventoryReportScope.Default(tenant) with
+        {
+            WarehouseId = _warehouse == "all" ? null : Guid.Parse(_warehouse),
+            FromUtc = DateTime.SpecifyKind(from.Date, DateTimeKind.Utc),
+            ToUtc = DateTime.SpecifyKind(through.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc)
+        };
+        _snapshot = null;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        if (_disposed) return;
+        var revision = ++_revision;
+        _request?.Cancel();
+        using var request = new CancellationTokenSource();
+        _request = request;
+        _loading = true; _error = null;
+        var tenant = Tenant.SelectedTenantId;
+        try
+        {
+            await _gate.WaitAsync(request.Token);
+            try
+            {
+                await Modules.EnsureLoadedAsync(request.Token);
+                if (_disposed || revision != _revision || tenant != Tenant.SelectedTenantId) return;
+                _enabled = Modules.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "reporting");
+                if (tenant is null || !_enabled) { _snapshot = null; return; }
+                _scope ??= InventoryReportScope.Default(tenant.Value);
+                var response = await Inventario.GetInventoryReportSnapshot(_scope.Request(), request.Token);
+                if (_disposed || revision != _revision || request.IsCancellationRequested || tenant != Tenant.SelectedTenantId) return;
+                if (!response.IsSuccess || response.Response is null || response.Response.TenantId != tenant)
+                { _snapshot = null; _error = "Could not open the overview. Check your report permission and tenant access."; return; }
+                _snapshot = response.Response;
+            }
+            finally { _gate.Release(); }
+        }
+        catch (OperationCanceledException) when (request.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Inventory overview failed for tenant {TenantId}", tenant);
+            if (!_disposed && revision == _revision) { _snapshot = null; _error = "Inventory overview could not be loaded. Try Refresh."; }
+        }
+        finally
+        {
+            if (ReferenceEquals(_request, request)) _request = null;
+            if (!_disposed && revision == _revision) { _loading = false; StateHasChanged(); }
+        }
+    }
+
+    private void OpenReport(string view)
+    {
+        if (_scope is not null && _snapshot is not null && !_loading) Navigation.NavigateTo(_scope.ShareUri(Navigation, view));
+    }
+    private void OpenDay(ChartClickEventArgs args)
+    {
+        if (_snapshot is null || _scope is null || _loading || args.DataIndex < 0 || args.DataIndex >= _snapshot.MovementTimeline.Count) return;
+        var day = _snapshot.MovementTimeline[args.DataIndex].DateUtc;
+        Navigation.NavigateTo((_scope with { FromUtc = day, ToUtc = day.AddDays(1).AddTicks(-1) }).ShareUri(Navigation, "movements"));
+    }
+    private void OpenProductMovements(MovementLedgerReportRow row)
+    {
+        if (_scope is not null && !_loading) Navigation.NavigateTo((_scope with { ProductId = row.ProductId }).ShareUri(Navigation, "movements"));
+    }
+    public void Dispose()
+    {
+        _disposed = true; _revision++;
+        Tenant.OnChanged -= ContextChanged; Modules.OnChanged -= ContextChanged;
+        _request?.Cancel();
+    }
+}

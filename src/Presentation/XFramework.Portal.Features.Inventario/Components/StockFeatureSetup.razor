@@ -1,0 +1,71 @@
+@using global::IdentityServer.Domain.Shared.Contracts.Requests
+@using global::IdentityServer.Integration.Drivers
+@inject IIdentityServerServiceWrapper IdentityServer
+@inject IDataContext DataContext
+@inject IPortalTenantContext TenantContext
+@inject IPortalModuleAvailability Availability
+@inject DialogService DialogService
+@inject ToastService ToastService
+
+<BbAlert>
+    <BbAlertTitle>Stock tracking needs to be enabled</BbAlertTitle>
+    <BbAlertDescription>One or more required stock features are disabled for this tenant. Lots and batches are a separate optional feature.</BbAlertDescription>
+    @if (CanManage)
+    {
+        <BbButton Class="mt-4" Disabled="@_saving" OnClick="Enable"><LucideIcon Name="boxes" class="mr-2 h-4 w-4" />Enable stock tracking</BbButton>
+    }
+    else
+    {
+        <p>Ask a tenant administrator to enable stock tracking.</p>
+    }
+</BbAlert>
+
+@code {
+    [Parameter] public bool CanManage { get; set; }
+    [Parameter] public EventCallback Enabled { get; set; }
+    private bool _saving;
+    private static readonly string[] RequiredKeys =
+    [TenantModuleFeatureKeys.Inventario, TenantModuleFeatureKeys.InventarioCatalog,
+     TenantModuleFeatureKeys.InventarioWarehousing, TenantModuleFeatureKeys.InventarioStockBalances,
+     TenantModuleFeatureKeys.InventarioMovements];
+
+    private async Task Enable()
+    {
+        if (_saving || !CanManage || TenantContext.SelectedTenantId is not Guid tenantId) return;
+        _saving = true;
+        try
+        {
+            var tenant = await DataContext.Query<Tenant>().IgnoreQueryFilters().NoCache()
+                .Where(x => x.Id == tenantId && !x.IsDeleted).FirstOrDefaultAsync();
+            if (tenant is null || TenantContext.SelectedTenantId != tenantId) return;
+            var features = await DataContext.Query<TenantModuleFeature>().IgnoreQueryFilters().NoCache()
+                .Where(x => x.TenantId == tenantId).ToListAsync();
+            if (TenantContext.SelectedTenantId != tenantId) return;
+            var confirmation = await DialogService.ConfirmAsync("Enable stock tracking?",
+                "This will enable Catalog, Warehousing, Stock Balances and Movements for this tenant. Existing stock and storage records will be kept. Lots and batches will not be enabled.",
+                new ConfirmDialogOptions { ConfirmText = "Enable stock tracking", CancelText = "Cancel" });
+            if (!confirmation.Confirmed || TenantContext.SelectedTenantId != tenantId) return;
+            var result = await IdentityServer.SetTenantModuleFeatures(new SetTenantModuleFeaturesRequest
+            {
+                Metadata = new() { RequestedTenantId = tenantId },
+                TenantId = tenantId, ExpectedConcurrencyStamp = tenant.ConcurrencyStamp,
+                Features = RequiredKeys.Select(key =>
+                {
+                    var parts = key.Split('.', 2);
+                    var existing = features.FirstOrDefault(x => x.Key == key);
+                    return new TenantModuleFeatureUpdate
+                    {
+                        ModuleKey = parts[0], SubFeatureKey = parts.Length == 2 ? parts[1] : "", IsEnabled = true,
+                        DisplayName = existing?.DisplayName, Description = existing?.Description
+                    };
+                }).ToList()
+            });
+            if (TenantContext.SelectedTenantId != tenantId) return;
+            if (!result.IsSuccess) { ToastService.Error("Stock tracking could not be enabled. Refresh and try again."); return; }
+            await Availability.ReloadAsync();
+            await Enabled.InvokeAsync();
+        }
+        catch { ToastService.Error("Stock tracking could not be enabled."); }
+        finally { _saving = false; }
+    }
+}

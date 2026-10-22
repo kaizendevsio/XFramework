@@ -36,7 +36,7 @@ namespace Portal.E2ETests;
 
 [TestFixture, NonParallelizable]
 [Category("Kind:E2E"), Category("Module:Inventario"), Category("Area:Reports")]
-public sealed class InventoryReportsE2ETests : PageTest
+public sealed partial class InventoryReportsE2ETests : PageTest
 {
     private WebApplication app = null!;
     private InventoryReportFixtureState state = null!;
@@ -81,7 +81,7 @@ public sealed class InventoryReportsE2ETests : PageTest
         var module = new Mock<IPortalModuleAvailability>();
         module.Setup(x => x.EnsureLoadedAsync(It.IsAny<CancellationToken>()))
             .Returns((CancellationToken ct) => state.EnsureAvailability(ct));
-        module.Setup(x => x.IsFeatureEnabled(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
+        module.Setup(x => x.IsFeatureEnabled(It.IsAny<string>(), It.IsAny<string>())).Returns(() => state.ReportingEnabled);
         builder.Services.AddSingleton(module.Object);
         var wrapper = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
         wrapper.Setup(x => x.GetInventoryReportSnapshot(It.IsAny<GetInventoryReportSnapshotRequest>(), It.IsAny<CancellationToken>()))
@@ -483,12 +483,15 @@ public sealed class InventoryReportFixtureState
     public ConcurrentQueue<Guid> AvailabilityTenants { get; } = new();
     public int Active, MaxActive, CanceledRequests;
     public int PositionRows = 1;
+    public bool ReportingEnabled = true;
+    public decimal OnHand = 20, Reserved = 5, Available = 15;
     public DateTime LastGeneratedAt;
     public void Reset()
     {
         SelectedTenant = FirstTenant; Status = HttpStatusCode.OK; HoldNext = null;
         HoldAvailability = null; AvailabilityEntered = null; AvailabilityTenants.Clear();
-        Active = 0; MaxActive = 0; CanceledRequests = 0; PositionRows = 1; Requests.Clear();
+        Active = 0; MaxActive = 0; CanceledRequests = 0; PositionRows = 1; ReportingEnabled = true; Requests.Clear();
+        OnHand = 20; Reserved = 5; Available = 15;
     }
     public async Task EnsureAvailability(CancellationToken ct)
     {
@@ -514,11 +517,11 @@ public sealed class InventoryReportFixtureState
             return new()
             {
                 HttpStatusCode = Status,
-                Response = Status != HttpStatusCode.OK ? null : new(tenant, LastGeneratedAt, 20, 5, 15, 30, 10,
+                Response = Status != HttpStatusCode.OK ? null : new(tenant, LastGeneratedAt, OnHand, Reserved, Available, 30, 10,
                     PositionRows, 1, true,
                     Enumerable.Range(1, PositionRows).Select(i => new StockPositionReportRow(Guid.NewGuid(), ProductId,
                         PositionRows == 1 ? name : $"{name} {i:00}", null, null, null, WarehouseId, "Main warehouse", LocationId,
-                        "Shelf A", null, null, 20, 5, 15)).ToList(),
+                        "Shelf A", null, null, OnHand, Reserved, Available)).ToList(),
                     [new(Guid.NewGuid(), ProductId, name, null, null, null, WarehouseId, "Main warehouse", LocationId,
                         "Shelf A", null, null, InventoryMovementType.Receipt, 30, "Receipt", null, request.FromUtc.AddDays(1))],
                     [new(Guid.NewGuid(), "EXP-1", ProductId, name, null, null, null, WarehouseId, "Main warehouse",
@@ -546,6 +549,7 @@ public sealed class InventoryReportFixtureAuth(IOptionsMonitor<AuthenticationSch
 }
 
 [Route("/inventario/reports")]
+[Route("/inventario/overview")]
 public sealed class InventoryReportFixtureRoot : ComponentBase
 {
     protected override void BuildRenderTree(RenderTreeBuilder b)

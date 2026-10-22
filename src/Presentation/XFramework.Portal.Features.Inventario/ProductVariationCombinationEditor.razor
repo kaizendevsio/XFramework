@@ -1,0 +1,84 @@
+<div class="combination-editor">
+    <div class="combination-heading">
+        <BbFormFieldInput TValue="string" Label="Combination name" @bind-Value="Draft.Name" Disabled="@Disabled" Required="true" />
+        <BbFormFieldCurrencyInput Label="Full selling price" CurrencyCode="@CurrencyCode" @bind-Value="Draft.Price" Disabled="@Disabled" />
+    </div>
+    @foreach (var option in Draft.Options)
+    {
+        <div class="combination-option" @key="option">
+            <XfEntityPicker TItem="ProductVariationType"
+                            Label="Option type"
+                            Value="@(option.TypeId == Guid.Empty ? null : option.TypeId.ToString())"
+                            ValueChanged="@(value => SetType(option, value))"
+                            Items="@TypesFor(option)"
+                            ValueSelector="@(type => type.Id.ToString())"
+                            TextSelector="@TypeLabel"
+                            SearchTextSelector="@(type => $"{type.Name} {type.Code}")"
+                            AdvancedColumns="@TypeColumns"
+                            AdvancedSearchScope="Variation type name, code, and scope."
+                            Placeholder="Select an option type"
+                            ShowCreate="@OnCreateType.HasDelegate"
+                            OnCreate="@OnCreateType"
+                            Disabled="@Disabled" />
+            <BbFormFieldInput TValue="string" Label="Option value" @bind-Value="option.Value" Disabled="@Disabled" Required="true" />
+            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" title="Remove option" aria-label="Remove option"
+                      Disabled="@(Disabled || Draft.Options.Count <= 2)" OnClick="@(() => RemoveOption(option))">
+                <LucideIcon Name="trash-2" />
+            </BbButton>
+        </div>
+    }
+    <div>
+        <BbButton Variant="ButtonVariant.Outline" Disabled="@(Disabled || Draft.Options.Count >= ProductVariationCombination.MaxOptions)" OnClick="@AddOption">
+            <LucideIcon Name="plus" /> Add option
+        </BbButton>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ProductVariationCombinationDraft Draft { get; set; } = new();
+    [Parameter] public IReadOnlyList<ProductVariationType> Types { get; set; } = [];
+    [Parameter] public Guid ProductId { get; set; }
+    [Parameter] public string CurrencyCode { get; set; } = "PHP";
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback OnCreateType { get; set; }
+
+    private static readonly IReadOnlyList<XfEntityPickerColumn<ProductVariationType>> TypeColumns =
+    [
+        new("Name", type => type.Name),
+        new("Code", type => type.Code),
+        new("Scope", type => type.ProductId is null ? "Tenant-wide" : "Product-local")
+    ];
+
+    private static string TypeLabel(ProductVariationType type) =>
+        $"{type.Name} ({(type.ProductId is null ? "Tenant-wide" : "Product-local")})";
+
+    private IReadOnlyList<ProductVariationType> TypesFor(ProductVariationCombinationDraft.Option option) =>
+        Types.Where(type => !type.IsDeleted && type.IsEnabled &&
+            (type.ProductId is null || type.ProductId == ProductId) &&
+            (type.Id == option.TypeId || Draft.Options.All(other => other.TypeId != type.Id))).ToList();
+
+    private void SetType(ProductVariationCombinationDraft.Option option, string? value)
+    {
+        if (Disabled)
+            return;
+        var id = Guid.TryParse(value, out var parsed) ? parsed : Guid.Empty;
+        if (id != Guid.Empty && TypesFor(option).All(type => type.Id != id))
+            return;
+        if (option.TypeId == id)
+            return;
+        option.TypeId = id;
+        option.Value = "";
+    }
+
+    private void AddOption()
+    {
+        if (!Disabled && Draft.Options.Count < ProductVariationCombination.MaxOptions)
+            Draft.Options.Add(new());
+    }
+
+    private void RemoveOption(ProductVariationCombinationDraft.Option option)
+    {
+        if (!Disabled && Draft.Options.Count > 2)
+            Draft.Options.Remove(option);
+    }
+}

@@ -9,6 +9,7 @@ using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Inventario.Domain.Shared.Contracts;
+using XFramework.Inventario.Domain.Shared.Contracts.Products;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Products;
 using XFramework.Inventario.Domain.Shared.Contracts.Responses.Products;
 using XFramework.Inventario.Domain.Shared.Enums;
@@ -59,6 +60,10 @@ public class ProductService
     /// </summary>
     public async Task<Result<Product>> CreateAsync(CreateProductRequest request, CancellationToken ct = default)
     {
+        var normalizedBrand = ProductBrand.Normalize(request.Brand);
+        if (normalizedBrand?.Length > ProductBrand.MaxLength)
+            return Result<Product>.Failure("Brand cannot exceed 100 characters", 400);
+
         var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
             return Result<Product>.Failure(tenantResult.Message!, tenantResult.StatusCode);
@@ -117,7 +122,7 @@ public class ProductService
                 StockQuantity = 0,
                 CategoryId = request.CategoryId,
                 SKU = normalizedSku,
-                Brand = request.Brand,
+                Brand = normalizedBrand,
                 Weight = request.Weight,
                 Image = request.Image,
                 IsAvailable = request.IsAvailable ?? (await _dataContext.Query<InventarioSetup>()
@@ -442,6 +447,10 @@ public class ProductService
     /// </summary>
     public async Task<Result<Product>> UpdateAsync(Guid id, UpdateProductRequest request, CancellationToken ct = default)
     {
+        var normalizedBrand = ProductBrand.Normalize(request.Brand);
+        if (normalizedBrand?.Length > ProductBrand.MaxLength)
+            return Result<Product>.Failure("Brand cannot exceed 100 characters", 400);
+
         var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
             return Result<Product>.Failure(tenantResult.Message!, tenantResult.StatusCode);
@@ -492,7 +501,7 @@ public class ProductService
             product.Price = request.Price;
             product.CategoryId = request.CategoryId;
             product.SKU = normalizedSku;
-            product.Brand = request.Brand;
+            product.Brand = normalizedBrand;
             product.Weight = request.Weight;
             product.Image = request.Image;
             product.IsAvailable = request.IsAvailable ?? product.IsAvailable;

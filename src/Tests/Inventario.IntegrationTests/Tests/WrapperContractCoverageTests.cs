@@ -42,11 +42,16 @@ public sealed class WrapperContractCoverageTests : InventarioTestBase
                 IsAvailable = true
             });
         create.IsSuccess.Should().BeTrue(create.Message);
+        create.Response.Should().NotBeNull();
+        create.Response!.Id.Should().NotBeEmpty();
+        create.Response.Brand.Should().Be("WRAPPER BRAND");
 
         await using var createdDb = CreateDbContext();
         var product = await createdDb.Set<Product>()
             .IgnoreQueryFilters()
             .SingleAsync(x => x.SKU == sku);
+        create.Response.Id.Should().Be(product.Id);
+        product.Brand.Should().Be("WRAPPER BRAND");
 
         var update = await InventarioIntegrationTestFixture.ServiceWrapper.UpdateProduct(
             new UpdateProductRequest
@@ -70,7 +75,7 @@ public sealed class WrapperContractCoverageTests : InventarioTestBase
 
         updated.Name.Should().EndWith("Updated");
         updated.Price.Should().Be(31.50m);
-        updated.Brand.Should().Be("Updated Wrapper Brand");
+        updated.Brand.Should().Be("UPDATED WRAPPER BRAND");
         updated.Description.Should().Be("Updated through wrapper coverage");
         updated.IsAvailable.Should().BeFalse();
     }

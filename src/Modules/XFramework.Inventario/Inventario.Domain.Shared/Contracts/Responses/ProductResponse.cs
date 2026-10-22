@@ -1,11 +1,12 @@
 using XFramework.Inventario.Domain.Shared.Contracts;
 
-namespace Inventario.Api.Features.Products;
+namespace XFramework.Inventario.Domain.Shared.Contracts.Responses;
 
 /// <summary>
 /// Response DTO for Product
 /// </summary>
-public class ProductResponse
+[MemoryPackable]
+public partial class ProductResponse
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;

@@ -204,6 +204,36 @@ public sealed class PosCatalogServiceTests
                 value.Metadata == request.Metadata), cancellation.Token), Times.Once);
     }
 
+    [Test]
+    public async Task SearchAsync_ZeroPricedCombination_PreservesPriceAndIndependentStockIdentity()
+    {
+        var combinationId = Guid.NewGuid();
+        var variant = Item("Shirt") with
+        {
+            ProductVariationId = combinationId, VariantName = "Red / Large",
+            VariantTypeName = "Combination", Price = 0m
+        };
+        var warehouse = Guid.NewGuid();
+        inventario.Setup(x => x.SearchSellableProducts(It.IsAny<SearchSellableProductsRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Success([variant]));
+        inventario.Setup(x => x.GetStockBalances(It.Is<GetStockBalancesRequest>(r =>
+                r.ProductId == variant.ProductId && r.ProductVariationId == combinationId && r.WarehouseId == warehouse),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new QueryResponse<List<StockBalance>>
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Response = [new() { ProductId = variant.ProductId, ProductVariationId = combinationId, AvailableQuantity = 7 }]
+            });
+        var result = await service.SearchAsync(new SearchPosCatalogRequest { WarehouseId = warehouse }, CancellationToken.None);
+        result.IsSuccess.Should().BeTrue(result.Message);
+        var row = result.Data.Should().ContainSingle().Which;
+        row.ProductVariationId.Should().Be(combinationId);
+        row.Price.Should().Be(0m);
+        row.AvailableQuantity.Should().Be(7);
+        inventario.VerifyAll();
+        inventario.VerifyNoOtherCalls();
+    }
+
     private static QueryResponse<List<SellableProductCatalogItem>> Success(List<SellableProductCatalogItem> items) => new()
     {
         HttpStatusCode = HttpStatusCode.OK,

@@ -1,0 +1,423 @@
+@implements IAsyncDisposable
+@using Microsoft.Extensions.Logging
+@inject IPOSServiceWrapper POS
+@inject IPortalTenantContext Tenant
+@inject IPortalModuleAvailability Modules
+@inject IDataContext DataContext
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject ILogger<PosReportWorkspace> Logger
+
+<div class="pos-report">
+    <div class="xf-page-header">
+        <div><BbTypographyH3>@(Overview ? "POS Overview" : "POS Reports")</BbTypographyH3><BbTypographyMuted>@TenantLabel</BbTypographyMuted></div>
+        <div class="xf-page-actions">
+            <div class="refresh-actions" role="group" aria-label="Refresh controls">
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Reload())" Disabled="@_busy"><LucideIcon Name="refresh-cw" Size="16" />Refresh</BbButton>
+                <BbDropdownMenu>
+                    <BbDropdownMenuTrigger><BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Icon" aria-label="Refresh options" title="Refresh options"><LucideIcon Name="chevron-down" Size="16" /></BbButton></BbDropdownMenuTrigger>
+                    <BbDropdownMenuContent><BbDropdownMenuCheckboxItem Checked="@_live" CheckedChanged="SetLive">Auto-refresh every 30 seconds</BbDropdownMenuCheckboxItem></BbDropdownMenuContent>
+                </BbDropdownMenu>
+            </div>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="Share" Disabled="@(_report is null || _busy)"><LucideIcon Name="link" Size="16" />Share link</BbButton>
+            @if (!Overview) { <BbButton Variant="ButtonVariant.Outline" OnClick="Export" Disabled="@(_report is null || _busy || _exporting)"><LucideIcon Name="download" Size="16" />PDF snapshot</BbButton> }
+            else { <BbButton Variant="ButtonVariant.Outline" OnClick="OpenReports"><LucideIcon Name="chart-no-axes-combined" Size="16" />Reports</BbButton> }
+        </div>
+    </div>
+    @if (_error is not null)
+    {
+        <BbAlert role="alert"><BbAlertDescription>@_error</BbAlertDescription></BbAlert>
+    }
+    @if (_scope is null && !_busy)
+    {
+        <ModuleUnavailable ModuleName="POS Reporting" RequiresTenant="true" />
+    }
+    @if (_scope is not null)
+    {
+        <div class="periods" role="group" aria-label="Sales period">
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => SetPeriod("today"))" Disabled="@_busy">Today</BbButton>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => SetPeriod("week"))" Disabled="@_busy">This week</BbButton>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => SetPeriod("month"))" Disabled="@_busy">This month</BbButton>
+        </div>
+        @if (!Overview)
+        {
+        <div class="filters">
+            <div><BbLabel>Sales / refund dates (UTC)</BbLabel><BbDateRangePicker @bind-Value="_dates" MaxDays="366" ShowPresets="true" AriaLabel="Report date range UTC" /></div>
+            <XfEntityPicker TItem="ReportChoice" @bind-Value="_register" Items="@_registers" Label="Register" Placeholder="All registers"
+                AllowClear="true" ShowAdvancedSearch="false" ValueSelector="@(x => x.Id.ToString())" TextSelector="@(x => x.Label)" />
+            <XfEntityPicker TItem="ReportChoice" @bind-Value="_currency" Items="@_currencies" Label="Currency" Placeholder="All currencies (separate totals)"
+                AllowClear="true" ShowAdvancedSearch="false" ValueSelector="@(x => x.Id.ToString())" TextSelector="@(x => x.Label)" />
+            <BbFormFieldSelect TValue="string" @bind-Value="_status" Label="Status">
+                <BbSelectItem Value="@("all")">All statuses</BbSelectItem>
+                @foreach (var status in Enum.GetValues<PosSaleStatus>()) { <BbSelectItem Value="@status.ToString()">@status</BbSelectItem> }
+            </BbFormFieldSelect>
+            <BbFormFieldSelect TValue="string" @bind-Value="_payment" Label="Payment method">
+                <BbSelectItem Value="@("all")">All methods</BbSelectItem>
+                @foreach (var method in Enum.GetValues<PosPaymentMethod>()) { <BbSelectItem Value="@method.ToString()">@method</BbSelectItem> }
+            </BbFormFieldSelect>
+            <BbButton OnClick="Apply" Disabled="@_busy"><LucideIcon Name="filter" Size="16" />Apply</BbButton>
+        </div>
+        @if (_scope.HourUtc is { } hour) { <p class="report-caption">Hour @hour.ToString("00"):00 UTC <BbButton Variant="ButtonVariant.Ghost" OnClick="ClearHour">Clear hour</BbButton></p> }
+        }
+    }
+    @if (_shareUri is not null)
+    {
+        <div><BbLabel>Protected report link</BbLabel><BbInput Value="@_shareUri" ReadOnly="true" aria-label="Protected report link" /></div>
+    }
+    @if (_busy) { <CenteredSpinner /> }
+    @if (_report is { } report)
+    {
+        <p class="report-caption">@report.FromUtc.ToString("yyyy-MM-dd") through @report.ToUtcExclusive.AddDays(-1).ToString("yyyy-MM-dd") UTC. Sales by completion date; refunds by successful refund date. Tax inclusive. As of @report.GeneratedAtUtc.ToString("HH:mm:ss") UTC.</p>
+        <div class="status-counts" aria-label="Sale statuses">
+            @foreach (var status in report.Statuses)
+            {
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => DrillStatus(status.Status))" Disabled="@_busy">@status.Status: @status.Count</BbButton>
+            }
+        </div>
+        @if (report.Currencies.Count == 0)
+        {
+            <BbEmpty Title="No completed sales or refunds in this scope" />
+        }
+        @foreach (var currency in report.Currencies)
+        {
+            <section class="currency-section" aria-label="@CurrencyLabel(currency.CurrencyId)">
+                <h4>@CurrencyLabel(currency.CurrencyId)</h4>
+                <div class="xf-summary-grid xf-summary-grid-3">
+                    <div><span>Gross sales (@currency.CompletedCount receipts)</span><strong>@currency.Total.ToString("N2")</strong></div>
+                    <div><span>Refunds (@currency.RefundCount returns)</span><strong>@currency.RefundTotal.ToString("N2")</strong></div>
+                    <div><span>Net sales</span><strong>@currency.NetTotal.ToString("N2")</strong></div>
+                </div>
+                <div class="charts">
+                    <section aria-label="Completed sales timeline">
+                        <h5>@(report.ToUtcExclusive - report.FromUtc == TimeSpan.FromDays(1) ? "Hourly sales (UTC)" : "Daily sales (UTC)")</h5>
+                        <BbLineChart @key="(report.GeneratedAtUtc, currency.CurrencyId)" Data="@Timeline(currency.CurrencyId)" Height="240px" OnDataPointClick="@((ChartClickEventArgs point) => DrillDate(currency.CurrencyId, point))">
+                            <BbXAxis DataKey="Date" BoundaryGap="true" /><BbYAxis /><BbChartTooltip /><BbChartLegend />
+                            <BbLine DataKey="Total" Name="Gross sales" Color="#16845b" ShowDots="true" />
+                            <BbLine DataKey="Refunds" Name="Refunds" Color="#ca4969" ShowDots="true" />
+                            <BbLine DataKey="Net" Name="Net sales" Color="#3977c4" ShowDots="true" />
+                        </BbLineChart>
+                    </section>
+                    <section aria-label="Completed sales by payment method">
+                        <h5>Payment methods</h5>
+                        @if (currency.CashTotal + currency.WalletTotal > 0)
+                        {
+                            <BbPieChart @key="(report.GeneratedAtUtc, currency.CurrencyId)" Data="@(new[] { new { Method = "Cash", Total = currency.CashTotal }, new { Method = "Wallet", Total = currency.WalletTotal } })" Height="240px" OnDataPointClick="@((ChartClickEventArgs point) => DrillPayment(currency.CurrencyId, point))">
+                                <BbPie DataKey="Total" NameKey="Method" InnerRadius="45" OuterRadius="80" /><BbChartTooltip /><BbChartLegend />
+                            </BbPieChart>
+                        }
+                        else { <BbEmpty Title="No captured sales in this period" /> }
+                    </section>
+                </div>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => DrillCurrency(currency.CurrencyId))" Disabled="@_busy">Receipts in @CurrencyLabel(currency.CurrencyId)<LucideIcon Name="arrow-right" Size="16" /></BbButton>
+            </section>
+        }
+        @if (!Overview)
+        {
+        <BbTabs @bind-Value="_detailTab">
+        <BbTabsList aria-label="Report details">
+            <BbTabsTrigger Value="receipts">Receipts (@report.TotalCount)</BbTabsTrigger>
+            <BbTabsTrigger Value="refunds">Refunds (@report.RefundCount)</BbTabsTrigger>
+        </BbTabsList>
+        <BbTabsContent Value="receipts">
+        <section class="receipt-section">
+            <h4>Receipts: page @report.Page</h4>
+            <p class="report-caption">@report.Rows.Count of @report.TotalCount matching receipts. Column filters apply to this page.</p>
+            <div class="receipt-grid">
+                <BbDataGrid @key="report" Items="@report.Rows" InitialPageSize="@report.PageSize" ShowPagination="false" OnRowClick="@((PosReportSaleRow row) => OpenSale(row))">
+                    <Columns>
+                        <BbDataGridPropertyColumn Property="@(x => x.SaleNumber)" Title="Receipt" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created UTC" Format="yyyy-MM-dd HH:mm" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.CompletedAt)" Title="Completed UTC" Format="yyyy-MM-dd HH:mm" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.RegisterName)" Title="Register" Filterable="true" />
+                        <BbDataGridTemplateColumn Title="Amount" Filterable="true" FilterBy="@(x => x.TotalAmount)">
+                            <ChildContent Context="row">@CurrencyLabel(row.CurrencyId) @row.TotalAmount.ToString("N2")</ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.PaymentMethod)" Title="Payment" Filterable="true" />
+                        <BbDataGridTemplateColumn Title="Actions"><ChildContent Context="row">
+                            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="@(() => OpenSale(row))" title="Open receipt" aria-label="Open receipt"><LucideIcon Name="arrow-up-right" Size="16" /></BbButton>
+                        </ChildContent></BbDataGridTemplateColumn>
+                    </Columns>
+                    <EmptyTemplate><BbEmpty Title="No receipts in this scope" /></EmptyTemplate>
+                </BbDataGrid>
+            </div>
+            <div class="pager">
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => ChangePage(-1))" Disabled="@(_busy || report.Page <= 1)"><LucideIcon Name="chevron-left" Size="16" />Previous</BbButton>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => ChangePage(1))" Disabled="@(_busy || report.Page >= 100000 || (long)report.Page * report.PageSize >= report.TotalCount)">Next<LucideIcon Name="chevron-right" Size="16" /></BbButton>
+            </div>
+        </section>
+        </BbTabsContent>
+        <BbTabsContent Value="refunds">
+        <section class="receipt-section">
+            <h4>Successful refunds: page @report.RefundPage</h4>
+            <p class="report-caption">@report.RefundRows.Count of @report.RefundCount matching refunds. Includes returns of sales completed before this period.</p>
+            <div class="receipt-grid">
+                <BbDataGrid @key="report.RefundRows" Items="@report.RefundRows" InitialPageSize="@report.PageSize" ShowPagination="false" OnRowClick="@((PosReportRefundRow row) => OpenReturn(row))">
+                    <Columns>
+                        <BbDataGridPropertyColumn Property="@(x => x.ReturnNumber)" Title="Return" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.RefundedAtUtc)" Title="Refunded UTC" Format="yyyy-MM-dd HH:mm" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.RefundMethod)" Title="Method" Filterable="true" />
+                        <BbDataGridTemplateColumn Title="Refund" Filterable="true" FilterBy="@(x => x.TotalRefundAmount)"><ChildContent Context="row">@CurrencyLabel(row.CurrencyId) @row.TotalRefundAmount.ToString("N2")</ChildContent></BbDataGridTemplateColumn>
+                        <BbDataGridTemplateColumn Title="Actions"><ChildContent Context="row"><BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="@(() => OpenReturn(row))" title="Open return" aria-label="Open return"><LucideIcon Name="arrow-up-right" Size="16" /></BbButton></ChildContent></BbDataGridTemplateColumn>
+                    </Columns>
+                    <EmptyTemplate><BbEmpty Title="No successful refunds in this scope" /></EmptyTemplate>
+                </BbDataGrid>
+            </div>
+            <div class="pager">
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => ChangeRefundPage(-1))" Disabled="@(_busy || report.RefundPage <= 1)">Previous refunds</BbButton>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => ChangeRefundPage(1))" Disabled="@(_busy || report.RefundPage >= 100000 || (long)report.RefundPage * report.PageSize >= report.RefundCount)">Next refunds</BbButton>
+            </div>
+        </section>
+        </BbTabsContent>
+        </BbTabs>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public bool Overview { get; set; }
+    private readonly CancellationTokenSource _lifetime = new();
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private CancellationTokenSource? _request;
+    private PosReportScope? _scope;
+    private PosSalesReportResponse? _report;
+    private List<ReportChoice> _registers = [], _currencies = [];
+    private DateRange _dates = DateRange.Create(DateTime.UtcNow.Date, DateTime.UtcNow.Date);
+    private string? _register, _currency, _error, _shareUri;
+    private string _status = "all", _payment = "all", _tenantLabel = "";
+    private string _detailTab = "receipts";
+    private int _revision, _liveRevision;
+    private bool _busy, _disposed, _exporting, _live;
+    private CancellationTokenSource? _liveCancellation;
+    private Task? _liveTask;
+    private IJSObjectReference? _visibility;
+    public sealed record ReportChoice(Guid Id, string Label);
+    public sealed record DayPoint(string Date, DateTime DateUtc, decimal Total, decimal Refunds, decimal Net);
+    private string TenantLabel => _report is not null ? _tenantLabel : Tenant.SelectedTenantName ?? "Select a tenant";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Tenant.OnChanged += ContextChanged;
+        Modules.OnChanged += ContextChanged;
+        Navigation.LocationChanged += LocationChanged;
+        await Reload();
+    }
+
+    private void LocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args) => ContextChanged();
+    private void ContextChanged()
+    {
+        if (_disposed) return;
+        Invalidate();
+        _ = InvokeAsync(() => Reload());
+    }
+    private void Invalidate()
+    {
+        _revision++;
+        _request?.Cancel();
+        _report = null; _shareUri = null; _error = null; _registers = []; _currencies = [];
+    }
+    private async Task Reload(bool preserveFilters = false)
+    {
+        if (_disposed) return;
+        Invalidate();
+        var revision = _revision;
+        using var request = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _request = request;
+        _busy = true;
+        StateHasChanged();
+        var selectedTenant = Tenant.SelectedTenantId;
+        bool Current() => !_disposed && !request.IsCancellationRequested && revision == _revision && selectedTenant == Tenant.SelectedTenantId;
+        try
+        {
+            _scope = PosReportScope.Parse(Navigation.Uri, selectedTenant, Overview);
+            if (_scope is null) return;
+            var scope = _scope;
+            if (!preserveFilters)
+            {
+                _dates = DateRange.Create(scope.FromUtc, scope.ToUtcExclusive.AddDays(-1));
+                _register = scope.RegisterId?.ToString(); _currency = scope.CurrencyId?.ToString(); _status = scope.Status?.ToString() ?? "all";
+                _payment = scope.PaymentMethod?.ToString() ?? "all";
+            }
+            await _gate.WaitAsync(request.Token);
+            try
+            {
+                await Modules.EnsureLoadedAsync(request.Token);
+                if (!Current()) return;
+                if (scope.TenantId == selectedTenant && !Modules.IsFeatureEnabled("pos", "reporting"))
+                { _error = "POS Reporting is not enabled for this tenant."; return; }
+                var response = await POS.GetPosSalesReport(scope.Request(), request.Token);
+                if (!Current()) return;
+                var report = response.Response;
+                var needsNarrowerScope = (int)response.HttpStatusCode == 400;
+                if ((!response.IsSuccess || report is null || report.TenantId != scope.TenantId) && !needsNarrowerScope)
+                { _error = "Could not open this report. Check sign-in, POS Reporting permission, tenant access and filters."; return; }
+                var currencyIds = report is null ? [] : report.Currencies.Select(x => x.CurrencyId).Concat(report.Rows.Select(x => x.CurrencyId)).Concat(report.RefundRows.Select(x => x.CurrencyId)).Distinct().ToList();
+                var currencies = new List<ReportChoice>();
+                var registers = new List<ReportChoice>();
+                try
+                {
+                    if (Modules.IsFeatureEnabled("wallets"))
+                    {
+                        var metadata = await DataContext.Query<CurrencyType>().NoCache().OrderBy(x => x.CurrencyIsoCode3).Take(100).ToListAsync(request.Token);
+                        currencies = metadata.Select(x => new ReportChoice(x.Id, x.CurrencyIsoCode3 ?? x.Name ?? "Currency")).ToList();
+                    }
+                    var registerRows = await DataContext.Query<PosRegister>().NoCache().Where(x => x.TenantId == scope.TenantId)
+                        .OrderBy(x => x.Name).Take(100).ToListAsync(request.Token);
+                    registers = registerRows.Select(x => new ReportChoice(x.Id, x.Name)).ToList();
+                }
+                catch (OperationCanceledException) when (request.IsCancellationRequested) { return; }
+                catch (Exception ex) { Logger.LogWarning(ex, "POS report lookup labels unavailable"); }
+                if (!Current()) return;
+                currencies = (report?.CurrencyLabels.Select(x => new ReportChoice(x.CurrencyId, x.Label)) ?? [])
+                    .Concat(currencies).DistinctBy(x => x.Id).ToList();
+                _currencies = currencies.Concat(currencyIds.Where(id => currencies.All(x => x.Id != id)).OrderBy(id => id)
+                    .Select((id, index) => new ReportChoice(id, $"Unknown currency {index + 1}"))).ToList();
+                _registers = registers.Concat(report?.Rows.Select(x => new ReportChoice(x.RegisterId, x.RegisterName)) ?? []).DistinctBy(x => x.Id).ToList();
+                if (needsNarrowerScope)
+                { _error = "Select a currency or register and a date range of at most 366 days, then apply the filters."; return; }
+                _tenantLabel = scope.TenantId == selectedTenant ? Tenant.SelectedTenantName ?? "Selected tenant" : $"Shared tenant {scope.TenantId.ToString()[..8]}";
+                _report = report;
+            }
+            finally { _gate.Release(); }
+        }
+        catch (FormatException ex) { if (Current()) { _scope = null; _error = ex.Message; } }
+        catch (OperationCanceledException) when (request.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "POS report load failed");
+            if (Current()) _error = "Could not load POS reports. Please try again.";
+        }
+        finally
+        {
+            if (ReferenceEquals(_request, request)) _request = null;
+            if (Current()) { _busy = false; StateHasChanged(); }
+        }
+    }
+    private string CurrencyLabel(Guid id) => _currencies.FirstOrDefault(x => x.Id == id)?.Label ?? "Unknown currency";
+    private List<DayPoint> Timeline(Guid currency)
+    {
+        if (_report is null) return [];
+        var hourly = _report.ToUtcExclusive - _report.FromUtc == TimeSpan.FromDays(1);
+        var buckets = _report.Timeline.Where(x => x.CurrencyId == currency).ToDictionary(x => x.DateUtc);
+        return Enumerable.Range(0, hourly ? 24 : (int)(_report.ToUtcExclusive - _report.FromUtc).TotalDays)
+            .Select(offset => hourly ? _report.FromUtc.AddHours(offset) : _report.FromUtc.AddDays(offset))
+            .Where(date => date <= _report.GeneratedAtUtc)
+            .Where(date => _scope?.HourUtc is not { } hour || date.Hour == hour)
+            .Select(date => new DayPoint(date.ToString(hourly ? "HH:mm" : "MM-dd"), date,
+                buckets.GetValueOrDefault(date)?.Total ?? 0, buckets.GetValueOrDefault(date)?.RefundTotal ?? 0,
+                buckets.GetValueOrDefault(date)?.NetTotal ?? 0)).ToList();
+    }
+    private void Navigate(PosReportScope scope) => Navigation.NavigateTo(scope.ShareUri(Navigation, Overview));
+    private void SetPeriod(string period)
+    {
+        if (_scope is not null) Navigate(PosReportScope.Period(_scope.TenantId, period, DateTime.UtcNow));
+    }
+    private void Apply()
+    {
+        if (_scope is null) return;
+        try
+        {
+            var scope = _scope with
+            {
+                FromUtc = DateTime.SpecifyKind(_dates.Start.Date, DateTimeKind.Utc),
+                ToUtcExclusive = DateTime.SpecifyKind(_dates.End.Date.AddDays(1), DateTimeKind.Utc),
+                RegisterId = string.IsNullOrEmpty(_register) ? null : Guid.Parse(_register),
+                CurrencyId = string.IsNullOrEmpty(_currency) ? null : Guid.Parse(_currency),
+                Status = _status == "all" ? null : Enum.Parse<PosSaleStatus>(_status), Page = 1, RefundPage = 1, HourUtc = null,
+                PaymentMethod = _payment == "all" ? null : Enum.Parse<PosPaymentMethod>(_payment)
+            };
+            PosReportScope.Parse(scope.ShareUri(Navigation, Overview), null, Overview);
+            Navigate(scope);
+        }
+        catch (Exception ex) when (ex is FormatException or ArgumentException)
+        { _error = "Choose valid filters and a date range of 1-366 days."; }
+    }
+    private void DrillStatus(PosSaleStatus status) { if (_scope is not null) Navigation.NavigateTo((_scope with { Status = status, Page = 1, RefundPage = 1 }).ShareUri(Navigation)); }
+    private void DrillCurrency(Guid currency) { if (_scope is not null) Navigation.NavigateTo((_scope with { CurrencyId = currency, Page = 1, RefundPage = 1 }).ShareUri(Navigation)); }
+    private void DrillPayment(Guid currency, ChartClickEventArgs point)
+    {
+        if (_scope is null || point.DataIndex is < 0 or > 1) return;
+        Navigation.NavigateTo((_scope with { CurrencyId = currency, PaymentMethod = point.DataIndex == 0 ? PosPaymentMethod.CashDrawer : PosPaymentMethod.WalletTransfer, Page = 1, RefundPage = 1 }).ShareUri(Navigation));
+    }
+    private void DrillDate(Guid currency, ChartClickEventArgs point)
+    {
+        var points = Timeline(currency);
+        if (_scope is null || point.DataIndex < 0 || point.DataIndex >= points.Count) return;
+        var date = points[point.DataIndex].DateUtc;
+        Navigation.NavigateTo((_scope with { CurrencyId = currency, FromUtc = date.Date, ToUtcExclusive = date.Date.AddDays(1),
+            HourUtc = _scope.ToUtcExclusive - _scope.FromUtc == TimeSpan.FromDays(1) ? date.Hour : null, Page = 1, RefundPage = 1 }).ShareUri(Navigation));
+    }
+    private void ClearHour() { if (_scope is not null) Navigate(_scope with { HourUtc = null, Page = 1, RefundPage = 1 }); }
+    private void OpenReports() { if (_scope is not null) Navigation.NavigateTo(_scope.ShareUri(Navigation)); }
+    private void ChangePage(int delta) { if (_scope is not null) Navigate(_scope with { Page = _scope.Page + delta }); }
+    private void ChangeRefundPage(int delta) { if (_scope is not null) Navigate(_scope with { RefundPage = _scope.RefundPage + delta }); }
+    private void OpenReturn(PosReportRefundRow row)
+    {
+        if (_scope?.TenantId != Tenant.SelectedTenantId) { _error = "Select this report's tenant before opening a return."; return; }
+        Navigation.NavigateTo($"/pos/returns/{row.Id}");
+    }
+    private void OpenSale(PosReportSaleRow row)
+    {
+        if (_scope?.TenantId != Tenant.SelectedTenantId) { _error = "Select this report's tenant before opening a receipt."; return; }
+        Navigation.NavigateTo($"/pos/sales/{row.Id}");
+    }
+    private void Share() { if (_scope is not null && _report is not null) _shareUri = _scope.ShareUri(Navigation, Overview); }
+    private async Task Export()
+    {
+        if (_report is null || _scope is null || _busy || _exporting) return;
+        var revision = _revision;
+        var model = PosReportExport.Create(_report, _scope, _tenantLabel, CurrencyLabel);
+        _exporting = true;
+        try
+        {
+            await using var module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/XFramework.Portal.Shared/reports/report-export.js");
+            if (!_disposed && revision == _revision) await module.InvokeVoidAsync("exportPdf", model);
+        }
+        catch (JSException ex) { Logger.LogWarning(ex, "POS PDF export failed"); if (revision == _revision) _error = "Could not export this snapshot."; }
+        finally { _exporting = false; }
+    }
+    private async Task SetLive(bool enabled)
+    {
+        var revision = ++_liveRevision;
+        _live = enabled;
+        var cancellation = _liveCancellation; var task = _liveTask;
+        _liveCancellation = null; _liveTask = null;
+        cancellation?.Cancel();
+        if (task is not null) await task;
+        cancellation?.Dispose();
+        if (!enabled || _disposed || !_live || revision != _liveRevision) return;
+        try
+        {
+            _visibility ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/XFramework.Portal.Features.POS/reports/refresh-visibility.js");
+            if (_disposed || !_live || revision != _liveRevision) return;
+            _liveCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+            _liveTask = LiveLoop(_liveCancellation.Token);
+        }
+        catch (JSException ex) { Logger.LogWarning(ex, "POS auto-refresh could not start"); _live = false; _error = "Auto-refresh unavailable. Refresh manually."; }
+    }
+    private async Task LiveLoop(CancellationToken ct)
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+            while (await timer.WaitForNextTickAsync(ct))
+                await InvokeAsync(async () =>
+                {
+                    if (!_disposed && !_busy && !_exporting && _report is not null && _visibility is not null &&
+                        await _visibility.InvokeAsync<bool>("isVisible", ct)) await Reload(preserveFilters: true);
+                });
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+        catch (JSDisconnectedException) { }
+        catch (JSException ex) { Logger.LogWarning(ex, "POS auto-refresh stopped"); _live = false; }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true; _revision++; _lifetime.Cancel();
+        Tenant.OnChanged -= ContextChanged; Modules.OnChanged -= ContextChanged;
+        Navigation.LocationChanged -= LocationChanged;
+        await SetLive(false);
+        if (_visibility is not null) { try { await _visibility.DisposeAsync(); } catch (JSDisconnectedException) { } }
+        _lifetime.Dispose();
+    }
+}

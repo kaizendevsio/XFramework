@@ -12,6 +12,33 @@ public sealed class InventarioNavigationTests
 {
     private const BindingFlags PrivateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public void LegacyStockLink_RedirectsToProductStockOrCatalog(bool scoped)
+    {
+        var productId = scoped ? Guid.NewGuid() : (Guid?)null;
+        var page = new Stock { ProductId = productId };
+        var navigation = new TestNavigation("/inventario/stock");
+        typeof(Stock).GetProperty("Navigation", PrivateInstance)!.SetValue(page, navigation);
+        typeof(Stock).GetMethod("OnParametersSet", PrivateInstance)!.Invoke(page, null);
+        navigation.Uri.Should().Be("https://portal.test/inventario/products" +
+            (productId is { } id ? $"/{id}/stock" : ""));
+    }
+
+    [TestCase(true, true, true, true)]
+    [TestCase(false, true, true, false)]
+    [TestCase(true, false, true, false)]
+    [TestCase(true, true, false, false)]
+    public void ProductStockEntry_RequiresAllStockDependencies(bool balances, bool movements, bool warehousing, bool ready)
+    {
+        var page = new ProductDetail();
+        var type = typeof(ProductDetail);
+        type.GetField("_stockEnabled", PrivateInstance)!.SetValue(page, balances);
+        type.GetField("_movementsEnabled", PrivateInstance)!.SetValue(page, movements);
+        type.GetField("_warehousingEnabled", PrivateInstance)!.SetValue(page, warehousing);
+        type.GetProperty("StockReady", PrivateInstance)!.GetValue(page).Should().Be(ready);
+    }
+
     [TestCase("summary")]
     [TestCase("stock")]
     [TestCase("lots")]
@@ -152,5 +179,6 @@ public sealed class InventarioNavigationTests
     {
         public TestNavigation(string path) => Initialize("https://portal.test/", "https://portal.test" + path);
         protected override void NavigateToCore(string uri, bool forceLoad) => Uri = ToAbsoluteUri(uri).AbsoluteUri;
+        protected override void NavigateToCore(string uri, NavigationOptions options) => Uri = ToAbsoluteUri(uri).AbsoluteUri;
     }
 }

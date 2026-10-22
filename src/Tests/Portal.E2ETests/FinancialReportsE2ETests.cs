@@ -84,8 +84,11 @@ public sealed class FinancialReportsE2ETests : PageTest
         app = builder.Build();
         app.UseStaticFiles();
         app.UseStaticFiles(new StaticFileOptions { FileProvider = new PhysicalFileProvider(Path.Combine(root.FullName, "src/Presentation/XFramework.Portal.Shared/wwwroot")), RequestPath = "/_content/XFramework.Portal.Shared" });
+        app.UseStaticFiles(new StaticFileOptions { FileProvider = new PhysicalFileProvider(Path.Combine(root.FullName, "src/Presentation/XFramework.Portal.Shared/wwwroot")), RequestPath = "/finance-fixture-pdf" });
         app.UseStaticFiles(new StaticFileOptions { FileProvider = new PhysicalFileProvider(Path.Combine(root.FullName, "src/Presentation/XFramework.Portal/wwwroot")), RequestPath = "/portal-assets" });
         app.UseAntiforgery();
+        app.MapGet("/_content/XFramework.Portal.Shared/reports/report-export.js", () => Microsoft.AspNetCore.Http.Results.Text(
+            "import {exportPdf as exportSnapshot, copyReportLink} from '/finance-fixture-pdf/reports/report-export.js'; export {copyReportLink}; export async function exportPdf(model){window.financialPdfSnapshot=model;return exportSnapshot(model);}", "text/javascript"));
         app.MapRazorComponents<FinancialReportFixtureRoot>().AddInteractiveServerRenderMode();
         await app.StartAsync();
     }
@@ -115,6 +118,10 @@ public sealed class FinancialReportsE2ETests : PageTest
         await Expect(Page.Locator("link[href='portal-assets/css/app.css'] + link[href='portal-assets/css/utilities.css']"))
             .ToHaveCountAsync(1);
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Daily activity - EUR" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Tab, new() { Name = "Summary", Exact = true })).ToHaveAttributeAsync("data-state", "active");
+        await Expect(Page.GetByRole(AriaRole.Tab, new() { Name = "Lines", Exact = true })).ToHaveAttributeAsync("data-state", "active");
+        await Expect(Page.Locator("table")).ToHaveCountAsync(0);
+        await Expect(Page.GetByRole(AriaRole.Switch)).ToHaveCountAsync(0);
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-base-color", "slate");
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-primary-color", "blue");
         await Expect(Page.Locator("html")).ToHaveCSSAsync("--radius", "0.5rem");
@@ -132,8 +139,44 @@ public sealed class FinancialReportsE2ETests : PageTest
         var bytes = await File.ReadAllBytesAsync(pdfPath);
         System.Text.Encoding.ASCII.GetString(bytes).Should().StartWith("%PDF-");
         bytes.Length.Should().BeGreaterThan(3000);
-        await Page.ScreenshotAsync(new() { Path = Path.ChangeExtension(pdfPath, ".png"), FullPage = true });
+        await Page.ScreenshotAsync(new() { Path = Path.Combine(Path.GetDirectoryName(pdfPath)!, $"financial-summary-{width}.png"), FullPage = true });
         (await Page.EvaluateAsync<bool>("document.documentElement.scrollWidth <= innerWidth")).Should().BeTrue();
+        foreach (var view in new[] { "Balances", "Activity", "Daily detail" })
+        {
+            await Page.GetByRole(AriaRole.Tab, new() { Name = view, Exact = true }).ClickAsync();
+            await Expect(Page.GetByRole(AriaRole.Tab, new() { Name = view, Exact = true })).ToHaveAttributeAsync("data-state", "active");
+            await Expect(Page.Locator("table")).ToHaveCountAsync(1);
+            await Expect(Page.Locator("div[_echarts_instance_]")).ToHaveCountAsync(0);
+            if (width == 1920)
+                await Page.ScreenshotAsync(new() { Path = Path.Combine(Path.GetDirectoryName(pdfPath)!, $"financial-{view.Replace(' ', '-')}-1920.png"), FullPage = true });
+            (await Page.EvaluateAsync<bool>("document.documentElement.scrollWidth <= innerWidth")).Should().BeTrue();
+        }
+        errors.Should().BeEmpty();
+    }
+
+    [TestCase("balances", "Balances")]
+    [TestCase("activity", "Activity")]
+    [TestCase("daily", "Daily detail")]
+    public async Task Pdf_FromTableTab_IncludesSnapshotChartsWithoutMountingSummary(string view, string label)
+    {
+        await Page.GotoAsync(app.Urls.Single() + $"/finance/reports?tenant={tenantId}&from=2026-09-01&through=2026-09-07&view={view}");
+        await Expect(Page.GetByRole(AriaRole.Tab, new() { Name = label, Exact = true })).ToHaveAttributeAsync("data-state", "active");
+        await Expect(Page.Locator("div[_echarts_instance_]")).ToHaveCountAsync(0);
+        var request = latest;
+        var download = await Page.RunAndWaitForDownloadAsync(() => Page.GetByRole(AriaRole.Button, new() { Name = "PDF", Exact = true }).ClickAsync());
+        (await Page.EvaluateAsync<string[]>("window.financialPdfSnapshot.charts.map(chart => chart.title)"))
+            .Should().Equal("Daily credits - EUR", "Daily debits (including fees) - EUR");
+        (await Page.EvaluateAsync<decimal[]>("window.financialPdfSnapshot.charts.map(chart => chart.values[0])")).Should().Equal(17m, 5m);
+        (await Page.EvaluateAsync<int>("window.financialPdfSnapshot.charts[0].labels.length")).Should().Be(7);
+        var path = Path.Combine(TestContext.CurrentContext.WorkDirectory, "artifacts", $"financial-{view}-with-charts.pdf");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await download.SaveAsAsync(path);
+        var bytes = await File.ReadAllBytesAsync(path);
+        System.Text.Encoding.ASCII.GetString(bytes).Should().StartWith("%PDF-");
+        bytes.Length.Should().BeGreaterThan(3000);
+        latest.Should().BeSameAs(request);
+        await Expect(Page.GetByRole(AriaRole.Tab, new() { Name = label, Exact = true })).ToHaveAttributeAsync("data-state", "active");
+        await Expect(Page.Locator("div[_echarts_instance_]")).ToHaveCountAsync(0);
         errors.Should().BeEmpty();
     }
 
@@ -146,22 +189,118 @@ public sealed class FinancialReportsE2ETests : PageTest
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "PDF", Exact = true })).ToBeDisabledAsync();
     }
 
+    [TestCase("currency=invalid")]
+    [TestCase("tenant=invalid")]
+    [TestCase("chart=invalid")]
+    [TestCase("view=invalid")]
+    [TestCase("day=2026-08-01")]
+    public async Task SharedReport_InvalidFilter_FailsClosedWithoutRequest(string filter)
+    {
+        await Page.GotoAsync(app.Urls.Single() + $"/finance/reports?from=2026-09-01&through=2026-09-07&{filter}");
+        await Expect(Page.GetByText("The report link contains an invalid filter.")).ToBeVisibleAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Refresh", Exact = true }).ClickAsync();
+        latest.Should().BeNull();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "PDF", Exact = true })).ToBeDisabledAsync();
+    }
+
+    [Test]
+    public async Task CurrencyChartAndDay_SharedLink_RestoresSelection_AndExportsOnlySelectedCurrency()
+    {
+        var from = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc);
+        var usd = Guid.NewGuid();
+        wrapper.Setup(x => x.WalletFinancialReport(It.Is<WalletFinancialReportRequest>(r => r.From == from), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((WalletFinancialReportRequest request, CancellationToken _) => {
+                latest = request;
+                return new CmdResponse<WalletFinancialReportResponse> { HttpStatusCode = HttpStatusCode.OK, Response = new() {
+                    TenantId = tenantId, GeneratedAt = DateTime.UtcNow,
+                    Currencies = [new() { CurrencyId = currencyId, Currency = "EUR", Credits = 17, Debits = 5 }, new() { CurrencyId = usd, Currency = "USD", Credits = 900 }],
+                    DailyActivity = [new() { CurrencyId = currencyId, Date = from, Credits = 17, Debits = 5 }, new() { CurrencyId = usd, Date = from, Credits = 900 }]
+                }};
+            });
+        await Page.GotoAsync(app.Urls.Single() + $"/finance/reports?tenant={tenantId}&from=2026-04-01&through=2026-04-07&currency={currencyId}&chart=line&day=2026-04-01&view=summary");
+        await Expect(Page.GetByRole(AriaRole.Tab, new() { Name = "Lines", Exact = true })).ToHaveAttributeAsync("data-state", "active");
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Daily activity - USD" })).ToHaveCountAsync(0);
+        await Page.GetByRole(AriaRole.Tab, new() { Name = "Daily detail", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Daily detail (UTC) - 2026-04-01", Exact = true })).ToBeVisibleAsync();
+        await Page.EvaluateAsync("() => { window.sharedReportUrl = undefined; navigator.clipboard.writeText = async value => { window.sharedReportUrl = value; }; }");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Share link", Exact = true }).ClickAsync();
+        await Page.WaitForFunctionAsync("typeof window.sharedReportUrl === 'string'");
+        var url = await Page.EvaluateAsync<string>("window.sharedReportUrl");
+        url.Should().Contain($"currency={currencyId}").And.Contain("view=daily").And.Contain("day=2026-04-01").And.NotContain("chart=").And.NotContain("token");
+        await Expect(Page.GetByRole(AriaRole.Textbox, new() { Name = "Protected report link" })).ToHaveValueAsync(url);
+        await Page.GotoAsync(url);
+        await Expect(Page.GetByRole(AriaRole.Tab, new() { Name = "Daily detail", Exact = true })).ToHaveAttributeAsync("data-state", "active");
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Daily detail (UTC) - 2026-04-01", Exact = true })).ToBeVisibleAsync();
+        var download = await Page.RunAndWaitForDownloadAsync(() => Page.GetByRole(AriaRole.Button, new() { Name = "PDF", Exact = true }).ClickAsync());
+        var path = Path.Combine(TestContext.CurrentContext.WorkDirectory, "artifacts", "financial-filtered-snapshot.pdf");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await download.SaveAsAsync(path);
+        (await File.ReadAllBytesAsync(path)).Length.Should().BeGreaterThan(3000);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "All days", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Daily detail (UTC)", Exact = true })).ToBeVisibleAsync();
+        await Page.GetByRole(AriaRole.Combobox, new() { Name = "Currency", Exact = true }).ClickAsync();
+        await Page.GetByRole(AriaRole.Option, new() { Name = "All currencies", Exact = true }).ClickAsync();
+        await Page.GetByRole(AriaRole.Tab, new() { Name = "Summary", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Daily activity - EUR" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Daily activity - USD" })).ToBeVisibleAsync();
+        errors.Should().BeEmpty();
+    }
+
+    [TestCase("line")]
+    [TestCase("bar")]
+    public async Task ChartPoint_SelectsCurrencyAndUtcDay_WithoutAnotherBackendQuery(string chartType)
+    {
+        await Page.GotoAsync(app.Urls.Single() + $"/finance/reports?tenant={tenantId}&from=2026-09-01&through=2026-09-07&chart={chartType}");
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Daily activity - EUR" })).ToBeVisibleAsync();
+        var request = latest;
+        var chart = Page.Locator("div[_echarts_instance_]");
+        await Expect(chart.Locator("svg")).ToBeVisibleAsync();
+        await chart.ScrollIntoViewIfNeededAsync();
+        if (chartType == "bar")
+        {
+        var point = await chart.EvaluateAsync<float[]>("""
+            element => {
+                const bar = [...element.querySelectorAll("svg path[fill='#16a34a']")]
+                    .find(path => path.getBoundingClientRect().height > 30);
+                const bounds = bar.getBoundingClientRect();
+                return [bounds.x + bounds.width / 2, bounds.y + bounds.height / 2];
+            }
+            """);
+        await Page.Mouse.ClickAsync(point[0], point[1]);
+        }
+        else
+        {
+            var point = await chart.EvaluateAsync<float[]>("""
+                async element => {
+                    const echarts = await import('/_content/BlazorBlueprint.Components/lib/echarts/echarts.min.js');
+                    return echarts.getInstanceByDom(element).convertToPixel({seriesIndex: 0}, [0, 17]);
+                }
+                """);
+            await chart.ClickAsync(new() { Position = new() { X = point[0], Y = point[1] } });
+        }
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Daily detail (UTC) - 2026-09-01", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Tab, new() { Name = "Daily detail", Exact = true })).ToHaveAttributeAsync("data-state", "active");
+        latest.Should().BeSameAs(request);
+        errors.Should().BeEmpty();
+    }
+
     [Test]
     public async Task FiltersAndShareLink_PreserveAppliedUtcRange_AndCalendarRemainsResponsive()
     {
         await Page.GotoAsync(app.Urls.Single() + $"/finance/reports?tenant={tenantId}&from=2026-09-01&through=2026-09-07");
-        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Current balances" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Tab, new() { Name = "Summary", Exact = true })).ToBeVisibleAsync();
         var dates = Page.Locator(".financial-report-filter input");
         await dates.Nth(0).FillAsync("2026-09-03"); await dates.Nth(0).PressAsync("Tab");
         await dates.Nth(1).FillAsync("2026-09-05"); await dates.Nth(1).PressAsync("Tab");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Apply", Exact = true }).ClickAsync();
+        await Page.GetByRole(AriaRole.Tab, new() { Name = "Activity", Exact = true }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Activity: 2026-09-03 to 2026-09-05 (UTC)" })).ToBeVisibleAsync();
         latest!.From.Should().Be(new DateTime(2026, 9, 3, 0, 0, 0, DateTimeKind.Utc));
         latest.ToExclusive.Should().Be(new DateTime(2026, 9, 6, 0, 0, 0, DateTimeKind.Utc));
-        await Page.EvaluateAsync("navigator.clipboard.writeText = async value => { window.sharedReportUrl = value; }");
+        await Page.EvaluateAsync("() => { window.sharedReportUrl = undefined; navigator.clipboard.writeText = async value => { window.sharedReportUrl = value; }; }");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Share link", Exact = true }).ClickAsync();
-        await Page.WaitForFunctionAsync("window.sharedReportUrl !== undefined");
-        (await Page.EvaluateAsync<string>("window.sharedReportUrl")).Should().EndWith($"finance/reports?tenant={tenantId}&from=2026-09-03&through=2026-09-05");
+        await Page.WaitForFunctionAsync("typeof window.sharedReportUrl === 'string'");
+        (await Page.EvaluateAsync<string>("window.sharedReportUrl")).Should().EndWith($"finance/reports?tenant={tenantId}&from=2026-09-03&through=2026-09-05&view=activity");
         await Page.Locator(".financial-report-filter button").First.ClickAsync();
         await Page.GetByRole(AriaRole.Heading, new() { Name = "Financial Reports", Exact = true }).ClickAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Refresh", Exact = true }).ClickAsync();
@@ -182,7 +321,7 @@ public sealed class FinancialReportsE2ETests : PageTest
                 return new CmdResponse<WalletFinancialReportResponse> { HttpStatusCode = HttpStatusCode.OK, Response = new() { TenantId = tenantId, GeneratedAt = DateTime.UtcNow } };
             });
         await Page.GotoAsync(app.Urls.Single() + $"/finance/reports?tenant={tenantId}&from=2026-08-01&through=2026-08-07");
-        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Current balances" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Tab, new() { Name = "Summary", Exact = true })).ToBeVisibleAsync();
         var initial = liveLatest;
         failNext = true;
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(65));
@@ -190,7 +329,7 @@ public sealed class FinancialReportsE2ETests : PageTest
         await Expect(Page.GetByText("Financial data could not be loaded. Check your report permissions and try again.")).ToBeVisibleAsync();
         var failed = liveLatest;
         while (ReferenceEquals(failed, liveLatest)) await Task.Delay(100, timeout.Token);
-        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Current balances" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Tab, new() { Name = "Summary", Exact = true })).ToBeVisibleAsync();
         liveLatest!.Metadata.RequestedTenantId.Should().Be(tenantId);
         liveLatest.From.Should().Be(initial!.From);
         liveLatest.ToExclusive.Should().Be(initial.ToExclusive);
@@ -227,7 +366,7 @@ public sealed class FinancialReportsE2ETests : PageTest
         {
             pending.TrySetResult(new() { HttpStatusCode = HttpStatusCode.OK, Response = new() { TenantId = tenantId, GeneratedAt = DateTime.UtcNow } });
         }
-        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Current balances" })).ToHaveCountAsync(0);
+        await Expect(Page.GetByRole(AriaRole.Tab, new() { Name = "Summary", Exact = true })).ToHaveCountAsync(0);
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "PDF", Exact = true })).ToBeDisabledAsync();
         errors.Should().BeEmpty();
     }
@@ -252,18 +391,40 @@ public sealed class FinancialReportsE2ETests : PageTest
         await Page.GotoAsync(app.Urls.Single() + $"/finance/reports?tenant={tenantId}&from=2026-06-01&through=2026-06-07");
         await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
         await Task.Run(() => modules.Raise(x => x.OnChanged += null));
-        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Current balances" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Tab, new() { Name = "Summary", Exact = true })).ToBeVisibleAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Refresh", Exact = true }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "PDF", Exact = true })).ToBeEnabledAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Close report", Exact = true }).ClickAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Open report", Exact = true }).ClickAsync();
-        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Current balances" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Tab, new() { Name = "Summary", Exact = true })).ToBeVisibleAsync();
         calls.Should().BeGreaterThanOrEqualTo(3);
         errors.Should().BeEmpty();
     }
 
     [Test]
-    public async Task LiveSwitch_DisableStopsPolling_AndEnableResumesIt()
+    public async Task RefreshControls_AreJoined_AndAutoRefreshMenuDismissesOutside()
+    {
+        await Page.SetViewportSizeAsync(1920, 1080);
+        await Page.GotoAsync(app.Urls.Single() + "/finance/reports");
+        await Expect(Page.GetByRole(AriaRole.Tab, new() { Name = "Summary", Exact = true })).ToBeVisibleAsync();
+        var group = Page.GetByRole(AriaRole.Group, new() { Name = "Refresh controls" });
+        var refresh = group.GetByRole(AriaRole.Button, new() { Name = "Refresh", Exact = true });
+        var options = group.GetByRole(AriaRole.Button, new() { Name = "Refresh options", Exact = true });
+        var left = (await refresh.BoundingBoxAsync())!;
+        var right = (await options.BoundingBoxAsync())!;
+        Math.Abs(right.X - (left.X + left.Width)).Should().BeLessThanOrEqualTo(1);
+        await options.ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Menuitemcheckbox, new() { Name = "Auto-refresh every 30 seconds" })).ToBeCheckedAsync();
+        var path = Path.Combine(TestContext.CurrentContext.WorkDirectory, "artifacts", "financial-refresh-menu-1920.png");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await Page.ScreenshotAsync(new() { Path = path, FullPage = true });
+        await Page.GetByRole(AriaRole.Heading, new() { Name = "Financial Reports", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Menuitemcheckbox)).ToHaveCountAsync(0);
+        errors.Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task AutoRefreshMenu_DisableStopsPolling_AndEnableResumesIt()
     {
         var from = new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc);
         var calls = 0;
@@ -274,16 +435,30 @@ public sealed class FinancialReportsE2ETests : PageTest
                     Response = new() { TenantId = tenantId, GeneratedAt = DateTime.UtcNow } };
             });
         await Page.GotoAsync(app.Urls.Single() + $"/finance/reports?tenant={tenantId}&from=2026-05-01&through=2026-05-07");
-        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Current balances" })).ToBeVisibleAsync();
-        var toggle = Page.GetByRole(AriaRole.Switch);
+        await Expect(Page.GetByRole(AriaRole.Tab, new() { Name = "Summary", Exact = true })).ToBeVisibleAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Refresh options", Exact = true }).ClickAsync();
+        var toggle = Page.GetByRole(AriaRole.Menuitemcheckbox, new() { Name = "Auto-refresh every 30 seconds" });
+        var outside = Page.GetByRole(AriaRole.Heading, new() { Name = "Financial Reports", Exact = true });
         await Expect(toggle).ToBeCheckedAsync();
         await toggle.ClickAsync();
+        await outside.ClickAsync();
+        await Expect(toggle).ToHaveCountAsync(0);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Refresh options", Exact = true }).ClickAsync();
         await Expect(toggle).Not.ToBeCheckedAsync();
+        await outside.ClickAsync();
+        await Expect(toggle).ToHaveCountAsync(0);
         var paused = Volatile.Read(ref calls);
         await Task.Delay(TimeSpan.FromSeconds(32));
         Volatile.Read(ref calls).Should().Be(paused);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Refresh options", Exact = true }).ClickAsync();
+        await Expect(toggle).Not.ToBeCheckedAsync();
         await toggle.ClickAsync();
+        await outside.ClickAsync();
+        await Expect(toggle).ToHaveCountAsync(0);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Refresh options", Exact = true }).ClickAsync();
         await Expect(toggle).ToBeCheckedAsync();
+        await outside.ClickAsync();
+        await Expect(toggle).ToHaveCountAsync(0);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(35));
         while (Volatile.Read(ref calls) == paused) await Task.Delay(100, timeout.Token);
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "PDF", Exact = true })).ToBeEnabledAsync();

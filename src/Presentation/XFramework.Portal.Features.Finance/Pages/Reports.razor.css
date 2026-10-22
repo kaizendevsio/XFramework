@@ -3,6 +3,15 @@
 .financial-report-filter { width: 12rem; max-width: 100%; }
 .financial-report-filter ::deep input { min-width: 0; width: 100%; }
 .financial-report-filter ::deep > div { max-width: 100%; }
-.financial-report-live { display: flex; align-items: center; gap: .5rem; min-height: 2.5rem; }
 .financial-report-section { display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
 .financial-report-section ::deep h4 { font-size: 1.125rem; letter-spacing: 0; }
+.financial-currency-filter { width: 16rem; max-width: 100%; }
+.financial-detail-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
+.financial-report-share { min-width: 0; }
+.financial-report-share ::deep input { width: 100%; min-width: 0; }
+.refresh-actions { display: inline-flex; align-items: center; gap: 0; }
+.refresh-actions ::deep .report-refresh-now { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.refresh-actions ::deep .report-refresh-options { margin-left: -1px; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.refresh-actions ::deep button:focus-visible { position: relative; z-index: 1; }
+.financial-summary-charts { display: grid; gap: 1.5rem; }
+.financial-report-page ::deep .financial-report-tabs > [role="tablist"] { display: flex; flex-wrap: wrap; height: auto; max-width: 100%; width: fit-content; }
