@@ -20,6 +20,19 @@ public sealed class InventoryReportingService(
     ITenantModuleFeatureService featureService,
     DbContext dbContext)
 {
+    public async Task<Result<int>> GetLowStockCountAsync(GetLowStockCountRequest request, CancellationToken ct = default)
+    {
+        var tenant = GetCurrentTenantId(request);
+        if (!tenant.IsSuccess) return Result<int>.Failure(tenant.Message!, tenant.StatusCode);
+        var enabled = await EnsureReportingEnabledAsync(tenant.Data, ct);
+        if (!enabled.IsSuccess) return Result<int>.Failure(enabled.Message!, enabled.StatusCode);
+        if (request.WarehouseId is { } warehouseId && !await dataContext.Query<Warehouse>().NoCache()
+            .AnyAsync(x => x.TenantId == tenant.Data && x.Id == warehouseId && !x.IsDeleted, ct))
+            return Result<int>.NotFound("Warehouse not found.");
+        return Result<int>.Success(await planningService.CountLowStockAsync(tenant.Data, request.ProductId,
+            request.ProductVariationId, request.WarehouseId, request.LocationId, ct));
+    }
+
     public async Task<Result<List<LowStockReportRow>>> GetLowStockAsync(
         GetLowStockReportRequest request,
         CancellationToken ct = default)

@@ -2,6 +2,7 @@ using FluentAssertions;
 using NUnit.Framework;
 using XFramework.Core.DataContext;
 using XFramework.Domain.Shared.Attributes;
+using XFramework.Integration.Security;
 
 namespace GeneratedAuthorizationContractTests.IdentityServer;
 
@@ -86,6 +87,9 @@ public sealed class GeneratedEntityAuthorizationCompletenessTests
     [TestCase(typeof(global::IdentityServer.Domain.Shared.Contracts.TenantModuleFeature))]
     [TestCase(typeof(global::IdentityServer.Domain.Shared.Contracts.IdentityInformation))]
     [TestCase(typeof(global::IdentityServer.Domain.Shared.Contracts.IdentityCredential))]
+    [TestCase(typeof(global::IdentityServer.Domain.Shared.Contracts.Tenant))]
+    [TestCase(typeof(global::IdentityServer.Domain.Shared.Contracts.Session))]
+    [TestCase(typeof(global::IdentityServer.Domain.Shared.Contracts.AuthorizationLog))]
     public void ManagedTenantPortalEntity_ReadPolicy_AllowsDelegation(Type entityType)
     {
         var registryType = typeof(global::IdentityServer.Api.Features.Auth.ValidateSession.ValidateIdentitySessionEndpoint)
@@ -106,6 +110,38 @@ public sealed class GeneratedEntityAuthorizationCompletenessTests
         policy.TenantAccessMode.Should().Be(XFramework.Integration.Security.TenantAccessMode.DelegatedTenant);
         policy.RequiredCrossTenantActorCapabilities.Should().ContainSingle()
             .Which.Should().Be("identity.tenants:manage");
+    }
+
+    [TestCase("Tenant")]
+    [TestCase("Session")]
+    [TestCase("AuthorizationLog")]
+    public void ManagedTenantPortalEntity_EvaluatedRead_RequiresCapabilityAndDelegation(string entityName)
+    {
+        var registryType = typeof(global::IdentityServer.Api.Features.Auth.ValidateSession.ValidateIdentitySessionEndpoint)
+            .Assembly.GetType("XFramework.Core.DataContext.DataContextEntityRegistrations", true)!;
+        var policies = (IReadOnlyCollection<GeneratedEntityAuthorizationPolicy>)registryType
+            .GetMethod("GetDataContextAuthorizationPolicies")!.Invoke(null, null)!;
+        var policy = policies.Single(candidate => candidate.EntityTypeName == entityName &&
+            candidate.Operation == GeneratedEntityOperation.Read);
+        var homeTenantId = Guid.NewGuid();
+        var targetTenantId = Guid.NewGuid();
+
+        TrustedInvocationContext Context(Guid tenantId, params string[] capabilities) => new(
+            new TrustedActorIdentity(Guid.NewGuid(), Guid.NewGuid(), homeTenantId, Guid.NewGuid(),
+                new HashSet<string>(), capabilities.ToHashSet(), "test", DateTimeOffset.UtcNow.AddMinutes(5)),
+            null, tenantId, tenantId, Guid.NewGuid());
+
+        policy.AllowRemoteMutation.Should().BeFalse();
+        GeneratedEntityAuthorizationEvaluator.Evaluate(
+            Context(targetTenantId, policy.RequiredCapability!, "identity.tenants:manage"), policy)
+            .IsSuccess.Should().BeTrue();
+        GeneratedEntityAuthorizationEvaluator.Evaluate(
+            Context(targetTenantId, policy.RequiredCapability!), policy).StatusCode.Should().Be(403);
+        GeneratedEntityAuthorizationEvaluator.Evaluate(
+            Context(targetTenantId, "identity.tenants:manage"), policy).StatusCode.Should().Be(403);
+        GeneratedEntityAuthorizationEvaluator.Evaluate(
+            Context(homeTenantId, policy.RequiredCapability!), policy).IsSuccess.Should().BeTrue();
+        GeneratedEntityAuthorizationEvaluator.Evaluate(null, policy).IsSuccess.Should().BeFalse();
     }
 
     private static IEnumerable<GeneratedEntityOperation> ExpectedOperations(

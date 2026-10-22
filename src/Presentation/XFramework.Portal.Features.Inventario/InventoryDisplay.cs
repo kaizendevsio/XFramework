@@ -22,6 +22,22 @@ internal static class InventoryDisplay
     public static string Effect(InventoryMovementType type) => type is InventoryMovementType.Reservation or InventoryMovementType.Release
         ? "Reserved" : "On hand";
 
+    public static string MovementName(InventoryMovementType type) => type == InventoryMovementType.OpeningBalance
+        ? "Opening balance" : type.ToString();
+
+    public static string MovementDescription(InventoryMovementType type) => type switch
+    {
+        InventoryMovementType.OpeningBalance => "Adds starting stock to on-hand and available quantities; does not replace the balance.",
+        InventoryMovementType.Receipt => "Adds received stock to on-hand and available quantities.",
+        InventoryMovementType.Adjustment => "Adds or removes on-hand and available stock. Enter a positive or negative quantity.",
+        InventoryMovementType.Transfer => "Requires a source and destination; unavailable in this dialog.",
+        InventoryMovementType.Reservation => "Increases reserved stock and reduces available stock; on-hand stays unchanged.",
+        InventoryMovementType.Release => "Reduces reserved stock and increases available stock; on-hand stays unchanged.",
+        InventoryMovementType.Shipment => "Reduces on-hand and available stock; does not release reserved stock.",
+        InventoryMovementType.Return => "Adds returned stock to on-hand and available quantities.",
+        _ => ""
+    };
+
     public static string Reference(string? type) => type switch
     {
         "POS.SaleLine" => "POS sale line",

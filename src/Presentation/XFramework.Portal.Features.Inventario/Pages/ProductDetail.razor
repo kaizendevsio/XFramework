@@ -250,12 +250,33 @@ else
                                         AdvancedSearchDescription="Search lots and batches for this product."
                                         OnCreate="@(() => OpenLotDialog(ProductWorkflow.Movement))" />
                     }
-                    <InventorySelect TValue="string" @bind-Value="_movementForm.MovementType" Label="Movement Type">
-                        @foreach (var type in Enum.GetValues<InventoryMovementType>())
-                        {
-                            <BbSelectItem Value="@type.ToString()">@type</BbSelectItem>
-                        }
-                    </InventorySelect>
+                    <div class="xf-form-field">
+                        <BbLabel>Movement Type</BbLabel>
+                        <BbPopover @bind-Open="_movementTypeOpen" RestoreFocusOnClose="true">
+                        <BbPopoverTrigger AsChild="false" id="movement-type-trigger" class="xf-entity-picker-trigger" role="combobox" aria-label="Movement Type" aria-haspopup="listbox">
+                            <span>@InventoryDisplay.MovementName(Enum.Parse<InventoryMovementType>(_movementForm.MovementType))</span>
+                            <LucideIcon Name="chevrons-up-down" class="xf-entity-picker-trigger-icon" />
+                        </BbPopoverTrigger>
+                        <BbPopoverContent MatchTriggerWidth="true" Class="xf-entity-picker-popover" AutoFocusId="movement-type-search" OnContentReady="FocusMovementType">
+                            <BbCommand>
+                                <BbCommandInput @ref="_movementTypeSearch" Id="movement-type-search" Placeholder="Search movement types..." />
+                                <BbCommandList>
+                                    @foreach (var type in Enum.GetValues<InventoryMovementType>())
+                                    {
+                                        <BbCommandItem Value="@type.ToString()" SearchText="@InventoryDisplay.MovementName(type)" Disabled="@(type == InventoryMovementType.Transfer)"
+                                                       OnSelect="@(() => SelectMovementType(type))"
+                                                       aria-disabled="@(type == InventoryMovementType.Transfer ? "true" : null)">
+                                            <span class="movement-option">
+                                                <span>@InventoryDisplay.MovementName(type)</span>
+                                                <span class="movement-option-description">@InventoryDisplay.MovementDescription(type)</span>
+                                            </span>
+                                        </BbCommandItem>
+                                    }
+                                </BbCommandList>
+                            </BbCommand>
+                        </BbPopoverContent>
+                        </BbPopover>
+                    </div>
                 </div>
 
                 <div class="grid gap-3 md:grid-cols-3">
@@ -821,6 +842,23 @@ else
     private readonly ProductVariationCombinationDraft _combinationDraft = new();
     private bool _variationTypeDialogOpen;
     private bool _movementDialogOpen;
+    private bool _movementTypeOpen;
+    private BbCommandInput? _movementTypeSearch;
+
+    private async Task FocusMovementType()
+    {
+        // Blueprint 4.1 can signal content readiness before the portaled popup is visible.
+        await Task.Delay(100);
+        if (_disposed || !_movementDialogOpen || !_movementTypeOpen || _movementTypeSearch is null) return;
+        try { await _movementTypeSearch.FocusAsync(); }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException) { }
+    }
+
+    private void SelectMovementType(InventoryMovementType type)
+    {
+        _movementForm.MovementType = type.ToString();
+        _movementTypeOpen = false;
+    }
     private bool _lotDialogOpen;
     private bool _receiveDialogOpen;
     private bool _ruleDialogOpen;
@@ -1844,6 +1882,7 @@ else
         _movementForm.ProductId = Id.ToString();
         _movementForm.WarehouseId = warehouseId?.ToString() ?? "";
         _movementForm.LocationId = location?.Id.ToString() ?? "";
+        _movementTypeOpen = false;
         _movementDialogOpen = true;
     }
 
@@ -1856,6 +1895,7 @@ else
         _movementForm.WarehouseId = balance.WarehouseId.ToString();
         _movementForm.LocationId = balance.LocationId.ToString();
         _movementForm.LotId = balance.LotId?.ToString() ?? "";
+        _movementTypeOpen = false;
         _movementDialogOpen = true;
         return Task.CompletedTask;
     }

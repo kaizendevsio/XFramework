@@ -48,20 +48,26 @@ public sealed class EffectiveCredentialCapabilitiesTests : IntegrationTestBase
         capability.DecisionSource.Should().Be("RoleTypePermissionDeny");
     }
 
-    [Test]
-    public async Task GetEffectiveCredentialCapabilities_TenantFeatureDisabled_DeniesAllowedRolePermission()
+    [TestCase(TenantModuleFeatureKeys.Wallets, TenantModuleFeatureKeys.TransfersSubFeature)]
+    [TestCase(TenantModuleFeatureKeys.Pos, "")]
+    [TestCase(TenantModuleFeatureKeys.Pos, TenantModuleFeatureKeys.SalesSubFeature)]
+    [TestCase(TenantModuleFeatureKeys.Pos, TenantModuleFeatureKeys.ReturnsSubFeature)]
+    [TestCase(TenantModuleFeatureKeys.Inventario, TenantModuleFeatureKeys.InventarioReportingSubFeature)]
+    [TestCase(TenantModuleFeatureKeys.Inventario, TenantModuleFeatureKeys.ReservationsSubFeature)]
+    public async Task GetEffectiveCredentialCapabilities_TenantFeatureDisabled_DeniesAllowedRolePermission(
+        string moduleKey, string subFeatureKey)
     {
         var scenario = await SeedScenario(MissingPermissionBehavior.Allow);
         await SeedTenantFeature(
             scenario.TenantId,
-            TenantModuleFeatureKeys.Wallets,
-            TenantModuleFeatureKeys.TransfersSubFeature,
+            moduleKey,
+            subFeatureKey,
             isEnabled: false);
         await SeedRoleTypePermission(
             scenario.TenantId,
             scenario.Roles[0].TypeId!.Value,
-            TenantModuleFeatureKeys.Wallets,
-            TenantModuleFeatureKeys.TransfersSubFeature,
+            moduleKey,
+            subFeatureKey,
             IdentityAuthorizationConstants.View,
             RoleCapabilityPermissionEffect.Allow);
 
@@ -69,11 +75,215 @@ public sealed class EffectiveCredentialCapabilitiesTests : IntegrationTestBase
 
         var capability = GetCapability(
             result,
-            TenantModuleFeatureKeys.Wallets,
-            TenantModuleFeatureKeys.TransfersSubFeature,
+            moduleKey,
+            subFeatureKey,
             IdentityAuthorizationConstants.View);
         capability.IsAllowed.Should().BeFalse();
         capability.DecisionSource.Should().Be("TenantFeatureDisabled");
+    }
+
+    [TestCase(IdentityAuthorizationConstants.View, false)]
+    [TestCase(IdentityAuthorizationConstants.Manage, false)]
+    [TestCase(IdentityAuthorizationConstants.View, true)]
+    [TestCase(IdentityAuthorizationConstants.Manage, true)]
+    public async Task PosReportingCapabilities_ExplicitGrant_DoesNotDependOnHomeTenantFeature(
+        string grantedCapability, bool homeFeatureEnabled)
+    {
+        var scenario = await SeedScenario(MissingPermissionBehavior.Deny);
+        await SeedTenantFeature(scenario.TenantId, TenantModuleFeatureKeys.Pos,
+            TenantModuleFeatureKeys.PosReportingSubFeature, homeFeatureEnabled);
+        await SeedRoleTypePermission(scenario.TenantId, scenario.Roles[0].TypeId!.Value,
+            TenantModuleFeatureKeys.Pos, TenantModuleFeatureKeys.PosReportingSubFeature,
+            grantedCapability, RoleCapabilityPermissionEffect.Allow);
+
+        await AssertPosReportingCapability(scenario, true, "RoleTypePermissionAllow");
+    }
+
+    [TestCase(false, IdentityAuthorizationConstants.View)]
+    [TestCase(false, IdentityAuthorizationConstants.Manage)]
+    [TestCase(true, IdentityAuthorizationConstants.View)]
+    [TestCase(true, IdentityAuthorizationConstants.Manage)]
+    public async Task PosReportingCapabilities_HomeFeatureDisabled_DenyStillOverridesAnotherRoleGrant(
+        bool credentialOverride, string deniedCapability)
+    {
+        var scenario = await SeedScenario(MissingPermissionBehavior.Allow, roleCount: 2);
+        await SeedTenantFeature(scenario.TenantId, TenantModuleFeatureKeys.Pos,
+            TenantModuleFeatureKeys.PosReportingSubFeature, isEnabled: false);
+        foreach (var role in scenario.Roles)
+        {
+            await SeedRoleTypePermission(scenario.TenantId, role.TypeId!.Value,
+                TenantModuleFeatureKeys.Pos, TenantModuleFeatureKeys.PosReportingSubFeature,
+                IdentityAuthorizationConstants.View, RoleCapabilityPermissionEffect.Allow);
+        }
+
+        await using (var db = CreateDbContext())
+        {
+            if (credentialOverride)
+            {
+                db.Set<IdentityRoleFeaturePermissionOverride>().Add(new IdentityRoleFeaturePermissionOverride
+                {
+                    Id = Guid.NewGuid(), TenantId = scenario.TenantId, IdentityRoleId = scenario.Roles[1].Id,
+                    ModuleKey = TenantModuleFeatureKeys.Pos, SubFeatureKey = TenantModuleFeatureKeys.PosReportingSubFeature,
+                    CapabilityKey = deniedCapability, Effect = RoleCapabilityPermissionEffect.Deny,
+                    IsEnabled = true, CreatedAt = DateTime.UtcNow
+                });
+            }
+            else
+            {
+                // Replace the second role's grant to exercise deny precedence across active roles.
+                var permission = await db.Set<IdentityRoleTypeFeaturePermission>().IgnoreQueryFilters().AsTracking()
+                    .SingleAsync(x => x.TenantId == scenario.TenantId && x.RoleTypeId == scenario.Roles[1].TypeId);
+                permission.CapabilityKey = deniedCapability;
+                permission.Effect = RoleCapabilityPermissionEffect.Deny;
+            }
+            await db.SaveChangesAsync();
+        }
+
+        await AssertPosReportingCapability(scenario, false,
+            credentialOverride ? "CredentialRoleOverrideDeny" : "RoleTypePermissionDeny");
+    }
+
+    [TestCase(MissingPermissionBehavior.Allow, false)]
+    [TestCase(MissingPermissionBehavior.Deny, false)]
+    [TestCase(MissingPermissionBehavior.Allow, true)]
+    [TestCase(MissingPermissionBehavior.Deny, true)]
+    public async Task PosReportingCapabilities_NoExplicitGrant_DeniesRegardlessOfTenantDefault(
+        MissingPermissionBehavior missingBehavior, bool homeFeatureEnabled)
+    {
+        var scenario = await SeedScenario(missingBehavior);
+        await SeedTenantFeature(scenario.TenantId, TenantModuleFeatureKeys.Pos,
+            TenantModuleFeatureKeys.PosReportingSubFeature, homeFeatureEnabled);
+        await SeedTenantFeature(scenario.TenantId, TenantModuleFeatureKeys.Identity,
+            TenantModuleFeatureKeys.TenantsSubFeature, isEnabled: true);
+        await SeedRoleTypePermission(scenario.TenantId, scenario.Roles[0].TypeId!.Value,
+            TenantModuleFeatureKeys.Identity, TenantModuleFeatureKeys.TenantsSubFeature,
+            IdentityAuthorizationConstants.Manage, RoleCapabilityPermissionEffect.Allow);
+
+        await AssertPosReportingCapability(scenario, false, "TenantDefaultDeny");
+    }
+
+    [Test]
+    public async Task PosReportingCapabilities_NoActiveRole_DeniesEvenWithPermissiveTenantDefault()
+    {
+        var scenario = await SeedScenario(MissingPermissionBehavior.Allow, roleCount: 0);
+
+        await AssertPosReportingCapability(scenario, false, "NoActiveRole");
+    }
+
+    [TestCase(IdentityAuthorizationConstants.View, true)]
+    [TestCase(IdentityAuthorizationConstants.Manage, true)]
+    [TestCase(IdentityAuthorizationConstants.View, false)]
+    [TestCase(IdentityAuthorizationConstants.Manage, false)]
+    public async Task InventarioPlanningCapabilities_HomeDisabled_PreservesExplicitGrantAndIndependentTargetGate(
+        string grantedCapability, bool targetEnabled)
+    {
+        var home = await SeedScenario(MissingPermissionBehavior.Deny);
+        var target = await SeedScenario(MissingPermissionBehavior.Deny, roleCount: 0);
+        await SeedTenantFeature(home.TenantId, TenantModuleFeatureKeys.Inventario,
+            TenantModuleFeatureKeys.PlanningSubFeature, isEnabled: false);
+        await SeedTenantFeature(target.TenantId, TenantModuleFeatureKeys.Inventario,
+            TenantModuleFeatureKeys.PlanningSubFeature, isEnabled: targetEnabled);
+        await SeedRoleTypePermission(home.TenantId, home.Roles[0].TypeId!.Value,
+            TenantModuleFeatureKeys.Inventario, TenantModuleFeatureKeys.PlanningSubFeature,
+            grantedCapability, RoleCapabilityPermissionEffect.Allow);
+
+        await AssertCapability(home, TenantModuleFeatureKeys.Inventario, TenantModuleFeatureKeys.PlanningSubFeature,
+            true, "RoleTypePermissionAllow");
+
+        await using var scope = IntegrationTestFixture.Services.CreateAsyncScope();
+        var features = scope.ServiceProvider.GetRequiredService<XFramework.Core.Services.FeatureGates.ITenantModuleFeatureService>();
+        var homeGate = await features.EnsureEnabledAsync(home.TenantId, TenantModuleFeatureKeys.Inventario,
+            TenantModuleFeatureKeys.PlanningSubFeature);
+        var targetGate = await features.EnsureEnabledAsync(target.TenantId, TenantModuleFeatureKeys.Inventario,
+            TenantModuleFeatureKeys.PlanningSubFeature);
+        homeGate.IsSuccess.Should().BeFalse();
+        homeGate.StatusCode.Should().Be(403);
+        targetGate.IsSuccess.Should().Be(targetEnabled);
+        targetGate.StatusCode.Should().Be(targetEnabled ? 200 : 403);
+    }
+
+    [TestCase(false, IdentityAuthorizationConstants.View)]
+    [TestCase(false, IdentityAuthorizationConstants.Manage)]
+    [TestCase(true, IdentityAuthorizationConstants.View)]
+    [TestCase(true, IdentityAuthorizationConstants.Manage)]
+    public async Task InventarioPlanningCapabilities_HomeDisabled_DenyOverridesAnotherRoleGrant(
+        bool credentialOverride, string deniedCapability)
+    {
+        var scenario = await SeedScenario(MissingPermissionBehavior.Allow, roleCount: 2);
+        await SeedTenantFeature(scenario.TenantId, TenantModuleFeatureKeys.Inventario,
+            TenantModuleFeatureKeys.PlanningSubFeature, isEnabled: false);
+        await SeedRoleTypePermission(scenario.TenantId, scenario.Roles[0].TypeId!.Value,
+            TenantModuleFeatureKeys.Inventario, TenantModuleFeatureKeys.PlanningSubFeature,
+            IdentityAuthorizationConstants.View, RoleCapabilityPermissionEffect.Allow);
+        await SeedRoleTypePermission(scenario.TenantId, scenario.Roles[1].TypeId!.Value,
+            TenantModuleFeatureKeys.Inventario, TenantModuleFeatureKeys.PlanningSubFeature,
+            deniedCapability, credentialOverride ? RoleCapabilityPermissionEffect.Allow : RoleCapabilityPermissionEffect.Deny);
+        if (credentialOverride)
+        {
+            await using var db = CreateDbContext();
+            db.Set<IdentityRoleFeaturePermissionOverride>().Add(new IdentityRoleFeaturePermissionOverride
+            {
+                Id = Guid.NewGuid(), TenantId = scenario.TenantId, IdentityRoleId = scenario.Roles[1].Id,
+                ModuleKey = TenantModuleFeatureKeys.Inventario, SubFeatureKey = TenantModuleFeatureKeys.PlanningSubFeature,
+                CapabilityKey = deniedCapability, Effect = RoleCapabilityPermissionEffect.Deny,
+                IsEnabled = true, CreatedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        await AssertCapability(scenario, TenantModuleFeatureKeys.Inventario, TenantModuleFeatureKeys.PlanningSubFeature,
+            false, credentialOverride ? "CredentialRoleOverrideDeny" : "RoleTypePermissionDeny");
+    }
+
+    [TestCase(0, "NoActiveRole")]
+    [TestCase(1, "TenantDefaultDeny")]
+    public async Task InventarioPlanningCapabilities_NoExplicitGrant_PermissiveDefaultDoesNotGrantAccess(
+        int roleCount, string expectedSource)
+    {
+        var scenario = await SeedScenario(MissingPermissionBehavior.Allow, roleCount);
+        await SeedTenantFeature(scenario.TenantId, TenantModuleFeatureKeys.Inventario,
+            TenantModuleFeatureKeys.PlanningSubFeature, isEnabled: false);
+        if (roleCount > 0)
+        {
+            await SeedRoleTypePermission(scenario.TenantId, scenario.Roles[0].TypeId!.Value,
+                TenantModuleFeatureKeys.Identity, TenantModuleFeatureKeys.TenantsSubFeature,
+                IdentityAuthorizationConstants.Manage, RoleCapabilityPermissionEffect.Allow);
+        }
+
+        await AssertCapability(scenario, TenantModuleFeatureKeys.Inventario, TenantModuleFeatureKeys.PlanningSubFeature,
+            false, expectedSource);
+    }
+
+    private static Task AssertPosReportingCapability(CapabilityScenario scenario, bool expectedAllowed, string expectedSource) =>
+        AssertCapability(scenario, TenantModuleFeatureKeys.Pos, TenantModuleFeatureKeys.PosReportingSubFeature,
+            expectedAllowed, expectedSource);
+
+    private static async Task AssertCapability(
+        CapabilityScenario scenario, string moduleKey, string subFeatureKey, bool expectedAllowed, string expectedSource)
+    {
+        var effective = GetCapability(await GetEffectiveCapabilities(scenario),
+            moduleKey, subFeatureKey,
+            IdentityAuthorizationConstants.View);
+        effective.IsAllowed.Should().Be(expectedAllowed);
+        effective.DecisionSource.Should().Be(expectedSource);
+
+        await using var scope = IntegrationTestFixture.Services.CreateAsyncScope();
+        IntegrationTestFixture.EstablishTrustedActorContext(scope.ServiceProvider, scenario.TenantId, scenario.CredentialId);
+        var service = scope.ServiceProvider.GetRequiredService<IIdentityAuthorizationService>();
+        var trusted = GetCapability(await service.GetTrustedEffectiveCredentialCapabilitiesAsync(scenario.TenantId, scenario.CredentialId),
+            moduleKey, subFeatureKey,
+            IdentityAuthorizationConstants.View);
+        trusted.Should().BeEquivalentTo(effective, "actor-token capabilities must match the public capability matrix");
+        var check = await service.CheckCredentialCapabilityAsync(new CheckCredentialCapabilityRequest
+        {
+            CredentialId = scenario.CredentialId, ModuleKey = moduleKey,
+            SubFeatureKey = subFeatureKey,
+            CapabilityKey = IdentityAuthorizationConstants.View,
+            Metadata = new RequestMetadata { RequestId = Guid.NewGuid() }
+        });
+        check.IsSuccess.Should().BeTrue(check.Message);
+        check.StatusCode.Should().Be(200);
+        check.Data.Should().BeEquivalentTo(effective, "single-capability checks must use the same policy as actor-token issuance");
     }
 
     [TestCase(MissingPermissionBehavior.Allow, true, "TenantDefaultAllow")]

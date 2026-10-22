@@ -95,6 +95,18 @@ Inventario is not the owner of identities, tenant membership, payments, wallet b
 - Portal pages must hide or disable Inventario workflows when the tenant feature or subfeature is unavailable.
 - If feature keys, route prefixes, or tenant-module behavior change, update `InventarioFeatureGateRoutes`, Portal navigation, integration tests, and this guide.
 
+### Verified Coverage Boundaries
+
+- Tenant detail's `API gated` badge describes implemented feature enforcement, not completion of an extended inventory subsystem. Purchasing, Traceability, Planning, Reporting, Negative Stock, and reservation Fulfillment are implemented. Legacy built-in descriptions are displayed using the corrected catalog scope; custom stored labels/descriptions are preserved.
+- Purchasing has suppliers, purchase orders/status transitions, and idempotent receiving that posts stock and updates order quantities. Planning has reorder rules, low-stock queries, and rule-based reorder suggestions; this is not demand forecasting.
+- Traceability has product/variant lots, batch references, expiry, and lot-aware stock/allocation workflows; this is not a serial-number tracking subsystem. Reporting has stock positions, movement ledgers, allocation status, low-stock/expiry reports, and snapshots; do not infer a valuation engine from the catalog description.
+- Negative Stock is already enforced by `StockPostingService` for both ordinary posting and transfers. A negative result requires both request `AllowNegativeStock` and the tenant's `inventario.negative_stock` feature; enabling the feature alone is not an override.
+- Fulfillment means the existing reservation shipping workflow, not separate pick/pack. `ReservationService.FulfillAsync` checks `inventario.fulfillment` before reading or mutating the reservation; existing reservation route permissions remain unchanged. Fulfillment requires Reservations, and POS Sales declares Fulfillment as a prerequisite. POS checks the flag before continuing checkout and immediately before external payment capture/retry; completed-sale replays remain readable.
+- Deploy migration `20261022010000_EnableExistingReservationFulfillment` through the migration runner **before** deploying the new gate. The data-only migration enables missing/disabled legacy Fulfillment placeholders for enabled, non-deleted tenants with enabled, non-deleted Inventario and Reservations. It preserves custom metadata, deleted Fulfillment rows, and all other feature choices; changed tenants receive fresh concurrency stamps. New tenants keep Fulfillment default-off. Explicitly deleted Fulfillment rows require administrator repair before shipping. Rollback preserves grants; services never auto-enable the flag at runtime, so later disablement is respected.
+- Evidence: `InventarioPlannedFeatureGateTests` covers service denials before data access and route mappings; `StockPostingServiceTests` covers negative shipment/transfer opt-in and feature combinations. Existing `PurchasingServiceTests`, `InventoryPlanningReportingServiceTests`, and `ReservationServiceTests` exercise workflow success. PostgreSQL/wrapper coverage lives in `PlanningPurchasingReportingTests`, `WarehousingTraceabilityTests`, and `StockReservationTests`; source coverage is not a claim that those integration suites ran in a metadata-only review.
+- Fulfillment rollout regression coverage lives in `FulfillmentRolloutMigrationTests` (PostgreSQL cohort/default/tombstone/custom-metadata/stamp checks), `PosReadinessRegressionTests` (disabled checkout/payment retry and completed replay), and `ReservationServiceTests` (disabled no-write and enabled shipping/replay).
+- POS's pre-payment fulfillment recheck must run before persisting a new Pending payment or PaymentPending sale. Denial before the first payment attempt leaves reserved inventory cancellable. Never downgrade an existing Pending payment on feature denial: an earlier charge may have succeeded with a lost response, so its existing recovery and cancellation protections must remain intact.
+
 ## Portal Rules
 
 - Follow `rules/UiGuidelines.md` for every Inventario UI change.
@@ -177,6 +189,9 @@ dotnet build src\Tests\Inventario.IntegrationTests\Inventario.IntegrationTests.c
 - Documentation-only changes should at least run `git diff --check` and verify referenced paths.
 
 ## Do
+
+- Overview low stock counts active reorder-rule positions, not unique products. Use `GetLowStockCount` for the uncapped SQL aggregate and `GetReorderSuggestionPage` for bounded Planning pages; both aggregate all matching balances before filtering/paging rules. Preserve the original legacy list contracts and their 1,000-row bound.
+- Planning validates its `warehouseId` query scope against the selected tenant and rejects unavailable scope without broadening it. The paged endpoint requires `inventario.planning:view` on both REST and Bolt. Native supplier filtering runs on the server before count/page calculation; other suggestion columns deliberately do not advertise unsupported filtering or sorting. Rule-grid filters remain native.
 
 - Keep Inventario tenant-scoped and inventory-focused.
 - Use Inventario services and wrapper contracts for business behavior.

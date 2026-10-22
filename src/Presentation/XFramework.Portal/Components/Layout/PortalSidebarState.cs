@@ -32,8 +32,10 @@ public sealed class PortalSidebarState
     public void ActivateGroup(string? groupId)
     {
         if (ActiveGroupId == groupId) return;
+        if (ActiveGroupId is not null)
+            _openGroups.Remove(ActiveGroupId);
         ActiveGroupId = groupId;
-        if (groupId is "tenant-detail" or "user-detail" or "wallet-detail" or "product-detail" or "tenant-admin")
+        if (!string.IsNullOrWhiteSpace(groupId))
             _openGroups.Add(groupId);
     }
 

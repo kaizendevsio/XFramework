@@ -86,6 +86,9 @@ public sealed partial class InventoryReportsE2ETests : PageTest
         var wrapper = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
         wrapper.Setup(x => x.GetInventoryReportSnapshot(It.IsAny<GetInventoryReportSnapshotRequest>(), It.IsAny<CancellationToken>()))
             .Returns((GetInventoryReportSnapshotRequest request, CancellationToken ct) => state.Load(request, ct));
+        wrapper.Setup(x => x.GetLowStockCount(It.IsAny<GetLowStockCountRequest>(), It.IsAny<CancellationToken>()))
+            .Returns((GetLowStockCountRequest request, CancellationToken ct) => state.LoadLowStock(request, ct));
+        ConfigurePlanningFixture(builder.Services, wrapper);
         builder.Services.AddSingleton(wrapper.Object);
         app = builder.Build();
         app.UseStaticFiles();
@@ -467,7 +470,7 @@ public sealed partial class InventoryReportsE2ETests : PageTest
     }
 }
 
-public sealed class InventoryReportFixtureState
+public sealed partial class InventoryReportFixtureState
 {
     public Guid FirstTenant { get; } = Guid.NewGuid();
     public Guid SecondTenant { get; } = Guid.NewGuid();
@@ -492,6 +495,8 @@ public sealed class InventoryReportFixtureState
         HoldAvailability = null; AvailabilityEntered = null; AvailabilityTenants.Clear();
         Active = 0; MaxActive = 0; CanceledRequests = 0; PositionRows = 1; ReportingEnabled = true; Requests.Clear();
         OnHand = 20; Reserved = 5; Available = 15;
+        LowStockRequests.Clear(); LowStockRows = 1207; LowStockStatus = HttpStatusCode.OK; HoldLowStock = null;
+        PlanningRequests.Clear(); PlanningStatus = HttpStatusCode.OK; HoldPlanning = null;
     }
     public async Task EnsureAvailability(CancellationToken ct)
     {
@@ -550,6 +555,7 @@ public sealed class InventoryReportFixtureAuth(IOptionsMonitor<AuthenticationSch
 
 [Route("/inventario/reports")]
 [Route("/inventario/overview")]
+[Route("/inventario/planning")]
 public sealed class InventoryReportFixtureRoot : ComponentBase
 {
     protected override void BuildRenderTree(RenderTreeBuilder b)

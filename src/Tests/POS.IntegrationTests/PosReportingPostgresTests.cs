@@ -11,6 +11,7 @@ using Testcontainers.PostgreSql;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Contexts;
+using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Security;
 using XFramework.TestInfrastructure;
 using CurrencyType = Wallets.Domain.Shared.Contracts.CurrencyType;
@@ -126,6 +127,45 @@ public sealed class PosReportingPostgresTests
         filtered.Data!.Currencies.Should().ContainSingle(x => x.Total == 10);
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task Report_DelegatedAdministrator_UsesTargetFeatureAndReturnsOnlyTargetSales(bool targetFeatureEnabled)
+    {
+        var homeTenant = Guid.NewGuid();
+        var targetTenant = Guid.NewGuid();
+        var currency = Guid.NewGuid();
+        var homeRegister = Register(homeTenant, currency);
+        await using (var homeDb = Context(homeTenant))
+        {
+            homeDb.AddRange(homeRegister, Sale(homeRegister, currency, Start, 900));
+            await homeDb.SaveChangesAsync();
+        }
+        await using var db = Context(targetTenant);
+        var targetRegister = Register(targetTenant, currency);
+        var targetSale = Sale(targetRegister, currency, Start, 25);
+        db.AddRange(targetRegister, targetSale);
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        var result = await Service(db, targetTenant, homeTenant, targetFeatureEnabled)
+            .GetSalesReportAsync(Request(targetTenant), CancellationToken.None);
+
+        result.IsSuccess.Should().Be(targetFeatureEnabled, result.Message);
+        result.StatusCode.Should().Be(targetFeatureEnabled ? 200 : 403);
+        if (targetFeatureEnabled)
+        {
+            result.Data!.TenantId.Should().Be(targetTenant);
+            result.Data.TotalCount.Should().Be(1);
+            result.Data.Rows.Should().ContainSingle(x => x.Id == targetSale.Id);
+            result.Data.Currencies.Should().ContainSingle(x => x.Total == 25);
+        }
+        else
+        {
+            result.Data.Should().BeNull();
+            result.Message.Should().Be("Target reporting is disabled.");
+        }
+    }
+
     private AppDbContext Context(Guid tenant) => new(options, new HttpContextAccessor(), new ConfigurationBuilder().Build(), new TestEffectiveTenantContextAccessor(tenant));
 
     [Test]
@@ -205,13 +245,17 @@ public sealed class PosReportingPostgresTests
         var wallet = (await service.GetSalesReportAsync(Request(tenant) with { PaymentMethod = PosPaymentMethod.WalletTransfer }, CancellationToken.None)).Data!;
         wallet.RefundCount.Should().Be(0);
     }
-    private static PosReportingService Service(AppDbContext db, Guid tenant)
+    private static PosReportingService Service(AppDbContext db, Guid tenant, Guid? actorTenant = null, bool reportingEnabled = true)
     {
-        var actor = new TrustedActorIdentity(Guid.NewGuid(), Guid.NewGuid(), tenant, Guid.NewGuid(), new HashSet<string>(),
-            new HashSet<string> { PosAuthorizationCapabilities.ReportingView }, "tests", DateTimeOffset.UtcNow.AddHours(1));
+        var capabilities = new HashSet<string> { PosAuthorizationCapabilities.ReportingView };
+        if (actorTenant.HasValue && actorTenant != tenant)
+            capabilities.Add(XFrameworkActorCapabilities.IdentityTenantsManage);
+        var actor = new TrustedActorIdentity(Guid.NewGuid(), Guid.NewGuid(), actorTenant ?? tenant, Guid.NewGuid(), new HashSet<string>(),
+            capabilities, "tests", DateTimeOffset.UtcNow.AddHours(1));
         var accessor = new Accessor(new(actor, null, tenant, null, Guid.NewGuid()));
         var features = new Mock<ITenantModuleFeatureService>(MockBehavior.Strict);
-        features.Setup(x => x.EnsureEnabledAsync(tenant, "pos", "reporting", It.IsAny<CancellationToken>())).ReturnsAsync(Result.Success());
+        features.Setup(x => x.EnsureEnabledAsync(tenant, "pos", "reporting", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(reportingEnabled ? Result.Success() : Result.Forbidden("Target reporting is disabled."));
         features.Setup(x => x.EnsureEnabledAsync(tenant, "wallets", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Failure("Wallets is disabled.", 403));
         return new(db, new PosRequestContextResolver(accessor), accessor, features.Object, NullLogger<PosReportingService>.Instance);

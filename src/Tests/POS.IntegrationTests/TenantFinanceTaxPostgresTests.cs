@@ -177,7 +177,10 @@ public sealed class TenantFinanceTaxPostgresTests
         resolver.Setup(x => x.Resolve(It.IsAny<RequestBase>(), It.IsAny<Guid?>()))
             .Returns((RequestBase r, Guid? actor) => Result<PosRequestContext>.Success(new(tenant, actor, r.Metadata, true, false)));
         var finance = new PosFinanceSettings(identity.Object);
-        var sales = new PosSalesService(db, inventory.Object, null!, resolver.Object, NullLogger<PosSalesService>.Instance, finance, new PosCheckoutSettingsService(db, resolver.Object));
+        var features = new Mock<XFramework.Core.Services.FeatureGates.ITenantModuleFeatureService>();
+        features.Setup(x => x.EnsureEnabledAsync(tenant, "inventario", "fulfillment", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        var sales = new PosSalesService(db, inventory.Object, null!, resolver.Object, NullLogger<PosSalesService>.Instance, finance, new PosCheckoutSettingsService(db, resolver.Object), features.Object);
         var carts = new PosCartService(db, inventory.Object, sales, resolver.Object, NullLogger<PosCartService>.Instance, finance, new PosCheckoutSettingsService(db, resolver.Object));
         var cart = await carts.CreateAsync(new()
         { RegisterId = register.Id, CashierCredentialId = Guid.NewGuid(), DiscountAmount = 10, Lines = [new() { ProductId = productId, Quantity = 1, DiscountAmount = 20 }] }, CancellationToken.None);

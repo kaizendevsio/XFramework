@@ -13,6 +13,7 @@ using Testcontainers.PostgreSql;
 using Wallets.Domain.Shared.Contracts.Requests;
 using Wallets.Integration.Drivers;
 using XFramework.Core.Patterns;
+using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts.Requests;
@@ -330,6 +331,120 @@ public sealed class PosReadinessRegressionTests
         persisted.Lines.Should().ContainSingle().Which.ReservationId.Should().NotBeNull();
     }
 
+    [Test]
+    public async Task CheckoutAsync_FulfillmentDisabledAtSecondCheckBeforeFirstPayment_RemainsCancellableWithoutCharge()
+    {
+        var tenant = Guid.NewGuid();
+        await using var db = Context(tenant);
+        var sale = Sale(tenant, PosSaleStatus.InventoryReserved);
+        var request = CheckoutRequest(sale.Register);
+        sale.IdempotencyKey = request.IdempotencyKey!;
+        sale.RequestHash = PosServiceHelpers.BuildSaleRequestHash(request);
+        var line = Line(sale);
+        var reservationId = line.ReservationId;
+        sale.Lines.Add(line);
+        db.Add(sale);
+        await db.SaveChangesAsync();
+        var features = new Mock<ITenantModuleFeatureService>(MockBehavior.Strict);
+        features.SetupSequence(x => x.EnsureEnabledAsync(tenant, "inventario", "fulfillment", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success())
+            .ReturnsAsync(Result.Forbidden("Fulfillment disabled"));
+        var inventory = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
+        inventory.Setup(x => x.ReleaseReservation(
+                It.Is<ReleaseReservationRequest>(r => r.ReservationId == reservationId), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CmdResponse { HttpStatusCode = HttpStatusCode.OK });
+        var wallets = new Mock<IWalletsServiceWrapper>(MockBehavior.Strict);
+        var service = Service(db, tenant, inventory, wallets, features.Object);
+
+        var checkout = await service.CheckoutAsync(request, CancellationToken.None);
+
+        checkout.StatusCode.Should().Be(403);
+        inventory.VerifyNoOtherCalls();
+        wallets.VerifyNoOtherCalls();
+        db.ChangeTracker.Clear();
+        (await db.Set<PosSale>().SingleAsync(x => x.Id == sale.Id)).Status.Should().Be(PosSaleStatus.InventoryReserved);
+        (await db.Set<PosPayment>().CountAsync(x => x.SaleId == sale.Id)).Should().Be(0);
+
+        var cancelled = await service.CancelAsync(new() { SaleId = sale.Id }, CancellationToken.None);
+
+        cancelled.IsSuccess.Should().BeTrue(cancelled.Message);
+        inventory.Verify(x => x.ReleaseReservation(
+            It.Is<ReleaseReservationRequest>(r => r.ReservationId == reservationId), It.IsAny<CancellationToken>()), Times.Once);
+        inventory.VerifyNoOtherCalls();
+        wallets.VerifyNoOtherCalls();
+        features.Verify(x => x.EnsureEnabledAsync(tenant, "inventario", "fulfillment", It.IsAny<CancellationToken>()), Times.Exactly(2));
+        db.ChangeTracker.Clear();
+        var persisted = await db.Set<PosSale>().Include(x => x.Lines).SingleAsync(x => x.Id == sale.Id);
+        persisted.Status.Should().Be(PosSaleStatus.Cancelled);
+        persisted.Lines.Should().OnlyContain(x => x.ReservationId == null);
+        (await db.Set<PosPayment>().CountAsync(x => x.SaleId == sale.Id)).Should().Be(0);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task RetryPaymentAsync_FulfillmentDisabledBeforeCharge_DoesNotCallWallet(bool disableAtRecheck)
+    {
+        var tenant = Guid.NewGuid();
+        await using var db = Context(tenant);
+        var sale = Sale(tenant, PosSaleStatus.PaymentPending);
+        sale.Lines.Add(Line(sale));
+        var payment = Payment(sale, PosPaymentStatus.Pending);
+        payment.FailureReason = "Previous payment response was lost";
+        sale.Payments.Add(payment);
+        db.Add(sale);
+        await db.SaveChangesAsync();
+        var features = new Mock<ITenantModuleFeatureService>(MockBehavior.Strict);
+        var checks = 0;
+        features.Setup(x => x.EnsureEnabledAsync(tenant, "inventario", "fulfillment", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => disableAtRecheck && ++checks == 1 ? Result.Success() : Result.Forbidden("Fulfillment disabled"));
+        var inventory = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
+        var wallets = new Mock<IWalletsServiceWrapper>(MockBehavior.Strict);
+
+        var service = Service(db, tenant, inventory, wallets, features.Object);
+        var result = await service.RetryPaymentAsync(new() { SaleId = sale.Id }, CancellationToken.None);
+        var cancellation = await service.CancelAsync(new() { SaleId = sale.Id }, CancellationToken.None);
+
+        result.StatusCode.Should().Be(403);
+        cancellation.StatusCode.Should().Be(409, "an earlier charge may have succeeded even though its response was lost");
+        inventory.VerifyNoOtherCalls();
+        wallets.VerifyNoOtherCalls();
+        features.Verify(x => x.EnsureEnabledAsync(tenant, "inventario", "fulfillment", It.IsAny<CancellationToken>()),
+            Times.Exactly(disableAtRecheck ? 2 : 1));
+        db.ChangeTracker.Clear();
+        var persistedPayment = await db.Set<PosPayment>().SingleAsync(x => x.SaleId == sale.Id);
+        persistedPayment.Status.Should().Be(PosPaymentStatus.Pending);
+        persistedPayment.FailureReason.Should().Be("Previous payment response was lost");
+        (await db.Set<PosSale>().SingleAsync(x => x.Id == sale.Id)).Status.Should().Be(PosSaleStatus.PaymentPending);
+    }
+
+    [TestCase(PosSaleStatus.Draft, 403)]
+    [TestCase(PosSaleStatus.Completed, 200)]
+    public async Task CheckoutAsync_FulfillmentDisabled_BlocksNewReservationButPreservesCompletedReplay(PosSaleStatus status, int expected)
+    {
+        var tenant = Guid.NewGuid();
+        await using var db = Context(tenant);
+        var sale = Sale(tenant, status);
+        var request = CheckoutRequest(sale.Register);
+        sale.IdempotencyKey = request.IdempotencyKey!;
+        sale.RequestHash = PosServiceHelpers.BuildSaleRequestHash(request);
+        db.Add(sale);
+        await db.SaveChangesAsync();
+        var features = new Mock<ITenantModuleFeatureService>(MockBehavior.Strict);
+        features.Setup(x => x.EnsureEnabledAsync(tenant, "inventario", "fulfillment", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Forbidden("Fulfillment disabled"));
+        var inventory = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
+        var wallets = new Mock<IWalletsServiceWrapper>(MockBehavior.Strict);
+
+        var result = await Service(db, tenant, inventory, wallets, features.Object).CheckoutAsync(request, CancellationToken.None);
+
+        result.StatusCode.Should().Be(expected);
+        inventory.VerifyNoOtherCalls();
+        wallets.VerifyNoOtherCalls();
+        db.ChangeTracker.Clear();
+        (await db.Set<PosSale>().SingleAsync(x => x.Id == sale.Id)).Status.Should().Be(status);
+        (await db.Set<PosPayment>().CountAsync(x => x.SaleId == sale.Id)).Should().Be(0);
+    }
+
     private AppDbContext Context(Guid tenant) => new(options, new HttpContextAccessor(),
         new ConfigurationBuilder().Build(), new TestEffectiveTenantContextAccessor(tenant));
 
@@ -337,7 +452,8 @@ public sealed class PosReadinessRegressionTests
         AppDbContext db,
         Guid tenant,
         Mock<IInventarioServiceWrapper> inventory,
-        Mock<IWalletsServiceWrapper>? wallets = null)
+        Mock<IWalletsServiceWrapper>? wallets = null,
+        ITenantModuleFeatureService? features = null)
     {
         var resolver = new Mock<IPosRequestContextResolver>();
         resolver.Setup(r => r.Resolve(It.IsAny<RequestBase>(), It.IsAny<Guid?>()))
@@ -346,7 +462,8 @@ public sealed class PosReadinessRegressionTests
         return new PosSalesService(db, inventory.Object, (wallets ?? new Mock<IWalletsServiceWrapper>(MockBehavior.Strict)).Object,
             resolver.Object, NullLogger<PosSalesService>.Instance,
             new PosFinanceSettings(Mock.Of<IdentityServer.Integration.Drivers.IIdentityServerServiceWrapper>()),
-            new PosCheckoutSettingsService(db, resolver.Object));
+            new PosCheckoutSettingsService(db, resolver.Object), features ?? Mock.Of<ITenantModuleFeatureService>(x =>
+                x.EnsureEnabledAsync(tenant, "inventario", "fulfillment", It.IsAny<CancellationToken>()) == Task.FromResult(Result.Success())));
     }
 
     private static PosSale Sale(Guid tenant, PosSaleStatus status)

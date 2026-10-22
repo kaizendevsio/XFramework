@@ -444,9 +444,12 @@ public sealed class PosPersistenceIntegrationTests
         var resolver = CreateResolver(tenantId);
         var inventory = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
         var wallets = new Mock<IWalletsServiceWrapper>(MockBehavior.Strict);
+        var features = new Mock<XFramework.Core.Services.FeatureGates.ITenantModuleFeatureService>();
+        features.Setup(x => x.EnsureEnabledAsync(tenantId, "inventario", "fulfillment", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
         var sales = new PosSalesService(db, inventory.Object, wallets.Object, resolver.Object,
             NullLogger<PosSalesService>.Instance, new PosFinanceSettings(Mock.Of<IIdentityServerServiceWrapper>()),
-            new PosCheckoutSettingsService(db, resolver.Object));
+            new PosCheckoutSettingsService(db, resolver.Object), features.Object);
         var cartService = new PosCartService(db, inventory.Object, sales, resolver.Object,
             NullLogger<PosCartService>.Instance, new PosFinanceSettings(Mock.Of<IIdentityServerServiceWrapper>()),
             new PosCheckoutSettingsService(db, resolver.Object));

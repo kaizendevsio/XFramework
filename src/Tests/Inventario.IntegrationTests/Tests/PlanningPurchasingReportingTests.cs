@@ -122,6 +122,21 @@ public sealed class PlanningPurchasingReportingTests : InventarioTestBase
             x.ProductId == seed.Product.Id &&
             x.AvailableQuantity == 4 &&
             x.ReorderPoint == 10);
+
+        var count = await InventarioIntegrationTestFixture.ServiceWrapper.GetLowStockCount(new GetLowStockCountRequest
+        {
+            Metadata = CreateMetadata(), ProductId = seed.Product.Id, WarehouseId = seed.Warehouse.Id
+        });
+        count.IsSuccess.Should().BeTrue(count.Message);
+        count.Response.Should().Be(1);
+        var page = await InventarioIntegrationTestFixture.ServiceWrapper.GetReorderSuggestionPage(new GetReorderSuggestionPageRequest
+        {
+            Metadata = CreateMetadata(), ProductId = seed.Product.Id, WarehouseId = seed.Warehouse.Id, Take = 20
+        });
+        page.IsSuccess.Should().BeTrue(page.Message);
+        page.Response!.TotalCount.Should().Be(1);
+        page.Response.TotalSuggestedQuantity.Should().Be(46);
+        page.Response.Items.Should().ContainSingle(x => x.SuggestedQuantity == 46);
     }
 
     [Test]

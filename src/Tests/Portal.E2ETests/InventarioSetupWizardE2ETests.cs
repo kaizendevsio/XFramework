@@ -420,15 +420,20 @@ public sealed partial class InventarioSetupWizardE2ETests : PageTest
     [Test]
     public async Task StockMovement_NewDialog_UsesSavedStockArea()
     {
+        PrepareProductWorkflow();
+        _state.Warehouses.Clear();
+        _state.Locations.Clear();
         SeedStorage();
         _state.Saved[_state.ActiveTenant] = _state.Get(_state.ActiveTenant) with { WarehouseId = _state.Warehouses[1].Id, LocationId = _state.Locations[1].Id };
-        await Page.GotoAsync(_app.Urls.Single() + "/inventario-stock-fixture");
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Post Movement", Exact = true }).ClickAsync();
-        var dialog = Page.GetByRole(AriaRole.Dialog);
+        await OpenWorkflowProduct();
+        await WorkflowAvailableStock.ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Post Stock Movement", Exact = true }).ClickAsync();
+        var dialog = Page.GetByRole(AriaRole.Dialog, new() { Name = "Post Stock Movement", Exact = true });
         await Expect(dialog).ToBeVisibleAsync();
         await Expect(dialog.GetByRole(AriaRole.Button, new() { Name = "Warehouse", Exact = true })).ToContainTextAsync("Store");
         await Expect(dialog.GetByRole(AriaRole.Button, new() { Name = "Location", Exact = true })).ToContainTextAsync("Store shelf");
         _state.Requests.Should().BeEmpty(); _state.PreferenceRequests.Should().BeEmpty();
+        AssertNoDirectStockWrites();
         _errors.Should().BeEmpty();
     }
 
@@ -691,6 +696,7 @@ public sealed class SetupBrowserSurface : ComponentBase, IDisposable
         b.OpenComponent<BbToastProvider>(0); b.CloseComponent();
         b.OpenComponent<XfContainerPortalHost>(1); b.CloseComponent();
         b.OpenComponent<BbOverlayPortalHost>(2); b.CloseComponent();
+        b.OpenComponent<BbDialogProvider>(3); b.CloseComponent();
         b.OpenElement(3, "main"); b.AddAttribute(4, "style", "padding:24px;margin:auto");
         b.OpenElement(5, "h1"); b.AddContent(6, State.ActiveTenant == State.FirstTenant ? "QA Tenant A" : "QA Tenant B"); b.CloseElement();
         b.OpenComponent<BbButton>(7); b.AddAttribute(8, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, State.Switch)); b.AddAttribute(9, "ChildContent", (RenderFragment)(x => x.AddContent(0, "Switch QA tenant"))); b.CloseComponent();

@@ -9,6 +9,7 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/authorization-logs",
     RequireAuthorization = true,
+    TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     AuthorizationFeature = "identity.auth_logs"
 )]
 public partial class AuthorizationLog : BaseModel

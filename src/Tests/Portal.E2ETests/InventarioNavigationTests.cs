@@ -1,9 +1,18 @@
 using System.Reflection;
+using System.Text.RegularExpressions;
+using BlazorBlueprint.Components;
 using FluentAssertions;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.JSInterop;
+using Moq;
+using XFramework.Domain.Shared.DataContext;
 using XFramework.Inventario.Domain.Shared.Contracts;
 using XFramework.Portal.Components.Layout;
 using XFramework.Portal.Features.Inventario.Pages;
+using XFramework.Portal.Services;
 
 namespace Portal.E2ETests;
 
@@ -11,6 +20,26 @@ namespace Portal.E2ETests;
 public sealed class InventarioNavigationTests
 {
     private const BindingFlags PrivateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
+
+    [TestCase("")]
+    [TestCase("/stock")]
+    public async Task ProductSidebar_OnlyCurrentDetailLinkIsHighlighted(string section)
+    {
+        var productId = Guid.NewGuid();
+        var services = new ServiceCollection().AddLogging();
+        services.AddBlazorBlueprintComponents();
+        services.AddSingleton<IJSRuntime>(Mock.Of<IJSRuntime>());
+        services.AddSingleton<NavigationManager>(new TestNavigation($"/inventario/products/{productId}{section}"));
+        services.AddSingleton(new TenantModuleNavigationService(new TenantFilterService(), Mock.Of<IDataContext>()));
+        await using var provider = services.BuildServiceProvider();
+        await using var renderer = new HtmlRenderer(provider, provider.GetRequiredService<ILoggerFactory>());
+        var html = await renderer.Dispatcher.InvokeAsync(async () =>
+            (await renderer.RenderComponentAsync<ProductDetailSidebar>(ParameterView.FromDictionary(
+                new Dictionary<string, object?> { [nameof(ProductDetailSidebar.ProductId)] = productId }))).ToHtmlString());
+
+        html.Should().Contain("href=\"/inventario/overview\"");
+        Regex.Matches(html, "class=\"[^\"]*\\bsidebar-nav-item-active\\b").Count.Should().Be(1);
+    }
 
     [TestCase(true)]
     [TestCase(false)]

@@ -1,10 +1,92 @@
 using FluentAssertions;
 using Microsoft.Playwright;
+using System.Collections.Concurrent;
+using System.Net;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Inventario.Domain.Shared.Contracts.Requests.Reports;
+using XFramework.Inventario.Domain.Shared.Contracts.Responses.Reports;
 
 namespace Portal.E2ETests;
 
 public sealed partial class InventoryReportsE2ETests
 {
+    [TestCase("On hand", "positions")]
+    [TestCase("Reserved", "positions")]
+    [TestCase("Available", "positions")]
+    [TestCase("Stock positions", "positions")]
+    [TestCase("Inbound", "movements")]
+    [TestCase("Outbound", "movements")]
+    public async Task Overview_MetricClick_PreservesAppliedWarehouseAndDates(string metric, string view)
+    {
+        await OpenScopedOverview();
+        var applied = state.Requests.Last();
+        // An unapplied filter must not change what a displayed metric drills into.
+        await Page.GetByRole(AriaRole.Combobox, new() { Name = "Warehouse", Exact = true }).ClickAsync();
+        await Page.GetByRole(AriaRole.Option, new() { Name = "All warehouses", Exact = true }).ClickAsync();
+        await Page.Locator(".overview-metrics, .overview-movement-totals")
+            .GetByRole(AriaRole.Button, new() { NameRegex = new System.Text.RegularExpressions.Regex("^" + metric) }).ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex("view=" + view));
+        await Expect(Page.GetByText("Fixture Widget", new() { Exact = true }).First).ToBeVisibleAsync();
+        var request = state.Requests.Last();
+        request.WarehouseId.Should().Be(state.WarehouseId);
+        request.FromUtc.Should().Be(applied.FromUtc);
+        request.ToUtc.Should().Be(applied.ToUtc);
+        request.Metadata.RequestedTenantId.Should().Be(state.FirstTenant);
+    }
+
+    [Test]
+    public async Task Overview_LowStock_UsesServerCountAndPreservesWarehouseInPlanningLink()
+    {
+        await OpenScopedOverview();
+        var metric = Page.GetByRole(AriaRole.Button, new() { Name = "Low stock 1,207", Exact = true });
+        await Expect(metric).ToBeEnabledAsync();
+        await Expect(metric).ToHaveAttributeAsync("title", "Low-stock positions matching active reorder rules");
+        state.LowStockRequests.Last().WarehouseId.Should().Be(state.WarehouseId);
+        state.LowStockRequests.Last().Metadata.RequestedTenantId.Should().Be(state.FirstTenant);
+        state.Requests.Last().WarehouseId.Should().Be(state.WarehouseId);
+        await metric.ClickAsync();
+        await Expect(Page).ToHaveURLAsync(app.Urls.Single() + $"/inventario/planning?warehouseId={state.WarehouseId}");
+    }
+
+    [Test]
+    public async Task Overview_LowStockFailure_ShowsUnavailableNotZero_AndRefreshRecovers()
+    {
+        state.LowStockStatus = HttpStatusCode.Forbidden;
+        await Page.GotoAsync(app.Urls.Single() + "/inventario/overview");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Low stock Unavailable", Exact = true })).ToBeDisabledAsync();
+        await Expect(Page.GetByText("Low-stock count could not be loaded. Try Refresh.")).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "On hand 20.00", Exact = true })).ToBeEnabledAsync();
+        state.LowStockStatus = HttpStatusCode.OK; state.LowStockRows = 0;
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Refresh", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Low stock 0", Exact = true })).ToBeEnabledAsync();
+        await Expect(Page.GetByText("Low-stock count could not be loaded. Try Refresh.")).ToHaveCountAsync(0);
+    }
+
+    [Test]
+    public async Task Overview_LowStockTenantChange_DiscardsStaleResponse()
+    {
+        var hold = state.HoldLowStock = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        await Page.GotoAsync(app.Urls.Single() + "/inventario/overview");
+        await Wait(() => !state.LowStockRequests.IsEmpty);
+        state.SelectedTenant = state.SecondTenant; state.LowStockRows = 3;
+        state.Tenant.Raise(x => x.OnChanged += null);
+        hold.TrySetResult();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Low stock 3", Exact = true })).ToBeEnabledAsync();
+        state.LowStockRequests.Last().Metadata.RequestedTenantId.Should().Be(state.SecondTenant);
+        state.LowStockRequests.Last().WarehouseId.Should().BeNull();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Low stock 1,207", Exact = true })).ToHaveCountAsync(0);
+    }
+
+    private async Task OpenScopedOverview()
+    {
+        await Page.GotoAsync(app.Urls.Single() + "/inventario/overview");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Low stock 1,207", Exact = true })).ToBeEnabledAsync();
+        await Page.GetByRole(AriaRole.Combobox, new() { Name = "Warehouse", Exact = true }).ClickAsync();
+        await Page.GetByRole(AriaRole.Option, new() { Name = "Main warehouse", Exact = true }).ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Apply", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Low stock 1,207", Exact = true })).ToBeEnabledAsync();
+    }
+
     [Test]
     public async Task Overview_StockSplit_ContainsOnlyReservedAndAvailable_AndKeepsOnHandMetric()
     {
@@ -84,7 +166,7 @@ public sealed partial class InventoryReportsE2ETests
         (await Page.EvaluateAsync<bool>("document.documentElement.scrollWidth <= innerWidth")).Should().BeTrue();
         var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, "artifacts", "inventory-overview");
         Directory.CreateDirectory(directory);
-        await Page.ScreenshotAsync(new() { Path = Path.Combine(directory, $"overview-{width}.png"), FullPage = true });
+        await Page.ScreenshotAsync(new() { Path = Path.Combine(directory, $"overview-{width}.png"), Animations = ScreenshotAnimations.Disabled });
         await Page.GetByRole(AriaRole.Button, new() { Name = "Stock positions", Exact = true }).ClickAsync();
         await Expect(Page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex("/inventario/reports\\?.*view=positions"));
         await Expect(Page.GetByText("Fixture Widget", new() { Exact = true }).First).ToBeVisibleAsync();
@@ -146,5 +228,26 @@ public sealed partial class InventoryReportsE2ETests
         await Page.GetByRole(AriaRole.Button, new() { Name = "Refresh", Exact = true }).ClickAsync();
         await Expect(Page.GetByText("Could not open the overview. Check your report permission and tenant access.")).ToBeVisibleAsync();
         await Expect(Page.GetByLabel("Current stock summary")).ToHaveCountAsync(0);
+    }
+}
+
+public sealed partial class InventoryReportFixtureState
+{
+    public ConcurrentQueue<GetLowStockCountRequest> LowStockRequests { get; } = new();
+    public int LowStockRows = 1207;
+    public HttpStatusCode LowStockStatus = HttpStatusCode.OK;
+    public TaskCompletionSource? HoldLowStock;
+
+    public async Task<QueryResponse<int>> LoadLowStock(GetLowStockCountRequest request, CancellationToken ct)
+    {
+        var count = LowStockRows;
+        var hold = Interlocked.Exchange(ref HoldLowStock, null);
+        LowStockRequests.Enqueue(request);
+        if (hold is not null) await hold.Task; // Ignore cancellation to test the page's revision guard.
+        return new()
+        {
+            HttpStatusCode = LowStockStatus,
+            Response = LowStockStatus != HttpStatusCode.OK ? 0 : count
+        };
     }
 }

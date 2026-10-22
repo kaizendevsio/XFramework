@@ -47,7 +47,7 @@ public sealed class InventarioIntegrationTestFixture
         Guid.Parse("00000000-0000-0000-0000-000000000821"),
         Guid.Parse("00000000-0000-0000-0000-000000000822"),
         Guid.Parse("00000000-0000-0000-0000-000000000823"),
-        ActorCapabilities: ["inventario.reporting:view", "inventario.movements:create", "inventario.warehousing:create"]);
+        ActorCapabilities: ["inventario.reporting:view", "inventario.planning:view", "inventario.movements:create", "inventario.warehousing:create"]);
 
     public static string ConnectionString { get; private set; } = null!;
     public static string BoltUrl => TestConstants.Ports.InventarioBolt;
@@ -404,6 +404,7 @@ public sealed class InventarioIntegrationTestFixture
         await TestInventarioSeed.SetInventarioFeature(db, IdentityServer.Domain.Shared.Contracts.TenantModuleFeatureKeys.StockBalancesSubFeature, true);
         await TestInventarioSeed.SetInventarioFeature(db, IdentityServer.Domain.Shared.Contracts.TenantModuleFeatureKeys.MovementsSubFeature, true);
         await TestInventarioSeed.SetInventarioFeature(db, IdentityServer.Domain.Shared.Contracts.TenantModuleFeatureKeys.ReservationsSubFeature, true);
+        await TestInventarioSeed.SetInventarioFeature(db, IdentityServer.Domain.Shared.Contracts.TenantModuleFeatureKeys.FulfillmentSubFeature, true);
         await TestInventarioSeed.SetInventarioFeature(db, IdentityServer.Domain.Shared.Contracts.TenantModuleFeatureKeys.TraceabilitySubFeature, true);
         await TestInventarioSeed.SetInventarioFeature(db, IdentityServer.Domain.Shared.Contracts.TenantModuleFeatureKeys.PlanningSubFeature, true);
         await TestInventarioSeed.SetInventarioFeature(db, IdentityServer.Domain.Shared.Contracts.TenantModuleFeatureKeys.InventarioReportingSubFeature, true);

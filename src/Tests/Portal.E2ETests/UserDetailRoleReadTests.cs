@@ -1,10 +1,13 @@
 using System.Reflection;
+using BlazorBlueprint.Components;
 using FluentAssertions;
 using IdentityServer.Domain.Shared.Contracts;
 using MemoryPack;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.JSInterop;
 using Moq;
 using XFramework.Domain.Shared.Attributes;
 using XFramework.Domain.Shared.BusinessObjects;
@@ -14,6 +17,8 @@ using XFramework.Integration.DataContext;
 using XFramework.Integration.Security;
 using XFramework.Portal.Components;
 using XFramework.Portal.Composition;
+using XFramework.Portal.Shared;
+using XFramework.Portal.Shared.Components;
 
 namespace Portal.E2ETests;
 
@@ -24,7 +29,8 @@ public sealed class UserDetailRoleReadTests
     private const BindingFlags PrivateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
     private static readonly FieldInfo WrapperMap =
         typeof(RemoteDataContext).GetField("_wrapperMap", BindingFlags.Static | BindingFlags.NonPublic)!;
-    private static readonly Type[] Entities = [typeof(IdentityCredential), typeof(IdentityRole), typeof(IdentityRoleType)];
+    private static readonly Type[] Entities =
+        [typeof(IdentityCredential), typeof(IdentityRole), typeof(IdentityRoleType), typeof(Session), typeof(AuthorizationLog)];
     private object? _originalMap;
     private ServiceProvider _services = null!;
     private RecordingWrapper _wrapper = null!;
@@ -127,6 +133,184 @@ public sealed class UserDetailRoleReadTests
         Field<List<IdentityRole>>("_roles").Should().ContainSingle();
     }
 
+    [Test]
+    public async Task LoadRoleTypes_PickerSource_IsBoundedToUserTenantAndActiveRoles()
+    {
+        await Invoke("LoadRoleTypes");
+
+        var query = _wrapper.Queries.Should().ContainSingle().Subject;
+        query.EntityTypeName.Should().Be(nameof(IdentityRoleType));
+        query.Filters.Should().Contain(filter => filter.PropertyName == nameof(IdentityRoleType.TenantId));
+        query.Filters.Single(filter => filter.PropertyName == nameof(IdentityRoleType.TenantId))
+            .Value.Should().Be(_wrapper.TargetTenantId, "the user tenant, not the actor's home tenant, owns the role options");
+        query.Filters.Should().Contain(filter => filter.PropertyName == nameof(IdentityRoleType.IsEnabled));
+        query.Filters.Should().Contain(filter => filter.PropertyName == nameof(IdentityRoleType.IsDeleted));
+        query.Take.Should().Be(100);
+        query.NoCache.Should().BeTrue();
+        Field<List<IdentityRoleType>>("_roleTypes").Should().ContainSingle().Which.TenantId.Should().Be(_wrapper.TargetTenantId);
+
+        var picker = new XfEntityPicker<IdentityRoleType>
+        {
+            Items = Field<List<IdentityRoleType>>("_roleTypes"),
+            ValueSelector = role => role.Id.ToString(),
+            TextSelector = role => role.Name
+        };
+        foreach (var property in new[] { "FilteredItems", "AdvancedFilteredItems" })
+        {
+            var options = (IReadOnlyList<IdentityRoleType>)picker.GetType()
+                .GetProperty(property, PrivateInstance)!.GetValue(picker)!;
+            options.Should().ContainSingle().Which.TenantId.Should().Be(_wrapper.TargetTenantId);
+        }
+    }
+
+    [Test]
+    public async Task LoadRoleTypes_WithoutUser_DoesNotQueryAllTenants()
+    {
+        SetField("_user", null!);
+        await Invoke("LoadRoleTypes");
+        _wrapper.Queries.Should().BeEmpty();
+        Field<List<IdentityRoleType>>("_roleTypes").Should().BeEmpty();
+    }
+
+    [TestCase("valid", true)]
+    [TestCase("foreign-role", false)]
+    [TestCase("foreign-credential", false)]
+    [TestCase("disabled-role", false)]
+    [TestCase("deleted-role", false)]
+    [TestCase("tenant-changed", false)]
+    public async Task AssignRole_SelectionMustBelongToUserTenant(string scenario, bool expected)
+    {
+        await LoadRolesSection();
+        var roleType = Field<List<IdentityRoleType>>("_roleTypes").Single();
+        var credential = Field<List<IdentityCredential>>("_credentials").Single();
+        switch (scenario)
+        {
+            case "foreign-role": roleType.TenantId = _wrapper.ActorTenantId; break;
+            case "foreign-credential": credential.TenantId = _wrapper.ActorTenantId; break;
+            case "disabled-role": roleType.IsEnabled = false; break;
+            case "deleted-role": roleType.IsDeleted = true; break;
+            case "tenant-changed": SetField("_outsideTenantContext", true); break;
+        }
+
+        ((bool)_pageType.GetMethod("CanAssignRole", PrivateInstance)!
+            .Invoke(_page, [credential.Id, roleType.Id])!).Should().Be(expected);
+    }
+
+    [TestCase("sessions", "_sessionsLoadFailed", nameof(Session))]
+    [TestCase("auth-logs", "_authLogsLoadFailed", nameof(AuthorizationLog))]
+    public async Task DetailAuditSection_ManagedTenant_ReturnsRows(string section, string failureField, string entity)
+    {
+        await Invoke("LoadActiveSectionData", section);
+
+        Field<bool>(failureField).Should().BeFalse();
+        var query = _wrapper.Queries.Should().ContainSingle(query => query.EntityTypeName == entity).Subject;
+        query.Take.Should().Be(100);
+        query.Filters.Should().Contain(filter => filter.PropertyName == "TenantId");
+        query.Filters.Should().Contain(filter => filter.PropertyName == "CredentialId");
+        _wrapper.AuthorizationResults.Should().OnlyContain(result => result.IsSuccess);
+    }
+
+    [TestCase("sessions", "_sessionsLoadFailed")]
+    [TestCase("auth-logs", "_authLogsLoadFailed")]
+    public async Task DetailAuditSection_CredentialFailure_IsNotAnEmptyResult(string section, string failureField)
+    {
+        _wrapper.FailCredentials = true;
+        await Invoke("LoadActiveSectionData", section);
+        Field<bool>(failureField).Should().BeTrue();
+
+        _wrapper.FailCredentials = false;
+        await Invoke("LoadActiveSectionData", section);
+        Field<bool>(failureField).Should().BeFalse();
+    }
+
+    [TestCase("/identity/sessions", nameof(Session), "_sessions")]
+    [TestCase("/identity/auth-logs", nameof(AuthorizationLog), "_logs")]
+    public async Task AuditList_ManagedTenant_BoundedOrderedReadAndRecoverableFailure(string route, string entity, string rows)
+    {
+        CreateAuditPage(route, _wrapper.TargetTenantId);
+        await Invoke("LoadData");
+
+        Field<bool>("_loadFailed").Should().BeFalse();
+        Field<System.Collections.ICollection>(rows).Count.Should().Be(1);
+        var query = _wrapper.Queries.Should().ContainSingle(query => query.EntityTypeName == entity).Subject;
+        query.Take.Should().Be(100);
+        query.IgnoreQueryFilters.Should().BeFalse();
+        query.Filters.Should().Contain(filter => filter.PropertyName == "TenantId");
+        query.Sorting.Should().ContainSingle().Which.Should().BeEquivalentTo(
+            new SortDescriptor { PropertyName = "CreatedAt", Descending = true });
+
+        _wrapper.HasCapability = false;
+        await Invoke("LoadData");
+        Field<bool>("_loadFailed").Should().BeTrue();
+        Field<System.Collections.ICollection>(rows).Count.Should().Be(0);
+        _wrapper.AuthorizationResults.Last().StatusCode.Should().Be(403);
+
+        _wrapper.HasCapability = true;
+        await Invoke("LoadData");
+        Field<bool>("_loadFailed").Should().BeFalse();
+        Field<System.Collections.ICollection>(rows).Count.Should().Be(1);
+    }
+
+    [TestCase("/identity/sessions")]
+    [TestCase("/identity/auth-logs")]
+    public async Task AuditList_NoTenant_DoesNotQuery(string route)
+    {
+        CreateAuditPage(route, null);
+        await Invoke("LoadData");
+        _wrapper.Queries.Should().BeEmpty();
+        Field<bool>("_loading").Should().BeFalse();
+    }
+
+    [TestCase("/identity/sessions", "_sessions")]
+    [TestCase("/identity/auth-logs", "_logs")]
+    public async Task AuditList_TenantChangesDuringRead_DiscardsOldResponse(string route, string rows)
+    {
+        var tenant = CreateAuditPage(route, _wrapper.TargetTenantId);
+        _wrapper.ReadGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var oldLoad = Invoke("LoadData");
+        tenant.SetupGet(context => context.SelectedTenantId).Returns((Guid?)null);
+        await Invoke("LoadData");
+        _wrapper.ReadGate.SetResult();
+        await oldLoad;
+        Field<System.Collections.ICollection>(rows).Count.Should().Be(0);
+        Field<bool>("_loadFailed").Should().BeFalse();
+        Field<bool>("_loading").Should().BeFalse();
+    }
+
+    private Mock<IPortalTenantContext> CreateAuditPage(string route, Guid? tenantId)
+    {
+        _pageType = PortalFeatureAssemblies.All.SelectMany(assembly => assembly.GetExportedTypes())
+            .Single(type => type.GetCustomAttributes<RouteAttribute>().Any(attribute => attribute.Template == route));
+        _page = Activator.CreateInstance(_pageType)!;
+        SetProperty("DataContext", new RemoteDataContext(_services, _metadata));
+        var tenant = new Mock<IPortalTenantContext>();
+        tenant.SetupGet(context => context.SelectedTenantId).Returns(tenantId);
+        SetProperty("TenantFilter", tenant.Object);
+        var loggerMock = (Mock)Activator.CreateInstance(typeof(Mock<>).MakeGenericType(typeof(ILogger<>).MakeGenericType(_pageType)))!;
+        SetProperty("Logger", loggerMock.Object);
+        return tenant;
+    }
+
+    [TestCase("/identity/sessions", "Sessions could not be loaded.", "No sessions")]
+    [TestCase("/identity/auth-logs", "Authorization logs could not be loaded.", "No authorization logs")]
+    public async Task AuditList_RenderedFailure_ShowsRetryInsteadOfEmptyState(string route, string failure, string empty)
+    {
+        var tenant = CreateAuditPage(route, _wrapper.TargetTenantId);
+        _wrapper.HasCapability = false;
+        var services = new ServiceCollection().AddLogging();
+        services.AddBlazorBlueprintComponents();
+        services.AddSingleton<IJSRuntime>(Mock.Of<IJSRuntime>());
+        services.AddSingleton(tenant.Object);
+        services.AddSingleton<IDataContext>(new RemoteDataContext(_services, _metadata));
+        await using var provider = services.BuildServiceProvider();
+        await using var renderer = new HtmlRenderer(provider, provider.GetRequiredService<ILoggerFactory>());
+
+        var html = await renderer.Dispatcher.InvokeAsync(async () =>
+            (await renderer.RenderComponentAsync(_pageType, ParameterView.Empty)).ToHtmlString());
+
+        html.Should().Contain(failure).And.Contain("Retry").And.NotContain(empty);
+    }
+
     private Task LoadRolesSection() => Invoke("LoadActiveSectionData", "roles");
     private Task Invoke(string name, params object[] arguments) =>
         (Task)_pageType.GetMethod(name, PrivateInstance)!.Invoke(_page, arguments)!;
@@ -143,13 +327,14 @@ public sealed class UserDetailRoleReadTests
         public bool HasCapability { get; set; } = true;
         public bool HasAllTenantsScope { get; set; } = true;
         public bool FailCredentials { get; set; }
+        public TaskCompletionSource? ReadGate { get; set; }
         public List<QueryDescriptor> Queries { get; } = [];
         public List<TrustedInvocationResult> AuthorizationResults { get; } = [];
 
         public RecordingWrapper()
         {
             Credential = new IdentityCredential { Id = Guid.NewGuid(), TenantId = TargetTenantId };
-            var type = new IdentityRoleType { Id = Guid.NewGuid(), TenantId = TargetTenantId, Name = "Test POS" };
+            var type = new IdentityRoleType { Id = Guid.NewGuid(), TenantId = TargetTenantId, Name = "Test POS", IsEnabled = true };
             Role = new IdentityRole
             {
                 Id = Guid.NewGuid(), TenantId = TargetTenantId, CredentialId = Credential.Id,
@@ -161,6 +346,8 @@ public sealed class UserDetailRoleReadTests
         {
             var query = MemoryPackSerializer.Deserialize<QueryDescriptor>(bytes)!;
             Queries.Add(query);
+            if (ReadGate is { } gate)
+                await gate.Task;
             // Use the entity's declared policy and the real resolver, not a blanket successful mock.
             var attribute = Entities.Single(type => type.Name == query.EntityTypeName)
                 .GetCustomAttribute<GenerateEndpointsAttribute>()!;
@@ -188,6 +375,10 @@ public sealed class UserDetailRoleReadTests
                 nameof(IdentityCredential) => MemoryPackSerializer.Serialize<List<IdentityCredential>>([Credential]),
                 nameof(IdentityRole) => MemoryPackSerializer.Serialize<List<IdentityRole>>([Role]),
                 nameof(IdentityRoleType) => MemoryPackSerializer.Serialize<List<IdentityRoleType>>([Role.Type!]),
+                nameof(Session) => MemoryPackSerializer.Serialize<List<Session>>(
+                    [new Session { Id = Guid.NewGuid(), TenantId = TargetTenantId, CredentialId = Credential.Id }]),
+                nameof(AuthorizationLog) => MemoryPackSerializer.Serialize<List<AuthorizationLog>>(
+                    [new AuthorizationLog { Id = Guid.NewGuid(), TenantId = TargetTenantId, CredentialId = Credential.Id }]),
                 _ => throw new NotSupportedException()
             };
         }

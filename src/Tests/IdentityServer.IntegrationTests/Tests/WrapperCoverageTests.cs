@@ -1564,6 +1564,45 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
     }
 
     [Test]
+    public async Task AssignCredentialRole_ForeignTenantRoleType_IsRejectedWithoutAssignment()
+    {
+        var credential = await SeedCredentialWithoutRole(UniqueUsername(), "AssignPassword123!");
+        var foreignTenantId = Guid.NewGuid();
+        var foreignGroup = new IdentityRoleTypeGroup
+        {
+            Id = Guid.NewGuid(), TenantId = foreignTenantId, Name = "Foreign roles",
+            Description = "Tenant isolation fixture", IsEnabled = true
+        };
+        var foreignRoleType = new IdentityRoleType
+        {
+            Id = Guid.NewGuid(), TenantId = foreignTenantId, Name = "Foreign administrator",
+            GroupId = foreignGroup.Id, RoleLevel = 10, IsEnabled = true
+        };
+        await using var db = CreateDbContext();
+        db.Set<Tenant>().Add(new Tenant
+        {
+            Id = foreignTenantId, TenantId = foreignTenantId, Name = "Foreign tenant",
+            Version = 1, IsEnabled = true
+        });
+        db.Set<IdentityRoleTypeGroup>().Add(foreignGroup);
+        db.Set<IdentityRoleType>().Add(foreignRoleType);
+        await db.SaveChangesAsync();
+
+        var result = await IntegrationTestFixture.ServiceWrapper.AssignCredentialRole(new AssignCredentialRoleRequest
+        {
+            CredentialId = credential.Id,
+            RoleTypeId = foreignRoleType.Id,
+            RoleExpiration = DateTime.UtcNow.AddMonths(6),
+            Metadata = CreateMetadata(credential.TenantId)
+        });
+
+        result.HttpStatusCode.Should().Be(HttpStatusCode.NotFound);
+        result.IsSuccess.Should().BeFalse();
+        (await db.Set<IdentityRole>().IgnoreQueryFilters()
+            .AnyAsync(role => role.CredentialId == credential.Id)).Should().BeFalse();
+    }
+
+    [Test]
     public async Task GetEffectiveCredentialCapabilities_WrapperReturnsResolvedCapabilities()
     {
         var credential = await SeedCredentialWithRole(UniqueUsername(), "EffectivePassword123!");

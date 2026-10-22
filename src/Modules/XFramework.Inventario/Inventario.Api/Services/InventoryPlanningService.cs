@@ -17,7 +17,8 @@ public sealed class InventoryPlanningService(
     IDataContext dataContext,
     ITrustedInvocationContextAccessor trustedInvocationContextAccessor,
     ITenantModuleFeatureService featureService,
-    ProductVariationService productVariationService)
+    ProductVariationService productVariationService,
+    DbContext dbContext)
 {
     public async Task<Result<List<InventoryReorderRule>>> GetRulesAsync(
         GetInventoryReorderRulesRequest request,
@@ -169,36 +170,76 @@ public sealed class InventoryPlanningService(
         GetReorderSuggestionsRequest request,
         CancellationToken ct = default)
     {
+        var page = await LoadReorderSuggestionPageAsync(new()
+        {
+            Metadata = request.Metadata, ProductId = request.ProductId, ProductVariationId = request.ProductVariationId,
+            WarehouseId = request.WarehouseId, LocationId = request.LocationId, Take = 1000
+        }, 1000, ct);
+        return page.IsSuccess ? Result<List<ReorderSuggestionRow>>.Success(page.Data!.Items)
+            : Result<List<ReorderSuggestionRow>>.Failure(page.Message!, page.StatusCode);
+    }
+
+    public Task<Result<ReorderSuggestionPage>> GetReorderSuggestionPageAsync(
+        GetReorderSuggestionPageRequest request, CancellationToken ct = default)
+    {
+        var context = trustedInvocationContextAccessor.Current;
+        if (context?.Actor is not { } actor || actor.ExpiresAtUtc <= DateTimeOffset.UtcNow)
+            return Task.FromResult(Result<ReorderSuggestionPage>.Unauthorized("Sign in to view inventory planning."));
+        if (!actor.Capabilities.Contains("inventario.planning:view"))
+            return Task.FromResult(Result<ReorderSuggestionPage>.Forbidden("Inventory planning view permission is required."));
+        if (request.Metadata?.RequestedTenantId is { } target && target != context.EffectiveTenantId)
+            return Task.FromResult(Result<ReorderSuggestionPage>.Forbidden("The planning tenant does not match the authorized tenant."));
+        return LoadReorderSuggestionPageAsync(request, 500, ct);
+    }
+
+    private async Task<Result<ReorderSuggestionPage>> LoadReorderSuggestionPageAsync(
+        GetReorderSuggestionPageRequest request, int maximumPageSize, CancellationToken ct)
+    {
         var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
-            return Result<List<ReorderSuggestionRow>>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+            return Result<ReorderSuggestionPage>.Failure(tenantResult.Message!, tenantResult.StatusCode);
 
         var featureResult = await EnsurePlanningEnabledAsync(tenantResult.Data, ct);
         if (!featureResult.IsSuccess)
-            return Result<List<ReorderSuggestionRow>>.Failure(featureResult.Message!, featureResult.StatusCode);
+            return Result<ReorderSuggestionPage>.Failure(featureResult.Message!, featureResult.StatusCode);
 
-        var lowStock = await BuildLowStockRowsAsync(
-            tenantResult.Data,
-            request.ProductId,
-            request.ProductVariationId,
-            request.WarehouseId,
-            request.LocationId,
-            ct);
-        var rules = await LoadRules(
-            tenantResult.Data,
-            request.ProductId,
-            request.ProductVariationId,
-            request.WarehouseId,
-            request.LocationId,
-            ct);
+        if (request.Skip < 0 || request.Take < 1 || request.Take > maximumPageSize)
+            return Result<ReorderSuggestionPage>.Failure($"Choose a page size between 1 and {maximumPageSize} and a nonnegative offset.", 400);
+        if (request.WarehouseId is { } warehouseId && !await dataContext.Query<Warehouse>().NoCache()
+            .AnyAsync(x => x.TenantId == tenantResult.Data && x.Id == warehouseId && !x.IsDeleted, ct))
+            return Result<ReorderSuggestionPage>.NotFound("Warehouse not found.");
 
-        var suggestions = lowStock.Select(row =>
+        var query = LowStockQuery(tenantResult.Data, request.ProductId, request.ProductVariationId, request.WarehouseId, request.LocationId);
+        if (request.SupplierFilterOperator is { } filter)
         {
-            var rule = rules.First(x =>
-                x.ProductId == row.ProductId &&
-                x.ProductVariationId == row.ProductVariationId &&
-                x.WarehouseId == row.WarehouseId &&
-                x.LocationId == row.LocationId);
+            var value = request.SupplierFilter ?? "";
+            if (value.Length > 200)
+                return Result<ReorderSuggestionPage>.Failure("Supplier filter must be at most 200 characters.", 400);
+            query = filter switch
+            {
+                "Equals" => query.Where(x => x.Rule.PreferredSupplier == value),
+                "NotEquals" => query.Where(x => x.Rule.PreferredSupplier != value),
+                "Contains" => query.Where(x => x.Rule.PreferredSupplier != null && x.Rule.PreferredSupplier.ToLower().Contains(value.ToLower())),
+                "NotContains" => query.Where(x => x.Rule.PreferredSupplier == null || !x.Rule.PreferredSupplier.ToLower().Contains(value.ToLower())),
+                "StartsWith" => query.Where(x => x.Rule.PreferredSupplier != null && x.Rule.PreferredSupplier.StartsWith(value)),
+                "EndsWith" => query.Where(x => x.Rule.PreferredSupplier != null && x.Rule.PreferredSupplier.EndsWith(value)),
+                "IsEmpty" => query.Where(x => x.Rule.PreferredSupplier == null || x.Rule.PreferredSupplier == ""),
+                "IsNotEmpty" => query.Where(x => x.Rule.PreferredSupplier != null && x.Rule.PreferredSupplier != ""),
+                _ => null
+            };
+            if (query is null)
+                return Result<ReorderSuggestionPage>.Failure("Unsupported supplier filter.", 400);
+        }
+        var count = await query.CountAsync(ct);
+        var total = await query.SumAsync(x => (decimal?)Math.Max(x.Rule.ReorderQuantity,
+            Math.Max(0m, (x.Rule.MaximumQuantity ?? (x.Rule.ReorderPoint > 0 ? x.Rule.ReorderPoint : x.Rule.MinimumQuantity) + x.Rule.ReorderQuantity) - x.AvailableQuantity)), ct) ?? 0m;
+        var positions = await query.OrderBy(x => x.Rule.ProductId).ThenBy(x => x.Rule.Id)
+            .Skip(request.Skip).Take(request.Take).ToListAsync(ct);
+        var lowStock = await DescribeLowStockRows(tenantResult.Data, positions, ct);
+
+        var suggestions = lowStock.Select((row, index) =>
+        {
+            var rule = positions[index].Rule;
             var targetQuantity = rule.MaximumQuantity ?? row.ReorderPoint + rule.ReorderQuantity;
             var neededToTarget = Math.Max(0, targetQuantity - row.AvailableQuantity);
             var suggested = Math.Max(rule.ReorderQuantity, neededToTarget);
@@ -218,7 +259,7 @@ public sealed class InventoryPlanningService(
                 rule.PreferredSupplier);
         }).ToList();
 
-        return Result<List<ReorderSuggestionRow>>.Success(suggestions);
+        return Result<ReorderSuggestionPage>.Success(new(count, total, suggestions));
     }
 
     internal async Task<List<LowStockReportRow>> BuildLowStockRowsAsync(
@@ -227,11 +268,17 @@ public sealed class InventoryPlanningService(
         Guid? productVariationId,
         Guid? warehouseId,
         Guid? locationId,
-        CancellationToken ct)
+        CancellationToken ct, int skip = 0, int take = 1000)
     {
-        var rules = await LoadRules(tenantId, productId, productVariationId, warehouseId, locationId, ct);
-        if (rules.Count == 0)
-            return [];
+        var positions = await LowStockQuery(tenantId, productId, productVariationId, warehouseId, locationId)
+            .OrderBy(x => x.Rule.ProductId).ThenBy(x => x.Rule.Id).Skip(skip).Take(take).ToListAsync(ct);
+        return await DescribeLowStockRows(tenantId, positions, ct);
+    }
+
+    private async Task<List<LowStockReportRow>> DescribeLowStockRows(Guid tenantId, List<RuleStock> positions, CancellationToken ct)
+    {
+        if (positions.Count == 0) return [];
+        var rules = positions.Select(x => x.Rule).ToList();
 
         var productIds = rules.Select(x => x.ProductId).Distinct().ToList();
         var variationIds = rules.Select(x => x.ProductVariationId).OfType<Guid>().Distinct().ToList();
@@ -248,36 +295,17 @@ public sealed class InventoryPlanningService(
         var locations = await dataContext.Query<InventoryLocation>()
             .Where(x => x.TenantId == tenantId && locationIds.Contains(x.Id))
             .ToListAsync(ct);
-        var balanceQuery = dataContext.Query<StockBalance>()
-            .Where(x => x.TenantId == tenantId && productIds.Contains(x.ProductId));
-        if (productVariationId is not null)
-            balanceQuery = balanceQuery.Where(x => x.ProductVariationId == productVariationId);
-        if (warehouseId is not null)
-            balanceQuery = balanceQuery.Where(x => x.WarehouseId == warehouseId);
-        if (locationId is not null)
-            balanceQuery = balanceQuery.Where(x => x.LocationId == locationId);
-
-        var balances = await balanceQuery
-            .Take(5000)
-            .ToListAsync(ct);
 
         var productNames = products.ToDictionary(x => x.Id, x => x.Name ?? x.Id.ToString()[..8]);
         var warehouseNames = warehouses.ToDictionary(x => x.Id, x => $"{x.Code} - {x.Name}");
         var locationNames = locations.ToDictionary(x => x.Id, x => $"{x.Code} - {x.Name}");
         var rows = new List<LowStockReportRow>();
 
-        foreach (var rule in rules)
+        foreach (var position in positions)
         {
-            var available = balances
-                .Where(x =>
-                    x.ProductId == rule.ProductId &&
-                    (rule.ProductVariationId is null || x.ProductVariationId == rule.ProductVariationId) &&
-                    (rule.WarehouseId is null || x.WarehouseId == rule.WarehouseId) &&
-                    (rule.LocationId is null || x.LocationId == rule.LocationId))
-                .Sum(x => x.AvailableQuantity);
+            var rule = position.Rule;
+            var available = position.AvailableQuantity;
             var reorderPoint = rule.ReorderPoint > 0 ? rule.ReorderPoint : rule.MinimumQuantity;
-            if (available > reorderPoint)
-                continue;
 
             rows.Add(new LowStockReportRow(
                 rule.ProductId,
@@ -298,23 +326,18 @@ public sealed class InventoryPlanningService(
                 rule.MinimumQuantity));
         }
 
-        return rows
-            .OrderBy(x => x.ProductName)
-            .ThenBy(x => x.WarehouseName)
-            .ThenBy(x => x.LocationName)
-            .ToList();
+        return rows;
     }
 
-    private async Task<List<InventoryReorderRule>> LoadRules(
-        Guid tenantId,
-        Guid? productId,
-        Guid? productVariationId,
-        Guid? warehouseId,
-        Guid? locationId,
-        CancellationToken ct)
+    internal Task<int> CountLowStockAsync(Guid tenantId, Guid? productId, Guid? productVariationId,
+        Guid? warehouseId, Guid? locationId, CancellationToken ct) =>
+        LowStockQuery(tenantId, productId, productVariationId, warehouseId, locationId).CountAsync(ct);
+
+    private IQueryable<RuleStock> LowStockQuery(Guid tenantId, Guid? productId, Guid? productVariationId,
+        Guid? warehouseId, Guid? locationId)
     {
-        var rulesQuery = dataContext.Query<InventoryReorderRule>()
-            .Where(x => x.TenantId == tenantId && x.IsActive);
+        var rulesQuery = dbContext.Set<InventoryReorderRule>().AsNoTracking()
+            .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.IsActive);
 
         if (productId is not null)
             rulesQuery = rulesQuery.Where(x => x.ProductId == productId);
@@ -325,10 +348,25 @@ public sealed class InventoryPlanningService(
         if (locationId is not null)
             rulesQuery = rulesQuery.Where(x => x.LocationId == null || x.LocationId == locationId);
 
-        return await rulesQuery
-            .OrderBy(x => x.ProductId)
-            .Take(1000)
-            .ToListAsync(ct);
+        var balances = dbContext.Set<StockBalance>().AsNoTracking().Where(x => x.TenantId == tenantId && !x.IsDeleted &&
+            (productVariationId == null || x.ProductVariationId == productVariationId) &&
+            (warehouseId == null || x.WarehouseId == warehouseId) && (locationId == null || x.LocationId == locationId));
+        // Aggregate the complete stock scope before filtering or paging reorder rules.
+        return rulesQuery.Select(rule => new RuleStock
+        {
+            Rule = rule,
+            AvailableQuantity = balances.Where(x => x.ProductId == rule.ProductId &&
+                (rule.ProductVariationId == null || x.ProductVariationId == rule.ProductVariationId) &&
+                (rule.WarehouseId == null || x.WarehouseId == rule.WarehouseId) &&
+                (rule.LocationId == null || x.LocationId == rule.LocationId))
+                .Sum(x => (decimal?)x.AvailableQuantity) ?? 0m
+        }).Where(x => x.AvailableQuantity <= (x.Rule.ReorderPoint > 0 ? x.Rule.ReorderPoint : x.Rule.MinimumQuantity));
+    }
+
+    private sealed class RuleStock
+    {
+        public InventoryReorderRule Rule { get; init; } = default!;
+        public decimal AvailableQuantity { get; init; }
     }
 
     private async Task<VariationLookups> LoadVariationLookups(
