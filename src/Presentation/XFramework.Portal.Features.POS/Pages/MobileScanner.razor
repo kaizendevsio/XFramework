@@ -188,7 +188,7 @@
         return InvokeAsync(StateHasChanged);
     }
 
-    private static bool IsPairingCode(string value) => value.Length == 6 && value.All(c => c is >= '0' and <= '9');
+    private static bool IsPairingCode(string? value) => value is { Length: 6 } && value.All(c => c is >= '0' and <= '9');
 
     private async Task PairEntered()
     {

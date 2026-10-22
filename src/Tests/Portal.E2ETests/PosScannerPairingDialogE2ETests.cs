@@ -344,10 +344,15 @@ public sealed partial class PosScannerPairingDialogE2ETests : PageTest
         await Wait(() => state.RevokedPairings.Contains(original));
     }
 
-    [Test]
-    public async Task ShortPairing_MobileManualEntry_ExactSixDigitsLeadingZeroAndDenial()
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ShortPairing_MobileManualEntry_ExactSixDigitsLeadingZeroAndDenial(bool blurBeforePairing)
     {
+        var errors = new List<string>();
+        Page.PageError += (_, error) => errors.Add(error);
+        await Page.SetViewportSizeAsync(390, 844);
         await Page.GotoAsync(app.Urls.Single() + "/pos/mobile-scanner?tenant=" + state.TenantId);
+        await Expect(Page.GetByLabel("Tenant ID", new() { Exact = true })).ToHaveValueAsync(state.TenantId.ToString());
         await Page.GetByText("Enter pairing code", new() { Exact = true }).ClickAsync();
         var code = Page.GetByLabel("Six-digit pairing code",new() {Exact=true});
         var pair = Page.GetByRole(AriaRole.Button,new() {Name="Pair with code",Exact=true});
@@ -355,18 +360,28 @@ public sealed partial class PosScannerPairingDialogE2ETests : PageTest
         await Expect(code).ToHaveAttributeAsync("maxlength","6");
         foreach (var invalid in new[] {"","12345","abc123"})
         {
+            // Observe each server-bound transition; an already-disabled button cannot acknowledge an input update.
+            await code.FillAsync("000008");
+            await Expect(pair).ToBeEnabledAsync();
             await code.FillAsync(invalid);
-            await code.BlurAsync();
             await Expect(pair).ToBeDisabledAsync();
         }
-        await code.FillAsync("000008"); await code.BlurAsync();
+        state.Claims.Should().BeEmpty("invalid input must never submit a pairing request");
+        await code.FillAsync("000008");
+        await Expect(pair).ToBeEnabledAsync();
+        if (blurBeforePairing) await code.BlurAsync();
         await pair.ClickAsync();
         await Expect(Page.GetByText("Pairing denied.",new() {Exact=true})).ToBeVisibleAsync();
-        await code.FillAsync("000007"); await code.BlurAsync();
+        await code.FillAsync("");
+        await Expect(pair).ToBeDisabledAsync();
+        await code.FillAsync("000007");
+        await Expect(pair).ToBeEnabledAsync();
+        if (blurBeforePairing) await code.BlurAsync();
         await pair.ClickAsync();
         await Expect(Page.GetByTestId("scanner-status")).ToHaveTextAsync("Paired");
         state.Claims.Select(c=>c.PairingCode).Should().Equal("000008","000007");
         state.Claims.Should().OnlyContain(c=>c.Challenge == "" && c.Metadata.RequestedTenantId == state.TenantId);
+        errors.Should().BeEmpty();
     }
 
     [Test]
