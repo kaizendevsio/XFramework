@@ -25,6 +25,13 @@
     {
         <CenteredSpinner />
     }
+    else if (_loadError is not null)
+    {
+        <BbAlert role="alert">
+            <BbAlertDescription>@_loadError</BbAlertDescription>
+        </BbAlert>
+        <BbButton Variant="ButtonVariant.Outline" OnClick="@LoadData">Retry</BbButton>
+    }
     else if (!_hasTenant)
     {
         <ModuleUnavailable ModuleName="Wallets" RequiresTenant="true" />
@@ -155,6 +162,7 @@
 
     private List<WalletApprovalRequest> _items = [];
     private bool _loading = true;
+    private string? _loadError;
     private bool _acting;
     private bool _hasTenant;
     private bool _moduleEnabled;
@@ -173,6 +181,7 @@
 
     private async Task LoadData()
     {
+        _loadError = null;
         _loading = true;
         try
         {
@@ -207,7 +216,7 @@
             _items = [];
             ResetSummary();
             Logger.LogError(ex, "Failed to load wallet approvals.");
-            ToastService.Error("Could not load wallet approvals.", "Wallets");
+            _loadError = "Could not load wallet approvals. Retry to load current data.";
         }
         finally
         {

@@ -11,6 +11,8 @@ public static class ReferenceDataValidationExtensions
             new ReferenceDataValidator<CurrencyType>(provider.GetRequiredService<IValidator<CurrencyType>>()));
         services.AddScoped<IRemoteDataContextEntityValidator>(provider =>
             new ReferenceDataValidator<ExchangeRate>(provider.GetRequiredService<IValidator<ExchangeRate>>()));
+        services.AddScoped<IRemoteDataContextEntityValidator>(provider =>
+            new ReferenceDataValidator<WalletType>(provider.GetRequiredService<IValidator<WalletType>>()));
         return services;
     }
 

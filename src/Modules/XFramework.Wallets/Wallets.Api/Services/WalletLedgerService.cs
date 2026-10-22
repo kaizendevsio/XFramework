@@ -49,6 +49,8 @@ public sealed class WalletLedgerService(
             ? ComputeHash(request)
             : request.RequestHash;
 
+        request = await ResolveRejectedHoldCaptureAsync(request, requestHash, ct);
+
         var replay = await FindCompletedReplayAsync(request.TenantId, request.IdempotencyKey, requestHash, ct);
         if (replay is not null)
         {
@@ -340,6 +342,54 @@ public sealed class WalletLedgerService(
             """, ct);
     }
 
+    private async Task<WalletLedgerExecutionRequest> ResolveRejectedHoldCaptureAsync(
+        WalletLedgerExecutionRequest request,
+        string requestHash,
+        CancellationToken ct)
+    {
+        if (request.OperationType != WalletOperationType.WithdrawalApproval ||
+            !request.ApprovalId.HasValue || string.IsNullOrWhiteSpace(request.IdempotencyKey))
+        {
+            return request;
+        }
+
+        var postings = request.Postings.Where(static p => p.WalletId.HasValue).ToArray();
+        if (postings.Length != 2 ||
+            postings[0].BalanceBucket != WalletBalanceBucket.DebitHold ||
+            postings[0].Direction != WalletLedgerDirection.Credit ||
+            postings[1].BalanceBucket != WalletBalanceBucket.Available ||
+            postings[1].Direction != WalletLedgerDirection.Debit ||
+            postings[0].WalletId != postings[1].WalletId ||
+            postings[0].Amount != postings[1].Amount)
+        {
+            return request;
+        }
+
+        var rejected = await dbContext.Set<WalletOperation>()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .SingleOrDefaultAsync(x =>
+                x.TenantId == request.TenantId && !x.IsDeleted &&
+                x.IdempotencyKey == request.IdempotencyKey, ct);
+
+        if (rejected is not
+            { Status: WalletOperationStatus.Rejected, FailureStatusCode: 400, FailureMessage: "Insufficient funds" } ||
+            rejected.OperationType != request.OperationType ||
+            rejected.ApprovalId != request.ApprovalId ||
+            !string.Equals(rejected.RequestHash, requestHash, StringComparison.Ordinal))
+        {
+            return request;
+        }
+
+        // Old prevalidation ignored the release. Preserve its rejection audit and allow one
+        // deterministic recovery; the recovery itself still has normal durable replay semantics.
+        return request with
+        {
+            IdempotencyKey = $"withdrawal:hold-capture-retry:{rejected.Id:N}",
+            OriginalOperationId = rejected.Id
+        };
+    }
+
     private async Task<Result<WalletLedgerExecutionResult>?> FindCompletedReplayAsync(
         Guid tenantId,
         string? idempotencyKey,
@@ -515,7 +565,7 @@ public sealed class WalletLedgerService(
         }
     }
 
-    private static void ApplyWalletPosting(Wallet wallet, WalletLedgerPostingRequest posting)
+    internal static void ApplyWalletPosting(Wallet wallet, WalletLedgerPostingRequest posting)
     {
         switch (posting.BalanceBucket)
         {

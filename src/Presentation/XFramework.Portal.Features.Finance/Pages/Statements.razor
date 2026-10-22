@@ -1,4 +1,5 @@
 @page "/finance/statements"
+@using global::Wallets.Domain.Shared.Contracts.Responses
 @using XFramework.Domain.Shared.DataContext
 @implements IDisposable
 
@@ -25,6 +26,13 @@
     @if (_loading)
     {
         <CenteredSpinner />
+    }
+    else if (_loadError is not null)
+    {
+        <BbAlert role="alert">
+            <BbAlertDescription>@_loadError</BbAlertDescription>
+        </BbAlert>
+        <BbButton Variant="ButtonVariant.Outline" OnClick="@LoadData">Retry</BbButton>
     }
     else if (!_hasTenant)
     {
@@ -143,7 +151,30 @@
     }
 </div>
 
+<BbDialog @bind-Open="_statementOpen">
+    <BbDialogContent Class="xf-dialog-wide" Style="max-height: calc(100dvh - 2rem); overflow: auto;">
+        <BbDialogHeader><BbDialogTitle>Wallet statement</BbDialogTitle><BbDialogDescription>@GetWalletLabel(_statementWalletId)</BbDialogDescription></BbDialogHeader>
+        <div style="min-width: 0; overflow: auto;">
+        <BbDataGrid Items="@_statementLines" ShowPagination="true" InitialPageSize="20">
+            <Columns>
+                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Date (UTC)" Sortable="true" Filterable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Filterable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.Direction)" Title="Direction" Filterable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.BalanceBucket)" Title="Balance bucket" Filterable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" Filterable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.RunningBalance)" Title="Running balance" Filterable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" Filterable="true" />
+            </Columns>
+            <EmptyTemplate><BbEmpty Title="No statement entries" /></EmptyTemplate>
+        </BbDataGrid>
+        </div>
+    </BbDialogContent>
+</BbDialog>
+
 @code {
+    private bool _statementOpen;
+    private Guid _statementWalletId;
+    private List<WalletStatementLineResponse> _statementLines = [];
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
     [Inject] private IPortalModuleAvailability ModuleNavigation { get; set; } = default!;
@@ -157,6 +188,7 @@
     private IReadOnlyDictionary<Guid, string> _walletLabels = new Dictionary<Guid, string>();
     private IReadOnlyDictionary<Guid, string> _credentialLabels = new Dictionary<Guid, string>();
     private bool _loading = true;
+    private string? _loadError;
     private bool _acting;
     private bool _hasTenant;
     private bool _moduleEnabled;
@@ -177,6 +209,9 @@
 
     private async Task LoadData()
     {
+        _statementOpen = false;
+        _statementLines = [];
+        _loadError = null;
         _loading = true;
         try
         {
@@ -223,7 +258,7 @@
         {
             ResetData();
             Logger.LogError(ex, "Failed to load wallet reporting data.");
-            ToastService.Error("Could not load wallet reporting data.", "Wallets");
+            _loadError = "Could not load wallet reporting data. Retry to load current data.";
         }
         finally
         {
@@ -240,13 +275,17 @@
 
     private async Task GenerateStatement(Guid walletId)
     {
+        var tenantId = TenantFilter.SelectedTenantId;
         _acting = true;
         try
         {
             var result = await WalletsAdminContracts.GenerateStatementAsync(walletId);
+            if (TenantFilter.SelectedTenantId != tenantId) return;
             if (result.IsSuccess)
             {
-                ToastService.Success("Statement generation submitted.", "Wallets");
+                _statementWalletId = walletId;
+                _statementLines = result.Response ?? [];
+                _statementOpen = true;
             }
             else
             {

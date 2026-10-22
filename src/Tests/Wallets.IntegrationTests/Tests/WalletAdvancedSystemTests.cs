@@ -13,6 +13,7 @@ using Wallets.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts.Requests;
 using Wallets.Domain.Shared.Contracts.Responses;
 using Wallets.Domain.Shared.Enums;
+using XFramework.Core.Patterns;
 using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.Enums;
@@ -154,6 +155,236 @@ public class WalletAdvancedSystemTests : WalletsTestBase
             x.BalanceBucket == WalletBalanceBucket.Fee &&
             x.EntryKind == WalletLedgerEntryKind.Fee &&
             x.Amount == 5m);
+    }
+
+    [TestCase(0, 0, false)]
+    [TestCase(2, 0, false)]
+    [TestCase(0, 3, false)]
+    [TestCase(2, 3, false)]
+    [TestCase(0, 0, true)]
+    [TestCase(2, 3, true)]
+    public async Task Http_WithdrawalSettlement_ExactAvailableBalanceIncludingFee_PreservesOtherHolds(
+        decimal fee, decimal unrelatedHold, bool recoverRejected)
+    {
+        const decimal principal = 10m;
+        var totalDebit = principal + fee;
+        var credential = await SeedCredential();
+        var checker = await SeedCredential();
+        var wallet = await SeedWallet(credential.Id, totalDebit + unrelatedHold);
+        await using (var seed = CreateDbContext())
+        {
+            await seed.Set<Wallet>().Where(x => x.Id == wallet.Id).ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.DebitOnHoldBalance, unrelatedHold)
+                .SetProperty(x => x.TransferableBalance, totalDebit));
+        }
+        var reference = $"exact-withdrawal-{Guid.NewGuid():N}";
+        var created = await HttpClient.PostAsJsonAsync("/api/wallets/withdrawals", new CreateWithdrawalWorkflowRequest
+        {
+            CredentialId = credential.Id, WalletId = wallet.Id, Amount = principal,
+            RequestedFee = fee, ExternalReference = reference, Metadata = CreateMetadata()
+        });
+        created.IsSuccessStatusCode.Should().BeTrue(await created.Content.ReadAsStringAsync());
+        await using var db = CreateDbContext();
+        var withdrawal = await db.Set<WithdrawalRequest>().AsNoTracking().SingleAsync(x => x.ExternalReference == reference);
+        var approved = await PostAsJsonAsActorAsync("/api/wallets/withdrawals/approve", new ApproveWithdrawalWorkflowRequest
+        {
+            RequestId = withdrawal.Id, Metadata = CreateMetadata()
+        }, checker.Id);
+        approved.IsSuccessStatusCode.Should().BeTrue(await approved.Content.ReadAsStringAsync());
+        var heldWallet = await db.Set<Wallet>().AsNoTracking().SingleAsync(x => x.Id == wallet.Id);
+        heldWallet.AvailableBalance.Should().Be(0m);
+        heldWallet.DebitOnHoldBalance.Should().Be(totalDebit + unrelatedHold);
+
+        var request = new SettleWithdrawalWorkflowRequest
+        {
+            RequestId = withdrawal.Id,
+            IdempotencyKey = recoverRejected && fee == 0 ? null : reference,
+            Metadata = CreateMetadata()
+        };
+        var settlementKey = request.IdempotencyKey ?? $"withdrawal:settle:{withdrawal.Id}:{withdrawal.ReferenceNumber}";
+        WalletLedgerExecutionRequest? rejectedRequest = null;
+        Guid? rejectedId = null;
+        if (recoverRejected)
+        {
+            // Execute the actual workflow with the old policy outcome to persist its real key/hash.
+            await using var legacyScope = WalletsTestFixture.Services.CreateAsyncScope();
+            EstablishTrustedActor(legacyScope, credential.Id);
+            var legacyPolicy = new RejectingPolicyEvaluator("Insufficient funds", 400);
+            var legacyLedger = ActivatorUtilities.CreateInstance<WalletLedgerService>(legacyScope.ServiceProvider, legacyPolicy);
+            var legacyWorkflow = ActivatorUtilities.CreateInstance<WalletWorkflowService>(legacyScope.ServiceProvider, legacyLedger);
+            var failed = await legacyWorkflow.SettleWithdrawalAsync(request);
+            failed.StatusCode.Should().Be(400);
+            failed.Message.Should().Be("Insufficient funds");
+            rejectedRequest = legacyPolicy.Request!;
+            var rejected = await db.Set<WalletOperation>().AsNoTracking().SingleAsync(x => x.IdempotencyKey == settlementKey);
+            rejectedId = rejected.Id;
+            rejected.Status.Should().Be(WalletOperationStatus.Rejected);
+            (await db.Set<WalletLedgerEntry>().AnyAsync(x => x.OperationId == rejectedId)).Should().BeFalse();
+
+            var changed = await HttpClient.PostAsJsonAsync("/api/wallets/withdrawals/settle", request with { Reason = "changed request" });
+            changed.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        }
+
+        var settlements = await Task.WhenAll(
+            HttpClient.PostAsJsonAsync("/api/wallets/withdrawals/settle", request),
+            HttpClient.PostAsJsonAsync("/api/wallets/withdrawals/settle", request));
+        settlements.Should().Contain(x => x.IsSuccessStatusCode);
+        foreach (var settled in settlements)
+            (settled.IsSuccessStatusCode || settled.StatusCode == HttpStatusCode.Conflict)
+                .Should().BeTrue(await settled.Content.ReadAsStringAsync());
+        var replay = await HttpClient.PostAsJsonAsync("/api/wallets/withdrawals/settle", request);
+        replay.IsSuccessStatusCode.Should().BeTrue(await replay.Content.ReadAsStringAsync());
+
+        var completed = await db.Set<WithdrawalRequest>().AsNoTracking().SingleAsync(x => x.Id == withdrawal.Id);
+        completed.WorkflowStatus.Should().Be(WalletWorkflowStatus.Completed);
+        completed.SettlementOperationId.Should().NotBeNull();
+        var updated = await db.Set<Wallet>().AsNoTracking().SingleAsync(x => x.Id == wallet.Id);
+        updated.Balance.Should().Be(unrelatedHold);
+        updated.DebitOnHoldBalance.Should().Be(unrelatedHold);
+        updated.AvailableBalance.Should().Be(0m);
+        updated.TransferableBalance.Should().Be(0m);
+        var snapshot = await db.Set<WalletBalanceSnapshot>().AsNoTracking().SingleAsync(x => x.WalletId == wallet.Id);
+        snapshot.Balance.Should().Be(updated.Balance);
+        snapshot.DebitOnHoldBalance.Should().Be(unrelatedHold);
+        snapshot.AvailableBalance.Should().Be(0m);
+        var transaction = await db.Set<WalletTransaction>().AsNoTracking().SingleAsync(x => x.Id == completed.SettlementTransactionId);
+        transaction.Held.Should().BeFalse();
+        transaction.Released.Should().BeTrue();
+        transaction.RunningBalance.Should().Be(unrelatedHold);
+        var entries = await db.Set<WalletLedgerEntry>().Where(x => x.OperationId == completed.SettlementOperationId)
+            .OrderBy(x => x.Sequence).ToListAsync();
+        entries.Where(x => x.Direction == WalletLedgerDirection.Debit).Sum(x => x.Amount)
+            .Should().Be(entries.Where(x => x.Direction == WalletLedgerDirection.Credit).Sum(x => x.Amount));
+        entries.Where(x => x.WalletId == wallet.Id).Should().HaveCount(2);
+        entries[0].BalanceBucket.Should().Be(WalletBalanceBucket.DebitHold);
+        entries[0].RunningAvailableBalance.Should().Be(totalDebit);
+        entries[1].RunningAvailableBalance.Should().Be(0m);
+        (await db.Set<WalletOperation>().CountAsync(x => x.IdempotencyKey == settlementKey)).Should().Be(1);
+        (await db.Set<WalletOutboxMessage>().CountAsync(x => x.OperationId == completed.SettlementOperationId)).Should().Be(1);
+        if (recoverRejected)
+        {
+            var original = await db.Set<WalletOperation>().AsNoTracking().SingleAsync(x => x.Id == rejectedId);
+            original.Status.Should().Be(WalletOperationStatus.Rejected);
+            original.FailureStatusCode.Should().Be(400);
+            original.FailureMessage.Should().Be("Insufficient funds");
+            var recovery = await db.Set<WalletOperation>().AsNoTracking().SingleAsync(x => x.OriginalOperationId == rejectedId);
+            recovery.Id.Should().Be(completed.SettlementOperationId!.Value);
+            recovery.Status.Should().Be(WalletOperationStatus.Completed);
+            recovery.RequestHash.Should().Be(original.RequestHash);
+            (await db.Set<WalletOutboxMessage>().AnyAsync(x => x.OperationId == rejectedId)).Should().BeFalse();
+
+            // Verify ledger replay too, not only the workflow's already-completed shortcut.
+            await using var replayScope = WalletsTestFixture.Services.CreateAsyncScope();
+            EstablishTrustedActor(replayScope, credential.Id);
+            var ledgerReplay = await replayScope.ServiceProvider.GetRequiredService<IWalletLedgerService>()
+                .ExecuteAsync(rejectedRequest! with { BeforeCommitAsync = null, TransactionUpdates = [] });
+            ledgerReplay.IsSuccess.Should().BeTrue(ledgerReplay.Message);
+            ledgerReplay.Data!.AlreadyProcessed.Should().BeTrue();
+            ledgerReplay.Data.OperationId.Should().Be(recovery.Id);
+            var changedReplay = await replayScope.ServiceProvider.GetRequiredService<IWalletLedgerService>()
+                .ExecuteAsync(rejectedRequest! with { Reason = "changed after recovery", BeforeCommitAsync = null, TransactionUpdates = [] });
+            changedReplay.StatusCode.Should().Be(409);
+        }
+    }
+
+    [TestCase(WalletOperationType.Debit, 400, "Insufficient funds")]
+    [TestCase(WalletOperationType.WithdrawalApproval, 403, "Insufficient funds")]
+    [TestCase(WalletOperationType.WithdrawalApproval, 400, "Wallet policy rejected the operation")]
+    public async Task Ledger_HoldCapture_OtherRejectionsRemainCached(
+        WalletOperationType operationType, int statusCode, string message)
+    {
+        var credential = await SeedCredential();
+        var wallet = await SeedWallet(credential.Id, 10m);
+        var key = $"cached-rejection-{Guid.NewGuid():N}";
+        var request = new WalletLedgerExecutionRequest
+        {
+            TenantId = wallet.TenantId, OperationType = operationType, ApprovalId = Guid.NewGuid(),
+            ActorCredentialId = credential.Id, IdempotencyKey = key,
+            Postings =
+            [
+                new() { WalletId = wallet.Id, Amount = 10m, Direction = WalletLedgerDirection.Credit, BalanceBucket = WalletBalanceBucket.DebitHold },
+                new() { WalletId = wallet.Id, Amount = 10m, Direction = WalletLedgerDirection.Debit, BalanceBucket = WalletBalanceBucket.Available }
+            ]
+        };
+        await using (var scope = WalletsTestFixture.Services.CreateAsyncScope())
+        {
+            EstablishTrustedActor(scope, credential.Id);
+            var ledger = ActivatorUtilities.CreateInstance<WalletLedgerService>(scope.ServiceProvider,
+                new RejectingPolicyEvaluator(message, statusCode));
+            var rejected = await ledger.ExecuteAsync(request);
+            rejected.StatusCode.Should().Be(statusCode);
+        }
+        await using (var scope = WalletsTestFixture.Services.CreateAsyncScope())
+        {
+            EstablishTrustedActor(scope, credential.Id);
+            var ledger = scope.ServiceProvider.GetRequiredService<IWalletLedgerService>();
+            var replay = await ledger.ExecuteAsync(request);
+            replay.IsSuccess.Should().BeFalse();
+            replay.StatusCode.Should().Be(statusCode);
+            replay.Message.Should().Be(message);
+            var changed = await ledger.ExecuteAsync(request with { Reason = "changed" });
+            changed.StatusCode.Should().Be(409);
+        }
+        await using var db = CreateDbContext();
+        var original = await db.Set<WalletOperation>().SingleAsync(x => x.IdempotencyKey == key);
+        (await db.Set<WalletOperation>().AnyAsync(x => x.OriginalOperationId == original.Id)).Should().BeFalse();
+        (await db.Set<WalletLedgerEntry>().AnyAsync(x => x.OperationId == original.Id)).Should().BeFalse();
+        (await db.Set<Wallet>().SingleAsync(x => x.Id == wallet.Id)).Balance.Should().Be(10m);
+    }
+
+    [TestCase(15, 15, 10, 11, false, "Insufficient funds")]
+    [TestCase(10, 10, 11, 11, false, "Debit hold balance is insufficient")]
+    [TestCase(10, 10, 10, 10, true, "Insufficient funds")]
+    [TestCase(10, 10, 10, 10.01, false, "Insufficient funds")]
+    public async Task Ledger_HoldCapture_InvalidReleaseOrCapture_RejectsAtomically(
+        decimal balance, decimal hold, decimal release, decimal debit, bool captureFirst, string message)
+    {
+        var credential = await SeedCredential();
+        var wallet = await SeedWallet(credential.Id, balance);
+        await using (var seed = CreateDbContext())
+        {
+            await seed.Set<Wallet>().Where(x => x.Id == wallet.Id).ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.DebitOnHoldBalance, hold)
+                .SetProperty(x => x.TransferableBalance, balance - hold));
+        }
+        var releasePosting = new WalletLedgerPostingRequest
+        {
+            WalletId = wallet.Id, WalletTypeId = wallet.WalletTypeId, Amount = release,
+            BalanceBucket = WalletBalanceBucket.DebitHold, Direction = WalletLedgerDirection.Credit
+        };
+        var capture = new WalletLedgerPostingRequest
+        {
+            WalletId = wallet.Id, WalletTypeId = wallet.WalletTypeId, Amount = debit,
+            BalanceBucket = WalletBalanceBucket.Available, Direction = WalletLedgerDirection.Debit
+        };
+        List<WalletLedgerPostingRequest> postings = captureFirst ? [capture, releasePosting] : [releasePosting, capture];
+        if (debit != release)
+            postings.Add(new WalletLedgerPostingRequest
+            {
+                Amount = Math.Abs(debit - release), BalanceBucket = WalletBalanceBucket.External,
+                Direction = debit > release ? WalletLedgerDirection.Credit : WalletLedgerDirection.Debit
+            });
+        var reference = $"capture-boundary-{Guid.NewGuid():N}";
+        await using var scope = WalletsTestFixture.Services.CreateAsyncScope();
+        EstablishTrustedActor(scope, credential.Id);
+        var result = await scope.ServiceProvider.GetRequiredService<IWalletLedgerService>().ExecuteAsync(new()
+        {
+            TenantId = wallet.TenantId, ActorCredentialId = credential.Id, OperationType = WalletOperationType.Debit,
+            IdempotencyKey = reference, ReferenceNumber = reference, Postings = postings
+        });
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(400);
+        result.Message.Should().Be(message);
+        await using var db = CreateDbContext();
+        var unchanged = await db.Set<Wallet>().SingleAsync(x => x.Id == wallet.Id);
+        unchanged.Balance.Should().Be(balance);
+        unchanged.DebitOnHoldBalance.Should().Be(hold);
+        unchanged.TransferableBalance.Should().Be(balance - hold);
+        var rejected = await db.Set<WalletOperation>().SingleAsync(x => x.IdempotencyKey == reference);
+        rejected.Status.Should().Be(WalletOperationStatus.Rejected);
+        (await db.Set<WalletLedgerEntry>().AnyAsync(x => x.OperationId == rejected.Id)).Should().BeFalse();
+        (await db.Set<WalletBalanceSnapshot>().AnyAsync(x => x.WalletId == wallet.Id)).Should().BeFalse();
+        (await db.Set<WalletOutboxMessage>().AnyAsync(x => x.OperationId == rejected.Id)).Should().BeFalse();
     }
 
     [Test]
@@ -1218,6 +1449,7 @@ public class WalletAdvancedSystemTests : WalletsTestBase
         var owner = await SeedCredential();
         var otherActor = await SeedCredential();
         var wallet = await SeedWallet(owner.Id, 100m);
+        var originalOperationId = await CreateOriginalDebitAsync(wallet, owner.Id, 20m);
 
         var wrongCreateResponse = await PostAsJsonAsActorAsync("/api/wallets/cases", new CreateWalletCaseRequest
         {
@@ -1239,6 +1471,7 @@ public class WalletAdvancedSystemTests : WalletsTestBase
             Amount = 10m,
             ExternalReference = caseReference,
             Reason = "owner opened case",
+            OriginalOperationId = originalOperationId,
             Metadata = CreateMetadata()
         }, owner.Id, privileged: false);
         createResponse.IsSuccessStatusCode.Should().BeTrue(await createResponse.Content.ReadAsStringAsync());
@@ -2497,6 +2730,18 @@ public class WalletAdvancedSystemTests : WalletsTestBase
         : ITrustedInvocationContextAccessor
     {
         public TrustedInvocationContext? Current => context;
+    }
+
+    private sealed class RejectingPolicyEvaluator(string message, int statusCode) : IWalletPolicyEvaluator
+    {
+        public WalletLedgerExecutionRequest? Request { get; private set; }
+
+        public Task<Result<WalletPolicyEvaluationResult>> EvaluateAsync(
+            WalletPolicyEvaluationContext context, CancellationToken ct = default)
+        {
+            Request = context.Request;
+            return Task.FromResult(Result<WalletPolicyEvaluationResult>.Failure(message, statusCode));
+        }
     }
 
     private async Task SetTenantFeatureEnabled(string featureKey, bool enabled)

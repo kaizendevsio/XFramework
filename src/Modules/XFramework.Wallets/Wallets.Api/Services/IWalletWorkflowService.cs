@@ -54,6 +54,7 @@ public interface IWalletCaseWorkflowService
 
 public interface IWalletReportingService
 {
+    Task<Result<List<WalletPaymentGatewayOptionResponse>>> GetPaymentGatewayOptionsAsync(WalletPaymentGatewayOptionsRequest request, CancellationToken ct = default);
     Task<Result<WalletFinancialReportResponse>> GetFinancialReportAsync(WalletFinancialReportRequest request, CancellationToken ct = default);
     Task<Result<List<WalletStatementLineResponse>>> GetStatementAsync(WalletStatementRequest request, CancellationToken ct = default);
     Task<Result<List<WalletStatementLineResponse>>> GetLedgerEntriesAsync(WalletLedgerEntriesRequest request, CancellationToken ct = default);

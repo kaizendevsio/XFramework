@@ -9,7 +9,7 @@ else
     <div class="space-y-6 inv-page">
         <a href="/inventario/planning">Back to planning</a>
         <div class="xf-page-header"><BbTypographyH3>Reorder Rule</BbTypographyH3><BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">Refresh</BbButton></div>
-        <p><a href="@($"/inventario/products/{_rule.ProductId}/replenishment")">@_productName</a> ? @_variantName ? @_warehouseName ? @_locationName</p>
+        <p><a href="@($"/inventario/products/{_rule.ProductId}/replenishment")">@_productName</a> / @_variantName / @_warehouseName / @_locationName</p>
         <p>Stock scope stays unchanged. Deactivate this rule to stop suggestions without deleting its history.</p>
         <BbCard><BbCardHeader><BbCardTitle>Reorder Rule Summary</BbCardTitle></BbCardHeader><BbCardContent>@if (_maintenanceEditing)
                     {
@@ -90,7 +90,7 @@ else
     private bool _editHasMaximum;
     private decimal _editReorderPoint;
     private decimal _editReorderQuantity;
-    private string _editPreferredSupplier = "";
+    private string? _editPreferredSupplier = "";
     private bool _editIsActive;
 
     private void BeginMaintenance()
@@ -111,7 +111,7 @@ else
     {
         if (_rule is null || _maintenanceSaving) return;
         _maintenanceError = null;
-        if (_editPreferredSupplier.Length > 200) { _maintenanceError = "Preferred supplier must be at most 200 characters."; return; }
+        if (_editPreferredSupplier?.Length > 200) { _maintenanceError = "Preferred supplier must be at most 200 characters."; return; }
         if (_editMinimumQuantity < 0 || _editReorderPoint < 0 || _editReorderQuantity < 0 || (_editHasMaximum && _editMaximumQuantity < _editMinimumQuantity))
         { _maintenanceError = "Quantities must be nonnegative, and maximum must be at least minimum."; return; }
         _maintenanceSaving = true;

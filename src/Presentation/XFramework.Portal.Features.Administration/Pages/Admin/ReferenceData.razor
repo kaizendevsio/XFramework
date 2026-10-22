@@ -506,6 +506,15 @@ else
                     break;
 
                 case "wallet-types":
+                    <XfEntityPicker TItem="global::Wallets.Domain.Shared.Contracts.CurrencyType"
+                                    Label="Currency"
+                                    @bind-Value="_formWalletCurrencyId"
+                                    Items="@_currencyTypes"
+                                    ValueSelector="@(currency => currency.Id.ToString())"
+                                    TextSelector="@(currency => $"{currency.CurrencyIsoCode3} - {currency.Name}")"
+                                    Placeholder="Select currency"
+                                    SearchPlaceholder="Search currencies..."
+                                    EmptyMessage="No currencies found." />
                     <BbFormFieldInput TValue="string"
                                       @bind-Value="_formCode"
                                       Label="Code"
@@ -665,6 +674,7 @@ else
     private string _formMinTransfer = "";
     private string _formMaxTransfer = "";
     private string _formCurrencyCode = "";
+    private string? _formWalletCurrencyId;
     private string _formValue = "";
     private string _formFee = "";
     private string _formSourceCurrency = "";
@@ -883,7 +893,10 @@ else
                 case "wallet-types":
                     var wallets = await LoadList<global::Wallets.Domain.Shared.Contracts.WalletType>();
                     if (!IsCurrentDraft(revision, tenantId, tab)) return;
+                    var walletCurrencies = await LoadList<global::Wallets.Domain.Shared.Contracts.CurrencyType>(500);
+                    if (!IsCurrentDraft(revision, tenantId, tab)) return;
                     _walletTypes = wallets;
+                    _currencyTypes = walletCurrencies;
                     break;
                 case "currency-types":
                     var currencies = await LoadList<global::Wallets.Domain.Shared.Contracts.CurrencyType>();
@@ -963,6 +976,7 @@ else
         _formMinTransfer = "";
         _formMaxTransfer = "";
         _formCurrencyCode = "";
+        _formWalletCurrencyId = null;
         _formValue = "";
         _formFee = "";
         _formSourceCurrency = "";
@@ -1013,6 +1027,7 @@ else
         _formDescription = item.Desc ?? "";
         _formMinTransfer = item.MinTransferRule?.ToString() ?? "";
         _formMaxTransfer = item.MaxTransferRule?.ToString() ?? "";
+        _formWalletCurrencyId = item.CurrencyTypeId?.ToString();
         _dialogOpen = true;
     }
 
@@ -1264,6 +1279,15 @@ else
         var code = (_formCode ?? string.Empty).Trim();
         var name = (_formName ?? string.Empty).Trim();
         var description = (_formDescription ?? string.Empty).Trim();
+        Guid? currencyId = Guid.TryParse(_formWalletCurrencyId, out var selectedCurrency) ? selectedCurrency : null;
+        var existingCurrencyId = (_editingRecord as global::Wallets.Domain.Shared.Contracts.WalletType)?.CurrencyTypeId;
+        if (currencyId != existingCurrencyId && currencyId.HasValue
+            && !_currencyTypes.Any(currency => currency.Id == currencyId && !currency.IsDeleted
+                && (currency.TenantId == TenantId || currency.TenantId == Guid.Empty)))
+        {
+            ToastService.Show("Select a currency available to this tenant.");
+            return;
+        }
 
         if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(code))
         {
@@ -1294,6 +1318,7 @@ else
             entity.Code = code;
             entity.Name = name;
             entity.Desc = string.IsNullOrWhiteSpace(description) ? null : description;
+            entity.CurrencyTypeId = currencyId;
             entity.MinTransferRule = decimal.TryParse(_formMinTransfer, out var minT) ? minT : null;
             entity.MaxTransferRule = decimal.TryParse(_formMaxTransfer, out var maxT) ? maxT : null;
         });

@@ -1146,6 +1146,17 @@ public sealed partial class WalletWorkflowService(
             return Result<WalletCaseResponse>.Failure(authorization.Message!, authorization.StatusCode);
         }
 
+        if (request.Amount <= 0 || !Enum.IsDefined(request.CaseType))
+        {
+            return Result<WalletCaseResponse>.Failure("A valid case type and positive amount are required", 400);
+        }
+
+        var original = await ResolveOriginalCaseOperationAsync(
+            wallet.TenantId, wallet.Id, request.CaseType,
+            request.OriginalTransactionId, request.OriginalOperationId, ct);
+        if (!original.IsSuccess)
+            return Result<WalletCaseResponse>.Failure(original.Message!, original.StatusCode);
+
         var walletCase = new WalletCase
         {
             Id = Guid.NewGuid(),
@@ -1153,7 +1164,7 @@ public sealed partial class WalletWorkflowService(
             CaseType = request.CaseType,
             Status = WalletCaseStatus.Open,
             WalletId = request.WalletId,
-            OriginalOperationId = request.OriginalOperationId,
+            OriginalOperationId = original.Data,
             OriginalTransactionId = request.OriginalTransactionId,
             Amount = request.Amount,
             ExternalReference = request.ExternalReference,
@@ -1241,6 +1252,13 @@ public sealed partial class WalletWorkflowService(
             return Result<WalletCaseResponse>.Success(ToCaseResponse(walletCase, message));
         }
 
+        var original = await ResolveOriginalCaseOperationAsync(
+            walletCase.TenantId, walletCase.WalletId, walletCase.CaseType,
+            walletCase.OriginalTransactionId, walletCase.OriginalOperationId, ct);
+        if (!original.IsSuccess)
+            return Result<WalletCaseResponse>.Failure(original.Message!, original.StatusCode);
+
+        var originalOperationId = original.Data;
         var credit = walletCase.CaseType is WalletCaseType.Refund;
         var ledgerResult = await ledgerService.ExecuteAsync(new WalletLedgerExecutionRequest
         {
@@ -1257,7 +1275,7 @@ public sealed partial class WalletWorkflowService(
             ReferenceNumber = walletCase.ExternalReference ?? walletCase.Id.ToString("N"),
             ExternalReference = walletCase.ExternalReference,
             Reason = request.Reason ?? walletCase.Reason,
-            OriginalOperationId = walletCase.OriginalOperationId,
+            OriginalOperationId = originalOperationId,
             Postings =
             [
                 new WalletLedgerPostingRequest
@@ -1291,10 +1309,11 @@ public sealed partial class WalletWorkflowService(
                 }
             ],
             TransactionalValidationAsync = validationCt =>
-                ValidateOriginalCaseReferenceInTransactionAsync(walletCase, validationCt),
+                ValidateOriginalCaseReferenceInTransactionAsync(walletCase, originalOperationId, validationCt),
             BeforeCommitAsync = (operation, _) =>
             {
                 walletCase.Status = WalletCaseStatus.Resolved;
+                walletCase.OriginalOperationId = originalOperationId;
                 walletCase.SettlementOperationId = operation.Id;
                 walletCase.DeciderCredentialId = deciderCredentialId;
                 walletCase.ResolvedAt = DateTime.UtcNow;
@@ -1312,6 +1331,7 @@ public sealed partial class WalletWorkflowService(
 
     private async Task<Result> ValidateOriginalCaseReferenceInTransactionAsync(
         WalletCase walletCase,
+        Guid originalOperationId,
         CancellationToken ct)
     {
         await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
@@ -1329,51 +1349,22 @@ public sealed partial class WalletWorkflowService(
             return Result.Conflict("Wallet case has already been decided");
         }
 
-        if (!walletCase.OriginalOperationId.HasValue)
-        {
-            return Result.Failure("Original wallet operation is required", 400);
-        }
-
         await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
             SELECT "ID"
             FROM "Wallet"."WalletOperation"
             WHERE "TenantId" = {walletCase.TenantId}
               AND "IsDeleted" = false
-              AND "ID" = {walletCase.OriginalOperationId.Value}
+              AND "ID" = {originalOperationId}
             FOR UPDATE
             """, ct);
 
-        var originalOperationExists = await dbContext.Set<WalletOperation>()
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .AnyAsync(x =>
-                x.Id == walletCase.OriginalOperationId.Value &&
-                x.TenantId == walletCase.TenantId &&
-                !x.IsDeleted &&
-                x.Status == WalletOperationStatus.Completed,
-                ct);
-        if (!originalOperationExists)
-        {
-            return Result.Failure("Original completed wallet operation was not found", 400);
-        }
-
-        if (walletCase.OriginalTransactionId.HasValue)
-        {
-            var transactionLinked = await dbContext.Set<WalletLedgerEntry>()
-                .IgnoreQueryFilters()
-                .AsNoTracking()
-                .AnyAsync(x =>
-                    x.TenantId == walletCase.TenantId &&
-                    !x.IsDeleted &&
-                    x.OperationId == walletCase.OriginalOperationId.Value &&
-                    x.WalletId == walletCase.WalletId &&
-                    x.WalletTransactionId == walletCase.OriginalTransactionId.Value,
-                    ct);
-            if (!transactionLinked)
-            {
-                return Result.Failure("Original transaction is not linked to the selected wallet operation", 400);
-            }
-        }
+        // Revalidate after locking/reloading, including legacy transaction-only cases.
+        var original = await ResolveOriginalCaseOperationAsync(
+            walletCase.TenantId, walletCase.WalletId, walletCase.CaseType,
+            walletCase.OriginalTransactionId, walletCase.OriginalOperationId, ct);
+        if (!original.IsSuccess) return Result.Failure(original.Message!, original.StatusCode);
+        if (original.Data != originalOperationId)
+            return Result.Conflict("Original wallet operation changed during case resolution");
 
         if (walletCase.CaseType is not WalletCaseType.Refund)
         {
@@ -1386,7 +1377,7 @@ public sealed partial class WalletWorkflowService(
             .Where(x =>
                 x.TenantId == walletCase.TenantId &&
                 !x.IsDeleted &&
-                x.OperationId == walletCase.OriginalOperationId.Value &&
+                x.OperationId == originalOperationId &&
                 x.WalletId == walletCase.WalletId &&
                 x.BalanceBucket == WalletBalanceBucket.Available &&
                 x.Direction == WalletLedgerDirection.Debit)
@@ -1406,7 +1397,7 @@ public sealed partial class WalletWorkflowService(
                 !x.Operation.IsDeleted &&
                 x.Operation.Status == WalletOperationStatus.Completed &&
                 x.Operation.OperationType == WalletOperationType.Refund &&
-                x.Operation.OriginalOperationId == walletCase.OriginalOperationId)
+                x.Operation.OriginalOperationId == originalOperationId)
             .SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
 
         return walletCase.Amount > 0 && walletCase.Amount <= refundableAmount - alreadyRefunded

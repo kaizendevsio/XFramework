@@ -2,13 +2,17 @@ using Wallets.Api.Services;
 using Wallets.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts.Requests;
 using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Attributes;
+using XFramework.Integration.Security;
 
 namespace Wallets.Api.Features.Batch;
 
 public static class BatchIncrementWalletBoltEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update])]
+    [BoltHandler(TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update])]
     public static async Task<Result<BatchOperationResult>> Handle(
         BatchIncrementWalletRequest request,
         IBatchWalletService batchService,
@@ -24,7 +28,9 @@ public static class BatchIncrementWalletBoltEndpoint
 
 public static class BatchDecrementWalletBoltEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update])]
+    [BoltHandler(TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update])]
     public static async Task<Result<BatchOperationResult>> Handle(
         BatchDecrementWalletRequest request,
         IBatchWalletService batchService,
@@ -40,7 +46,9 @@ public static class BatchDecrementWalletBoltEndpoint
 
 public static class BatchTransferWalletBoltEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update])]
+    [BoltHandler(TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update])]
     public static async Task<Result<BatchOperationResult>> Handle(
         BatchTransferWalletRequest request,
         IBatchWalletService batchService,

@@ -22,6 +22,13 @@
     {
         <CenteredSpinner />
     }
+    else if (_loadError is not null)
+    {
+        <BbAlert role="alert">
+            <BbAlertDescription>@_loadError</BbAlertDescription>
+        </BbAlert>
+        <BbButton Variant="ButtonVariant.Outline" OnClick="@LoadData">Retry</BbButton>
+    }
     else if (!_hasTenant)
     {
         <ModuleUnavailable ModuleName="Wallets" RequiresTenant="true" />
@@ -69,6 +76,7 @@
     private List<WalletOperation> _items = [];
     private IReadOnlyDictionary<Guid, string> _credentialLabels = new Dictionary<Guid, string>();
     private bool _loading = true;
+    private string? _loadError;
     private bool _hasTenant;
     private bool _moduleEnabled;
 
@@ -87,6 +95,7 @@
 
     private async Task LoadData()
     {
+        _loadError = null;
         _loading = true;
         try
         {
@@ -118,7 +127,7 @@
             _items = [];
             _credentialLabels = new Dictionary<Guid, string>();
             Logger.LogError(ex, "Failed to load wallet operations.");
-            ToastService.Error("Could not load wallet operations.", "Wallets");
+            _loadError = "Could not load wallet operations. Retry to load current data.";
         }
         finally
         {

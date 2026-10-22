@@ -28,6 +28,13 @@
     {
         <CenteredSpinner />
     }
+    else if (_loadError is not null)
+    {
+        <BbAlert role="alert">
+            <BbAlertDescription>@_loadError</BbAlertDescription>
+        </BbAlert>
+        <BbButton Variant="ButtonVariant.Outline" OnClick="@LoadData">Retry</BbButton>
+    }
     else if (!_hasTenant)
     {
         <ModuleUnavailable ModuleName="Wallets" RequiresTenant="true" />
@@ -156,7 +163,7 @@
                                 AdvancedSearchTitle="Find Wallet"
                                 AdvancedSearchDescription="Search active wallets before creating a withdrawal request." />
                 <XfEntityPicker TItem="PaymentGateway"
-                                Label="Gateway"
+                                Label="Gateway (optional)"
                                 Value="@_createGatewayId"
                                 ValueChanged="@(value => _createGatewayId = value ?? NoSelectionValue)"
                                 Items="@_gateways"
@@ -166,13 +173,17 @@
                                 AdvancedColumns="@GatewayAdvancedColumns"
                                 AdvancedFilters="@GatewayAdvancedFilters"
                                 AdvancedSearchScope="Searches gateway name, category/provider, enabled state, service charge, convenience fee, discount, and description."
-                                Placeholder="No payout provider yet"
+                                Placeholder="Manual settlement"
                                 SearchPlaceholder="Search gateways..."
                                 EmptyMessage="No gateways found."
                                 AllowClear="true"
-                                ClearText="No payout provider"
+                                ClearText="Manual settlement"
                                 AdvancedSearchTitle="Find Payout Gateway"
                                 AdvancedSearchDescription="Search configured payment gateways for withdrawal settlement." />
+                @if (!Guid.TryParse(_createGatewayId, out _))
+                {
+                    <p class="text-sm text-muted-foreground">Manual settlement records the withdrawal in the ledger. It does not send an external payout.</p>
+                }
                 <XfEntityPicker TItem="global::Wallets.Domain.Shared.Contracts.CurrencyType"
                                 Label="Currency"
                                 Value="@_createCurrencyId"
@@ -228,6 +239,7 @@
     private List<PaymentGateway> _gateways = [];
     private Dictionary<Guid, string> _credentialLabels = [];
     private bool _loading = true;
+    private string? _loadError;
     private bool _acting;
     private bool _createDialogOpen;
     private bool _hasTenant;
@@ -257,6 +269,7 @@
 
     private async Task LoadData()
     {
+        _loadError = null;
         _loading = true;
         try
         {
@@ -294,7 +307,7 @@
             ResetCreateOptions();
             ResetSummary();
             Logger.LogError(ex, "Failed to load withdrawal requests.");
-            ToastService.Error("Could not load withdrawal requests.", "Wallets");
+            _loadError = "Could not load withdrawal requests. Retry to load current data.";
         }
         finally
         {
@@ -344,24 +357,10 @@
 
     private async Task LoadPaymentGateways(Guid tenantId)
     {
-        try
-        {
-            _gateways = await DataContext.Query<PaymentGateway>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Include(x => x.PaymentGatewayCategory)
-                .Where(x => !x.IsDeleted)
-                .OrderBy(x => x.Name)
-                .Take(100)
-                .ToListAsync();
-            _gateways = _gateways
-                .Where(x => x.TenantId == tenantId || x.TenantId == Guid.Empty)
-                .ToList();
-        }
-        catch (InvalidOperationException ex) when (IsMissingPaymentGatewayWrapper(ex))
-        {
-            _gateways = [];
-        }
+        _gateways = [];
+        var gateways = await WalletsAdminContracts.GetPaymentGatewaysAsync(tenantId);
+        if (TenantFilter.SelectedTenantId == tenantId)
+            _gateways = gateways;
     }
 
     private async Task CreateWithdrawal()
@@ -508,7 +507,7 @@
             else
             {
                 Logger.LogWarning("{Label} failed: {Message}", label, result.Message);
-                ToastService.Error($"{label} could not be completed.", "Wallets");
+                ToastService.Error(WalletsPortalDisplayService.WorkflowFailureMessage(result.Message, $"{label} could not be completed."), "Wallets");
             }
         }
         catch (Exception ex)
@@ -640,10 +639,6 @@
         string.IsNullOrWhiteSpace(gateway.Name)
             ? gateway.Id.ToString()[..8]
             : $"{gateway.Name} - {gateway.ServiceCharge.ToString("N2", CultureInfo.CurrentCulture)}";
-
-    private static bool IsMissingPaymentGatewayWrapper(Exception ex) =>
-        ex.Message.Contains("PaymentGateway", StringComparison.OrdinalIgnoreCase)
-        && ex.Message.Contains("service wrapper", StringComparison.OrdinalIgnoreCase);
 
     private static string GetCredentialSortText(IdentityCredential credential) =>
         credential.IdentityInfo?.FullName

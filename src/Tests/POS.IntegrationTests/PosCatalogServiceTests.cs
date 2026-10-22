@@ -188,7 +188,7 @@ public sealed class PosCatalogServiceTests
             .ReturnsAsync(new QueryResponse<List<StockBalance>>
             {
                 HttpStatusCode = HttpStatusCode.OK,
-                Response = [new StockBalance { AvailableQuantity = 3 }]
+                Response = [new StockBalance { ProductVariationId = variant.ProductVariationId, AvailableQuantity = 3 }]
             });
 
         var result = await service.SearchAsync(request, cancellation.Token);
@@ -232,6 +232,34 @@ public sealed class PosCatalogServiceTests
         row.AvailableQuantity.Should().Be(7);
         inventario.VerifyAll();
         inventario.VerifyNoOtherCalls();
+    }
+
+    [TestCase(22, true)]
+    [TestCase(0, false)]
+    public async Task SearchAsync_BaseSku_DoesNotCountVariantStock(decimal baseQuantity, bool available)
+    {
+        var product = Item("Coffee");
+        var variant = product with { ProductVariationId = Guid.NewGuid(), VariantName = "Large" };
+        inventario.Setup(x => x.SearchSellableProducts(It.IsAny<SearchSellableProductsRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Success([product, variant]));
+        inventario.Setup(x => x.GetStockBalances(It.IsAny<GetStockBalancesRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new QueryResponse<List<StockBalance>>
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Response =
+                [
+                    new() { ProductId = product.ProductId, AvailableQuantity = baseQuantity },
+                    new() { ProductId = product.ProductId, ProductVariationId = variant.ProductVariationId, AvailableQuantity = 8 }
+                ]
+            });
+
+        var result = await service.SearchAsync(new SearchPosCatalogRequest { WarehouseId = Guid.NewGuid(), IsAvailable = null }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue(result.Message);
+        var baseItem = result.Data!.Single(x => x.ProductVariationId == null);
+        baseItem.AvailableQuantity.Should().Be(baseQuantity);
+        baseItem.IsAvailable.Should().Be(available);
+        result.Data!.Single(x => x.ProductVariationId != null).AvailableQuantity.Should().Be(8);
     }
 
     private static QueryResponse<List<SellableProductCatalogItem>> Success(List<SellableProductCatalogItem> items) => new()

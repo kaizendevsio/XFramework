@@ -15,6 +15,29 @@ public sealed class FinancialReportTests : WalletsTestBase
     [TestCase(true, true)]
     [TestCase(true, false)]
     [TestCase(false, true)]
+    public async Task Wrapper_Statement_DelegatedTenant_RequiresReportingAndTenantManagement(bool canReport, bool canManageTenants)
+    {
+        var owner = await SeedCredential();
+        var wallet = await SeedWallet(owner.Id, 123);
+        List<string> capabilities = [];
+        if (canReport) capabilities.Add(WalletAuthorizationCapabilities.ReportingView);
+        if (canManageTenants) capabilities.Add(XFrameworkActorCapabilities.IdentityTenantsManage);
+        var token = TestInvocationIdentityExtensions.CreateTestActorToken(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), [], capabilities);
+        using var scope = TestInvocationActorTokenScope.Push(token);
+        var response = await WalletsTestFixture.ServiceWrapper.WalletStatement(new()
+        {
+            WalletId = wallet.Id,
+            Metadata = CreateMetadata()
+        });
+        response.IsSuccess.Should().Be(canReport && canManageTenants, response.Message);
+        if (!canReport || !canManageTenants)
+            response.HttpStatusCode.Should().Be(System.Net.HttpStatusCode.Forbidden);
+    }
+
+    [TestCase(true, true)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
     public async Task Wrapper_Report_DelegatedTenant_RequiresReportingAndTenantManagement(bool canReport, bool canManageTenants)
     {
         var owner = await SeedCredential();
