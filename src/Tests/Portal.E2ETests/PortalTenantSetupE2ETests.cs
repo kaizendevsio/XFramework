@@ -68,11 +68,11 @@ public sealed class PortalTenantSetupE2ETests : PageTest
             await Page.GotoAsync("/inventario/transactions");
             await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
             var surface = Page.GetByTestId("inventory-transactions-surface");
-            var filters = Page.GetByTestId("inventory-transaction-filters");
+            var filters = Page.GetByTestId("transaction-date-filter");
             await Expect(filters).ToBeVisibleAsync(new() { Timeout = 30_000 });
             var surfaceBox = (await surface.BoundingBoxAsync())!;
             var boxes = new List<LocatorBoundingBoxResult>();
-            foreach (var id in new[] { "transaction-product-filter", "transaction-from-filter", "transaction-through-filter" })
+            foreach (var id in new[] { "transaction-date-filter" })
             {
                 var wrapper = Page.GetByTestId(id);
                 var box = (await wrapper.BoundingBoxAsync())!;
@@ -91,10 +91,9 @@ public sealed class PortalTenantSetupE2ETests : PageTest
                 (a.X < b.X + b.Width && a.X + a.Width > b.X && a.Y < b.Y + b.Height && a.Y + a.Height > b.Y)
                     .Should().BeFalse("filter fields must not overlap");
             }
-            await Page.GetByLabel("Product search", new() { Exact = true }).FillAsync("no matching product");
-            await Expect(surface.GetByRole(AriaRole.Heading, new() { Name = "No sales transactions found", Exact = true })).ToBeVisibleAsync();
-            await Page.GetByTestId("transaction-from-filter").GetByRole(AriaRole.Button).ClickAsync();
-            await Expect(Page.GetByRole(AriaRole.Grid)).ToBeVisibleAsync();
+            await Expect(Page.GetByLabel("Product search", new() { Exact = true })).ToHaveCountAsync(0);
+            await Page.GetByRole(AriaRole.Button, new() { Name = "Sales date range UTC" }).ClickAsync();
+            await Expect(Page.GetByRole(AriaRole.Grid).First).ToBeVisibleAsync();
             await Page.Keyboard.PressAsync("Escape");
             await Expect(Page.Locator("#blazor-error-ui")).ToBeHiddenAsync();
             var path = Path.Combine(TestContext.CurrentContext.WorkDirectory, "artifacts", "tenant-setup",

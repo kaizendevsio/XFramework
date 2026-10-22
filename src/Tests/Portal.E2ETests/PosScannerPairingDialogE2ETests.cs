@@ -166,6 +166,7 @@ public sealed partial class PosScannerPairingDialogE2ETests : PageTest
         Static(root + "/src/Presentation/XFramework.Portal.Features.POS/wwwroot", "/_content/XFramework.Portal.Features.POS");
         var configuration = new DirectoryInfo(TestContext.CurrentContext.TestDirectory).Parent!.Name;
         Static(root + $"/src/Presentation/XFramework.Portal.Features.POS/obj/{configuration}/net10.0/scopedcss/projectbundle", "/_content/XFramework.Portal.Features.POS");
+        Static(root + $"/src/Presentation/XFramework.Portal.Shared/obj/{configuration}/net10.0/scopedcss/projectbundle", "/_content/XFramework.Portal.Shared");
         Static(root + "/src/Presentation/XFramework.Portal/wwwroot/css", "/cashier-css");
         app.UseAntiforgery();
         app.MapRazorComponents<PosPairingFixtureRoot>().AddInteractiveServerRenderMode();
@@ -621,7 +622,7 @@ public sealed class PosPairingFixtureRoot : ComponentBase
     [Inject] public NavigationManager Navigation { get; set; } = null!;
     protected override void BuildRenderTree(RenderTreeBuilder b)
     {
-        b.AddMarkupContent(0,"<!doctype html><html data-base-color='slate' data-primary-color='blue' style='--radius:0.5rem'><head><base href='/'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/css/themes.css'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/blazorblueprint.css'><link rel='stylesheet' href='cashier-css/app.css'><link rel='stylesheet' href='cashier-css/utilities.css'><link rel='stylesheet' href='_content/XFramework.Portal.Features.POS/XFramework.Portal.Features.POS.bundle.scp.css'><style>body{margin:16px;font-family:Arial}button{gap:8px}.app-main{height:100dvh}.mobile-scanner{max-width:528px;margin:auto}</style></head><body>");
+        b.AddMarkupContent(0,"<!doctype html><html data-base-color='slate' data-primary-color='blue' style='--radius:0.5rem'><head><base href='/'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/css/themes.css'><link rel='stylesheet' href='_content/BlazorBlueprint.Components/blazorblueprint.css'><link rel='stylesheet' href='cashier-css/app.css'><link rel='stylesheet' href='cashier-css/utilities.css'><link rel='stylesheet' href='_content/XFramework.Portal.Features.POS/XFramework.Portal.Features.POS.bundle.scp.css'><link rel='stylesheet' href='_content/XFramework.Portal.Shared/XFramework.Portal.Shared.bundle.scp.css'><style>body{margin:16px;font-family:Arial}button{gap:8px}.app-main{height:100dvh}.mobile-scanner{max-width:528px;margin:auto}</style></head><body>");
         b.OpenComponent(1,new Uri(Navigation.Uri).AbsolutePath switch
         {
             "/cashier-scanner-fixture" => typeof(PosScannerFixtureCashierSurface),

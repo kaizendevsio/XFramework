@@ -5,7 +5,7 @@ using XFramework.Core.Services.FeatureGates;
 
 namespace POS.Api.Services;
 
-public sealed class PosReportingService(
+public sealed partial class PosReportingService(
     AppDbContext db,
     IPosRequestContextResolver contextResolver,
     ITrustedInvocationContextAccessor trustedContext,

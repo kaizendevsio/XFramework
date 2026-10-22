@@ -1,0 +1,6 @@
+.receipt-editor { display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, .8fr); gap: 1.5rem; }
+.receipt-controls { display: grid; gap: 1rem; min-width: 0; }
+.receipt-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.receipt-preview-column { min-width: 0; }
+input[type=file] { max-width: 100%; }
+@media (max-width: 760px) { .receipt-editor { grid-template-columns: minmax(0, 1fr); } }

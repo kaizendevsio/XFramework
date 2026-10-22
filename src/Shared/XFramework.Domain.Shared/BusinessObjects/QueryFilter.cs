@@ -30,7 +30,13 @@ public partial class QueryFilter
                 "System.Single" => BitConverter.ToSingle(InternalValue, 0),
                 "System.Decimal" => (decimal) BitConverter.ToDouble(InternalValue, 0),
                 "System.Boolean" => BitConverter.ToBoolean(InternalValue, 0),
-                "System.DateTime" => new DateTime(BitConverter.ToInt64(InternalValue, 0)),
+                "System.DateTime" => InternalValue.Length switch
+                {
+                    // Legacy payloads contain only ticks; their original kind cannot be recovered.
+                    8 => new DateTime(BitConverter.ToInt64(InternalValue, 0)),
+                    9 => new DateTime(BitConverter.ToInt64(InternalValue, 0), (DateTimeKind)InternalValue[8]),
+                    _ => throw new ArgumentException("Invalid DateTime query filter payload.")
+                },
                 _ => null
             };
         } 
@@ -69,7 +75,8 @@ public partial class QueryFilter
                 float f => BitConverter.GetBytes(f),
                 decimal dec => BitConverter.GetBytes((double) dec),
                 bool b => BitConverter.GetBytes(b),
-                DateTime dt => BitConverter.GetBytes(dt.Ticks),
+                // Keep the legacy ticks prefix and append kind without changing the descriptor schema.
+                DateTime dt => [.. BitConverter.GetBytes(dt.Ticks), (byte)dt.Kind],
                 Enum e => GetEnumBytes(e),
                 _ => null
             };

@@ -1582,7 +1582,7 @@ else
         </BbTabs>
     </div>;
 
-    private RenderFragment TransactionsSection => @<div class="space-y-6"><p>This view contains Inventario product sales records. POS shipment and return references are recorded separately in the stock movement ledger.</p><a href="@($"/inventario/products/{Id}/stock")">View product stock movements</a>
+    private RenderFragment TransactionsSection => @<div class="space-y-6"><p>This view contains Inventario product sales records. POS shipment and return references are recorded separately in the stock movement ledger.</p><BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo($"/inventario/products/{Id}/stock"))"><LucideIcon Name="arrow-right-left" />View product stock movements</BbButton>
         <BbCard>
             <BbCardHeader>
                 <BbCardTitle>Sales Transaction History</BbCardTitle>

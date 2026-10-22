@@ -1,0 +1,133 @@
+<section class="layout-editor">
+    <div class="layout-toolbar">
+        <div class="layout-field xf-form-field">
+        <BbLabel for="pos-table-layout">Layout</BbLabel>
+        <BbSelect TValue="string" Value="@_layoutId" ValueChanged="SelectLayout" Disabled="@Disabled">
+            <BbSelectTrigger TValue="string" id="pos-table-layout" aria-label="Layout"><BbSelectValue>@(Current?.Name ?? "Select layout")</BbSelectValue></BbSelectTrigger>
+            <BbSelectContent>
+            @foreach (var layout in Settings.TableLayouts)
+            {
+                <BbSelectItem Value="@(layout.Id.ToString())" Text="@(layout.Name + (layout.Id == Settings.ActiveTableLayoutId ? " (Active)" : ""))">@(layout.Name) @(layout.Id == Settings.ActiveTableLayoutId ? "(Active)" : "")</BbSelectItem>
+            }
+            </BbSelectContent>
+        </BbSelect></div>
+        <BbButton Variant="ButtonVariant.Outline" OnClick="AddLayout" Disabled="@(Disabled || Settings.TableLayouts.Count >= 10)"><LucideIcon Name="plus" Size="16" />New layout</BbButton>
+    </div>
+    @if (Current is { } current)
+    {
+        <div class="layout-toolbar">
+            <div class="layout-field"><BbFormFieldInput @bind-Value="current.Name" Label="Layout name" Disabled="@Disabled" /></div>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Settings.ActiveTableLayoutId = current.Id)" Disabled="@(Disabled || Settings.ActiveTableLayoutId == current.Id)"><LucideIcon Name="check" Size="16" />@(Settings.ActiveTableLayoutId == current.Id ? "Active layout" : "Use this layout")</BbButton>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _deleteOpen = true)" Disabled="@Disabled"><LucideIcon Name="trash-2" Size="16" />Delete layout</BbButton>
+        </div>
+        <div class="layout-toolbar">
+            <BbButton Variant="ButtonVariant.Outline" OnClick="AddTable" Disabled="@(Disabled || current.Tables.Count >= 96)"><LucideIcon Name="plus" Size="16" />Add table</BbButton>
+            <span>@current.Tables.Count tables</span>
+        </div>
+        <div class="layout-workspace">
+            <PosTablePlan Layout="current" SelectedId="_tableId" Editable="true" Disabled="@Disabled"
+                          TableSelected="@(table => _tableId = table.Id)" PositionSelected="MoveTable" />
+            @if (SelectedTable is { } table)
+            {
+                <div class="table-properties">
+                    <BbFormFieldInput @bind-Value="table.Label" Label="Table label" Disabled="@Disabled" />
+                    <BbFormFieldNumericInput TValue="int" @bind-Value="table.Seats" Label="Seats" Min="1" Max="24" Disabled="@Disabled" />
+                    <div class="property-pair">
+                        <BbFormFieldNumericInput TValue="int" @bind-Value="table.Column" Label="Column" Min="1" Max="12" Disabled="@Disabled" />
+                        <BbFormFieldNumericInput TValue="int" @bind-Value="table.Row" Label="Row" Min="1" Max="8" Disabled="@Disabled" />
+                        <BbFormFieldNumericInput TValue="int" @bind-Value="table.Width" Label="Width" Min="1" Max="4" Disabled="@Disabled" />
+                        <BbFormFieldNumericInput TValue="int" @bind-Value="table.Height" Label="Height" Min="1" Max="4" Disabled="@Disabled" />
+                    </div>
+                    <label class="shape-toggle"><BbSwitch @bind-Checked="table.Round" Disabled="@Disabled" />Round table</label>
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="DeleteTable" Disabled="@Disabled"><LucideIcon Name="trash-2" Size="16" />Remove table</BbButton>
+                </div>
+            }
+        </div>
+        @if (!current.IsValid())
+        {
+            <p role="alert">Use unique table labels, 1-24 seats, sizes of 1-4 cells, and positions within the 12 by 8 layout. Tables cannot overlap.</p>
+        }
+    }
+    else
+    {
+        <BbEmpty Title="No table layouts" />
+    }
+    @if (_error is not null) { <p role="alert">@_error</p> }
+</section>
+<BbDialog @bind-Open="_deleteOpen">
+    <BbDialogContent>
+        <BbDialogHeader><BbDialogTitle>Delete layout?</BbDialogTitle><BbDialogDescription>Held sales keep their table labels, but must select a table from the active layout before payment.</BbDialogDescription></BbDialogHeader>
+        <BbDialogFooter><BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _deleteOpen = false)">Cancel</BbButton><BbButton OnClick="DeleteLayout" Disabled="@Disabled">Delete layout</BbButton></BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    [Parameter, EditorRequired] public PosCheckoutSettings Settings { get; set; } = new();
+    [Parameter] public bool Disabled { get; set; }
+    private string? _layoutId;
+    private Guid? _tableId;
+    private bool _deleteOpen;
+    private string? _error;
+    private PosTableLayout? Current => Settings.TableLayouts.FirstOrDefault(layout => layout.Id.ToString() == _layoutId);
+    private PosDiningTable? SelectedTable => Current?.Tables.FirstOrDefault(table => table.Id == _tableId);
+
+    protected override void OnParametersSet()
+    {
+        if (Current is null) _layoutId = (Settings.ActiveTableLayout ?? Settings.TableLayouts.FirstOrDefault())?.Id.ToString();
+    }
+
+    private void SelectLayout(string? value) { _layoutId = value; _tableId = null; _error = null; }
+    private void AddLayout()
+    {
+        if (Disabled || Settings.TableLayouts.Count >= 10) return;
+        var suffix = 1;
+        while (Settings.TableLayouts.Any(layout => layout.Name.Equals($"Dining room {suffix}", StringComparison.OrdinalIgnoreCase))) suffix++;
+        var added = new PosTableLayout { Name = $"Dining room {suffix}" };
+        Settings.TableLayouts.Add(added);
+        Settings.ActiveTableLayoutId ??= added.Id;
+        SelectLayout(added.Id.ToString());
+    }
+    private void DeleteLayout()
+    {
+        if (Disabled || Current is not { } current) return;
+        Settings.TableLayouts.Remove(current);
+        if (Settings.ActiveTableLayoutId == current.Id) Settings.ActiveTableLayoutId = Settings.TableLayouts.FirstOrDefault()?.Id;
+        SelectLayout(Settings.TableLayouts.FirstOrDefault()?.Id.ToString());
+        _deleteOpen = false;
+    }
+    private void AddTable()
+    {
+        if (Disabled || Current is not { } current || current.Tables.Count >= 96) return;
+        var number = 1;
+        while (current.Tables.Any(table => table.Label == number.ToString())) number++;
+        var added = new PosDiningTable { Label = number.ToString() };
+        for (var row = 1; row <= 7; row++)
+            for (var column = 1; column <= 11; column++)
+            {
+                added.Row = row;
+                added.Column = column;
+                if (current.Tables.Any(table => table.Overlaps(added))) continue;
+                current.Tables.Add(added);
+                _tableId = added.Id;
+                _error = null;
+                return;
+            }
+        _error = "No space for another table. Resize or move existing tables first.";
+    }
+    private void DeleteTable()
+    {
+        if (Disabled || SelectedTable is not { } table) return;
+        Current!.Tables.Remove(table);
+        _tableId = null;
+    }
+    private void MoveTable((int Column, int Row) position)
+    {
+        if (Disabled || SelectedTable is not { } table) return;
+        var moved = table with { Column = position.Column, Row = position.Row };
+        if (!moved.IsValid() || Current!.Tables.Any(other => other.Id != table.Id && other.Overlaps(moved)))
+        { _error = "That position is outside the layout or overlaps another table."; return; }
+        table.Column = moved.Column;
+        table.Row = moved.Row;
+        _error = null;
+    }
+}

@@ -147,6 +147,7 @@ public sealed class PosScannerCashierIntegrationTests
     }
 
     [TestCase("_paymentOpen", true)]
+    [TestCase("_tablePickerOpen", true)]
     [TestCase("_checkingOut", true)]
     [TestCase("_savingCart", true)]
     [TestCase("_actingOnCart", true)]
@@ -311,6 +312,33 @@ public sealed class PosScannerCashierIntegrationTests
         Field<string>("_loadError").Should().Be("Configure the new tenant");
         Field<bool>("_reloading").Should().BeFalse();
         Field<bool>("_reloadRequested").Should().BeFalse();
+        wrapper.VerifyNoOtherCalls();
+    }
+
+    [Test]
+    public async Task HoldSale_TableEnabled_OpensPickerBeforeCreatingCart()
+    {
+        await Receive("SKU-1");
+        Set("_cartsEnabled", true);
+        Set("_checkoutSettings", new POS.Domain.Shared.Contracts.PosCheckoutSettings { TableTrackingEnabled = true });
+        await renderer.Dispatcher.InvokeAsync(() => (Task)Invoke("SuspendCart")!);
+        Field<bool>("_tablePickerOpen").Should().BeTrue();
+        Field<bool>("_holdAfterTable").Should().BeTrue();
+        Cart.Count.Should().Be(1);
+        wrapper.Verify(w => w.CreatePosCart(It.IsAny<CreatePosCartRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Test]
+    public async Task TableSelection_RetainsTableIdentityForCheckout_WithoutFinancialCalls()
+    {
+        var layout = new POS.Domain.Shared.Contracts.PosTableLayout { Tables = [new() { Label = "A1" }] };
+        Set("_checkoutSettings", new POS.Domain.Shared.Contracts.PosCheckoutSettings
+        { TableTrackingEnabled = true, ActiveTableLayoutId = layout.Id, TableLayouts = [layout] });
+        await renderer.Dispatcher.InvokeAsync(() => (Task)Invoke("TableSelected", layout.Tables[0])!);
+        var metadata = (POS.Domain.Shared.Contracts.PosCheckoutMetadata)Invoke("BuildCheckoutMetadata")!;
+        metadata.TableId.Should().Be(layout.Tables[0].Id);
+        metadata.TableLayoutId.Should().Be(layout.Id);
+        metadata.TableNumber.Should().Be("A1");
         wrapper.VerifyNoOtherCalls();
     }
 

@@ -4,6 +4,7 @@
 @using XFramework.Inventario.Domain.Shared.Contracts.Responses.Reports
 @using DataGridRequest = BlazorBlueprint.Primitives.DataGrid.DataGridRequest
 @implements IDisposable
+@inject Microsoft.Extensions.Logging.ILogger<Planning> Logger
 
 <PageTitle>Inventario Planning - Portal</PageTitle>
 
@@ -306,10 +307,17 @@ else
             var warehouses = await DataContext.Query<Warehouse>().NoCache()
                 .Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.Code).Take(500).ToListAsync(ct);
             if (selectedWarehouse is not null && warehouses.All(x => x.Id != selectedWarehouse.Id)) warehouses.Add(selectedWarehouse);
-            var locations = await DataContext.Query<InventoryLocation>().NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted && (scope == null || x.WarehouseId == scope)).OrderBy(x => x.Code).Take(500).ToListAsync(ct);
+            var locationsQuery = DataContext.Query<InventoryLocation>().NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted);
             var rulesQuery = DataContext.Query<InventoryReorderRule>().NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted && (scope == null || x.WarehouseId == null || x.WarehouseId == scope));
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted);
+            // Remote predicates must compare entity properties, not local-only conditions.
+            if (scope is Guid scopedWarehouseId)
+            {
+                locationsQuery = locationsQuery.Where(x => x.WarehouseId == scopedWarehouseId);
+                rulesQuery = rulesQuery.Where(x => x.WarehouseId == null || x.WarehouseId == scopedWarehouseId);
+            }
+            var locations = await locationsQuery.OrderBy(x => x.Code).Take(500).ToListAsync(ct);
             var activeRules = await rulesQuery.Where(x => x.IsActive).CountAsync(ct);
             var rules = await rulesQuery.OrderBy(x => x.CreatedAt).Take(500).ToListAsync(ct);
             if (!IsCurrent(revision, tenantId) || ct.IsCancellationRequested) return;
@@ -321,6 +329,7 @@ else
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Could not load inventory planning for tenant {TenantId}, warehouse {WarehouseId}", tenantId, WarehouseId);
             if (IsCurrent(revision, tenantId)) _loadError = ex is InvalidOperationException ? ex.Message : "Could not load planning. Try again.";
         }
         finally

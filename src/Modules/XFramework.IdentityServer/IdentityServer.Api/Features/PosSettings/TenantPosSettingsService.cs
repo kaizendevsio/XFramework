@@ -38,7 +38,7 @@ public sealed class TenantPosSettingsService(AppDbContext db, ITrustedInvocation
         if (!tenant.IsSuccess) return Result<TenantPosSettingsResponse>.Failure(tenant.Message!, tenant.StatusCode);
         if (!CanManage) return Result<TenantPosSettingsResponse>.Forbidden("Only a tenant administrator can change POS checkout settings");
         if (request.Settings?.IsValid() != true)
-            return Result<TenantPosSettingsResponse>.Failure("Use up to 20 checkout fields with unique keys and labels", 400);
+            return Result<TenantPosSettingsResponse>.Failure("Check receipt settings, checkout fields and table layouts for invalid values, duplicate names or overlapping tables", 400);
         var row = await db.Set<RegistryConfiguration>().AsTracking()
             .SingleOrDefaultAsync(x => x.TenantId == tenant.Data && x.Key == PosCheckoutSettings.RegistryKey, ct);
         if ((row?.ConcurrencyStamp ?? Guid.Empty) != request.ExpectedConcurrencyStamp)

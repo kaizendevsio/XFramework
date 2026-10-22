@@ -1,0 +1,41 @@
+@inject IJSRuntime JS
+
+<BbDialog Open="@(Url is not null)" OpenChanged="@(open => open ? Task.CompletedTask : UrlChanged.InvokeAsync(null))">
+    <BbDialogContent>
+        <BbDialogHeader><BbDialogTitle>Share report</BbDialogTitle><BbDialogDescription>Recipients must sign in and have access to this tenant and report.</BbDialogDescription></BbDialogHeader>
+        <BbFormFieldInput Value="@Url" ReadOnly="true" Label="Protected report link" AriaLabel="Protected report link" />
+        @if (_error is not null) { <p role="alert">@_error</p> }
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => UrlChanged.InvokeAsync(null))">Close</BbButton>
+            <BbButton OnClick="Copy" Disabled="@_copying"><LucideIcon Name="copy" Size="16" />@(_copied ? "Copied" : "Copy link")</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    [Parameter] public string? Url { get; set; }
+    [Parameter] public EventCallback<string?> UrlChanged { get; set; }
+    private string? _lastUrl, _error;
+    private bool _copied, _copying;
+    protected override void OnParametersSet()
+    {
+        if (_lastUrl == Url) return;
+        _lastUrl = Url;
+        _copied = false;
+        _error = null;
+    }
+    private async Task Copy()
+    {
+        if (Url is null || _copying) return;
+        _copying = true;
+        _error = null;
+        try
+        {
+            await using var module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/XFramework.Portal.Shared/reports/report-export.js");
+            await module.InvokeVoidAsync("copyReportLink", Url);
+            _copied = true;
+        }
+        catch (JSException) { _error = "Clipboard access was blocked. Select and copy the link above."; }
+        finally { _copying = false; }
+    }
+}

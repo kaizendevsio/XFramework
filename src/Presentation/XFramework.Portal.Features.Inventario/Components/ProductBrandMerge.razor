@@ -22,6 +22,7 @@
 @code {
     [Parameter] public Guid? CategoryId { get; set; }
     [Parameter] public bool CanManage { get; set; }
+    [Parameter] public string? SourceBrand { get; set; }
     [Parameter] public EventCallback<ProductBrandMergePreview> Merged { get; set; }
     private Guid? _category, _tenant;
     private string? _source, _target, _error;
@@ -39,7 +40,8 @@
         _category = CategoryId;
         _tenant = TenantContext.SelectedTenantId;
         ++_scopeVersion;
-        _source = _target = _error = null;
+        _source = SourceBrand;
+        _target = _error = null;
     }
 
     private async Task PreviewAsync()

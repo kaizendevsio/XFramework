@@ -1,0 +1,38 @@
+<div class="table-plan-scroll">
+    <div class="table-plan" role="group" aria-label="@Layout.Name">
+        @if (Editable)
+        {
+            @for (var row = 1; row <= 8; row++)
+            {
+                @for (var col = 1; col <= 12; col++)
+                {
+                    var position = (Column: col, Row: row);
+                    <button type="button" class="plan-cell" style="@($"grid-column:{col};grid-row:{row}")"
+                            aria-label="@($"Column {col}, row {row}")" disabled="@Disabled"
+                            @onclick="@(() => PositionSelected.InvokeAsync(position))"
+                            @ondragover:preventDefault @ondrop="@(() => PositionSelected.InvokeAsync(position))"></button>
+                }
+            }
+        }
+        @foreach (var table in Layout.Tables)
+        {
+            <button type="button" @key="table.Id" class="@($"dining-table {(table.Round ? "round" : "")} {(SelectedId == table.Id ? "selected" : "")}")"
+                    style="@($"grid-column:{table.Column}/span {table.Width};grid-row:{table.Row}/span {table.Height}")"
+                    aria-label="@($"Table {table.Label}, {table.Seats} seats")" aria-pressed="@(SelectedId == table.Id)"
+                    title="@($"Table {table.Label}, {table.Seats} seats")"
+                    disabled="@Disabled" draggable="@(Editable && !Disabled)"
+                    @ondragstart="@(() => TableSelected.InvokeAsync(table))" @onclick="@(() => TableSelected.InvokeAsync(table))">
+                <strong>@table.Label</strong><span>@table.Seats seats</span>
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public PosTableLayout Layout { get; set; } = new();
+    [Parameter] public Guid? SelectedId { get; set; }
+    [Parameter] public bool Editable { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback<PosDiningTable> TableSelected { get; set; }
+    [Parameter] public EventCallback<(int Column, int Row)> PositionSelected { get; set; }
+}

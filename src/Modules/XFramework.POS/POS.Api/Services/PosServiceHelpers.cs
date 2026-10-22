@@ -229,12 +229,23 @@ internal static class PosServiceHelpers
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json)));
     }
 
-    private static object? CheckoutHashData(PosCheckoutMetadata metadata) =>
-        metadata.TableNumber is null && metadata.Fields.Count == 0 ? null : new
+    private static object? CheckoutHashData(PosCheckoutMetadata metadata)
     {
-        metadata.TableNumber,
-        Fields = metadata.Fields.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToArray()
-    };
+        if (metadata.TableNumber is null && metadata.Fields.Count == 0 && metadata.TableId is null && metadata.TableLayoutId is null)
+            return null;
+        var values = new Dictionary<string, object?>
+        {
+            ["TableNumber"] = metadata.TableNumber,
+            ["Fields"] = metadata.Fields.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToArray()
+        };
+        // Keep existing held-sale hashes stable when no layout was selected.
+        if (metadata.TableId is not null || metadata.TableLayoutId is not null)
+        {
+            values["TableLayoutId"] = metadata.TableLayoutId;
+            values["TableId"] = metadata.TableId;
+        }
+        return values;
+    }
 
     public static PosCheckoutMetadata ReadCheckoutMetadata(string? json) =>
         string.IsNullOrWhiteSpace(json) ? new() : JsonSerializer.Deserialize<PosCheckoutMetadata>(json)!;

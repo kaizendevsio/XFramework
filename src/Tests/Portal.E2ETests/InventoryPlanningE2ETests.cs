@@ -8,6 +8,7 @@ using Microsoft.Playwright;
 using Moq;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
+using XFramework.Integration.DataContext.ExpressionVisitor;
 using XFramework.Inventario.Domain.Shared.Contracts;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Planning;
 using XFramework.Inventario.Domain.Shared.Contracts.Responses.Reports;
@@ -98,7 +99,12 @@ public sealed partial class InventoryReportsE2ETests
     {
         var query = new Mock<IRemoteQuery<T>>(MockBehavior.Strict);
         query.Setup(x => x.NoCache()).Returns(query.Object);
-        query.Setup(x => x.Where(It.IsAny<Expression<Func<T, bool>>>())).Returns((Expression<Func<T, bool>> predicate) => PlanningQuery(rows.Where(predicate.Compile())));
+        query.Setup(x => x.Where(It.IsAny<Expression<Func<T, bool>>>())).Returns((Expression<Func<T, bool>> predicate) =>
+        {
+            // Exercise the production serializer, not just LINQ-to-Objects semantics.
+            QueryExpressionVisitor.Parse(predicate);
+            return PlanningQuery(rows.Where(predicate.Compile()));
+        });
         query.Setup(x => x.Take(It.IsAny<int>())).Returns((int count) => PlanningQuery(rows.Take(count)));
         query.Setup(x => x.OrderBy(It.IsAny<Expression<Func<T, string>>>())).Returns(query.Object);
         query.Setup(x => x.OrderBy(It.IsAny<Expression<Func<T, DateTime>>>())).Returns(query.Object);

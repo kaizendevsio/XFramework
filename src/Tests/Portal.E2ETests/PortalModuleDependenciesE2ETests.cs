@@ -136,7 +136,9 @@ public sealed class PortalModuleDependenciesE2ETests : PageTest
         await Expect(roleDialog).ToBeVisibleAsync();
         var roleName = roleDialog.GetByRole(AriaRole.Textbox, new() { Name = "Name", Exact = true });
         await roleName.FillAsync("QA Cashier Role");
-        await roleDialog.GetByRole(AriaRole.Button, new() { Name = "Add Role Group", Exact = true }).ClickAsync();
+        await Expect(roleDialog.GetByRole(AriaRole.Button, new() { Name = "Add Role Group", Exact = true })).ToHaveCountAsync(0);
+        await roleDialog.GetByRole(AriaRole.Combobox, new() { Name = "Role Group", Exact = true }).ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Create New", Exact = true }).ClickAsync();
         var groupDialog = Page.GetByRole(AriaRole.Dialog, new() { Name = "Add Role Group", Exact = true });
         await Expect(groupDialog).ToBeVisibleAsync();
         await groupDialog.GetByRole(AriaRole.Textbox, new() { Name = "Name", Exact = true }).FillAsync("QA Cashiers");

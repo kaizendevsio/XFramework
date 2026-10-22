@@ -1,0 +1,105 @@
+@using Microsoft.AspNetCore.Components.Forms
+
+<section aria-label="Receipt settings" class="receipt-editor">
+    <div class="receipt-controls">
+        <BbTypographyH4>Receipts</BbTypographyH4>
+        <div class="receipt-options">
+            <div><BbLabel>Paper width</BbLabel>
+                <BbSelect TValue="int" @bind-Value="Settings.PaperWidthMm" @bind-Value:after="Changed" Disabled="@Disabled">
+                    <BbSelectTrigger TValue="int" aria-label="Receipt paper width"><BbSelectValue>@(Settings.PaperWidthMm) mm</BbSelectValue></BbSelectTrigger>
+                    <BbSelectContent><BbSelectItem TValue="int" Value="58" Text="58 mm">58 mm</BbSelectItem><BbSelectItem TValue="int" Value="80" Text="80 mm">80 mm</BbSelectItem></BbSelectContent>
+                </BbSelect>
+            </div>
+            <div><BbLabel>Template</BbLabel>
+                <BbSelect TValue="PosReceiptTemplate" @bind-Value="Settings.Template" @bind-Value:after="Changed" Disabled="@Disabled">
+                    <BbSelectTrigger TValue="PosReceiptTemplate" aria-label="Receipt template"><BbSelectValue>@Settings.Template</BbSelectValue></BbSelectTrigger>
+                    <BbSelectContent>
+                        @foreach (var template in Enum.GetValues<PosReceiptTemplate>())
+                        { <BbSelectItem TValue="PosReceiptTemplate" Value="@template" Text="@template.ToString()">@template</BbSelectItem> }
+                    </BbSelectContent>
+                </BbSelect>
+            </div>
+        </div>
+        <div><BbLabel>Merchant name</BbLabel><BbInput @bind-Value="Settings.MerchantName" @bind-Value:after="Changed" Disabled="@Disabled" AriaLabel="Receipt merchant name" MaxLength="100" /></div>
+        <div><BbLabel>Top logo (PNG or JPEG, up to 128 KB)</BbLabel>
+            <InputFile OnChange="UploadLogo" accept="image/png,image/jpeg" disabled="@Disabled" aria-label="Receipt logo" />
+            @if (!string.IsNullOrEmpty(Settings.LogoDataUrl))
+            { <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Remove receipt logo" Title="Remove logo" Disabled="@Disabled" OnClick="RemoveLogo"><LucideIcon Name="trash-2" /></BbButton> }
+            @if (_logoError is not null) { <p role="alert">@_logoError</p> }
+        </div>
+        <div><BbLabel>Header</BbLabel><BbTextarea @bind-Value="Settings.Header" @bind-Value:after="Changed" Disabled="@Disabled" AriaLabel="Receipt header" MaxLength="500" /></div>
+        <div><BbLabel>Footer</BbLabel><BbTextarea @bind-Value="Settings.Footer" @bind-Value:after="Changed" Disabled="@Disabled" AriaLabel="Receipt footer" MaxLength="500" /></div>
+        <DocumentSectionLayoutEditor TSection="PosReceiptSection" Order="Settings.SectionOrder" Hidden="Settings.HiddenSections"
+                                     Label="@(section => section.ToString())" IsRequired="PosReceiptSettings.IsRequired" Disabled="Disabled"
+                                     AriaLabel="Receipt section order" VisibilityLabel="@(section => $"Show receipt {section}")"
+                                     OrderChanged="SetSectionOrder" HiddenChanged="SetHiddenSections" />
+        @if (!Settings.IsValid()) { <p role="alert">Receipt settings are invalid. Use 58 or 80 mm paper, a supported logo, and keep Sale, Items and Totals visible.</p> }
+    </div>
+    <div class="receipt-preview-column">
+        <BbTypographyH4>Preview</BbTypographyH4>
+        <ReceiptPreview Settings="Settings" Sale="SampleSale" MerchantName="Your store" CurrencyCode="USD" />
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public PosReceiptSettings Settings { get; set; } = new();
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback<PosReceiptSettings> SettingsChanged { get; set; }
+    private string? _logoError;
+    private Task Changed() => SettingsChanged.InvokeAsync(Settings);
+
+    private async Task SetSectionOrder(List<PosReceiptSection> order)
+    {
+        if (Disabled) return;
+        Settings.SectionOrder = order;
+        await Changed();
+    }
+
+    private async Task SetHiddenSections(List<PosReceiptSection> hidden)
+    {
+        if (Disabled) return;
+        Settings.HiddenSections = hidden;
+        await Changed();
+    }
+
+    private async Task RemoveLogo()
+    {
+        if (Disabled) return;
+        Settings.LogoDataUrl = null;
+        _logoError = null;
+        await Changed();
+    }
+
+    private async Task UploadLogo(InputFileChangeEventArgs args)
+    {
+        if (Disabled) return;
+        var draft = Settings;
+        _logoError = null;
+        try
+        {
+            if (args.File.ContentType is not ("image/png" or "image/jpeg"))
+                throw new InvalidOperationException();
+            await using var input = args.File.OpenReadStream(PosReceiptSettings.MaxLogoBytes);
+            using var output = new MemoryStream();
+            await input.CopyToAsync(output);
+            var logo = $"data:{args.File.ContentType};base64,{Convert.ToBase64String(output.ToArray())}";
+            if (!PosReceiptSettings.IsValidLogo(logo)) throw new InvalidOperationException();
+            if (Disabled || !ReferenceEquals(Settings, draft)) return;
+            Settings.LogoDataUrl = logo;
+            await Changed();
+        }
+        catch (Exception exception) when (exception is IOException or InvalidOperationException)
+        {
+            if (ReferenceEquals(Settings, draft)) _logoError = "Choose a PNG or JPEG image no larger than 128 KB.";
+        }
+    }
+
+    private static readonly PosSaleReceiptResponse SampleSale = new()
+    {
+        SaleNumber = "SAMPLE-001", Status = PosSaleStatus.Completed, CompletedAt = new DateTime(2026, 10, 22, 9, 30, 0, DateTimeKind.Utc),
+        SubtotalAmount = 25, DiscountAmount = 2, TaxAmount = 1.84m, TotalAmount = 24.84m,
+        Lines = [new() { LineNumber = 1, ProductName = "House blend coffee", VariantName = "250 g", Quantity = 2, UnitPrice = 9.50m, LineTotal = 19 },
+                 new() { LineNumber = 2, ProductName = "Reusable cup", Quantity = 1, UnitPrice = 6, LineTotal = 6 }],
+        Payments = [new() { Method = PosPaymentMethod.CashDrawer, Status = PosPaymentStatus.Captured, Amount = 24.84m, CashTenderedAmount = 30, ChangeAmount = 5.16m }]
+    };
+}

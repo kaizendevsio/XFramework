@@ -38,8 +38,8 @@ public sealed partial class PosScannerPairingDialogE2ETests
             .ReturnsAsync((UpdateTenantPosSettingsRequest request, CancellationToken _) =>
             {
                 request.Metadata.RequestedTenantId.Should().Be(state.TenantId);
-                state.CheckoutSettings = request.Settings with
-                { CheckoutFields = request.Settings.CheckoutFields.Select(field => field with { }).ToList() };
+                request.Settings.IsValid().Should().BeTrue();
+                state.CheckoutSettings = request.Settings.DeepClone();
                 Interlocked.Increment(ref state.SettingsSaves);
                 return SettingsResponse();
             });
@@ -79,6 +79,7 @@ public sealed partial class PosScannerPairingDialogE2ETests
             {
                 request.Metadata.RequestedTenantId.Should().Be(state.TenantId);
                 request.Suspend.Should().BeTrue();
+                state.CheckoutSettings.Validate(request.CheckoutMetadata, false, requireTable: true).Should().BeNull();
                 state.HeldCart = new()
                 {
                     Id = Guid.NewGuid(), TenantId = state.TenantId, RegisterId = state.RegisterId,
@@ -123,10 +124,14 @@ public sealed partial class PosScannerPairingDialogE2ETests
             };
             """);
         await Page.GotoAsync(app.Urls.Single() + "/pos-settings-fixture");
-        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Add field", Exact = true })).ToBeEnabledAsync();
-        var trackTables = Page.GetByRole(AriaRole.Switch, new() { Name = "Track table numbers", Exact = true });
+        var trackTables = Page.GetByRole(AriaRole.Switch, new() { Name = "Enable table selection", Exact = true });
         await trackTables.ClickAsync();
         await Expect(trackTables).ToBeCheckedAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "New layout", Exact = true }).ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Add table", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Table 1, 4 seats", Exact = true })).ToBeVisibleAsync();
+        await CheckoutScreenshot("table-layout-designer", width);
+        await Page.GetByRole(AriaRole.Tab, new() { Name = "Checkout fields", Exact = true }).ClickAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Add field", Exact = true }).ClickAsync();
         await Expect(Page.GetByLabel("Field key", new() { Exact = true })).ToHaveAttributeAsync("data-pos-change-ready", "true");
         await Expect(Page.GetByLabel("Field label", new() { Exact = true })).ToHaveAttributeAsync("data-pos-change-ready", "true");
@@ -145,6 +150,7 @@ public sealed partial class PosScannerPairingDialogE2ETests
         savedField.Enabled.Should().BeTrue();
         savedField.Required.Should().BeTrue("Save must capture the checked Required switch");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Refresh", Exact = true }).ClickAsync();
+        await Page.GetByRole(AriaRole.Tab, new() { Name = "Checkout fields", Exact = true }).ClickAsync();
         await Expect(Page.GetByLabel("Field key", new() { Exact = true })).ToHaveValueAsync("coupon");
         await Expect(Page.GetByLabel("Field label", new() { Exact = true })).ToHaveValueAsync("Coupon");
         await Expect(requireCoupon).ToBeCheckedAsync();
@@ -160,18 +166,20 @@ public sealed partial class PosScannerPairingDialogE2ETests
 
         await Page.GotoAsync(app.Urls.Single() + "/cashier-scanner-fixture");
         await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync("10.00");
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Sale details", Exact = true }).ClickAsync();
-        await Page.GetByLabel("Table number", new() { Exact = true }).FillAsync("12");
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Done", Exact = true }).ClickAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Hold sale", Exact = true }).ClickAsync();
-        await Expect(Page.GetByText("Table 12", new() { Exact = true })).ToBeVisibleAsync();
-        state.HeldCart!.CheckoutMetadata.TableNumber.Should().Be("12");
+        await Expect(Page.GetByRole(AriaRole.Dialog, new() { Name = "Select table", Exact = true })).ToBeVisibleAsync();
+        state.HeldCart.Should().BeNull("holding must ask for a table before persisting the order");
+        await CheckoutScreenshot("hold-table-picker", width);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Table 1, 4 seats", Exact = true }).ClickAsync();
+        await Expect(Page.GetByText("Table 1", new() { Exact = true })).ToBeVisibleAsync();
+        state.HeldCart!.CheckoutMetadata.TableNumber.Should().Be("1");
+        state.HeldCart.CheckoutMetadata.TableId.Should().Be(state.CheckoutSettings.ActiveTableLayout!.Tables[0].Id);
         state.HeldCart.CheckoutMetadata.Fields.Should().BeEmpty("required checkout fields do not block holding a table bill");
         await CheckoutScreenshot("held-table", width);
         await Page.GetByRole(AriaRole.Button, new() { Name = "Resume sale", Exact = true }).ClickAsync();
         await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync("10.00");
         await Page.GetByTestId("pos-checkout").ClickAsync();
-        await Expect(Page.GetByLabel("Table number", new() { Exact = true })).ToHaveValueAsync("12");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Table 1", Exact = true })).ToBeVisibleAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Exact amount", Exact = true }).ClickAsync();
         await Expect(Page.GetByTestId("pos-confirm-payment")).ToBeDisabledAsync();
         await Page.GetByLabel("Coupon", new() { Exact = false }).FillAsync("SAVE50");
@@ -199,12 +207,52 @@ public sealed partial class PosScannerPairingDialogE2ETests
         await Expect(dialog).ToBeHiddenAsync();
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Customer", Exact = true })).ToContainTextAsync("table.customer");
         await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync("10.00");
-        await Expect(Page.GetByLabel("Table number", new() { Exact = true })).ToHaveValueAsync("12");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Table 1", Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByLabel("Coupon", new() { Exact = false })).ToHaveValueAsync("SAVE50");
         state.IdentityCreates.Should().Be(2);
         state.CredentialCreates.Should().Be(1);
         state.FinancialCalls.Should().Be(0);
         await CheckoutScreenshot("customer-selected", width);
+    }
+
+    [TestCase(1920, 1080)]
+    [TestCase(768, 1024)]
+    public async Task CheckoutControls_LegacyHeldTable_CanClearOptionalTableWithoutLayout(int width, int height)
+    {
+        state.CheckoutSettings = new() { TableTrackingEnabled = true, TableRequired = false };
+        state.HeldCart = new()
+        {
+            Id = Guid.NewGuid(), TenantId = state.TenantId, RegisterId = state.RegisterId,
+            CartNumber = "HELD-LEGACY", CurrencyId = state.CurrencyId, Status = PosCartStatus.Suspended,
+            ConcurrencyStamp = Guid.NewGuid(), TotalAmount = 10,
+            CheckoutMetadata = new() { TableNumber = "T12" },
+            Lines = [new() { ProductId = state.Item.ProductId, ProductName = state.Item.ProductName,
+                Quantity = 1, ExpectedUnitPrice = 10 }]
+        };
+        await Page.SetViewportSizeAsync(width, height);
+        await Page.GotoAsync(app.Urls.Single() + "/cashier-scanner-fixture");
+        await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync("10.00");
+        await state.Cashier!.ClearForFixture();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Held sales", Exact = true }).ClickAsync();
+        var heldSales = Page.GetByRole(AriaRole.Dialog, new() { Name = "Held sales", Exact = true });
+        await heldSales.GetByRole(AriaRole.Button, new() { Name = "Search", Exact = true }).ClickAsync();
+        await heldSales.GetByRole(AriaRole.Button, new() { Name = "Resume sale", Exact = true }).ClickAsync();
+        await Expect(heldSales).ToBeHiddenAsync();
+        await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync("10.00");
+        await Page.GetByTestId("pos-checkout").ClickAsync();
+        var payment = Page.GetByRole(AriaRole.Dialog, new() { Name = "Payment", Exact = true });
+        await Expect(payment.GetByRole(AriaRole.Button, new() { Name = "Table T12", Exact = true })).ToBeVisibleAsync();
+        await payment.GetByRole(AriaRole.Button, new() { Name = "Exact amount", Exact = true }).ClickAsync();
+        await Expect(Page.GetByTestId("pos-confirm-payment")).ToBeDisabledAsync();
+        await Expect(payment.GetByText("Configure an active table layout in POS settings", new() { Exact = true })).ToBeVisibleAsync();
+
+        await payment.GetByRole(AriaRole.Button, new() { Name = "No table", Exact = true }).ClickAsync();
+        await Expect(payment.GetByRole(AriaRole.Button, new() { Name = "Select table", Exact = true })).ToBeVisibleAsync();
+        await Expect(payment.GetByRole(AriaRole.Button, new() { Name = "No table", Exact = true })).ToHaveCountAsync(0);
+        await Expect(Page.GetByTestId("pos-confirm-payment")).ToBeEnabledAsync();
+        await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync("10.00");
+        state.FinancialCalls.Should().Be(0);
+        await CheckoutScreenshot("legacy-held-table-cleared", width);
     }
 
     [TestCase(1920, 1080)]
@@ -256,7 +304,7 @@ public sealed partial class PosScannerPairingDialogE2ETests
             }
             """);
 
-        var previous = await dialog.GetByLabel("Table number", new() { Exact = true }).BoundingBoxAsync();
+        var previous = await dialog.GetByRole(AriaRole.Button, new() { Name = "Select table", Exact = true }).BoundingBoxAsync();
         previous.Should().NotBeNull();
         for (var index = 1; index <= 20; index++)
         {
@@ -264,8 +312,11 @@ public sealed partial class PosScannerPairingDialogE2ETests
             bounds.Should().NotBeNull();
             bounds!.Y.Should().BeGreaterThanOrEqualTo(previous!.Y + previous.Height,
                 "metadata inputs must be vertically stacked without overlapping");
-            Math.Abs(bounds.X - previous.X).Should().BeLessThanOrEqualTo(1);
-            Math.Abs(bounds.Width - previous.Width).Should().BeLessThanOrEqualTo(1);
+            if (index > 1)
+            {
+                Math.Abs(bounds.X - previous.X).Should().BeLessThanOrEqualTo(1);
+                Math.Abs(bounds.Width - previous.Width).Should().BeLessThanOrEqualTo(1);
+            }
             previous = bounds;
         }
         (await dialog.EvaluateAsync<bool>("e => e.scrollHeight > e.clientHeight && e.scrollWidth <= e.clientWidth + 1 && ['auto', 'scroll'].includes(getComputedStyle(e).overflowY)")).Should().BeTrue();
@@ -294,6 +345,44 @@ public sealed partial class PosScannerPairingDialogE2ETests
         await Expect(confirm).ToBeDisabledAsync();
         await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync("10.00");
         state.FinancialCalls.Should().Be(0);
+    }
+
+    [TestCase(1920, 1080)]
+    [TestCase(768, 1024)]
+    public async Task CheckoutControls_ActiveLayout_RequiredPaymentAndCancelledHold(int width, int height)
+    {
+        await Page.SetViewportSizeAsync(width, height);
+        await Page.GotoAsync(app.Urls.Single() + "/pos-settings-fixture");
+        await Page.GetByRole(AriaRole.Switch, new() { Name = "Enable table selection", Exact = true }).ClickAsync();
+        await Page.GetByRole(AriaRole.Switch, new() { Name = "Require a table at payment", Exact = true }).ClickAsync();
+        for (var index = 0; index < 2; index++)
+        {
+            await Page.GetByRole(AriaRole.Button, new() { Name = "New layout", Exact = true }).ClickAsync();
+            await Page.GetByRole(AriaRole.Button, new() { Name = "Add table", Exact = true }).ClickAsync();
+        }
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Use this layout", Exact = true }).ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        await Wait(() => Volatile.Read(ref state.SettingsSaves) == 1);
+        state.CheckoutSettings.TableLayouts.Should().HaveCount(2);
+        state.CheckoutSettings.ActiveTableLayout!.Name.Should().Be("Dining room 2");
+        state.CheckoutSettings.TableRequired.Should().BeTrue();
+        await Page.GotoAsync(app.Urls.Single() + "/cashier-scanner-fixture");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Hold sale", Exact = true }).ClickAsync();
+        var picker = Page.GetByRole(AriaRole.Dialog, new() { Name = "Select table", Exact = true });
+        await picker.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
+        await Expect(picker).ToBeHiddenAsync();
+        state.HeldCart.Should().BeNull();
+        await Expect(Page.GetByTestId("pos-total")).ToHaveTextAsync("10.00");
+        await Page.GetByTestId("pos-checkout").ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Exact amount", Exact = true }).ClickAsync();
+        await Expect(Page.GetByTestId("pos-confirm-payment")).ToBeDisabledAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Select table", Exact = true }).ClickAsync();
+        await Expect(picker.GetByText("Dining room 2", new() { Exact = true })).ToBeVisibleAsync();
+        await picker.GetByRole(AriaRole.Button, new() { Name = "Table 1, 4 seats", Exact = true }).ClickAsync();
+        await Expect(Page.GetByTestId("pos-confirm-payment")).ToBeEnabledAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "No table", Exact = true })).ToHaveCountAsync(0);
+        state.FinancialCalls.Should().Be(0);
+        await CheckoutScreenshot("required-table-payment", width);
     }
 
     private async Task CheckoutScreenshot(string name, int width)

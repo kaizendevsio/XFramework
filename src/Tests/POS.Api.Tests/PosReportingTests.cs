@@ -19,7 +19,7 @@ using XFramework.TestInfrastructure;
 namespace POS.Api.Tests;
 
 [TestFixture]
-public sealed class PosReportingTests
+public sealed partial class PosReportingTests
 {
     [TestCase(1, 1, 1, true)]
     [TestCase(366, 100000, 100, true)]

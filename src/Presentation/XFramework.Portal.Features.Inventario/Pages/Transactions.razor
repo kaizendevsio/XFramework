@@ -1,6 +1,15 @@
 @page "/inventario/transactions"
-@using XFramework.Domain.Shared.DataContext
+@using Microsoft.Extensions.Logging
+@using global::POS.Integration.Drivers
+@using global::POS.Domain.Shared.Contracts.Requests
+@using global::POS.Domain.Shared.Contracts.Responses
+@using DataGridRequest = BlazorBlueprint.Primitives.DataGrid.DataGridRequest
 @implements IDisposable
+@inject IPOSServiceWrapper POS
+@inject IInventarioServiceWrapper Inventario
+@inject IPortalTenantContext Tenant
+@inject IPortalModuleAvailability Modules
+@inject ILogger<Transactions> Logger
 
 <PageTitle>Inventario Sales Transactions - Portal</PageTitle>
 
@@ -8,160 +17,175 @@
 {
     <CenteredSpinner />
 }
-else if (!_hasTenant)
+else if (_tenantId is null)
 {
     <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" />
 }
-else if (!_moduleEnabled)
+else if (!_enabled)
 {
-    <ModuleUnavailable ModuleName="Inventario" />
+    <ModuleUnavailable ModuleName="Sales Transactions" />
 }
 else
 {
-    <FadeInContent>
-        <div class="space-y-6 inv-page">
-            <div class="xf-page-header">
-                <div>
-                    <BbTypographyH3>Sales Transactions</BbTypographyH3>
-                    <BbTypographyMuted>This view contains Inventario product sales records. POS shipment and return references are recorded separately in the stock movement ledger.</BbTypographyMuted>
-                </div>
-                <div class="xf-page-actions">
-                    <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
-                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
-                        Refresh
-                    </BbButton>
-                </div>
+    <div class="space-y-6 inv-page" data-testid="inventory-transactions-surface">
+        <div class="xf-page-header">
+            <div>
+                <BbTypographyH3>Sales Transactions</BbTypographyH3>
+                <BbTypographyMuted>@(_source == "pos" ? "Completed POS sales. After line discounts; before receipt discounts, tax and refunds." : "Direct inventory sales. Recorded totals have no currency metadata.")</BbTypographyMuted>
             </div>
-
-            <BbCard data-testid="inventory-transactions-surface">
-                <BbCardHeader>
-                    <BbCardTitle>Sales Transaction History</BbCardTitle>
-                    <BbCardDescription>@_transactions.Count sales transaction(s) loaded</BbCardDescription>
-                </BbCardHeader>
-                <BbCardContent>
-                    @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "reporting"))
-                    {
-                        <div class="xf-page-actions mb-4">
-                            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo($"/inventario/reports?tenant={TenantFilter.SelectedTenantId}&view=movements"))">
-                                <LucideIcon Name="arrow-right" class="mr-2 h-4 w-4" />View stock movements
-                            </BbButton>
-                        </div>
-                    }
-                    <div class="inv-transaction-filters" data-testid="inventory-transaction-filters">
-                        <div data-testid="transaction-product-filter">
-                            <BbFormFieldInput TValue="string" @bind-Value="_productSearch" Label="Product search" Placeholder="Search products" />
-                        </div>
-                        <div data-testid="transaction-from-filter">
-                            <BbFormFieldDatePicker @bind-Value="_fromDate" Label="From date" InputClass="inv-transaction-date-trigger" />
-                        </div>
-                        <div data-testid="transaction-through-filter">
-                            <BbFormFieldDatePicker @bind-Value="_toDate" Label="Through date" InputClass="inv-transaction-date-trigger" />
-                        </div>
-                    </div>
-                    <BbDataGrid Items="@_transactions.Where(x => (_fromDate == null || x.TransactionDate >= _fromDate) && (_toDate == null || x.TransactionDate < _toDate.Value.AddDays(1)) && GetProductName(x.ProductId).Contains(_productSearch, StringComparison.OrdinalIgnoreCase)).ToList()" ShowPagination="true" InitialPageSize="20"
-                                OnRowClick="@((ProductTransaction item) => Navigation.NavigateTo($"/inventario/transactions/{item.Id}"))"
-                                Class="cursor-pointer">
-                        <EmptyTemplate>
-                            <BbEmpty Title="No sales transactions found" Description="No Inventario sales records match the selected filters." />
-                        </EmptyTemplate>
-                        <Columns>
-                            <InventoryTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
-                                <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
-                            </InventoryTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Quantity" Format="0.####" Sortable="true" Filterable="true" />
-                            <InventoryTemplateColumn Title="Total" Filterable="true" SortBy="@(item => item.TotalPrice)" FilterBy="@(item => item.TotalPrice)">
-                                <ChildContent Context="item">@item.TotalPrice.ToString("N2")</ChildContent>
-                            </InventoryTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.TransactionDate)" Title="Transaction Date" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Actions">
-                                <ChildContent Context="item">
-                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View sales transaction"
-                                              OnClick="@(() => Navigation.NavigateTo($"/inventario/transactions/{item.Id}"))">
-                                        <LucideIcon Name="eye" class="h-4 w-4" />
-                                    </BbButton>
-                                </ChildContent>
-                            </BbDataGridTemplateColumn>
-                        </Columns>
-                    </BbDataGrid>
-                </BbCardContent>
-            </BbCard>
+            <div class="xf-page-actions">
+                <BbButton Variant="ButtonVariant.Outline" OnClick="Reload"><LucideIcon Name="refresh-cw" Size="16" />Refresh</BbButton>
+            </div>
         </div>
-    </FadeInContent>
+        <BbTabs Value="@_source" ValueChanged="ChangeSource">
+        <BbTabsList aria-label="Sales source">
+            @if (_inventoryEnabled) { <BbTabsTrigger Value="inventory">Inventory sales</BbTabsTrigger> }
+            @if (_posEnabled) { <BbTabsTrigger Value="pos">POS product sales</BbTabsTrigger> }
+        </BbTabsList>
+        <BbTabsContent Value="@_source" Class="space-y-4">
+        <div class="sales-dates" data-testid="transaction-date-filter">
+            <BbLabel>@(_source == "pos" ? "Completion dates (UTC)" : "Transaction dates (UTC)")</BbLabel>
+            <BbDateRangePicker Value="_dates" ValueChanged="ChangeDates" MaxDays="366" ShowPresets="true" AriaLabel="Sales date range UTC" />
+        </div>
+        @if (_error is not null)
+        {
+            <BbAlert role="alert"><BbAlertDescription>@_error</BbAlertDescription></BbAlert>
+        }
+        <BbDataGrid @key="_revision" TData="SalesSummaryRow" ItemsProvider="LoadSales" ShowPagination="true" InitialPageSize="20" PageSizes="@(new[] { 20, 50, 100 })">
+            <Columns>
+                <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" Sortable="false" />
+                <BbDataGridPropertyColumn Property="@(x => x.VariantName)" Title="Variant" Sortable="false" />
+                <BbDataGridPropertyColumn Property="@(x => x.SKU)" Title="SKU" Sortable="false" />
+                <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Quantity sold" Format="0.####" Sortable="false" />
+                @if (_source == "pos")
+                {
+                <BbDataGridTemplateColumn Title="Currency">
+                    <ChildContent Context="row"><span title="@row.CurrencyId">@CurrencyLabel(row.CurrencyId)</span></ChildContent>
+                </BbDataGridTemplateColumn>
+                }
+                <BbDataGridPropertyColumn Property="@(x => x.SalesAmount)" Title="@(_source == "pos" ? "Product revenue" : "Recorded revenue")" Format="N2" Sortable="false" />
+            </Columns>
+            <EmptyTemplate>
+                <BbEmpty Title="@(_error is null ? "No sold products in this date range" : "Sales summary unavailable")" />
+            </EmptyTemplate>
+        </BbDataGrid>
+        </BbTabsContent>
+        </BbTabs>
+    </div>
 }
 
 @code {
-    private DateTime? _fromDate;
-    private DateTime? _toDate;
-    private string _productSearch = "";
-    [Inject] private IDataContext DataContext { get; set; } = default!;
-    [Inject] private NavigationManager Navigation { get; set; } = default!;
-    [Inject] private ToastService ToastService { get; set; } = default!;
-    [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
-    [Inject] private IPortalModuleAvailability ModuleNavigation { get; set; } = default!;
+    private DateRange _dates = DateRange.Create(DateTime.UtcNow.Date.AddDays(-29), DateTime.UtcNow.Date);
+    private DateTime _fromUtc, _toUtc;
+    private Guid? _tenantId;
+    private bool _loading = true, _enabled, _inventoryEnabled, _posEnabled, _disposed;
+    private string _source = "pos";
+    private int _revision;
+    private string? _error;
+    private Dictionary<Guid, string> _currencies = [];
+    private CancellationTokenSource _load = new();
 
-    private List<ProductTransaction> _transactions = [];
-    private Dictionary<Guid, string> _productNames = [];
-    private bool _loading = true;
-    private bool _hasTenant;
-    private bool _moduleEnabled;
-
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        TenantFilter.OnChanged += OnTenantChanged;
-        ModuleNavigation.OnChanged += OnTenantChanged;
+        Tenant.OnChanged += OnScopeChanged;
+        Modules.OnChanged += OnScopeChanged;
+        await Reload();
     }
 
-    protected override async Task OnInitializedAsync() => await Reload();
-
-    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+    private void OnScopeChanged() => _ = InvokeAsync(Reload);
+    private async Task ChangeDates(DateRange dates) { _dates = dates; await Reload(); }
+    private async Task ChangeSource(string source) { _source = source; await Reload(); }
 
     private async Task Reload()
     {
-        _loading = true;
+        if (_disposed) return;
+        _load.Cancel(); _load.Dispose(); _load = new();
+        var revision = ++_revision;
+        _loading = true; _error = null; _currencies = [];
+        _tenantId = Tenant.SelectedTenantId;
         try
         {
-            await ModuleNavigation.EnsureLoadedAsync();
-            _hasTenant = TenantFilter.SelectedTenantId is Guid;
-            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.InventarioTransactions);
-            _transactions = [];
-            _productNames = [];
-            if (!_hasTenant || !_moduleEnabled) return;
-
-            var tenantId = TenantFilter.SelectedTenantId!.Value;
-            var products = await DataContext.Query<Product>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-                .Take(1000)
-                .ToListAsync();
-            _productNames = products.ToDictionary(x => x.Id, x => x.Name ?? x.Id.ToString()[..8]);
-
-            _transactions = await DataContext.Query<ProductTransaction>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-                .OrderByDescending(x => x.TransactionDate)
-                .Take(250)
-                .ToListAsync();
+            await Modules.EnsureLoadedAsync(_load.Token);
+            if (revision != _revision || _disposed) return;
+            _inventoryEnabled = Modules.IsFeatureEnabled(TenantModuleFeatureKeys.InventarioTransactions);
+            _posEnabled = Modules.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, TenantModuleFeatureKeys.PosReportingSubFeature);
+            _enabled = _inventoryEnabled || _posEnabled;
+            if (_source == "inventory" && !_inventoryEnabled) _source = "pos";
+            else if (_source == "pos" && !_posEnabled) _source = "inventory";
+            _fromUtc = DateTime.SpecifyKind(_dates.Start.Date, DateTimeKind.Utc);
+            _toUtc = DateTime.SpecifyKind(_dates.End.Date, DateTimeKind.Utc).AddDays(1);
+            if (_toUtc <= _fromUtc || _toUtc - _fromUtc > TimeSpan.FromDays(366))
+                _error = "Choose a date range of 1-366 days.";
         }
-        catch
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
         {
-            ToastService.Show("Could not load inventory transactions.");
+            Logger.LogError(ex, "Could not load sold-product report scope");
+            if (revision == _revision) _error = "Could not load sales summary. Refresh to retry.";
         }
         finally
         {
-            _loading = false;
-            StateHasChanged();
+            if (!_disposed && revision == _revision) { _loading = false; StateHasChanged(); }
         }
     }
 
-    private string GetProductName(Guid productId) =>
-        _productNames.TryGetValue(productId, out var name) ? name : productId.ToString()[..8];
+    private async ValueTask<BlazorBlueprint.Primitives.DataGrid.DataGridResult<SalesSummaryRow>> LoadSales(DataGridRequest request)
+    {
+        var revision = _revision;
+        var tenantId = _tenantId;
+        if (_disposed || _loading || !_enabled || tenantId is null || _error is not null)
+            return new() { Items = [], TotalItemCount = 0 };
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(_load.Token, request.CancellationToken);
+        try
+        {
+            var filter = request.Filters?.GetValueOrDefault(nameof(SalesSummaryRow.ProductName));
+            if (_source == "inventory")
+            {
+                var inventory = await Inventario.GetInventoryProductSales(new()
+                {
+                    Metadata = new() { RequestedTenantId = tenantId }, FromUtc = _fromUtc, ToUtcExclusive = _toUtc,
+                    Skip = Math.Max(0, request.StartIndex), Take = Math.Clamp(request.Count ?? 20, 1, 100),
+                    ProductFilter = Convert.ToString(filter?.Value), ProductFilterOperator = filter?.Operator.ToString()
+                }, linked.Token);
+                if (!IsCurrent(revision, tenantId) || linked.IsCancellationRequested) return new() { Items = [], TotalItemCount = 0 };
+                if (!inventory.IsSuccess || inventory.Response is null) throw new InvalidOperationException("Inventory product-sales report was unavailable.");
+                return new() { Items = inventory.Response.Rows.Select(x => new SalesSummaryRow(x.ProductName, x.VariantName, x.SKU,
+                    Guid.Empty, x.Quantity, x.RecordedRevenue)).ToList(), TotalItemCount = inventory.Response.TotalCount };
+            }
+            var response = await POS.GetPosProductSalesReport(new()
+            {
+                Metadata = new() { RequestedTenantId = tenantId }, FromUtc = _fromUtc, ToUtcExclusive = _toUtc,
+                Skip = Math.Max(0, request.StartIndex), Take = Math.Clamp(request.Count ?? 20, 1, 100),
+                ProductFilter = Convert.ToString(filter?.Value), ProductFilterOperator = filter?.Operator.ToString()
+            }, linked.Token);
+            if (!IsCurrent(revision, tenantId) || linked.IsCancellationRequested) return new() { Items = [], TotalItemCount = 0 };
+            if (!response.IsSuccess || response.Response is null) throw new InvalidOperationException("POS product-sales report was unavailable.");
+            _currencies = response.Response.CurrencyLabels.ToDictionary(x => x.CurrencyId, x => x.Label);
+            await InvokeAsync(StateHasChanged);
+            return new() { Items = response.Response.Rows.Select(x => new SalesSummaryRow(x.ProductName, x.VariantName, x.SKU,
+                x.CurrencyId, x.Quantity, x.SalesAmount)).ToList(), TotalItemCount = response.Response.TotalCount };
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load sold-product report for tenant {TenantId}", tenantId);
+            if (IsCurrent(revision, tenantId))
+            {
+                _error = "Could not load sales summary. Refresh to retry.";
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        return new() { Items = [], TotalItemCount = 0 };
+    }
 
+    private bool IsCurrent(int revision, Guid? tenantId) => !_disposed && revision == _revision && tenantId == Tenant.SelectedTenantId;
+    private string CurrencyLabel(Guid id) => _currencies.GetValueOrDefault(id, $"Unknown ({id.ToString()[..8]})");
+    private sealed record SalesSummaryRow(string ProductName, string? VariantName, string? SKU,
+        Guid CurrencyId, decimal Quantity, decimal SalesAmount);
     public void Dispose()
     {
-        TenantFilter.OnChanged -= OnTenantChanged;
-        ModuleNavigation.OnChanged -= OnTenantChanged;
+        _disposed = true; _load.Cancel(); _load.Dispose();
+        Tenant.OnChanged -= OnScopeChanged;
+        Modules.OnChanged -= OnScopeChanged;
     }
 }

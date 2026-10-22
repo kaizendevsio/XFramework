@@ -107,7 +107,8 @@ public sealed class PosPersistenceIntegrationTests
             Id = Guid.NewGuid(), TenantId = tenant, Name = "POS", SystemReferenceId = Guid.NewGuid(),
             IsEnabled = true, CreatedAt = DateTime.UtcNow, ConcurrencyStamp = Guid.NewGuid()
         };
-        var settings = new PosCheckoutSettings { TableTrackingEnabled = true,
+        var layout = new PosTableLayout { Tables = [new() { Label = "T1" }] };
+        var settings = new PosCheckoutSettings { TableTrackingEnabled = true, ActiveTableLayoutId = layout.Id, TableLayouts = [layout],
             CheckoutFields = [new() { Key = "coupon", Label = "Coupon", Required = true, Enabled = true }] };
         await using (var db = CreateContext(tenant))
         {
@@ -126,13 +127,42 @@ public sealed class PosPersistenceIntegrationTests
             (await service.ValidateAsync(tenant, new(), false, CancellationToken.None)).IsSuccess.Should().BeTrue();
             var result = await service.ValidateAsync(tenant, new()
             {
-                TableNumber = " T1 ", Fields = new() { ["coupon"] = " VALUE " },
+                TableNumber = "Untrusted table", TableLayoutId = layout.Id, TableId = layout.Tables[0].Id,
+                Fields = new() { ["coupon"] = " VALUE " },
                 Labels = new() { ["coupon"] = "Untrusted label" }
             }, true, CancellationToken.None);
             result.IsSuccess.Should().BeTrue();
             result.Data!.TableNumber.Should().Be("T1");
+            result.Data.TableId.Should().Be(layout.Tables[0].Id);
+            result.Data.TableLayoutId.Should().Be(layout.Id);
             result.Data.Fields["coupon"].Should().Be("VALUE");
             result.Data.Labels["coupon"].Should().Be("Coupon");
+
+            var register = CreateRegister(tenant);
+            var cart = CreateCart(tenant, register.Id, "table-hold");
+            db.AddRange(register, cart);
+            await db.SaveChangesAsync();
+            var resolver = CreateResolver(tenant);
+            var inventory = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
+            var wallets = new Mock<IWalletsServiceWrapper>(MockBehavior.Strict);
+            var finance = new PosFinanceSettings(Mock.Of<IIdentityServerServiceWrapper>());
+            var sales = new PosSalesService(db, inventory.Object, wallets.Object, resolver.Object,
+                NullLogger<PosSalesService>.Instance, finance, service,
+                Mock.Of<XFramework.Core.Services.FeatureGates.ITenantModuleFeatureService>());
+            var carts = new PosCartService(db, inventory.Object, sales, resolver.Object,
+                NullLogger<PosCartService>.Instance, finance, service);
+            var hold = new SuspendPosCartRequest { CartId = cart.Id, ExpectedConcurrencyStamp = cart.ConcurrencyStamp };
+            (await carts.SuspendAsync(hold, CancellationToken.None)).StatusCode.Should().Be(400);
+            cart.Status.Should().Be(PosCartStatus.Open);
+            cart.CheckoutMetadataJson = System.Text.Json.JsonSerializer.Serialize(new PosCheckoutMetadata
+            { TableId = layout.Tables[0].Id, TableLayoutId = layout.Id, TableNumber = "Forged label" });
+            await db.SaveChangesAsync();
+            var held = await carts.SuspendAsync(hold, CancellationToken.None);
+            held.IsSuccess.Should().BeTrue(held.Message);
+            held.Data!.CheckoutMetadata.TableNumber.Should().Be("T1");
+            held.Data.CheckoutMetadata.Fields.Should().BeEmpty("payment-only requirements must not block holding an order");
+            inventory.VerifyNoOtherCalls();
+            wallets.VerifyNoOtherCalls();
         }
         var otherTenant = Guid.NewGuid();
         await using (var db = CreateContext(otherTenant))

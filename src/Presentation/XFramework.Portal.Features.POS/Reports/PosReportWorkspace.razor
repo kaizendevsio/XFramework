@@ -42,7 +42,7 @@
         @if (!Overview)
         {
         <div class="filters">
-            <div><BbLabel>Sales / refund dates (UTC)</BbLabel><BbDateRangePicker @bind-Value="_dates" MaxDays="366" ShowPresets="true" AriaLabel="Report date range UTC" /></div>
+            <div class="date-filter"><BbLabel>Sales / refund dates (UTC)</BbLabel><BbDateRangePicker @bind-Value="_dates" MaxDays="366" ShowPresets="true" AriaLabel="Report date range UTC" /></div>
             <XfEntityPicker TItem="ReportChoice" @bind-Value="_register" Items="@_registers" Label="Register" Placeholder="All registers"
                 AllowClear="true" ShowAdvancedSearch="false" ValueSelector="@(x => x.Id.ToString())" TextSelector="@(x => x.Label)" />
             <XfEntityPicker TItem="ReportChoice" @bind-Value="_currency" Items="@_currencies" Label="Currency" Placeholder="All currencies (separate totals)"
@@ -60,10 +60,7 @@
         @if (_scope.HourUtc is { } hour) { <p class="report-caption">Hour @hour.ToString("00"):00 UTC <BbButton Variant="ButtonVariant.Ghost" OnClick="ClearHour">Clear hour</BbButton></p> }
         }
     }
-    @if (_shareUri is not null)
-    {
-        <div><BbLabel>Protected report link</BbLabel><BbInput Value="@_shareUri" ReadOnly="true" aria-label="Protected report link" /></div>
-    }
+    <ReportShareDialog @bind-Url="_shareUri" />
     @if (_busy) { <CenteredSpinner /> }
     @if (_report is { } report)
     {

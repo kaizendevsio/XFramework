@@ -2,6 +2,7 @@
 @implements IDisposable
 @using IdentityServer.Integration.Drivers
 @using Microsoft.Extensions.Logging
+@using XFramework.Portal.Features.POS.Tables
 @inject IIdentityServerServiceWrapper Identity
 @inject IPortalTenantContext Tenant
 @inject IPortalModuleAvailability Modules
@@ -36,11 +37,24 @@
         }
         @if (_response is not null)
         {
+            <BbTabs DefaultValue="tables">
+            <BbTabsList aria-label="POS settings sections">
+                <BbTabsTrigger Value="tables">Tables</BbTabsTrigger>
+                <BbTabsTrigger Value="receipts">Receipts</BbTabsTrigger>
+                <BbTabsTrigger Value="checkout">Checkout fields</BbTabsTrigger>
+            </BbTabsList>
+            <BbTabsContent Value="tables">
             <section class="pos-settings-section">
                 <BbTypographyH4>Tables</BbTypographyH4>
-                <label class="pos-settings-switch"><BbSwitch @bind-Checked="_settings.TableTrackingEnabled" Disabled="@ReadOnly" />Track table numbers</label>
+                <label class="pos-settings-switch"><BbSwitch @bind-Checked="_settings.TableTrackingEnabled" Disabled="@ReadOnly" />Enable table selection</label>
+                <label class="pos-settings-switch"><BbSwitch @bind-Checked="_settings.TableRequired" Disabled="@(ReadOnly || !_settings.TableTrackingEnabled)" />Require a table at payment</label>
+                <PosTableLayoutEditor @key="_settings" Settings="_settings" Disabled="@ReadOnly" />
             </section>
-            <BbSeparator />
+            </BbTabsContent>
+            <BbTabsContent Value="receipts">
+            <ReceiptSettingsEditor Settings="_settings.Receipt" Disabled="@ReadOnly" />
+            </BbTabsContent>
+            <BbTabsContent Value="checkout">
             <section class="pos-settings-section">
                 <div class="xf-page-header">
                     <BbTypographyH4>Checkout fields</BbTypographyH4>
@@ -72,12 +86,14 @@
                 </BbDataGrid>
                 @if (!_settings.IsValid())
                 {
-                    <p role="alert">Each field needs a unique key (letters, numbers, underscore or hyphen, up to 64 characters) and a label of up to 100 characters.</p>
+                    <p role="alert">Check table layouts and checkout fields. Fields need unique keys (letters, numbers, underscore or hyphen, up to 64 characters) and labels of up to 100 characters.</p>
                 }
             </section>
+            </BbTabsContent>
+            </BbTabs>
             <div class="xf-page-actions">
                 <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Apply(_response))" Disabled="@ReadOnly">Discard changes</BbButton>
-                <BbButton OnClick="@Save" Disabled="@(ReadOnly || !_settings.IsValid())"><LucideIcon Name="save" class="mr-2 h-4 w-4" />Save</BbButton>
+                <BbButton OnClick="@Save" Disabled="@ReadOnly"><LucideIcon Name="save" class="mr-2 h-4 w-4" />Save</BbButton>
             </div>
         }
     }
@@ -134,7 +150,7 @@
     private void Apply(TenantPosSettingsResponse response)
     {
         _response = response;
-        _settings = response.Settings with { CheckoutFields = response.Settings.CheckoutFields.Select(field => field with { }).ToList() };
+        _settings = response.Settings.DeepClone();
         _error = response.ConfigurationError;
     }
 
@@ -151,7 +167,12 @@
 
     private async Task Save()
     {
-        if (ReadOnly || !_settings.IsValid() || Tenant.SelectedTenantId is not Guid tenantId || _response is null) return;
+        if (ReadOnly || Tenant.SelectedTenantId is not Guid tenantId || _response is null) return;
+        if (!_settings.IsValid())
+        {
+            _error = "Check the table layouts, receipt settings and checkout fields before saving.";
+            return;
+        }
         _busy = true;
         var version = _version;
         _error = null;

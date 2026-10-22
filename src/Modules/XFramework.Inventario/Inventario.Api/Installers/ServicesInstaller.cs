@@ -23,6 +23,7 @@ public class ServicesInstaller : IInstaller
         services.AddScoped<InventoryLotService>();
         services.AddScoped<InventoryPlanningService>();
         services.AddScoped<InventoryReportingService>();
+        services.AddScoped<InventoryProductSalesService>();
         services.AddScoped<PurchasingService>();
         services.AddScoped<ProductVariationService>();
 

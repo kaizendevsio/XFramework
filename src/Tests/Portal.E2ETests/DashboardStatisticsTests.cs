@@ -1,10 +1,14 @@
 using System.Reflection;
 using FluentAssertions;
+using IdentityServer.Domain.Shared;
 using IdentityServer.Domain.Shared.Contracts;
 using MemoryPack;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Wallets.Domain.Shared.Contracts;
+using XFramework.Core.DataContext;
+using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Domain.Shared.Enums;
@@ -32,10 +36,12 @@ public sealed class DashboardStatisticsTests
     private TenantFilterService _tenantFilter = null!;
     private RequestMetadata _metadata = null!;
     private Dashboard _page = null!;
+    private readonly TestClock _clock = new();
 
     [SetUp]
     public void SetUp()
     {
+        _clock.Now = new DateTimeOffset(2026, 10, 22, 12, 0, 0, TimeSpan.Zero);
         _originalMap = WrapperMap.GetValue(null);
         WrapperMap.SetValue(null, Entities.ToDictionary(name => name, _ => typeof(RecordingWrapper).FullName!));
         _wrapper = new RecordingWrapper();
@@ -56,6 +62,7 @@ public sealed class DashboardStatisticsTests
         SetProperty("RequestMetadata", _metadata);
         SetProperty("TenantFilter", _tenantFilter);
         SetProperty("Logger", NullLogger<Dashboard>.Instance);
+        SetProperty("Clock", _clock);
     }
 
     [TearDown]
@@ -151,6 +158,169 @@ public sealed class DashboardStatisticsTests
         _wrapper.Queries.Should().ContainSingle("a rejected request must not retry with weaker authorization");
         _wrapper.AuthorizationResults.Should().ContainSingle().Which.StatusCode.Should().Be(403);
         _metadata.RequestedTenantId.Should().Be(_selectedTenantId);
+        Field<long?>("_sessionCount").Should().BeNull("a failed query is not a zero count");
+    }
+
+    [Test]
+    public async Task LoadStats_SerializedSessionDescriptor_TranslatesNestedPredicatesToPostgreSql()
+    {
+        await LoadStats();
+
+        // Captured after the real page's RemoteDataContext parser and MemoryPack round-trip.
+        var descriptor = _wrapper.Queries.Single(query => query.EntityTypeName == nameof(Session));
+        QueryDescriptorExecutor.ValidateDescriptor(descriptor).Should().BeNull();
+        descriptor.Mode.Should().Be(QueryExecutionMode.Count);
+        descriptor.NoCache.Should().BeTrue();
+        AssertFilter(descriptor, "SessionType.SystemReferenceId", IdentityConstants.SessionType.User);
+        AssertFilter(descriptor, "Credential.IdentityInfo.IsEnabled", true);
+        AssertFilter(descriptor, "Credential.IdentityInfo.IsDeleted", false);
+        AssertFilter(descriptor, "Credential.Tenant.IsEnabled", true);
+        AssertFilter(descriptor, "Credential.Tenant.IsDeleted", false);
+        foreach (var (property, operation) in new[]
+        {
+            ("ExpiresAt", QueryFilterOperation.GreaterThan),
+            ("RefreshTokenExpiresAt", QueryFilterOperation.GreaterThan),
+            ("Credential.Tenant.AvailabilityDate", QueryFilterOperation.LessThanOrEqual),
+            ("Credential.Tenant.Expiration", QueryFilterOperation.GreaterThan)
+        })
+        {
+            var filter = descriptor.Filters.Should().ContainSingle(filter => filter.PropertyName == property && filter.Operation == operation).Subject;
+            var cutoff = filter.Value.Should().BeOfType<DateTime>().Subject;
+            cutoff.Should().Be(_clock.GetUtcNow().UtcDateTime);
+            cutoff.Kind.Should().Be(DateTimeKind.Utc, "Npgsql timestamptz predicates require the original UTC kind");
+        }
+
+        // Production model and server builder; ToQueryString compiles through Npgsql without opening a connection.
+        using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql("Host=127.0.0.1;Database=translation_only;Username=unused;Password=unused")
+            .Options);
+        var build = typeof(QueryDescriptorExecutor).GetMethod("BuildQueryable", BindingFlags.NonPublic | BindingFlags.Static)!
+            .MakeGenericMethod(typeof(Session));
+        var queryable = (IQueryable<Session>)build.Invoke(null, [db, descriptor, _wrapper.ActorTenantId, true])!;
+        var sql = queryable.Select(session => session.Id).ToQueryString();
+
+        sql.Should().Contain("\"Identity\".\"Session\"")
+            .And.Contain("JOIN \"Identity\".\"SessionType\"")
+            .And.Contain("JOIN \"Identity\".\"IdentityCredential\"")
+            .And.Contain("JOIN \"Identity\".\"IdentityInformation\"")
+            .And.Contain("JOIN \"Application\".\"Application\"")
+            .And.Contain("\"RefreshTokenExpiresAt\"")
+            .And.Contain("\"AvailabilityDate\"")
+            .And.Contain("\"Expiration\"")
+            .And.Contain(_selectedTenantId.ToString());
+    }
+
+    [Test]
+    public async Task LoadStats_SessionValidity_CountsRenewableUserSessionsRatherThanOnlinePresence()
+    {
+        var now = _clock.GetUtcNow().UtcDateTime;
+        Session Valid() => new()
+        {
+            Id = Guid.NewGuid(), TenantId = _selectedTenantId, IsEnabled = true,
+            Status = CurrentSessionState.Active, ExpiresAt = now.AddHours(1),
+            RefreshTokenExpiresAt = now.AddDays(1),
+            SessionType = new() { IsEnabled = true, SystemReferenceId = IdentityConstants.SessionType.User },
+            Credential = new()
+            {
+                IsEnabled = true, IsOnline = false,
+                IdentityInfo = new() { IsEnabled = true },
+                Tenant = new() { IsEnabled = true }
+            }
+        };
+        var valid = Valid();
+        var persistent = Valid();
+        persistent.ExpiresAt = null;
+        var invalid = new List<Session>();
+        foreach (var mutate in new Action<Session>[]
+        {
+            x => x.ExpiresAt = now,
+            x => x.ExpiresAt = now.AddTicks(-1),
+            x => x.Status = CurrentSessionState.Inactive,
+            x => x.Status = CurrentSessionState.Expired,
+            x => x.Status = CurrentSessionState.Suspended,
+            x => x.IsDeleted = true,
+            x => x.IsEnabled = false,
+            x => x.SessionType = null,
+            x => x.SessionType!.IsDeleted = true,
+            x => x.SessionType!.IsEnabled = false,
+            x => x.SessionType!.SystemReferenceId = IdentityConstants.SessionType.Service,
+            x => x.SessionType!.SystemReferenceId = IdentityConstants.SessionType.Rpc,
+            x => x.SessionType!.SystemReferenceId = Guid.NewGuid(),
+            x => x.Credential.IsDeleted = true,
+            x => x.Credential.IsEnabled = false,
+            x => x.Credential.IdentityInfo = null,
+            x => x.Credential.IdentityInfo!.IsDeleted = true,
+            x => x.Credential.IdentityInfo!.IsEnabled = false,
+            x => x.Credential.Tenant.IsDeleted = true,
+            x => x.Credential.Tenant.IsEnabled = false,
+            x => x.Credential.Tenant.AvailabilityDate = now.AddTicks(1),
+            x => x.Credential.Tenant.Expiration = now,
+            x => x.TenantId = Guid.NewGuid()
+        })
+        {
+            var session = Valid();
+            mutate(session);
+            invalid.Add(session);
+        }
+        _wrapper.Sessions = [valid, persistent, .. invalid];
+
+        await LoadStats();
+
+        Field<long?>("_sessionCount").Should().Be(2);
+        Field<DateTime?>("_countedAtUtc").Should().Be(now);
+        _wrapper.Sessions.Should().Equal(new[] { valid, persistent }.Concat(invalid),
+            "counting must leave historical session records untouched");
+    }
+
+    [TestCase(false, null, 0)]
+    [TestCase(false, -1, 0)]
+    [TestCase(false, 0, 0)]
+    [TestCase(false, 1, 1)]
+    [TestCase(true, null, 0)]
+    [TestCase(true, -1, 0)]
+    [TestCase(true, 0, 0)]
+    [TestCase(true, 1, 1)]
+    public async Task LoadStats_RefreshDeadline_RequiresKnownFutureExpiry(
+        bool persistent, int? refreshOffsetSeconds, long expectedCount)
+    {
+        var now = _clock.GetUtcNow().UtcDateTime;
+        _wrapper.Sessions = [new()
+        {
+            TenantId = _selectedTenantId, IsEnabled = true, Status = CurrentSessionState.Active,
+            ExpiresAt = persistent ? null : now.AddHours(1),
+            RefreshTokenExpiresAt = refreshOffsetSeconds is { } offset ? now.AddSeconds(offset) : null,
+            SessionType = new() { IsEnabled = true, SystemReferenceId = IdentityConstants.SessionType.User },
+            Credential = new() { IsEnabled = true, IdentityInfo = new() { IsEnabled = true }, Tenant = new() { IsEnabled = true } }
+        }];
+
+        await LoadStats();
+
+        Field<string?>("_error").Should().BeNull();
+        Field<long?>("_sessionCount").Should().Be(expectedCount);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task LoadStats_RefreshUsesNewTime_AndFailureClearsPreviousCount(bool refreshExpiresFirst)
+    {
+        var expiry = _clock.GetUtcNow().UtcDateTime.AddMinutes(1);
+        _wrapper.Sessions = [new()
+        {
+            TenantId = _selectedTenantId, IsEnabled = true, Status = CurrentSessionState.Active,
+            ExpiresAt = refreshExpiresFirst ? null : expiry,
+            RefreshTokenExpiresAt = refreshExpiresFirst ? expiry : expiry.AddHours(1),
+            SessionType = new() { IsEnabled = true, SystemReferenceId = IdentityConstants.SessionType.User },
+            Credential = new() { IsEnabled = true, IdentityInfo = new() { IsEnabled = true }, Tenant = new() { IsEnabled = true } }
+        }];
+        await LoadStats();
+        Field<long?>("_sessionCount").Should().Be(1);
+        _clock.Now = new DateTimeOffset(expiry);
+        await LoadStats();
+        Field<long?>("_sessionCount").Should().Be(0);
+        _wrapper.HasCapability = false;
+        await LoadStats();
+        Field<long?>("_sessionCount").Should().BeNull();
+        Field<DateTime?>("_countedAtUtc").Should().BeNull();
     }
 
     [Test]
@@ -194,6 +364,7 @@ public sealed class DashboardStatisticsTests
 
     private sealed class RecordingWrapper : IDataContextServiceWrapper, IActorIdentityProvider, IServiceIdentityProvider
     {
+        public List<Session>? Sessions { get; set; }
         public Guid ActorTenantId { get; } = Guid.NewGuid();
         public bool HasCapability { get; set; } = true;
         public bool HasAllTenantsScope { get; set; } = true;
@@ -220,6 +391,14 @@ public sealed class DashboardStatisticsTests
             AuthorizationResults.Add(result);
             if (!result.IsSuccess)
                 throw new InvalidOperationException($"Remote query failed: {result.StatusCode} {result.Error}");
+            if (query.EntityTypeName == nameof(Session) && Sessions is not null)
+            {
+                // Execute the actual serialized Portal predicates with the server's filter builder.
+                var apply = typeof(QueryDescriptorExecutor).GetMethod("ApplyFilters", BindingFlags.NonPublic | BindingFlags.Static)!
+                    .MakeGenericMethod(typeof(Session));
+                var filtered = (IQueryable<Session>)apply.Invoke(null, [Sessions.AsQueryable(), query.Filters])!;
+                return MemoryPackSerializer.Serialize(filtered.Count());
+            }
             return MemoryPackSerializer.Serialize(10 + Array.IndexOf(Entities, query.EntityTypeName));
         }
 
@@ -244,5 +423,11 @@ public sealed class DashboardStatisticsTests
 
         public IAsyncEnumerable<byte[]> ExecuteQueryStreamAsync(byte[] bytes, CancellationToken ct = default) =>
             throw new NotSupportedException("Dashboard statistics use scalar queries.");
+    }
+
+    private sealed class TestClock : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = new(2026, 10, 22, 12, 0, 0, TimeSpan.Zero);
+        public override DateTimeOffset GetUtcNow() => Now;
     }
 }

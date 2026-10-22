@@ -1,0 +1,11 @@
+.table-plan-scroll { overflow-x: auto; max-width: 100%; }
+.table-plan { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: repeat(8, minmax(0, 1fr)); aspect-ratio: 3 / 2; min-width: 480px; padding: .5rem; gap: .3rem; background: var(--muted); border: 1px solid var(--border); border-radius: 6px; }
+.plan-cell { background: var(--background); border: 1px dashed var(--border); border-radius: 3px; min-width: 0; min-height: 0; }
+.plan-cell:hover { outline: 1px solid var(--primary); }
+.dining-table { z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .15rem; padding: .25rem; background: var(--background); border: 2px solid var(--muted-foreground); border-radius: 6px; color: var(--foreground); min-width: 0; overflow: hidden; }
+.dining-table strong { font-size: .875rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dining-table span { font-size: .65rem; white-space: nowrap; }
+.dining-table.round { border-radius: 50%; }
+.dining-table.selected { border-color: var(--primary); background: var(--accent); }
+.dining-table:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.dining-table[draggable="true"] { cursor: move; }
