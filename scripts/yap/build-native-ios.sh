@@ -10,5 +10,6 @@ else
   : "${YAP_CODESIGN_KEY:?Set the Apple Development signing identity name}"
   : "${YAP_CODESIGN_PROVISION:?Set the Yap development profile UUID or name}"
   dotnet publish "$project" -c Release -r ios-arm64 -p:BuildIpa=true \
+    "-p:ApplicationId=${YAP_APPLICATION_ID:-io.kaizendevs.yap.nativebenchmark}" \
     "-p:CodesignKey=$YAP_CODESIGN_KEY" "-p:CodesignProvision=$YAP_CODESIGN_PROVISION"
 fi
