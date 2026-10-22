@@ -1,4 +1,5 @@
 using FluentValidation;
+using XFramework.Inventario.Domain.Shared.Contracts.Products;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Products;
 
 namespace Inventario.Api.Features.Products.Update;
@@ -25,7 +26,8 @@ public class UpdateProductValidator : AbstractValidator<UpdateProductRequest>
             .When(x => !string.IsNullOrEmpty(x.SKU));
 
         RuleFor(x => x.Brand)
-            .MaximumLength(100).WithMessage("Brand cannot exceed 100 characters")
+            .Must(value => (ProductBrand.Normalize(value)?.Length ?? 0) <= ProductBrand.MaxLength)
+            .WithMessage("Brand cannot exceed 100 characters")
             .When(x => !string.IsNullOrEmpty(x.Brand));
 
         RuleFor(x => x.Weight)

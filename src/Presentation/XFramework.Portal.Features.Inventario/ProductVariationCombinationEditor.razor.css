@@ -1,0 +1,36 @@
+.combination-editor {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.combination-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    gap: 1rem;
+}
+
+.combination-option {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 2.5rem;
+    align-items: end;
+    gap: .75rem;
+}
+
+.combination-editor ::deep .xf-form-field {
+    min-width: 0;
+}
+
+@media (max-width: 640px) {
+    .combination-heading {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .combination-option {
+        grid-template-columns: minmax(0, 1fr) 2.5rem;
+    }
+
+    .combination-option ::deep .xf-entity-picker {
+        grid-column: 1 / -1;
+    }
+}

@@ -1,0 +1,121 @@
+@using XFramework.Integration.DataContext
+@inject IServiceProvider Services
+@inject IPortalTenantContext TenantContext
+@inject ToastService ToastService
+
+<XfEntityPicker TItem="ProductCategory" Label="Category" Value="@Value" ValueChanged="ValueChanged"
+                Items="@_items" ValueSelector="@(x => x.Id.ToString())" TextSelector="@(x => x.Name ?? "Unnamed category")"
+                SearchTextSelector="@(x => $"{x.Name} {x.Description}")" AdvancedColumns="@Columns"
+                Placeholder="Select category" SearchPlaceholder="Search categories..." EmptyMessage="No categories found."
+                ShowCreate="true" OnCreate="OpenCreate" AdvancedSearchTitle="Find Category" />
+
+<BbDialog @bind-Open="_open">
+    <BbDialogContent>
+        <BbDialogHeader><BbDialogTitle>Create Category</BbDialogTitle></BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <BbFormFieldInput TValue="string" @bind-Value="_name" Label="Name" Required="true" UpdateTiming="UpdateTiming.Immediate" Disabled="@(_saving || _uncertain)" />
+            <BbFormFieldTextarea @bind-Value="_description" Label="Description" Disabled="@(_saving || _uncertain)" />
+            @if (_error is not null) { <BbAlert Variant="AlertVariant.Danger"><BbAlertDescription>@_error</BbAlertDescription></BbAlert> }
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" Disabled="@_saving" OnClick="@(() => _open = false)">Cancel</BbButton>
+            <BbButton Disabled="@(_saving || string.IsNullOrWhiteSpace(_name))" OnClick="Create">Create category</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public IReadOnlyList<ProductCategory> Items { get; set; } = [];
+    [Parameter] public EventCallback<ProductCategory> Created { get; set; }
+    private List<ProductCategory> _items = [];
+    private Guid? _tenantId;
+    private bool _open, _saving;
+    private bool _uncertain;
+    private ProductCategory? _pendingCategory;
+    private string? _error;
+    private string _name = "", _description = "";
+    private static readonly IReadOnlyList<XfEntityPickerColumn<ProductCategory>> Columns =
+    [new("Name", x => x.Name), new("Description", x => x.Description)];
+
+    protected override void OnParametersSet()
+    {
+        if (_tenantId != TenantContext.SelectedTenantId)
+        {
+            _tenantId = TenantContext.SelectedTenantId;
+            _open = false;
+            _pendingCategory = null;
+            _uncertain = false;
+            _error = null;
+        }
+        _items = Items.ToList();
+    }
+
+    private void OpenCreate()
+    {
+        if (_saving) return;
+        if (_pendingCategory is null) { _name = ""; _description = ""; _error = null; }
+        _open = true;
+    }
+
+    private async Task Create()
+    {
+        if (_saving || _tenantId is not Guid tenantId || tenantId != TenantContext.SelectedTenantId || string.IsNullOrWhiteSpace(_name)) return;
+        _saving = true;
+        var category = _pendingCategory ??= new ProductCategory
+        {
+            Id = Guid.NewGuid(), TenantId = tenantId, CreatedAt = DateTime.UtcNow, IsEnabled = true
+        };
+        if (!_uncertain)
+        {
+            category.Name = _name.Trim();
+            category.Description = string.IsNullOrWhiteSpace(_description) ? null : _description.Trim();
+        }
+        try
+        {
+            // Isolate failed batches from the circuit's shared read context and other editors.
+            var context = new RemoteDataContext(Services, new RequestMetadata { RequestedTenantId = tenantId });
+            ProductCategory? existing = null;
+            if (_uncertain)
+            {
+                existing = await context.Query<ProductCategory>().IgnoreQueryFilters().NoCache()
+                    .Where(x => x.Id == category.Id && x.TenantId == tenantId && !x.IsDeleted).FirstOrDefaultAsync();
+                if (!IsCurrent(category)) return;
+            }
+            if (existing is null)
+            {
+                context.Add(category);
+                var result = await context.SaveChangesAsync();
+                if (!IsCurrent(category)) return;
+                if (!result.IsSuccess)
+                {
+                    _uncertain |= result.StatusCode >= 500;
+                    _error = _uncertain ? "The category result is unconfirmed. Retry to reconcile the original category; do not create another copy."
+                        : "Could not create category. Correct the details or access and retry.";
+                    return;
+                }
+            }
+            if (!IsCurrent(category)) return;
+            _pendingCategory = null;
+            _uncertain = false;
+            _error = null;
+            _open = false;
+            await Created.InvokeAsync(existing ?? category);
+            await ValueChanged.InvokeAsync((existing ?? category).Id.ToString());
+            ToastService.Success("Category created.");
+        }
+        catch
+        {
+            if (IsCurrent(category))
+            {
+                _uncertain = true;
+                _error = "The category result is unconfirmed. Retry to reconcile the original category; do not create another copy.";
+            }
+        }
+        finally { _saving = false; }
+    }
+
+    private bool IsCurrent(ProductCategory category) => ReferenceEquals(_pendingCategory, category)
+        && _tenantId == category.TenantId && TenantContext.SelectedTenantId == category.TenantId;
+}

@@ -1,4 +1,5 @@
 using XFramework.Core.Patterns;
+using XFramework.Inventario.Domain.Shared.Contracts.Responses;
 using XFramework.Integration.Attributes;
 using XFramework.Inventario.Api.Services;
 

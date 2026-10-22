@@ -19,7 +19,7 @@ else if (!_stockEnabled)
 else if (_outsideTenantContext)
 {
     <div class="space-y-4">
-        <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo($"/inventario/stock{ProductQuery}"))">
+        <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo(StockHref))">
             <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
             Back to Stock
         </BbButton>
@@ -38,8 +38,8 @@ else
     <FadeInContent>
         <div class="space-y-6 inv-page">
             <div class="flex items-center gap-4">
-                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to stock"
-                          OnClick="@(() => Navigation.NavigateTo($"/inventario/stock{ProductQuery}"))">
+                <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Icon" AriaLabel="Back to stock"
+                          OnClick="@(() => Navigation.NavigateTo(StockHref))">
                     <LucideIcon Name="arrow-left" class="h-4 w-4" />
                 </BbButton>
                 <div class="flex-1">
@@ -147,6 +147,8 @@ else
     [Parameter] public Guid Id { get; set; }
     [SupplyParameterFromQuery] public Guid? ProductId { get; set; }
     private string ProductQuery => ProductId is { } productId ? $"?productId={productId}" : "";
+    private string StockHref => (_outsideTenantContext ? ProductId : _balance?.ProductId ?? ProductId) is { } id
+        ? $"/inventario/products/{id}/stock" : "/inventario/products";
 
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;

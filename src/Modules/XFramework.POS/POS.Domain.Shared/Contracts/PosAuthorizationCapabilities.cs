@@ -2,6 +2,7 @@ namespace POS.Domain.Shared.Contracts;
 
 public static class PosAuthorizationCapabilities
 {
+    public const string ReportingView = "pos.reporting:view";
     public const string RegistersView = "pos.registers:view";
     public const string RegistersCreate = "pos.registers:create";
     public const string RegistersUpdate = "pos.registers:update";

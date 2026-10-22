@@ -1,0 +1,16 @@
+.inventory-overview { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; }
+.overview-filters { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; }
+.overview-filter { width: 14rem; max-width: 100%; }
+.overview-filter ::deep > div { max-width: 100%; }
+.overview-filter ::deep input { width: 100%; min-width: 0; }
+.overview-asof { font-size: .875rem; color: var(--muted-foreground); }
+.overview-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; padding-block: 1rem; border-block: 1px solid var(--border); }
+.overview-metrics > div { display: flex; flex-direction: column; gap: .5rem; min-width: 0; }
+.overview-metrics strong { font-size: 1.5rem; overflow-wrap: anywhere; }
+.overview-metrics span { color: var(--muted-foreground); font-size: .875rem; }
+.overview-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; }
+.overview-charts section { min-width: 0; }
+.overview-section-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
+.overview-section-heading ::deep h4 { font-size: 1.125rem; letter-spacing: 0; }
+.overview-movement-totals { display: flex; flex-wrap: wrap; gap: 1rem; font-size: .875rem; }
+@media (max-width: 800px) { .overview-charts { grid-template-columns: minmax(0, 1fr); } .overview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

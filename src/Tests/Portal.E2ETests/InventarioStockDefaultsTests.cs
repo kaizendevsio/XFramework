@@ -28,7 +28,7 @@ public sealed class InventarioStockDefaultsTests
     {
         var location = new InventoryLocation { Id = Guid.NewGuid(), WarehouseId = _preferred.Id, IsEnabled = true };
         var wrapper = Wrapper(location);
-        var page = new Stock { ProductId = _product };
+        var page = new ProductDetail { Id = _product };
         Configure(page, wrapper.Object, location);
         await Invoke(page, "OpenMovementDialog");
         AssertSelection(page, "_movementForm", _preferred.Id, location.Id);
@@ -62,7 +62,7 @@ public sealed class InventarioStockDefaultsTests
         var unrelated = new InventoryLocation { Id = Guid.NewGuid(), WarehouseId = _first.Id, IsEnabled = true };
         var fallback = new InventoryLocation { Id = Guid.NewGuid(), WarehouseId = _preferred.Id, IsEnabled = true };
         var wrapper = Wrapper(unrelated);
-        var page = new Stock();
+        var page = new ProductDetail { Id = _product };
         Configure(page, wrapper.Object, unrelated);
         Set(page, "_locations", new List<InventoryLocation> { unrelated, fallback });
         await Invoke(page, "OpenMovementDialog");
@@ -87,7 +87,7 @@ public sealed class InventarioStockDefaultsTests
         context.SetupGet(x => x.SelectedTenantId).Returns(_tenant);
         page.GetType().GetProperty("TenantFilter", Private)!.SetValue(page, context.Object);
         page.GetType().GetProperty("Inventario", Private)!.SetValue(page, wrapper);
-        page.GetType().GetProperty("FocusJs", Private)!.SetValue(page, new FocusJavaScript());
+        page.GetType().GetProperty("FocusJs", Private)?.SetValue(page, new FocusJavaScript());
         Set(page, "_warehouses", new List<Warehouse> { _first, _preferred });
         Set(page, "_locations", new List<InventoryLocation> { location });
     }

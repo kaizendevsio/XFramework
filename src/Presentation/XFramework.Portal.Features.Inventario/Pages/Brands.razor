@@ -1,0 +1,177 @@
+@page "/inventario/brands"
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Setup
+@using XFramework.Inventario.Domain.Shared.Contracts.Responses
+@using XFramework.Inventario.Domain.Shared.Contracts.Responses.Brands
+@using XFramework.Portal.Features.Inventario.Components
+@implements IDisposable
+
+<PageTitle>Inventario Brands - Portal</PageTitle>
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (TenantContext.SelectedTenantId is null)
+{
+    <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" />
+}
+else if (!_catalogEnabled)
+{
+    <ModuleUnavailable ModuleName="Inventario Catalog" />
+}
+else
+{
+    <div class="inv-page brands-page space-y-6">
+        <div class="xf-page-header">
+            <div><BbTypographyH3>Brands</BbTypographyH3><BbTypographyMuted>@TenantContext.SelectedTenantName</BbTypographyMuted></div>
+            <div class="xf-page-actions">
+                <BbButton Variant="ButtonVariant.Outline" OnClick="Reload"><LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />Reload</BbButton>
+                @if (CanManage)
+                {
+                    <BbButton Variant="ButtonVariant.Outline" Disabled="@(SelectedCategory is null)" OnClick="OpenMerge">
+                        <LucideIcon Name="merge" class="mr-2 h-4 w-4" />Merge brands
+                    </BbButton>
+                }
+            </div>
+        </div>
+        @if (_error is not null)
+        {
+            <BbAlert Variant="AlertVariant.Danger" role="alert"><BbAlertDescription>@_error</BbAlertDescription></BbAlert>
+        }
+        else if (_preferences is not null)
+        {
+            <div class="brands-fields">
+                <XfEntityPicker TItem="ProductCategory" Label="Category" Value="@_categoryId" ValueChanged="SelectCategory"
+                                Items="@_categories" ValueSelector="@(x => x.Id.ToString())" TextSelector="@(x => x.Name ?? "Unnamed category")"
+                                SearchTextSelector="@(x => $"{x.Name} {x.Description}")" AdvancedColumns="@CategoryColumns"
+                                AdvancedSearchTitle="Find category" AdvancedSearchScope="Categories in the selected tenant"
+                                Placeholder="Select category" SearchPlaceholder="Search categories..." ShowCreate="false" />
+                <ProductBrandPicker @key="_brandVersion" CategoryId="@SelectedCategory?.Id" @bind-Value="_brand" AllowNew="false" />
+            </div>
+            @if (!CanManage)
+            {
+                <BbAlert><BbAlertDescription>Tenant management permission is required to merge brands.</BbAlertDescription></BbAlert>
+            }
+        }
+    </div>
+}
+
+<BbDialog @bind-Open="_mergeOpen">
+    <BbDialogContent TrapFocus="false">
+        <BbDialogHeader>
+            <BbDialogTitle>Merge brands</BbDialogTitle>
+            <BbDialogDescription>@_mergeCategoryName</BbDialogDescription>
+        </BbDialogHeader>
+        @if (_mergeOpen && CanManage && _mergeCategoryId is not null)
+        {
+            <ProductBrandMerge @key="(_revision, _mergeCategoryId)" CategoryId="@_mergeCategoryId" CanManage="@CanManage" Merged="OnMerged" />
+        }
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private IPortalTenantContext TenantContext { get; set; } = default!;
+    [Inject] private IPortalModuleAvailability Availability { get; set; } = default!;
+    [Inject] private ILogger<Brands> Logger { get; set; } = default!;
+    private InventarioSetupResponse? _preferences;
+    private List<ProductCategory> _categories = [];
+    private string? _categoryId, _brand, _error, _mergeCategoryName;
+    private Guid? _mergeCategoryId;
+    private bool _loading = true, _catalogEnabled, _mergeOpen, _disposed;
+    private int _revision, _brandVersion;
+    private bool CanManage => _preferences?.CanManage == true && _preferences.TenantId == TenantContext.SelectedTenantId;
+    private ProductCategory? SelectedCategory => _categories.FirstOrDefault(x => x.Id.ToString() == _categoryId);
+    private static readonly IReadOnlyList<XfEntityPickerColumn<ProductCategory>> CategoryColumns =
+        [new("Name", x => x.Name), new("Description", x => x.Description)];
+
+    protected override void OnInitialized()
+    {
+        TenantContext.OnChanged += Changed;
+        Availability.OnChanged += Changed;
+    }
+    protected override Task OnInitializedAsync() => Reload();
+
+    private void Changed()
+    {
+        if (_disposed) return;
+        _ = InvokeAsync(async () =>
+        {
+            var pending = Reload();
+            StateHasChanged();
+            await pending;
+            if (!_disposed) StateHasChanged();
+        });
+    }
+
+    private async Task Reload()
+    {
+        var revision = ++_revision;
+        var tenant = TenantContext.SelectedTenantId;
+        _loading = true;
+        _mergeOpen = false;
+        _mergeCategoryId = null;
+        _preferences = null;
+        _categories = [];
+        _categoryId = _brand = _error = null;
+        ++_brandVersion;
+        try
+        {
+            await Availability.EnsureLoadedAsync();
+            if (!Current(revision, tenant)) return;
+            _catalogEnabled = Availability.ActiveTenantId == tenant &&
+                Availability.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, TenantModuleFeatureKeys.CatalogSubFeature);
+            if (tenant is not Guid tenantId || !_catalogEnabled) return;
+            var result = await Inventario.GetInventarioSetup(new GetInventarioSetupRequest { Metadata = new() { RequestedTenantId = tenantId } });
+            if (!Current(revision, tenant)) return;
+            if (!result.IsSuccess || result.Response?.TenantId != tenantId)
+            {
+                _error = "Brand permissions could not be loaded.";
+                return;
+            }
+            var categories = await DataContext.Query<ProductCategory>()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted).NoCache()
+                .OrderBy(x => x.Name).Take(1000).ToListAsync();
+            if (!Current(revision, tenant)) return;
+            _preferences = result.Response;
+            _categories = categories;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Brand management prerequisites could not be loaded.");
+            if (Current(revision, tenant)) _error = "Brands could not be loaded. Reload to try again.";
+        }
+        finally { if (Current(revision, tenant)) _loading = false; }
+    }
+
+    private void SelectCategory(string? value)
+    {
+        _categoryId = value;
+        _brand = null;
+        _mergeOpen = false;
+        ++_brandVersion;
+    }
+    private void OpenMerge()
+    {
+        if (!CanManage || SelectedCategory is not { } category) return;
+        _mergeCategoryId = category.Id;
+        _mergeCategoryName = category.Name;
+        _mergeOpen = true;
+    }
+    private void OnMerged(ProductBrandMergePreview result)
+    {
+        _mergeOpen = false;
+        _brand = result.TargetBrand;
+        ++_brandVersion;
+    }
+    private bool Current(int revision, Guid? tenant) =>
+        !_disposed && revision == _revision && TenantContext.SelectedTenantId == tenant;
+    public void Dispose()
+    {
+        _disposed = true;
+        ++_revision;
+        TenantContext.OnChanged -= Changed;
+        Availability.OnChanged -= Changed;
+    }
+}
+

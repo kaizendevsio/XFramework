@@ -1,0 +1,109 @@
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Brands
+@using XFramework.Inventario.Domain.Shared.Contracts.Responses.Brands
+@implements IDisposable
+@inject IInventarioServiceWrapper Inventario
+@inject IPortalTenantContext TenantContext
+@inject DialogService DialogService
+@inject ToastService ToastService
+@inject ILogger<ProductBrandMerge> Logger
+
+<div class="brand-merge" @key="_refresh">
+    <ProductBrandPicker CategoryId="@CategoryId" @bind-Value="_source" AllowNew="false" Label="Merge brand" Disabled="@(_busy || !CanManage)" />
+    <ProductBrandPicker CategoryId="@CategoryId" @bind-Value="_target" AllowNew="false" Label="Into brand" Disabled="@(_busy || !CanManage)" />
+    <BbButton Type="ButtonType.Button" Variant="ButtonVariant.Outline" Disabled="@(!CanPreview)" OnClick="PreviewAsync">
+        <LucideIcon Name="merge" />Review merge
+    </BbButton>
+    @if (_error is not null)
+    {
+        <BbAlert Variant="AlertVariant.Danger" role="alert"><BbAlertDescription>@_error</BbAlertDescription></BbAlert>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid? CategoryId { get; set; }
+    [Parameter] public bool CanManage { get; set; }
+    [Parameter] public EventCallback<ProductBrandMergePreview> Merged { get; set; }
+    private Guid? _category, _tenant;
+    private string? _source, _target, _error;
+    private bool _busy, _disposed;
+    private int _refresh;
+    private int _scopeVersion;
+    private bool CanPreview => !_busy && CanManage && CategoryId is { } id && id != Guid.Empty &&
+        !string.IsNullOrEmpty(_source) && !string.IsNullOrEmpty(_target);
+
+    protected override void OnInitialized() => TenantContext.OnChanged += TenantChanged;
+
+    protected override void OnParametersSet()
+    {
+        if (_category == CategoryId && _tenant == TenantContext.SelectedTenantId) return;
+        _category = CategoryId;
+        _tenant = TenantContext.SelectedTenantId;
+        ++_scopeVersion;
+        _source = _target = _error = null;
+    }
+
+    private async Task PreviewAsync()
+    {
+        if (!CanPreview) return;
+        var tenant = TenantContext.SelectedTenantId;
+        var category = CategoryId!.Value;
+        var version = _scopeVersion;
+        _busy = true;
+        _error = null;
+        try
+        {
+            var preview = await Inventario.PreviewProductBrandMerge(new PreviewProductBrandMergeRequest
+            {
+                Metadata = new() { RequestedTenantId = tenant }, CategoryId = category, SourceBrand = _source!, TargetBrand = _target!
+            });
+            if (!Current(version, tenant, category)) return;
+            if (!preview.IsSuccess || preview.Response is not { } plan)
+            {
+                _error = "This merge is unavailable. Check permission and select brands with products to update.";
+                return;
+            }
+            var confirmed = await DialogService.Confirm("Merge brands",
+                $"Change {plan.AffectedProductCount} product(s) from \"{plan.SourceBrand}\" to \"{plan.TargetBrand}\" in this category? Other categories, stock and prices will not change.",
+                new ConfirmDialogOptions { ConfirmText = "Merge brands", CancelText = "Cancel" });
+            if (!confirmed || !Current(version, tenant, category) || !CanManage) return;
+            var merged = await Inventario.MergeProductBrands(new MergeProductBrandsRequest
+            {
+                Metadata = new() { RequestedTenantId = tenant }, CategoryId = category, SourceBrand = plan.SourceBrand,
+                TargetBrand = plan.TargetBrand, Confirmed = true, ExpectedProductCount = plan.AffectedProductCount
+            });
+            if (!Current(version, tenant, category)) return;
+            if (!merged.IsSuccess || merged.Response is null)
+            {
+                _error = "The merge was not completed. Review the current brands before retrying.";
+                return;
+            }
+            _source = _target = null;
+            ++_refresh;
+            ToastService.Success("Brands merged.");
+            await Merged.InvokeAsync(merged.Response);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Brand merge could not be completed.");
+            if (Current(version, tenant, category)) _error = "The merge could not be completed. Refresh brands before retrying.";
+        }
+        finally { _busy = false; }
+    }
+
+    private bool Current(int version, Guid? tenant, Guid category) =>
+        !_disposed && version == _scopeVersion && tenant == TenantContext.SelectedTenantId && category == CategoryId;
+    private void TenantChanged() => _ = InvokeAsync(() =>
+    {
+        if (_disposed) return;
+        ++_scopeVersion;
+        _tenant = TenantContext.SelectedTenantId;
+        _source = _target = _error = null;
+        StateHasChanged();
+    });
+    public void Dispose()
+    {
+        _disposed = true;
+        TenantContext.OnChanged -= TenantChanged;
+    }
+}
+

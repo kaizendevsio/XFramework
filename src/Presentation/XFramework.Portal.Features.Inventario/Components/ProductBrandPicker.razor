@@ -1,0 +1,174 @@
+@using XFramework.Inventario.Domain.Shared.Contracts.Products
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Brands
+@implements IDisposable
+@inject IInventarioServiceWrapper Inventario
+@inject IPortalTenantContext TenantContext
+@inject ILogger<ProductBrandPicker> Logger
+
+<div class="brand-picker">
+    <BbLabel for="@_id">@Label</BbLabel>
+    <div class="brand-picker-controls">
+        <BbPopover @bind-Open="_open" RestoreFocusOnClose="true">
+            <BbPopoverTrigger AsChild="false" class="xf-entity-picker-trigger" id="@_id" role="combobox"
+                              aria-label="@Label" aria-expanded="@_open" disabled="@(Disabled || !HasCategory)">
+                <span class="xf-entity-picker-trigger-text">@(Value ?? (HasCategory ? "Select a brand" : "Select a category first"))</span>
+                <LucideIcon Name="chevrons-up-down" class="xf-entity-picker-trigger-icon" />
+            </BbPopoverTrigger>
+            <BbPopoverContent Class="xf-entity-picker-popover" MatchTriggerWidth="true"
+                              CloseOnClickOutside="false" CloseOnEscape="true" ZIndex="90">
+                <BbCommand SearchQuery="@_search" SearchQueryChanged="SearchAsync" CloseOnSelect="false">
+                    <BbCommandInput Placeholder="Search brands" />
+                    <BbCommandList>
+                        @if (_options.Count == 0)
+                        {
+                            <BbCommandEmpty>@(_loading ? "Loading brands..." : "No matching brands")</BbCommandEmpty>
+                        }
+                        @foreach (var option in _options)
+                        {
+                            <BbCommandItem @key="option.Value" Value="@option.Value" SearchText="@option.Text"
+                                           OnSelect="@(() => SelectAsync(option.Value))">@option.Text</BbCommandItem>
+                        }
+                    </BbCommandList>
+                </BbCommand>
+            </BbPopoverContent>
+            @if (_open)
+            {
+                <XfPopoverClickOutside />
+            }
+        </BbPopover>
+        @if (!string.IsNullOrEmpty(Value))
+        {
+            <BbButton Type="ButtonType.Button" Size="ButtonSize.Icon" Variant="ButtonVariant.Ghost" Disabled="@(Disabled || !HasCategory)" OnClick="@(() => SelectAsync(string.Empty))"
+                      aria-label="Clear brand" title="Clear brand"><LucideIcon Name="x" /></BbButton>
+        }
+    </div>
+    @if (_error is not null)
+    {
+        <div role="alert" class="brand-picker-error">
+            <span>@_error</span>
+            <BbButton Type="ButtonType.Button" Size="ButtonSize.Icon" Variant="ButtonVariant.Ghost" Disabled="@_loading" OnClick="@(() => LoadAsync(false))"
+                      aria-label="Retry brand search" title="Retry brand search"><LucideIcon Name="refresh-cw" /></BbButton>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid? CategoryId { get; set; }
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public string Label { get; set; } = "Brand";
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool AllowNew { get; set; } = true;
+
+    private readonly string _id = $"brand-{Guid.NewGuid():N}";
+    private Guid? _tenantId, _categoryId;
+    private string _search = "";
+    private string? _error;
+    private bool _loading, _disposed, _open;
+    private int _generation;
+    private CancellationTokenSource? _searchCancellation;
+    private List<SelectOption<string>> _options = [];
+    private bool HasCategory => CategoryId is { } category && category != Guid.Empty && _tenantId is { } tenant && tenant != Guid.Empty;
+
+    protected override void OnInitialized() => TenantContext.OnChanged += TenantChanged;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_tenantId == TenantContext.SelectedTenantId && _categoryId == CategoryId) return;
+        _tenantId = TenantContext.SelectedTenantId;
+        _categoryId = CategoryId;
+        _open = false;
+        _search = "";
+        await LoadAsync(false);
+    }
+
+    private async Task SearchAsync(string search)
+    {
+        _search = ProductBrand.Normalize(search) ?? "";
+        await LoadAsync(true);
+    }
+
+    private async Task LoadAsync(bool debounce)
+    {
+        var generation = ++_generation;
+        _searchCancellation?.Cancel();
+        _searchCancellation?.Dispose();
+        _searchCancellation = new();
+        var ct = _searchCancellation.Token;
+        _options = [];
+        _error = null;
+        _loading = HasCategory;
+        if (!HasCategory) return;
+        var tenant = _tenantId;
+        var category = CategoryId;
+        try
+        {
+            if (_search.Length > ProductBrand.MaxLength)
+            {
+                _error = "Brand must be 100 characters or fewer.";
+                return;
+            }
+            if (debounce) await Task.Delay(200, ct);
+            var result = await Inventario.SearchProductBrands(new SearchProductBrandsRequest
+            {
+                Metadata = new() { RequestedTenantId = tenant }, CategoryId = category!.Value, Search = _search, Limit = 20
+            }, ct);
+            if (!IsCurrent(generation, tenant, category)) return;
+            if (!result.IsSuccess)
+            {
+                _error = "Brands could not be loaded.";
+                return;
+            }
+            _options = (result.Response ?? []).Select(x => new SelectOption<string>(x, x)).ToList();
+            if (AllowNew && _search.Length > 0 && !_options.Any(x => x.Value == _search))
+                _options.Add(new(_search, $"Use \"{_search}\" (new)"));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Brand suggestions could not be loaded.");
+            if (IsCurrent(generation, tenant, category)) _error = "Brands could not be loaded.";
+        }
+        finally
+        {
+            if (IsCurrent(generation, tenant, category)) _loading = false;
+        }
+    }
+
+    private bool IsCurrent(int generation, Guid? tenant, Guid? category) =>
+        !_disposed && generation == _generation && TenantContext.SelectedTenantId == tenant && CategoryId == category;
+
+    private async Task SelectAsync(string value)
+    {
+        if (Disabled || !HasCategory) return;
+        _open = false;
+        var normalized = ProductBrand.Normalize(value);
+        await ValueChanged.InvokeAsync(normalized);
+        if (normalized is null)
+        {
+            _search = "";
+            await LoadAsync(false);
+        }
+    }
+
+    private void TenantChanged() => _ = InvokeAsync(async () =>
+    {
+        if (_disposed) return;
+        _tenantId = TenantContext.SelectedTenantId;
+        _open = false;
+        _search = "";
+        await ValueChanged.InvokeAsync(null);
+        await LoadAsync(false);
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        _disposed = true;
+        ++_generation;
+        TenantContext.OnChanged -= TenantChanged;
+        _searchCancellation?.Cancel();
+        _searchCancellation?.Dispose();
+    }
+}
+

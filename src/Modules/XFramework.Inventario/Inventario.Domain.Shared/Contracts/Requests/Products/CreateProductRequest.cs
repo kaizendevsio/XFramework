@@ -5,7 +5,7 @@ using XFramework.Domain.Shared.Contracts.Requests;
 namespace XFramework.Inventario.Domain.Shared.Contracts.Requests.Products;
 
 using TRequest = CreateProductRequest;
-using TResponse = CmdResponse;
+using TResponse = CmdResponse<XFramework.Inventario.Domain.Shared.Contracts.Responses.ProductResponse>;
 
 [MemoryPackable]
 public partial record CreateProductRequest : RequestBase,

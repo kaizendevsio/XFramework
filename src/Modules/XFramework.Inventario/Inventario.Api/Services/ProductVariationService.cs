@@ -122,14 +122,22 @@ public sealed class ProductVariationService(
         if (!featureResult.IsSuccess)
             return Result<ProductVariation>.Failure(featureResult.Message!, featureResult.StatusCode);
 
+        var validation = new global::Inventario.Api.Features.Variations.Create.CreateProductVariationValidator().Validate(request);
+        if (!validation.IsValid)
+            return Result<ProductVariation>.Failure(validation.Errors[0].ErrorMessage, 400);
+
         var tenantId = tenantResult.Data;
         var product = await LoadProductAsync(tenantId, request.ProductId, ct);
         if (product is null)
             return Result<ProductVariation>.NotFound("Product not found.");
 
-        var typeResult = await ValidateVariationTypeAsync(tenantId, request.ProductId, request.ProductVariationTypeId, ct);
-        if (!typeResult.IsSuccess)
-            return Result<ProductVariation>.Failure(typeResult.Message!, typeResult.StatusCode);
+        var definitionResult = await ValidateDefinitionAsync(tenantId, request.ProductId,
+            request.ProductVariationTypeId, request.CombinationOptions, ct);
+        if (!definitionResult.IsSuccess)
+            return Result<ProductVariation>.Failure(definitionResult.Message!, definitionResult.StatusCode);
+        var definition = definitionResult.Data!;
+        var typeId = definition.TypeId;
+        var combinationKey = definition.Key;
 
         var name = NormalizeRequired(request.Name);
         if (name is null)
@@ -139,20 +147,22 @@ public sealed class ProductVariationService(
             .AnyAsync(x =>
                 x.TenantId == tenantId &&
                 x.ProductId == request.ProductId &&
-                x.ProductVariationTypeId == request.ProductVariationTypeId &&
-                x.Name == name &&
+                ((x.ProductVariationTypeId == typeId && x.Name == name) ||
+                    (combinationKey != null && x.CombinationKey == combinationKey)) &&
                 !x.IsDeleted,
                 ct);
         if (duplicate)
-            return Result<ProductVariation>.Conflict("A variant with the same type and name already exists for this product.");
+            return Result<ProductVariation>.Conflict("A variant with the same name and type or option combination already exists for this product.");
 
         var variation = new ProductVariation
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             ProductId = request.ProductId,
-            ProductVariationTypeId = request.ProductVariationTypeId,
-            VariationType = typeResult.Data!.Name,
+            ProductVariationTypeId = typeId,
+            VariationType = definition.TypeName,
+            CombinationOptions = definition.Options,
+            CombinationKey = combinationKey,
             Name = name,
             Price = request.Price,
             AdditionalPrice = request.Price - product.Price,
@@ -162,7 +172,7 @@ public sealed class ProductVariationService(
         };
 
         dataContext.Add(variation);
-        var saveResult = await dataContext.SaveChangesAsync(ct);
+        var saveResult = await SaveVariationAsync(variation, ct);
         if (!saveResult.IsSuccess)
             return Result<ProductVariation>.Failure(saveResult.Message ?? "Variant save failed.", saveResult.StatusCode);
 
@@ -181,6 +191,10 @@ public sealed class ProductVariationService(
         if (!featureResult.IsSuccess)
             return Result<ProductVariation>.Failure(featureResult.Message!, featureResult.StatusCode);
 
+        var validation = new global::Inventario.Api.Features.Variations.Update.UpdateProductVariationValidator().Validate(request);
+        if (!validation.IsValid)
+            return Result<ProductVariation>.Failure(validation.Errors[0].ErrorMessage, 400);
+
         var tenantId = tenantResult.Data;
         var variation = await dataContext.Query<ProductVariation>()
             .Where(x => x.TenantId == tenantId && x.Id == request.ProductVariationId && !x.IsDeleted)
@@ -188,13 +202,22 @@ public sealed class ProductVariationService(
         if (variation is null)
             return Result<ProductVariation>.NotFound("Variant not found.");
 
+        if (variation.CombinationOptions is not null && request.CombinationOptions is null)
+            return Result<ProductVariation>.Failure("Combination options are required when editing a combination.", 400);
+        if (request.ExpectedConcurrencyStamp is { } stamp && stamp != variation.ConcurrencyStamp)
+            return Result<ProductVariation>.Conflict("The variant has changed. Reload and try again.");
+
         var product = await LoadProductAsync(tenantId, variation.ProductId, ct);
         if (product is null)
             return Result<ProductVariation>.NotFound("Product not found.");
 
-        var typeResult = await ValidateVariationTypeAsync(tenantId, variation.ProductId, request.ProductVariationTypeId, ct);
-        if (!typeResult.IsSuccess)
-            return Result<ProductVariation>.Failure(typeResult.Message!, typeResult.StatusCode);
+        var definitionResult = await ValidateDefinitionAsync(tenantId, variation.ProductId,
+            request.ProductVariationTypeId, request.CombinationOptions, ct);
+        if (!definitionResult.IsSuccess)
+            return Result<ProductVariation>.Failure(definitionResult.Message!, definitionResult.StatusCode);
+        var definition = definitionResult.Data!;
+        var typeId = definition.TypeId;
+        var combinationKey = definition.Key;
 
         var name = NormalizeRequired(request.Name);
         if (name is null)
@@ -205,23 +228,25 @@ public sealed class ProductVariationService(
                 x.TenantId == tenantId &&
                 x.ProductId == variation.ProductId &&
                 x.Id != variation.Id &&
-                x.ProductVariationTypeId == request.ProductVariationTypeId &&
-                x.Name == name &&
+                ((x.ProductVariationTypeId == typeId && x.Name == name) ||
+                    (combinationKey != null && x.CombinationKey == combinationKey)) &&
                 !x.IsDeleted,
                 ct);
         if (duplicate)
-            return Result<ProductVariation>.Conflict("A variant with the same type and name already exists for this product.");
+            return Result<ProductVariation>.Conflict("A variant with the same name and type or option combination already exists for this product.");
 
         dataContext.Update(variation);
-        variation.ProductVariationTypeId = request.ProductVariationTypeId;
-        variation.VariationType = typeResult.Data!.Name;
+        variation.ProductVariationTypeId = typeId;
+        variation.VariationType = definition.TypeName;
+        variation.CombinationOptions = definition.Options;
+        variation.CombinationKey = combinationKey;
         variation.Name = name;
         variation.Price = request.Price;
         variation.AdditionalPrice = request.Price - product.Price;
         variation.ModifiedAt = DateTime.UtcNow;
         variation.ConcurrencyStamp = Guid.NewGuid();
 
-        var saveResult = await dataContext.SaveChangesAsync(ct);
+        var saveResult = await SaveVariationAsync(variation, ct);
         if (!saveResult.IsSuccess)
             return Result<ProductVariation>.Failure(saveResult.Message ?? "Variant update failed.", saveResult.StatusCode);
 
@@ -257,6 +282,48 @@ public sealed class ProductVariationService(
         return Result<ProductVariation?>.Success(variation);
     }
 
+    private sealed record VariationDefinition(Guid? TypeId, string? TypeName,
+        List<ProductVariationOption>? Options, string? Key);
+
+    private async Task<Result<VariationDefinition>> ValidateDefinitionAsync(
+        Guid tenantId, Guid productId, Guid typeId, List<ProductVariationOption>? options, CancellationToken ct)
+    {
+        if (options is null)
+        {
+            var type = await ValidateVariationTypeAsync(tenantId, productId, typeId, ct);
+            return type.IsSuccess
+                ? Result<VariationDefinition>.Success(new(typeId, type.Data!.Name, null, null))
+                : Result<VariationDefinition>.Failure(type.Message!, type.StatusCode);
+        }
+
+        var ids = options.Select(x => x.ProductVariationTypeId).ToList();
+        var types = await dataContext.Query<ProductVariationType>()
+            .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.IsEnabled && ids.Contains(x.Id) &&
+                (x.ProductId == null || x.ProductId == productId))
+            .Take(ProductVariationCombination.MaxOptions)
+            .ToListAsync(ct);
+        if (types.Count != ids.Count)
+            return Result<VariationDefinition>.Failure("One or more option types are unavailable for this product.", 400);
+
+        var normalized = ProductVariationCombination.Normalize(options);
+        return Result<VariationDefinition>.Success(new(null, "Combination", normalized,
+            ProductVariationCombination.CreateKey(normalized)));
+    }
+
+    private async Task<Result> SaveVariationAsync(ProductVariation variation, CancellationToken ct)
+    {
+        var result = await dataContext.SaveChangesAsync(ct);
+        if (result.IsSuccess)
+            return Result.Success();
+
+        // ServerDataContext hides provider exceptions. Recheck the unique key to translate a losing insert/update race.
+        if (variation.CombinationKey is { } key && await dataContext.Query<ProductVariation>()
+            .AnyAsync(x => x.TenantId == variation.TenantId && x.ProductId == variation.ProductId &&
+                x.Id != variation.Id && x.CombinationKey == key && !x.IsDeleted, ct))
+            return Result.Conflict("This option combination already exists for this product.");
+        return Result.Failure(result.Message ?? "Variant save failed.", result.StatusCode);
+    }
+
     private async Task<Result<ProductVariationType>> ValidateVariationTypeAsync(
         Guid tenantId,
         Guid productId,
@@ -267,7 +334,7 @@ public sealed class ProductVariationService(
             .Where(x =>
                 x.TenantId == tenantId &&
                 x.Id == productVariationTypeId &&
-                !x.IsDeleted)
+                !x.IsDeleted && x.IsEnabled)
             .FirstOrDefaultAsync(ct);
 
         if (type is null)

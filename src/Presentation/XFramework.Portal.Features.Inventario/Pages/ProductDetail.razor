@@ -9,6 +9,7 @@
 @using XFramework.Inventario.Domain.Shared.Contracts.Requests.Variations
 @using XFramework.Inventario.Domain.Shared.Contracts.Requests.Warehouses
 @using XFramework.Inventario.Domain.Shared.Enums
+@using XFramework.Portal.Features.Inventario.Components
 @implements IDisposable
 
 <PageTitle>Inventario Product - Portal</PageTitle>
@@ -86,6 +87,13 @@ else
                 <BbDialogDescription>Configure a sellable variant for @_product.Name.</BbDialogDescription>
             </BbDialogHeader>
             <div class="grid gap-4 py-4 inv-dialog-body">
+                <BbFormFieldSwitch Checked="@_combinationMode" CheckedChanged="@((bool value) => _combinationMode = value)" Label="Combination of options" Disabled="@(_saving || _variationForm.IsEditing)" />
+                @if (_combinationMode)
+                {
+                    <ProductVariationCombinationEditor Draft="@_combinationDraft" Types="@_variationTypes" ProductId="Id" CurrencyCode="@_currency" Disabled="@_saving" OnCreateType="OpenVariationTypeDialog" />
+                }
+                else
+                {
                 <XfEntityPicker TItem="ProductVariationType"
                                 Label="Variation Type"
                                 Value="@_variationForm.ProductVariationTypeId"
@@ -118,6 +126,7 @@ else
                                               Required="true"
                                               ShowSymbol="false" />
                 </div>
+                }
             </div>
             <BbDialogFooter>
                 <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _variationDialogOpen = false)">Cancel</BbButton>
@@ -793,14 +802,23 @@ else
     private bool _planningEnabled;
     private bool _stockEnabled;
     private bool _movementsEnabled;
+    private bool _warehousingEnabled;
+    private bool StockReady => _stockEnabled && _movementsEnabled && _warehousingEnabled;
     private bool _traceabilityEnabled;
     private bool _variationsEnabled;
     private bool _transactionsEnabled;
     private bool _purchasingEnabled;
     private bool _negativeStockEnabled;
+    private bool _basicMode;
+    private bool _canManageSetup;
+    private readonly SemaphoreSlim _reloadGate = new(1, 1);
+    private int _reloadRevision;
+    private bool _disposed;
     private bool _outsideTenantContext;
     private bool _editMode;
     private bool _variationDialogOpen;
+    private bool _combinationMode;
+    private readonly ProductVariationCombinationDraft _combinationDraft = new();
     private bool _variationTypeDialogOpen;
     private bool _movementDialogOpen;
     private bool _lotDialogOpen;
@@ -881,14 +899,27 @@ else
         await Reload();
     }
 
-    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+    private void OnTenantChanged()
+    {
+        if (_disposed) return;
+        _editMode = _variationDialogOpen = _variationTypeDialogOpen = _movementDialogOpen = false;
+        _lotDialogOpen = _receiveDialogOpen = _ruleDialogOpen = false;
+        _warehouseCreateDialogOpen = _locationCreateDialogOpen = _supplierCreateDialogOpen = false;
+        _ = InvokeAsync(Reload);
+    }
 
     private async Task Reload()
     {
+        var revision = ++_reloadRevision;
+        var tenantId = TenantFilter.SelectedTenantId;
+        var productId = Id;
         _loading = true;
+        await _reloadGate.WaitAsync();
         try
         {
+            if (!IsCurrentLoad(revision, tenantId, productId)) return;
             await ModuleNavigation.EnsureLoadedAsync();
+            if (!IsCurrentLoad(revision, tenantId, productId)) return;
             LoadFeatureFlags();
             ResetData();
 
@@ -897,27 +928,40 @@ else
             _product = await DataContext.Query<Product>()
                 .IgnoreQueryFilters()
                 .NoCache()
-                .Where(x => x.Id == Id && !x.IsDeleted)
+                .Where(x => x.Id == productId && !x.IsDeleted)
                 .FirstOrDefaultAsync();
 
+            if (!IsCurrentLoad(revision, tenantId, productId)) return;
             _outsideTenantContext = _product is not null && _product.TenantId != TenantFilter.SelectedTenantId;
             if (_product is null || _outsideTenantContext) return;
 
-            _currency = await InventoryDisplay.CurrencyAsync(Inventario, _product.TenantId);
+            var preferences = await InventoryDisplay.PreferencesAsync(Inventario, _product.TenantId);
+            if (!IsCurrentLoad(revision, tenantId, productId)) return;
+            _currency = preferences.DefaultCurrency;
+            _basicMode = preferences.Mode == InventarioSetupMode.Basic;
+            _canManageSetup = preferences.CanManage;
             await LoadProductData(_product.TenantId);
+            if (!IsCurrentLoad(revision, tenantId, productId)) return;
             if (!_editMode)
                 LoadProductForm();
         }
         catch
         {
-            ToastService.Show("Could not load product.");
+            if (IsCurrentLoad(revision, tenantId, productId)) ToastService.Show("Could not load product.");
         }
         finally
         {
-            _loading = false;
-            StateHasChanged();
+            _reloadGate.Release();
+            if (IsCurrentLoad(revision, tenantId, productId))
+            {
+                _loading = false;
+                StateHasChanged();
+            }
         }
     }
+
+    private bool IsCurrentLoad(int revision, Guid? tenantId, Guid productId) =>
+        !_disposed && revision == _reloadRevision && tenantId == TenantFilter.SelectedTenantId && productId == Id;
 
     private void LoadFeatureFlags()
     {
@@ -926,6 +970,7 @@ else
         _planningEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "planning");
         _stockEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "stock_balances");
         _movementsEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "movements");
+        _warehousingEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "warehousing");
         _traceabilityEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "traceability");
         _variationsEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "variations");
         _transactionsEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "transactions");
@@ -1025,7 +1070,7 @@ else
                 .Take(500)
                 .ToListAsync();
 
-        if (_stockEnabled || _movementsEnabled || _purchasingEnabled || _planningEnabled)
+        if (_warehousingEnabled && (_stockEnabled || _movementsEnabled || _purchasingEnabled || _planningEnabled))
         {
             await LoadOperationalLookups(tenantId);
             ApplyWorkflowDefaults();
@@ -1123,6 +1168,14 @@ else
                 </BbButton>
                 @if (CurrentSection == "summary")
                 {
+                    @if (_basicMode && StockReady && _product is not null)
+                    {
+                        <BasicProductStockEntry Product="@_product" Variations="@_variations" Saved="Reload" />
+                    }
+                    else
+                    {
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo($"/inventario/products/{Id}/stock"))"><LucideIcon Name="boxes" class="mr-2 h-4 w-4" />Stock</BbButton>
+                    }
                     <BbButton OnClick="@StartEdit">
                         <LucideIcon Name="pencil" class="mr-2 h-4 w-4" />
                         Edit
@@ -1134,10 +1187,13 @@ else
 
     private RenderFragment SummarySection => @<div class="space-y-6">
         <div class="xf-summary-grid xf-summary-grid-4">
-            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Price</BbTypographyMuted><BbTypographyH3>@_currency @(_product?.Price.ToString("N2") ?? "0.00")</BbTypographyH3></div></BbCardContent></BbCard>
-            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Available Stock</BbTypographyMuted><BbTypographyH3><a href="@($"/inventario/products/{Id}/stock")">@TotalAvailable.ToString("0.####")</a></BbTypographyH3></div></BbCardContent></BbCard>
-            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Locations</BbTypographyMuted><BbTypographyH3><a href="@($"/inventario/products/{Id}/stock")">@ActiveLocationCount</a></BbTypographyH3></div></BbCardContent></BbCard>
-            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Reorder Rules</BbTypographyMuted><BbTypographyH3><a href="@($"/inventario/products/{Id}/replenishment")">@_reorderRules.Count</a></BbTypographyH3></div></BbCardContent></BbCard>
+            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Base price</BbTypographyMuted><BbTypographyH3>@_currency @(_product?.Price.ToString("N2") ?? "0.00")</BbTypographyH3></div></BbCardContent></BbCard>
+            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Available Stock</BbTypographyMuted><BbTypographyH3><a href="@($"/inventario/products/{Id}/stock")">@(_stockEnabled ? TotalAvailable.ToString("0.####") : "Not enabled")</a></BbTypographyH3></div></BbCardContent></BbCard>
+            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Locations</BbTypographyMuted><BbTypographyH3><a href="@($"/inventario/products/{Id}/stock")">@(_stockEnabled ? ActiveLocationCount.ToString() : "Not enabled")</a></BbTypographyH3></div></BbCardContent></BbCard>
+            @if (_planningEnabled)
+            {
+                <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Reorder Rules</BbTypographyMuted><BbTypographyH3><a href="@($"/inventario/products/{Id}/replenishment")">@_reorderRules.Count</a></BbTypographyH3></div></BbCardContent></BbCard>
+            }
         </div>
 
         <BbCard>
@@ -1153,30 +1209,15 @@ else
                             <BbFormFieldInput TValue="string" @bind-Value="_productForm.Name" Label="Name" Required="true" />
                             <BbFormFieldInput TValue="string" @bind-Value="_productForm.Sku" Label="SKU" />
                         </div>
-                        <XfEntityPicker TItem="ProductCategory"
-                                        Label="Category"
-                                        Value="@_productForm.CategoryId"
-                                        ValueChanged="@(value => _productForm.CategoryId = value ?? "")"
-                                        Items="@_categories"
-                                        ValueSelector="@GetCategoryPickerValue"
-                                        TextSelector="@GetCategoryLabel"
-                                        SearchTextSelector="@GetCategorySearchText"
-                                        AdvancedColumns="@CategoryAdvancedColumns"
-                                        AdvancedFilters="@CategoryAdvancedFilters"
-                                        AdvancedSearchScope="Searches category name, description, and created date."
-                                        Placeholder="Select category"
-                                        SearchPlaceholder="Search categories..."
-                                        EmptyMessage="No categories found."
-                                        ShowCreate="false"
-                                        AdvancedSearchTitle="Find Category"
-                                        AdvancedSearchDescription="Select the category for this product." />
+                        <ProductCategoryPicker Value="@_productForm.CategoryId" Items="@_categories"
+                            ValueChanged="@(value => _productForm.CategoryId = value ?? "")" Created="@(category => _categories.Add(category))" />
                         <div class="xf-detail-field-grid">
                             <BbFormFieldCurrencyInput CurrencyCode="@_currency" @bind-Value="_productForm.Price"
-                                                      Label="Price"
+                                                      Label="Base price"
                                                       Min="0"
                                                       Required="true"
                                                       ShowSymbol="false" />
-                            <BbFormFieldInput TValue="string" @bind-Value="_productForm.Brand" Label="Brand" />
+                            <ProductBrandPicker CategoryId="@(Guid.TryParse(_productForm.CategoryId, out var categoryId) ? categoryId : null)" Value="@_productForm.Brand" ValueChanged="@(value => _productForm.Brand = value ?? "")" Disabled="@_saving" />
                         </div>
                         <BbFormFieldInput TValue="string" @bind-Value="_productForm.Description" Label="Description" />
                         <BbFormFieldSwitch Checked="@_productForm.IsAvailable"
@@ -1214,12 +1255,22 @@ else
     </div>;
 
     private RenderFragment StockSection => @<div class="space-y-6">
+        @if (!StockReady)
+        {
+            <StockFeatureSetup CanManage="@_canManageSetup" Enabled="Reload" />
+        }
+        @if (StockReady)
+        {
         <div class="xf-page-header">
             <div>
                 <BbTypographyH3>Stock</BbTypographyH3>
                 <BbTypographyMuted>Post stock, receive batches, and inspect balances for this product.</BbTypographyMuted>
             </div>
             <div class="xf-page-actions">
+                @if (_basicMode && _product is not null)
+                {
+                    <BasicProductStockEntry Product="@_product" Variations="@_variations" Saved="Reload" />
+                }
                 @if (_movementsEnabled)
                 {
                     <BbButton OnClick="@OpenMovementDialog">
@@ -1274,6 +1325,9 @@ else
                         <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Format="0.####" Sortable="true" Filterable="true" />
                         <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Format="0.####" Sortable="true" Filterable="true" />
                         <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Format="0.####" Sortable="true" Filterable="true" />
+                        <BbDataGridTemplateColumn Title="Actions"><ChildContent Context="item">
+                            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@(() => OpenForBalance(item))">Adjust</BbButton>
+                        </ChildContent></BbDataGridTemplateColumn>
                     </Columns>
                 </BbDataGrid>
             </BbCardContent>
@@ -1315,6 +1369,7 @@ else
                 </BbDataGrid>
             </BbCardContent>
         </BbCard></BbTabsContent></BbTabs>
+        }
     </div>;
 
     private RenderFragment LotsSection => @<div class="space-y-6">
@@ -1489,7 +1544,7 @@ else
         </BbTabs>
     </div>;
 
-    private RenderFragment TransactionsSection => @<div class="space-y-6"><p>This view contains Inventario product sales records. POS shipment and return references are recorded separately in the stock movement ledger.</p><a href="@($"/inventario/stock?productId={Id}")">View product stock movements</a>
+    private RenderFragment TransactionsSection => @<div class="space-y-6"><p>This view contains Inventario product sales records. POS shipment and return references are recorded separately in the stock movement ledger.</p><a href="@($"/inventario/products/{Id}/stock")">View product stock movements</a>
         <BbCard>
             <BbCardHeader>
                 <BbCardTitle>Sales Transaction History</BbCardTitle>
@@ -1526,7 +1581,7 @@ else
     private bool IsSectionAvailable(string section) => section switch
     {
         "summary" => true,
-        "stock" => _stockEnabled || _movementsEnabled || _purchasingEnabled,
+        "stock" => true,
         "lots" => _traceabilityEnabled,
         "replenishment" => _planningEnabled,
         "variations" => _variationsEnabled,
@@ -1629,6 +1684,8 @@ else
     private void OpenVariationDialog()
     {
         _variationForm.Reset();
+        _combinationMode = false;
+        _combinationDraft.Load(null, _product?.Price ?? 0m);
         _variationForm.Price = _product?.Price ?? 0m;
         _variationDialogOpen = true;
     }
@@ -1636,6 +1693,8 @@ else
     private void OpenVariationDialog(ProductVariation variation)
     {
         _variationForm.Reset();
+        _combinationMode = variation.CombinationOptions is { Count: > 0 };
+        _combinationDraft.Load(variation.Name, GetVariantPrice(variation), variation.CombinationOptions);
         _variationForm.ProductVariationId = variation.Id.ToString();
         _variationForm.ProductVariationTypeId = variation.ProductVariationTypeId?.ToString() ?? "";
         _variationForm.Name = variation.Name ?? "";
@@ -1692,7 +1751,13 @@ else
 
     private async Task SaveVariation()
     {
-        if (_product is null) return;
+        if (_product is null || _saving) return;
+        if (_combinationMode)
+        {
+            if (_combinationDraft.Validate() is { } error) { ToastService.Show(error); return; }
+            _variationForm.Name = _combinationDraft.Name;
+            _variationForm.Price = _combinationDraft.Price;
+        }
         if (string.IsNullOrWhiteSpace(_variationForm.Name))
         {
             ToastService.Show("Variant name is required.");
@@ -1710,7 +1775,7 @@ else
         _saving = true;
         try
         {
-            var typeId = await ResolveVariationTypeId();
+            var typeId = _combinationMode ? Guid.Empty : await ResolveVariationTypeId();
             if (typeId is null)
                 return;
 
@@ -1720,9 +1785,11 @@ else
                 {
                     Metadata = BuildMetadata(),
                     ProductVariationId = variationId,
+                    ExpectedConcurrencyStamp = _variations.FirstOrDefault(x => x.Id == variationId)?.ConcurrencyStamp,
                     ProductVariationTypeId = typeId.Value,
                     Name = requestName,
-                    Price = price
+                    Price = price,
+                    CombinationOptions = _combinationMode ? _combinationDraft.ToOptions() : null
                 })
                 : await Inventario.CreateProductVariation(new CreateProductVariationRequest
                 {
@@ -1730,7 +1797,8 @@ else
                     ProductId = _product.Id,
                     ProductVariationTypeId = typeId.Value,
                     Name = requestName,
-                    Price = price
+                    Price = price,
+                    CombinationOptions = _combinationMode ? _combinationDraft.ToOptions() : null
                 });
 
             if (result.IsSuccess)
@@ -1763,13 +1831,33 @@ else
         return null;
     }
 
-    private void OpenMovementDialog()
+    private async Task OpenMovementDialog()
     {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
+        XFramework.Inventario.Domain.Shared.Contracts.Responses.InventarioSetupResponse preferences;
+        try { preferences = await InventoryDisplay.PreferencesAsync(Inventario, tenantId); }
+        catch { ToastService.Show("Could not load stock defaults. Try again."); return; }
+        if (TenantFilter.SelectedTenantId != tenantId) return;
+        var warehouseId = (_warehouses.FirstOrDefault(x => x.IsEnabled && x.Id == preferences.WarehouseId) ?? _warehouses.FirstOrDefault(x => x.IsEnabled))?.Id;
+        var location = _locations.FirstOrDefault(x => x.IsEnabled && x.WarehouseId == warehouseId && x.Id == preferences.LocationId) ?? _locations.FirstOrDefault(x => x.IsEnabled && x.WarehouseId == warehouseId);
         _movementForm.Reset();
         _movementForm.ProductId = Id.ToString();
-        _movementForm.WarehouseId = _warehouses.FirstOrDefault()?.Id.ToString() ?? "";
-        _movementForm.LocationId = FirstLocationForWarehouse(_movementForm.WarehouseId)?.Id.ToString() ?? "";
+        _movementForm.WarehouseId = warehouseId?.ToString() ?? "";
+        _movementForm.LocationId = location?.Id.ToString() ?? "";
         _movementDialogOpen = true;
+    }
+
+    private Task OpenForBalance(StockBalance balance)
+    {
+        if (balance.ProductId != Id) return Task.CompletedTask;
+        _movementForm.Reset();
+        _movementForm.ProductId = Id.ToString();
+        _movementForm.ProductVariationId = balance.ProductVariationId?.ToString() ?? "";
+        _movementForm.WarehouseId = balance.WarehouseId.ToString();
+        _movementForm.LocationId = balance.LocationId.ToString();
+        _movementForm.LotId = balance.LotId?.ToString() ?? "";
+        _movementDialogOpen = true;
+        return Task.CompletedTask;
     }
 
     private async Task PostMovement()
@@ -2345,13 +2433,7 @@ else
     private static string GetVariationTypeScope(ProductVariationType type) =>
         type.ProductId is null ? "Tenant-wide" : "Product";
 
-    private decimal GetVariantPrice(ProductVariation variation)
-    {
-        if (variation.ProductVariationTypeId is null && variation.Price == 0m)
-            return (_product?.Price ?? 0m) + variation.AdditionalPrice;
-
-        return variation.Price;
-    }
+    private decimal GetVariantPrice(ProductVariation variation) => variation.GetSellingPrice(_product?.Price ?? 0m);
 
     private decimal GetVariantDelta(ProductVariation variation) =>
         GetVariantPrice(variation) - (_product?.Price ?? 0m);
@@ -2593,6 +2675,8 @@ else
 
     public void Dispose()
     {
+        _disposed = true;
+        ++_reloadRevision;
         TenantFilter.OnChanged -= OnTenantChanged;
         ModuleNavigation.OnChanged -= OnTenantChanged;
     }

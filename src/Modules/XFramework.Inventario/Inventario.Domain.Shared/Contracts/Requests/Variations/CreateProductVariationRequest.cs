@@ -16,4 +16,5 @@ public partial record CreateProductVariationRequest : RequestBase,
     public Guid ProductVariationTypeId { get; init; }
     public string? Name { get; init; }
     public decimal Price { get; init; }
+    public List<ProductVariationOption>? CombinationOptions { get; init; }
 }

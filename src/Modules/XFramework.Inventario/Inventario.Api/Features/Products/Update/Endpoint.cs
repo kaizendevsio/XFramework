@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using XFramework.Core.Patterns;
+using XFramework.Inventario.Domain.Shared.Contracts.Responses;
 using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Integration.Security;

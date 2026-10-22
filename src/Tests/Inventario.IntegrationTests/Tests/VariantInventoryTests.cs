@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using XFramework.Inventario.Domain.Shared.Contracts;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Lots;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Purchasing;
+using XFramework.Inventario.Domain.Shared.Contracts.Requests.Products;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Reports;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Reservations;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Stock;
@@ -17,6 +18,67 @@ namespace Inventario.IntegrationTests.Tests;
 [Category(TestCategories.Inventario)]
 public sealed class VariantInventoryTests : InventarioTestBase
 {
+    [Test]
+    [Category(TestCategories.Stock)]
+    [Category(TestCategories.Wrappers)]
+    public async Task Combination_WrapperReadUpdateAndStock_PreserveSingleVariantIdAndZeroPrice()
+    {
+        var seed = await SeedInventoryScope();
+        var color = await CreateVariationType("Color");
+        var size = await CreateVariationType("Size");
+        var request = new CreateProductVariationRequest
+        {
+            Metadata = CreateMetadata(), ProductId = seed.Product.Id, Name = "Red / Large", Price = 17,
+            CombinationOptions = [new() { ProductVariationTypeId = color.Id, Value = "Red" }, new() { ProductVariationTypeId = size.Id, Value = "Large" }]
+        };
+        var created = await InventarioIntegrationTestFixture.ServiceWrapper.CreateProductVariation(request);
+        created.IsSuccess.Should().BeTrue(created.Message);
+        var deniedToken = TestInvocationIdentityExtensions.CreateTestActorToken(
+            InventarioIntegrationTestFixture.TestTenantId,
+            InventarioIntegrationTestFixture.TestCredentialId,
+            InventarioIntegrationTestFixture.TestIdentityId, Guid.NewGuid(), [], []);
+        using (TestInvocationActorTokenScope.Push(deniedToken))
+        {
+            var deniedRead = async () => await InventarioIntegrationTestFixture.DataContext.Query<ProductVariation>()
+                .Where(x => x.ProductId == seed.Product.Id && x.Name == request.Name).FirstOrDefaultAsync();
+            await deniedRead.Should().ThrowAsync<InvalidOperationException>().WithMessage("*403 (Forbidden)*");
+        }
+
+        // Remote entity reads require their own view capability, independently of wrapper commands.
+        var readerToken = TestInvocationIdentityExtensions.CreateTestActorToken(
+            InventarioIntegrationTestFixture.TestTenantId,
+            InventarioIntegrationTestFixture.TestCredentialId,
+            InventarioIntegrationTestFixture.TestIdentityId, Guid.NewGuid(), [], ["inventario.variations:view"]);
+        ProductVariation? remote;
+        using (TestInvocationActorTokenScope.Push(readerToken))
+        {
+            remote = await InventarioIntegrationTestFixture.DataContext.Query<ProductVariation>()
+                .Where(x => x.ProductId == seed.Product.Id && x.Name == request.Name).FirstOrDefaultAsync();
+        }
+        remote.Should().NotBeNull();
+        remote!.CombinationOptions.Should().BeEquivalentTo(request.CombinationOptions);
+        var posted = await PostOpeningBalance(seed, remote.Id, 7, $"combination-stock-{Guid.NewGuid():N}");
+        posted.IsSuccess.Should().BeTrue(posted.Message);
+        var update = await InventarioIntegrationTestFixture.ServiceWrapper.UpdateProductVariation(new UpdateProductVariationRequest
+        {
+            Metadata = CreateMetadata(), ProductVariationId = remote.Id, Name = remote.Name, Price = 0,
+            CombinationOptions = remote.CombinationOptions, ExpectedConcurrencyStamp = remote.ConcurrencyStamp
+        });
+        update.IsSuccess.Should().BeTrue(update.Message);
+        var catalog = await InventarioIntegrationTestFixture.ServiceWrapper.GetProductVariations(new GetProductVariationsRequest
+        { Metadata = CreateMetadata(), ProductId = seed.Product.Id });
+        catalog.IsSuccess.Should().BeTrue(catalog.Message);
+        catalog.Response.Should().ContainSingle(x => x.ProductVariationId == remote.Id && x.Price == 0);
+        var balances = await InventarioIntegrationTestFixture.ServiceWrapper.GetStockBalances(new GetStockBalancesRequest
+        { Metadata = CreateMetadata(), ProductId = seed.Product.Id, ProductVariationId = remote.Id });
+        balances.IsSuccess.Should().BeTrue(balances.Message);
+        balances.Response.Should().ContainSingle(x => x.ProductVariationId == remote.Id && x.OnHandQuantity == 7);
+        await using var db = CreateDbContext();
+        var baseStock = await db.Set<StockBalance>().IgnoreQueryFilters()
+            .AnyAsync(x => x.ProductId == seed.Product.Id && x.ProductVariationId == null);
+        baseStock.Should().BeFalse();
+    }
+
     [Test]
     [Category(TestCategories.Traceability)]
     [Category(TestCategories.Stock)]

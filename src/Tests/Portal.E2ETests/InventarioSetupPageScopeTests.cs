@@ -37,12 +37,17 @@ public sealed class InventarioSetupPageScopeTests
         _navigation = new();
     }
 
-    [TestCase(false, false, true, "/inventario/setup")]
-    [TestCase(true, false, true, "/inventario/products")]
-    [TestCase(false, true, true, "/inventario/products")]
-    [TestCase(false, false, false, "/inventario/products")]
-    public async Task Entry_FreshOrExistingTenant_RoutesWithoutWrites(bool existing, bool complete, bool manager, string destination)
+    [TestCase(false, false, true, false, "/inventario/setup")]
+    [TestCase(false, false, true, true, "/inventario/setup")]
+    [TestCase(true, false, true, false, "/inventario/products")]
+    [TestCase(true, false, true, true, "/inventario/overview")]
+    [TestCase(false, true, true, false, "/inventario/products")]
+    [TestCase(false, true, true, true, "/inventario/overview")]
+    [TestCase(false, false, false, false, "/inventario/products")]
+    [TestCase(false, false, false, true, "/inventario/overview")]
+    public async Task Entry_FreshOrExistingTenant_RoutesWithoutWrites(bool existing, bool complete, bool manager, bool reporting, string destination)
     {
+        _availability.Setup(x => x.IsFeatureEnabled("inventario", "reporting")).Returns(reporting);
         _wrapper.Setup(x => x.GetInventarioSetup(It.IsAny<GetInventarioSetupRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Response(new() { TenantId = _tenant, CanManage = manager, HasExistingConfiguration = existing, CompletedAt = complete ? DateTime.UtcNow : null }));
         await Invoke(Page<SetupEntry>(), "Load");
@@ -156,6 +161,22 @@ public sealed class InventarioSetupPageScopeTests
         gate.SetResult(Response(new() { TenantId = foreignResponse ? Guid.NewGuid() : firstTenant, LowStockThreshold = 19, DefaultCurrency = "SGD" }));
         if (foreignResponse) await FluentActions.Awaiting(() => pending).Should().ThrowAsync<InvalidOperationException>();
         else await pending;
+        Field<int>(page, "_lowStockThreshold").Should().Be(5);
+        Field<string>(page, "_currency").Should().Be("PHP");
+    }
+
+    [Test]
+    public async Task Products_SupersededDefaultsResponse_DoesNotOverwriteNewerReload()
+    {
+        var gate = new TaskCompletionSource<QueryResponse<InventarioSetupResponse>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _wrapper.Setup(x => x.GetInventarioSetup(It.IsAny<GetInventarioSetupRequest>(), It.IsAny<CancellationToken>())).Returns(gate.Task);
+        var page = new Products();
+        typeof(Products).GetProperty("Inventario", Private)!.SetValue(page, _wrapper.Object);
+        typeof(Products).GetProperty("TenantFilter", Private)!.SetValue(page, _context.Object);
+        var pending = (Task<bool>)typeof(Products).GetMethod("LoadSettings", Private)!.Invoke(page, [_tenant])!;
+        SetField(page, "_reloadRevision", 1);
+        gate.SetResult(Response(new() { TenantId = _tenant, LowStockThreshold = 19, DefaultCurrency = "SGD" }));
+        (await pending).Should().BeFalse();
         Field<int>(page, "_lowStockThreshold").Should().Be(5);
         Field<string>(page, "_currency").Should().Be("PHP");
     }

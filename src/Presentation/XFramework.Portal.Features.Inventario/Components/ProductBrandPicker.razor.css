@@ -1,0 +1,6 @@
+.brand-picker { min-width: 0; }
+.brand-picker-controls { display: flex; align-items: center; gap: .25rem; min-width: 0; }
+.brand-picker-controls ::deep > :first-child { flex: 1; min-width: 0; }
+.brand-picker-controls ::deep button { max-width: 100%; }
+.brand-picker-error { display: flex; align-items: center; gap: .25rem; font-size: .875rem; color: var(--destructive); }
+
