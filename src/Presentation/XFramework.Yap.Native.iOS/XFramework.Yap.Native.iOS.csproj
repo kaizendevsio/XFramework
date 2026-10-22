@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-ios</TargetFramework><OutputType>Exe</OutputType>
+    <SupportedOSPlatformVersion>17.4</SupportedOSPlatformVersion>
+    <ApplicationId>io.kaizendevs.yap.nativebenchmark</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion><ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
+    <Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../XFramework.Yap.Native.Core/XFramework.Yap.Native.Core.csproj" /></ItemGroup>
+</Project>

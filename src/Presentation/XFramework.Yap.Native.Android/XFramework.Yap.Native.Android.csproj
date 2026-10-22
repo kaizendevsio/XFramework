@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework><OutputType>Exe</OutputType>
+    <SupportedOSPlatformVersion>30</SupportedOSPlatformVersion>
+    <ApplicationId>io.kaizendevs.yap.nativebenchmark</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion><ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
+    <Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <AndroidPackageFormats>apk</AndroidPackageFormats><IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../XFramework.Yap.Native.Core/XFramework.Yap.Native.Core.csproj" /></ItemGroup>
+</Project>
