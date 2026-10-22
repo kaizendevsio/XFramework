@@ -1,0 +1,24 @@
+<BbDialog Open="@Open" OpenChanged="OpenChanged">
+    <BbDialogContent Class="sm:max-w-3xl">
+        <BbDialogHeader><BbDialogTitle>Select table</BbDialogTitle></BbDialogHeader>
+        @if (Settings.ActiveTableLayout is { Tables.Count: > 0 } layout)
+        {
+            <BbTypographyH4>@(layout.Name)</BbTypographyH4>
+            <PosTablePlan Layout="layout" SelectedId="SelectedId" TableSelected="Select" />
+        }
+        else
+        {
+            <BbAlert><BbAlertDescription>No active tables. Configure a table layout in POS settings.</BbAlertDescription></BbAlert>
+        }
+        <BbDialogFooter><BbButton Variant="ButtonVariant.Outline" OnClick="@(() => OpenChanged.InvokeAsync(false))">Cancel</BbButton></BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter, EditorRequired] public PosCheckoutSettings Settings { get; set; } = new();
+    [Parameter] public Guid? SelectedId { get; set; }
+    [Parameter] public EventCallback<PosDiningTable> Selected { get; set; }
+    private async Task Select(PosDiningTable table) { await OpenChanged.InvokeAsync(false); await Selected.InvokeAsync(table); }
+}

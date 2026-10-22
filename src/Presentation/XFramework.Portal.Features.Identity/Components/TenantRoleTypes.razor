@@ -74,10 +74,13 @@ else
         <div class="xf-short-form py-4">
             <BbFormFieldInput TValue="string" @bind-Value="_roleName" Label="Name" Required="true" Disabled="@_saving" />
             <BbFormFieldNumericInput TValue="short" @bind-Value="_roleLevel" Label="Role Level" Min="short.MinValue" Max="short.MaxValue" DecimalPlaces="0" AllowNegative="true" Disabled="@_saving" />
-            <BbFormFieldCombobox TValue="string" @bind-Value="_groupId" Label="Role Group" Options="@GroupOptions" Required="true" Disabled="@_saving" />
-            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => OpenGroupDialog(true))" Disabled="@_saving">
-                <LucideIcon Name="folder-plus" class="mr-2 h-4 w-4" /> Add Role Group
-            </BbButton>
+            <XfEntityPicker TItem="IdentityRoleTypeGroup" @bind-Value="_groupId" Label="Role Group"
+                            Items="@AvailableGroups" Disabled="@_saving" Placeholder="Select role group"
+                            ValueSelector="@(group => group.Id.ToString())" TextSelector="@(group => group.Name)"
+                            SearchTextSelector="@(group => $"{group.Name} {group.Description}")"
+                            AdvancedColumns="@GroupColumns" AdvancedSearchTitle="Find Role Group"
+                            AdvancedSearchScope="Active role groups in this tenant"
+                            ShowCreate="true" OnCreate="@(() => OpenGroupDialog(true))" />
             @if (_roleError is not null)
             {
                 <BbAlert Variant="AlertVariant.Danger" role="alert"><BbAlertDescription>@_roleError</BbAlertDescription></BbAlert>

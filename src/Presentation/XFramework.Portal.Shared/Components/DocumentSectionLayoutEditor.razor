@@ -1,0 +1,47 @@
+@typeparam TSection where TSection : notnull
+
+<ol class="document-sections" aria-label="@AriaLabel">
+    @foreach (var section in Order)
+    {
+        <li @key="section">
+            <span>@Label(section)</span>
+            <BbSwitch Checked="@(!Hidden.Contains(section))" CheckedChanged="@(value => SetVisible(section, value))"
+                      Disabled="@(Disabled || IsRequired(section))" AriaLabel="@(VisibilityLabel?.Invoke(section) ?? $"Show {Label(section)}")" />
+            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="@($"Move {Label(section)} up")" Title="Move up"
+                      Disabled="@(Disabled || EqualityComparer<TSection>.Default.Equals(section, Order[0]))" OnClick="@(() => Move(section, -1))"><LucideIcon Name="arrow-up" /></BbButton>
+            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="@($"Move {Label(section)} down")" Title="Move down"
+                      Disabled="@(Disabled || EqualityComparer<TSection>.Default.Equals(section, Order[Order.Count - 1]))" OnClick="@(() => Move(section, 1))"><LucideIcon Name="arrow-down" /></BbButton>
+        </li>
+    }
+</ol>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<TSection> Order { get; set; } = [];
+    [Parameter] public IReadOnlyCollection<TSection> Hidden { get; set; } = [];
+    [Parameter, EditorRequired] public Func<TSection, string> Label { get; set; } = section => section.ToString() ?? string.Empty;
+    [Parameter] public Func<TSection, bool> IsRequired { get; set; } = _ => false;
+    [Parameter] public Func<TSection, string>? VisibilityLabel { get; set; }
+    [Parameter] public string AriaLabel { get; set; } = "Document section order";
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback<List<TSection>> OrderChanged { get; set; }
+    [Parameter] public EventCallback<List<TSection>> HiddenChanged { get; set; }
+
+    private async Task Move(TSection section, int offset)
+    {
+        if (Disabled) return;
+        var order = Order.ToList();
+        var index = order.IndexOf(section);
+        var next = index + offset;
+        if (index < 0 || next < 0 || next >= order.Count) return;
+        (order[index], order[next]) = (order[next], order[index]);
+        await OrderChanged.InvokeAsync(order);
+    }
+
+    private async Task SetVisible(TSection section, bool visible)
+    {
+        if (Disabled || IsRequired(section) || !Order.Contains(section) || Hidden.Contains(section) == !visible) return;
+        var hidden = Hidden.Where(item => !EqualityComparer<TSection>.Default.Equals(item, section)).ToList();
+        if (!visible) hidden.Add(section);
+        await HiddenChanged.InvokeAsync(hidden);
+    }
+}

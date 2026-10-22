@@ -87,7 +87,7 @@ public sealed class PosReportsE2ETests : PageTest
         Assets(Path.Combine(presentation, "XFramework.Portal.Features.POS", "obj", configuration, "net10.0", "scopedcss", "projectbundle"), "/_content/XFramework.Portal.Features.POS");
         app.UseAuthentication(); app.UseAuthorization(); app.UseAntiforgery();
         app.MapGet("/_content/XFramework.Portal.Shared/reports/report-export.js", () => Microsoft.AspNetCore.Http.Results.Text(
-            "import { exportPdf as realExport } from '/pos-fixture-shared/reports/report-export.js'; export function exportPdf(model){window.posPdf=model;return realExport(model);}", "text/javascript"));
+            "import { exportPdf as realExport } from '/pos-fixture-shared/reports/report-export.js'; export { copyReportLink } from '/pos-fixture-shared/reports/report-export.js'; export function exportPdf(model){window.posPdf=model;return realExport(model);}", "text/javascript"));
         app.MapRazorComponents<PosReportBrowserRoot>().AddInteractiveServerRenderMode().RequireAuthorization();
         await app.StartAsync();
     }
@@ -148,6 +148,24 @@ public sealed class PosReportsE2ETests : PageTest
         await download.SaveAsAsync(pdf);
         TestContext.AddTestAttachment(pdf);
         await Capture($"reports-{width}");
+    }
+
+    [Test]
+    public async Task Share_OpensCopyDialog_AndDateLabelIsAbovePicker()
+    {
+        await Page.SetViewportSizeAsync(1920, 1080);
+        var label = await Page.Locator(".date-filter label").BoundingBoxAsync();
+        var picker = await Page.Locator(".date-filter button").First.BoundingBoxAsync();
+        label.Should().NotBeNull();
+        picker.Should().NotBeNull();
+        (label!.Y + label.Height).Should().BeLessThanOrEqualTo(picker!.Y + 1);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Share link", Exact = true }).ClickAsync();
+        var dialog = Page.GetByRole(AriaRole.Dialog);
+        await Expect(dialog.GetByRole(AriaRole.Heading, new() { Name = "Share report" })).ToBeVisibleAsync();
+        await Expect(dialog.GetByRole(AriaRole.Textbox, new() { Name = "Protected report link" })).ToHaveValueAsync(new System.Text.RegularExpressions.Regex("/pos/reports\\?tenant="));
+        await dialog.GetByRole(AriaRole.Button, new() { Name = "Copy link", Exact = true }).ClickAsync();
+        await Expect(dialog.GetByRole(AriaRole.Button, new() { Name = "Copied", Exact = true })).ToBeVisibleAsync();
+        await Capture("share-dialog-1920");
     }
 
     [Test]
@@ -240,17 +258,21 @@ public sealed class PosReportsE2ETests : PageTest
         var chart = Page.Locator("[data-slot=line-chart]").First;
         await Expect(chart.Locator("svg")).ToBeVisibleAsync();
         await chart.ScrollIntoViewIfNeededAsync();
-        var point = await chart.EvaluateAsync<float[]>("""
+        var pointIndex = await chart.EvaluateAsync<int>("""
             element => {
-                const symbol = [...element.querySelectorAll("svg path")].filter(p => {
+                const paths = [...element.querySelectorAll("svg path")];
+                const symbol = paths.filter(p => {
                     const r = p.getBoundingClientRect();
                     return (p.getAttribute('fill') === '#16845b' || p.getAttribute('stroke') === '#16845b') && r.width > 0 && r.width < 16 && r.height > 0 && r.height < 16;
                 }).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)[0];
-                const r = symbol.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2];
+                return paths.indexOf(symbol);
             }
             """);
-        await Page.Mouse.ClickAsync(point[0], point[1]);
+        // Locator clicks wait for chart animation and scrolling to settle before hitting the point.
+        pointIndex.Should().BeGreaterThanOrEqualTo(0);
+        await chart.Locator("svg path").Nth(pointIndex).ClickAsync();
         await Expect(Page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex("currency="));
+        await Expect(Page.Locator(".report-caption").Filter(new() { HasText = "2026-09-01 through 2026-09-01 UTC." })).ToBeVisibleAsync();
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "PDF snapshot", Exact = true })).ToBeEnabledAsync();
         var request = state.Requests.Last();
         (request.ToUtcExclusive - request.FromUtc).Should().Be(TimeSpan.FromDays(1));

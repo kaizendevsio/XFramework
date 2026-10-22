@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using FluentAssertions;
 using MemoryPack;
 using NUnit.Framework;
@@ -10,6 +12,45 @@ namespace XFramework.Core.Tests.DataContext;
 [TestFixture]
 public class QueryDescriptorSerializationTests
 {
+    [TestCase(DateTimeKind.Utc)]
+    [TestCase(DateTimeKind.Local)]
+    [TestCase(DateTimeKind.Unspecified)]
+    public void QueryFilter_DateTimeRoundTrip_PreservesTicksAndKind(DateTimeKind kind)
+    {
+        var original = new DateTime(2026, 10, 22, 12, 34, 56, kind).AddTicks(1234567);
+        var filter = new QueryFilter
+        {
+            PropertyName = "ExpiresAt", Operation = QueryFilterOperation.GreaterThan, Value = original
+        };
+
+        var assigned = (DateTime)filter.Value!;
+        assigned.Ticks.Should().Be(original.Ticks);
+        assigned.Kind.Should().Be(kind, "filter assignment must not erase UTC before serialization");
+        BitConverter.ToInt64(filter.InternalValue!, 0).Should().Be(original.Ticks,
+            "the existing ticks prefix remains readable by legacy consumers");
+
+        var descriptor = new QueryDescriptor { EntityTypeName = "Session", Filters = [filter] };
+        var restored = MemoryPackSerializer.Deserialize<QueryDescriptor>(MemoryPackSerializer.Serialize(descriptor))!;
+        var value = (DateTime)restored.Filters.Single().Value!;
+        value.Ticks.Should().Be(original.Ticks);
+        value.Kind.Should().Be(kind);
+    }
+
+    [Test]
+    public void QueryFilter_LegacyDateTimePayload_RemainsUnspecifiedWithoutGuessingTimezone()
+    {
+        var original = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Unspecified);
+        var filter = new QueryFilter
+        {
+            Type = "System.DateTime", InternalValue = BitConverter.GetBytes(original.Ticks)
+        };
+
+        var restored = MemoryPackSerializer.Deserialize<QueryFilter>(MemoryPackSerializer.Serialize(filter))!;
+        var value = (DateTime)restored.Value!;
+        value.Ticks.Should().Be(original.Ticks);
+        value.Kind.Should().Be(DateTimeKind.Unspecified);
+    }
+
     [Test]
     public void QueryDescriptor_RoundTrip_PreservesAllFields()
     {

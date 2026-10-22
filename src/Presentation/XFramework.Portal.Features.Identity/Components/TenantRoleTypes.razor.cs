@@ -10,6 +10,7 @@ using XFramework.Domain.Shared.Contracts.Base;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Integration.DataContext;
 using XFramework.Portal.Shared;
+using XFramework.Portal.Shared.Components;
 
 namespace XFramework.Portal.Features.Identity.Components;
 
@@ -48,9 +49,16 @@ public partial class TenantRoleTypes
     private string? _roleError;
     private string? _groupError;
 
-    private List<SelectOption<string>> GroupOptions => _groups
+    private List<IdentityRoleTypeGroup> AvailableGroups => _groups
         .Where(group => group.TenantId == TenantId && group.IsEnabled && !group.IsDeleted)
-        .Select(group => new SelectOption<string>(group.Id.ToString(), group.Name)).ToList();
+        .ToList();
+
+    private static readonly IReadOnlyList<XfEntityPickerColumn<IdentityRoleTypeGroup>> GroupColumns =
+    [
+        new("Name", group => group.Name),
+        new("Description", group => group.Description),
+        new("Created", group => group.CreatedAt.ToString("yyyy-MM-dd"))
+    ];
 
     protected override void OnInitialized() => TenantContext.OnChanged += OnTenantContextChanged;
 

@@ -16,6 +16,50 @@ namespace Inventario.IntegrationTests.Tests;
 public sealed class PlanningPurchasingReportingTests : InventarioTestBase
 {
     [Test]
+    public async Task GetInventoryProductSales_AggregatesAllTransactionsBeforePagingThroughWrapper()
+    {
+        var seed = await SeedInventoryScope();
+        var prefix = "Direct sales " + Guid.NewGuid().ToString("N");
+        var start = DateTime.UtcNow.Date;
+        await using (var db = CreateDbContext())
+        {
+            await TestInventarioSeed.SetInventarioFeature(db, "transactions", true);
+            await db.Set<Product>().Where(x => x.Id == seed.Product.Id).ExecuteUpdateAsync(x => x.SetProperty(p => p.Name, prefix + " Main"));
+            var variant = new ProductVariation { Id = Guid.NewGuid(), TenantId = seed.Product.TenantId, ProductId = seed.Product.Id, Name = "Blue", IsEnabled = true };
+            db.Add(variant);
+            ProductTransaction Transaction(Guid productId, DateTime date, Guid? variation = null) => new()
+            {
+                Id = Guid.NewGuid(), TenantId = seed.Product.TenantId, ProductId = productId, ProductVariationId = variation,
+                Quantity = 2, TotalPrice = 7.5m, TransactionDate = date, IsEnabled = true, CreatedAt = start
+            };
+            db.AddRange(Enumerable.Range(0, 501).Select(_ => Transaction(seed.Product.Id, start)));
+            db.Add(Transaction(seed.Product.Id, start, variant.Id));
+            db.AddRange(Transaction(seed.Product.Id, start.AddTicks(-1)), Transaction(seed.Product.Id, start.AddDays(1)));
+            var deleted = Transaction(seed.Product.Id, start); deleted.IsDeleted = true; db.Add(deleted);
+            var foreign = Transaction(seed.Product.Id, start); db.Add(foreign);
+            for (var i = 0; i < 25; i++)
+            {
+                var product = new Product { Id = Guid.NewGuid(), TenantId = seed.Product.TenantId, CategoryId = seed.Product.CategoryId,
+                    Name = $"{prefix} {i:00}", IsEnabled = true };
+                db.Add(product); db.Add(Transaction(product.Id, start));
+            }
+            await db.SaveChangesAsync();
+            await db.Set<ProductTransaction>().Where(x => x.Id == foreign.Id).ExecuteUpdateAsync(x => x.SetProperty(t => t.TenantId, Guid.NewGuid()));
+        }
+        var request = new GetInventoryProductSalesRequest { Metadata = CreateMetadata(), FromUtc = start,
+            ToUtcExclusive = start.AddDays(1), Take = 20, ProductFilter = prefix, ProductFilterOperator = "StartsWith" };
+        var first = await InventarioIntegrationTestFixture.ServiceWrapper.GetInventoryProductSales(request);
+        first.IsSuccess.Should().BeTrue(first.Message);
+        first.Response!.TotalCount.Should().Be(27); first.Response.Rows.Should().HaveCount(20);
+        var last = await InventarioIntegrationTestFixture.ServiceWrapper.GetInventoryProductSales(request with { Skip = 20 });
+        last.IsSuccess.Should().BeTrue(last.Message); last.Response!.Rows.Should().HaveCount(7);
+        first.Response.Rows.Intersect(last.Response.Rows).Should().BeEmpty();
+        var aggregate = last.Response.Rows.Single(x => x.ProductId == seed.Product.Id && x.ProductVariationId is null);
+        aggregate.Quantity.Should().Be(1002); aggregate.RecordedRevenue.Should().Be(3757.5m);
+        last.Response.Rows.Single(x => x.ProductVariationId is not null).Quantity.Should().Be(2);
+    }
+
+    [Test]
     [Category(TestCategories.ExtendedIntegration)]
     [Category(TestCategories.Planning)]
     [Category(TestCategories.Wrappers)]

@@ -157,29 +157,26 @@ public sealed class ProductBrandsE2ETests : PageTest
 
     [TestCase(1920, 1080)]
     [TestCase(768, 1024)]
-    public async Task Brands_CategoryChange_OffersOnlyScopedSuggestionsAndClearsSelection(int width, int height)
+    public async Task Brands_CategoryChange_ListsAndSearchesOnlyScopedBrands(int width, int height)
     {
         await Open(width, height);
-        await Expect(Combo("Brand")).ToBeDisabledAsync();
+        await Expect(Combo("Brand")).ToHaveCountAsync(0);
         await SelectCategory("Tools");
-        await Combo("Brand").ClickAsync();
-        await Expect(Option("ACME TOOLS")).ToBeVisibleAsync();
-        await Expect(Option("FABRIC HOUSE")).ToHaveCountAsync(0);
-        await Page.GetByPlaceholder("Search brands", new() { Exact = true }).FillAsync("  acme   tools ");
-        await Expect(Option("ACME TOOLS")).ToBeVisibleAsync();
-        await Expect(Option("ACM TOOLS")).ToHaveCountAsync(0);
-        await Expect(Option("Use \"ACME TOOLS\" (new)")).ToHaveCountAsync(0);
-        await Screenshot("tools-suggestions", width, height);
-        await Option("ACME TOOLS").ClickAsync();
+        await Expect(BrandCell("ACME TOOLS")).ToBeVisibleAsync();
+        await Expect(BrandCell("FABRIC HOUSE")).ToHaveCountAsync(0);
+        await Page.GetByPlaceholder("Search all brands in category...").FillAsync("ACME TOOLS");
+        await Page.GetByPlaceholder("Search all brands in category...").PressAsync("Tab");
+        await Expect(BrandCell("ACME TOOLS")).ToBeVisibleAsync();
+        await Expect(BrandCell("ACM TOOLS")).ToHaveCountAsync(0);
+        await Screenshot("tools-grid", width, height);
         await SelectCategory("Apparel");
-        await Expect(Combo("Brand")).Not.ToContainTextAsync("ACME TOOLS");
-        await Combo("Brand").ClickAsync();
-        await Expect(Option("FABRIC HOUSE")).ToBeVisibleAsync();
-        await Expect(Option("ACME TOOLS")).ToHaveCountAsync(0);
-        await Screenshot("apparel-suggestions", width, height);
+        await Expect(Page.GetByPlaceholder("Search all brands in category...")).ToBeEmptyAsync();
+        await Expect(BrandCell("FABRIC HOUSE")).ToBeVisibleAsync();
+        await Expect(BrandCell("ACME TOOLS")).ToHaveCountAsync(0);
+        await Screenshot("apparel-grid", width, height);
         _state.Searches.Should().Contain(x => x.CategoryId == _state.Tools).And.Contain(x => x.CategoryId == _state.Apparel);
         _state.Searches.Should().Contain(x => x.CategoryId == _state.Tools && x.Search == "ACME TOOLS");
-        _state.Searches.Should().OnlyContain(x => x.Metadata.RequestedTenantId == _state.Tenant && x.Limit == 20);
+        _state.Searches.Should().OnlyContain(x => x.Metadata.RequestedTenantId == _state.Tenant && x.Limit == 50);
         _state.Merges.Should().BeEmpty();
         _errors.Should().BeEmpty();
     }
@@ -190,8 +187,8 @@ public sealed class ProductBrandsE2ETests : PageTest
     {
         await Open(width, height);
         await SelectCategory("Tools");
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Merge brands", Exact = true }).ClickAsync();
-        await ChooseBrand("Merge brand", "ACM TOOLS");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Merge ACM TOOLS", Exact = true }).ClickAsync();
+        await Expect(Combo("Merge brand")).ToContainTextAsync("ACM TOOLS");
         await ChooseBrand("Into brand", "ACME TOOLS");
         var review = Page.GetByRole(AriaRole.Button, new() { Name = "Review merge", Exact = true });
         await review.ClickAsync();
@@ -210,7 +207,7 @@ public sealed class ProductBrandsE2ETests : PageTest
         await Expect(confirmation).ToBeVisibleAsync();
         await confirmation.GetByRole(AriaRole.Button, new() { Name = "Merge brands", Exact = true }).ClickAsync();
         await Expect(review).ToHaveCountAsync(0);
-        await Expect(Combo("Brand")).ToContainTextAsync("ACME TOOLS");
+        await Expect(BrandCell("ACME TOOLS")).ToBeVisibleAsync();
         var request = _state.Merges.Should().ContainSingle().Subject;
         request.Confirmed.Should().BeTrue();
         request.ExpectedProductCount.Should().Be(2);
@@ -220,10 +217,8 @@ public sealed class ProductBrandsE2ETests : PageTest
         request.TargetBrand.Should().Be("ACME TOOLS");
         _state.Previews.Should().HaveCount(2).And.OnlyContain(x => x.Metadata.RequestedTenantId == _state.Tenant && x.CategoryId == _state.Tools);
         _state.Brands(_state.Apparel).Should().Contain("ACM TOOLS");
-        await Combo("Brand").ClickAsync();
-        await Expect(Option("ACME TOOLS")).ToBeVisibleAsync();
-        await Expect(Option("ACM TOOLS")).ToHaveCountAsync(0);
-        await Screenshot("merged-suggestions", width, height);
+        await Expect(BrandCell("ACM TOOLS")).ToHaveCountAsync(0);
+        await Screenshot("merged-grid", width, height);
         _errors.Should().BeEmpty();
     }
 
@@ -236,7 +231,8 @@ public sealed class ProductBrandsE2ETests : PageTest
         await Expect(Page.GetByText("Tenant management permission is required to merge brands.", new() { Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Merge brands", Exact = true })).ToHaveCountAsync(0);
         await SelectCategory("Tools");
-        await ChooseBrand("Brand", "ACME TOOLS");
+        await Expect(BrandCell("ACME TOOLS")).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Merge ACME TOOLS", Exact = true })).ToHaveCountAsync(0);
         await Screenshot("read-only", width, height);
         _state.Previews.Should().BeEmpty();
         _state.Merges.Should().BeEmpty();
@@ -262,18 +258,68 @@ public sealed class ProductBrandsE2ETests : PageTest
         _errors.Should().BeEmpty();
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task Brands_GridPagesAndFilters_AndSearchFindsBeyondBoundedResults(bool dark)
+    {
+        if (dark) await Page.AddInitScriptAsync("localStorage.setItem('bb-theme', JSON.stringify({baseColor:'slate',primaryColor:'blue',radius:0.5,isDarkMode:true}))");
+        _state.SetBrands(_state.Tools, Enumerable.Range(1, 61).Select(x => $"BRAND {x:000}"));
+        await Open(1920, 1080);
+        (await Page.Locator("html").EvaluateAsync<bool>("element => element.classList.contains('dark')")).Should().Be(dark);
+        await SelectCategory("Tools");
+        await Expect(BrandCell("BRAND 001")).ToBeVisibleAsync();
+        await Expect(BrandCell("BRAND 011")).ToHaveCountAsync(0);
+        await Expect(Page.GetByText("Showing the first 50 matching brands. Refine the search to find other brands.")).ToBeVisibleAsync();
+        await Screenshot(dark ? "brands-grid-page-1-dark" : "brands-grid-page-1", 1920, 1080);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Next", Exact = true })
+            .Or(Page.GetByRole(AriaRole.Link, new() { Name = "Next", Exact = true })).ClickAsync();
+        await Expect(BrandCell("BRAND 011")).ToBeVisibleAsync();
+        await Expect(BrandCell("BRAND 001")).ToHaveCountAsync(0);
+        await Page.GetByRole(AriaRole.Columnheader).Filter(new() { HasText = "Brand" }).HoverAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Filter Brand", Exact = true }).ClickAsync();
+        await Page.GetByPlaceholder("Enter value...").FillAsync("BRAND 023");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Apply", Exact = true }).ClickAsync();
+        await Expect(BrandCell("BRAND 023")).ToBeVisibleAsync();
+        await Expect(BrandCell("BRAND 011")).ToHaveCountAsync(0);
+        await Screenshot(dark ? "brands-grid-column-filter-dark" : "brands-grid-column-filter", 1920, 1080);
+        await Page.GetByPlaceholder("Search all brands in category...").FillAsync("BRAND 061");
+        await Page.GetByPlaceholder("Search all brands in category...").PressAsync("Tab");
+        await Expect(BrandCell("BRAND 061")).ToBeVisibleAsync();
+        await Expect(BrandCell("BRAND 023")).ToHaveCountAsync(0);
+        _state.Searches.Should().Contain(x => x.Search == "BRAND 061" && x.Limit == 50);
+        _errors.Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task Brands_ReadFailureDisplaysError_NotEmptyGrid_AndRetryRecovers()
+    {
+        _state.DenySearch = true;
+        await Open(1920, 1080);
+        await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("Brands could not be loaded.");
+        await Expect(Page.GetByText("No matching brands", new() { Exact = true })).ToHaveCountAsync(0);
+        await Screenshot("brands-load-error", 1920, 1080);
+        _state.DenySearch = false;
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Retry brands", Exact = true }).ClickAsync();
+        await Expect(BrandCell("FABRIC HOUSE")).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Alert)).ToHaveCountAsync(0);
+        _errors.Should().BeEmpty();
+    }
+
     private async Task Open(int width, int height, string path = "/inventario/brands")
     {
         await Page.SetViewportSizeAsync(width, height);
         var response = await Page.GotoAsync(_app.Urls.Single() + path);
         response!.Status.Should().Be(200);
-        await Expect(Combo("Brand")).ToBeVisibleAsync();
+        if (path == "/inventario/brands")
+            await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Category", Exact = true })).ToBeVisibleAsync();
+        else await Expect(Combo("Brand")).ToBeVisibleAsync();
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-base-color", "slate");
         foreach (var href in await Page.Locator("link[rel='stylesheet']").EvaluateAllAsync<string[]>("links => links.map(x => x.href)"))
             (await Page.APIRequest.GetAsync(href)).Status.Should().Be(200, href);
     }
 
     private ILocator Combo(string label) => Page.GetByRole(AriaRole.Combobox, new() { Name = label, Exact = true });
+    private ILocator BrandCell(string name) => Page.GetByRole(AriaRole.Gridcell, new() { Name = name, Exact = true });
     private ILocator Option(string label) => Page.GetByRole(AriaRole.Option, new() { Name = label, Exact = true });
     private async Task SelectCategory(string category)
     {
@@ -343,6 +389,7 @@ public sealed class BrandBrowserState
     public Guid Tools { get; } = Guid.NewGuid();
     public Guid Apparel { get; } = Guid.NewGuid();
     public bool CanManage { get; set; } = true;
+    public bool DenySearch { get; set; }
     public ConcurrentQueue<SearchProductBrandsRequest> Searches { get; } = new();
     public ConcurrentQueue<PreviewProductBrandMergeRequest> Previews { get; } = new();
     public ConcurrentQueue<MergeProductBrandsRequest> Merges { get; } = new();
@@ -355,13 +402,16 @@ public sealed class BrandBrowserState
             _brands[Apparel] = ["FABRIC HOUSE", "ACM TOOLS"];
         }
         CanManage = true;
+        DenySearch = false;
         Searches.Clear(); Previews.Clear(); Merges.Clear();
     }
     public List<string> Brands(Guid category) { lock (_brands) return _brands[category].ToList(); }
+    public void SetBrands(Guid category, IEnumerable<string> brands) { lock (_brands) _brands[category] = brands.ToList(); }
     public QueryResponse<List<string>> Search(SearchProductBrandsRequest request)
     {
         Searches.Enqueue(request);
         request.Metadata.RequestedTenantId.Should().Be(Tenant);
+        if (DenySearch) return new() { HttpStatusCode = HttpStatusCode.Forbidden };
         return Ok(Brands(request.CategoryId).Distinct().Where(x => x.Contains(ProductBrand.Normalize(request.Search) ?? "", StringComparison.Ordinal))
             .OrderBy(x => x).Take(request.Limit).ToList());
     }

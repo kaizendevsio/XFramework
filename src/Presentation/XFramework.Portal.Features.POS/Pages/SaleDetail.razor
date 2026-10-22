@@ -1,4 +1,5 @@
 @page "/pos/sales/{Id:guid}"
+@using XFramework.Portal.Features.POS.Receipts
 @implements IDisposable
 
 <PageTitle>POS Sale - Portal</PageTitle>
@@ -33,7 +34,8 @@ else
                     <BbTypographyMuted>Completed @(_sale.CompletedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-") &middot; ID @_sale.Id</BbTypographyMuted>
                 </div>
                 <div class="xf-page-actions no-print">
-                    <BbButton Variant="ButtonVariant.Outline" OnClick="@PrintReceipt"><LucideIcon Name="printer" class="mr-2 h-4 w-4" />Print receipt</BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _previewOpen = true)" Disabled="@(!ReceiptReady)"><LucideIcon Name="eye" class="mr-2 h-4 w-4" />Receipt preview</BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@PrintReceipt" Disabled="@(!ReceiptReady || _printing)"><LucideIcon Name="printer" class="mr-2 h-4 w-4" />Print receipt</BbButton>
                     <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload" Disabled="@_acting"><LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />Refresh</BbButton>
                     @if (_sale.Status == PosSaleStatus.InventoryFulfillmentFailed)
                     {
@@ -53,6 +55,11 @@ else
                     }
                 </div>
             </div>
+
+            @if (_receiptError is not null)
+            {
+                <BbAlert Variant="AlertVariant.Warning"><BbAlertDescription>@_receiptError</BbAlertDescription></BbAlert>
+            }
 
             @if (!string.IsNullOrWhiteSpace(_sale.FailureReason) || !string.IsNullOrWhiteSpace(_sale.RecoveryState))
             {
@@ -112,6 +119,16 @@ else
             </BbCardContent></BbCard>
         </div>
     </FadeInContent>
+    <BbDialog @bind-Open="_previewOpen">
+        <BbDialogContent>
+            <BbDialogHeader><BbDialogTitle>Receipt preview</BbDialogTitle></BbDialogHeader>
+            @if (_receiptSettings is not null)
+            {
+                <ReceiptPreview Settings="_receiptSettings" Sale="_sale" MerchantName="@_receiptMerchantName" CurrencyCode="@_currencyCode" />
+            }
+            <BbDialogFooter><BbButton OnClick="PrintReceipt" Disabled="@(!ReceiptReady || _printing)"><LucideIcon Name="printer" class="mr-2 h-4 w-4" />Print receipt</BbButton></BbDialogFooter>
+        </BbDialogContent>
+    </BbDialog>
 }
 
 @code {
@@ -134,31 +151,61 @@ else
     private string _cashierLabel = "-";
     private string _customerLabel = "-";
     private string? _currencyCode;
+    private PosReceiptSettings? _receiptSettings;
+    private string _receiptMerchantName = "Store";
+    private string? _receiptError;
+    private bool _printing, _previewOpen, _disposed;
+    private long _loadVersion;
+    private Guid? _loadedId;
+    private bool ReceiptReady => !_loading && _sale is not null && _sale.TenantId == TenantFilter.SelectedTenantId && _receiptSettings is not null;
 
     protected override void OnInitialized() { TenantFilter.OnChanged += OnContextChanged; ModuleNavigation.OnChanged += OnContextChanged; }
-    protected override async Task OnInitializedAsync() => await Reload();
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == Id) return;
+        _loadedId = Id;
+        await Reload();
+    }
     private void OnContextChanged() => _ = InvokeAsync(Reload);
     private async Task Reload()
     {
-        _loading = true; _sale = null; _loadError = null;
+        var version = ++_loadVersion;
+        var tenantId = TenantFilter.SelectedTenantId;
+        _loading = true; _sale = null; _loadError = null; _receiptSettings = null; _receiptError = null; _previewOpen = false; _currencyCode = null;
         try
         {
             await ModuleNavigation.EnsureLoadedAsync();
+            if (_disposed || version != _loadVersion || tenantId != TenantFilter.SelectedTenantId) return;
             _hasTenant = TenantFilter.SelectedTenantId is Guid;
             _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "sales");
             if (!_hasTenant || !_moduleEnabled) return;
             var response = await POS.GetPosSale(new GetPosSaleRequest { Id = Id, Metadata = BuildMetadata() });
+            if (_disposed || version != _loadVersion || tenantId != TenantFilter.SelectedTenantId) return;
             _sale = response.Response;
+            if (_sale?.TenantId != tenantId) _sale = null;
             if (!response.IsSuccess) _loadError = response.Message;
             if (_sale is not null)
             {
                 SetReferenceFallbacks(_sale.RegisterId, _sale.CashierCredentialId, _sale.CustomerCredentialId);
-                try { await LoadReferenceLabels(); }
+                try { await LoadReferenceLabels(_sale, version); }
                 catch { ToastService.Show("The sale loaded, but some reference labels are unavailable."); }
+                if (_disposed || version != _loadVersion || tenantId != TenantFilter.SelectedTenantId) return;
+                try
+                {
+                    var settings = await POS.GetPosCheckoutSettings(new() { Metadata = BuildMetadata() });
+                    if (_disposed || version != _loadVersion || tenantId != TenantFilter.SelectedTenantId) return;
+                    if (settings.IsSuccess && settings.Response?.TenantId == tenantId && settings.Response.Settings.Receipt?.IsValid() == true)
+                    {
+                        _receiptSettings = settings.Response.Settings.Receipt.DeepClone();
+                        _receiptMerchantName = TenantFilter.SelectedTenantName ?? "Store";
+                    }
+                    else _receiptError = "Receipt settings are unavailable. Refresh or ask a tenant administrator to review POS settings before printing.";
+                }
+                catch { if (version == _loadVersion) _receiptError = "Receipt settings could not load. Refresh before printing."; }
             }
         }
-        catch { _loadError = "Could not load the sale."; }
-        finally { _loading = false; }
+        catch { if (version == _loadVersion) _loadError = "Could not load the sale."; }
+        finally { if (version == _loadVersion) _loading = false; }
     }
     private async Task RetryFulfillment()
     {
@@ -180,7 +227,23 @@ else
         finally { _acting = false; }
     }
     private void StartReturn() => Navigation.NavigateTo($"/pos/returns?saleId={Id}");
-    private async Task PrintReceipt() => await JSRuntime.InvokeVoidAsync("print");
+    private async Task PrintReceipt()
+    {
+        if (!ReceiptReady || _printing) return;
+        var tenantId = TenantFilter.SelectedTenantId;
+        var version = _loadVersion;
+        var settings = _receiptSettings!;
+        var document = PosReceiptDocument.Create(_sale!, settings, _receiptMerchantName, _currencyCode);
+        _printing = true;
+        try
+        {
+            await using var module = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/XFramework.Portal.Features.POS/js/receipt-print.js");
+            if (_disposed || version != _loadVersion || tenantId != TenantFilter.SelectedTenantId) return;
+            await module.InvokeVoidAsync("printReceipt", document, settings.PaperWidthMm);
+        }
+        catch (JSException) { ToastService.Warning("Receipt could not be printed. Check the logo and try again."); }
+        finally { _printing = false; }
+    }
     private void Back() => Navigation.NavigateTo("/pos/sales");
     private void SetReferenceFallbacks(Guid registerId, Guid cashierId, Guid? customerId)
     {
@@ -188,22 +251,24 @@ else
         _cashierLabel = cashierId.ToString()[..8];
         _customerLabel = customerId is { } id ? id.ToString()[..8] : "Walk-in customer";
     }
-    private async Task LoadReferenceLabels()
+    private async Task LoadReferenceLabels(PosSaleReceiptResponse sale, long version)
     {
-        var sale = _sale!;
         var registerResponse = await POS.GetPosRegister(new GetPosRegisterRequest { Id = sale.RegisterId, Metadata = BuildMetadata() });
-        if (registerResponse.Response is { } register)
-            _registerLabel = string.IsNullOrWhiteSpace(register.Code) ? register.Name : $"{register.Name} ({register.Code})";
+        if (_disposed || version != _loadVersion || sale.TenantId != TenantFilter.SelectedTenantId) return;
 
         var currency = await DataContext.Query<Wallets.Domain.Shared.Contracts.CurrencyType>()
             .IgnoreQueryFilters().NoCache().Where(item => item.Id == sale.CurrencyId).FirstOrDefaultAsync();
         var code = currency?.CurrencyIsoCode3?.Trim().ToUpperInvariant();
-        _currencyCode = code is { Length: 3 } && code.All(char.IsAsciiLetter) ? code : null;
+        if (_disposed || version != _loadVersion || sale.TenantId != TenantFilter.SelectedTenantId) return;
 
         var credentials = await DataContext.Query<IdentityCredential>()
             .IgnoreQueryFilters().NoCache()
             .Where(item => item.Id == sale.CashierCredentialId || item.Id == sale.CustomerCredentialId)
             .ToListAsync();
+        if (_disposed || version != _loadVersion || sale.TenantId != TenantFilter.SelectedTenantId) return;
+        if (registerResponse.Response is { } register)
+            _registerLabel = string.IsNullOrWhiteSpace(register.Code) ? register.Name : $"{register.Name} ({register.Code})";
+        _currencyCode = code is { Length: 3 } && code.All(char.IsAsciiLetter) ? code : null;
         _cashierLabel = CredentialLabel(credentials.FirstOrDefault(item => item.Id == sale.CashierCredentialId), sale.CashierCredentialId);
         _customerLabel = sale.CustomerCredentialId is { } customerId
             ? CredentialLabel(credentials.FirstOrDefault(item => item.Id == customerId), customerId)
@@ -218,5 +283,5 @@ else
             : credential.UserName ?? id.ToString()[..8];
     private RequestMetadata BuildMetadata() => new() { RequestedTenantId = TenantFilter.SelectedTenantId, RequestId = Guid.NewGuid(), OperationName = "Portal" };
     private static string StatusBadgeValue(PosSaleStatus status) => status switch { PosSaleStatus.Completed => "active", PosSaleStatus.Cancelled => "inactive", PosSaleStatus.PaymentFailed or PosSaleStatus.InventoryFulfillmentFailed or PosSaleStatus.InventoryReservationFailed => "warning", _ => "pending" };
-    public void Dispose() { TenantFilter.OnChanged -= OnContextChanged; ModuleNavigation.OnChanged -= OnContextChanged; }
+    public void Dispose() { _disposed = true; _loadVersion++; TenantFilter.OnChanged -= OnContextChanged; ModuleNavigation.OnChanged -= OnContextChanged; }
 }

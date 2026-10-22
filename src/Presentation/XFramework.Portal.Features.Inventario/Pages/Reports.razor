@@ -62,10 +62,7 @@
             </div>
         </div>
         }
-        @if (_shareUri is not null)
-        {
-            <div class="protected-share"><BbLabel>Protected report link</BbLabel><BbInput Value="@_shareUri" ReadOnly="true" aria-label="Protected report link" /></div>
-        }
+        <ReportShareDialog @bind-Url="_shareUri" />
         @if (_busy && _snapshot is null)
         {
             <CenteredSpinner />

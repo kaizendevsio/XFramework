@@ -1,4 +1,5 @@
 @page "/"
+@using global::IdentityServer.Domain.Shared
 @using XFramework.Domain.Shared.DataContext
 @using XFramework.Integration.DataContext
 @implements IDisposable
@@ -12,9 +13,14 @@
 else
 {
 <div class="space-y-6">
-    <div class="space-y-1">
+    <div class="xf-page-header">
+      <div class="space-y-1">
         <h2 class="text-2xl font-bold tracking-tight">Dashboard</h2>
         <p class="text-sm text-muted-foreground">Identity Server &amp; Wallets Administration</p>
+      </div>
+      <BbButton Variant="ButtonVariant.Outline" OnClick="LoadStats" Disabled="@_loading">
+          <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" /> Refresh
+      </BbButton>
     </div>
 
     @if (_error is not null)
@@ -32,17 +38,21 @@ else
                 <BbCardDescription>Total registered users</BbCardDescription>
             </BbCardHeader>
             <BbCardContent>
-                <BbTypographyH2>@_userCount</BbTypographyH2>
+                <BbTypographyH2>@(_userCount?.ToString("N0") ?? "Unavailable")</BbTypographyH2>
             </BbCardContent>
         </BbCard>
 
         <BbCard>
             <BbCardHeader>
-                <BbCardTitle>Active Sessions</BbCardTitle>
-                <BbCardDescription>Currently active sessions</BbCardDescription>
+                <BbCardTitle>Valid Renewable Sessions</BbCardTitle>
+                <BbCardDescription>Enabled, unrevoked user sessions within their refresh and session lifetimes. Not users online.</BbCardDescription>
             </BbCardHeader>
             <BbCardContent>
-                <BbTypographyH2>@_sessionCount</BbTypographyH2>
+                <BbTypographyH2>@(_sessionCount?.ToString("N0") ?? "Unavailable")</BbTypographyH2>
+                @if (_countedAtUtc is { } countedAt)
+                {
+                    <BbTypographyMuted>As of @countedAt.ToString("yyyy-MM-dd HH:mm:ss") UTC</BbTypographyMuted>
+                }
             </BbCardContent>
         </BbCard>
 
@@ -52,7 +62,7 @@ else
                 <BbCardDescription>Total wallets created</BbCardDescription>
             </BbCardHeader>
             <BbCardContent>
-                <BbTypographyH2>@_walletCount</BbTypographyH2>
+                <BbTypographyH2>@(_walletCount?.ToString("N0") ?? "Unavailable")</BbTypographyH2>
             </BbCardContent>
         </BbCard>
 
@@ -62,7 +72,7 @@ else
                 <BbCardDescription>Total tenants</BbCardDescription>
             </BbCardHeader>
             <BbCardContent>
-                <BbTypographyH2>@_tenantCount</BbTypographyH2>
+                <BbTypographyH2>@(_tenantCount?.ToString("N0") ?? "Unavailable")</BbTypographyH2>
             </BbCardContent>
         </BbCard>
     </div>
@@ -74,12 +84,13 @@ else
     [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
     [Inject] private ILogger<Dashboard> Logger { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TimeProvider Clock { get; set; } = default!;
 
     private bool _loading = true;
-    private long _userCount;
-    private long _sessionCount;
-    private long _walletCount;
-    private long _tenantCount;
+    private long? _userCount, _sessionCount, _walletCount, _tenantCount;
+    private DateTime? _countedAtUtc;
+    private int _revision;
+    private bool _disposed;
     private string? _error;
 
     protected override async Task OnInitializedAsync()
@@ -99,8 +110,14 @@ else
 
     private async Task LoadStats()
     {
+        if (_disposed) return;
+        var revision = ++_revision;
+        var selectedTenantId = TenantFilter.SelectedTenantId;
+        var now = Clock.GetUtcNow().UtcDateTime;
         _loading = true;
         _error = null;
+        _userCount = _sessionCount = _walletCount = _tenantCount = null;
+        _countedAtUtc = null;
         try
         {
             // Admin aggregates use the authenticated actor's tenant, not delegated tenant access.
@@ -119,11 +136,22 @@ else
                 .NoCache()
                 .Where(x => !x.IsDeleted);
 
+            // Persisted renewable user sessions, not connected users or live access tokens.
+            // Persistent sessions may omit absolute expiry, but must have a future refresh deadline.
             var sessionsQuery = dataContext.Query<Session>()
                 .IgnoreQueryFilters()
                 .NoCache()
-                .Where(x => !x.IsDeleted)
-                .Where(x => x.Status == CurrentSessionState.Active);
+                .Where(x => !x.IsDeleted && x.IsEnabled)
+                .Where(x => x.Status == CurrentSessionState.Active)
+                .Where(x => x.ExpiresAt == null || x.ExpiresAt > now)
+                .Where(x => x.RefreshTokenExpiresAt != null && x.RefreshTokenExpiresAt > now)
+                .Where(x => x.SessionType != null && !x.SessionType.IsDeleted && x.SessionType.IsEnabled)
+                .Where(x => x.SessionType!.SystemReferenceId == IdentityConstants.SessionType.User)
+                .Where(x => !x.Credential.IsDeleted && x.Credential.IsEnabled)
+                .Where(x => x.Credential.IdentityInfo != null && !x.Credential.IdentityInfo.IsDeleted && x.Credential.IdentityInfo.IsEnabled)
+                .Where(x => !x.Credential.Tenant.IsDeleted && x.Credential.Tenant.IsEnabled)
+                .Where(x => x.Credential.Tenant.AvailabilityDate == null || x.Credential.Tenant.AvailabilityDate <= now)
+                .Where(x => x.Credential.Tenant.Expiration == null || x.Credential.Tenant.Expiration > now);
 
             var walletsQuery = dataContext.Query<Wallet>()
                 .IgnoreQueryFilters()
@@ -135,7 +163,7 @@ else
                 .NoCache()
                 .Where(x => !x.IsDeleted);
 
-            if (TenantFilter.SelectedTenantId is Guid tenantId)
+            if (selectedTenantId is Guid tenantId)
             {
                 usersQuery = usersQuery.Where(x => x.TenantId == tenantId);
                 sessionsQuery = sessionsQuery.Where(x => x.TenantId == tenantId);
@@ -143,24 +171,33 @@ else
                 tenantsQuery = tenantsQuery.Where(x => x.Id == tenantId);
             }
 
-            _userCount = await usersQuery.CountAsync();
-            _sessionCount = await sessionsQuery.CountAsync();
-            _walletCount = await walletsQuery.CountAsync();
-            _tenantCount = await tenantsQuery.CountAsync();
+            var users = await usersQuery.CountAsync();
+            var sessions = await sessionsQuery.CountAsync();
+            var wallets = await walletsQuery.CountAsync();
+            var tenants = await tenantsQuery.CountAsync();
+            if (_disposed || revision != _revision || selectedTenantId != TenantFilter.SelectedTenantId) return;
+            _userCount = users;
+            _sessionCount = sessions;
+            _walletCount = wallets;
+            _tenantCount = tenants;
+            _countedAtUtc = now;
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to load dashboard stats");
-            _error = "Dashboard statistics are temporarily unavailable. Please try again.";
+            if (!_disposed && revision == _revision)
+                _error = "Dashboard statistics are temporarily unavailable. Please try again.";
         }
         finally
         {
-            _loading = false;
+            if (!_disposed && revision == _revision) _loading = false;
         }
     }
 
     public void Dispose()
     {
+        _disposed = true;
+        _revision++;
         TenantFilter.OnChanged -= OnTenantFilterChanged;
     }
 }

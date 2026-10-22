@@ -4,6 +4,7 @@
 .refresh-actions ::deep > button { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .refresh-actions ::deep button[aria-label="Refresh options"] { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: -1px; }
 .filters > div { min-width: 0; }
+.date-filter { display: flex; flex-direction: column; align-items: stretch; gap: .5rem; }
 .filters ::deep [data-slot="label"] { display: block; margin-bottom: .5rem; }
 .currency-section .xf-summary-grid > div { display: grid; gap: .25rem; }
 .currency-section .xf-summary-grid strong { font-size: 1.5rem; line-height: 1.25; }

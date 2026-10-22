@@ -1,0 +1,31 @@
+.sales-dates {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: .375rem;
+    width: min(100%, 26rem);
+    min-width: 0;
+}
+
+.sales-dates ::deep button {
+    width: 100%;
+    max-width: 300px;
+    min-width: 0;
+    min-height: 2.5rem;
+    height: auto;
+    white-space: normal;
+}
+
+.sales-dates ::deep button span { min-width: 0; overflow-wrap: anywhere; }
+.sales-dates ::deep button svg { flex-shrink: 0; }
+
+.inv-page ::deep [aria-label="Sales source"] {
+    display: flex;
+    width: max-content;
+    max-width: 100%;
+    height: auto;
+}
+
+.inv-page ::deep [aria-label="Sales source"] [role="tab"] {
+    min-width: 0;
+    white-space: normal;
+}

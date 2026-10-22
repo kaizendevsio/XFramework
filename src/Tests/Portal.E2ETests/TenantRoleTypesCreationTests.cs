@@ -162,6 +162,24 @@ public sealed class TenantRoleTypesCreationTests
     }
 
     [Test]
+    public async Task RoleGroupPicker_OnlyOffersEnabledGroupsInRouteTenant()
+    {
+        await InvokeAsync("OnParametersSetAsync");
+        var groups = Field<List<IdentityRoleTypeGroup>>("_groups");
+        var validId = groups[0].Id;
+        groups.AddRange([
+            new() { Id = Guid.NewGuid(), TenantId = Guid.NewGuid(), IsEnabled = true },
+            new() { Id = Guid.NewGuid(), TenantId = _tenantId, IsEnabled = false },
+            new() { Id = Guid.NewGuid(), TenantId = _tenantId, IsEnabled = true, IsDeleted = true }
+        ]);
+
+        var available = (List<IdentityRoleTypeGroup>)typeof(TenantRoleTypes)
+            .GetProperty("AvailableGroups", PrivateInstance)!.GetValue(_component)!;
+
+        available.Should().ContainSingle().Which.Id.Should().Be(validId);
+    }
+
+    [Test]
     public async Task SaveGroup_FromToolbar_CreatesWithoutOpeningRoleForm()
     {
         await LoadAsync();

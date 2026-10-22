@@ -1,4 +1,5 @@
 @page "/inventario/brands"
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Brands
 @using XFramework.Inventario.Domain.Shared.Contracts.Requests.Setup
 @using XFramework.Inventario.Domain.Shared.Contracts.Responses
 @using XFramework.Inventario.Domain.Shared.Contracts.Responses.Brands
@@ -27,7 +28,7 @@ else
                 <BbButton Variant="ButtonVariant.Outline" OnClick="Reload"><LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />Reload</BbButton>
                 @if (CanManage)
                 {
-                    <BbButton Variant="ButtonVariant.Outline" Disabled="@(SelectedCategory is null)" OnClick="OpenMerge">
+                    <BbButton Variant="ButtonVariant.Outline" Disabled="@(SelectedCategory is null || _brandsLoading)" OnClick="@(() => OpenMerge())">
                         <LucideIcon Name="merge" class="mr-2 h-4 w-4" />Merge brands
                     </BbButton>
                 }
@@ -45,8 +46,42 @@ else
                                 SearchTextSelector="@(x => $"{x.Name} {x.Description}")" AdvancedColumns="@CategoryColumns"
                                 AdvancedSearchTitle="Find category" AdvancedSearchScope="Categories in the selected tenant"
                                 Placeholder="Select category" SearchPlaceholder="Search categories..." ShowCreate="false" />
-                <ProductBrandPicker @key="_brandVersion" CategoryId="@SelectedCategory?.Id" @bind-Value="_brand" AllowNew="false" />
+                <BbFormFieldInput TValue="string" Label="Search brands" Value="@_search" ValueChanged="SearchBrands"
+                                  UpdateTiming="UpdateTiming.Debounced" DebounceInterval="300"
+                                  Placeholder="Search all brands in category..." MaxLength="100" Disabled="@(SelectedCategory is null)" />
             </div>
+            @if (_brandsError is not null)
+            {
+                <BbAlert Variant="AlertVariant.Danger" role="alert">
+                    <BbAlertDescription>@_brandsError</BbAlertDescription>
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="LoadBrands"><LucideIcon Name="refresh-cw" />Retry brands</BbButton>
+                </BbAlert>
+            }
+            else
+            {
+                @if (_brands.Count == BrandLimit)
+                {
+                    <BbAlert><BbAlertDescription>Showing the first 50 matching brands. Refine the search to find other brands.</BbAlertDescription></BbAlert>
+                }
+                <BbDataGrid @key="(_categoryId, _brandVersion)" TItem="BrandRow" Items="@_brands" IsLoading="@_brandsLoading"
+                            ShowPagination="true" InitialPageSize="10" aria-label="Brands">
+                    <Columns>
+                        <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Brand" Sortable="true" Filterable="true" />
+                        @if (CanManage)
+                        {
+                            <BbDataGridTemplateColumn Title="Actions" Width="140px">
+                                <ChildContent Context="brand">
+                                    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@(() => OpenMerge(brand.Name))"
+                                              AriaLabel="@($"Merge {brand.Name}")"><LucideIcon Name="merge" />Merge</BbButton>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                        }
+                    </Columns>
+                    <EmptyTemplate>
+                        <BbEmpty><BbEmptyTitle>@(SelectedCategory is null ? "No categories available" : "No matching brands")</BbEmptyTitle></BbEmpty>
+                    </EmptyTemplate>
+                </BbDataGrid>
+            }
             @if (!CanManage)
             {
                 <BbAlert><BbAlertDescription>Tenant management permission is required to merge brands.</BbAlertDescription></BbAlert>
@@ -63,7 +98,7 @@ else
         </BbDialogHeader>
         @if (_mergeOpen && CanManage && _mergeCategoryId is not null)
         {
-            <ProductBrandMerge @key="(_revision, _mergeCategoryId)" CategoryId="@_mergeCategoryId" CanManage="@CanManage" Merged="OnMerged" />
+            <ProductBrandMerge @key="(_revision, _mergeCategoryId, _mergeSource)" CategoryId="@_mergeCategoryId" SourceBrand="@_mergeSource" CanManage="@CanManage" Merged="OnMerged" />
         }
     </BbDialogContent>
 </BbDialog>
@@ -76,10 +111,14 @@ else
     [Inject] private ILogger<Brands> Logger { get; set; } = default!;
     private InventarioSetupResponse? _preferences;
     private List<ProductCategory> _categories = [];
-    private string? _categoryId, _brand, _error, _mergeCategoryName;
+    private string? _categoryId, _error, _mergeCategoryName, _mergeSource, _brandsError;
+    private string _search = "";
+    private const int BrandLimit = 50;
+    private List<BrandRow> _brands = [];
     private Guid? _mergeCategoryId;
-    private bool _loading = true, _catalogEnabled, _mergeOpen, _disposed;
-    private int _revision, _brandVersion;
+    private bool _loading = true, _catalogEnabled, _mergeOpen, _disposed, _brandsLoading;
+    private int _revision, _brandVersion, _brandRevision;
+    private sealed record BrandRow(string Name);
     private bool CanManage => _preferences?.CanManage == true && _preferences.TenantId == TenantContext.SelectedTenantId;
     private ProductCategory? SelectedCategory => _categories.FirstOrDefault(x => x.Id.ToString() == _categoryId);
     private static readonly IReadOnlyList<XfEntityPickerColumn<ProductCategory>> CategoryColumns =
@@ -108,12 +147,16 @@ else
     {
         var revision = ++_revision;
         var tenant = TenantContext.SelectedTenantId;
+        var categoryId = _categoryId;
+        ++_brandRevision;
         _loading = true;
         _mergeOpen = false;
         _mergeCategoryId = null;
         _preferences = null;
         _categories = [];
-        _categoryId = _brand = _error = null;
+        _categoryId = _error = _brandsError = null;
+        _brands = [];
+        _search = "";
         ++_brandVersion;
         try
         {
@@ -135,6 +178,8 @@ else
             if (!Current(revision, tenant)) return;
             _preferences = result.Response;
             _categories = categories;
+            _categoryId = (_categories.FirstOrDefault(x => x.Id.ToString() == categoryId) ?? _categories.FirstOrDefault())?.Id.ToString();
+            await LoadBrands();
         }
         catch (Exception ex)
         {
@@ -144,25 +189,68 @@ else
         finally { if (Current(revision, tenant)) _loading = false; }
     }
 
-    private void SelectCategory(string? value)
+    private async Task SelectCategory(string? value)
     {
         _categoryId = value;
-        _brand = null;
+        _search = "";
         _mergeOpen = false;
         ++_brandVersion;
+        await LoadBrands();
     }
-    private void OpenMerge()
+    private async Task SearchBrands(string value)
+    {
+        _search = value;
+        ++_brandVersion;
+        await LoadBrands();
+    }
+    private async Task LoadBrands()
+    {
+        var revision = ++_brandRevision;
+        var tenant = TenantContext.SelectedTenantId;
+        var category = SelectedCategory?.Id;
+        _brands = [];
+        _brandsError = null;
+        _brandsLoading = true;
+        try
+        {
+            if (tenant is null || category is null || !_catalogEnabled || _preferences?.TenantId != tenant) return;
+            var result = await Inventario.SearchProductBrands(new SearchProductBrandsRequest
+            {
+                Metadata = new() { RequestedTenantId = tenant }, CategoryId = category.Value, Search = _search, Limit = BrandLimit
+            });
+            if (!BrandsCurrent(revision, tenant, category)) return;
+            if (!result.IsSuccess || result.Response is null)
+            {
+                _brandsError = "Brands could not be loaded. Try again.";
+                return;
+            }
+            _brands = result.Response.Select(name => new BrandRow(name)).ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Category brands could not be loaded.");
+            if (BrandsCurrent(revision, tenant, category)) _brandsError = "Brands could not be loaded. Try again.";
+        }
+        finally { if (BrandsCurrent(revision, tenant, category)) _brandsLoading = false; }
+    }
+    private bool BrandsCurrent(int revision, Guid? tenant, Guid? category) =>
+        !_disposed && revision == _brandRevision && tenant == TenantContext.SelectedTenantId && category == SelectedCategory?.Id;
+
+    private void OpenMerge(string? source = null)
     {
         if (!CanManage || SelectedCategory is not { } category) return;
         _mergeCategoryId = category.Id;
         _mergeCategoryName = category.Name;
+        _mergeSource = source;
         _mergeOpen = true;
     }
-    private void OnMerged(ProductBrandMergePreview result)
+    private async Task OnMerged(ProductBrandMergePreview result)
     {
+        if (!CanManage || result.CategoryId != SelectedCategory?.Id) return;
         _mergeOpen = false;
-        _brand = result.TargetBrand;
+        _search = "";
         ++_brandVersion;
+        await LoadBrands();
     }
     private bool Current(int revision, Guid? tenant) =>
         !_disposed && revision == _revision && TenantContext.SelectedTenantId == tenant;

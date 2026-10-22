@@ -107,6 +107,35 @@ public sealed class RemoteQueryPostgreSqlTests
     }
 
     [Test]
+    public async Task Execute_SerializedUtcExpiry_PreservesTimestampKindAndTenantBoundary()
+    {
+        await using var db = new QueryDb(options);
+        var tenant = Guid.NewGuid();
+        var now = new DateTime(2026, 10, 22, 12, 0, 0, DateTimeKind.Utc);
+        var future = Row(tenant, "future", null, true);
+        future.ExpiresAt = now.AddSeconds(1);
+        var boundary = Row(tenant, "boundary", null, true);
+        boundary.ExpiresAt = now;
+        var expired = Row(tenant, "expired", null, true);
+        expired.ExpiresAt = now.AddSeconds(-1);
+        var unbounded = Row(tenant, "unbounded", null, true);
+        var foreign = Row(Guid.NewGuid(), "foreign", null, true);
+        foreign.ExpiresAt = now.AddSeconds(1);
+        db.AddRange(future, boundary, expired, unbounded, foreign);
+        await db.SaveChangesAsync();
+
+        var descriptor = RoundTrip<SearchRow>(x => x.ExpiresAt == null || x.ExpiresAt > now);
+        descriptor.Mode = QueryExecutionMode.Count;
+        var cutoff = (DateTime)descriptor.Filters.Single(filter => filter.Operation == QueryFilterOperation.GreaterThan).Value!;
+        cutoff.Kind.Should().Be(DateTimeKind.Utc);
+        QueryDescriptorExecutor.ValidateDescriptor(descriptor).Should().BeNull();
+
+        var result = await QueryDescriptorExecutor.ExecuteAsync(db, typeof(SearchRow), descriptor, tenant);
+
+        result.Should().Be(2, "only the future and unbounded rows in the requested tenant qualify");
+    }
+
+    [Test]
     public async Task Execute_SerializedEnumEquality_CountsOnlyActiveSessionsInTenant()
     {
         await using var db = new QueryDb(options);
@@ -178,6 +207,7 @@ public sealed class RemoteQueryPostgreSqlTests
         public string? UserName { get; set; }
         public string? UserAlias { get; set; }
         public bool IsEnabled { get; set; }
+        public DateTime? ExpiresAt { get; set; }
         public CurrentSessionState Status { get; set; }
         public CurrentSessionState? NullableStatus { get; set; }
     }

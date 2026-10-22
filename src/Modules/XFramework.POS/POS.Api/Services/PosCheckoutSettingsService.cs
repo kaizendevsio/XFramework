@@ -17,18 +17,20 @@ public sealed class PosCheckoutSettingsService(AppDbContext db, IPosRequestConte
             : Result<PosCheckoutSettingsResponse>.Failure(result.Message!, result.StatusCode);
     }
 
-    public async Task<Result<PosCheckoutMetadata>> ValidateAsync(Guid tenantId, PosCheckoutMetadata metadata, bool requireValues, CancellationToken ct)
+    public async Task<Result<PosCheckoutMetadata>> ValidateAsync(Guid tenantId, PosCheckoutMetadata metadata, bool requireValues, CancellationToken ct, bool requireTable = false)
     {
         var result = await ReadAsync(tenantId, ct);
         if (!result.IsSuccess) return Result<PosCheckoutMetadata>.Failure(result.Message!, result.StatusCode);
         var settings = result.Data!;
-        if (settings.Validate(metadata, requireValues) is { } error)
+        if (settings.Validate(metadata, requireValues, requireTable) is { } error)
             return Result<PosCheckoutMetadata>.Failure(error, 400);
         var fields = metadata.Fields.Where(pair => !string.IsNullOrWhiteSpace(pair.Value))
             .OrderBy(pair => pair.Key, StringComparer.Ordinal).ToDictionary(pair => pair.Key, pair => pair.Value.Trim());
         return Result<PosCheckoutMetadata>.Success(new()
         {
-            TableNumber = PosServiceHelpers.NormalizeOptional(metadata.TableNumber),
+            TableNumber = settings.ActiveTableLayout?.Tables.FirstOrDefault(table => table.Id == metadata.TableId)?.Label.Trim(),
+            TableId = metadata.TableId,
+            TableLayoutId = metadata.TableLayoutId,
             Fields = fields,
             Labels = settings.CheckoutFields.Where(field => fields.ContainsKey(field.Key))
                 .ToDictionary(field => field.Key, field => field.Label)

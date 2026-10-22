@@ -2,6 +2,7 @@
 @using XFramework.Domain.Shared.DataContext
 @using Microsoft.Extensions.Logging
 @using XFramework.Portal.Features.POS.Scanner
+@using XFramework.Portal.Features.POS.Tables
 @implements IAsyncDisposable
 
 <PageTitle>POS Cashier - Portal</PageTitle>
@@ -124,7 +125,7 @@ else if (!_moduleEnabled)
                             <div class="flex flex-col gap-4">
                                 @if (_checkoutSettings?.TableTrackingEnabled == true)
                                 {
-                                    <BbFormFieldInput @bind-Value="_checkoutMetadata.TableNumber" Label="Table number" Disabled="@IsInteractionLocked" />
+                                    <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => OpenTablePicker(false))" Disabled="@IsInteractionLocked"><LucideIcon Name="layout-grid" Size="16" />@TableButtonLabel</BbButton>
                                 }
                                 <BbFormFieldInput @bind-Value="_customerLabel" Label="Customer reference" Placeholder="Name or queue number" Disabled="@IsInteractionLocked" />
                                 <BbFormFieldTextarea @bind-Value="_cartNotes" Label="Sale notes" Placeholder="Optional note" Disabled="@IsInteractionLocked" />
@@ -406,8 +407,14 @@ else if (!_moduleEnabled)
                             <div class="flex flex-col gap-4">
                                 @if (checkoutSettings.TableTrackingEnabled)
                                 {
-                                    <BbFormFieldInput @bind-Value="_checkoutMetadata.TableNumber" Label="Table number"
-                                                      Disabled="@IsInteractionLocked" />
+                                    <div class="xf-page-actions">
+                                        <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => OpenTablePicker(false))" Disabled="@IsInteractionLocked"><LucideIcon Name="layout-grid" Size="16" />@TableButtonLabel</BbButton>
+                                        @if (!checkoutSettings.TableRequired && (_checkoutMetadata.TableId is not null ||
+                                            _checkoutMetadata.TableLayoutId is not null || !string.IsNullOrWhiteSpace(_checkoutMetadata.TableNumber)))
+                                        {
+                                            <BbButton Variant="ButtonVariant.Ghost" OnClick="ClearTable" Disabled="@IsInteractionLocked">No table</BbButton>
+                                        }
+                                    </div>
                                 }
                                 @foreach (var field in checkoutSettings.CheckoutFields.Where(item => item.Enabled))
                                 {
@@ -515,6 +522,11 @@ else if (!_moduleEnabled)
     <PosCreateCustomerDialog @key="TenantFilter.SelectedTenantId" Open="@_createCustomerOpen"
                              OpenChanged="@CustomerDialogChanged" OnCreated="@CustomerCreated"
                              TenantId="@TenantFilter.SelectedTenantId" Metadata="@BuildMetadata()" />
+    @if (_checkoutSettings is { } tableSettings)
+    {
+        <PosTablePicker @key="@($"table-picker:{TenantFilter.SelectedTenantId}")" Open="@(_tablePickerOpen && IsCashierVisible)" OpenChanged="TablePickerChanged"
+                        Settings="tableSettings" SelectedId="_checkoutMetadata.TableId" Selected="TableSelected" />
+    }
 
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
@@ -584,6 +596,8 @@ else if (!_moduleEnabled)
     private PosCheckoutSettings? _checkoutSettings;
     private PosCheckoutMetadata _checkoutMetadata = new();
     private bool _createCustomerOpen;
+    private bool _tablePickerOpen, _holdAfterTable, _returnToPayment, _returnToDetails;
+    private string TableButtonLabel => string.IsNullOrWhiteSpace(_checkoutMetadata.TableNumber) ? "Select table" : $"Table {_checkoutMetadata.TableNumber}";
     private decimal _taxAmount => _financeSettings?.CalculateTax(Subtotal - _discountAmount) ?? 0;
     private decimal _cashTenderedAmount;
     private PosPaymentMethod _paymentMethod = PosPaymentMethod.CashDrawer;
@@ -608,7 +622,7 @@ else if (!_moduleEnabled)
         PosSaleStatus.Cancelled;
     private bool IsInteractionLocked => IsBusy || HasPendingPayment || HasTerminalCheckoutFailure;
     private bool IsCashierVisible => !_loading && _hasTenant && _moduleEnabled;
-    private bool IsMobileScannerPaused => _disposed || _paymentOpen || _createCustomerOpen || IsInteractionLocked ||
+    private bool IsMobileScannerPaused => _disposed || _paymentOpen || _createCustomerOpen || _tablePickerOpen || IsInteractionLocked ||
         _loading || _searching || !_hasTenant || !_moduleEnabled || _loadError is not null ||
         SelectedRegister is null;
     private PosRegisterResponse? SelectedRegister => _registers.FirstOrDefault(item => item.Id.ToString() == _selectedRegisterId);
@@ -686,6 +700,8 @@ else if (!_moduleEnabled)
         if (_disposed)
             return;
         _scannerSaleGeneration++;
+        _tablePickerOpen = false;
+        _holdAfterTable = _returnToPayment = _returnToDetails = false;
         InvalidateCatalogSearch();
         if (_reloading)
         {
@@ -985,7 +1001,7 @@ else if (!_moduleEnabled)
 
             if (_disposed || version != _searchVersion || tenantId != TenantFilter.SelectedTenantId ||
                 (mobileScan && (generation != _scannerSaleGeneration || registerId != TryResolveSelectedRegisterId() ||
-                    _paymentOpen || _createCustomerOpen || IsInteractionLocked || _loading || !_hasTenant || !_moduleEnabled || _loadError is not null)))
+                    _paymentOpen || _createCustomerOpen || _tablePickerOpen || IsInteractionLocked || _loading || !_hasTenant || !_moduleEnabled || _loadError is not null)))
                 return null;
 
             _lastCatalogSearch = searchText;
@@ -1138,6 +1154,13 @@ else if (!_moduleEnabled)
             return;
         }
 
+        if (_checkoutSettings is null) { ToastService.Show("Refresh to load checkout settings."); return; }
+        if (_checkoutSettings.TableTrackingEnabled &&
+            _checkoutSettings.Validate(BuildCheckoutMetadata(), requireValues: false, requireTable: true) is not null)
+        {
+            OpenTablePicker(true);
+            return;
+        }
         _savingCart = true;
         try
         {
@@ -1543,6 +1566,8 @@ else if (!_moduleEnabled)
         _scannerSaleGeneration++;
         InvalidateCatalogSearch();
         _paymentOpen = false;
+        _tablePickerOpen = false;
+        _holdAfterTable = _returnToPayment = _returnToDetails = false;
         _cart = [];
         _removedLine = null;
         _adjustmentsOpen = false;
@@ -1608,10 +1633,45 @@ else if (!_moduleEnabled)
     private PosCheckoutMetadata BuildCheckoutMetadata() => new()
     {
         TableNumber = _checkoutSettings?.TableTrackingEnabled == true ? _checkoutMetadata.TableNumber : null,
+        TableLayoutId = _checkoutSettings?.TableTrackingEnabled == true ? _checkoutMetadata.TableLayoutId : null,
+        TableId = _checkoutSettings?.TableTrackingEnabled == true ? _checkoutMetadata.TableId : null,
         Fields = _checkoutMetadata.Fields.Where(pair =>
             _checkoutSettings?.CheckoutFields.Any(field => field.Enabled && field.Key == pair.Key) == true)
             .ToDictionary(pair => pair.Key, pair => pair.Value)
     };
+
+    private void OpenTablePicker(bool hold)
+    {
+        if (IsInteractionLocked) return;
+        _holdAfterTable = hold;
+        _returnToPayment = _paymentOpen;
+        _returnToDetails = _saleDetailsOpen;
+        _paymentOpen = _saleDetailsOpen = false;
+        _tablePickerOpen = true;
+    }
+
+    private void TablePickerChanged(bool open)
+    {
+        _tablePickerOpen = open;
+        if (!open) { _paymentOpen = _returnToPayment; _saleDetailsOpen = _returnToDetails; }
+    }
+
+    private async Task TableSelected(PosDiningTable table)
+    {
+        if (_checkoutSettings?.ActiveTableLayout is not { } layout || !layout.Tables.Any(item => item.Id == table.Id)) return;
+        _checkoutMetadata.TableId = table.Id;
+        _checkoutMetadata.TableLayoutId = layout.Id;
+        _checkoutMetadata.TableNumber = table.Label;
+        var hold = _holdAfterTable;
+        _holdAfterTable = false;
+        if (hold) await SuspendCart();
+    }
+
+    private void ClearTable()
+    {
+        _checkoutMetadata.TableId = _checkoutMetadata.TableLayoutId = null;
+        _checkoutMetadata.TableNumber = null;
+    }
 
     private void OpenCreateCustomer()
     {

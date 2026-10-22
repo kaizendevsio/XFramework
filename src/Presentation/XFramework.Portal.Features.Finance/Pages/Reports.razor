@@ -30,10 +30,7 @@
         <BbButton Variant="ButtonVariant.Outline" OnClick='@(() => Navigation.NavigateTo("finance/reports"))' Disabled="@_loading"><LucideIcon Name="rotate-ccw" class="mr-2 h-4 w-4" />Reset</BbButton>
         @if (_report is not null) { <span class="text-sm text-muted-foreground">Updated @_report.GeneratedAt.ToLocalTime().ToString("HH:mm:ss")</span> }
     </div>
-    @if (_shareUri is not null)
-    {
-        <div class="financial-report-share"><BbLabel>Protected report link</BbLabel><BbInput Value="@_shareUri" ReadOnly="true" aria-label="Protected report link" /></div>
-    }
+    <ReportShareDialog @bind-Url="_shareUri" />
     @if (_error is not null) { <BbAlert Variant="AlertVariant.Danger"><BbAlertTitle>Report unavailable</BbAlertTitle><BbAlertDescription>@_error</BbAlertDescription></BbAlert> }
     @if (!_hasTenant) { <ModuleUnavailable ModuleName="Wallets" RequiresTenant="true" /> }
     else if (!_enabled) { <ModuleUnavailable ModuleName="Wallets" /> }
@@ -297,10 +294,9 @@
         _currency = FinancialReportPresentation.CurrencyKey(currency.CurrencyId);
         _day = daily[args.DataIndex].Date; _view = "daily"; _shareUri = null;
     }
-    private async Task CopyLink()
+    private void CopyLink()
     {
         if (!CanExport) return;
-        var version = _version;
         var url = Navigation.GetUriWithQueryParameters(Navigation.ToAbsoluteUri("finance/reports").ToString(), new Dictionary<string, object?> {
             ["tenant"] = _report!.TenantId, ["from"] = _appliedFrom.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             ["through"] = _appliedThrough.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
@@ -308,12 +304,6 @@
             ["view"] = _view == "summary" ? null : _view
         });
         _shareUri = url;
-        try {
-            _exportModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/XFramework.Portal.Shared/reports/report-export.js");
-            if (!CanExport || version != _version) return;
-            await _exportModule.InvokeVoidAsync("copyReportLink", url); Toast.Success("Report link copied.");
-        }
-        catch (JSException) { Toast.Error("Copy is unavailable in this browser."); }
     }
     private async Task Export()
     {

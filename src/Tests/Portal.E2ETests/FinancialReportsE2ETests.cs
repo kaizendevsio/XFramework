@@ -224,6 +224,7 @@ public sealed class FinancialReportsE2ETests : PageTest
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Daily detail (UTC) - 2026-04-01", Exact = true })).ToBeVisibleAsync();
         await Page.EvaluateAsync("() => { window.sharedReportUrl = undefined; navigator.clipboard.writeText = async value => { window.sharedReportUrl = value; }; }");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Share link", Exact = true }).ClickAsync();
+        await Page.GetByRole(AriaRole.Dialog).GetByRole(AriaRole.Button, new() { Name = "Copy link", Exact = true }).ClickAsync();
         await Page.WaitForFunctionAsync("typeof window.sharedReportUrl === 'string'");
         var url = await Page.EvaluateAsync<string>("window.sharedReportUrl");
         url.Should().Contain($"currency={currencyId}").And.Contain("view=daily").And.Contain("day=2026-04-01").And.NotContain("chart=").And.NotContain("token");
@@ -299,8 +300,11 @@ public sealed class FinancialReportsE2ETests : PageTest
         latest.ToExclusive.Should().Be(new DateTime(2026, 9, 6, 0, 0, 0, DateTimeKind.Utc));
         await Page.EvaluateAsync("() => { window.sharedReportUrl = undefined; navigator.clipboard.writeText = async value => { window.sharedReportUrl = value; }; }");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Share link", Exact = true }).ClickAsync();
+        await Page.GetByRole(AriaRole.Dialog).GetByRole(AriaRole.Button, new() { Name = "Copy link", Exact = true }).ClickAsync();
         await Page.WaitForFunctionAsync("typeof window.sharedReportUrl === 'string'");
         (await Page.EvaluateAsync<string>("window.sharedReportUrl")).Should().EndWith($"finance/reports?tenant={tenantId}&from=2026-09-03&through=2026-09-05&view=activity");
+        await Page.GetByRole(AriaRole.Dialog).GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).First.ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Dialog)).ToHaveCountAsync(0);
         await Page.Locator(".financial-report-filter button").First.ClickAsync();
         await Page.GetByRole(AriaRole.Heading, new() { Name = "Financial Reports", Exact = true }).ClickAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Refresh", Exact = true }).ClickAsync();

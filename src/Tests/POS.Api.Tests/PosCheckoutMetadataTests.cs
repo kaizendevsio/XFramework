@@ -24,7 +24,7 @@ public sealed class PosCheckoutMetadataTests
 
     [TestCase(false, "12", true)]
     [TestCase(false, null, false)]
-    [TestCase(true, "12", false)]
+    [TestCase(true, "12", true)]
     public void Validate_TableToggle_RejectsDisabledTableData(bool enabled, string? table, bool invalid) =>
         (new PosCheckoutSettings { TableTrackingEnabled = enabled }.Validate(new() { TableNumber = table }, true) is not null)
         .Should().Be(invalid);

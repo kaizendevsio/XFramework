@@ -58,7 +58,7 @@ public sealed class PosCartService(
         if (request.CurrencyId.HasValue && request.CurrencyId.Value != register.CurrencyId)
             return Result<PosCartResponse>.Conflict("Cart currency must match the register currency");
 
-        var checkout = await checkoutSettings.ValidateAsync(tenantId, request.CheckoutMetadata, requireValues: false, ct);
+        var checkout = await checkoutSettings.ValidateAsync(tenantId, request.CheckoutMetadata, requireValues: false, ct, requireTable: request.Suspend);
         if (!checkout.IsSuccess)
             return Result<PosCartResponse>.Failure(checkout.Message!, checkout.StatusCode);
 
@@ -165,7 +165,8 @@ public sealed class PosCartService(
         if (request.CurrencyId.HasValue && request.CurrencyId.Value != register.CurrencyId)
             return Result<PosCartResponse>.Conflict("Cart currency must match the register currency");
 
-        var checkout = await checkoutSettings.ValidateAsync(tenantId, request.CheckoutMetadata, requireValues: false, ct);
+        var checkout = await checkoutSettings.ValidateAsync(tenantId, request.CheckoutMetadata, requireValues: false, ct,
+            requireTable: cart.Status == PosCartStatus.Suspended);
         if (!checkout.IsSuccess)
             return Result<PosCartResponse>.Failure(checkout.Message!, checkout.StatusCode);
 
@@ -301,6 +302,11 @@ public sealed class PosCartService(
             return Result<PosCartResponse>.Failure(concurrencyResult.Message!, concurrencyResult.StatusCode);
 
         var now = DateTime.UtcNow;
+        var checkout = await checkoutSettings.ValidateAsync(tenantId,
+            PosServiceHelpers.ReadCheckoutMetadata(cart.CheckoutMetadataJson), requireValues: false, ct, requireTable: true);
+        if (!checkout.IsSuccess)
+            return Result<PosCartResponse>.Failure(checkout.Message!, checkout.StatusCode);
+        cart.CheckoutMetadataJson = System.Text.Json.JsonSerializer.Serialize(checkout.Data);
         cart.Status = PosCartStatus.Suspended;
         cart.SuspendedAt = now;
         cart.ExpiresAt ??= now.Add(CartTtl);

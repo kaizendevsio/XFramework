@@ -8,6 +8,7 @@ using Moq;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Inventario.Domain.Shared.Contracts;
+using XFramework.Inventario.Domain.Shared.Contracts.Requests.Brands;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Setup;
 using XFramework.Inventario.Domain.Shared.Contracts.Responses;
 using XFramework.Portal.Features.Inventario.Pages;
@@ -39,6 +40,8 @@ public sealed class BrandsPageTests
         _availability.Setup(x => x.EnsureLoadedAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         _availability.Setup(x => x.IsFeatureEnabled(It.IsAny<string>(), It.IsAny<string?>())).Returns(true);
         _wrapper = new(MockBehavior.Strict);
+        _wrapper.Setup(x => x.SearchProductBrands(It.IsAny<SearchProductBrandsRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new QueryResponse<List<string>> { HttpStatusCode = HttpStatusCode.OK, Response = ["ACME"] });
         _data = new(MockBehavior.Strict);
         _query = new();
         _query.Setup(x => x.Where(It.IsAny<Expression<Func<ProductCategory, bool>>>())).Returns(_query.Object);
@@ -62,8 +65,8 @@ public sealed class BrandsPageTests
         _wrapper.Verify(x => x.GetInventarioSetup(It.Is<GetInventarioSetupRequest>(r => r.Metadata.RequestedTenantId == _tenant),
             It.IsAny<CancellationToken>()), Times.Once);
         _query.Verify(x => x.Take(1000), Times.Once);
-        typeof(Brands).GetMethod("SelectCategory", Private)!.Invoke(page, [_category.Id.ToString()]);
-        typeof(Brands).GetMethod("OpenMerge", Private)!.Invoke(page, null);
+        await (Task)typeof(Brands).GetMethod("SelectCategory", Private)!.Invoke(page, [_category.Id.ToString()])!;
+        typeof(Brands).GetMethod("OpenMerge", Private)!.Invoke(page, new object?[] { null });
         Field<bool>(page, "_mergeOpen").Should().Be(manager);
         _data.Verify(x => x.Query<ProductCategory>(), Times.Once);
         _query.Verify(x => x.ToListAsync(It.IsAny<CancellationToken>()), Times.Once);
@@ -105,6 +108,70 @@ public sealed class BrandsPageTests
         await Reload(page);
         _wrapper.VerifyNoOtherCalls();
         _data.VerifyNoOtherCalls();
+    }
+
+    [Test]
+    public async Task Brands_SearchUsesCurrentTenantCategoryAndBoundedWrapper()
+    {
+        _wrapper.Setup(x => x.GetInventarioSetup(It.IsAny<GetInventarioSetupRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(_tenant, true));
+        using var page = Page();
+        await Reload(page);
+        await (Task)typeof(Brands).GetMethod("SearchBrands", Private)!.Invoke(page, ["ACME"] )!;
+        _wrapper.Verify(x => x.SearchProductBrands(It.Is<SearchProductBrandsRequest>(r =>
+            r.Metadata.RequestedTenantId == _tenant && r.CategoryId == _category.Id && r.Search == "ACME" && r.Limit == 50),
+            It.IsAny<CancellationToken>()), Times.Once);
+        typeof(Brands).GetMethod("OpenMerge", Private)!.Invoke(page, ["ACME"]);
+        Field<string>(page, "_mergeSource").Should().Be("ACME");
+    }
+
+    [Test]
+    public async Task Brands_FailedReadShowsErrorAndRetryClearsIt()
+    {
+        _wrapper.Setup(x => x.GetInventarioSetup(It.IsAny<GetInventarioSetupRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(_tenant, true));
+        _wrapper.SetupSequence(x => x.SearchProductBrands(It.IsAny<SearchProductBrandsRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new QueryResponse<List<string>> { HttpStatusCode = HttpStatusCode.Forbidden })
+            .ReturnsAsync(new QueryResponse<List<string>> { HttpStatusCode = HttpStatusCode.OK, Response = ["ACME"] });
+        using var page = Page();
+        await Reload(page);
+        Field<string?>(page, "_brandsError").Should().NotBeNull();
+        await (Task)typeof(Brands).GetMethod("LoadBrands", Private)!.Invoke(page, null)!;
+        Field<string?>(page, "_brandsError").Should().BeNull();
+    }
+
+    [Test]
+    public async Task Brands_TenantSwitchDuringReadDiscardsOldRows()
+    {
+        _wrapper.Setup(x => x.GetInventarioSetup(It.IsAny<GetInventarioSetupRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(_tenant, true));
+        var pending = new TaskCompletionSource<QueryResponse<List<string>>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _wrapper.Setup(x => x.SearchProductBrands(It.IsAny<SearchProductBrandsRequest>(), It.IsAny<CancellationToken>())).Returns(pending.Task);
+        using var page = Page();
+        var loading = Reload(page);
+        _tenant = Guid.NewGuid();
+        pending.SetResult(new() { HttpStatusCode = HttpStatusCode.OK, Response = ["FOREIGN BRAND"] });
+        await loading;
+        ((System.Collections.ICollection)typeof(Brands).GetField("_brands", Private)!.GetValue(page)!).Count.Should().Be(0);
+    }
+
+    [Test]
+    public async Task Brands_OutOfOrderSearchDoesNotReplaceNewerRows()
+    {
+        _wrapper.Setup(x => x.GetInventarioSetup(It.IsAny<GetInventarioSetupRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(_tenant, true));
+        using var page = Page();
+        await Reload(page);
+        var pending = new TaskCompletionSource<QueryResponse<List<string>>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _wrapper.Setup(x => x.SearchProductBrands(It.Is<SearchProductBrandsRequest>(r => r.Search == "OLD"), It.IsAny<CancellationToken>()))
+            .Returns(pending.Task);
+        var search = typeof(Brands).GetMethod("SearchBrands", Private)!;
+        var oldRead = (Task)search.Invoke(page, ["OLD"])!;
+        await (Task)search.Invoke(page, ["ACME"])!;
+        pending.SetResult(new() { HttpStatusCode = HttpStatusCode.OK, Response = ["OLD"] });
+        await oldRead;
+        var rows = (System.Collections.IEnumerable)typeof(Brands).GetField("_brands", Private)!.GetValue(page)!;
+        rows.Cast<object>().Select(row => row.GetType().GetProperty("Name")!.GetValue(row)).Should().Equal("ACME");
     }
 
     private Brands Page()

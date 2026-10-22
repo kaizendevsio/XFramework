@@ -20,7 +20,7 @@ namespace POS.IntegrationTests;
 
 [TestFixture, NonParallelizable]
 [Category("Kind:Integration"), Category("Module:POS"), Category("Area:Reports")]
-public sealed class PosReportingPostgresTests
+public sealed partial class PosReportingPostgresTests
 {
     private PostgreSqlContainer? postgres;
     private DbContextOptions<AppDbContext> options = null!;

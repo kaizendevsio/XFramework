@@ -81,7 +81,8 @@ public sealed partial class InventoryReportsE2ETests : PageTest
         var module = new Mock<IPortalModuleAvailability>();
         module.Setup(x => x.EnsureLoadedAsync(It.IsAny<CancellationToken>()))
             .Returns((CancellationToken ct) => state.EnsureAvailability(ct));
-        module.Setup(x => x.IsFeatureEnabled(It.IsAny<string>(), It.IsAny<string>())).Returns(() => state.ReportingEnabled);
+        module.Setup(x => x.IsFeatureEnabled(It.IsAny<string>(), It.IsAny<string>()))
+            .Returns((string moduleKey, string? subFeature) => state.ReportingEnabled && (moduleKey != "pos" || state.PosSalesEnabled));
         builder.Services.AddSingleton(module.Object);
         var wrapper = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
         wrapper.Setup(x => x.GetInventoryReportSnapshot(It.IsAny<GetInventoryReportSnapshotRequest>(), It.IsAny<CancellationToken>()))
@@ -89,6 +90,7 @@ public sealed partial class InventoryReportsE2ETests : PageTest
         wrapper.Setup(x => x.GetLowStockCount(It.IsAny<GetLowStockCountRequest>(), It.IsAny<CancellationToken>()))
             .Returns((GetLowStockCountRequest request, CancellationToken ct) => state.LoadLowStock(request, ct));
         ConfigurePlanningFixture(builder.Services, wrapper);
+        ConfigureProductSalesFixture(builder.Services, wrapper);
         builder.Services.AddSingleton(wrapper.Object);
         app = builder.Build();
         app.UseStaticFiles();
@@ -199,6 +201,8 @@ public sealed partial class InventoryReportsE2ETests : PageTest
         await Page.GetByRole(AriaRole.Button, new() { Name = "Share link", Exact = true }).ClickAsync();
         var uri = await Page.GetByRole(AriaRole.Textbox, new() { Name = "Protected report link" }).InputValueAsync();
         uri.Should().Contain("tenant=" + state.FirstTenant).And.Contain("from=").And.Contain("to=").And.Contain("expiry=30");
+        await Page.GetByRole(AriaRole.Dialog).GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).First.ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Dialog)).ToHaveCountAsync(0);
         if (actualPdf)
         {
             var download = await Page.RunAndWaitForDownloadAsync(() => Page.GetByRole(AriaRole.Button, new() { Name = "PDF snapshot" }).ClickAsync());
@@ -497,6 +501,8 @@ public sealed partial class InventoryReportFixtureState
         OnHand = 20; Reserved = 5; Available = 15;
         LowStockRequests.Clear(); LowStockRows = 1207; LowStockStatus = HttpStatusCode.OK; HoldLowStock = null;
         PlanningRequests.Clear(); PlanningStatus = HttpStatusCode.OK; HoldPlanning = null;
+        ProductSalesRequests.Clear(); ProductSalesStatus = HttpStatusCode.OK; HoldProductSales = null;
+        InventorySalesRequests.Clear(); PosSalesEnabled = true;
     }
     public async Task EnsureAvailability(CancellationToken ct)
     {
@@ -556,6 +562,7 @@ public sealed class InventoryReportFixtureAuth(IOptionsMonitor<AuthenticationSch
 [Route("/inventario/reports")]
 [Route("/inventario/overview")]
 [Route("/inventario/planning")]
+[Route("/inventario/transactions")]
 public sealed class InventoryReportFixtureRoot : ComponentBase
 {
     protected override void BuildRenderTree(RenderTreeBuilder b)

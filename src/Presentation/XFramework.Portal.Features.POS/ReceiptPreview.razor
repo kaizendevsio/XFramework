@@ -1,0 +1,17 @@
+@using XFramework.Portal.Features.POS.Receipts
+
+@if (Settings.IsValid())
+{
+    <iframe title="Receipt preview" class="receipt-preview" sandbox="" srcdoc="@PosReceiptDocument.Create(Sale, Settings, MerchantName, CurrencyCode)"></iframe>
+}
+else
+{
+    <p role="alert">Correct the receipt settings to preview this receipt.</p>
+}
+
+@code {
+    [Parameter, EditorRequired] public PosReceiptSettings Settings { get; set; } = new();
+    [Parameter, EditorRequired] public PosSaleReceiptResponse Sale { get; set; } = new();
+    [Parameter] public string MerchantName { get; set; } = "Store";
+    [Parameter] public string? CurrencyCode { get; set; }
+}
