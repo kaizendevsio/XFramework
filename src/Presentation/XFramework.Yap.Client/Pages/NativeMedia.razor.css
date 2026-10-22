@@ -1,0 +1,8 @@
+.native-test { padding: 16px 20px 100px; max-width: 800px; width: 100%; box-sizing: border-box; margin: 0 auto; }
+.appbar { background: var(--page, #1b1b1b); }
+.native-test p { line-height: 1.5; }
+.native-test label { display: block; margin: 12px 0; }
+.native-test input:not([type=checkbox]), .native-test textarea, .native-test select { display: block; box-sizing: border-box; width: 100%; background: var(--surface, #222); color: inherit; border: 1px solid #777; padding: 8px; border-radius: 8px; }
+.options, .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.options label { flex: 1; }
+.native-test pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }

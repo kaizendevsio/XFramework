@@ -1,0 +1,74 @@
+@page "/diagnostics/native-media"
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject VoiceState Voice
+<PageTitle>Native video benchmark · Yap</PageTitle>
+<ScrollSurface><Header><div class="appbar plain"><a class="iconbtn" href="/settings/help" aria-label="Back"><Icon Name="back" /></a><h1>Native video benchmark</h1></div></Header>
+<ChildContent><div class="body native-test">
+    <p>Two-phone native H.264 test, 1080p. Microphones are off. Native camera and display sit above this page in the prototype app.</p>
+    <p>This uses a paired, encrypted LAN connection. It does not join normal Yap calls or test Bolt's STUN/TURN path. Keep both phones on the same network.</p>
+    @if (!available) { <p role="status">Open this page in the Android or iOS native benchmark app to run the test. Ordinary web calls are unchanged.</p> }
+    <div class="options">
+        <label>FPS<select @bind="fps" disabled="@running"><option value="30">30</option><option value="60">60</option></select></label>
+        <label>Mbps<input type="number" min="1" max="12" @bind="mbps" disabled="@running" /></label>
+        <label><input type="checkbox" @bind="rear" disabled="@running" /> Rear camera</label>
+    </div>
+    <label>This phone's Wi-Fi IPv4 address (host only)<input @bind="address" placeholder="192.168.1.20" disabled="@running" /></label>
+    <button class="btn" disabled="@(!available || running || Voice.IsCalling)" @onclick="Host">Create paired test</button>
+    <label>Pairing invitation<textarea @bind="invitation" rows="3" placeholder="Copy the host invitation onto the other phone"></textarea></label>
+    <p>The invitation is a temporary credential. Share it only with the other test phone. It expires when the host stops or after three minutes waiting.</p>
+    <div class="actions">
+        <button class="btn" disabled="@(!available || running || Voice.IsCalling)" @onclick="Join">Join paired test</button>
+        <button class="btn ghost" disabled="@(!running)" @onclick="Stop">Stop</button>
+        <button class="btn ghost" disabled="@(!available || running)" @onclick="Export">Export numeric report</button>
+    </div>
+    @if (Voice.IsCalling) { <p>End the regular Yap call before starting this benchmark.</p> }
+    <p role="status">@status</p>
+    @if (sample.Length > 0) { <pre>@sample</pre> }
+    <p>Unsupported capture modes fail explicitly. Output FPS is a native output callback/submission count, not measured screen presentation. iOS thermal state is a category; Android battery temperature is not CPU temperature.</p>
+</div></ChildContent></ScrollSurface>
+@code {
+    private IJSObjectReference? module;
+    private DotNetObjectReference<NativeMedia>? reference;
+    private bool available, running;
+    private int fps = 30, mbps = 6;
+    private bool rear;
+    private string address = "", invitation = "", status = "Ready", sample = "";
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (!first) return;
+        module = await JS.InvokeAsync<IJSObjectReference>("import", "./native-media.js");
+        reference = DotNetObjectReference.Create(this);
+        await module.InvokeVoidAsync("attach", reference);
+        Voice.Changed += CallChanged;
+    }
+    private Task Host() => Send("host");
+    private Task Join() => Send("join");
+    private Task Stop() => Send("stop");
+    private Task Export() => Send("export");
+    private async Task Send(string action)
+    {
+        if (module is null) return;
+        if (action is "host" or "join") { if (Voice.IsCalling) return; running = true; sample = ""; status = "Connecting…"; }
+        try { await module.InvokeVoidAsync("send", new { action, address, invitation, settings = new { fps, bitrate = mbps * 1_000_000, rear } }); }
+        catch (JSException ex) { status = ex.Message; running = false; }
+        if (action == "stop") running = false;
+    }
+    [JSInvokable] public Task Available(bool value) => InvokeAsync(() => { available = value; StateHasChanged(); });
+    [JSInvokable] public Task Message(System.Text.Json.JsonElement message) => InvokeAsync(() =>
+    {
+        var kind = message.GetProperty("kind").GetString();
+        if (kind == "invitation") invitation = message.GetProperty("invitation").GetString() ?? "";
+        else if (kind is "status" or "error") { status = message.GetProperty("text").GetString() ?? ""; if (kind == "error") running = false; }
+        else if (kind == "finished") running = false;
+        else if (kind == "yap-native-video-v1") sample = System.Text.Json.JsonSerializer.Serialize(message, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        StateHasChanged();
+    });
+    private void CallChanged() { if (Voice.IsCalling) _ = InvokeAsync(Stop); }
+    public async ValueTask DisposeAsync()
+    {
+        Voice.Changed -= CallChanged;
+        if (module is not null) { try { await module.InvokeVoidAsync("detach"); } catch (JSException) { } await module.DisposeAsync(); }
+        reference?.Dispose();
+    }
+}
