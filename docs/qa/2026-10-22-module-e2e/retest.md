@@ -4,6 +4,8 @@ Date: 2026-10-23 Singapore (browser timestamps below are UTC, 2026-10-22).
 
 Status: Targeted bug-fix verification completed. B01-B04 passed the live checks below; provider settlement and separate-checker resolution remain blocked by prerequisites. This is not full release certification. This supplements, and does not overwrite, the [original audit](report.md).
 
+Follow-up: this is the historical first retest. See [blocked-workflows.md](blocked-workflows.md) for subsequent fixes, manual settlement/checker verification, and release status.
+
 ## Scope and Environment
 
 - Target: http://xeon-dev:5000/

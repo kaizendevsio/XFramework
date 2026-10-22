@@ -471,6 +471,18 @@ public sealed class WrapperContractCoverageTests : WalletsTestBase
         reject.IsSuccess.Should().BeTrue(reject.Message);
 
         var createCaseReference = Unique("case");
+        var originalReference = Unique("case-original-debit");
+        var originalDebit = await WalletsTestFixture.ServiceWrapper.DecrementWallet(new DecrementWalletRequest
+        {
+            WalletId = wallet.Id, CredentialId = credential.Id,
+            WalletTypeId = WalletsTestFixture.TestWalletTypeId, Amount = 10m,
+            ReferenceNumber = originalReference, Metadata = Metadata(credential.Id)
+        });
+        originalDebit.IsSuccess.Should().BeTrue(originalDebit.Message);
+        await using var caseDb = CreateDbContext();
+        var originalTransactionId = await caseDb.Set<WalletTransaction>()
+            .Where(x => x.WalletId == wallet.Id && x.ReferenceNumber == originalReference)
+            .Select(x => x.Id).SingleAsync();
         var createCase = await WalletsTestFixture.ServiceWrapper.CreateWalletCase(new CreateWalletCaseRequest
         {
             Metadata = Metadata(credential.Id),
@@ -478,6 +490,7 @@ public sealed class WrapperContractCoverageTests : WalletsTestBase
             CaseType = WalletCaseType.Refund,
             Amount = 10m,
             ExternalReference = createCaseReference,
+            OriginalTransactionId = originalTransactionId,
             ReasonCode = "WRAPPER",
             Reason = "wrapper case"
         });

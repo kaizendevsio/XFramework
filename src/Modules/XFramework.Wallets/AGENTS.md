@@ -115,6 +115,12 @@ not ordinary CRUD.
 - Persist the original failure status for rejected ledger operations so an
   idempotent replay returns the same outcome. Do not infer replay status from
   mutable messages.
+- Validate balance postings in order on detached projections before committing;
+  a debit-hold release must fund its following capture without releasing other holds.
+  The legacy approved withdrawal hold-capture rejection (400, `Insufficient funds`)
+  has one narrowly scoped recovery under a deterministic retry key, only for the
+  identical request hash and approval. Keep the rejection immutable, link the new
+  operation through `OriginalOperationId`, and rerun all ledger/policy checks.
 - Resolve and reject refund/dispute cases through row-safe transitions. A stale
   rejection must never overwrite a completed ledger settlement.
 - Maintain constraints and indexes for account numbers, active wallet uniqueness,

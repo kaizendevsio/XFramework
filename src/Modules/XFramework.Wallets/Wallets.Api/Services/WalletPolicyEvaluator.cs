@@ -50,6 +50,15 @@ public sealed class WalletPolicyEvaluator(DbContext dbContext) : IWalletPolicyEv
         var requiresApproval = false;
         var decisions = new List<object>();
         var requestedDebitAmountsByWallet = new Dictionary<Guid, decimal>();
+        // Preview ordered postings without changing tracked balances before policy/approval succeeds.
+        var projectedWallets = context.Wallets.ToDictionary(pair => pair.Key, pair => new Wallet
+        {
+            Balance = pair.Value.Balance,
+            DebitOnHoldBalance = pair.Value.DebitOnHoldBalance,
+            CreditOnHoldBalance = pair.Value.CreditOnHoldBalance,
+            TransferableBalance = pair.Value.TransferableBalance,
+            MaintainingBalanceRule = pair.Value.MaintainingBalanceRule
+        });
 
         foreach (var posting in walletPostings)
         {
@@ -99,21 +108,18 @@ public sealed class WalletPolicyEvaluator(DbContext dbContext) : IWalletPolicyEv
                 }
             }
 
+            try
+            {
+                WalletLedgerService.ApplyWalletPosting(projectedWallets[walletId], posting);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Result<WalletPolicyEvaluationResult>.Failure(ex.Message, 400);
+            }
+
             if (posting.Direction is not WalletLedgerDirection.Debit)
             {
                 continue;
-            }
-
-            if (posting.BalanceBucket is WalletBalanceBucket.Available &&
-                wallet.AvailableBalance < posting.Amount)
-            {
-                return Result<WalletPolicyEvaluationResult>.Failure("Insufficient funds", 400);
-            }
-
-            if (posting.BalanceBucket is WalletBalanceBucket.DebitHold &&
-                wallet.AvailableBalance < posting.Amount)
-            {
-                return Result<WalletPolicyEvaluationResult>.Failure("Insufficient funds for hold", 400);
             }
 
             requestedDebitAmountsByWallet.TryGetValue(walletId, out var requestedDebitAmount);

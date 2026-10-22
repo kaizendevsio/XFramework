@@ -226,11 +226,11 @@
                                 AdvancedColumns="@TransactionAdvancedColumns"
                                 AdvancedFilters="@TransactionAdvancedFilters"
                                 AdvancedSearchScope="Searches transaction reference, wallet, type, amount, fee, held/released state, and created date."
-                                Placeholder="No original transaction"
+                                Placeholder="Select original transaction"
                                 SearchPlaceholder="Search transactions..."
                                 EmptyMessage="No transactions found."
                                 AllowClear="true"
-                                ClearText="No original transaction"
+                                ClearText="Clear transaction"
                                 AdvancedSearchTitle="Find Original Transaction"
                                 AdvancedSearchDescription="Search recent wallet transactions to link the case to its original movement." />
                 <BbFormFieldCurrencyInput @bind-Value="_amount" Label="Amount" ShowSymbol="false" Min="0" />
@@ -449,9 +449,11 @@
             return;
         }
 
-        var transactionId = Guid.TryParse(_transactionId, out var parsedTransactionId)
-            ? parsedTransactionId
-            : (Guid?)null;
+        if (!Guid.TryParse(_transactionId, out var transactionId) || transactionId == Guid.Empty)
+        {
+            ToastService.Warning("Select the original transaction for this case.", "Validation");
+            return;
+        }
 
         _acting = true;
         try
