@@ -79,14 +79,16 @@ public sealed class BenchmarkRun : IAsyncDisposable
     private async Task SampleAsync(VideoSettings settings)
     {
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
-        using var process = Process.GetCurrentProcess();
+        // System.Diagnostics.Process metrics are unsupported on iOS. Optional
+        // telemetry must not terminate the media run or report fabricated zeros.
+        using var process = OperatingSystem.IsIOS() ? null : Process.GetCurrentProcess();
         var start = Stopwatch.GetTimestamp(); var previous = start;
-        var cpu = process.TotalProcessorTime;
+        var cpu = process?.TotalProcessorTime;
         long captured = 0, encoded = 0, received = 0, output = 0, sentBytes = 0, receivedBytes = 0;
         while (await timer.WaitForNextTickAsync(lifetime.Token))
         {
             var now = Stopwatch.GetTimestamp(); var elapsed = Stopwatch.GetElapsedTime(previous, now).TotalSeconds; previous = now;
-            process.Refresh(); var nextCpu = process.TotalProcessorTime;
+            process?.Refresh(); var nextCpu = process?.TotalProcessorTime;
             var c = video.Counters;
             var nc = Interlocked.Read(ref c.Captured); var ne = Interlocked.Read(ref c.Encoded);
             var nr = Interlocked.Read(ref c.Received); var no = Interlocked.Read(ref c.Output);
@@ -100,8 +102,8 @@ public sealed class BenchmarkRun : IAsyncDisposable
                 CaptureMaxGapMs = c.CaptureGapMs(), OutputMaxGapMs = c.OutputGapMs(),
                 SentKbps = (ns - sentBytes) * 8 / 1000d / elapsed, ReceivedKbps = (nb - receivedBytes) * 8 / 1000d / elapsed,
                 Queue = outgoing.Reader.Count, QueueDrops = Interlocked.Read(ref c.QueueDrops),
-                CpuCorePercent = (nextCpu - cpu).TotalSeconds / elapsed * 100,
-                MemoryBytes = process.WorkingSet64, Device = video.DeviceState()
+                CpuCorePercent = nextCpu.HasValue && cpu.HasValue ? (nextCpu.Value - cpu.Value).TotalSeconds / elapsed * 100 : null,
+                MemoryBytes = process?.WorkingSet64, Device = video.DeviceState()
             });
             captured = nc; encoded = ne; received = nr; output = no; sentBytes = ns; receivedBytes = nb; cpu = nextCpu;
             if (Stopwatch.GetElapsedTime(start, now) > TimeSpan.FromMinutes(15)) { lifetime.Cancel(); return; }

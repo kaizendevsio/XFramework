@@ -53,7 +53,11 @@ public sealed class AndroidVideo : Java.Lang.Object, INativeVideo
         var minimum = map.GetOutputMinFrameDuration(surfaceClass, size);
         if (minimum > 1_000_000_000L / settings.Fps + 1_000_000)
             throw new InvalidOperationException($"Camera reports a {minimum / 1_000_000d:F1} ms minimum frame time at 1080p; requested {settings.Fps} FPS is unsupported.");
-        var ranges = (global::Android.Util.Range[])characteristics.Get(CameraCharacteristics.ControlAeAvailableTargetFpsRanges)!;
+        // Camera2 returns a Java array wrapper, not a managed Range[]. Marshal
+        // its elements through the Android binding instead of casting the wrapper.
+        using var javaRanges = characteristics.Get(CameraCharacteristics.ControlAeAvailableTargetFpsRanges)
+            ?? throw new InvalidOperationException("Camera did not report recording FPS ranges.");
+        var ranges = javaRanges.ToArray<global::Android.Util.Range>();
         var range = ranges.Where(r => ((Java.Lang.Integer)r.Upper!).IntValue() == settings.Fps)
             .OrderByDescending(r => ((Java.Lang.Integer)r.Lower!).IntValue()).FirstOrDefault()
             ?? throw new InvalidOperationException($"This camera does not advertise a {settings.Fps} FPS recording range.");

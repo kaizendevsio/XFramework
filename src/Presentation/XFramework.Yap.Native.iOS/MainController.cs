@@ -16,9 +16,12 @@ public sealed class MainController : UIViewController, IWKScriptMessageHandler
     private NativeCoordinator coordinator = null!;
     private string origin = "";
     private IosVideo? current;
+    private string? launchInvitation = Environment.GetEnvironmentVariable("YAP_BENCHMARK_INVITATION");
+    private readonly string statusPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "native-status.log");
     public override void ViewDidLoad()
     {
         base.ViewDidLoad(); View!.BackgroundColor = UIColor.Black;
+        File.WriteAllText(statusPath, "");
         address = new UITextField { Text = "https://xeon-dev.tailed40e.ts.net:8443", TextColor = UIColor.White, Font = UIFont.SystemFontOfSize(12), AutocapitalizationType = UITextAutocapitalizationType.None, AutocorrectionType = UITextAutocorrectionType.No };
         open = UIButton.FromType(UIButtonType.System); open.SetTitle("Open", UIControlState.Normal);
         videos = new UIView { Hidden = true }; remote = new UIView(); preview = new UIView();
@@ -34,6 +37,8 @@ public sealed class MainController : UIViewController, IWKScriptMessageHandler
             if (!Trusted(web.Url?.AbsoluteString)) return;
             web.EvaluateJavaScript($"window.dispatchEvent(new CustomEvent('yap-native-message',{{detail:{message}}}))", (_, _) => { });
             using var parsed = JsonDocument.Parse(message);
+            if (parsed.RootElement.GetProperty("kind").GetString() is "status" or "error" or "finished")
+                File.AppendAllText(statusPath, message + Environment.NewLine);
             if (parsed.RootElement.GetProperty("kind").GetString() == "finished")
             { videos.Hidden = true; current = null; View.SetNeedsLayout(); }
         });
@@ -99,5 +104,31 @@ public sealed class MainController : UIViewController, IWKScriptMessageHandler
     private sealed class Navigation(MainController owner) : WKNavigationDelegate
     {
         public override void DidStartProvisionalNavigation(WKWebView webView, WKNavigation navigation) => owner.Stop();
+        public override void DidFinishNavigation(WKWebView webView, WKNavigation navigation)
+        {
+            // Development-device launch only: consume once, after navigation has
+            // finished cancelling the previous run. Ordinary launches stay manual.
+            if (!owner.Trusted(webView.Url?.AbsoluteString) || owner.launchInvitation is not { Length: > 0 } invitation) return;
+            owner.launchInvitation = null;
+            Environment.SetEnvironmentVariable("YAP_BENCHMARK_INVITATION", null);
+            // Use the page's own enabled Join action, so Blazor has attached its
+            // message listener and updates its running/Stop state normally.
+            var encoded = JsonSerializer.Serialize(invitation, NativeJson.Default.String);
+            webView.EvaluateJavaScript($$"""
+                (() => {
+                    let attempts = 0;
+                    const timer = setInterval(() => {
+                        const join = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Join paired test');
+                        const input = document.querySelector('textarea');
+                        if (join && !join.disabled && input) {
+                            clearInterval(timer);
+                            input.value = {{encoded}};
+                            input.dispatchEvent(new Event('change', { bubbles: true }));
+                            join.click();
+                        } else if (++attempts >= 240) clearInterval(timer);
+                    }, 250);
+                })();
+                """, (_, _) => { });
+        }
     }
 }
