@@ -28,7 +28,8 @@ concurrency:
 jobs:
   scanner-tests:
     name: POS scanner authorization, integration and browser tests
-    runs-on: ubuntu-latest
+    # Playwright 1.51 supports Ubuntu 24.04, not the newer ubuntu-latest image.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
