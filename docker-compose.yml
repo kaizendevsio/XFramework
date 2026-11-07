@@ -860,6 +860,8 @@ services:
   # by the deployment workflow and never runs as part of the normal stack.
   bolt-phase0-synthetics:
     profiles: [phase0-verification]
+    # Tailscale Serve binds its interface; bridge containers cannot reach the host's WSS listener.
+    network_mode: host
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/bolt-phase0-synthetics:${IMAGE_TAG:-develop}
     build:
       context: .
