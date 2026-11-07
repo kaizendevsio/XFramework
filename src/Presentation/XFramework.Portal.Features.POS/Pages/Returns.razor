@@ -96,12 +96,12 @@ else
 }
 
 <BbDialog Open="@_dialogOpen" OpenChanged="@(value => _dialogOpen = value)">
-    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide pos-scroll-dialog">
         <BbDialogHeader>
             <BbDialogTitle>Create POS Return</BbDialogTitle>
             <BbDialogDescription>Select a completed sale and the quantities to return.</BbDialogDescription>
         </BbDialogHeader>
-        <div class="grid gap-4 py-4">
+        <div class="pos-scroll-dialog-body grid gap-4 py-4">
             <div class="flex items-end gap-2">
                 <BbFormFieldInput TValue="string" @bind-Value="_saleSearch" Label="Find older receipt" />
                 <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => SearchCompletedSales())" Disabled="@_searchingSales">

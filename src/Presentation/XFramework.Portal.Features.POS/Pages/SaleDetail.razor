@@ -120,13 +120,18 @@ else
         </div>
     </FadeInContent>
     <BbDialog @bind-Open="_previewOpen">
-        <BbDialogContent>
+        <BbDialogContent Class="pos-scroll-dialog">
             <BbDialogHeader><BbDialogTitle>Receipt preview</BbDialogTitle></BbDialogHeader>
-            @if (_receiptSettings is not null)
-            {
-                <ReceiptPreview Settings="_receiptSettings" Sale="_sale" MerchantName="@_receiptMerchantName" CurrencyCode="@_currencyCode" />
-            }
-            <BbDialogFooter><BbButton OnClick="PrintReceipt" Disabled="@(!ReceiptReady || _printing)"><LucideIcon Name="printer" class="mr-2 h-4 w-4" />Print receipt</BbButton></BbDialogFooter>
+            <div class="pos-scroll-dialog-body">
+                @if (_receiptSettings is not null)
+                {
+                    <ReceiptPreview Settings="_receiptSettings" Sale="_sale" MerchantName="@_receiptMerchantName" CurrencyCode="@_currencyCode" />
+                }
+            </div>
+            <BbDialogFooter>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _previewOpen = false)">Close preview</BbButton>
+                <BbButton OnClick="PrintReceipt" Disabled="@(!ReceiptReady || _printing)"><LucideIcon Name="printer" class="mr-2 h-4 w-4" />Print receipt</BbButton>
+            </BbDialogFooter>
         </BbDialogContent>
     </BbDialog>
 }
@@ -169,9 +174,11 @@ else
     private void OnContextChanged() => _ = InvokeAsync(Reload);
     private async Task Reload()
     {
+        if (_disposed) return;
         var version = ++_loadVersion;
         var tenantId = TenantFilter.SelectedTenantId;
         _loading = true; _sale = null; _loadError = null; _receiptSettings = null; _receiptError = null; _previewOpen = false; _currencyCode = null;
+        StateHasChanged();
         try
         {
             await ModuleNavigation.EnsureLoadedAsync();
@@ -205,7 +212,15 @@ else
             }
         }
         catch { if (version == _loadVersion) _loadError = "Could not load the sale."; }
-        finally { if (version == _loadVersion) _loading = false; }
+        finally
+        {
+            // Context notifications are not Blazor UI events; they need an explicit render.
+            if (!_disposed && version == _loadVersion)
+            {
+                _loading = false;
+                StateHasChanged();
+            }
+        }
     }
     private async Task RetryFulfillment()
     {
