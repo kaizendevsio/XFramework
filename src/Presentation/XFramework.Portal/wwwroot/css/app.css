@@ -625,6 +625,29 @@
     max-width: min(74rem, calc(100vw - 2rem));
 }
 
+/* Keep POS dialog actions reachable while long forms and receipts scroll. */
+.pos-scroll-dialog {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100dvh - 2rem);
+    max-width: min(32rem, calc(100vw - 2rem));
+    overflow: hidden;
+}
+
+.pos-scroll-dialog.xf-dialog-wide {
+    max-width: min(64rem, calc(100vw - 2rem));
+}
+
+.pos-scroll-dialog > .pos-scroll-dialog-body {
+    min-height: 0;
+    min-width: 0;
+    overflow: auto;
+}
+
+.pos-scroll-dialog > :not(.pos-scroll-dialog-body) {
+    flex-shrink: 0;
+}
+
 .identity-role-permissions-dialog {
     width: min(68rem, calc(100vw - 2rem));
     max-width: min(68rem, calc(100vw - 2rem));

@@ -173,6 +173,19 @@ public sealed class StockPostingService(
         if (request.LotId is { } lotId)
             query = query.Where(x => x.LotId == lotId);
 
+        if (request.AllocatableOnly)
+        {
+            // Match normal FEFO allocation eligibility without hiding physical stock from inventory views.
+            var now = DateTime.UtcNow;
+            query = query.Where(x => x.AvailableQuantity > 0 &&
+                (x.LotId == null || (x.Lot != null && x.Lot.TenantId == tenantId && !x.Lot.IsDeleted &&
+                    x.Lot.Status != InventoryLotStatus.Quarantined &&
+                    x.Lot.Status != InventoryLotStatus.Consumed &&
+                    x.Lot.Status != InventoryLotStatus.Rejected &&
+                    x.Lot.Status != InventoryLotStatus.Expired &&
+                    (x.Lot.ExpiresAt == null || x.Lot.ExpiresAt > now))));
+        }
+
         var balances = await query
             .OrderBy(x => x.ProductId)
             .Take(500)

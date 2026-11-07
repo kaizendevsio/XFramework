@@ -17,6 +17,14 @@ else if (!_warehousingEnabled)
 {
     <ModuleUnavailable ModuleName="Inventario Warehousing" />
 }
+else if (_loadFailed)
+{
+    <BbAlert>
+        <BbAlertTitle>Could not load location</BbAlertTitle>
+        <BbAlertDescription>Refresh and try again.</BbAlertDescription>
+    </BbAlert>
+    <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">Retry location</BbButton>
+}
 else if (_outsideTenantContext)
 {
     <div class="space-y-4">
@@ -129,6 +137,8 @@ else
                         </div>
                     </BbCardContent>
                 </BbCard>
+                @if (_reservationsEnabled)
+                {
                 <BbCard>
                     <BbCardContent>
                         <div class="space-y-1 pt-4">
@@ -137,10 +147,11 @@ else
                         </div>
                     </BbCardContent>
                 </BbCard>
+                }
             </div>
 
             <BbTabs DefaultValue="balances" Class="inv-workspace-tabs">
-                <BbTabsList><BbTabsTrigger Value="balances">Balances</BbTabsTrigger><BbTabsTrigger Value="movements">Movements</BbTabsTrigger><BbTabsTrigger Value="reservations">Reservations</BbTabsTrigger></BbTabsList>
+                <BbTabsList><BbTabsTrigger Value="balances">Balances</BbTabsTrigger><BbTabsTrigger Value="movements">Movements</BbTabsTrigger>@if (_reservationsEnabled) { <BbTabsTrigger Value="reservations">Reservations</BbTabsTrigger> }</BbTabsList>
                 <BbTabsContent Value="balances">
             <BbCard>
                 <BbCardHeader>
@@ -155,6 +166,7 @@ else
                             <InventoryTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item"><a href="@($"/inventario/stock/balances/{item.Id}")" aria-label="@($"View stock position: {GetProductName(item.ProductId)}")">@GetProductName(item.ProductId)</a></ChildContent>
                             </InventoryTemplateColumn>
+                            <InventoryTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></InventoryTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Format="0.####" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Format="0.####" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Format="0.####" Sortable="true" Filterable="true" />
@@ -178,6 +190,7 @@ else
                             <InventoryTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </InventoryTemplateColumn>
+                            <InventoryTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></InventoryTemplateColumn>
                             <InventoryTemplateColumn Title="Type" Sortable="true" SortBy="@(item => item.MovementType)" Filterable="true" FilterBy="@(item => item.MovementType)">
                                 <ChildContent Context="item"><a href="@($"/inventario/stock/movements/{item.Id}")" aria-label="@($"View stock movement: {item.MovementType}")">@item.MovementType</a></ChildContent>
                             </InventoryTemplateColumn>
@@ -205,6 +218,7 @@ else
                             <InventoryTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item"><a href="@($"/inventario/reservations/{item.Id}")" aria-label="@($"View reservation: {GetProductName(item.ProductId)}")">@GetProductName(item.ProductId)</a></ChildContent>
                             </InventoryTemplateColumn>
+                            <InventoryTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></InventoryTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Qty" Format="0.####" Sortable="true" Filterable="true" />
                             <InventoryTemplateColumn Title="Status" Filterable="true" SortBy="@(item => item.Status.ToString())" FilterBy="@(item => item.Status.ToString())">
                                 <ChildContent Context="item">
@@ -237,10 +251,13 @@ else
     private List<StockBalance> _balances = [];
     private List<InventoryMovement> _movements = [];
     private List<Reservation> _reservations = [];
+    private List<ProductVariation> _variants = [];
     private Dictionary<Guid, string> _productNames = [];
     private bool _loading = true;
     private bool _hasTenant;
     private bool _warehousingEnabled;
+    private bool _reservationsEnabled;
+    private bool _loadFailed;
     private bool _outsideTenantContext;
     private bool _reloading;
     private Guid? _loadedId;
@@ -270,11 +287,13 @@ else
 
         _reloading = true;
         _loading = true;
+        _loadFailed = false;
         try
         {
             await ModuleNavigation.EnsureLoadedAsync();
             _hasTenant = TenantFilter.SelectedTenantId is Guid;
             _warehousingEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "warehousing");
+            _reservationsEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "reservations");
             _outsideTenantContext = false;
             _location = null;
             _warehouse = null;
@@ -282,6 +301,7 @@ else
             _balances = [];
             _movements = [];
             _reservations = [];
+            _variants = [];
             _productNames = [];
 
             if (!_hasTenant || !_warehousingEnabled) return;
@@ -327,13 +347,25 @@ else
                 .Take(100)
                 .ToListAsync();
 
-            _reservations = await DataContext.Query<Reservation>()
+            if (_reservationsEnabled)
+            {
+                _reservations = await DataContext.Query<Reservation>()
                 .IgnoreQueryFilters()
                 .NoCache()
                 .Where(x => x.TenantId == tenantId && x.LocationId == Id && !x.IsDeleted)
                 .OrderByDescending(x => x.ReservedAt)
                 .Take(100)
                 .ToListAsync();
+            }
+
+            if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "variations"))
+            {
+                _variants = await DataContext.Query<ProductVariation>()
+                    .NoCache()
+                    .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                    .Take(1000)
+                    .ToListAsync();
+            }
 
             var productIds = _balances.Select(x => x.ProductId)
                 .Concat(_movements.Select(x => x.ProductId))
@@ -355,7 +387,7 @@ else
         }
         catch
         {
-            ToastService.Show("Could not load location.");
+            _loadFailed = true;
         }
         finally
         {

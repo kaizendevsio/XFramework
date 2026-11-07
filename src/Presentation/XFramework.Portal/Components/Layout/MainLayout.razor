@@ -194,9 +194,10 @@
 </div>
 
 <BbToastProvider Position="ToastPosition.BottomRight" />
-<BbDialogProvider />
 <XfContainerPortalHost />
 <BbOverlayPortalHost />
+@* Service confirmations must stack above the dialogs that opened them. *@
+<BbDialogProvider />
 
 @code {
     private bool IsInventarioRoute => new Uri(Nav.Uri).AbsolutePath.StartsWith("/inventario/", StringComparison.OrdinalIgnoreCase);

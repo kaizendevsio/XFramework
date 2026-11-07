@@ -18,4 +18,5 @@ public partial record GetStockBalancesRequest : RequestBase,
     public Guid? WarehouseId { get; init; }
     public Guid? LocationId { get; init; }
     public Guid? LotId { get; init; }
+    public bool AllocatableOnly { get; init; }
 }

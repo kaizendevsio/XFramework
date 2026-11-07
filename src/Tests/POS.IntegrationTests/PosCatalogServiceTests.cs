@@ -201,6 +201,7 @@ public sealed class PosCatalogServiceTests
                 value.ProductVariationId == variant.ProductVariationId &&
                 value.WarehouseId == request.WarehouseId &&
                 value.LocationId == request.LocationId &&
+                value.AllocatableOnly &&
                 value.Metadata == request.Metadata), cancellation.Token), Times.Once);
     }
 

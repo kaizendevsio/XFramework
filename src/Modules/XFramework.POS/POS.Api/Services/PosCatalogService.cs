@@ -90,6 +90,7 @@ public sealed class PosCatalogService(
                     ProductVariationId = item.ProductVariationId,
                     WarehouseId = warehouseId,
                     LocationId = locationId,
+                    AllocatableOnly = true,
                     Metadata = context.Metadata
                 }, ct);
 

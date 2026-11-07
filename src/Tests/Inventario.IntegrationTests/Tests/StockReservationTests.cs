@@ -12,6 +12,55 @@ namespace Inventario.IntegrationTests.Tests;
 [Category(TestCategories.Inventario)]
 public sealed class StockReservationTests : InventarioTestBase
 {
+    [TestCase(InventoryLotStatus.Available, -1)]
+    [TestCase(InventoryLotStatus.Expired, 30)]
+    [TestCase(InventoryLotStatus.Quarantined, 30)]
+    [TestCase(InventoryLotStatus.Consumed, 30)]
+    [TestCase(InventoryLotStatus.Rejected, 30)]
+    public async Task GetStockBalances_AllocatableOnly_ExcludesIneligibleLotsButPreservesPhysicalStock(
+        InventoryLotStatus status, int expiryDays)
+    {
+        var seed = await SeedInventoryScope();
+        await PostOpeningBalance(seed.Product.Id, seed.Warehouse.Id, seed.Location.Id, seed.Lot.Id, 10);
+        await using var db = CreateDbContext();
+        var lot = await db.Set<InventoryLot>().SingleAsync(x => x.Id == seed.Lot.Id);
+        lot.Status = status;
+        lot.ExpiresAt = DateTime.UtcNow.AddDays(expiryDays);
+        await db.SaveChangesAsync();
+
+        var request = new GetStockBalancesRequest
+        {
+            Metadata = CreateMetadata(), ProductId = seed.Product.Id,
+            WarehouseId = seed.Warehouse.Id, LocationId = seed.Location.Id
+        };
+        var physical = await InventarioIntegrationTestFixture.ServiceWrapper.GetStockBalances(request);
+        physical.IsSuccess.Should().BeTrue(physical.Message);
+        physical.Response.Should().ContainSingle().Which.AvailableQuantity.Should().Be(10);
+        var allocatable = await InventarioIntegrationTestFixture.ServiceWrapper.GetStockBalances(request with { AllocatableOnly = true });
+        allocatable.IsSuccess.Should().BeTrue(allocatable.Message);
+        allocatable.Response.Should().BeEmpty();
+
+        lot.Status = InventoryLotStatus.Available;
+        lot.ExpiresAt = DateTime.UtcNow.AddDays(30);
+        await db.SaveChangesAsync();
+        var eligible = await InventarioIntegrationTestFixture.ServiceWrapper.GetStockBalances(request with { AllocatableOnly = true });
+        eligible.IsSuccess.Should().BeTrue(eligible.Message);
+        eligible.Response.Should().ContainSingle().Which.AvailableQuantity.Should().Be(10);
+
+        var untracked = await InventarioIntegrationTestFixture.ServiceWrapper.PostStockMovement(new()
+        {
+            Metadata = CreateMetadata(), ProductId = seed.Product.Id,
+            WarehouseId = seed.Warehouse.Id, LocationId = seed.Location.Id,
+            MovementType = InventoryMovementType.OpeningBalance, Quantity = 3,
+            IdempotencyKey = $"untracked-{Guid.NewGuid():N}"
+        });
+        untracked.IsSuccess.Should().BeTrue(untracked.Message);
+        var mixed = await InventarioIntegrationTestFixture.ServiceWrapper.GetStockBalances(request with { AllocatableOnly = true });
+        mixed.IsSuccess.Should().BeTrue(mixed.Message);
+        mixed.Response.Should().HaveCount(2);
+        mixed.Response!.Sum(x => x.AvailableQuantity).Should().Be(13);
+    }
+
     [Test]
     [Category(TestCategories.Stock)]
     public async Task PostStockMovement_OpeningBalance_CreatesMovementAndBalance()

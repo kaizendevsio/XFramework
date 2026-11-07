@@ -65,7 +65,17 @@ public sealed partial class PosScannerPairingDialogE2ETests
         await CheckoutScreenshot("receipt-settings", width);
         await Page.GetByLabel("Receipt merchant name", new() { Exact = true }).FillAsync("Unsaved name");
         await Page.GetByLabel("Receipt merchant name", new() { Exact = true }).BlurAsync();
+        await Page.GetByLabel("Receipt paper width", new() { Exact = true }).ClickAsync();
+        await Page.GetByRole(AriaRole.Option, new() { Name = "80 mm", Exact = true }).ClickAsync();
+        await Page.GetByLabel("Receipt template", new() { Exact = true }).ClickAsync();
+        await Page.GetByRole(AriaRole.Option, new() { Name = "Classic", Exact = true }).ClickAsync();
+        await Expect(preview.Locator("body")).ToHaveClassAsync("classic");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Discard changes", Exact = true }).ClickAsync();
         await Expect(Page.GetByLabel("Receipt merchant name", new() { Exact = true })).ToHaveValueAsync("North Market");
+        await Expect(Page.GetByLabel("Receipt paper width", new() { Exact = true })).ToContainTextAsync("58 mm");
+        await Expect(Page.GetByLabel("Receipt template", new() { Exact = true })).ToContainTextAsync("Bold");
+        await Expect(preview.Locator("body")).ToHaveClassAsync("bold");
+        (await preview.Locator("body").BoundingBoxAsync())!.Width.Should().BeApproximately(58 * 96f / 25.4f, 1f);
+        state.SettingsSaves.Should().Be(1, "discard must not save the edited settings");
     }
 }
