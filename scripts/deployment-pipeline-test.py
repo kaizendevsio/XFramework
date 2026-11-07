@@ -121,6 +121,19 @@ class BaselineTests(unittest.TestCase):
 
 
 class ContextTests(unittest.TestCase):
+    def test_synthetic_gate_reaches_tailscale_from_host_network_only(self):
+        compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
+        services = compose["services"]
+        synthetic = services["bolt-phase0-synthetics"]
+        self.assertEqual("host", synthetic["network_mode"])
+        self.assertEqual(["phase0-verification"], synthetic["profiles"])
+        self.assertNotIn("ports", synthetic)
+        self.assertNotIn("networks", synthetic)
+        self.assertIn("BOLT_SYNTHETIC_TARGET", synthetic["environment"])
+        for name, service in services.items():
+            if name != "bolt-phase0-synthetics":
+                self.assertNotEqual("host", service.get("network_mode"), name)
+
     def test_restore_preserves_razor_discovery_and_publish_checks_portal_runtime(self):
         dockerfile = (ROOT / "Dockerfile").read_text()
         restore_inputs = dockerfile.split("AS restore-inputs", 1)[1].split("AS build", 1)[0]
