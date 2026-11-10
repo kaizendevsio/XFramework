@@ -4,11 +4,13 @@ Date: 2026-11-10 (Asia/Singapore).
 
 ## Release Decision
 
-**NO-GO for unrestricted production rollout.** This pass found and fixed two POS defects and a known vulnerable dependency. The changes are local and have not been deployed. Passing service, browser, and disposable-database tests is not proof of production recovery, operations, or payment-provider readiness.
+**NO-GO for unrestricted production rollout.** This pass found and fixed two POS defects and a known vulnerable dependency. The fixes subsequently passed CI, merged in [PR #620](https://github.com/kaizendevsio/XFramework/pull/620), and deployed to Xeon Dev. The [post-deployment retest](deployed-retest/report.md) passed checkout, partial refund, refund retry and cancellation on Jay Test 01, with stock and wallet reconciliation. Passing these checks is not proof of production recovery, operations, or payment-provider readiness.
 
 This supersedes the remaining-gate assessment in the [October verification](../2026-10-29-pos-inventory-verification/report.md), without replacing its historical transaction evidence. The [November UI retest](../2026-11-07-pos-dialog-sale-links/report.md) remains historical evidence for the dialog and sale-link fixes.
 
 ## Candidate and Test Boundaries
+
+The bullets below describe the initial readiness pass. The later deployment and financial-mutation checks are recorded separately in the [deployed retest](deployed-retest/report.md).
 
 - Branch: `codex/pos-inventory-production-readiness`, based on `b2b4033d1be79221a8e1f7b579729f566a939511` plus the uncommitted changes in this pass.
 - Live target: `http://xeon-dev:5000`; standard full-stack release `42355002692-1`, from successful deployment run `42355002692`. Application containers were healthy when checked.
@@ -79,7 +81,7 @@ The final live rerun passed all 26 executed tests with zero failures. The explic
 
 | Gate | What still blocks sign-off | Next verification / owner |
 | --- | --- | --- |
-| Candidate release | The fixes above are not in Xeon Dev or a release image; local passing tests do not replace CI. | Engineering: review/merge, complete required CI, build the immutable candidate, deploy to staging and rerun checkout/refund/cancellation/retry against that exact image. |
+| Candidate release | CLOSED for Xeon Dev: all PR checks passed; merged commit `cd60d3d08851696160e4890fd83c4e74f8aef432` deployed successfully; image IDs verified and all four requested live workflows passed. | See the [deployed retest](deployed-retest/report.md). Production promotion is not authorized or validated by this development deployment. |
 | Full-stack interruption recovery | Simulated lost replies and fresh DbContexts do not prove recovery after a real POS, Wallets, or Inventario process dies between commit and acknowledgment. | Engineering/operations: isolated full-stack tenant/environment; interrupt each phase, restart, retry the same keys, reconcile cash/wallet and stock ledgers, verify no duplicate settlement or stranded reservations. Do not interrupt the shared dev stack during other work. |
 | Production recovery | Only a disposable POS database was dumped/restored. Production backup availability, encryption, retention, all-module restore and schema/image rollback are not demonstrated. | Operations: restore an actual sanitized backup, validate module relationships and totals, rehearse compatible image/schema rollback, record agreed RPO/RTO and measured times. |
 | Production security/operations | Dev health and synthetic authorization checks do not validate production TLS, secret handling, actual role assignment, alerts or incident response. | Operations/security: verify production configuration, real restricted cashier/manager/inventory accounts, tenant isolation, alert delivery for failed settlement/reconciliation and a recovery runbook. |
