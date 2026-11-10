@@ -47,7 +47,8 @@ public sealed class InventarioIntegrationTestFixture
         Guid.Parse("00000000-0000-0000-0000-000000000821"),
         Guid.Parse("00000000-0000-0000-0000-000000000822"),
         Guid.Parse("00000000-0000-0000-0000-000000000823"),
-        ActorCapabilities: ["inventario.reporting:view", "inventario.planning:view", "inventario.transactions:view", "inventario.movements:create", "inventario.warehousing:create"]);
+        ActorCapabilities: ["inventario.reporting:view", "inventario.planning:view", "inventario.transactions:view", "inventario.movements:create", "inventario.warehousing:create",
+            "inventario.catalog:view", "inventario.catalog:create", "inventario.catalog:update", "inventario.catalog:delete"]);
 
     public static string ConnectionString { get; private set; } = null!;
     public static string BoltUrl => TestConstants.Ports.InventarioBolt;

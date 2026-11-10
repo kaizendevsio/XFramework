@@ -422,7 +422,8 @@ public sealed class PosCashierE2ETests : PageTest
     public async Task Adjustments_DiscountRecalculatesAutomaticTax_AndRejectsNegativeTotal()
     {
         await AddProductAsync(_settings.ProductName, _settings.ProductName);
-        var subtotal = await MoneyAsync(Page.GetByTestId("pos-subtotal"));
+        await Expect(Lines).ToHaveCountAsync(1);
+        var subtotal = await MoneyAsync(Lines.First.Locator(".pos-cart-line-total"));
         subtotal.Should().BeGreaterThan(0);
         await OpenPaymentAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Discount and tax", Exact = true }).ClickAsync();
@@ -552,6 +553,7 @@ public sealed class PosCashierE2ETests : PageTest
     {
         await Page.SetViewportSizeAsync(1100, 500);
         var available = Page.Locator(".pos-product-tile:not([disabled])");
+        await Expect(available.Nth(_settings.ScrollItemCount - 1)).ToBeVisibleAsync(new() { Timeout = 30_000 });
         (await available.CountAsync()).Should().BeGreaterThanOrEqualTo(_settings.ScrollItemCount,
             "the scroll fixture needs enough distinct sellable entries on the first catalog page; "
             + "see POS_E2E_SCROLL_ITEM_COUNT in POS-E2E.md");

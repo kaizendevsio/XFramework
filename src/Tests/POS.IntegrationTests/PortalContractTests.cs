@@ -452,7 +452,8 @@ public sealed class PortalContractTests
             "src", "Presentation", "XFramework.Portal", "wwwroot", "css", "app.css"));
 
         saleDetail.Should().Contain("Print receipt");
-        saleDetail.Should().Contain("JSRuntime.InvokeVoidAsync(\"print\")");
+        saleDetail.Should().Contain("PosReceiptDocument.Create(");
+        saleDetail.Should().Contain("module.InvokeVoidAsync(\"printReceipt\"");
         saleDetail.Should().Contain("Refunded Amount");
         saleDetail.Should().Contain("item.RefundedAmount");
         saleDetail.Should().Contain("_registerLabel");

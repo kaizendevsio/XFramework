@@ -177,6 +177,43 @@ public sealed class PosBoltRuntimeIntegrationTests
         denied.Response.Should().BeNull();
     }
 
+    [Test]
+    public async Task Cashier_WithoutManageOrRefundCapabilities_CannotMutateThroughBolt()
+    {
+        var wrapper = clientScope!.ServiceProvider.GetRequiredService<IPOSServiceWrapper>();
+        var token = TestInvocationIdentityExtensions.CreateTestActorToken(
+            tenantId, credentialId, Guid.NewGuid(), Guid.NewGuid(), ["Cashier"],
+            [PosAuthorizationCapabilities.SalesView, PosAuthorizationCapabilities.RegistersView]);
+        using var actor = TestInvocationActorTokenScope.Push(token);
+        var refund = await wrapper.CreatePosReturn(new()
+        {
+            Metadata = new() { RequestedTenantId = tenantId }, SaleId = Guid.NewGuid(),
+            CashierCredentialId = credentialId, IdempotencyKey = Guid.NewGuid().ToString()
+        });
+        ((int)refund.HttpStatusCode).Should().Be(403);
+        var update = await wrapper.UpdatePosRegister(new()
+        { Metadata = new() { RequestedTenantId = tenantId }, Id = registerId, Name = "Unauthorized edit" });
+        ((int)update.HttpStatusCode).Should().Be(403);
+        var read = await wrapper.GetPosRegister(new()
+        { Metadata = new() { RequestedTenantId = tenantId }, Id = registerId });
+        read.Response!.Name.Should().Be("Bolt register");
+    }
+
+    [Test]
+    public async Task GetPosRegister_OtherTenantActorWithViewCapability_CannotReadKnownObjectId()
+    {
+        var otherTenant = Guid.NewGuid();
+        var token = TestInvocationIdentityExtensions.CreateTestActorToken(
+            otherTenant, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), ["Cashier"],
+            [PosAuthorizationCapabilities.RegistersView]);
+        using var actor = TestInvocationActorTokenScope.Push(token);
+        var wrapper = clientScope!.ServiceProvider.GetRequiredService<IPOSServiceWrapper>();
+        var result = await wrapper.GetPosRegister(new()
+        { Metadata = new() { RequestedTenantId = otherTenant }, Id = registerId });
+        ((int)result.HttpStatusCode).Should().Be(404);
+        result.Response.Should().BeNull();
+    }
+
     private async Task MigrateAndSeedAsync()
     {
         System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(PosRegister).TypeHandle);
@@ -323,6 +360,7 @@ public sealed class PosBoltRuntimeIntegrationTests
             ["ServiceIdentity:ClientSecret"] = "pos-runtime-tests-secret-2026-secure",
             ["ServiceIdentity:DefaultScopes:0"] = XFrameworkServiceScopes.BoltService,
             ["Tenant:DefaultId"] = TestConstants.TenantId.ToString(),
+            ["JwtOptions:SigningPrivateKeyPath"] = string.Empty,
             ["Kestrel:Endpoints:Http:Url"] = url,
             ["urls"] = url,
             ["Logging:LogLevel:Default"] = "Warning"

@@ -306,8 +306,8 @@ public sealed class CatalogTests : InventarioTestBase
         var save = await ctx.SaveChangesAsync();
 
         save.IsSuccess.Should().BeFalse();
-        save.Message.Should().Contain("ProductVariation");
-        save.Message.Should().Contain("not registered for remote mutation");
+        save.StatusCode.Should().Be(403);
+        (await db.Set<ProductVariation>().IgnoreQueryFilters().AnyAsync(x => x.Id == variation.Id)).Should().BeFalse();
     }
 
     [Test]
@@ -330,8 +330,7 @@ public sealed class CatalogTests : InventarioTestBase
         var save = await ctx.SaveChangesAsync();
 
         save.IsSuccess.Should().BeFalse();
-        save.Message.Should().Contain("ProductVariationType");
-        save.Message.Should().Contain("not registered for remote mutation");
+        save.StatusCode.Should().Be(403);
     }
 
     [Test]
@@ -362,8 +361,7 @@ public sealed class CatalogTests : InventarioTestBase
         var save = await ctx.SaveChangesAsync();
 
         save.IsSuccess.Should().BeFalse();
-        save.Message.Should().Contain("InventoryReorderRule");
-        save.Message.Should().Contain("not registered for remote mutation");
+        save.StatusCode.Should().Be(403);
     }
 
     [Test]
@@ -413,8 +411,7 @@ public sealed class CatalogTests : InventarioTestBase
             var save = await ctx.SaveChangesAsync();
 
             save.IsSuccess.Should().BeFalse(entityName);
-            save.Message.Should().Contain(entityName);
-            save.Message.Should().Contain("not registered for remote mutation");
+            save.StatusCode.Should().Be(403, entityName);
         }
     }
 

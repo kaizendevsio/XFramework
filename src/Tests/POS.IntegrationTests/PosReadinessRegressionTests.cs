@@ -276,7 +276,9 @@ public sealed class PosReadinessRegressionTests
         var service = Service(db, tenant, inventory, wallets);
 
         var uncertain = await service.CheckoutAsync(request, CancellationToken.None);
-        var recovered = await service.RetryPaymentAsync(
+        await using var retryDb = Context(tenant);
+        retryDb.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
+        var recovered = await Service(retryDb, tenant, inventory, wallets).RetryPaymentAsync(
             new RetryPosSalePaymentRequest { SaleId = sale.Id }, CancellationToken.None);
 
         uncertain.IsSuccess.Should().BeTrue(uncertain.Message);
@@ -284,6 +286,9 @@ public sealed class PosReadinessRegressionTests
         uncertain.Data.RecoveryState.Should().Contain("same idempotency key");
         recovered.IsSuccess.Should().BeTrue(recovered.Message);
         recovered.Data!.Status.Should().Be(PosSaleStatus.Completed);
+        await using var verification = Context(tenant);
+        (await verification.Set<PosSale>().SingleAsync(x => x.Id == sale.Id)).Status.Should().Be(PosSaleStatus.Completed);
+        (await verification.Set<PosPayment>().SingleAsync(x => x.Id == payment.Id)).Status.Should().Be(PosPaymentStatus.Captured);
         wallets.Verify(item => item.IncrementWallet(It.Is<IncrementWalletRequest>(walletRequest =>
             walletRequest.CredentialId == originalMerchantCredentialId &&
             walletRequest.WalletId == originalWalletId &&

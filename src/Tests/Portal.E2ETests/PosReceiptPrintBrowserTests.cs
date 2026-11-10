@@ -17,7 +17,13 @@ public sealed class PosReceiptPrintBrowserTests : PageTest
     [TestCase(80, PosReceiptTemplate.Compact)]
     [TestCase(58, PosReceiptTemplate.Bold)]
     [TestCase(80, PosReceiptTemplate.Bold)]
-    public async Task PrintDocument_AllTemplatesAndWidths_LogoFitsAndPdfUsesThermalPaper(int width, PosReceiptTemplate template)
+    [TestCase(58, PosReceiptTemplate.Classic, 50)]
+    [TestCase(80, PosReceiptTemplate.Classic, 50)]
+    [TestCase(58, PosReceiptTemplate.Compact, 50)]
+    [TestCase(80, PosReceiptTemplate.Compact, 50)]
+    [TestCase(58, PosReceiptTemplate.Bold, 50)]
+    [TestCase(80, PosReceiptTemplate.Bold, 50)]
+    public async Task PrintDocument_AllTemplatesAndWidths_LogoFitsAndPdfUsesThermalPaper(int width, PosReceiptTemplate template, int itemCount = 2)
     {
         await Page.SetViewportSizeAsync(390, 900);
         await Page.SetContentAsync("<html><body><p>PRIVATE PORTAL AUDIT</p></body></html>");
@@ -39,6 +45,20 @@ public sealed class PosReceiptPrintBrowserTests : PageTest
             SubtotalAmount = 1555.20m, TotalAmount = 1555.20m,
             Payments = [sale.Payments[0] with { Amount = 1555.20m, CashTenderedAmount = 1600m, ChangeAmount = 44.80m }]
         };
+        if (itemCount > 2)
+        {
+            var lines = Enumerable.Range(1, itemCount).Select(index => sale.Lines[1] with
+            {
+                LineNumber = index,
+                ProductName = $"Item {index:D2} - {sale.Lines[1].ProductName}"
+            }).ToList();
+            var total = lines.Sum(x => x.LineTotal);
+            sale = sale with
+            {
+                Lines = lines, SubtotalAmount = total, TotalAmount = total,
+                Payments = [sale.Payments[0] with { Amount = total, CashTenderedAmount = total, ChangeAmount = 0 }]
+            };
+        }
         var html = PosReceiptDocument.Create(sale, settings, "Store", "USD");
         var script = await File.ReadAllTextAsync(Path.Combine(FindRoot(), "src/Presentation/XFramework.Portal.Features.POS/wwwroot/js/receipt-print.js"));
         await Page.EvaluateAsync("""
@@ -65,7 +85,7 @@ public sealed class PosReceiptPrintBrowserTests : PageTest
         await Page.EvaluateAsync("() => Promise.all([...document.images].map(x=>x.decode()))");
         var output = Path.Combine(TestContext.CurrentContext.WorkDirectory, "receipt-artifacts");
         Directory.CreateDirectory(output);
-        var stem = Path.Combine(output, $"{template.ToString().ToLowerInvariant()}-{width}mm");
+        var stem = Path.Combine(output, $"{template.ToString().ToLowerInvariant()}-{width}mm-{itemCount}items");
         await Page.Locator(".receipt").ScreenshotAsync(new() { Path = stem + ".png" });
         var pdf = await Page.PdfAsync(new() { Path = stem + ".pdf", PreferCSSPageSize = true, PrintBackground = true });
         var match = Regex.Match(Encoding.Latin1.GetString(pdf), @"/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]");

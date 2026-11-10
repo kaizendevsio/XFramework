@@ -1,0 +1,163 @@
+﻿{
+    "generatedAt":  "2026-11-10T12:20:57.7217729+08:00",
+    "baseline":  "b2b4033d1be79221a8e1f7b579729f566a939511",
+    "note":  "Runs overlap. See report for final counts and live versus candidate boundaries. Raw artifacts are local, not embedded.",
+    "runs":  [
+                 {
+                     "file":  "inventario-integration-fixed.trx",
+                     "sha256":  "CE399A4E46DFB997B31B6BDBCB1E34AB1564627BE5B7CC41A47F392201660189",
+                     "started":  "2026-11-10T12:02:15.7968917+08:00",
+                     "finished":  "2026-11-10T12:06:11.5844052+08:00",
+                     "total":  183,
+                     "passed":  183,
+                     "failed":  0,
+                     "notExecuted":  0,
+                     "failedTests":  [
+
+                                     ]
+                 },
+                 {
+                     "file":  "pos-integration-complete.trx",
+                     "sha256":  "DAD0A8BEAF41F93131029E5A512F7C2B8B60143A54DD80DC2B54D02B035BA275",
+                     "started":  "2026-11-10T12:12:55.2555589+08:00",
+                     "finished":  "2026-11-10T12:15:34.3720663+08:00",
+                     "total":  130,
+                     "passed":  130,
+                     "failed":  0,
+                     "notExecuted":  0,
+                     "failedTests":  [
+
+                                     ]
+                 },
+                 {
+                     "file":  "inventario-unit.trx",
+                     "sha256":  "141D6C5F525A5CB3204069F55BDADDB64283AE919DAD4F633266D78C2F2CCFB7",
+                     "started":  "2026-11-10T12:05:16.9329124+08:00",
+                     "finished":  "2026-11-10T12:05:53.9651959+08:00",
+                     "total":  132,
+                     "passed":  132,
+                     "failed":  0,
+                     "notExecuted":  0,
+                     "failedTests":  [
+
+                                     ]
+                 },
+                 {
+                     "file":  "pos-unit.trx",
+                     "sha256":  "0CD65E7EF8B1EDE4FCFAE255CD7ED8FF6FCC51DA07A1D387C0B41C4FA1404186",
+                     "started":  "2026-11-10T12:04:06.2750608+08:00",
+                     "finished":  "2026-11-10T12:04:09.1308950+08:00",
+                     "total":  155,
+                     "passed":  155,
+                     "failed":  0,
+                     "notExecuted":  0,
+                     "failedTests":  [
+
+                                     ]
+                 },
+                 {
+                     "file":  "bolt-rpc-auth.trx",
+                     "sha256":  "8BA6103DE44BD8E027981EA8A94EBC80E73C6C29A6A8F91BCD6B999FE36AC0F2",
+                     "started":  "2026-11-10T12:08:16.6424991+08:00",
+                     "finished":  "2026-11-10T12:08:31.6282831+08:00",
+                     "total":  37,
+                     "passed":  37,
+                     "failed":  0,
+                     "notExecuted":  0,
+                     "failedTests":  [
+
+                                     ]
+                 },
+                 {
+                     "file":  "portal-readiness.trx",
+                     "sha256":  "1E6DE081B5D9D2210E3BAF549D02947B5CFF34A507CC0FE8AEAAEC986CB39339",
+                     "started":  "2026-11-10T12:03:36.5830164+08:00",
+                     "finished":  "2026-11-10T12:12:16.4497690+08:00",
+                     "total":  384,
+                     "passed":  356,
+                     "failed":  26,
+                     "notExecuted":  0,
+                     "failedTests":  [
+                                         "Payment_InvalidDiscount_CanReopenAndCorrectWithoutSubmitting",
+                                         "Payment_OpensOnlyAfterPay_ClosingPreservesDraftAndTender",
+                                         "Lists_ResponsiveToolbarAndFilters_StayContainedAndReturnResults(390,844)",
+                                         "Cart_AddChangeRemoveAndUndo_RestoresQuantityOrderAndTotals",
+                                         "Dialogs_RepeatedOpenAndClose_PreserveDraftWithoutPersistingIt",
+                                         "Catalog_ClearedInputSubmitted_RestoresCatalogWithoutCircuitError",
+                                         "Layout_ViewportAndFocusMode_ContainContentAndKeepPaymentReachable(1366,768,\"dark\")",
+                                         "Cash_InsufficientExactAndExcessTender_UpdatesReadinessAndChange",
+                                         "Register_OpenEditRejectInvalidDraftAndDiscard_DoesNotMutateFixture",
+                                         "Catalog_EnterWithUniqueSku_AddsProductOncePerScan",
+                                         "Layout_ViewportAndFocusMode_ContainContentAndKeepPaymentReachable(768,1024,\"light\")",
+                                         "Catalog_RapidConsecutiveQueries_KeepsLatestInputAndCircuitAlive",
+                                         "Layout_ViewportAndFocusMode_ContainContentAndKeepPaymentReachable(390,844,\"light\")",
+                                         "Layout_ViewportAndFocusMode_ContainContentAndKeepPaymentReachable(1920,1080,\"light\")",
+                                         "Lists_ResponsiveToolbarAndFilters_StayContainedAndReturnResults(1920,1080)",
+                                         "Catalog_NameVariantAndNoMatchSearch_ShowsCurrentResults",
+                                         "Layout_ViewportAndFocusMode_ContainContentAndKeepPaymentReachable(768,1024,\"dark\")",
+                                         "Wallet_NoCustomer_DisablesPaymentWithCustomerGuidance",
+                                         "Adjustments_DiscountRecalculatesAutomaticTax_AndRejectsNegativeTotal",
+                                         "Lists_ResponsiveToolbarAndFilters_StayContainedAndReturnResults(768,1024)",
+                                         "Layout_ViewportAndFocusMode_ContainContentAndKeepPaymentReachable(1920,1080,\"dark\")",
+                                         "Layout_ViewportAndFocusMode_ContainContentAndKeepPaymentReachable(390,844,\"dark\")",
+                                         "Layout_LongCatalogAndCart_ScrollIndependentlyWithPaymentVisible",
+                                         "Layout_ViewportAndFocusMode_ContainContentAndKeepPaymentReachable(1366,768,\"light\")",
+                                         "Catalog_InitialLoad_ShowsProductsWithoutManualSearch",
+                                         "Catalog_VariantSku_OnlyAutoAddsWhenExactlyOneMatchExists"
+                                     ]
+                 },
+                 {
+                     "file":  "portal-live-readiness.trx",
+                     "sha256":  "2813C5DAEDA3860A0448880BF9C9F8B95489985989569AAA166006CC47B4BFC1",
+                     "started":  "2026-11-10T12:13:17.0752187+08:00",
+                     "finished":  "2026-11-10T12:15:14.2778672+08:00",
+                     "total":  27,
+                     "passed":  25,
+                     "failed":  1,
+                     "notExecuted":  0,
+                     "failedTests":  [
+                                         "Adjustments_DiscountRecalculatesAutomaticTax_AndRejectsNegativeTotal"
+                                     ]
+                 },
+                 {
+                     "file":  "portal-live-final.trx",
+                     "sha256":  "E6B5F1145F34E7DCE0F241C7B0F5D62AA7EE5C051FDF5C30BA1893757AE3EF7F",
+                     "started":  "2026-11-10T12:16:17.2052985+08:00",
+                     "finished":  "2026-11-10T12:18:03.9937531+08:00",
+                     "total":  27,
+                     "passed":  25,
+                     "failed":  1,
+                     "notExecuted":  0,
+                     "failedTests":  [
+                                         "Layout_LongCatalogAndCart_ScrollIndependentlyWithPaymentVisible"
+                                     ]
+                 },
+                 {
+                     "file":  "pos-notracking-before.trx",
+                     "sha256":  "1C0A9A3200BA418EB93AC2D75906B4E466AD935219A3746B52D9E0D23013D92B",
+                     "started":  "2026-11-10T12:00:42.5132923+08:00",
+                     "finished":  "2026-11-10T12:01:11.5640768+08:00",
+                     "total":  2,
+                     "passed":  0,
+                     "failed":  2,
+                     "notExecuted":  0,
+                     "failedTests":  [
+                                         "CancelSale_NoTrackingDefault_PersistsCancellationAcrossRequests",
+                                         "RetryReturn_InventoryReplyLost_DoesNotRefundUntilRestockAcknowledged"
+                                     ]
+                 },
+                 {
+                     "file":  "portal-live-complete.trx",
+                     "sha256":  "62482D7DD155536524EF7CC18CF8CB3EC1A1925317C17ADDBCD38CC9BF44CFDB",
+                     "started":  "2026-11-10T12:18:35.6563786+08:00",
+                     "finished":  "2026-11-10T12:20:23.1617498+08:00",
+                     "total":  27,
+                     "passed":  26,
+                     "failed":  0,
+                     "notExecuted":  0,
+                     "failedTests":  [
+
+                                     ]
+                 }
+             ]
+}

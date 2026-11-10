@@ -378,10 +378,20 @@ public sealed class PosPersistenceIntegrationTests
         first.Data!.Status.Should().Be(PosReturnStatus.InventoryPostFailed);
         wallets.Verify(item => item.DecrementWallet(It.IsAny<DecrementWalletRequest>()), Times.Never);
         db.ChangeTracker.Clear();
-        var retry = await service.RetryAsync(new RetryPosReturnRequest { ReturnId = first.Data.Id }, CancellationToken.None);
+        await using var retryDb = CreateContext(tenantId);
+        retryDb.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
+        var retryService = CreateReturnsService(retryDb, tenantId, inventory, wallets);
+        var retry = await retryService.RetryAsync(new RetryPosReturnRequest { ReturnId = first.Data.Id }, CancellationToken.None);
 
         retry.IsSuccess.Should().BeTrue(retry.Message);
         retry.Data!.Status.Should().Be(PosReturnStatus.Completed);
+        await using var verification = CreateContext(tenantId);
+        (await verification.Set<PosReturn>().SingleAsync(x => x.Id == first.Data.Id))
+            .Status.Should().Be(PosReturnStatus.Completed, "a fresh production-style context must persist recovery");
+        (await verification.Set<PosPayment>().SingleAsync(x => x.Id == seed.Payment.Id))
+            .RefundedAmount.Should().Be(25);
+        (await retryService.RetryAsync(new RetryPosReturnRequest { ReturnId = first.Data.Id }, CancellationToken.None))
+            .IsSuccess.Should().BeTrue();
         movementRequests.Should().HaveCount(2);
         movementRequests.Select(item => item.IdempotencyKey).Distinct().Should().ContainSingle();
         movementRequests.Should().OnlyContain(item => item.Quantity == seed.Line.Quantity &&
@@ -507,11 +517,116 @@ public sealed class PosPersistenceIntegrationTests
         exactCart.Data.Should().ContainSingle().Which.CustomerLabel.Should().Be("oldest-marker");
     }
 
+    [Test]
+    public async Task CreateReturn_ConcurrentCashiers_RefundsOnceAndRejectsOverReturnWithoutServerErrors()
+    {
+        var tenantId = Guid.NewGuid();
+        var seed = CreateCompletedSale(tenantId, PosPaymentMethod.CashDrawer);
+        await using (var db = CreateContext(tenantId))
+        {
+            db.Add(seed.Sale);
+            await db.SaveChangesAsync();
+        }
+
+        var inventory = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
+        inventory.Setup(x => x.PostStockMovement(It.IsAny<PostStockMovementRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CmdResponse { HttpStatusCode = HttpStatusCode.OK });
+        var wallets = new Mock<IWalletsServiceWrapper>(MockBehavior.Strict);
+        wallets.Setup(x => x.DecrementWallet(It.IsAny<DecrementWalletRequest>()))
+            .ReturnsAsync(new CmdResponse { HttpStatusCode = HttpStatusCode.OK });
+
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var attempts = Enumerable.Range(0, 12).Select(async _ =>
+        {
+            await using var db = CreateContext(tenantId);
+            await start.Task;
+            return await CreateReturnsService(db, tenantId, inventory, wallets).CreateAsync(
+                CreateReturnRequest(seed, PosPaymentMethod.CashDrawer), CancellationToken.None);
+        }).ToArray();
+        start.SetResult();
+        var results = await Task.WhenAll(attempts);
+
+        results.Count(x => x.IsSuccess).Should().Be(1);
+        results.Where(x => !x.IsSuccess).Should().OnlyContain(x => x.StatusCode == 409);
+        inventory.Verify(x => x.PostStockMovement(It.IsAny<PostStockMovementRequest>(), It.IsAny<CancellationToken>()), Times.Once);
+        wallets.Verify(x => x.DecrementWallet(It.IsAny<DecrementWalletRequest>()), Times.Once);
+        await using var persisted = CreateContext(tenantId);
+        (await persisted.Set<PosReturnLine>().SumAsync(x => x.Quantity)).Should().Be(1);
+        (await persisted.Set<PosPayment>().SingleAsync(x => x.Id == seed.Payment.Id)).RefundedAmount.Should().Be(25);
+    }
+
+    [Test]
+    public async Task CancelSale_NoTrackingDefault_PersistsCancellationAcrossRequests()
+    {
+        var tenantId = Guid.NewGuid();
+        var register = CreateRegister(tenantId);
+        var sale = CreateSale(tenantId, register.Id);
+        sale.Status = PosSaleStatus.Draft;
+        await using (var seed = CreateContext(tenantId))
+        {
+            seed.AddRange(register, sale);
+            await seed.SaveChangesAsync();
+        }
+
+        await using var db = CreateContext(tenantId);
+        db.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
+        var resolver = CreateResolver(tenantId);
+        var inventory = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
+        var wallets = new Mock<IWalletsServiceWrapper>(MockBehavior.Strict);
+        var service = new PosSalesService(db, inventory.Object, wallets.Object, resolver.Object,
+            NullLogger<PosSalesService>.Instance, new PosFinanceSettings(Mock.Of<IIdentityServerServiceWrapper>()),
+            new PosCheckoutSettingsService(db, resolver.Object),
+            Mock.Of<XFramework.Core.Services.FeatureGates.ITenantModuleFeatureService>());
+        var result = await service.CancelAsync(new CancelPosSaleRequest { SaleId = sale.Id, Reason = "Customer cancelled" }, CancellationToken.None);
+        result.IsSuccess.Should().BeTrue(result.Message);
+        await using var verification = CreateContext(tenantId);
+        var saved = await verification.Set<PosSale>().SingleAsync(x => x.Id == sale.Id);
+        saved.Status.Should().Be(PosSaleStatus.Cancelled);
+        saved.CancelledAt.Should().NotBeNull();
+        inventory.VerifyNoOtherCalls();
+        wallets.VerifyNoOtherCalls();
+    }
+
     private AppDbContext CreateContext(Guid tenantId) => new(
         options,
         new HttpContextAccessor(),
         new ConfigurationBuilder().Build(),
         new TestEffectiveTenantContextAccessor(tenantId));
+
+    [Test]
+    public async Task BackupRestore_PreservesCompletedSaleAndMigrationHistory()
+    {
+        var tenantId = Guid.NewGuid();
+        var seed = CreateCompletedSale(tenantId, PosPaymentMethod.CashDrawer);
+        await using (var db = CreateContext(tenantId))
+        {
+            db.Add(seed.Sale);
+            await db.SaveChangesAsync();
+        }
+
+        var restoreDatabase = $"restore_{Guid.NewGuid():N}";
+        var archive = $"/tmp/{restoreDatabase}.dump";
+        var dump = await postgres!.ExecAsync(["pg_dump", "-U", "test_user", "-d", "XFramework_POS_Test", "-Fc", "-f", archive]);
+        dump.ExitCode.Should().Be(0, dump.Stderr);
+        var create = await postgres.ExecAsync(["createdb", "-U", "test_user", restoreDatabase]);
+        create.ExitCode.Should().Be(0, create.Stderr);
+        var restore = await postgres.ExecAsync(["pg_restore", "-U", "test_user", "-d", restoreDatabase, "--exit-on-error", archive]);
+        restore.ExitCode.Should().Be(0, restore.Stderr);
+
+        var connection = new Npgsql.NpgsqlConnectionStringBuilder(postgres.GetConnectionString()) { Database = restoreDatabase };
+        var restoredOptions = new DbContextOptionsBuilder<AppDbContext>(options).UseNpgsql(connection.ConnectionString).Options;
+        await using var restored = new AppDbContext(restoredOptions, new HttpContextAccessor(),
+            new ConfigurationBuilder().Build(), new TestEffectiveTenantContextAccessor(tenantId));
+        var saved = await restored.Set<PosSale>().Include(x => x.Lines).Include(x => x.Payments)
+            .SingleAsync(x => x.Id == seed.Sale.Id);
+        saved.Status.Should().Be(PosSaleStatus.Completed);
+        saved.TotalAmount.Should().Be(25);
+        saved.Lines.Should().ContainSingle().Which.Quantity.Should().Be(1);
+        saved.Payments.Should().ContainSingle().Which.Amount.Should().Be(25);
+        (await restored.Database.GetPendingMigrationsAsync()).Should().BeEmpty();
+        await restored.Database.MigrateAsync();
+        (await restored.Set<PosPayment>().CountAsync()).Should().Be(1);
+    }
 
     private static PosReturnsService CreateReturnsService(
         AppDbContext db,
