@@ -816,8 +816,7 @@ public sealed class PosSalesService(
             .Include(item => item.Payments)
             .Where(item => item.TenantId == tenantId && item.Id == saleId && !item.IsDeleted);
 
-        if (!tracking)
-            query = query.AsNoTracking();
+        query = tracking ? query.AsTracking() : query.AsNoTracking();
 
         return await query.FirstOrDefaultAsync(ct);
     }

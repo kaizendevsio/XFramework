@@ -41,7 +41,6 @@ public sealed class PortalContractTests
         "Receiving.razor",
         "Reports.razor",
         "Reservations.razor",
-        "Stock.razor",
         "Suppliers.razor",
         "Transactions.razor",
         "Warehouses.razor"
@@ -64,7 +63,6 @@ public sealed class PortalContractTests
         "Products.razor",
         "ProductDetail.razor",
         "Lots.razor",
-        "Stock.razor",
         "Receiving.razor",
         "PurchaseOrders.razor",
         "Reservations.razor",
@@ -72,7 +70,7 @@ public sealed class PortalContractTests
     ];
 
     [Test]
-    public void Reports_OnlyLoadsExpiryRiskReports()
+    public void Reports_LoadsAuthorizedSnapshotAndDelegatesToReportView()
     {
         var repositoryRoot = FindRepositoryRoot();
         var reportsPath = Path.Combine(
@@ -84,14 +82,8 @@ public sealed class PortalContractTests
             "Reports.razor");
         var text = File.ReadAllText(reportsPath);
 
-        var expiryReportMethods = new[]
-        {
-            "GetNearExpiryStockReport",
-            "GetExpiredStockReport"
-        };
-
-        foreach (var method in expiryReportMethods)
-            text.Should().Contain($"Inventario.{method}(");
+        text.Should().Contain("Inventario.GetInventoryReportSnapshot(");
+        text.Should().Contain("<InventoryReportView");
 
         text.Should().NotContain("GetLowStockReport");
         text.Should().NotContain("GetStockPositionReport");
@@ -256,13 +248,14 @@ public sealed class PortalContractTests
         var productsText = File.ReadAllText(Path.Combine(pagesRoot, "Products.razor"));
         var productDetailText = File.ReadAllText(Path.Combine(pagesRoot, "ProductDetail.razor"));
 
-        productsText.Should().Contain("XfEntityPicker TItem=\"ProductCategory\"");
-        productsText.Should().Contain("AdvancedColumns=\"@CategoryAdvancedColumns\"");
+        productsText.Should().Contain("ProductCategoryPicker");
         productsText.Should().NotContain("CategoryOptions");
 
-        productDetailText.Should().Contain("XfEntityPicker TItem=\"ProductCategory\"");
-        productDetailText.Should().Contain("AdvancedColumns=\"@CategoryAdvancedColumns\"");
+        productDetailText.Should().Contain("ProductCategoryPicker");
         productDetailText.Should().NotContain("Options=\"@CategoryOptions\"");
+        var picker = File.ReadAllText(Path.Combine(pagesRoot, "..", "Components", "ProductCategoryPicker.razor"));
+        picker.Should().Contain("XfEntityPicker TItem=\"ProductCategory\"");
+        picker.Should().Contain("AdvancedColumns=\"@Columns\"");
     }
 
     [Test]
@@ -390,6 +383,11 @@ public sealed class PortalContractTests
             var pagePath = Path.Combine(pagesRoot, page);
             var text = File.ReadAllText(pagePath);
 
+            if (page == "Reports.razor")
+            {
+                text.Should().Contain("<InventoryReportView");
+                text = File.ReadAllText(Path.Combine(pagesRoot, "..", "Reports", "InventoryReportView.razor"));
+            }
             text.Should().NotContain("<table", $"{page} should use BlazorBlueprint data grids instead of raw tables");
             text.Should().Contain("<BbDataGrid", $"{page} should use BbDataGrid for list/report tabular records");
             text.Should().NotMatchRegex(
@@ -448,7 +446,10 @@ public sealed class PortalContractTests
             var pagePath = Path.Combine(pagesRoot, page);
             var text = File.ReadAllText(pagePath);
 
-            text.Should().Contain("<XfEntityPicker", $"{page} should use the shared entity picker for domain entity selectors");
+            if (page == "Products.razor")
+                text.Should().Contain("ProductCategoryPicker");
+            else
+                text.Should().Contain("<XfEntityPicker", $"{page} should use the shared entity picker for domain entity selectors");
             text.Should().NotContain("<BbCombobox", $"{page} should not use plain comboboxes for product, warehouse, location, lot, supplier, or purchase-order selectors");
             text.Should().NotContain("<BbFormFieldCombobox", $"{page} should not use form-field comboboxes for domain entity selectors");
         }

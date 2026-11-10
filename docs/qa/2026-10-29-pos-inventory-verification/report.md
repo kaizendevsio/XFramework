@@ -1,5 +1,7 @@
 # POS and Inventario Verification - 2026-10-29
 
+Latest production-readiness assessment: [2026-11-10 checks, fixes and remaining shipping gates](../2026-11-10-production-readiness/report.md). The results below are historical, not a current release sign-off.
+
 Status at original verification: three defects and explicit coverage gaps. **Follow-up: B01, B02 and B03 are fixed, deployed and retested; see [fix and retest results](fix-retest.md).** The findings below preserve the original evidence. Not a production release sign-off.
 
 ## Conclusion

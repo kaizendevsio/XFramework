@@ -54,7 +54,8 @@ public sealed class BasicProductStockWrapperTests : InventarioTestBase
         }
         finally
         {
-            if (added) seed.Remove(setup);
+            // The setup has a tenant-unique index, including soft-deleted rows.
+            if (added) await seed.Set<InventarioSetup>().Where(x => x.Id == setup.Id).ExecuteDeleteAsync();
             else (setup.Mode, setup.WarehouseId, setup.LocationId) = original;
             await seed.SaveChangesAsync();
         }

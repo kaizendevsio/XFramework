@@ -358,6 +358,43 @@ public sealed class StockReservationTests : InventarioTestBase
         allocation.Status.Should().Be(ReservationAllocationStatus.Expired);
     }
 
+    [Test]
+    public async Task ReserveInventory_TwentyClientsCompeteForFiveUnits_NoOversellingOrStrandedAllocations()
+    {
+        var seed = await SeedInventoryScope();
+        await PostOpeningBalance(seed.Product.Id, seed.Warehouse.Id, seed.Location.Id, seed.Lot.Id, 5);
+        var results = await Task.WhenAll(Enumerable.Range(0, 20).Select(_ =>
+            InventarioIntegrationTestFixture.ServiceWrapper.ReserveInventory(new ReserveInventoryRequest
+            {
+                Metadata = CreateMetadata(), ProductId = seed.Product.Id,
+                WarehouseId = seed.Warehouse.Id, LocationId = seed.Location.Id, LotId = seed.Lot.Id,
+                Quantity = 1, IdempotencyKey = $"contention-{Guid.NewGuid():N}"
+            })));
+
+        results.Count(x => x.IsSuccess).Should().BeInRange(1, 5);
+        results.Where(x => !x.IsSuccess).Should().OnlyContain(x => (int)x.HttpStatusCode == 409);
+        await using var db = CreateDbContext();
+        var balance = await db.Set<StockBalance>().SingleAsync(x => x.ProductId == seed.Product.Id);
+        var reservations = await db.Set<Reservation>().Where(x => x.ProductId == seed.Product.Id).ToListAsync();
+        var allocations = await db.Set<ReservationAllocation>().Where(x => x.ProductId == seed.Product.Id).ToListAsync();
+        balance.OnHandQuantity.Should().Be(5);
+        balance.ReservedQuantity.Should().Be(results.Count(x => x.IsSuccess));
+        balance.AvailableQuantity.Should().Be(5 - balance.ReservedQuantity);
+        reservations.Should().HaveCount(results.Count(x => x.IsSuccess));
+        allocations.Sum(x => x.Quantity).Should().Be(balance.ReservedQuantity);
+
+        foreach (var reservation in reservations)
+        {
+            var released = await InventarioIntegrationTestFixture.ServiceWrapper.ReleaseReservation(new()
+            { Metadata = CreateMetadata(), ReservationId = reservation.Id });
+            released.IsSuccess.Should().BeTrue(released.Message);
+        }
+        db.ChangeTracker.Clear();
+        balance = await db.Set<StockBalance>().SingleAsync(x => x.ProductId == seed.Product.Id);
+        balance.ReservedQuantity.Should().Be(0);
+        balance.AvailableQuantity.Should().Be(5);
+    }
+
     private async Task<InventoryScope> SeedInventoryScope()
     {
         await using var db = CreateDbContext();

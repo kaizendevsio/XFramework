@@ -1,6 +1,7 @@
 using System.Data;
 using Inventario.Integration.Drivers;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using POS.Domain.Shared.Contracts;
 using POS.Domain.Shared.Contracts.Requests;
 using POS.Domain.Shared.Contracts.Responses;
@@ -23,6 +24,24 @@ public sealed class PosReturnsService(
     IPosRequestContextResolver contextResolver)
 {
     public async Task<Result<PosReturnResponse>> CreateAsync(
+        CreatePosReturnRequest request,
+        CancellationToken ct)
+    {
+        try
+        {
+            return await CreateCoreAsync(request, ct);
+        }
+        catch (Exception ex) when (ex.GetBaseException() is PostgresException
+            { SqlState: PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected })
+        {
+            // A competing refund can invalidate the serializable allocation snapshot.
+            // Let the caller replay its original key instead of reporting a server failure.
+            db.ChangeTracker.Clear();
+            return Result<PosReturnResponse>.Conflict("Return changed concurrently. Retry with the same idempotency key.");
+        }
+    }
+
+    private async Task<Result<PosReturnResponse>> CreateCoreAsync(
         CreatePosReturnRequest request,
         CancellationToken ct)
     {
@@ -527,8 +546,7 @@ public sealed class PosReturnsService(
             .Include(item => item.Lines)
             .Where(item => item.TenantId == tenantId && item.Id == returnId && !item.IsDeleted);
 
-        if (!tracking)
-            query = query.AsNoTracking();
+        query = tracking ? query.AsTracking() : query.AsNoTracking();
 
         return await query.FirstOrDefaultAsync(ct);
     }
