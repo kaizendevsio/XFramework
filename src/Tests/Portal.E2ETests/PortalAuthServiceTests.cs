@@ -5,6 +5,7 @@ using IdentityServer.Domain.Shared.Contracts.Responses;
 using IdentityServer.Integration.Drivers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Configuration;
 using Moq;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Portal.Services;
@@ -51,7 +52,8 @@ public sealed class PortalAuthServiceTests
                 HttpStatusCode = status,
                 Message = "Internal details must not be displayed."
             });
-        var service = new PortalAuthService(identityServer.Object, NullLogger<PortalAuthService>.Instance);
+        var service = new PortalAuthService(identityServer.Object, NullLogger<PortalAuthService>.Instance,
+            new PortalLoginSites(new ConfigurationBuilder().Build()));
         var context = new DefaultHttpContext();
         context.Request.Scheme = "https";
 

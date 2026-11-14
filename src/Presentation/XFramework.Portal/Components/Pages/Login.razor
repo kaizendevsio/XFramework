@@ -1,25 +1,28 @@
 @page "/login"
 @attribute [AllowAnonymous]
 @layout LoginLayout
+@inject PortalLoginSites LoginSites
+@inject NavigationManager Navigation
 
 <PageTitle>Sign in - Portal</PageTitle>
 
-<section class="login-panel" aria-labelledby="login-title">
+<section class="login-panel" aria-label="Sign in">
     <div class="login-card">
         <div class="login-brand">
-            <div class="login-logo" aria-hidden="true">X</div>
-            <div>
-                <div class="login-brand-name">Portal</div>
-                <p>Modules &amp; operations</p>
-            </div>
+            @if (_interactive && !string.IsNullOrWhiteSpace(_site?.LogoUrl) && !_logoFailed)
+            {
+                <img src="@_site.LogoUrl" alt="@_site.BrandName" class="login-logo" referrerpolicy="no-referrer" @onerror="() => _logoFailed = true" />
+            }
+            else
+            {
+                <span class="login-wordmark">@(_site?.BrandName ?? "XSystems")</span>
+            }
         </div>
 
-        <div class="login-heading">
-        <p class="login-kicker">Secure portal access</p>
-            <h1 id="login-title">Sign in to Portal</h1>
-            <p>Use your administrator credential to manage tenants, modules, wallets, inventory, and identity operations.</p>
-        </div>
-
+        @if (_site is null)
+        {
+            <div class="login-error" role="alert">Sign-in is not configured for this address.</div>
+        }
         @if (!string.IsNullOrWhiteSpace(Error))
         {
             <div class="login-error" role="alert">@Error</div>
@@ -30,59 +33,29 @@
 
             <label>
                 <span>Username</span>
-                <input name="username" autocomplete="username" required autofocus placeholder="admin@example.com" disabled="@(!_interactive)" />
+                <input name="username" autocomplete="username" required autofocus disabled="@(!_interactive || _site is null)" />
             </label>
 
             <label>
                 <span>Password</span>
-                <input name="password" type="password" autocomplete="current-password" required placeholder="Enter your password" disabled="@(!_interactive)" />
+                <input name="password" type="password" autocomplete="current-password" required disabled="@(!_interactive || _site is null)" />
             </label>
 
-            <div class="login-form-row">
-                <label class="login-remember">
-                    <input name="rememberMe" type="checkbox" value="true" />
-                    <span>Keep me signed in</span>
-                </label>
-                <span>Protected session</span>
-            </div>
-
-            <button type="submit" disabled="@(!_interactive)">
+            <button type="submit" disabled="@(!_interactive || _site is null)">
                 <span>Sign in</span>
                 <LucideIcon Name="arrow-right" class="login-submit-icon" />
             </button>
         </form>
     </div>
 
-    <aside class="login-context" aria-label="Portal capabilities">
-        <div class="login-context-header">
-            <span class="login-context-dot"></span>
-            <span>Operational console</span>
-        </div>
-        <h3>One surface for every active module.</h3>
-        <p>Review tenant state, follow workflow approvals, and operate business modules with the same theme you use after sign-in.</p>
-        <div class="login-context-grid">
-            <div>
-                <LucideIcon Name="building-2" class="login-context-icon" />
-                <span>Tenants</span>
-            </div>
-            <div>
-                <LucideIcon Name="wallet" class="login-context-icon" />
-                <span>Wallets</span>
-            </div>
-            <div>
-                <LucideIcon Name="package" class="login-context-icon" />
-                <span>Inventory</span>
-            </div>
-            <div>
-                <LucideIcon Name="shield-check" class="login-context-icon" />
-                <span>Identity</span>
-            </div>
-        </div>
-    </aside>
 </section>
 
 @code {
     private bool _interactive;
+    private bool _logoFailed;
+    private PortalLoginSite? _site;
+
+    protected override void OnInitialized() => _site = LoginSites.Resolve(new Uri(Navigation.Uri).Host);
 
     protected override void OnAfterRender(bool firstRender)
     {

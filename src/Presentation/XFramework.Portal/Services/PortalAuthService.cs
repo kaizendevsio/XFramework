@@ -9,7 +9,8 @@ namespace XFramework.Portal.Services;
 
 public sealed class PortalAuthService(
     IIdentityServerServiceWrapper identityServer,
-    ILogger<PortalAuthService> logger)
+    ILogger<PortalAuthService> logger,
+    PortalLoginSites loginSites)
 {
     public async Task<PortalLoginResult> AuthenticateAsync(
         string? username,
@@ -18,6 +19,10 @@ public sealed class PortalAuthService(
         HttpContext httpContext,
         CancellationToken ct)
     {
+        var site = loginSites.Resolve(httpContext.Request.Host.Host);
+        if (site is null)
+            return PortalLoginResult.Failed("Sign-in is not configured for this address.");
+
         if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
         {
             return PortalLoginResult.Failed("Username and password are required.");
@@ -27,14 +32,14 @@ public sealed class PortalAuthService(
         {
             UserName = username.Trim(),
             Password = password,
-            RoleId = PortalBootstrapConstants.AdminRoleTypeId,
+            RoleId = site.AuthenticationRoleId,
             AuthorizationType = AuthorizationType.Username,
             GenerateToken = true,
             RememberMe = rememberMe,
-            Metadata = BuildMetadata(httpContext, PortalBootstrapConstants.AdminTenantId)
+            Metadata = BuildMetadata(httpContext, site.AuthenticationTenantId)
         };
 
-        var response = await identityServer.AuthenticateIdentity(request);
+        var response = await identityServer.AuthenticateIdentity(request, ct);
         if (!response.IsSuccess || response.Response?.Credential is null || response.Response.Identity is null)
         {
             logger.LogWarning(
@@ -44,12 +49,16 @@ public sealed class PortalAuthService(
             var message = response.HttpStatusCode switch
             {
                 HttpStatusCode.Unauthorized or HttpStatusCode.NotFound or HttpStatusCode.BadRequest or HttpStatusCode.Forbidden =>
-                    "Invalid username, password, or admin permission.",
+                    site.IsTenantLogin ? "Invalid username, password, or sign-in permission." : "Invalid username, password, or admin permission.",
                 _ => "Unable to sign in. Check IdentityServer health and try again."
             };
 
             return PortalLoginResult.Failed(message);
         }
+
+        if (response.Response.Credential.TenantId != site.AuthenticationTenantId ||
+            response.Response.Identity.TenantId != site.AuthenticationTenantId)
+            return PortalLoginResult.Failed("Unable to sign in to this site.");
 
         if (string.IsNullOrWhiteSpace(response.Response.AccessToken) ||
             string.IsNullOrWhiteSpace(response.Response.RefreshToken) ||
@@ -61,8 +70,8 @@ public sealed class PortalAuthService(
 
         var principal = BuildPrincipal(
             response.Response,
-            PortalBootstrapConstants.AdminRoleTypeId,
-            PortalBootstrapConstants.AdminTenantId,
+            site.AuthenticationRoleId,
+            site.AuthenticationTenantId,
             username.Trim());
         return PortalLoginResult.Success(principal);
     }

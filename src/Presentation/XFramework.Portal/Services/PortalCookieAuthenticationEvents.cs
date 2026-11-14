@@ -5,10 +5,18 @@ namespace XFramework.Portal.Services;
 
 public sealed class PortalCookieAuthenticationEvents(
     PortalIdentitySessionValidator sessionValidator,
-    ILogger<PortalCookieAuthenticationEvents> logger) : CookieAuthenticationEvents
+    ILogger<PortalCookieAuthenticationEvents> logger,
+    PortalLoginSites loginSites) : CookieAuthenticationEvents
 {
     public override async Task ValidatePrincipal(CookieValidatePrincipalContext context)
     {
+        if (!loginSites.AcceptsPrincipal(context.Request.Host.Host, context.Principal))
+        {
+            context.RejectPrincipal();
+            await context.HttpContext.SignOutAsync(PortalAuthDefaults.AuthenticationScheme);
+            return;
+        }
+
         var validation = await sessionValidator.ValidateAndRefreshAsync(
             context.Principal,
             context.HttpContext.RequestAborted);

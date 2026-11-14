@@ -150,6 +150,7 @@
                                 <label class="profile-menu-label">Active Tenant</label>
                                 <BbCombobox TValue="string"
                                              Value="@_selectedTenantId"
+                                             Disabled="@(_loginTenantId.HasValue)"
                                              ValueChanged="@OnTenantSelectionChanged"
                                              Options="@TenantOptions"
                                              Placeholder="All Tenants"
@@ -236,6 +237,7 @@
     private string? _breadcrumbWalletLabel;
     private bool _profileMenuOpen;
     private bool _canManageTenants;
+    private Guid? _loginTenantId;
 
     private string _selectedTenantName => TenantFilter.SelectedTenantName ?? "";
     private string ActiveTenantLabel => string.IsNullOrWhiteSpace(_selectedTenantName) ? "All Tenants" : _selectedTenantName;
@@ -252,7 +254,7 @@
 
     private List<SelectOption<string>> TenantOptions =>
     [
-        new(AllTenantsValue, "All Tenants"),
+        .. (_loginTenantId.HasValue ? Array.Empty<SelectOption<string>>() : [new(AllTenantsValue, "All Tenants")]),
         .. _tenants.Select(t => new SelectOption<string>(t.Id.ToString(), t.Name ?? t.Id.ToString()[..8]))
     ];
 
@@ -414,6 +416,14 @@
         }
 
         _canManageTenants = PortalAccess.CanManageTenants(user);
+        _loginTenantId = !_canManageTenants && Guid.TryParse(user.FindFirst(PortalAuthClaims.TenantId)?.Value, out var loginTenantId)
+            ? loginTenantId : null;
+        if (_loginTenantId is { } fixedTenantId)
+        {
+            _selectedTenantId = fixedTenantId.ToString();
+            if (TenantFilter.SelectedTenantId != fixedTenantId)
+                TenantFilter.SetTenant(fixedTenantId, _tenants.FirstOrDefault(t => t.Id == fixedTenantId)?.Name ?? "Tenant");
+        }
         _userName = user.Identity.Name ?? "";
         _displayName = user.FindFirst(PortalAuthClaims.DisplayName)?.Value
             ?? user.Identity.Name
@@ -545,10 +555,14 @@
     {
         try
         {
-            _tenants = await DataContext.Query<IdentityServer.Domain.Shared.Contracts.Tenant>()
+            var query = DataContext.Query<IdentityServer.Domain.Shared.Contracts.Tenant>()
                 .IgnoreQueryFilters()
                 .NoCache()
-                .Where(t => !t.IsDeleted)
+                .Where(t => !t.IsDeleted);
+            if (_loginTenantId is { } loginTenantId)
+                query = query.Where(t => t.Id == loginTenantId);
+
+            _tenants = await query
                 .OrderBy(t => t.Name)
                 .Take(100)
                 .ToListAsync();
@@ -562,6 +576,13 @@
 
     private async Task RestoreTenantSelection()
     {
+        if (_loginTenantId is { } loginTenantId)
+        {
+            _selectedTenantId = loginTenantId.ToString();
+            TenantFilter.SetTenant(loginTenantId, _tenants.FirstOrDefault(t => t.Id == loginTenantId)?.Name ?? "Tenant");
+            return;
+        }
+
         if (_canManageTenants && IsManageTenantsRoute)
         {
             await SetAllTenantsActive();
@@ -645,6 +666,9 @@
 
     private async Task OnTenantSelectionChanged(string? value)
     {
+        if (_loginTenantId.HasValue)
+            return;
+
         if (_canManageTenants && IsManageTenantsRoute)
         {
             await SetAllTenantsActive();
