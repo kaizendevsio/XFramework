@@ -7,10 +7,12 @@ using Microsoft.AspNetCore.Components.Web.HtmlRendering;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
+using Microsoft.Playwright;
 using Moq;
 using POS.Domain.Shared.Contracts;
 using POS.Domain.Shared.Contracts.Requests;
 using POS.Domain.Shared.Contracts.Responses;
+using POS.Domain.Shared.Enums;
 using POS.Integration.Drivers;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
@@ -63,9 +65,57 @@ public sealed class PosSaleDetailLoadingTests
         (await fixture.Html()).Should().NotContain("Receipt Totals").And.NotContain(fixture.Sale.SaleNumber);
     }
 
+    [Test, Category("Area:PortalLayoutBrowser")]
+    public async Task PaymentAudit_AttemptedCapturedAndRefundedAmounts_MatchEachPaymentState()
+    {
+        await using var fixture = new Fixture();
+        fixture.Sale.Payments.Clear();
+        foreach (var status in new[] { PosPaymentStatus.Pending, PosPaymentStatus.Failed, PosPaymentStatus.Captured, PosPaymentStatus.Refunded })
+            fixture.Sale.Payments.Add(new() { Id = Guid.NewGuid(), Status = status, Amount = 12.50m,
+                RefundedAmount = status == PosPaymentStatus.Refunded ? 12.50m : 0m });
+        await fixture.Render();
+        await fixture.SelectTenant(fixture.Sale.TenantId);
+        await fixture.Complete(false);
+
+        using var playwright = await Playwright.CreateAsync();
+        await using var browser = await playwright.Chromium.LaunchAsync();
+        var page = await browser.NewPageAsync();
+        await page.SetContentAsync(await fixture.Html());
+        var grid = page.GetByRole(AriaRole.Grid).Filter(new() { Has = page.GetByRole(AriaRole.Columnheader, new() { Name = "Attempted Amount" }) });
+        var headers = await grid.GetByRole(AriaRole.Columnheader).AllTextContentsAsync();
+        var attempted = headers.ToList().FindIndex(x => x.Contains("Attempted Amount"));
+        var captured = headers.ToList().FindIndex(x => x.Contains("Captured Amount"));
+        var refunded = headers.ToList().FindIndex(x => x.Contains("Refunded Amount"));
+        new[] { attempted, captured, refunded }.Should().OnlyContain(index => index >= 0);
+        foreach (var (status, capture, refund) in new[] {
+            ("Pending", "-", "0.00"), ("Failed", "0.00", "0.00"),
+            ("Captured", "12.50", "0.00"), ("Refunded", "12.50", "12.50") })
+        {
+            var row = grid.GetByRole(AriaRole.Row).Filter(new() { Has = page.GetByRole(AriaRole.Gridcell, new() { Name = status, Exact = true }) });
+            var cells = row.GetByRole(AriaRole.Gridcell);
+            (await cells.Nth(attempted).InnerTextAsync()).Should().Be("12.50");
+            (await cells.Nth(captured).InnerTextAsync()).Should().Be(capture);
+            (await cells.Nth(refunded).InnerTextAsync()).Should().Be(refund);
+        }
+    }
+
+    [TestCase(PosSaleStatus.PaymentCaptured, true)]
+    [TestCase(PosSaleStatus.InventoryFulfillmentFailed, true)]
+    [TestCase(PosSaleStatus.Completed, false)]
+    [TestCase(PosSaleStatus.PaymentPending, false)]
+    public async Task RetryFulfillment_OfferedOnlyOnPaidUnfulfilledReceipt(PosSaleStatus status, bool offered)
+    {
+        await using var fixture = new Fixture();
+        fixture.Sale = fixture.Sale with { Status = status };
+        await fixture.Render();
+        await fixture.SelectTenant(fixture.Sale.TenantId);
+        await fixture.Complete(false);
+        (await fixture.Html()).Contains("Retry Fulfillment").Should().Be(offered);
+    }
+
     private sealed class Fixture : IAsyncDisposable
     {
-        public PosSaleReceiptResponse Sale { get; } = PosReceiptTests.Sale();
+        public PosSaleReceiptResponse Sale { get; set; } = PosReceiptTests.Sale();
         public Mock<IPOSServiceWrapper> POS { get; } = new(MockBehavior.Strict);
         private readonly Mock<IPortalTenantContext> _tenant = new();
         private readonly Mock<IPortalModuleAvailability> _modules = new();

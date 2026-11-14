@@ -37,7 +37,7 @@ else
                     <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _previewOpen = true)" Disabled="@(!ReceiptReady)"><LucideIcon Name="eye" class="mr-2 h-4 w-4" />Receipt preview</BbButton>
                     <BbButton Variant="ButtonVariant.Outline" OnClick="@PrintReceipt" Disabled="@(!ReceiptReady || _printing)"><LucideIcon Name="printer" class="mr-2 h-4 w-4" />Print receipt</BbButton>
                     <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload" Disabled="@_acting"><LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />Refresh</BbButton>
-                    @if (_sale.Status == PosSaleStatus.InventoryFulfillmentFailed)
+                    @if (_sale.Status is PosSaleStatus.PaymentCaptured or PosSaleStatus.InventoryFulfillmentFailed)
                     {
                         <BbButton OnClick="@RetryFulfillment" Disabled="@_acting">Retry Fulfillment</BbButton>
                     }
@@ -109,12 +109,13 @@ else
                 <BbDataGrid Items="@_sale.Payments" ShowPagination="false"><Columns>
                     <BbDataGridPropertyColumn Property="@(x => x.Method)" Title="Method" Filterable="true" />
                     <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Filterable="true" />
-                    <BbDataGridTemplateColumn Title="Captured Amount" Sortable="true" Filterable="true" FilterBy="@(x => x.Amount)"><ChildContent Context="item">@FormatMoney(item.Amount)</ChildContent></BbDataGridTemplateColumn>
+                    <BbDataGridTemplateColumn Title="Attempted Amount" Sortable="true" Filterable="true" FilterBy="@(x => x.Amount)"><ChildContent Context="item">@FormatMoney(item.Amount)</ChildContent></BbDataGridTemplateColumn>
+                    <BbDataGridTemplateColumn Title="Captured Amount" Filterable="true" FilterBy="@(x => CapturedAmount(x))"><ChildContent Context="item">@FormatOptionalMoney(CapturedAmount(item))</ChildContent></BbDataGridTemplateColumn>
                     <BbDataGridTemplateColumn Title="Refunded Amount" Sortable="true" Filterable="true" FilterBy="@(x => x.RefundedAmount)"><ChildContent Context="item">@FormatMoney(item.RefundedAmount)</ChildContent></BbDataGridTemplateColumn>
                     <BbDataGridTemplateColumn Title="Cash Received" Sortable="true" Filterable="true" FilterBy="@(x => x.CashTenderedAmount)"><ChildContent Context="item">@FormatOptionalMoney(item.CashTenderedAmount)</ChildContent></BbDataGridTemplateColumn>
                     <BbDataGridTemplateColumn Title="Change" Sortable="true" Filterable="true" FilterBy="@(x => x.ChangeAmount)"><ChildContent Context="item">@FormatOptionalMoney(item.ChangeAmount)</ChildContent></BbDataGridTemplateColumn>
                     <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Filterable="true" />
-                    <BbDataGridPropertyColumn Property="@(x => x.CapturedAt)" Title="Captured" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.CapturedAt)" Title="Captured At" Sortable="true" />
                 </Columns></BbDataGrid>
             </BbCardContent></BbCard>
         </div>
@@ -291,6 +292,12 @@ else
     }
     private string FormatMoney(decimal value) => _currencyCode is { } code ? $"{code} {value:N2}" : value.ToString("N2");
     private string FormatOptionalMoney(decimal? value) => value.HasValue ? FormatMoney(value.Value) : "-";
+    private static decimal? CapturedAmount(PosPaymentResponse payment) => payment.Status switch
+    {
+        PosPaymentStatus.Captured or PosPaymentStatus.Refunded => payment.Amount,
+        PosPaymentStatus.Failed => 0m,
+        _ => null
+    };
     private static string CredentialLabel(IdentityCredential? credential, Guid id) => credential is null
         ? id.ToString()[..8]
         : !string.IsNullOrWhiteSpace(credential.UserAlias)

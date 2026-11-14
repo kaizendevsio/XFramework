@@ -285,28 +285,7 @@ public sealed class PosSalesService(
         }
 
         if (sale.Status is PosSaleStatus.PaymentCaptured or PosSaleStatus.InventoryFulfillmentFailed)
-        {
-            var fulfillmentResult = await FulfillReservationsAsync(sale, metadata);
-            if (!fulfillmentResult.IsSuccess)
-            {
-                sale.Status = PosSaleStatus.InventoryFulfillmentFailed;
-                sale.FailureReason = fulfillmentResult.Message;
-                sale.RecoveryState = "Payment captured; retry fulfillment for unfulfilled reservation IDs.";
-                await db.SaveChangesAsync(ct);
-                return Result<PosSaleReceiptResponse>.Success(PosServiceHelpers.ToSaleReceiptResponse(sale), fulfillmentResult.Message);
-            }
-
-            sale.Status = PosSaleStatus.Completed;
-            sale.CompletedAt = DateTime.UtcNow;
-            sale.FailureReason = null;
-            sale.RecoveryState = null;
-            await db.SaveChangesAsync(ct);
-
-            var receipt = PosServiceHelpers.ToSaleReceiptResponse(sale);
-            return replayed
-                ? Result<PosSaleReceiptResponse>.Success(receipt, "POS sale replay completed")
-                : Result<PosSaleReceiptResponse>.Success(receipt, 201, "POS sale completed");
-        }
+            return await CompletePaidSaleAsync(sale.TenantId, sale.Id, metadata, replayed, ct);
 
         return Result<PosSaleReceiptResponse>.Success(PosServiceHelpers.ToSaleReceiptResponse(sale), replayed ? "POS sale replayed" : "POS sale accepted");
     }
@@ -435,19 +414,42 @@ public sealed class PosSalesService(
         if (sale is null)
             return Result<PosSaleReceiptResponse>.NotFound("POS sale was not found");
 
-        if (sale.Status != PosSaleStatus.InventoryFulfillmentFailed)
-            return Result<PosSaleReceiptResponse>.Conflict("Only sales with failed inventory fulfillment can be retried");
+        if (sale.Status is not (PosSaleStatus.PaymentCaptured or PosSaleStatus.InventoryFulfillmentFailed))
+            return Result<PosSaleReceiptResponse>.Conflict("Only paid sales awaiting fulfillment can be retried");
 
         var fulfillmentFeature = await EnsureFulfillmentEnabledAsync(sale.TenantId, ct);
         if (!fulfillmentFeature.IsSuccess)
             return Result<PosSaleReceiptResponse>.Failure(fulfillmentFeature.Message!, fulfillmentFeature.StatusCode);
 
-        var fulfillmentResult = await FulfillReservationsAsync(sale, contextResult.Data.Metadata);
+        return await CompletePaidSaleAsync(sale.TenantId, sale.Id, contextResult.Data.Metadata, true, ct);
+    }
+
+    private async Task<Result<PosSaleReceiptResponse>> CompletePaidSaleAsync(
+        Guid tenantId, Guid saleId, RequestMetadata metadata, bool replayed, CancellationToken ct)
+    {
+        // The operator can arrive while checkout is still shipping. A dead connection releases the lock.
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var locked = await db.Database.SqlQuery<bool>(
+            $"SELECT pg_try_advisory_xact_lock(hashtextextended({"pos:fulfill:" + saleId}, 0)) AS \"Value\"")
+            .SingleAsync(ct);
+        if (!locked)
+            return Result<PosSaleReceiptResponse>.Conflict("Fulfillment is in progress. Refresh the receipt before retrying.");
+        db.ChangeTracker.Clear();
+        var sale = await LoadSaleAsync(tenantId, saleId, true, ct);
+        if (sale is null)
+            return Result<PosSaleReceiptResponse>.NotFound("POS sale was not found");
+        if (sale.Status == PosSaleStatus.Completed)
+            return Result<PosSaleReceiptResponse>.Success(PosServiceHelpers.ToSaleReceiptResponse(sale), "POS sale completed");
+        if (sale.Status is not (PosSaleStatus.PaymentCaptured or PosSaleStatus.InventoryFulfillmentFailed))
+            return Result<PosSaleReceiptResponse>.Conflict("Sale is not awaiting fulfillment");
+        var fulfillmentResult = await FulfillReservationsAsync(sale, metadata);
         if (!fulfillmentResult.IsSuccess)
         {
+            sale.Status = PosSaleStatus.InventoryFulfillmentFailed;
             sale.FailureReason = fulfillmentResult.Message;
             sale.RecoveryState = "Payment captured; retry fulfillment for unfulfilled reservation IDs.";
             await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
             return Result<PosSaleReceiptResponse>.Success(PosServiceHelpers.ToSaleReceiptResponse(sale), fulfillmentResult.Message);
         }
 
@@ -456,8 +458,9 @@ public sealed class PosSalesService(
         sale.FailureReason = null;
         sale.RecoveryState = null;
         await db.SaveChangesAsync(ct);
-
-        return Result<PosSaleReceiptResponse>.Success(PosServiceHelpers.ToSaleReceiptResponse(sale), "POS sale fulfillment completed");
+        await tx.CommitAsync(ct);
+        return Result<PosSaleReceiptResponse>.Success(PosServiceHelpers.ToSaleReceiptResponse(sale),
+            replayed ? 200 : 201, "POS sale completed");
     }
 
     public async Task<Result<PosSaleReceiptResponse>> RetryPaymentAsync(

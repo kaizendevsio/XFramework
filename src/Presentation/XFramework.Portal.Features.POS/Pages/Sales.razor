@@ -72,7 +72,7 @@ else
                                         <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Ghost" OnClick="@(() => OpenSale(item.Id))">
                                             View
                                         </BbButton>
-                                        @if (item.Status == PosSaleStatus.InventoryFulfillmentFailed)
+                                        @if (item.Status is PosSaleStatus.PaymentCaptured or PosSaleStatus.InventoryFulfillmentFailed)
                                         {
                                             <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => RetryFulfillment(item.Id))" Disabled="@_acting">
                                                 Retry
