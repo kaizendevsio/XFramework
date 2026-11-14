@@ -28,3 +28,9 @@ Portal table rule:
 - Enable native `BbDataGrid` column filtering on useful user-facing data columns. Use `Filterable="true"` on property columns and set `FilterBy` on template columns; leave command/action columns unfiltered.
 
 Task-specific OpenCode skills live under `.opencode/skills/`; use them as workflow helpers, not as the primary documentation authority.
+
+Deployment verification policy (owner decision, 2026-11-14):
+
+- For Dev and staging deployments, do not run or wait for broad regression/production-readiness suites as a release gate. Keep build checks, deployment health checks, and focused smoke tests for the changed workflow.
+- Run the full regression and production-readiness checks before a production deployment. Report skipped checks honestly; a Dev deployment is not production sign-off.
+- This policy does not disable CI jobs or change branch protection. Use the authorized merge path for the requested Dev/staging release rather than weakening repository protections.

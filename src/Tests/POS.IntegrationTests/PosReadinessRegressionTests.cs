@@ -37,12 +37,15 @@ public sealed class PosReadinessRegressionTests
             .WithDatabase("pos_readiness").WithUsername("qa").WithPassword("isolated_test_only").Build();
         await postgres.StartAsync();
         System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(PosRegister).TypeHandle);
-        options = new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(postgres.GetConnectionString())
-            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
-            .Options;
+        ConnectDatabase();
         await using var db = Context(Guid.NewGuid());
         await db.Database.MigrateAsync();
     }
+
+    private void ConnectDatabase() =>
+        options = new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(postgres.GetConnectionString())
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
+            .Options;
 
     [OneTimeTearDown]
     public async Task StopDatabase()
@@ -298,6 +301,114 @@ public sealed class PosReadinessRegressionTests
             It.Is<FulfillReservationRequest>(fulfill => fulfill.ReservationId == line.ReservationId),
             It.IsAny<CancellationToken>()), Times.Once);
         inventory.VerifyNoOtherCalls();
+    }
+
+    [Test]
+    public async Task CheckoutAsync_InterruptedAfterCapture_ReplayCompletesWithoutChargingAgain()
+    {
+        var tenant = Guid.NewGuid();
+        var sale = Sale(tenant, PosSaleStatus.PaymentPending);
+        var request = CheckoutRequest(sale.Register);
+        sale.IdempotencyKey = request.IdempotencyKey!;
+        sale.RequestHash = PosServiceHelpers.BuildSaleRequestHash(request);
+        var line = Line(sale);
+        line.ProductId = request.Lines[0].ProductId;
+        sale.Lines.Add(line);
+        sale.Payments.Add(Payment(sale, PosPaymentStatus.Pending));
+        var inventory = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
+        inventory.SetupSequence(x => x.FulfillReservation(
+                It.Is<FulfillReservationRequest>(r => r.ReservationId == line.ReservationId), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException("Interrupted before fulfillment"))
+            .ReturnsAsync(new CmdResponse { HttpStatusCode = HttpStatusCode.OK });
+        var wallets = new Mock<IWalletsServiceWrapper>(MockBehavior.Strict);
+        wallets.Setup(x => x.IncrementWallet(It.IsAny<IncrementWalletRequest>()))
+            .ReturnsAsync(new CmdResponse { HttpStatusCode = HttpStatusCode.OK });
+
+        await using (var db = Context(tenant))
+        {
+            db.Add(sale);
+            await db.SaveChangesAsync();
+            var service = Service(db, tenant, inventory, wallets);
+            Assert.ThrowsAsync<OperationCanceledException>(async () => await service.CheckoutAsync(request, CancellationToken.None));
+        }
+
+        await using (var retry = Context(tenant))
+        {
+            retry.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
+            (await retry.Set<PosSale>().SingleAsync(x => x.Id == sale.Id)).Status.Should().Be(PosSaleStatus.PaymentCaptured);
+            var recovered = await Service(retry, tenant, inventory, wallets).CheckoutAsync(request, CancellationToken.None);
+            recovered.IsSuccess.Should().BeTrue(recovered.Message);
+            recovered.Data!.Status.Should().Be(PosSaleStatus.Completed);
+        }
+
+        await using var verify = Context(tenant);
+        (await verify.Set<PosSale>().SingleAsync(x => x.Id == sale.Id)).Status.Should().Be(PosSaleStatus.Completed);
+        (await verify.Set<PosPayment>().SingleAsync(x => x.SaleId == sale.Id)).Status.Should().Be(PosPaymentStatus.Captured);
+        var replay = await Service(verify, tenant, inventory, wallets).CheckoutAsync(request, CancellationToken.None);
+        replay.Data!.Status.Should().Be(PosSaleStatus.Completed);
+        wallets.Verify(x => x.IncrementWallet(It.IsAny<IncrementWalletRequest>()), Times.Once);
+        inventory.Verify(x => x.FulfillReservation(It.IsAny<FulfillReservationRequest>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        inventory.VerifyNoOtherCalls();
+        wallets.VerifyNoOtherCalls();
+    }
+
+    [Test]
+    [NonParallelizable]
+    public async Task RetryFulfillment_AfterDatabaseRestart_ResumesPaidReceiptByIdWithoutRecharging()
+    {
+        var tenant = Guid.NewGuid();
+        var sale = Sale(tenant, PosSaleStatus.PaymentPending);
+        var request = CheckoutRequest(sale.Register);
+        sale.IdempotencyKey = request.IdempotencyKey!;
+        sale.RequestHash = PosServiceHelpers.BuildSaleRequestHash(request);
+        var line = Line(sale);
+        line.ProductId = request.Lines[0].ProductId;
+        sale.Lines.Add(line);
+        sale.Payments.Add(Payment(sale, PosPaymentStatus.Pending));
+        var wallet = new Mock<IWalletsServiceWrapper>(MockBehavior.Strict);
+        wallet.Setup(x => x.IncrementWallet(It.IsAny<IncrementWalletRequest>()))
+            .ReturnsAsync(new CmdResponse { HttpStatusCode = HttpStatusCode.OK });
+        var inventory = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
+        var beforeAck = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var acknowledge = new TaskCompletionSource<CmdResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        inventory.SetupSequence(x => x.FulfillReservation(
+                It.Is<FulfillReservationRequest>(r => r.ReservationId == line.ReservationId), It.IsAny<CancellationToken>()))
+            .Returns(() => { beforeAck.SetResult(); return acknowledge.Task; })
+            .ReturnsAsync(new CmdResponse { HttpStatusCode = HttpStatusCode.OK });
+
+        await using (var db = Context(tenant))
+        {
+            db.Add(sale);
+            await db.SaveChangesAsync();
+            var checkout = Service(db, tenant, inventory, wallet).CheckoutAsync(request, CancellationToken.None);
+            try
+            {
+                await beforeAck.Task.WaitAsync(TimeSpan.FromSeconds(20));
+                await using var other = Context(tenant);
+                var busy = await Service(other, tenant, inventory, wallet).RetryFulfillmentAsync(new() { SaleId = sale.Id }, default);
+                busy.StatusCode.Should().Be(409);
+                await postgres.StopAsync();
+            }
+            finally
+            {
+                acknowledge.TrySetResult(new CmdResponse { HttpStatusCode = HttpStatusCode.OK });
+                await postgres.StartAsync();
+                ConnectDatabase();
+            }
+            var error = await Task.WhenAny(checkout, Task.Delay(TimeSpan.FromSeconds(20)));
+            error.Should().BeSameAs(checkout);
+            Assert.CatchAsync<Exception>(async () => await checkout);
+        }
+
+        await using var retry = Context(tenant);
+        (await retry.Set<PosSale>().AsNoTracking().SingleAsync(s => s.Id == sale.Id)).Status.Should().Be(PosSaleStatus.PaymentCaptured);
+        var recovered = await Service(retry, tenant, inventory, wallet).RetryFulfillmentAsync(new() { SaleId = sale.Id }, default);
+        recovered.IsSuccess.Should().BeTrue(recovered.Message);
+        await using var verify = Context(tenant);
+        (await verify.Set<PosSale>().SingleAsync(s => s.Id == sale.Id)).Status.Should().Be(PosSaleStatus.Completed);
+        (await verify.Set<PosPayment>().SingleAsync(p => p.SaleId == sale.Id)).Status.Should().Be(PosPaymentStatus.Captured);
+        inventory.Verify(x => x.FulfillReservation(It.IsAny<FulfillReservationRequest>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        wallet.Verify(x => x.IncrementWallet(It.IsAny<IncrementWalletRequest>()), Times.Once);
     }
 
     [Test]

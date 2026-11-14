@@ -1,0 +1,26 @@
+[
+  {
+    "file": "inventario.trx",
+    "sha256": "5D7A0AD2422997EBFFA9596FE26C1006E7997633DD99AEA6C6C549F43ABD03BC",
+    "finished": "2026-11-11T10:10:31.7984150+08:00",
+    "executed": 184,
+    "passed": 184,
+    "failed": 0
+  },
+  {
+    "file": "portal.trx",
+    "sha256": "4CAA1051797E503C174EB4424CFFFF267680639CE75D76EDBB0C5CA2FEA9437D",
+    "finished": "2026-11-11T09:59:41.2216387+08:00",
+    "executed": 17,
+    "passed": 17,
+    "failed": 0
+  },
+  {
+    "file": "pos.trx",
+    "sha256": "F1A827EA67756FEB258A2061CE41886E8FF37B89EA98389A41CBA9533A88C208",
+    "finished": "2026-11-11T10:08:24.5194635+08:00",
+    "executed": 131,
+    "passed": 131,
+    "failed": 0
+  }
+]

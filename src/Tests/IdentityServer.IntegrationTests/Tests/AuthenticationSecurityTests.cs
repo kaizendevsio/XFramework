@@ -625,6 +625,44 @@ public sealed class AuthenticationSecurityTests : IntegrationTestBase
         result.IsSuccess.Should().BeFalse();
     }
 
+    [TestCase("QA cashier", false)]
+    [TestCase("QA manager", true)]
+    public async Task PosStoreLogin_IssuedSessionReflectsAssignedRole(string roleName, bool canRecoverAndRefund)
+    {
+        var seeded = await SeedAuthenticationGraph();
+        var now = DateTime.UtcNow;
+        await using (var db = CreateDbContext())
+        {
+            var role = await db.Set<IdentityRoleType>().IgnoreQueryFilters().SingleAsync(x => x.Id == seeded.RoleTypeId);
+            role.Name = roleName;
+            foreach (var feature in new[] { "", "sales", "returns", "registers" })
+                db.Add(new TenantModuleFeature { Id = Guid.NewGuid(), TenantId = seeded.TenantId, ModuleKey = "pos",
+                    SubFeatureKey = feature, DisplayName = "POS " + feature, IsEnabled = true, CreatedAt = now });
+            foreach (var (feature, action, allow) in new[] {
+                ("sales", "create", true), ("sales", "update", canRecoverAndRefund),
+                ("returns", "create", canRecoverAndRefund), ("registers", "update", false) })
+                db.Add(new IdentityRoleTypeFeaturePermission { Id = Guid.NewGuid(), TenantId = seeded.TenantId,
+                    RoleTypeId = role.Id, ModuleKey = "pos", SubFeatureKey = feature, CapabilityKey = action,
+                    Effect = allow ? RoleCapabilityPermissionEffect.Allow : RoleCapabilityPermissionEffect.Deny,
+                    IsEnabled = true, CreatedAt = now });
+            await db.SaveChangesAsync();
+        }
+        var login = await IntegrationTestFixture.ServiceWrapper.AuthenticateIdentity(
+            CreateAuthRequest(seeded.TenantId, seeded.RoleTypeId, seeded.Username, seeded.Password));
+        login.IsSuccess.Should().BeTrue(login.Message);
+        using var actor = IntegrationTestFixture.UseActorAccessToken(login.Response!.AccessToken!);
+        var session = await IntegrationTestFixture.ServiceWrapper.ValidateIdentitySession(new()
+        {
+            Metadata = new RequestMetadata { RequestId = Guid.NewGuid(), RequestedTenantId = seeded.TenantId }
+        });
+        session.IsSuccess.Should().BeTrue(session.Message);
+        session.Response!.CredentialId.Should().Be(seeded.CredentialId);
+        session.Response.TenantId.Should().Be(seeded.TenantId);
+        session.Response.Capabilities.Should().Contain("pos.sales:create").And.NotContain("pos.registers:update");
+        session.Response.Capabilities.Contains("pos.sales:update").Should().Be(canRecoverAndRefund);
+        session.Response.Capabilities.Contains("pos.returns:create").Should().Be(canRecoverAndRefund);
+    }
+
     [Test]
     public void JsonSerialization_IdentityCredential_DoesNotExposeSecrets()
     {

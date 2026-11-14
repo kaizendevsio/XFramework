@@ -232,7 +232,8 @@ public sealed class PortalAuthenticationTicketStoreTests
             new AuthenticationScheme(PortalAuthDefaults.AuthenticationScheme, null, typeof(CookieAuthenticationHandler)),
             new CookieAuthenticationOptions { SessionStore = fixture.Store }, ticket);
         var events = new PortalCookieAuthenticationEvents(
-            fixture.Validator(), NullLogger<PortalCookieAuthenticationEvents>.Instance);
+            fixture.Validator(), NullLogger<PortalCookieAuthenticationEvents>.Instance,
+            new PortalLoginSites(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()));
 
         var validation = () => events.ValidatePrincipal(context);
         await validation.Should().ThrowAsync<OperationCanceledException>();
@@ -242,6 +243,34 @@ public sealed class PortalAuthenticationTicketStoreTests
         var stored = (await fixture.NewStore().RetrieveAsync(key))!;
         stored.Principal.FindFirstValue(PortalAuthClaims.RefreshToken).Should().Be("refresh-1");
         (await fixture.Validator().ValidateAndRefreshAsync(stored.Principal)).IsValid.Should().BeTrue();
+    }
+
+    [Test]
+    public async Task CookieValidation_UnconfiguredHost_RejectsBeforeRemoteSessionValidation()
+    {
+        var fixture = new SessionFixture();
+        var ticket = fixture.CreateTicket();
+        var http = new DefaultHttpContext();
+        http.Request.Host = new HostString("unknown.example.com");
+        var authentication = new Mock<IAuthenticationService>(MockBehavior.Strict);
+        authentication.Setup(x => x.SignOutAsync(http, PortalAuthDefaults.AuthenticationScheme, null))
+            .Returns(Task.CompletedTask);
+        using var services = new ServiceCollection().AddSingleton(authentication.Object).BuildServiceProvider();
+        http.RequestServices = services;
+        var context = new CookieValidatePrincipalContext(http,
+            new AuthenticationScheme(PortalAuthDefaults.AuthenticationScheme, null, typeof(CookieAuthenticationHandler)),
+            new CookieAuthenticationOptions(), ticket);
+        var config = new Microsoft.Extensions.Configuration.ConfigurationBuilder();
+        Microsoft.Extensions.Configuration.MemoryConfigurationBuilderExtensions.AddInMemoryCollection(config,
+            new Dictionary<string, string?> { ["Portal:Login:Hosts:0:Host"] = "admin.example.com" });
+        var events = new PortalCookieAuthenticationEvents(fixture.Validator(),
+            NullLogger<PortalCookieAuthenticationEvents>.Instance, new PortalLoginSites(config.Build()));
+
+        await events.ValidatePrincipal(context);
+
+        context.Principal.Should().BeNull();
+        authentication.Verify(x => x.SignOutAsync(http, PortalAuthDefaults.AuthenticationScheme, null), Times.Once);
+        fixture.RefreshCalls.Should().Be(0);
     }
 
     [Test]

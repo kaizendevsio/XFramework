@@ -489,8 +489,9 @@ public sealed class PortalSessionRevocationContractTests
             "Services",
             "PortalAuthService.cs"));
 
-        authService.Should().Contain("PortalBootstrapConstants.AdminTenantId");
-        authService.Should().Contain("PortalBootstrapConstants.AdminRoleTypeId");
+        authService.Should().Contain("loginSites.Resolve(httpContext.Request.Host.Host)");
+        authService.Should().Contain("site.AuthenticationTenantId");
+        authService.Should().Contain("site.AuthenticationRoleId");
         authService.Should().NotContain("IDataContext");
         authService.Should().NotContain("IgnoreQueryFilters()");
         authService.Should().NotContain("FindBootstrapTenantAsync");

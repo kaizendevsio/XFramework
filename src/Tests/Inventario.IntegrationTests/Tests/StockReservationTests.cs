@@ -395,6 +395,51 @@ public sealed class StockReservationTests : InventarioTestBase
         balance.AvailableQuantity.Should().Be(5);
     }
 
+    [Test]
+    public async Task ConcurrentSaleAndReturnCycles_ReconcileEachStockPosition()
+    {
+        const int cycles = 10;
+        var scopes = new List<InventoryScope>();
+        for (int i = 0; i < 4; i++)
+        {
+            var scope = await SeedInventoryScope();
+            await PostOpeningBalance(scope.Product.Id, scope.Warehouse.Id, scope.Location.Id, scope.Lot.Id, 5);
+            scopes.Add(scope);
+        }
+
+        var wrapper = InventarioIntegrationTestFixture.ServiceWrapper;
+        var timings = await Task.WhenAll(scopes.Select(async scope =>
+        {
+            var samples = new List<double>();
+            for (int i = 0; i < cycles; i++)
+            {
+                var timer = System.Diagnostics.Stopwatch.StartNew();
+                var id = await ReserveAndGetId(scope, 1);
+                var shipped = await wrapper.FulfillReservation(new() { Metadata = CreateMetadata(), ReservationId = id });
+                shipped.IsSuccess.Should().BeTrue(shipped.Message);
+                var returned = await wrapper.PostStockMovement(new()
+                {
+                    Metadata = CreateMetadata(), ProductId = scope.Product.Id, WarehouseId = scope.Warehouse.Id,
+                    LocationId = scope.Location.Id, LotId = scope.Lot.Id, MovementType = InventoryMovementType.Return,
+                    Quantity = 1, IdempotencyKey = $"return-{id:N}"
+                });
+                returned.IsSuccess.Should().BeTrue(returned.Message);
+                samples.Add(timer.Elapsed.TotalMilliseconds);
+            }
+            await using var db = CreateDbContext();
+            var balance = await db.Set<StockBalance>().SingleAsync(x => x.ProductId == scope.Product.Id);
+            balance.OnHandQuantity.Should().Be(5);
+            balance.AvailableQuantity.Should().Be(5);
+            balance.ReservedQuantity.Should().Be(0);
+            var ledger = db.Set<InventoryMovement>().Where(x => x.StockBalanceId == balance.Id);
+            (await ledger.CountAsync(x => x.MovementType == InventoryMovementType.Shipment)).Should().Be(cycles);
+            (await ledger.CountAsync(x => x.MovementType == InventoryMovementType.Return)).Should().Be(cycles);
+            return samples;
+        }));
+        var ordered = timings.SelectMany(x => x).Order().ToArray();
+        TestContext.WriteLine($"Inventory cycles: n={ordered.Length}, p50={ordered[(ordered.Length - 1) / 2]:F0} ms, p95={ordered[(int)Math.Ceiling(ordered.Length * .95) - 1]:F0} ms");
+    }
+
     private async Task<InventoryScope> SeedInventoryScope()
     {
         await using var db = CreateDbContext();
