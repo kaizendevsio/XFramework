@@ -21,11 +21,12 @@ using XFramework.Portal.Shared;
 
 namespace Portal.E2ETests;
 
-[TestFixture, Category("Area:PortalContract"), Category("Module:POS")]
+[TestFixture, Category("Module:POS")]
 public sealed class PosSaleDetailLoadingTests
 {
     [TestCase(false)]
     [TestCase(true)]
+    [Category("Area:PortalContract")]
     public async Task ContextChanged_DelayedResponse_RendersWithoutAnotherUserEvent(bool fail)
     {
         await using var fixture = new Fixture();
@@ -38,7 +39,7 @@ public sealed class PosSaleDetailLoadingTests
         if (!fail) html.Should().Contain(fixture.Sale.SaleNumber);
     }
 
-    [Test]
+    [Test, Category("Area:PortalContract")]
     public async Task ContextChanged_TenantCleared_DiscardsLateSale()
     {
         await using var fixture = new Fixture();
@@ -51,7 +52,7 @@ public sealed class PosSaleDetailLoadingTests
         fixture.POS.Verify(x => x.GetPosCheckoutSettings(It.IsAny<GetPosCheckoutSettingsRequest>(), It.IsAny<CancellationToken>()), Times.Never());
     }
 
-    [Test]
+    [Test, Category("Area:PortalContract")]
     public async Task ModuleChanged_Disabled_ClearsPreviouslyRenderedSale()
     {
         await using var fixture = new Fixture();
@@ -103,6 +104,7 @@ public sealed class PosSaleDetailLoadingTests
     [TestCase(PosSaleStatus.InventoryFulfillmentFailed, true)]
     [TestCase(PosSaleStatus.Completed, false)]
     [TestCase(PosSaleStatus.PaymentPending, false)]
+    [Category("Area:PortalContract")]
     public async Task RetryFulfillment_OfferedOnlyOnPaidUnfulfilledReceipt(PosSaleStatus status, bool offered)
     {
         await using var fixture = new Fixture();
